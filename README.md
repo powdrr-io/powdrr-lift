@@ -76,7 +76,8 @@ report_yaml = validate_change_log_yaml(proposed_yaml, branch_name="feature/my-br
 
 Installable skills live under `skills/`. The repo currently ships a
 `prepare-pr-changelog` skill that drives the PR changelog workflow with the
-`powdrr-lift` CLI.
+`powdrr-lift` CLI, plus a `review-pr-changelog` skill that checks PRs for a
+changelog and reviews each changelog change against the PR intent.
 
 ## MCP
 

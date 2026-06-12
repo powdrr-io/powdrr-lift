@@ -1,6 +1,7 @@
 # powdrr-lift
 
-`powdrr-lift` parses structured changelog YAML into typed Python objects.
+`powdrr-lift` parses structured changelog YAML into typed Python objects and
+exposes the same core logic through a CLI and an MCP server.
 
 ## Layout
 
@@ -21,6 +22,20 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src tests
+```
+
+## CLI
+
+Create a template for the current branch:
+
+```bash
+changelog init
+```
+
+Validate a proposed ChangeLog against the current branch:
+
+```bash
+changelog evaluate-pr-against-changelog --input proposed-change-log.yaml
 ```
 
 ## Example
@@ -48,4 +63,12 @@ Validate a proposed ChangeLog YAML file against a branch diff:
 from powdrr_lift import validate_change_log_yaml
 
 report_yaml = validate_change_log_yaml(proposed_yaml, branch_name="feature/my-branch")
+```
+
+## MCP
+
+Run the MCP server locally:
+
+```bash
+powdrr-lift-mcp
 ```

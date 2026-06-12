@@ -18,7 +18,6 @@ dev = [
 ]
 
 [project.scripts]
-changelog = "powdrr_lift.cli:main"
 powdrr-lift = "powdrr_lift.cli:main"
 powdrr-lift-mcp = "powdrr_lift.mcp_server:main"
 

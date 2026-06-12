@@ -14,7 +14,7 @@ from powdrr_lift.core import (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="changelog")
+    parser = argparse.ArgumentParser(prog="powdrr-lift")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser(

@@ -29,13 +29,13 @@ uv run mypy src tests
 Create a template for the current branch:
 
 ```bash
-changelog init
+powdrr-lift init
 ```
 
 Validate a proposed ChangeLog against the current branch:
 
 ```bash
-changelog evaluate-pr-against-changelog --input proposed-change-log.yaml
+powdrr-lift evaluate-pr-against-changelog --input proposed-change-log.yaml
 ```
 
 ## Example

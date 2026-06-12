@@ -40,6 +40,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     template_text = output_path.read_text(encoding="utf-8")
     assert "branch `feature/change-log`" in template_text
     assert "Compared against default branch `main`." in template_text
+    assert "Delete these instructional comments" in template_text
     assert "change_id: null" in template_text
     assert "decisions:" in template_text
     assert "A src/app.py" in template_text

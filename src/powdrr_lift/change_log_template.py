@@ -125,6 +125,8 @@ def _render_header(
         f"# Compared against default branch `{default_branch_name}`.\n"
         "#\n"
         "# Instructions for the coding agent:\n"
+        "# - Delete these instructional comments before including this file in the\n"
+        "#   PR.\n"
         "# - Keep this file valid YAML.\n"
         "# - Replace each `null` with concrete values when they are known.\n"
         "# - Leave a list empty only when the section truly does not apply.\n"

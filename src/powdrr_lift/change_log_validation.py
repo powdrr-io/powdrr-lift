@@ -65,6 +65,19 @@ def build_validation_report(
     issues: list[ValidationIssue] = []
     proposed_change_files: list[str] = []
 
+    instruction_comment_issue = _find_instruction_comment_issue(
+        proposed_change_log_yaml
+    )
+    if instruction_comment_issue is not None:
+        return ValidationReport(
+            validation_successful=False,
+            branch_name=branch_name,
+            default_branch_name=default_branch_name,
+            expected_change_files=expected_change_files,
+            proposed_change_files=proposed_change_files,
+            issues=[instruction_comment_issue],
+        )
+
     try:
         change_log = parse_change_log(proposed_change_log_yaml)
     except Exception as exc:  # noqa: BLE001
@@ -206,3 +219,22 @@ def _parse_sequence(raw_data: object | None) -> Sequence[object]:
         raise ValueError("Expected a sequence in the validation report structure.")
 
     return raw_data
+
+
+def _find_instruction_comment_issue(
+    proposed_change_log_yaml: str,
+) -> ValidationIssue | None:
+    if not any(
+        line.lstrip().startswith("#")
+        for line in proposed_change_log_yaml.splitlines()
+        if line.strip()
+    ):
+        return None
+
+    return ValidationIssue(
+        code="instructions_not_removed",
+        message=(
+            "Remove instructional comments from the changelog before including it "
+            "in the PR."
+        ),
+    )

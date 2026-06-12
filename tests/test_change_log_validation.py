@@ -118,6 +118,40 @@ def test_validate_change_log_yaml_reports_invalid_yaml(tmp_path: Path) -> None:
     assert report.issues[0].code == "invalid_yaml"
 
 
+def test_validate_change_log_yaml_rejects_remaining_comments(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            """
+            # Remove this comment before submitting.
+            version: 1
+            change_id: 7
+            title: Add application files
+
+            changes:
+              - file: src/app.py
+                span:
+                  start_line: 1
+                  end_line: 1
+                summary: Add app code
+              - file: tests/test_app.py
+                span:
+                  start_line: 1
+                  end_line: 2
+                summary: Add app test
+            """,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert report.issues[0].code == "instructions_not_removed"
+
+
 def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

@@ -8,6 +8,7 @@ from powdrr_lift.change_log_parser import (
     Span,
     parse_change_log,
 )
+from powdrr_lift.change_log_template import create_change_log_template
 
 __all__ = [
     "Change",
@@ -17,5 +18,6 @@ __all__ = [
     "Intent",
     "RelationshipChange",
     "Span",
+    "create_change_log_template",
     "parse_change_log",
 ]

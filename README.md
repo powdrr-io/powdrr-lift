@@ -79,3 +79,9 @@ Run the MCP server locally:
 ```bash
 powdrr-lift-mcp
 ```
+
+## Skills
+
+Installable skills live under `skills/`. The repo currently ships a
+`prepare-pr-changelog` skill that drives the PR changelog workflow with the
+`powdrr-lift` CLI.

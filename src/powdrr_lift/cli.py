@@ -105,9 +105,7 @@ def _run_init(args: argparse.Namespace) -> int:
     )
     print(output_path)
     if args.pr_number is not None:
-        print(
-            "Next: fill out the template according to the instructions in the file."
-        )
+        print("Next: fill out the template according to the instructions in the file.")
         print(
             "Then validate it with: "
             f"powdrr-lift evaluate-pr-against-changelog --pr-number {args.pr_number}"

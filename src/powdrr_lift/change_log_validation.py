@@ -90,7 +90,9 @@ def build_validation_report(
     ]
 
     missing_change_files = [
-        file_path for file_path in expected_change_files if file_path not in proposed_change_files
+        file_path
+        for file_path in expected_change_files
+        if file_path not in proposed_change_files
     ]
     for file_path in missing_change_files:
         issues.append(
@@ -102,15 +104,16 @@ def build_validation_report(
         )
 
     unexpected_change_files = [
-        file_path for file_path in proposed_change_files if file_path not in expected_change_files
+        file_path
+        for file_path in proposed_change_files
+        if file_path not in expected_change_files
     ]
     for file_path in unexpected_change_files:
         issues.append(
             ValidationIssue(
                 code="unexpected_change",
                 message=(
-                    f"Change entry for {file_path} does not appear in the branch "
-                    "diff"
+                    f"Change entry for {file_path} does not appear in the branch diff"
                 ),
                 path=file_path,
             )
@@ -144,10 +147,12 @@ def parse_validation_report(yaml_content: str) -> ValidationReport:
         branch_name=str(data.get("branch_name", "")),
         default_branch_name=str(data.get("default_branch_name", "")),
         expected_change_files=[
-            str(change_file) for change_file in _parse_sequence(data.get("expected_change_files"))
+            str(change_file)
+            for change_file in _parse_sequence(data.get("expected_change_files"))
         ],
         proposed_change_files=[
-            str(change_file) for change_file in _parse_sequence(data.get("proposed_change_files"))
+            str(change_file)
+            for change_file in _parse_sequence(data.get("proposed_change_files"))
         ],
         issues=[
             _parse_validation_issue(issue_data)

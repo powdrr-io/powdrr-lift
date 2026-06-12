@@ -33,7 +33,6 @@ class Span:
 
 @dataclass(frozen=True, slots=True)
 class Change:
-    id: str | None = None
     file: str | None = None
     span: Span = field(default_factory=Span)
     summary: str | None = None
@@ -56,7 +55,7 @@ class ChangeLog:
     change_id: str | None = None
     title: str | None = None
     intent: Intent = field(default_factory=Intent)
-    decision: Decision = field(default_factory=Decision)
+    decisions: list[Decision] = field(default_factory=list)
     entities: list[Entity] = field(default_factory=list)
     changes: list[Change] = field(default_factory=list)
     relationship_changes: list[RelationshipChange] = field(default_factory=list)
@@ -76,7 +75,7 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
         change_id=data.get("change_id", data.get("pr_id")),
         title=data.get("title"),
         intent=_parse_intent(data.get("intent")),
-        decision=_parse_decision(data.get("decision")),
+        decisions=_parse_decisions(data),
         entities=[
             _parse_entity(entity_data)
             for entity_data in _parse_sequence(data.get("entities"))
@@ -104,6 +103,18 @@ def _parse_decision(raw_decision: object | None) -> Decision:
     return Decision(id=data.get("id"), summary=data.get("summary"))
 
 
+def _parse_decisions(data: Mapping[str, Any]) -> list[Decision]:
+    decisions = [
+        _parse_decision(decision_data)
+        for decision_data in _parse_sequence(data.get("decisions"))
+    ]
+
+    if not decisions and data.get("decision") is not None:
+        decisions.append(_parse_decision(data.get("decision")))
+
+    return decisions
+
+
 def _parse_entity(raw_entity: object) -> Entity:
     data = _parse_mapping(raw_entity)
     return Entity(id=data.get("id"), type=data.get("type"))
@@ -112,7 +123,6 @@ def _parse_entity(raw_entity: object) -> Entity:
 def _parse_change(raw_change: object) -> Change:
     data = _parse_mapping(raw_change)
     return Change(
-        id=data.get("id"),
         file=data.get("file"),
         span=_parse_span(data.get("span")),
         summary=data.get("summary"),

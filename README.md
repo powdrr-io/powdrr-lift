@@ -31,3 +31,11 @@ from powdrr_lift import parse_change_log
 change_log = parse_change_log(your_yaml_text)
 print(change_log.title)
 ```
+
+## ChangeLog template
+
+Generate a parser-safe template from a branch diff:
+
+```bash
+uv run python -m powdrr_lift.change_log_template feature/my-branch
+```

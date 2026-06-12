@@ -12,17 +12,16 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
           problem: Access tokens expire too frequently
           goal: Maintain authenticated sessions
 
-        decision:
-          id: ADR-042
-          summary: Store refresh tokens in Redis
+        decisions:
+          - id: ADR-042
+            summary: Store refresh tokens in Redis
 
         entities:
           - id: AuthService
             type: Component
 
         changes:
-          - id: C1
-            file: src/auth/token_service.py
+          - file: src/auth/token_service.py
             span:
               start_line: 42
               end_line: 78
@@ -45,7 +44,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
     assert change_log.change_id == "CHG-2026-001"
     assert change_log.title == "Introduce JWT refresh token flow"
     assert change_log.intent.problem == "Access tokens expire too frequently"
-    assert change_log.decision.id == "ADR-042"
+    assert change_log.decisions[0].id == "ADR-042"
     assert change_log.entities[0].id == "AuthService"
     assert change_log.changes[0].span.start_line == 42
     assert change_log.changes[0].affects == ["AuthService", "UserSession"]

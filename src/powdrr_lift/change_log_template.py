@@ -35,6 +35,7 @@ def create_change_log_template(
         default_branch_name=default_branch_name,
         diff_entries=diff_entries,
     )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(template, encoding="utf-8")
     return output_path
 

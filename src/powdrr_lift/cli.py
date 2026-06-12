@@ -32,6 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the template to this path instead of the default file.",
     )
     init_parser.add_argument(
+        "--pr-number",
+        type=int,
+        help=(
+            "Write the template to docs/changelogs/PR-<num>-changelog.yaml and "
+            "print the next workflow step."
+        ),
+    )
+    init_parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root to use when running git commands.",
@@ -58,6 +66,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Read the proposed ChangeLog YAML from this file instead of stdin.",
     )
     evaluate_parser.add_argument(
+        "--pr-number",
+        type=int,
+        help=(
+            "Read docs/changelogs/PR-<num>-changelog.yaml and print the final "
+            "workflow step."
+        ),
+    )
+    evaluate_parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root to use when running git commands.",
@@ -80,20 +96,34 @@ def main(argv: list[str] | None = None) -> int:
 def _run_init(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     branch_name = args.branch_name or _current_branch(repo_root)
+    output_path = _resolve_template_output_path(repo_root, args.output, args.pr_number)
     output_path = create_change_log_template(
         branch_name=branch_name,
-        output_path=args.output,
+        output_path=output_path,
         repo_root=repo_root,
         default_branch=args.default_branch,
     )
     print(output_path)
+    if args.pr_number is not None:
+        print(
+            "Next: fill out the template according to the instructions in the file."
+        )
+        print(
+            "Then validate it with: "
+            f"powdrr-lift evaluate-pr-against-changelog --pr-number {args.pr_number}"
+        )
+        print(
+            "When it passes, include it in the PR as "
+            f"docs/changelogs/PR-{args.pr_number}-changelog.yaml"
+        )
     return 0
 
 
 def _run_evaluate(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     branch_name = args.branch_name or _current_branch(repo_root)
-    proposed_yaml = _read_input(args.input)
+    input_path = _resolve_template_input_path(repo_root, args.input, args.pr_number)
+    proposed_yaml = _read_input(input_path)
     report_yaml = validate_change_log_yaml(
         proposed_yaml,
         branch_name=branch_name,
@@ -104,6 +134,19 @@ def _run_evaluate(args: argparse.Namespace) -> int:
     sys.stdout.write(report_yaml)
     if not report_yaml.endswith("\n"):
         sys.stdout.write("\n")
+    if args.pr_number is not None:
+        if report.validation_successful:
+            print(
+                "Next: include docs/changelogs/PR-"
+                f"{args.pr_number}-changelog.yaml in the PR.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "Next: fix docs/changelogs/PR-"
+                f"{args.pr_number}-changelog.yaml and rerun the validate command.",
+                file=sys.stderr,
+            )
     return 0 if report.validation_successful else 1
 
 
@@ -133,6 +176,34 @@ def _read_input(input_path: Path | None) -> str:
         return sys.stdin.read()
 
     return input_path.read_text(encoding="utf-8")
+
+
+def _resolve_template_output_path(
+    repo_root: Path,
+    explicit_output_path: Path | None,
+    pr_number: int | None,
+) -> Path | None:
+    if explicit_output_path is not None:
+        return explicit_output_path
+
+    if pr_number is None:
+        return None
+
+    return repo_root / "docs" / "changelogs" / f"PR-{pr_number}-changelog.yaml"
+
+
+def _resolve_template_input_path(
+    repo_root: Path,
+    explicit_input_path: Path | None,
+    pr_number: int | None,
+) -> Path | None:
+    if explicit_input_path is not None:
+        return explicit_input_path
+
+    if pr_number is None:
+        return None
+
+    return repo_root / "docs" / "changelogs" / f"PR-{pr_number}-changelog.yaml"
 
 
 if __name__ == "__main__":

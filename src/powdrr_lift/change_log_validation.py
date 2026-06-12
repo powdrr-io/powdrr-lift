@@ -60,7 +60,11 @@ def build_validation_report(
         default_branch_name,
         branch_name,
     )
-    expected_change_files = [entry.path for entry in diff_entries]
+    expected_change_files = [
+        entry.path
+        for entry in diff_entries
+        if not _is_changelog_artifact_path(entry.path)
+    ]
 
     issues: list[ValidationIssue] = []
     proposed_change_files: list[str] = []
@@ -238,3 +242,7 @@ def _find_instruction_comment_issue(
             "in the PR."
         ),
     )
+
+
+def _is_changelog_artifact_path(path: str) -> bool:
+    return path.startswith("docs/changelogs/PR-") and path.endswith("-changelog.yaml")

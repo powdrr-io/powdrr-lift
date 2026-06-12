@@ -152,6 +152,47 @@ def test_validate_change_log_yaml_rejects_remaining_comments(
     assert report.issues[0].code == "instructions_not_removed"
 
 
+def test_validate_change_log_yaml_ignores_pr_changelog_artifact(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    changelog_path = repo_root / "docs" / "changelogs" / "PR-7-changelog.yaml"
+    changelog_path.parent.mkdir(parents=True, exist_ok=True)
+    changelog_path.write_text(
+        "version: 1\nchange_id: 7\ntitle: Add application files\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/changelogs/PR-7-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Add PR changelog artifact")
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            """
+            version: 1
+            change_id: 7
+            title: Add application files
+
+            changes:
+              - file: src/app.py
+                span:
+                  start_line: 1
+                  end_line: 1
+                summary: Add app code
+              - file: tests/test_app.py
+                span:
+                  start_line: 1
+                  end_line: 2
+                summary: Add app test
+            """,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.expected_change_files == ["src/app.py", "tests/test_app.py"]
+
+
 def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

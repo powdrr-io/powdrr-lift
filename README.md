@@ -39,3 +39,13 @@ Generate a parser-safe template from a branch diff:
 ```bash
 uv run python -m powdrr_lift.change_log_template feature/my-branch
 ```
+
+## Validation
+
+Validate a proposed ChangeLog YAML file against a branch diff:
+
+```python
+from powdrr_lift import validate_change_log_yaml
+
+report_yaml = validate_change_log_yaml(proposed_yaml, branch_name="feature/my-branch")
+```

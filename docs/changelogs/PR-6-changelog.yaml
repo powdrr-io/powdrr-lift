@@ -1,0 +1,33 @@
+version: 1
+change_id: 6
+title: Add review PR changelog skill
+intent:
+  problem: "PR review workflows lacked a reusable installable skill that enforced the changelog-first review process."
+  goal: "Package the PR changelog review workflow as a Codex skill that checks for a changelog, validates it, and reviews each change against PR intent."
+decisions:
+  - id: SKILL-002
+    summary: "Ship the PR changelog review workflow as an installable skill under skills/."
+entities: []
+changes:
+  - file: README.md
+    span:
+      start_line: 79
+      end_line: 80
+    summary: "Document the new review skill alongside the existing changelog prep skill."
+    affects: []
+    rationale: "Help users discover that PR changelog review is available as an installable skill."
+  - file: skills/review-pr-changelog/SKILL.md
+    span:
+      start_line: 1
+      end_line: 34
+    summary: "Define the review workflow for changelog-first PR reviews."
+    affects: []
+    rationale: "Encode the required review sequence: check for a changelog, validate it, then review each change against the PR intent."
+  - file: skills/review-pr-changelog/agents/openai.yaml
+    span:
+      start_line: 1
+      end_line: 4
+    summary: "Add installable skill metadata for the review workflow."
+    affects: []
+    rationale: "Make the skill discoverable in Codex with the right UI name, description, and default prompt."
+relationship_changes: []

@@ -72,6 +72,12 @@ from powdrr_lift import validate_change_log_yaml
 report_yaml = validate_change_log_yaml(proposed_yaml, branch_name="feature/my-branch")
 ```
 
+## Skills
+
+Installable skills live under `skills/`. The repo currently ships a
+`prepare-pr-changelog` skill that drives the PR changelog workflow with the
+`powdrr-lift` CLI.
+
 ## MCP
 
 Run the MCP server locally:

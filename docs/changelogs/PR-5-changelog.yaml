@@ -1,0 +1,85 @@
+# ChangeLog template generated from branch `codex/prepare-pr-changelog-skill`.
+# Compared against default branch `main`.
+#
+# Instructions for the coding agent:
+# - Keep this file valid YAML.
+# - Replace each `null` with concrete values when they are known.
+# - Leave a list empty only when the section truly does not apply.
+# - Use the prefilled `changes` entries as the starting point for the files
+#   that differ from the default branch.
+# - Add or remove `changes` items as needed so every meaningful change is
+#   represented exactly once.
+# - Keep `version: 1` unless the schema changes.
+#
+# Diff summary:
+#   M README.md
+#   A skills/prepare-pr-changelog/SKILL.md
+#   A skills/prepare-pr-changelog/agents/openai.yaml
+version: 1
+# Use the PR number here.
+change_id: 5
+# Brief title for the pull request.
+title: Add installable PR changelog skill
+intent:
+  # Describe the underlying problem.
+  problem: There was no installable skill that guided agents through the PR changelog workflow.
+  # Describe the intended outcome.
+  goal: Package the PR changelog workflow as a reusable Codex skill backed by the powdrr-lift CLI.
+# List each decision or ADR used by this change.
+decisions:
+  -
+    # Decision identifier, such as an ADR number.
+    id: SKILL-001
+    # Short summary of the decision.
+    summary: Ship the PR changelog workflow as an installable skill under skills/.
+# List the repository entities affected by this change.
+entities: []
+# Each change entry should map one changed file.
+changes:
+  -
+    # File changed on branch; keep this path aligned with
+    # the diff.
+    file: README.md
+    span:
+      # First changed line in this file.
+      start_line: 52
+      # Last changed line in this file.
+      end_line: 57
+    # Short description of the file-level change.
+    summary: Document the skill installation and PR changelog workflow.
+    # List of entity ids affected by this change.
+    affects: []
+    # Why the change was made.
+    rationale: Help agents discover the installable skill and understand the workflow.
+  -
+    # File changed on branch; keep this path aligned with
+    # the diff.
+    file: skills/prepare-pr-changelog/SKILL.md
+    span:
+      # First changed line in this file.
+      start_line: 1
+      # Last changed line in this file.
+      end_line: 33
+    # Short description of the file-level change.
+    summary: Define the skill workflow that drives PR changelog preparation.
+    # List of entity ids affected by this change.
+    affects: []
+    # Why the change was made.
+    rationale: Teach the agent to run the CLI steps in the right order.
+  -
+    # File changed on branch; keep this path aligned with
+    # the diff.
+    file: skills/prepare-pr-changelog/agents/openai.yaml
+    span:
+      # First changed line in this file.
+      start_line: 1
+      # Last changed line in this file.
+      end_line: 4
+    # Short description of the file-level change.
+    summary: Add skill metadata for installable discovery.
+    # List of entity ids affected by this change.
+    affects: []
+    # Why the change was made.
+    rationale: Make the skill installable with a UI-friendly name and prompt.
+# Relationship changes are optional and can remain empty.
+relationship_changes: []

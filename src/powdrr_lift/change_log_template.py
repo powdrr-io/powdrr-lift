@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-
-import yaml
 
 
 @dataclass(frozen=True, slots=True)
 class BranchDiffEntry:
     status: str
     path: str
+    start_line: int
+    end_line: int
 
 
 def create_change_log_template(
@@ -44,28 +45,68 @@ def render_change_log_template(
     diff_entries: Sequence[BranchDiffEntry],
 ) -> str:
     header = _render_header(branch_name, default_branch_name, diff_entries)
-    template_data: dict[str, object] = {
-        "version": 1,
-        "change_id": None,
-        "title": None,
-        "intent": {"problem": None, "goal": None},
-        "decision": {"id": None, "summary": None},
-        "entities": [],
-        "changes": [
-            {
-                "id": None,
-                "file": diff_entry.path,
-                "span": {"start_line": None, "end_line": None},
-                "summary": None,
-                "affects": [],
-                "rationale": None,
-            }
-            for diff_entry in diff_entries
-        ],
-        "relationship_changes": [],
-    }
-    body = yaml.safe_dump(template_data, sort_keys=False, default_flow_style=False)
+    body = _render_template_body(diff_entries)
     return f"{header}\n{body}"
+
+
+def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
+    lines = [
+        "version: 1",
+        "# Use the PR number here.",
+        "change_id: null",
+        "# Brief title for the pull request.",
+        "title: null",
+        "intent:",
+        "  # Describe the underlying problem.",
+        "  problem: null",
+        "  # Describe the intended outcome.",
+        "  goal: null",
+        "# List each decision or ADR used by this change.",
+        "decisions:",
+        "  -",
+        "    # Decision identifier, such as an ADR number.",
+        "    id: null",
+        "    # Short summary of the decision.",
+        "    summary: null",
+        "# List the repository entities affected by this change.",
+        "entities: []",
+        "# Each change entry should map one changed file.",
+    ]
+
+    if diff_entries:
+        lines.append("changes:")
+        for diff_entry in diff_entries:
+            lines.extend(
+                [
+                    "  -",
+                    "    # File changed on branch; keep this path aligned with",
+                    "    # the diff.",
+                    f"    file: {diff_entry.path}",
+                    "    span:",
+                    "      # First changed line in this file.",
+                    f"      start_line: {diff_entry.start_line}",
+                    "      # Last changed line in this file.",
+                    f"      end_line: {diff_entry.end_line}",
+                    "    # Short description of the file-level change.",
+                    "    summary: null",
+                    "    # List of entity ids affected by this change.",
+                    "    affects: []",
+                    "    # Why the change was made.",
+                    "    rationale: null",
+                ]
+            )
+    else:
+        lines.append("changes: []")
+
+    lines.extend(
+        [
+            "# Relationship changes are optional and can remain empty.",
+            "relationship_changes: []",
+            "",
+        ]
+    )
+
+    return "\n".join(lines)
 
 
 def _render_header(
@@ -119,9 +160,66 @@ def _collect_branch_diff_entries(
         if status.startswith(("R", "C")) and len(parts) >= 3:
             path = parts[2]
 
-        entries.append(BranchDiffEntry(status=status, path=path))
+        start_line, end_line = _collect_file_span(
+            repo_root,
+            default_branch_name,
+            branch_name,
+            path,
+        )
+        entries.append(
+            BranchDiffEntry(
+                status=status,
+                path=path,
+                start_line=start_line,
+                end_line=end_line,
+            )
+        )
 
     return entries
+
+
+def _collect_file_span(
+    repo_root: Path,
+    default_branch_name: str,
+    branch_name: str,
+    path: str,
+) -> tuple[int, int]:
+    diff_output = _git_output(
+        repo_root,
+        "diff",
+        "--unified=0",
+        "--no-color",
+        f"{default_branch_name}...{branch_name}",
+        "--",
+        path,
+    )
+    span_ranges: list[tuple[int, int]] = []
+    hunk_header_pattern = re.compile(
+        r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
+        r"\+(?P<new_start>\d+)(?:,(?P<new_count>\d+))? @@"
+    )
+
+    for line in diff_output.splitlines():
+        match = hunk_header_pattern.match(line)
+        if not match:
+            continue
+
+        old_start = int(match.group("old_start"))
+        old_count = int(match.group("old_count") or "1")
+        new_start = int(match.group("new_start"))
+        new_count = int(match.group("new_count") or "1")
+
+        if new_count > 0:
+            span_ranges.append((new_start, new_start + new_count - 1))
+        elif old_count > 0:
+            span_ranges.append((old_start, old_start + old_count - 1))
+
+    if not span_ranges:
+        return 1, 1
+
+    start_line = min(span[0] for span in span_ranges)
+    end_line = max(span[1] for span in span_ranges)
+    return start_line, end_line
 
 
 def _resolve_repo_root(repo_root: str | Path | None) -> Path:

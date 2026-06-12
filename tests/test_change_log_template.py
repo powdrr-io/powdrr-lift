@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from powdrr_lift import create_change_log_template, parse_change_log
+from powdrr_lift import Decision, create_change_log_template, parse_change_log
 
 
 def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
@@ -40,6 +40,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     template_text = output_path.read_text(encoding="utf-8")
     assert "branch `feature/change-log`" in template_text
     assert "Compared against default branch `main`." in template_text
+    assert "change_id: null" in template_text
+    assert "decisions:" in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 
@@ -48,6 +50,9 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
         "src/app.py",
         "tests/test_app.py",
     ]
+    assert [change.span.start_line for change in change_log.changes] == [1, 1]
+    assert [change.span.end_line for change in change_log.changes] == [1, 2]
+    assert change_log.decisions == [Decision()]
 
 
 def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:
@@ -72,6 +77,7 @@ def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
     assert change_log.changes == []
+    assert change_log.decisions == [Decision()]
 
 
 def _git(repo_root: Path, *args: str) -> None:

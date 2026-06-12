@@ -1,3 +1,5 @@
+from typing import Any
+
 from powdrr_lift.change_log_parser import (
     Change,
     ChangeLog,
@@ -8,7 +10,6 @@ from powdrr_lift.change_log_parser import (
     Span,
     parse_change_log,
 )
-from powdrr_lift.change_log_template import create_change_log_template
 
 __all__ = [
     "Change",
@@ -21,3 +22,12 @@ __all__ = [
     "create_change_log_template",
     "parse_change_log",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "create_change_log_template":
+        from powdrr_lift.change_log_template import create_change_log_template
+
+        return create_change_log_template
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

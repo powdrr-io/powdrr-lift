@@ -1,3 +1,9 @@
+from powdrr_lift.core.index import (
+    ChangelogDocument,
+    ProvenanceRecord,
+    SourceIndex,
+    build_changelog_index,
+)
 from powdrr_lift.core.pr_analysis import (
     BranchDiffEntry,
     collect_branch_diff_entries,
@@ -28,16 +34,20 @@ from powdrr_lift.core.validate import (
 
 __all__ = [
     "BranchDiffEntry",
+    "ChangelogDocument",
     "Change",
     "ChangeLog",
     "Decision",
     "Entity",
     "Intent",
+    "ProvenanceRecord",
     "RelationshipChange",
     "Span",
+    "SourceIndex",
     "ValidationIssue",
     "ValidationReport",
     "build_validation_report",
+    "build_changelog_index",
     "collect_branch_diff_entries",
     "create_change_log_template",
     "parse_change_log",

@@ -17,9 +17,12 @@ __all__ = [
     "Decision",
     "Entity",
     "Intent",
+    "ChangelogDocument",
+    "ProvenanceRecord",
     "RelationshipChange",
     "Span",
     "create_change_log_template",
+    "build_changelog_index",
     "parse_change_log",
     "build_validation_report",
     "parse_validation_report",
@@ -34,6 +37,28 @@ def __getattr__(name: str) -> Any:
         from powdrr_lift.change_log_template import create_change_log_template
 
         return create_change_log_template
+
+    if name == "build_changelog_index":
+        from powdrr_lift.core.index import build_changelog_index
+
+        return build_changelog_index
+
+    if name in {
+        "ChangelogDocument",
+        "ProvenanceRecord",
+        "SourceIndex",
+    }:
+        from powdrr_lift.core.index import (
+            ChangelogDocument,
+            ProvenanceRecord,
+            SourceIndex,
+        )
+
+        return {
+            "ChangelogDocument": ChangelogDocument,
+            "ProvenanceRecord": ProvenanceRecord,
+            "SourceIndex": SourceIndex,
+        }[name]
 
     if name in {
         "build_validation_report",

@@ -15,6 +15,7 @@ htmlcov/
 dist/
 build/
 .ipynb_checkpoints/
+.worktrees/
 .aider.*
 .aider/
 uv.lock

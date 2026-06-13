@@ -8,12 +8,16 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_lift.change_log_parser import Change, parse_change_log
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
     _collect_branch_diff_entries,
     _resolve_default_branch,
     _resolve_repo_root,
+)
+from powdrr_lift.core.index import (
+    _normalize_entity_id,
+    build_changelog_index_at_ref,
 )
 
 
@@ -95,6 +99,11 @@ def build_validation_report(
         for change in change_log.changes
         if change.file is not None and change.file != ""
     ]
+    proposed_entities_by_id = {
+        entity_id: entity
+        for entity in change_log.entities
+        if (entity_id := _normalize_entity_id(entity.id)) is not None
+    }
     expected_change_entries_by_file: dict[str, list[BranchDiffEntry]] = {}
     for entry in diff_entries:
         if _is_changelog_artifact_path(entry.path):
@@ -102,12 +111,62 @@ def build_validation_report(
 
         expected_change_entries_by_file.setdefault(entry.path, []).append(entry)
 
-    proposed_change_entries_by_file: dict[str, list] = {}
+    proposed_change_entries_by_file: dict[str, list[Change]] = {}
     for change in change_log.changes:
         if change.file is None or change.file == "":
             continue
 
         proposed_change_entries_by_file.setdefault(change.file, []).append(change)
+
+    known_entity_ids = set(
+        build_changelog_index_at_ref(
+            repo_root=repo_root_path,
+            ref=default_branch_name,
+        ).entity_graph.entities
+    )
+    proposed_entity_ids = set(proposed_entities_by_id)
+
+    for entity_id, entity in proposed_entities_by_id.items():
+        if entity_id not in known_entity_ids and entity.action != "added":
+            issues.append(
+                ValidationIssue(
+                    code="entity_not_marked_added",
+                    message=(
+                        f"Entity {entity_id} is new to the graph and must be "
+                        "marked added."
+                    ),
+                    path=None,
+                )
+            )
+
+    for relationship_change in change_log.relationship_changes:
+        source = _normalize_entity_id(relationship_change.source)
+        target = _normalize_entity_id(relationship_change.target)
+        if source is None or target is None:
+            issues.append(
+                ValidationIssue(
+                    code="relationship_unknown_entity",
+                    message=(
+                        "Relationship references must name both source and target "
+                        "entities."
+                    ),
+                )
+            )
+            continue
+
+        missing_entities = [
+            name for name in (source, target) if name not in proposed_entity_ids
+        ]
+        for entity_id in missing_entities:
+            issues.append(
+                ValidationIssue(
+                    code="relationship_unknown_entity",
+                    message=(
+                        f"Relationship references entity {entity_id}, but that entity "
+                        "is not described in the file entities section."
+                    ),
+                )
+            )
 
     for file_path, expected_entries in expected_change_entries_by_file.items():
         proposed_entries = proposed_change_entries_by_file.get(file_path, [])

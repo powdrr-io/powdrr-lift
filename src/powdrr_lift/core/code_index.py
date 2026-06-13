@@ -9,11 +9,15 @@ from powdrr_lift.change_log_parser import ChangeLog, Intent, Span, parse_change_
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 from powdrr_lift.core.index import (
     ChangelogDocument,
+    EntityGraph,
+    EntityOccurrence,
     ProvenanceRecord,
+    RelationshipOccurrence,
     SourceIndex,
     _apply_file_patch,
     _backfill_line_state_from_blame,
     _build_commit_changes,
+    _build_entity_graph,
     _collect_file_patches,
     _CommitRecord,
     _git_output,
@@ -22,7 +26,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 4
+INDEX_CACHE_VERSION = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,6 +336,32 @@ class CodeIndexStore:
 
                 CREATE INDEX IF NOT EXISTS idx_provenance_lookup
                   ON provenance_record(branch_name, file_path, span_start, span_end);
+
+                CREATE TABLE IF NOT EXISTS entity_occurrence (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  entity_type TEXT,
+                  action TEXT,
+                  pr_number INTEGER,
+                  commit_sha TEXT,
+                  commit_timestamp INTEGER,
+                  changelog_path TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS relationship_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  source_entity_id TEXT NOT NULL,
+                  target_entity_id TEXT NOT NULL,
+                  relationship TEXT,
+                  action TEXT,
+                  rationale TEXT,
+                  pr_number INTEGER,
+                  commit_sha TEXT,
+                  commit_timestamp INTEGER,
+                  changelog_path TEXT NOT NULL
+                );
                 """
             )
             branch_state_info = connection.execute(
@@ -436,6 +466,27 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
+            entity_rows = connection.execute(
+                """
+                SELECT entity_id, entity_type, action, pr_number, commit_sha,
+                       commit_timestamp, changelog_path
+                FROM entity_occurrence
+                WHERE branch_name = ?
+                ORDER BY entity_id, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            relationship_rows = connection.execute(
+                """
+                SELECT source_entity_id, target_entity_id, relationship, action,
+                       rationale, pr_number, commit_sha, commit_timestamp,
+                       changelog_path
+                FROM relationship_record
+                WHERE branch_name = ?
+                ORDER BY id
+                """,
+                (branch_name,),
+            ).fetchall()
             provenance_rows = connection.execute(
                 """
                 SELECT id, kind, pr_number, commit_sha, commit_timestamp,
@@ -457,6 +508,35 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
+
+        entities_by_id: dict[str, list[EntityOccurrence]] = {}
+        for row in entity_rows:
+            entities_by_id.setdefault(row["entity_id"], []).append(
+                EntityOccurrence(
+                    entity_id=row["entity_id"],
+                    entity_type=row["entity_type"],
+                    action=row["action"],
+                    pr_number=row["pr_number"],
+                    commit_sha=row["commit_sha"],
+                    commit_timestamp=row["commit_timestamp"],
+                    changelog_path=row["changelog_path"],
+                )
+            )
+
+        relationship_records = [
+            RelationshipOccurrence(
+                source=row["source_entity_id"],
+                target=row["target_entity_id"],
+                relationship=row["relationship"],
+                action=row["action"],
+                rationale=row["rationale"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+            for row in relationship_rows
+        ]
 
         provenance_by_id = {
             row["id"]: _row_to_provenance_record(row) for row in provenance_rows
@@ -499,6 +579,13 @@ class CodeIndexStore:
             repo_root=self.repo_root,
             default_branch_name=branch_row["parent_branch"],
             documents=documents,
+            entity_graph=EntityGraph(
+                entities={
+                    entity_id: tuple(occurrences)
+                    for entity_id, occurrences in entities_by_id.items()
+                },
+                relationships=tuple(relationship_records),
+            ),
             changes=changes,
             file_lines={path: tuple(lines) for path, lines in file_lines.items()},
         )
@@ -528,6 +615,14 @@ class CodeIndexStore:
             )
             connection.execute(
                 "DELETE FROM file_line WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM entity_occurrence WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM relationship_record WHERE branch_name = ?",
                 (branch_name,),
             )
             connection.execute(
@@ -568,6 +663,50 @@ class CodeIndexStore:
                         document.changelog.change_id,
                         document.changelog.intent.problem,
                         document.changelog.intent.goal,
+                    ),
+                )
+
+            for entity_id, occurrences in index.entity_graph.entities.items():
+                for occurrence in occurrences:
+                    connection.execute(
+                        """
+                        INSERT INTO entity_occurrence (
+                          branch_name, entity_id, entity_type, action, pr_number,
+                          commit_sha, commit_timestamp, changelog_path
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            entity_id,
+                            occurrence.entity_type,
+                            occurrence.action,
+                            occurrence.pr_number,
+                            occurrence.commit_sha,
+                            occurrence.commit_timestamp,
+                            occurrence.changelog_path,
+                        ),
+                    )
+
+            for relationship in index.entity_graph.relationships:
+                connection.execute(
+                    """
+                    INSERT INTO relationship_record (
+                      branch_name, source_entity_id, target_entity_id, relationship,
+                      action, rationale, pr_number, commit_sha, commit_timestamp,
+                      changelog_path
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        branch_name,
+                        relationship.source,
+                        relationship.target,
+                        relationship.relationship,
+                        relationship.action,
+                        relationship.rationale,
+                        relationship.pr_number,
+                        relationship.commit_sha,
+                        relationship.commit_timestamp,
+                        relationship.changelog_path,
                     ),
                 )
 
@@ -696,6 +835,7 @@ def _build_branch_index(
         repo_root=repo_root,
         default_branch_name=parent_branch,
         documents=documents,
+        entity_graph=_build_entity_graph(documents),
         changes=changes,
         file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
     )
@@ -748,6 +888,7 @@ def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
         repo_root=repo_root,
         default_branch_name=ref,
         documents=documents,
+        entity_graph=_build_entity_graph(documents),
         changes=changes,
         file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
     )

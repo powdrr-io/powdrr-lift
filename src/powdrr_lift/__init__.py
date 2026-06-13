@@ -16,6 +16,8 @@ __all__ = [
     "ChangeLog",
     "Decision",
     "Entity",
+    "EntityGraph",
+    "EntityOccurrence",
     "Intent",
     "ChangelogDocument",
     "BranchState",
@@ -33,10 +35,12 @@ __all__ = [
     "lookup_edit_context",
     "ProvenanceRecord",
     "RelationshipChange",
+    "RelationshipOccurrence",
     "RepoTreeNode",
     "Span",
     "create_change_log_template",
     "build_changelog_index",
+    "build_changelog_index_at_ref",
     "build_blame_file_view",
     "build_blame_view_state",
     "build_repo_tree",
@@ -66,6 +70,11 @@ def __getattr__(name: str) -> Any:
         from powdrr_lift.core.index import build_changelog_index
 
         return build_changelog_index
+
+    if name == "build_changelog_index_at_ref":
+        from powdrr_lift.core.index import build_changelog_index_at_ref
+
+        return build_changelog_index_at_ref
 
     if name in {
         "BranchState",
@@ -136,19 +145,31 @@ def __getattr__(name: str) -> Any:
 
     if name in {
         "ChangelogDocument",
+        "EntityGraph",
+        "EntityOccurrence",
         "ProvenanceRecord",
+        "RelationshipOccurrence",
         "SourceIndex",
+        "build_changelog_index_at_ref",
     }:
         from powdrr_lift.core.index import (
             ChangelogDocument,
+            EntityGraph,
+            EntityOccurrence,
             ProvenanceRecord,
+            RelationshipOccurrence,
             SourceIndex,
+            build_changelog_index_at_ref,
         )
 
         return {
             "ChangelogDocument": ChangelogDocument,
+            "EntityGraph": EntityGraph,
+            "EntityOccurrence": EntityOccurrence,
             "ProvenanceRecord": ProvenanceRecord,
+            "RelationshipOccurrence": RelationshipOccurrence,
             "SourceIndex": SourceIndex,
+            "build_changelog_index_at_ref": build_changelog_index_at_ref,
         }[name]
 
     if name in {

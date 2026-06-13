@@ -19,6 +19,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
         entities:
           - id: AuthService
             type: Component
+            action: added
 
         changes:
           - file: src/auth/token_service.py
@@ -46,6 +47,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
     assert change_log.intent.problem == "Access tokens expire too frequently"
     assert change_log.decisions[0].id == "ADR-042"
     assert change_log.entities[0].id == "AuthService"
+    assert change_log.entities[0].action == "added"
     assert change_log.changes[0].span.start_line == 42
     assert change_log.changes[0].affects == ["AuthService", "UserSession"]
     assert change_log.relationship_changes[0].relationship == "stores_refresh_tokens"

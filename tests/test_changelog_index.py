@@ -187,6 +187,164 @@ def test_build_changelog_index_uses_commit_body_when_pr_is_missing(
     assert provenance.rationale == "Track intent in the commit comment."
 
 
+def test_build_changelog_index_normalizes_entities_and_relationships(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 1
+        title: Introduce Foo
+
+        intent:
+          problem: Foo does not exist.
+          goal: Add Foo to the graph.
+
+        entities:
+          - id: foo
+            type: Service
+            action: added
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Introduce Foo.
+            affects: [foo]
+            rationale: Foo is now part of the system.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Introduce Foo (#1)")
+
+    (repo_root / "src" / "app.py").write_text(
+        "print('hello again')\n", encoding="utf-8"
+    )
+    (repo_root / "docs" / "changelogs" / "PR-2-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 2
+        title: Connect Foo to Bar
+
+        intent:
+          problem: Foo needs to talk to Bar.
+          goal: Model the dependency between the shared entities.
+
+        entities:
+          - id: foo
+            type: Service
+          - id: bar
+            type: Cache
+            action: added
+
+        relationship_changes:
+          - action: add
+            source: foo
+            target: bar
+            relationship: reads_from
+            rationale: Foo depends on Bar.
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Wire Foo to Bar.
+            affects: [foo, bar]
+            rationale: Foo now uses Bar.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-2-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Connect Foo to Bar (#2)")
+
+    index = build_changelog_index(repo_root)
+
+    assert set(index.entity_graph.entities) == {"bar", "foo"}
+    assert len(index.entity_graph.entities["foo"]) == 2
+    assert index.entity_graph.entities["foo"][0].action == "added"
+    assert index.entity_graph.entities["foo"][1].action is None
+    assert index.entity_graph.relationships[0].source == "foo"
+    assert index.entity_graph.relationships[0].target == "bar"
+
+
+def test_build_changelog_index_skips_relationships_for_undeclared_entities(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 1
+        title: Introduce Foo
+
+        intent:
+          problem: Foo does not exist.
+          goal: Add Foo to the graph.
+
+        entities:
+          - id: foo
+            type: Service
+            action: added
+
+        relationship_changes:
+          - action: add
+            source: foo
+            target: bar
+            relationship: reads_from
+            rationale: This edge is invalid because bar is not declared.
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Introduce Foo.
+            affects: [foo]
+            rationale: Foo is now part of the system.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Introduce Foo (#1)")
+
+    index = build_changelog_index(repo_root)
+
+    assert set(index.entity_graph.entities) == {"foo"}
+    assert index.entity_graph.relationships == ()
+
+
 def _git(repo_root: Path, *args: str) -> None:
     subprocess.run(
         ["git", "-C", str(repo_root), *args],

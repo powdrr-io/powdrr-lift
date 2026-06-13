@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -110,55 +111,60 @@ def build_validation_report(
 
     for file_path, expected_entries in expected_change_entries_by_file.items():
         proposed_entries = proposed_change_entries_by_file.get(file_path, [])
-        paired_count = min(len(expected_entries), len(proposed_entries))
-
-        for index in range(paired_count):
-            expected_entry = expected_entries[index]
-            proposed_entry = proposed_entries[index]
+        expected_spans = Counter(
+            (entry.start_line, entry.end_line) for entry in expected_entries
+        )
+        proposed_spans: Counter[tuple[int, int]] = Counter()
+        for change_index, proposed_entry in enumerate(proposed_entries, start=1):
             if (
                 proposed_entry.span.start_line is None
                 or proposed_entry.span.end_line is None
                 or proposed_entry.span.start_line > proposed_entry.span.end_line
-                or proposed_entry.span.start_line != expected_entry.start_line
-                or proposed_entry.span.end_line != expected_entry.end_line
             ):
                 issues.append(
                     ValidationIssue(
                         code="span_mismatch",
                         message=(
-                            f"Span for {file_path} change {index + 1} should be "
-                            f"{expected_entry.start_line}-{expected_entry.end_line}"
-                            f" but was {proposed_entry.span.start_line}-"
+                            f"Span for {file_path} change {change_index} is invalid: "
+                            f"{proposed_entry.span.start_line}-"
                             f"{proposed_entry.span.end_line}"
                         ),
                         path=file_path,
                     )
                 )
+                continue
 
-        for index in range(paired_count, len(expected_entries)):
-            expected_entry = expected_entries[index]
-            issues.append(
-                ValidationIssue(
-                    code="missing_change",
-                    message=(
-                        f"Missing change entry {index + 1} for {file_path} "
-                        f"({expected_entry.start_line}-{expected_entry.end_line})"
-                    ),
-                    path=file_path,
-                )
-            )
+            proposed_spans[
+                (proposed_entry.span.start_line, proposed_entry.span.end_line)
+            ] += 1
 
-        for index in range(paired_count, len(proposed_entries)):
-            issues.append(
-                ValidationIssue(
-                    code="unexpected_change",
-                    message=(
-                        f"Unexpected change entry {index + 1} for {file_path} "
-                        "does not appear in the branch diff"
-                    ),
-                    path=file_path,
+        for span, count in expected_spans.items():
+            difference = count - proposed_spans.get(span, 0)
+            for _ in range(max(0, difference)):
+                issues.append(
+                    ValidationIssue(
+                        code="missing_change",
+                        message=(
+                            f"Missing change entry for {file_path} "
+                            f"({span[0]}-{span[1]})"
+                        ),
+                        path=file_path,
+                    )
                 )
-            )
+
+        for span, count in proposed_spans.items():
+            difference = count - expected_spans.get(span, 0)
+            for _ in range(max(0, difference)):
+                issues.append(
+                    ValidationIssue(
+                        code="unexpected_change",
+                        message=(
+                            f"Unexpected change entry for {file_path} "
+                            f"({span[0]}-{span[1]}) does not appear in the branch diff"
+                        ),
+                        path=file_path,
+                    )
+                )
 
     for file_path in proposed_change_entries_by_file:
         if file_path in expected_change_entries_by_file:

@@ -103,7 +103,7 @@ def test_validate_change_log_yaml_reports_missing_changes(
     assert report.issues[0].path == "tests/test_app.py"
 
 
-def test_validate_change_log_yaml_reports_span_mismatch(
+def test_validate_change_log_yaml_allows_hunks_in_any_order(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
@@ -123,6 +123,14 @@ def test_validate_change_log_yaml_reports_span_mismatch(
     changes:
       - file: src/app.py
         span:
+          start_line: 8
+          end_line: 8
+        summary: Update the fourth line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
           start_line: 2
           end_line: 2
         summary: Update the first line.
@@ -131,25 +139,17 @@ def test_validate_change_log_yaml_reports_span_mismatch(
         rationale: Needed for the feature.
       - file: src/app.py
         span:
-          start_line: 4
-          end_line: 4
-        summary: Update the second line.
-        affects:
-          - AppService
-        rationale: Needed for the feature.
-      - file: src/app.py
-        span:
           start_line: 6
-          end_line: 7
+          end_line: 6
         summary: Update the third line.
         affects:
           - AppService
         rationale: Needed for the feature.
       - file: src/app.py
         span:
-          start_line: 8
-          end_line: 8
-        summary: Update the fourth line.
+          start_line: 4
+          end_line: 4
+        summary: Update the second line.
         affects:
           - AppService
         rationale: Needed for the feature.
@@ -163,9 +163,8 @@ def test_validate_change_log_yaml_reports_span_mismatch(
         )
     )
 
-    assert report.validation_successful is False
-    assert any(issue.code == "span_mismatch" for issue in report.issues)
-    assert any(issue.path == "src/app.py" for issue in report.issues)
+    assert report.validation_successful is True
+    assert report.issues == []
 
 
 def test_validate_change_log_yaml_reports_missing_hunk_entries(

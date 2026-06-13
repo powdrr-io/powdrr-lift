@@ -20,22 +20,158 @@ decisions:
     changelog artifact.
 entities: []
 changes:
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 84
+    end_line: 84
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 89
+    end_line: 89
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 91
+    end_line: 91
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 164
+    end_line: 167
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 173
+    end_line: 180
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 177
+    end_line: 177
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 186
+    end_line: 186
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 191
+    end_line: 191
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 223
+    end_line: 223
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 283
+    end_line: 286
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
 - file: src/powdrr_lift/change_log_validation.py
   span:
-    start_line: 95
-    end_line: 99
+    start_line: 12
+    end_line: 12
   summary: Add span-aware changelog validation.
   affects: []
-  rationale: Validate each proposed hunk against the branch diff and report missing
-    or unexpected hunks.
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
 - file: src/powdrr_lift/change_log_validation.py
   span:
-    start_line: 115
-    end_line: 142
+    start_line: 69
+    end_line: 69
   summary: Add span-aware changelog validation.
   affects: []
-  rationale: Validate each proposed hunk against the branch diff and report missing
-    or unexpected hunks.
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 97
+    end_line: 149
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 151
+    end_line: 160
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 108
+    end_line: 108
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 163
+    end_line: 166
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 19
@@ -199,45 +335,51 @@ changes:
 - file: tests/test_change_log_template.py
   span:
     start_line: 83
-    end_line: 128
+    end_line: 135
   summary: Add regression coverage for hunk-level template generation.
   affects: []
-  rationale: Ensure sparse multi-hunk diffs render one changelog entry per hunk.
+  rationale: Ensure sparse multi-hunk diffs render one changelog entry per hunk and
+    rename-only diffs stay out of the template.
 - file: tests/test_change_log_validation.py
   span:
     start_line: 106
-    end_line: 146
+    end_line: 211
   summary: Add regression coverage for multi-hunk changelog validation.
   affects: []
-  rationale: Ensure missing hunk counts and span mismatches are detected.
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
 - file: tests/test_change_log_validation.py
   span:
-    start_line: 228
-    end_line: 242
+    start_line: 293
+    end_line: 307
   summary: Add regression coverage for multi-hunk changelog validation.
   affects: []
-  rationale: Ensure missing hunk counts and span mismatches are detected.
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
 - file: tests/test_change_log_validation.py
   span:
-    start_line: 244
-    end_line: 244
+    start_line: 309
+    end_line: 309
   summary: Add regression coverage for multi-hunk changelog validation.
   affects: []
-  rationale: Ensure missing hunk counts and span mismatches are detected.
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
 - file: tests/test_change_log_validation.py
   span:
     start_line: 191
     end_line: 191
   summary: Add regression coverage for multi-hunk changelog validation.
   affects: []
-  rationale: Ensure missing hunk counts and span mismatches are detected.
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
 - file: tests/test_change_log_validation.py
   span:
-    start_line: 260
-    end_line: 308
+    start_line: 325
+    end_line: 382
   summary: Add regression coverage for multi-hunk changelog validation.
   affects: []
-  rationale: Ensure missing hunk counts and span mismatches are detected.
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
 - file: tests/test_changelog_index.py
   span:
     start_line: 6

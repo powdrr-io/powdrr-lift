@@ -161,6 +161,9 @@ def _collect_branch_diff_entries(
         if status.startswith(("R", "C")) and len(parts) >= 3:
             path = parts[2]
 
+        if status[0] in {"R", "C"} and status[1:] == "100":
+            continue
+
         if _is_changelog_artifact_path(path):
             continue
 
@@ -170,6 +173,9 @@ def _collect_branch_diff_entries(
             branch_name,
             path,
         )
+        if not spans:
+            continue
+
         for start_line, end_line in spans:
             entries.append(
                 BranchDiffEntry(
@@ -220,7 +226,7 @@ def _collect_file_spans(
             span_ranges.append((old_start, old_start + old_count - 1))
 
     if not span_ranges:
-        return [(1, 1)]
+        return []
 
     return span_ranges
 

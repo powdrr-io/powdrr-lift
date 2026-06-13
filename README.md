@@ -72,12 +72,22 @@ from powdrr_lift import validate_change_log_yaml
 report_yaml = validate_change_log_yaml(proposed_yaml, branch_name="feature/my-branch")
 ```
 
+## Edit context
+
+Inspect prior intent for a file and line ranges before editing code:
+
+```bash
+powdrr-lift edit-context --file src/app.py --range 10:20 --parent-branch main
+```
+
 ## Skills
 
 Installable skills live under `skills/`. The repo currently ships a
 `prepare-pr-changelog` skill that drives the PR changelog workflow with the
 `powdrr-lift` CLI, plus a `review-pr-changelog` skill that checks PRs for a
-changelog and reviews each changelog change against the PR intent.
+changelog and reviews each changelog change against the PR intent. It also
+ships a `code-edit-context` skill that asks for index-backed context before
+editing code so prior intent can be preserved or explicitly superseded.
 
 ## MCP
 
@@ -86,3 +96,5 @@ Run the MCP server locally:
 ```bash
 powdrr-lift-mcp
 ```
+
+The server exposes `get_edit_context` alongside the changelog workflow tools.

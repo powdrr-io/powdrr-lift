@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Edit Context"
+  short_description: "Get provenance before editing code"
+  default_prompt: "Use $code-edit-context before editing code: ask powdrr-lift for the file and line ranges first, review the prior intent and justification, and then either honor that intent or explicitly say the new work supersedes it."

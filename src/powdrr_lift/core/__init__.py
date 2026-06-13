@@ -5,6 +5,15 @@ from powdrr_lift.core.code_index import (
     lookup_code_provenance_span,
     refresh_code_index,
 )
+from powdrr_lift.core.edit_context import (
+    EditContextLine,
+    EditContextRange,
+    EditContextReport,
+    lookup_edit_context,
+    parse_line_range,
+    parse_line_ranges,
+    render_edit_context_report,
+)
 from powdrr_lift.core.index import (
     ChangelogDocument,
     ProvenanceRecord,
@@ -42,6 +51,9 @@ from powdrr_lift.core.validate import (
 __all__ = [
     "BranchDiffEntry",
     "BranchState",
+    "EditContextLine",
+    "EditContextRange",
+    "EditContextReport",
     "ChangelogDocument",
     "Change",
     "ChangeLog",
@@ -61,9 +73,13 @@ __all__ = [
     "create_change_log_template",
     "lookup_code_provenance",
     "lookup_code_provenance_span",
+    "lookup_edit_context",
     "parse_change_log",
+    "parse_line_range",
+    "parse_line_ranges",
     "parse_validation_report",
     "render_change_log_template",
+    "render_edit_context_report",
     "resolve_default_branch",
     "resolve_repo_root",
     "refresh_code_index",

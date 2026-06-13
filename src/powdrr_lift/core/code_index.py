@@ -19,9 +19,10 @@ from powdrr_lift.core.index import (
     _git_output,
     _load_branch_pr_description_document,
     _normalize_line_state,
+    _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 3
+INDEX_CACHE_VERSION = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -643,25 +644,26 @@ def _build_branch_index(
             branch_name,
             parent_branch,
         )
-    if branch_document is None:
-        return parent_index
 
     line_state: dict[str, list[ProvenanceRecord | None]] = {
         path: list(lines) for path, lines in parent_index.file_lines.items()
     }
     documents = list(parent_index.documents)
-    if all(document.pr_number != branch_document.pr_number for document in documents):
+    if branch_document is not None and all(
+        document.pr_number != branch_document.pr_number for document in documents
+    ):
         documents.append(branch_document)
     changes = list(parent_index.changes)
     changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
 
     commits = _collect_branch_commits(repo_root, parent_branch, branch_name)
     for commit in commits:
-        commit = replace(
-            commit,
-            pr_number=branch_document.pr_number,
-            changelog_document=branch_document,
-        )
+        if branch_document is not None:
+            commit = replace(
+                commit,
+                pr_number=branch_document.pr_number,
+                changelog_document=branch_document,
+            )
         file_patches = _collect_file_patches(repo_root, commit.sha, commit.parent_sha)
         commit_changes = _build_commit_changes(
             repo_root,
@@ -761,15 +763,13 @@ def _collect_branch_commits(
         "log",
         "--first-parent",
         "--reverse",
-        "--format=%H\t%ct\t%s\t%P",
+        "--format=%H%x1f%ct%x1f%s%x1f%b%x1f%P%x1e",
         f"{parent_branch}..{branch_name}",
     )
     commits: list[_CommitRecord] = []
-    for line in output.splitlines():
-        if not line:
-            continue
-
-        sha, timestamp_text, subject, parents = line.split("\t", maxsplit=3)
+    for sha, timestamp_text, subject, commit_body, parents in _parse_commit_log_output(
+        output
+    ):
         parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
         commits.append(
             _CommitRecord(
@@ -777,6 +777,7 @@ def _collect_branch_commits(
                 parent_sha=parent_sha,
                 timestamp=int(timestamp_text),
                 subject=subject,
+                commit_body=commit_body,
                 pr_number=None,
                 changelog_document=None,
             )
@@ -838,15 +839,13 @@ def _load_mainline_commits_at_ref(
         "log",
         "--first-parent",
         "--reverse",
-        "--format=%H\t%ct\t%s\t%P",
+        "--format=%H%x1f%ct%x1f%s%x1f%b%x1f%P%x1e",
         ref,
     )
     commits: list[_CommitRecord] = []
-    for line in output.splitlines():
-        if not line:
-            continue
-
-        sha, timestamp_text, subject, parents = line.split("\t", maxsplit=3)
+    for sha, timestamp_text, subject, commit_body, parents in _parse_commit_log_output(
+        output
+    ):
         parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
         pr_number = None
         match = _extract_pr_number_from_subject(subject)
@@ -872,6 +871,7 @@ def _load_mainline_commits_at_ref(
                 parent_sha=parent_sha,
                 timestamp=int(timestamp_text),
                 subject=subject,
+                commit_body=commit_body,
                 pr_number=pr_number,
                 changelog_document=changelog_document,
             )

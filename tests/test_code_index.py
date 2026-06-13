@@ -175,6 +175,56 @@ def test_refresh_code_index_uses_pr_description_when_changelog_is_missing(
     )
 
 
+def test_refresh_code_index_uses_commit_body_when_pr_is_missing(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/code-index")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    _git(repo_root, "add", "src/app.py")
+    _git(
+        repo_root,
+        "commit",
+        "-m",
+        "Add helper",
+        "-m",
+        "Track intent in the commit comment.",
+    )
+
+    index = refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    provenance = index.provenance_for("src/app.py", 1)
+    assert provenance is not None
+    assert provenance.kind == "commented"
+    assert provenance.title == "Add helper"
+    assert provenance.intent_goal == "Track intent in the commit comment."
+    assert (
+        lookup_code_provenance(
+            "src/app.py",
+            1,
+            branch_name="feature/code-index",
+            parent_branch="main",
+            repo_root=repo_root,
+        ).kind
+        == "commented"
+    )
+
+
 def test_refresh_code_index_uses_sparse_spans_from_pr_description(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

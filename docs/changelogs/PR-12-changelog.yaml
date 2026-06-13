@@ -1,0 +1,51 @@
+version: 1
+change_id: 12
+title: Clarify changelog entity instructions
+intent:
+  problem: The changelog template did not explain how to capture relevant architectural entities and relationship changes.
+  goal: Guide agents to record direct and adjacent systems plus relationship changes in changelog entries.
+decisions: []
+entities:
+  - id: changelog-template
+    type: Template
+  - id: powdrr-lift-cli
+    type: CLI
+  - id: template-regression-tests
+    type: TestSuite
+changes:
+  - file: src/powdrr_lift/change_log_template.py
+    span:
+      start_line: 72
+      end_line: 78
+    summary: Expand the template instructions for entities and relationship changes.
+    affects:
+      - changelog-template
+      - powdrr-lift-cli
+    rationale: The template needs concrete guidance on which systems to capture and how to describe relationship changes.
+  - file: src/powdrr_lift/change_log_template.py
+    span:
+      start_line: 111
+      end_line: 113
+    summary: Add relationship-change guidance to the template footer.
+    affects:
+      - changelog-template
+    rationale: Relationship changes should describe how relevant systems are connected or reconnected by the change.
+  - file: tests/test_change_log_template.py
+    span:
+      start_line: 45
+      end_line: 46
+    summary: Add regression coverage for the new entity guidance in the generated template.
+    affects:
+      - template-regression-tests
+    rationale: Ensure the generated template keeps the new instructions for entities and relationship changes.
+relationship_changes:
+  - action: update
+    source: changelog-template
+    target: powdrr-lift-cli
+    relationship: guides_template_output
+    rationale: The CLI now emits template instructions that explicitly cover direct and adjacent architectural entities.
+  - action: add
+    source: changelog-template
+    target: template-regression-tests
+    relationship: guarded_by
+    rationale: The new wording is protected by a regression test so the instruction stays present.

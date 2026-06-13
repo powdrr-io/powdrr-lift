@@ -35,6 +35,36 @@ class ChangelogDocument:
 
 
 @dataclass(frozen=True, slots=True)
+class EntityOccurrence:
+    entity_id: str
+    entity_type: str | None
+    action: str | None
+    pr_number: int | None
+    commit_sha: str | None
+    commit_timestamp: int | None
+    changelog_path: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RelationshipOccurrence:
+    source: str
+    target: str
+    relationship: str | None
+    action: str | None
+    rationale: str | None
+    pr_number: int | None
+    commit_sha: str | None
+    commit_timestamp: int | None
+    changelog_path: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class EntityGraph:
+    entities: dict[str, tuple[EntityOccurrence, ...]] = field(default_factory=dict)
+    relationships: tuple[RelationshipOccurrence, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True, slots=True)
 class ProvenanceRecord:
     kind: str
     pr_number: int | None
@@ -57,6 +87,7 @@ class SourceIndex:
     repo_root: Path
     default_branch_name: str
     documents: list[ChangelogDocument] = field(default_factory=list)
+    entity_graph: EntityGraph = field(default_factory=EntityGraph)
     changes: list[ProvenanceRecord] = field(default_factory=list)
     file_lines: dict[str, tuple[ProvenanceRecord | None, ...]] = field(
         default_factory=dict
@@ -116,9 +147,123 @@ def build_changelog_index(
         document_by_pr,
     )
 
+    return _build_source_index(
+        repo_root_path=repo_root_path,
+        default_branch_name=default_branch_name,
+        commits=commits,
+        documents=list(document_by_pr.values()),
+    )
+
+
+def build_changelog_index_at_ref(
+    repo_root: str | Path | None = None,
+    ref: str | None = None,
+    changelog_dir: str | Path = "docs/changelogs",
+) -> SourceIndex:
+    repo_root_path = _resolve_repo_root(repo_root)
+    resolved_ref = ref or _resolve_default_branch(repo_root_path)
+    documents = _load_changelog_documents_at_ref(
+        repo_root_path,
+        resolved_ref,
+        changelog_dir=changelog_dir,
+    )
+    document_by_pr = {document.pr_number: document for document in documents}
+    commits = _load_mainline_commits_at_ref(
+        repo_root_path,
+        resolved_ref,
+        document_by_pr,
+    )
+    return _build_source_index(
+        repo_root_path=repo_root_path,
+        default_branch_name=resolved_ref,
+        commits=commits,
+        documents=list(document_by_pr.values()),
+    )
+
+
+def _load_changelog_documents(
+    repo_root: Path,
+    changelog_dir: str | Path,
+) -> list[ChangelogDocument]:
+    changelog_root = repo_root / Path(changelog_dir)
+    if not changelog_root.exists():
+        return []
+
+    documents: list[ChangelogDocument] = []
+    for changelog_path in sorted(changelog_root.glob("PR-*-changelog.yaml")):
+        match = _PR_FILE_NAME_RE.match(changelog_path.name)
+        if match is None:
+            continue
+
+        pr_number = int(match.group(1))
+        content = changelog_path.read_text(encoding="utf-8")
+        documents.append(
+            ChangelogDocument(
+                pr_number=pr_number,
+                changelog_path=changelog_path,
+                changelog=parse_change_log(content),
+                commit_sha=None,
+                commit_timestamp=None,
+                commit_subject=None,
+            )
+        )
+
+    return documents
+
+
+def _load_changelog_documents_at_ref(
+    repo_root: Path,
+    ref: str,
+    changelog_dir: str | Path = "docs/changelogs",
+) -> list[ChangelogDocument]:
+    changelog_root = Path(changelog_dir)
+    listed_paths = _git_output(
+        repo_root,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        ref,
+        str(changelog_root),
+    )
+    documents: list[ChangelogDocument] = []
+    for path_text in sorted(listed_paths.splitlines()):
+        if not path_text.startswith("docs/changelogs/PR-") or not path_text.endswith(
+            "-changelog.yaml"
+        ):
+            continue
+
+        pr_number_text = path_text.rsplit("/", maxsplit=1)[-1]
+        pr_number_text = pr_number_text.removeprefix("PR-").removesuffix(
+            "-changelog.yaml"
+        )
+        if not pr_number_text.isdigit():
+            continue
+
+        content = _git_output(repo_root, "show", f"{ref}:{path_text}")
+        documents.append(
+            ChangelogDocument(
+                pr_number=int(pr_number_text),
+                changelog_path=repo_root / path_text,
+                changelog=parse_change_log(content),
+                commit_sha=None,
+                commit_timestamp=None,
+                commit_subject=None,
+            )
+        )
+
+    return documents
+
+
+def _build_source_index(
+    repo_root_path: Path,
+    default_branch_name: str,
+    commits: Sequence[_CommitRecord],
+    documents: list[ChangelogDocument],
+) -> SourceIndex:
     changes: list[ProvenanceRecord] = []
     line_state: dict[str, list[ProvenanceRecord | None]] = {}
     changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
+    entity_graph = _build_entity_graph(documents)
 
     for commit in commits:
         file_patches = _collect_file_patches(
@@ -154,44 +299,14 @@ def build_changelog_index(
         line_state,
         changes_by_commit_and_file,
     )
-    documents = list(document_by_pr.values())
     return SourceIndex(
         repo_root=repo_root_path,
         default_branch_name=default_branch_name,
         documents=documents,
+        entity_graph=entity_graph,
         changes=changes,
         file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
     )
-
-
-def _load_changelog_documents(
-    repo_root: Path,
-    changelog_dir: str | Path,
-) -> list[ChangelogDocument]:
-    changelog_root = repo_root / Path(changelog_dir)
-    if not changelog_root.exists():
-        return []
-
-    documents: list[ChangelogDocument] = []
-    for changelog_path in sorted(changelog_root.glob("PR-*-changelog.yaml")):
-        match = _PR_FILE_NAME_RE.match(changelog_path.name)
-        if match is None:
-            continue
-
-        pr_number = int(match.group(1))
-        content = changelog_path.read_text(encoding="utf-8")
-        documents.append(
-            ChangelogDocument(
-                pr_number=pr_number,
-                changelog_path=changelog_path,
-                changelog=parse_change_log(content),
-                commit_sha=None,
-                commit_timestamp=None,
-                commit_subject=None,
-            )
-        )
-
-    return documents
 
 
 def _load_mainline_commits(
@@ -227,7 +342,7 @@ def _load_mainline_commits(
             )
             continue
 
-        changelog_document = document_by_pr.get(pr_number)
+        changelog_document: ChangelogDocument | None = document_by_pr.get(pr_number)
         if changelog_document is None:
             changelog_document = _load_pr_description_document(repo_root, pr_number)
             if changelog_document is not None:
@@ -243,6 +358,57 @@ def _load_mainline_commits(
                 commit_subject=subject,
             )
             document_by_pr[pr_number] = changelog_document
+
+        commits.append(
+            _CommitRecord(
+                sha=sha,
+                parent_sha=parent_sha,
+                timestamp=int(timestamp_text),
+                subject=subject,
+                commit_body=commit_body,
+                pr_number=pr_number,
+                changelog_document=changelog_document,
+            )
+        )
+
+    return commits
+
+
+def _load_mainline_commits_at_ref(
+    repo_root: Path,
+    ref: str,
+    document_by_pr: dict[int, ChangelogDocument],
+) -> list[_CommitRecord]:
+    output = _git_output(
+        repo_root,
+        "log",
+        "--first-parent",
+        "--reverse",
+        "--format=%H%x1f%ct%x1f%s%x1f%b%x1f%P%x1e",
+        ref,
+    )
+    commits: list[_CommitRecord] = []
+    for sha, timestamp_text, subject, commit_body, parents in _parse_commit_log_output(
+        output
+    ):
+        parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
+        pr_number = _extract_pr_number(subject)
+        changelog_document: ChangelogDocument | None = None
+        if pr_number is not None and pr_number in document_by_pr:
+            changelog_document = document_by_pr[pr_number]
+            changelog_document = ChangelogDocument(
+                pr_number=changelog_document.pr_number,
+                changelog_path=changelog_document.changelog_path,
+                changelog=changelog_document.changelog,
+                commit_sha=sha,
+                commit_timestamp=int(timestamp_text),
+                commit_subject=subject,
+            )
+            document_by_pr[pr_number] = changelog_document
+        else:
+            changelog_document = (
+                None if pr_number is None else document_by_pr.get(pr_number)
+            )
 
         commits.append(
             _CommitRecord(
@@ -431,6 +597,73 @@ def _build_commit_changes(
         )
 
     return commit_changes
+
+
+def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
+    entity_occurrences: dict[str, list[EntityOccurrence]] = {}
+    relationships: list[RelationshipOccurrence] = []
+    seen_documents: set[str] = set()
+
+    for changelog_document in documents:
+        changelog_path = str(changelog_document.changelog_path)
+        if changelog_path in seen_documents:
+            continue
+
+        seen_documents.add(changelog_path)
+        entity_ids_in_document = {
+            normalized_entity_id
+            for entity in changelog_document.changelog.entities
+            if (normalized_entity_id := _normalize_entity_id(entity.id)) is not None
+        }
+        for entity in changelog_document.changelog.entities:
+            entity_id = _normalize_entity_id(entity.id)
+            if entity_id is None:
+                continue
+
+            entity_occurrences.setdefault(entity_id, []).append(
+                EntityOccurrence(
+                    entity_id=entity_id,
+                    entity_type=entity.type,
+                    action=entity.action,
+                    pr_number=changelog_document.pr_number,
+                    commit_sha=changelog_document.commit_sha,
+                    commit_timestamp=changelog_document.commit_timestamp,
+                    changelog_path=changelog_path,
+                )
+            )
+
+        for relationship_change in changelog_document.changelog.relationship_changes:
+            source = _normalize_entity_id(relationship_change.source)
+            target = _normalize_entity_id(relationship_change.target)
+            if (
+                source is None
+                or target is None
+                or source not in entity_ids_in_document
+                or target not in entity_ids_in_document
+            ):
+                continue
+
+            relationships.append(
+                RelationshipOccurrence(
+                    source=source,
+                    target=target,
+                    relationship=relationship_change.relationship,
+                    action=relationship_change.action,
+                    rationale=relationship_change.rationale,
+                    pr_number=changelog_document.pr_number,
+                    commit_sha=changelog_document.commit_sha,
+                    commit_timestamp=changelog_document.commit_timestamp,
+                    changelog_path=changelog_path,
+                )
+            )
+
+    return EntityGraph(
+        entities={
+            entity_id: tuple(occurrences)
+            for entity_id, occurrences in sorted(entity_occurrences.items())
+        },
+        relationships=tuple(relationships),
+    )
 
 
 def _build_declared_provenance(
@@ -910,6 +1143,14 @@ def _extract_pr_number(subject: str) -> int | None:
         return None
 
     return int(match.group("pr_number"))
+
+
+def _normalize_entity_id(entity_id: str | None) -> str | None:
+    if entity_id is None:
+        return None
+
+    normalized_entity_id = entity_id.strip()
+    return normalized_entity_id or None
 
 
 def _git_output(repo_root: Path, *args: str) -> str:

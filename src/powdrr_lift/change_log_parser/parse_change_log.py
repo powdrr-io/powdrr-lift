@@ -23,6 +23,7 @@ class Decision:
 class Entity:
     id: str | None = None
     type: str | None = None
+    action: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,7 +118,7 @@ def _parse_decisions(data: Mapping[str, Any]) -> list[Decision]:
 
 def _parse_entity(raw_entity: object) -> Entity:
     data = _parse_mapping(raw_entity)
-    return Entity(id=data.get("id"), type=data.get("type"))
+    return Entity(id=data.get("id"), type=data.get("type"), action=data.get("action"))
 
 
 def _parse_change(raw_change: object) -> Change:

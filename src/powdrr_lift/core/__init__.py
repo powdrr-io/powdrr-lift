@@ -30,9 +30,13 @@ from powdrr_lift.core.edit_context import (
 )
 from powdrr_lift.core.index import (
     ChangelogDocument,
+    EntityGraph,
+    EntityOccurrence,
     ProvenanceRecord,
+    RelationshipOccurrence,
     SourceIndex,
     build_changelog_index,
+    build_changelog_index_at_ref,
 )
 from powdrr_lift.core.pr_analysis import (
     BranchDiffEntry,
@@ -78,10 +82,13 @@ __all__ = [
     "ChangeLog",
     "Decision",
     "Entity",
+    "EntityGraph",
+    "EntityOccurrence",
     "Intent",
     "code_index_db_path",
     "ProvenanceRecord",
     "RelationshipChange",
+    "RelationshipOccurrence",
     "RepoTreeNode",
     "Span",
     "SourceIndex",
@@ -92,6 +99,7 @@ __all__ = [
     "blame_tree_node_to_data",
     "blame_view_state_to_data",
     "build_changelog_index",
+    "build_changelog_index_at_ref",
     "build_blame_file_view",
     "build_blame_view_state",
     "build_repo_tree",

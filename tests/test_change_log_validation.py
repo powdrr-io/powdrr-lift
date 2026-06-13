@@ -26,6 +26,7 @@ def test_validate_change_log_yaml_reports_success_when_changes_match(
     entities:
       - id: AppService
         type: Service
+        action: added
 
     changes:
       - file: src/app.py
@@ -77,6 +78,11 @@ def test_validate_change_log_yaml_reports_missing_changes(
       - id: ADR-100
         summary: Add files directly
 
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
     changes:
       - file: src/app.py
         span:
@@ -119,6 +125,11 @@ def test_validate_change_log_yaml_allows_hunks_in_any_order(
     decisions:
       - id: ADR-101
         summary: Keep the file entry scoped to the changed lines.
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
 
     changes:
       - file: src/app.py
@@ -184,6 +195,11 @@ def test_validate_change_log_yaml_reports_missing_hunk_entries(
       - id: ADR-101
         summary: Keep the file entry scoped to the changed lines.
 
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
     changes:
       - file: src/app.py
         span:
@@ -233,6 +249,11 @@ def test_validate_change_log_yaml_ignores_changelog_artifact(
       - id: ADR-100
         summary: Add files directly
 
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
     changes:
       - file: src/app.py
         span:
@@ -262,6 +283,134 @@ def test_validate_change_log_yaml_ignores_changelog_artifact(
 
     assert report.validation_successful is True
     assert report.expected_change_files == ["src/app.py", "tests/test_app.py"]
+    assert report.issues == []
+
+
+def test_validate_change_log_yaml_rejects_unknown_relationship_entities(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add application files
+
+    intent:
+      problem: Missing files
+      goal: Ship the new files
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+
+    relationship_changes:
+      - action: add
+        source: AppService
+        target: RedisCache
+        relationship: stores_sessions
+        rationale: This relationship is not declared in the file entities section.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "relationship_unknown_entity" for issue in report.issues)
+
+
+def test_validate_change_log_yaml_requires_new_entities_to_be_marked_added(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add application files
+
+    intent:
+      problem: Missing files
+      goal: Ship the new files
+
+    entities:
+      - id: AppService
+        type: Service
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "entity_not_marked_added" for issue in report.issues)
+
+
+def test_validate_change_log_yaml_allows_existing_entities_without_action(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_entity_history(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 8
+    title: Reuse application service
+
+    intent:
+      problem: The shared service already exists.
+      goal: Reference the existing service without redefining it.
+
+    entities:
+      - id: AppService
+        type: Service
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 2
+          end_line: 2
+        summary: Update the service usage.
+        affects:
+          - AppService
+        rationale: The existing service is still relevant.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is True
     assert report.issues == []
 
 
@@ -317,6 +466,61 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     )
     _git(repo_root, "add", "src/app.py", "tests/test_app.py")
     _git(repo_root, "commit", "-m", "Add application files")
+
+    return repo_root
+
+
+def _create_repo_with_entity_history(tmp_path: Path) -> Path:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 1
+        title: Introduce AppService
+
+        intent:
+          problem: AppService does not exist.
+          goal: Add the shared service to the graph.
+
+        entities:
+          - id: AppService
+            type: Service
+            action: added
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Introduce the shared service.
+            affects:
+              - AppService
+            rationale: AppService is part of the baseline graph.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Introduce AppService (#1)")
+
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "src" / "app.py").write_text(
+        "print('hello')\nprint('world')\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py")
+    _git(repo_root, "commit", "-m", "Reuse AppService (#8)")
 
     return repo_root
 

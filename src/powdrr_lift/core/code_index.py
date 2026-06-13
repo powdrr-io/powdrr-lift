@@ -19,6 +19,8 @@ from powdrr_lift.core.index import (
     _load_branch_pr_description_document,
 )
 
+INDEX_CACHE_VERSION = 2
+
 
 @dataclass(frozen=True, slots=True)
 class BranchState:
@@ -26,6 +28,8 @@ class BranchState:
     parent_branch: str
     branch_head_sha: str
     parent_head_sha: str
+    parent_index_version: int
+    index_version: int
     indexed_at: int
 
 
@@ -93,16 +97,23 @@ class CodeIndexStore:
             "rev-parse",
             parent_branch,
         ).strip()
+        parent_index = self._ensure_parent_index(parent_branch)
+        parent_state = self._read_branch_state(parent_branch)
+        parent_index_version = (
+            INDEX_CACHE_VERSION if parent_state is None else parent_state.index_version
+        )
         current_state = self._read_branch_state(branch_name)
         if (
             current_state is not None
+            and parent_state is not None
+            and current_state.index_version == INDEX_CACHE_VERSION
+            and current_state.parent_index_version == parent_index_version
             and current_state.branch_head_sha == branch_head_sha
             and current_state.parent_branch == parent_branch
             and current_state.parent_head_sha == parent_head_sha
         ):
             return self._load_branch_index(branch_name)
 
-        parent_index = self._ensure_parent_index(parent_branch)
         branch_index = _build_branch_index(
             self.repo_root,
             branch_name=branch_name,
@@ -114,6 +125,7 @@ class CodeIndexStore:
             parent_branch=parent_branch,
             branch_head_sha=branch_head_sha,
             parent_head_sha=parent_head_sha,
+            parent_index_version=parent_index_version,
             index=branch_index,
         )
         return branch_index
@@ -263,6 +275,8 @@ class CodeIndexStore:
                   parent_branch TEXT NOT NULL,
                   branch_head_sha TEXT NOT NULL,
                   parent_head_sha TEXT NOT NULL,
+                  parent_index_version INTEGER NOT NULL DEFAULT 0,
+                  index_version INTEGER NOT NULL DEFAULT 0,
                   indexed_at INTEGER NOT NULL
                 );
 
@@ -317,6 +331,24 @@ class CodeIndexStore:
                   ON provenance_record(branch_name, file_path, span_start, span_end);
                 """
             )
+            branch_state_info = connection.execute(
+                "PRAGMA table_info(branch_state)"
+            ).fetchall()
+            branch_state_columns = {row[1] for row in branch_state_info}
+            if "index_version" not in branch_state_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_state
+                    ADD COLUMN index_version INTEGER NOT NULL DEFAULT 0
+                    """
+                )
+            if "parent_index_version" not in branch_state_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_state
+                    ADD COLUMN parent_index_version INTEGER NOT NULL DEFAULT 0
+                    """
+                )
 
     def _ensure_parent_index(self, parent_branch: str) -> SourceIndex:
         current_state = self._read_branch_state(parent_branch)
@@ -328,16 +360,19 @@ class CodeIndexStore:
         if (
             current_state is not None
             and current_state.branch_head_sha == parent_head_sha
+            and current_state.index_version == INDEX_CACHE_VERSION
         ):
             return self._load_branch_index(parent_branch)
 
         if parent_branch == _resolve_default_branch(self.repo_root):
             index = _build_mainline_index_at_ref(self.repo_root, parent_branch)
+            parent_index_version = INDEX_CACHE_VERSION
             self._write_branch_index(
                 branch_name=parent_branch,
                 parent_branch=parent_branch,
                 branch_head_sha=parent_head_sha,
                 parent_head_sha=parent_head_sha,
+                parent_index_version=parent_index_version,
                 index=index,
             )
             return index
@@ -352,7 +387,8 @@ class CodeIndexStore:
             row = connection.execute(
                 """
                 SELECT branch_name, parent_branch, branch_head_sha,
-                       parent_head_sha, indexed_at
+                       parent_head_sha, parent_index_version, index_version,
+                       indexed_at
                 FROM branch_state
                 WHERE branch_name = ?
                 """,
@@ -367,6 +403,8 @@ class CodeIndexStore:
             parent_branch=row["parent_branch"],
             branch_head_sha=row["branch_head_sha"],
             parent_head_sha=row["parent_head_sha"],
+            parent_index_version=row["parent_index_version"],
+            index_version=row["index_version"],
             indexed_at=row["indexed_at"],
         )
 
@@ -375,7 +413,8 @@ class CodeIndexStore:
             connection.row_factory = sqlite3.Row
             branch_row = connection.execute(
                 """
-                SELECT branch_name, parent_branch, branch_head_sha, parent_head_sha
+                SELECT branch_name, parent_branch, branch_head_sha, parent_head_sha,
+                       parent_index_version, index_version
                 FROM branch_state
                 WHERE branch_name = ?
                 """,
@@ -467,6 +506,7 @@ class CodeIndexStore:
         parent_branch: str,
         branch_head_sha: str,
         parent_head_sha: str,
+        parent_index_version: int,
         index: SourceIndex,
     ) -> None:
         with sqlite3.connect(self.db_path) as connection:
@@ -491,14 +531,16 @@ class CodeIndexStore:
                 """
                 INSERT INTO branch_state (
                   branch_name, parent_branch, branch_head_sha, parent_head_sha,
-                  indexed_at
-                ) VALUES (?, ?, ?, ?, ?)
+                  parent_index_version, index_version, indexed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     branch_name,
                     parent_branch,
                     branch_head_sha,
                     parent_head_sha,
+                    parent_index_version,
+                    INDEX_CACHE_VERSION,
                     int(time.time()),
                 ),
             )

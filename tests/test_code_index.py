@@ -137,17 +137,20 @@ def test_refresh_code_index_uses_pr_description_when_changelog_is_missing(
         *gh_args: str,
     ) -> dict[str, object]:
         assert repo_root_arg == repo_root
-        assert gh_args == (
-            "list",
-            "--head",
-            "feature/code-index",
-            "--base",
-            "main",
-            "--state",
-            "all",
-            "--limit",
-            "1",
-        )
+        assert gh_args in {
+            (
+                "list",
+                "--head",
+                "feature/code-index",
+                "--base",
+                "main",
+                "--state",
+                "all",
+                "--limit",
+                "1",
+            ),
+            ("view", "21"),
+        }
         return {
             "number": 21,
             "title": "Add application scaffold",
@@ -225,17 +228,20 @@ def test_refresh_code_index_uses_sparse_spans_from_pr_description(
         *gh_args: str,
     ) -> dict[str, object]:
         assert repo_root_arg == repo_root
-        assert gh_args == (
-            "list",
-            "--head",
-            "feature/code-index",
-            "--base",
-            "main",
-            "--state",
-            "all",
-            "--limit",
-            "1",
-        )
+        assert gh_args in {
+            (
+                "list",
+                "--head",
+                "feature/code-index",
+                "--base",
+                "main",
+                "--state",
+                "all",
+                "--limit",
+                "1",
+            ),
+            ("view", "22"),
+        }
         return {
             "number": 22,
             "title": "Sparse app changes",
@@ -251,6 +257,162 @@ def test_refresh_code_index_uses_sparse_spans_from_pr_description(
     )
 
     assert index.changes[0].span == Span(start_line=2, end_line=6)
+
+
+def test_backfill_line_state_from_blame_fills_missing_lines(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    sha = "a" * 40
+    provenance = core_index.ProvenanceRecord(
+        kind="declared",
+        pr_number=7,
+        commit_sha=sha,
+        commit_timestamp=1,
+        changelog_path="docs/changelogs/PR-7-changelog.yaml",
+        title="Add changelog provenance index",
+        change_id="7",
+        intent_problem="Missing provenance lines.",
+        intent_goal="Backfill missing provenance from blame.",
+        file="src/app.py",
+        span=Span(start_line=2, end_line=2),
+        summary="Backfill missing provenance.",
+        rationale="Use local blame data to fill gaps.",
+        change_index=0,
+    )
+    line_state: dict[str, list[core_index.ProvenanceRecord | None]] = {
+        "src/app.py": [None, None, None]
+    }
+    changes_by_commit_and_file = {(sha, "src/app.py"): [provenance]}
+
+    def _fake_git_output(repo_root_arg: Path, *args: str) -> str:
+        assert repo_root_arg == repo_root
+        assert args == ("blame", "--line-porcelain", "--", "src/app.py")
+        return "\n".join(
+            [
+                f"{sha} 1 1 3",
+                "\tline 1",
+                f"{sha} 2 2 1",
+                "\tline 2",
+                f"{sha} 3 3 1",
+                "\tline 3",
+            ]
+        )
+
+    monkeypatch.setattr(core_index, "_git_output", _fake_git_output)
+
+    core_index._backfill_line_state_from_blame(  # noqa: SLF001
+        repo_root,
+        line_state,
+        changes_by_commit_and_file,
+    )
+
+    assert line_state["src/app.py"][0] == provenance
+    assert line_state["src/app.py"][1] == provenance
+    assert line_state["src/app.py"][2] == provenance
+
+
+def test_refresh_code_index_rebuilds_when_parent_snapshot_changes(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/code-index")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text(
+        "print('hello')\nprint('world')\n",
+        encoding="utf-8",
+    )
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-30-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 30
+        title: Add application scaffold
+
+        intent:
+          problem: The repository had no application entry point.
+          goal: Introduce the initial application file.
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 2
+            summary: Add the initial application body.
+            affects: []
+            rationale: Bootstrap the app file.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-30-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Add application scaffold (#30)")
+
+    index = refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+    assert index.provenance_for("src/app.py", 1).pr_number == 30
+
+    db_path = code_index_db_path(repo_root)
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            "UPDATE branch_state SET index_version = 0 WHERE branch_name = ?",
+            ("main",),
+        )
+        connection.execute(
+            """
+            UPDATE branch_state
+            SET parent_index_version = 0
+            WHERE branch_name = ?
+            """,
+            ("feature/code-index",),
+        )
+        connection.commit()
+
+    stale_feature_state = refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    assert stale_feature_state.provenance_for("src/app.py", 1).pr_number == 30
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        feature_row = connection.execute(
+            """
+            SELECT index_version, parent_index_version
+            FROM branch_state
+            WHERE branch_name = ?
+            """,
+            ("feature/code-index",),
+        ).fetchone()
+        main_row = connection.execute(
+            """
+            SELECT index_version
+            FROM branch_state
+            WHERE branch_name = ?
+            """,
+            ("main",),
+        ).fetchone()
+
+    assert feature_row["index_version"] == 2
+    assert feature_row["parent_index_version"] == 2
+    assert main_row["index_version"] == 2
 
 
 def _git(repo_root: Path, *args: str) -> None:

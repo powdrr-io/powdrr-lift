@@ -2,39 +2,41 @@ version: 1
 change_id: 7
 title: Add changelog provenance index
 intent:
-  problem: There was no way to replay changelog documents into a line-level provenance index for the current source tree.
-  goal: Build a smart provenance index that maps each current line back to the changelog change that introduced it, while preserving the original PR-time span and intent.
+  problem: There was no persistent private store for replaying changelog documents into a line-level provenance index across branch refreshes.
+  goal: Build a smart SQLite-backed provenance index in `.powdrr-lift/state/code_index.db` that maps current source lines back to the changelog change that introduced them and refreshes when the branch or parent branch changes.
 decisions:
   - id: INDEX-001
     summary: Replay merged PR changelog docs in mainline order and transform line provenance through later diffs.
+  - id: INDEX-002
+    summary: Persist branch snapshots in SQLite keyed by branch and parent branch heads for fast file/span lookup and refresh checks.
 entities: []
 changes:
   - file: src/powdrr_lift/__init__.py
     span:
-      start_line: 20
-      end_line: 62
-    summary: Export the changelog provenance index API from the top-level package.
+      start_line: 1
+      end_line: 114
+    summary: Export the branch snapshot and SQLite lookup APIs from the top-level package.
     affects: []
-    rationale: Make the new index builder and provenance types available to library callers without importing internal modules.
+    rationale: Make the private code index store and its refresh/lookup helpers available to library callers without reaching into internal modules.
   - file: src/powdrr_lift/core/__init__.py
     span:
       start_line: 1
-      end_line: 50
-    summary: Re-export the provenance index builder through the core package.
+      end_line: 71
+    summary: Re-export the SQLite-backed code index API through the core package.
     affects: []
-    rationale: Keep the core package aligned with the rest of the thin-wrapper module layout and surface the new index API consistently.
-  - file: src/powdrr_lift/core/index.py
+    rationale: Keep the core package aligned with the rest of the thin-wrapper module layout and surface the new index and lookup functions consistently.
+  - file: src/powdrr_lift/core/code_index.py
     span:
       start_line: 1
-      end_line: 668
-    summary: Implement the changelog provenance index and line-history replay logic.
+      end_line: 837
+    summary: Implement the SQLite-backed branch snapshot store and file/span lookup path.
     affects: []
-    rationale: Parse merged changelog docs, resolve their PR commits, and replay file diffs so each current line can be traced back to its originating change, intent, and rationale.
-  - file: tests/test_changelog_index.py
+    rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale branch or parent heads, refresh the snapshot when needed, and provide fast per-file and per-span provenance lookups.
+  - file: tests/test_code_index.py
     span:
       start_line: 1
-      end_line: 108
-    summary: Add regression coverage for provenance tracking across later insertions.
+      end_line: 109
+    summary: Add regression coverage for stale-branch refresh and span lookups.
     affects: []
-    rationale: Prove that the index preserves earlier line provenance even when later PRs insert lines that shift file offsets.
+    rationale: Prove the SQLite store is created, refreshes when new commits land on the branch, and still resolves the original change rationale after later line shifts.
 relationship_changes: []

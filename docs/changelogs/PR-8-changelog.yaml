@@ -15,29 +15,29 @@ entities: []
 changes:
   - file: src/powdrr_lift/core/code_index.py
     span:
-      start_line: 1
-      end_line: 842
+      start_line: 19
+      end_line: 617
     summary: Implement the SQLite-backed branch snapshot store and file/span lookup path with PR-description fallback for missing changelog files.
     affects: []
     rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale branch or parent heads, refresh the snapshot when needed, and hydrate branch history from PR descriptions when the changelog artifact is missing.
   - file: src/powdrr_lift/core/index.py
     span:
-      start_line: 1
-      end_line: 780
+      start_line: 3
+      end_line: 347
     summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed index.
     affects: []
     rationale: Reuse the existing changelog replay logic for branch snapshots, provenance records, file-line attribution, and PR description fallback in the persistent code index.
   - file: tests/test_code_index.py
     span:
-      start_line: 1
-      end_line: 175
+      start_line: 7
+      end_line: 166
     summary: Add regression coverage for stale-branch refresh, span lookups, and PR-description fallback.
     affects: []
     rationale: Prove the SQLite store is created, refreshes when new commits land on the branch, still resolves the original change rationale after later line shifts, and can build provenance from PR descriptions when no changelog file exists.
   - file: tests/test_changelog_index.py
     span:
-      start_line: 1
-      end_line: 159
+      start_line: 6
+      end_line: 152
     summary: Cover lineage tracking across later insertions, changelog artifact provenance, and PR-description fallback.
     affects: []
     rationale: Verify the mainline index preserves per-line attribution after later commits, still records the changelog artifact as a provenance-bearing file, and uses the PR body when the changelog file is absent.

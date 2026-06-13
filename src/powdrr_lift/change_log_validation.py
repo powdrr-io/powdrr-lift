@@ -92,6 +92,11 @@ def build_validation_report(
         for change in change_log.changes
         if change.file is not None and change.file != ""
     ]
+    expected_change_spans = {
+        entry.path: entry
+        for entry in diff_entries
+        if not _is_changelog_artifact_path(entry.path)
+    }
 
     missing_change_files = [
         file_path
@@ -106,6 +111,34 @@ def build_validation_report(
                 path=file_path,
             )
         )
+
+    for change in change_log.changes:
+        if change.file is None or change.file == "":
+            continue
+
+        expected_entry = expected_change_spans.get(change.file)
+        if expected_entry is None or _is_changelog_artifact_path(change.file):
+            continue
+
+        if (
+            change.span.start_line is None
+            or change.span.end_line is None
+            or change.span.start_line > change.span.end_line
+            or change.span.start_line != expected_entry.start_line
+            or change.span.end_line != expected_entry.end_line
+        ):
+            issues.append(
+                ValidationIssue(
+                    code="span_mismatch",
+                    message=(
+                        "Span for "
+                        f"{change.file} should be "
+                        f"{expected_entry.start_line}-{expected_entry.end_line}"
+                        f" but was {change.span.start_line}-{change.span.end_line}"
+                    ),
+                    path=change.file,
+                )
+            )
 
     unexpected_change_files = [
         file_path

@@ -94,7 +94,9 @@ class _FilePatch:
 @dataclass(frozen=True, slots=True)
 class _PatchHunk:
     old_start: int
+    old_count: int
     new_start: int
+    new_count: int
     lines: list[str]
 
 
@@ -675,7 +677,9 @@ def _parse_patch_hunks(patch_output: str) -> list[_PatchHunk]:
                 hunks.append(current_hunk)
             current_hunk = _PatchHunk(
                 old_start=int(match.group("old_start")),
+                old_count=int(match.group("old_count") or "1"),
                 new_start=int(match.group("new_start")),
+                new_count=int(match.group("new_count") or "1"),
                 lines=[],
             )
             continue
@@ -690,24 +694,20 @@ def _parse_patch_hunks(patch_output: str) -> list[_PatchHunk]:
 
 
 def _resolve_patch_span(file_patch: _FilePatch) -> Span:
-    new_line_numbers: list[int] = []
-    line_number = 1
+    span_ranges: list[tuple[int, int]] = []
     for hunk in file_patch.hunks:
-        while line_number < hunk.new_start:
-            new_line_numbers.append(line_number)
-            line_number += 1
+        if hunk.new_count > 0:
+            span_ranges.append((hunk.new_start, hunk.new_start + hunk.new_count - 1))
+        elif hunk.old_count > 0:
+            span_ranges.append((hunk.old_start, hunk.old_start + hunk.old_count - 1))
 
-        for line in hunk.lines:
-            if line.startswith("+") or line.startswith(" "):
-                new_line_numbers.append(line_number)
-                line_number += 1
-            elif line.startswith("-"):
-                continue
-
-    if not new_line_numbers:
+    if not span_ranges:
         return Span(start_line=1, end_line=1)
 
-    return Span(start_line=min(new_line_numbers), end_line=max(new_line_numbers))
+    return Span(
+        start_line=min(span[0] for span in span_ranges),
+        end_line=max(span[1] for span in span_ranges),
+    )
 
 
 def _span_sort_key(change: ProvenanceRecord) -> tuple[int, int]:

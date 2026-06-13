@@ -80,6 +80,23 @@ Inspect prior intent for a file and line ranges before editing code:
 powdrr-lift edit-context --file src/app.py --range 10:20 --parent-branch main
 ```
 
+## Blame UI
+
+Open a local blame-style view of the repository, powered by the cached index:
+
+```bash
+powdrr-lift blame-ui --parent-branch main --file src/app.py
+```
+
+The UI has three panes:
+
+- a file tree on the left
+- blame-grouped source in the center
+- PR intent and change rationale on the right
+
+The first time you open it, the CLI refreshes the local SQLite index if needed.
+After that, the UI reads only from the repository and local index files.
+
 ## Skills
 
 Installable skills live under `skills/`. The repo currently ships a
@@ -97,4 +114,5 @@ Run the MCP server locally:
 powdrr-lift-mcp
 ```
 
-The server exposes `get_edit_context` alongside the changelog workflow tools.
+The server exposes `get_edit_context`, `get_blame_view`, and the changelog
+workflow tools.

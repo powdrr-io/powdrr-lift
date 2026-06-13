@@ -609,15 +609,16 @@ def _render_html() -> str:
                 <div class="detail-key">PR</div>
                 <div>#${provenance.pr_number ?? "?"}</div>
                 <div class="detail-key">Kind</div>
-                <div>${escapeHtml(provenance.kind)}</div>
-                <div class="detail-key">Change ID</div>
-                <div>${escapeHtml(String(provenance.change_id ?? ""))}</div>
+                <div>${escapeHtml(kindLabel(provenance.kind))}</div>
                 <div class="detail-key">File</div>
                 <div>${escapeHtml(provenance.file_path || "")}</div>
-                <div class="detail-key">Span</div>
+                <div class="detail-key">Source span</div>
                 <div>
                   ${provenance.span_start ?? "?"}–${provenance.span_end ?? "?"}
                 </div>
+              </div>
+              <div class="detail-text" style="margin-top: 10px; color: var(--muted);">
+                The span is the source-file line range tied to this provenance.
               </div>
             </div>
             <div class="detail-card">
@@ -657,6 +658,19 @@ def _render_html() -> str:
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
+      }
+
+      function kindLabel(kind) {
+        if (kind === "declared") {
+          return "declared: explicit changelog entry";
+        }
+        if (kind === "artifact") {
+          return "artifact: PR changelog file itself";
+        }
+        if (kind === "implicit") {
+          return "implicit: inferred from the diff";
+        }
+        return kind;
       }
 
       bootstrap().catch((error) => {

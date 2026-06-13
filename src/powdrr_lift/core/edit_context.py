@@ -39,9 +39,7 @@ class EditContextReport:
 
 def parse_line_range(range_text: str) -> tuple[int, int]:
     if ":" not in range_text:
-        raise ValueError(
-            f"Line range {range_text!r} must use start:end format."
-        )
+        raise ValueError(f"Line range {range_text!r} must use start:end format.")
 
     start_text, end_text = range_text.split(":", maxsplit=1)
     start_line = int(start_text)

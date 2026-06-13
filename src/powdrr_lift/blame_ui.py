@@ -211,7 +211,12 @@ def _render_html() -> str:
       }
       .workspace {
         display: grid;
-        grid-template-columns: 280px minmax(0, 1fr) 360px;
+        grid-template-columns:
+          minmax(220px, var(--tree-width, 280px))
+          8px
+          minmax(360px, var(--code-width, 1fr))
+          8px
+          minmax(280px, var(--context-width, 360px));
         min-height: 0;
       }
       .pane {
@@ -220,6 +225,41 @@ def _render_html() -> str:
         background: rgba(255,255,255,0.6);
       }
       .pane:last-child { border-right: none; }
+      .splitter {
+        position: relative;
+        z-index: 3;
+        cursor: col-resize;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(21, 41, 71, 0.08),
+            rgba(21, 41, 71, 0.03)
+          );
+        border-right: 1px solid rgba(18, 32, 51, 0.08);
+        border-left: 1px solid rgba(18, 32, 51, 0.08);
+        touch-action: none;
+      }
+      .splitter::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 2px;
+        height: 34px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        background: rgba(97, 111, 137, 0.55);
+        box-shadow:
+          -5px 0 0 rgba(97, 111, 137, 0.22),
+          5px 0 0 rgba(97, 111, 137, 0.22);
+      }
+      .splitter:hover::before,
+      .splitter.dragging::before {
+        background: var(--accent);
+        box-shadow:
+          -5px 0 0 rgba(33, 86, 230, 0.22),
+          5px 0 0 rgba(33, 86, 230, 0.22);
+      }
       .pane-header {
         position: sticky;
         top: 0;
@@ -238,6 +278,10 @@ def _render_html() -> str:
         overflow: auto;
         height: calc(100vh - 60px);
       }
+      .tree-branch {
+        display: grid;
+        gap: 2px;
+      }
       .tree-node {
         margin: 0;
         padding: 0;
@@ -245,13 +289,40 @@ def _render_html() -> str:
       }
       .tree-folder > summary {
         cursor: pointer;
-        padding: 6px 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px 6px calc(8px + (var(--depth, 0) * 16px));
         border-radius: 8px;
         color: var(--muted);
       }
       .tree-folder[open] > summary {
         background: var(--panel-muted);
         color: var(--text);
+      }
+      .tree-folder summary::before,
+      .tree-file::before {
+        content: "";
+        width: 10px;
+        flex: none;
+      }
+      .tree-folder summary::before {
+        content: "▸";
+        color: var(--muted);
+        font-size: 11px;
+        transform: translateY(-1px);
+      }
+      .tree-folder[open] > summary::before {
+        content: "▾";
+      }
+      .tree-children {
+        margin-left: 12px;
+        padding-left: 12px;
+        border-left: 1px solid rgba(93, 107, 130, 0.18);
+      }
+      .tree-entry {
+        --depth: 0;
+        padding-left: calc(var(--depth) * 16px);
       }
       .tree-file {
         display: block;
@@ -422,10 +493,12 @@ def _render_html() -> str:
           <div class="pane-header">Files</div>
           <div class="tree-list" id="tree"></div>
         </aside>
+        <div class="splitter" data-splitter="tree" aria-hidden="true"></div>
         <main class="pane">
           <div class="pane-header">CODE</div>
           <div class="blame-pane" id="blame"></div>
         </main>
+        <div class="splitter" data-splitter="code" aria-hidden="true"></div>
         <aside class="pane">
           <div class="pane-header">Context</div>
           <div class="details" id="details"></div>
@@ -437,6 +510,9 @@ def _render_html() -> str:
         app: null,
         currentFileView: null,
         selectedChunkRef: null,
+        treeWidth: 280,
+        codeWidth: null,
+        contextWidth: 360,
       };
 
       async function bootstrap() {
@@ -448,9 +524,91 @@ def _render_html() -> str:
           }`
         );
         state.app = await response.json();
+        applyColumnWidths();
+        installSplitters();
         renderMeta();
         renderTree();
         renderFileView(state.app.file_view);
+      }
+
+      function applyColumnWidths() {
+        const workspace = document.querySelector(".workspace");
+        if (!workspace) return;
+        workspace.style.setProperty("--tree-width", `${state.treeWidth}px`);
+        workspace.style.setProperty("--context-width", `${state.contextWidth}px`);
+        if (state.codeWidth != null) {
+          workspace.style.setProperty("--code-width", `${state.codeWidth}px`);
+        } else {
+          workspace.style.removeProperty("--code-width");
+        }
+      }
+
+      function installSplitters() {
+        const splitterMap = {
+          tree: {
+            element: document.querySelector('[data-splitter="tree"]'),
+            left: "treeWidth",
+            right: "codeWidth",
+            minLeft: 220,
+            minRight: 360,
+          },
+          code: {
+            element: document.querySelector('[data-splitter="code"]'),
+            left: "codeWidth",
+            right: "contextWidth",
+            minLeft: 360,
+            minRight: 280,
+          },
+        };
+
+        for (const config of Object.values(splitterMap)) {
+          if (!config.element) continue;
+          config.element.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            const workspace = document.querySelector(".workspace");
+            if (!workspace) return;
+            const rect = workspace.getBoundingClientRect();
+            const leftPane = config.element.previousElementSibling;
+            const rightPane = config.element.nextElementSibling;
+            if (!leftPane || !rightPane) return;
+
+            const initialLeft = measurePaneWidth(leftPane);
+            const initialRight = measurePaneWidth(rightPane);
+            const startX = event.clientX;
+            config.element.classList.add("dragging");
+            config.element.setPointerCapture(event.pointerId);
+
+            const onMove = (moveEvent) => {
+              const delta = moveEvent.clientX - startX;
+              const total = initialLeft + initialRight;
+              const maxLeft = total - config.minRight;
+              const nextLeft = clamp(initialLeft + delta, config.minLeft, maxLeft);
+              const nextRight = total - nextLeft;
+              state[config.left] = nextLeft;
+              state[config.right] = nextRight;
+              applyColumnWidths();
+            };
+
+            const onUp = () => {
+              config.element.classList.remove("dragging");
+              config.element.removeEventListener("pointermove", onMove);
+              config.element.removeEventListener("pointerup", onUp);
+              config.element.removeEventListener("pointercancel", onUp);
+            };
+
+            config.element.addEventListener("pointermove", onMove);
+            config.element.addEventListener("pointerup", onUp, { once: true });
+            config.element.addEventListener("pointercancel", onUp, { once: true });
+          });
+        }
+      }
+
+      function measurePaneWidth(element) {
+        return Math.round(element.getBoundingClientRect().width);
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
       }
 
       function renderMeta() {
@@ -471,20 +629,27 @@ def _render_html() -> str:
 
       function renderTreeNodes(nodes, depth) {
         const container = document.createElement("div");
+        container.className = "tree-branch";
         for (const node of nodes) {
           if (node.kind === "dir") {
             const details = document.createElement("details");
+            details.style.setProperty("--depth", depth.toString());
             details.open = depth < 2;
             details.className = "tree-node tree-folder";
             const summary = document.createElement("summary");
             summary.textContent = node.name;
             details.appendChild(summary);
-            details.appendChild(renderTreeNodes(node.children, depth + 1));
+            const children = document.createElement("div");
+            children.className = "tree-children";
+            children.appendChild(renderTreeNodes(node.children, depth + 1));
+            details.appendChild(children);
             container.appendChild(details);
           } else {
             const button = document.createElement("button");
             button.className =
-              "tree-file" + (node.path === state.app.selected_file ? " active" : "");
+              "tree-file tree-entry" +
+              (node.path === state.app.selected_file ? " active" : "");
+            button.style.setProperty("--depth", depth.toString());
             button.textContent = node.name;
             button.dataset.path = node.path;
             button.addEventListener("click", () => loadFile(node.path));

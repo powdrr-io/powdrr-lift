@@ -60,7 +60,11 @@ def build_validation_report(
         default_branch_name,
         branch_name,
     )
-    expected_change_files = [entry.path for entry in diff_entries]
+    expected_change_files = [
+        entry.path
+        for entry in diff_entries
+        if not _is_changelog_artifact_path(entry.path)
+    ]
 
     issues: list[ValidationIssue] = []
     proposed_change_files: list[str] = []
@@ -206,3 +210,7 @@ def _parse_sequence(raw_data: object | None) -> Sequence[object]:
         raise ValueError("Expected a sequence in the validation report structure.")
 
     return raw_data
+
+
+def _is_changelog_artifact_path(path: str) -> bool:
+    return path.startswith("docs/changelogs/PR-") and path.endswith("-changelog.yaml")

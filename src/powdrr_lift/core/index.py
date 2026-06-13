@@ -1,0 +1,668 @@
+from __future__ import annotations
+
+import re
+import subprocess
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from powdrr_lift.change_log_parser import Change, ChangeLog, Span, parse_change_log
+from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
+
+_PR_FILE_NAME_RE = re.compile(r"^PR-(\d+)-changelog\.yaml$")
+_PR_SUBJECT_RE = re.compile(r"\(#(?P<pr_number>\d+)\)")
+_HUNK_HEADER_RE = re.compile(
+    r"^@@ -(?P<old_start>\d+)(?:,(?P<old_count>\d+))? "
+    r"\+(?P<new_start>\d+)(?:,(?P<new_count>\d+))? @@"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ChangelogDocument:
+    pr_number: int
+    changelog_path: Path
+    changelog: ChangeLog
+    commit_sha: str | None
+    commit_timestamp: int | None
+    commit_subject: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ProvenanceRecord:
+    kind: str
+    pr_number: int | None
+    commit_sha: str | None
+    commit_timestamp: int | None
+    changelog_path: str | None
+    title: str | None
+    change_id: str | None
+    intent_problem: str | None
+    intent_goal: str | None
+    file: str | None
+    span: Span | None
+    summary: str | None
+    rationale: str | None
+    change_index: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SourceIndex:
+    repo_root: Path
+    default_branch_name: str
+    documents: list[ChangelogDocument] = field(default_factory=list)
+    changes: list[ProvenanceRecord] = field(default_factory=list)
+    file_lines: dict[str, tuple[ProvenanceRecord | None, ...]] = field(
+        default_factory=dict
+    )
+
+    def provenance_for(self, path: str, line_number: int) -> ProvenanceRecord | None:
+        if line_number < 1:
+            raise ValueError("Line numbers are 1-based.")
+
+        file_lines = self.file_lines.get(path)
+        if file_lines is None or line_number > len(file_lines):
+            return None
+
+        return file_lines[line_number - 1]
+
+
+@dataclass(frozen=True, slots=True)
+class _CommitRecord:
+    sha: str
+    parent_sha: str | None
+    timestamp: int
+    subject: str
+    pr_number: int | None
+    changelog_document: ChangelogDocument | None
+
+
+@dataclass(frozen=True, slots=True)
+class _FilePatch:
+    status: str
+    path: str
+    old_path: str | None
+    hunks: list[_PatchHunk]
+
+
+@dataclass(frozen=True, slots=True)
+class _PatchHunk:
+    old_start: int
+    new_start: int
+    lines: list[str]
+
+
+def build_changelog_index(
+    repo_root: str | Path | None = None,
+    default_branch: str | None = None,
+    changelog_dir: str | Path = "docs/changelogs",
+) -> SourceIndex:
+    repo_root_path = _resolve_repo_root(repo_root)
+    default_branch_name = default_branch or _resolve_default_branch(repo_root_path)
+    documents = _load_changelog_documents(repo_root_path, changelog_dir)
+    document_by_pr = {document.pr_number: document for document in documents}
+    commits = _load_mainline_commits(
+        repo_root_path,
+        default_branch_name,
+        document_by_pr,
+    )
+
+    changes: list[ProvenanceRecord] = []
+    line_state: dict[str, list[ProvenanceRecord | None]] = {}
+
+    for commit in commits:
+        file_patches = _collect_file_patches(
+            repo_root_path,
+            commit.sha,
+            commit.parent_sha,
+        )
+        commit_changes = _build_commit_changes(
+            repo_root_path,
+            commit,
+            file_patches,
+        )
+        changes.extend(commit_changes)
+
+        for file_patch in file_patches:
+            _apply_file_patch(
+                line_state=line_state,
+                commit=commit,
+                file_patch=file_patch,
+                commit_changes=commit_changes,
+            )
+
+    _normalize_line_state(repo_root_path, line_state)
+    documents = [
+        document_by_pr.get(document.pr_number, document) for document in documents
+    ]
+    return SourceIndex(
+        repo_root=repo_root_path,
+        default_branch_name=default_branch_name,
+        documents=documents,
+        changes=changes,
+        file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
+    )
+
+
+def _load_changelog_documents(
+    repo_root: Path,
+    changelog_dir: str | Path,
+) -> list[ChangelogDocument]:
+    changelog_root = repo_root / Path(changelog_dir)
+    if not changelog_root.exists():
+        return []
+
+    documents: list[ChangelogDocument] = []
+    for changelog_path in sorted(changelog_root.glob("PR-*-changelog.yaml")):
+        match = _PR_FILE_NAME_RE.match(changelog_path.name)
+        if match is None:
+            continue
+
+        pr_number = int(match.group(1))
+        content = changelog_path.read_text(encoding="utf-8")
+        documents.append(
+            ChangelogDocument(
+                pr_number=pr_number,
+                changelog_path=changelog_path,
+                changelog=parse_change_log(content),
+                commit_sha=None,
+                commit_timestamp=None,
+                commit_subject=None,
+            )
+        )
+
+    return documents
+
+
+def _load_mainline_commits(
+    repo_root: Path,
+    default_branch_name: str,
+    document_by_pr: dict[int, ChangelogDocument],
+) -> list[_CommitRecord]:
+    output = _git_output(
+        repo_root,
+        "log",
+        "--first-parent",
+        "--reverse",
+        "--format=%H\t%ct\t%s\t%P",
+        default_branch_name,
+    )
+    commits: list[_CommitRecord] = []
+    for line in output.splitlines():
+        if not line:
+            continue
+
+        sha, timestamp_text, subject, parents = line.split("\t", maxsplit=3)
+        parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
+        pr_number = _extract_pr_number(subject)
+        if pr_number is None:
+            commits.append(
+                _CommitRecord(
+                    sha=sha,
+                    parent_sha=parent_sha,
+                    timestamp=int(timestamp_text),
+                    subject=subject,
+                    pr_number=None,
+                    changelog_document=None,
+                )
+            )
+            continue
+
+        changelog_document = document_by_pr.get(pr_number)
+        if changelog_document is not None:
+            changelog_document = ChangelogDocument(
+                pr_number=changelog_document.pr_number,
+                changelog_path=changelog_document.changelog_path,
+                changelog=changelog_document.changelog,
+                commit_sha=sha,
+                commit_timestamp=int(timestamp_text),
+                commit_subject=subject,
+            )
+            document_by_pr[pr_number] = changelog_document
+
+        commits.append(
+            _CommitRecord(
+                sha=sha,
+                parent_sha=parent_sha,
+                timestamp=int(timestamp_text),
+                subject=subject,
+                pr_number=pr_number,
+                changelog_document=changelog_document,
+            )
+        )
+
+    return commits
+
+
+def _build_commit_changes(
+    repo_root: Path,
+    commit: _CommitRecord,
+    file_patches: Sequence[_FilePatch],
+) -> list[ProvenanceRecord]:
+    if commit.changelog_document is None:
+        return []
+
+    declared_changes_by_file = _group_declared_changes(commit.changelog_document)
+    commit_changes: list[ProvenanceRecord] = []
+    for file_patch in file_patches:
+        if _is_changelog_artifact_path(file_patch.path, commit.pr_number):
+            commit_changes.append(
+                _build_artifact_provenance(
+                    repo_root=repo_root,
+                    commit=commit,
+                    changelog_document=commit.changelog_document,
+                    file_patch=file_patch,
+                )
+            )
+            continue
+
+        declared_changes = declared_changes_by_file.get(file_patch.path, [])
+        if declared_changes:
+            for change_index, change in enumerate(declared_changes):
+                commit_changes.append(
+                    _build_declared_provenance(
+                        commit=commit,
+                        changelog_document=commit.changelog_document,
+                        file_patch=file_patch,
+                        change=change,
+                        change_index=change_index,
+                    )
+                )
+            continue
+
+        commit_changes.append(
+            _build_implicit_provenance(
+                repo_root=repo_root,
+                commit=commit,
+                changelog_document=commit.changelog_document,
+                file_patch=file_patch,
+            )
+        )
+
+    return commit_changes
+
+
+def _build_declared_provenance(
+    commit: _CommitRecord,
+    changelog_document: ChangelogDocument,
+    file_patch: _FilePatch,
+    change: Change,
+    change_index: int,
+) -> ProvenanceRecord:
+    return ProvenanceRecord(
+        kind="declared",
+        pr_number=commit.pr_number,
+        commit_sha=commit.sha,
+        commit_timestamp=commit.timestamp,
+        changelog_path=str(changelog_document.changelog_path),
+        title=changelog_document.changelog.title,
+        change_id=changelog_document.changelog.change_id,
+        intent_problem=changelog_document.changelog.intent.problem,
+        intent_goal=changelog_document.changelog.intent.goal,
+        file=file_patch.path,
+        span=change.span,
+        summary=change.summary,
+        rationale=change.rationale,
+        change_index=change_index,
+    )
+
+
+def _build_artifact_provenance(
+    repo_root: Path,
+    commit: _CommitRecord,
+    changelog_document: ChangelogDocument,
+    file_patch: _FilePatch,
+) -> ProvenanceRecord:
+    line_count = _read_commit_line_count(repo_root, commit.sha, file_patch.path)
+    span = Span(start_line=1, end_line=line_count)
+    return ProvenanceRecord(
+        kind="artifact",
+        pr_number=commit.pr_number,
+        commit_sha=commit.sha,
+        commit_timestamp=commit.timestamp,
+        changelog_path=str(changelog_document.changelog_path),
+        title=changelog_document.changelog.title,
+        change_id=changelog_document.changelog.change_id,
+        intent_problem=changelog_document.changelog.intent.problem,
+        intent_goal=changelog_document.changelog.intent.goal,
+        file=file_patch.path,
+        span=span,
+        summary=f"Create changelog artifact for PR {commit.pr_number}",
+        rationale="Store the validated PR changelog alongside the code change.",
+        change_index=None,
+    )
+
+
+def _build_implicit_provenance(
+    repo_root: Path,
+    commit: _CommitRecord,
+    changelog_document: ChangelogDocument,
+    file_patch: _FilePatch,
+) -> ProvenanceRecord:
+    span = _resolve_patch_span(file_patch)
+    return ProvenanceRecord(
+        kind="implicit",
+        pr_number=commit.pr_number,
+        commit_sha=commit.sha,
+        commit_timestamp=commit.timestamp,
+        changelog_path=str(changelog_document.changelog_path),
+        title=changelog_document.changelog.title,
+        change_id=changelog_document.changelog.change_id,
+        intent_problem=changelog_document.changelog.intent.problem,
+        intent_goal=changelog_document.changelog.intent.goal,
+        file=file_patch.path,
+        span=span,
+        summary=f"Unlisted change in {file_patch.path}",
+        rationale=(
+            "Captured from the PR changelog because no explicit file entry matched."
+        ),
+        change_index=None,
+    )
+
+
+def _group_declared_changes(
+    changelog_document: ChangelogDocument,
+) -> dict[str, list[Change]]:
+    grouped: dict[str, list[Change]] = {}
+    for change in changelog_document.changelog.changes:
+        if change.file is None or change.file == "":
+            continue
+
+        grouped.setdefault(change.file, []).append(change)
+
+    return grouped
+
+
+def _apply_file_patch(
+    line_state: dict[str, list[ProvenanceRecord | None]],
+    commit: _CommitRecord,
+    file_patch: _FilePatch,
+    commit_changes: Sequence[ProvenanceRecord],
+) -> None:
+    if file_patch.status.startswith("D"):
+        line_state.pop(file_patch.path, None)
+        if file_patch.old_path is not None and file_patch.old_path != file_patch.path:
+            line_state.pop(file_patch.old_path, None)
+        return
+
+    if file_patch.status.startswith("R") and file_patch.old_path is not None:
+        previous_lines = line_state.pop(file_patch.old_path, [])
+        line_state[file_patch.path] = list(previous_lines)
+    elif file_patch.status.startswith("C") and file_patch.old_path is not None:
+        previous_lines = line_state.get(file_patch.old_path, [])
+        line_state[file_patch.path] = list(previous_lines)
+    elif file_patch.path not in line_state:
+        line_state[file_patch.path] = []
+
+    current_lines = line_state[file_patch.path]
+    commit_changes_for_file = [
+        change for change in commit_changes if change.file == file_patch.path
+    ]
+    next_lines = _apply_patch(
+        current_lines,
+        file_patch.hunks,
+        lambda new_line_number: _resolve_line_origin(
+            file_patch.path,
+            new_line_number,
+            commit,
+            commit_changes_for_file,
+        ),
+    )
+    line_state[file_patch.path] = next_lines
+
+
+def _apply_patch(
+    old_lines: Sequence[ProvenanceRecord | None],
+    hunks: Sequence[_PatchHunk],
+    resolve_origin: Callable[[int], ProvenanceRecord | None],
+) -> list[ProvenanceRecord | None]:
+    new_lines: list[ProvenanceRecord | None] = []
+    old_index = 1
+    new_index = 1
+
+    for hunk in hunks:
+        while old_index < hunk.old_start and new_index < hunk.new_start:
+            new_lines.append(_safe_line(old_lines, old_index))
+            old_index += 1
+            new_index += 1
+
+        for line in hunk.lines:
+            if line.startswith(" "):
+                new_lines.append(_safe_line(old_lines, old_index))
+                old_index += 1
+                new_index += 1
+                continue
+
+            if line.startswith("-"):
+                old_index += 1
+                continue
+
+            if line.startswith("+"):
+                new_lines.append(resolve_origin(new_index))
+                new_index += 1
+                continue
+
+    while old_index <= len(old_lines):
+        new_lines.append(_safe_line(old_lines, old_index))
+        old_index += 1
+        new_index += 1
+
+    return new_lines
+
+
+def _resolve_line_origin(
+    file_path: str,
+    new_line_number: int,
+    commit: _CommitRecord,
+    commit_changes_for_file: Sequence[ProvenanceRecord],
+) -> ProvenanceRecord | None:
+    if not commit_changes_for_file:
+        return None
+
+    if _is_changelog_artifact_path(file_path, commit.pr_number):
+        return commit_changes_for_file[0]
+
+    matching_changes = [
+        change
+        for change in commit_changes_for_file
+        if change.span is not None
+        and change.span.start_line is not None
+        and change.span.end_line is not None
+        and change.span.start_line <= new_line_number <= change.span.end_line
+    ]
+    if matching_changes:
+        return min(
+            matching_changes,
+            key=_span_sort_key,
+        )
+
+    return commit_changes_for_file[0]
+
+
+def _normalize_line_state(
+    repo_root: Path,
+    line_state: dict[str, list[ProvenanceRecord | None]],
+) -> None:
+    for file_path in _tracked_files(repo_root):
+        current_line_count = _read_worktree_line_count(repo_root, file_path)
+        file_lines = line_state.get(file_path)
+        if file_lines is None:
+            line_state[file_path] = [None] * current_line_count
+            continue
+
+        if len(file_lines) < current_line_count:
+            file_lines.extend([None] * (current_line_count - len(file_lines)))
+            continue
+
+        if len(file_lines) > current_line_count:
+            del file_lines[current_line_count:]
+
+
+def _collect_file_patches(
+    repo_root: Path,
+    commit_sha: str,
+    parent_sha: str | None,
+) -> list[_FilePatch]:
+    if parent_sha is None:
+        return []
+
+    name_status_output = _git_output(
+        repo_root,
+        "diff",
+        "--name-status",
+        "--find-renames",
+        "--find-copies",
+        parent_sha,
+        commit_sha,
+    )
+    patches: list[_FilePatch] = []
+    for line in name_status_output.splitlines():
+        if not line:
+            continue
+
+        parts = line.split("\t")
+        status = parts[0]
+        old_path: str | None
+        if status.startswith(("R", "C")) and len(parts) >= 3:
+            old_path = parts[1]
+            path = parts[2]
+        else:
+            old_path = None if status != "D" else parts[1]
+            path = parts[-1]
+
+        patch_output = _git_output(
+            repo_root,
+            "diff",
+            "--unified=0",
+            "--no-color",
+            "--find-renames",
+            "--find-copies",
+            parent_sha,
+            commit_sha,
+            "--",
+            path,
+        )
+        patches.append(
+            _FilePatch(
+                status=status,
+                path=path,
+                old_path=old_path,
+                hunks=_parse_patch_hunks(patch_output),
+            )
+        )
+
+    return patches
+
+
+def _parse_patch_hunks(patch_output: str) -> list[_PatchHunk]:
+    hunks: list[_PatchHunk] = []
+    current_hunk: _PatchHunk | None = None
+    for line in patch_output.splitlines():
+        match = _HUNK_HEADER_RE.match(line)
+        if match is not None:
+            if current_hunk is not None:
+                hunks.append(current_hunk)
+            current_hunk = _PatchHunk(
+                old_start=int(match.group("old_start")),
+                new_start=int(match.group("new_start")),
+                lines=[],
+            )
+            continue
+
+        if current_hunk is not None and line[:1] in {" ", "+", "-"}:
+            current_hunk.lines.append(line)
+
+    if current_hunk is not None:
+        hunks.append(current_hunk)
+
+    return hunks
+
+
+def _resolve_patch_span(file_patch: _FilePatch) -> Span:
+    new_line_numbers: list[int] = []
+    line_number = 1
+    for hunk in file_patch.hunks:
+        while line_number < hunk.new_start:
+            new_line_numbers.append(line_number)
+            line_number += 1
+
+        for line in hunk.lines:
+            if line.startswith("+") or line.startswith(" "):
+                new_line_numbers.append(line_number)
+                line_number += 1
+            elif line.startswith("-"):
+                continue
+
+    if not new_line_numbers:
+        return Span(start_line=1, end_line=1)
+
+    return Span(start_line=min(new_line_numbers), end_line=max(new_line_numbers))
+
+
+def _span_sort_key(change: ProvenanceRecord) -> tuple[int, int]:
+    span = change.span
+    if span is None:
+        return (0, change.change_index or 0)
+
+    start_line = span.start_line or 0
+    end_line = span.end_line or start_line
+    return (end_line - start_line, change.change_index or 0)
+
+
+def _read_commit_line_count(repo_root: Path, commit_sha: str, path: str) -> int:
+    content = _git_output(repo_root, "show", f"{commit_sha}:{path}")
+    if content == "":
+        return 0
+
+    return len(content.splitlines())
+
+
+def _read_worktree_line_count(repo_root: Path, path: str) -> int:
+    file_path = repo_root / path
+    if not file_path.exists():
+        return 0
+
+    content = file_path.read_text(encoding="utf-8")
+    if content == "":
+        return 0
+
+    return len(content.splitlines())
+
+
+def _tracked_files(repo_root: Path) -> list[str]:
+    output = _git_output(repo_root, "ls-files")
+    return [line for line in output.splitlines() if line]
+
+
+def _safe_line(
+    lines: Sequence[ProvenanceRecord | None],
+    line_number: int,
+) -> ProvenanceRecord | None:
+    if line_number < 1 or line_number > len(lines):
+        return None
+
+    return lines[line_number - 1]
+
+
+def _is_changelog_artifact_path(path: str, pr_number: int | None) -> bool:
+    if pr_number is None:
+        return False
+
+    return path == f"docs/changelogs/PR-{pr_number}-changelog.yaml"
+
+
+def _extract_pr_number(subject: str) -> int | None:
+    match = _PR_SUBJECT_RE.search(subject)
+    if match is None:
+        return None
+
+    return int(match.group("pr_number"))
+
+
+def _git_output(repo_root: Path, *args: str) -> str:
+    process = subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return process.stdout

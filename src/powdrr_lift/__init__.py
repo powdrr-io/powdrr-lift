@@ -17,9 +17,17 @@ __all__ = [
     "Decision",
     "Entity",
     "Intent",
+    "ChangelogDocument",
+    "BranchState",
+    "code_index_db_path",
+    "lookup_code_provenance",
+    "lookup_code_provenance_span",
+    "ProvenanceRecord",
     "RelationshipChange",
     "Span",
     "create_change_log_template",
+    "build_changelog_index",
+    "refresh_code_index",
     "parse_change_log",
     "build_validation_report",
     "parse_validation_report",
@@ -34,6 +42,51 @@ def __getattr__(name: str) -> Any:
         from powdrr_lift.change_log_template import create_change_log_template
 
         return create_change_log_template
+
+    if name == "build_changelog_index":
+        from powdrr_lift.core.index import build_changelog_index
+
+        return build_changelog_index
+
+    if name in {
+        "BranchState",
+        "code_index_db_path",
+        "lookup_code_provenance",
+        "lookup_code_provenance_span",
+        "refresh_code_index",
+    }:
+        from powdrr_lift.core.code_index import (
+            BranchState,
+            code_index_db_path,
+            lookup_code_provenance,
+            lookup_code_provenance_span,
+            refresh_code_index,
+        )
+
+        return {
+            "BranchState": BranchState,
+            "code_index_db_path": code_index_db_path,
+            "lookup_code_provenance": lookup_code_provenance,
+            "lookup_code_provenance_span": lookup_code_provenance_span,
+            "refresh_code_index": refresh_code_index,
+        }[name]
+
+    if name in {
+        "ChangelogDocument",
+        "ProvenanceRecord",
+        "SourceIndex",
+    }:
+        from powdrr_lift.core.index import (
+            ChangelogDocument,
+            ProvenanceRecord,
+            SourceIndex,
+        )
+
+        return {
+            "ChangelogDocument": ChangelogDocument,
+            "ProvenanceRecord": ProvenanceRecord,
+            "SourceIndex": SourceIndex,
+        }[name]
 
     if name in {
         "build_validation_report",

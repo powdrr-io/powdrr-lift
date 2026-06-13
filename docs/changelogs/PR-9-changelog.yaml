@@ -1,0 +1,185 @@
+version: 1
+change_id: 9
+title: "Add edit-context skill and index-backed code edit reporting"
+intent:
+  problem: "Agents needed a reliable way to inspect prior provenance before editing code."
+  goal: "Add an installable edit-context skill plus CLI and MCP support that report index-backed context for requested files and line ranges."
+decisions: []
+entities: []
+changes:
+  - file: README.md
+    span:
+      start_line: 75
+      end_line: 82
+    summary: "Document the new edit-context workflow."
+    affects: []
+    rationale: "Explain how to inspect provenance before editing code."
+  - file: README.md
+    span:
+      start_line: 88
+      end_line: 90
+    summary: "Advertise the installable code-edit-context skill."
+    affects: []
+    rationale: "Make the new skill discoverable alongside the existing PR workflow skills."
+  - file: README.md
+    span:
+      start_line: 99
+      end_line: 100
+    summary: "Document the new get_edit_context MCP tool."
+    affects: []
+    rationale: "Expose the edit-context capability in the MCP server documentation."
+  - file: skills/code-edit-context/SKILL.md
+    span:
+      start_line: 1
+      end_line: 25
+    summary: "Define the code-edit-context workflow and guardrails."
+    affects: []
+    rationale: "Give the agent a concrete edit-before-context workflow with explicit guidance to preserve or supersede prior intent."
+  - file: skills/code-edit-context/agents/openai.yaml
+    span:
+      start_line: 1
+      end_line: 4
+    summary: "Add UI metadata and default prompt for the skill."
+    affects: []
+    rationale: "Make the skill visible in the UI and easy to invoke with the right editing prompt."
+  - file: src/powdrr_lift/__init__.py
+    span:
+      start_line: 22
+      end_line: 24
+    summary: "Export the new edit-context types from the package root."
+    affects: []
+    rationale: "Keep the top-level API aligned with the new edit-context report models."
+  - file: src/powdrr_lift/__init__.py
+    span:
+      start_line: 28
+      end_line: 28
+    summary: "Export lookup_edit_context from the package root."
+    affects: []
+    rationale: "Make the new edit-context lookup helper available from the public package surface."
+  - file: src/powdrr_lift/__init__.py
+    span:
+      start_line: 36
+      end_line: 37
+    summary: "Export the line-range parsing helpers from the package root."
+    affects: []
+    rationale: "Expose the input parsing utilities needed by the CLI and MCP tool."
+  - file: src/powdrr_lift/__init__.py
+    span:
+      start_line: 40
+      end_line: 40
+    summary: "Export the edit-context YAML renderer from the package root."
+    affects: []
+    rationale: "Keep the report serialization helper available to callers that want the rendered output."
+  - file: src/powdrr_lift/__init__.py
+    span:
+      start_line: 98
+      end_line: 134
+    summary: "Lazy-load the edit-context exports."
+    affects: []
+    rationale: "Expose the new API without forcing the package to import edit-context code eagerly."
+  - file: src/powdrr_lift/cli.py
+    span:
+      start_line: 10
+      end_line: 11
+    summary: "Import the edit-context lookup helpers into the CLI."
+    affects: []
+    rationale: "Support the new command while reusing the shared core implementation."
+  - file: src/powdrr_lift/cli.py
+    span:
+      start_line: 13
+      end_line: 13
+    summary: "Import the edit-context YAML renderer into the CLI."
+    affects: []
+    rationale: "Let the CLI emit the report in the same structured format as the MCP tool."
+  - file: src/powdrr_lift/cli.py
+    span:
+      start_line: 90
+      end_line: 124
+    summary: "Add the edit-context CLI command."
+    affects: []
+    rationale: "Provide a shell-friendly entry point for requesting provenance for a file and line ranges."
+  - file: src/powdrr_lift/cli.py
+    span:
+      start_line: 189
+      end_line: 202
+    summary: "Add the edit-context command handler."
+    affects: []
+    rationale: "Resolve the current branch, fetch the index-backed context, and print the report."
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 8
+      end_line: 16
+    summary: "Expose the edit-context core module from the package namespace."
+    affects: []
+    rationale: "Make the new report types and helpers available through the shared core import path."
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 54
+      end_line: 56
+    summary: "Add the edit-context report types to __all__."
+    affects: []
+    rationale: "Keep the exported type surface consistent with the new module."
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 76
+      end_line: 76
+    summary: "Export lookup_edit_context from core.__all__."
+    affects: []
+    rationale: "Expose the main edit-context lookup entry point alongside the rest of the core API."
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 78
+      end_line: 79
+    summary: "Export the line-range parsers from core.__all__."
+    affects: []
+    rationale: "Make the CLI/MCP parsing helpers visible to downstream callers."
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 82
+      end_line: 82
+    summary: "Export the edit-context YAML renderer from core.__all__."
+    affects: []
+    rationale: "Keep the rendered-report helper available through the shared core namespace."
+  - file: src/powdrr_lift/core/code_index.py
+    span:
+      start_line: 201
+      end_line: 255
+    summary: "Add line-level lookup support to the SQLite code index."
+    affects: []
+    rationale: "Let the edit-context report map each requested line back to its provenance record."
+  - file: src/powdrr_lift/core/edit_context.py
+    span:
+      start_line: 1
+      end_line: 180
+    summary: "Implement edit-context report models, lookup, and rendering."
+    affects: []
+    rationale: "Provide the shared core logic used by the CLI and MCP tool to return provenance-backed edit context."
+  - file: src/powdrr_lift/mcp_server.py
+    span:
+      start_line: 8
+      end_line: 9
+    summary: "Import the edit-context helpers into the MCP server."
+    affects: []
+    rationale: "Reuse the shared core implementation for the MCP tool."
+  - file: src/powdrr_lift/mcp_server.py
+    span:
+      start_line: 11
+      end_line: 11
+    summary: "Import the edit-context YAML renderer into the MCP server."
+    affects: []
+    rationale: "Return the edit-context report in the same structured format as the CLI."
+  - file: src/powdrr_lift/mcp_server.py
+    span:
+      start_line: 70
+      end_line: 87
+    summary: "Add the get_edit_context MCP tool."
+    affects: []
+    rationale: "Expose the edit-context capability to MCP clients."
+  - file: tests/test_edit_context.py
+    span:
+      start_line: 1
+      end_line: 209
+    summary: "Cover the edit-context lookup and CLI output."
+    affects: []
+    rationale: "Prove that the new API returns provenance for requested line ranges and that the CLI serializes the report correctly."
+relationship_changes: []

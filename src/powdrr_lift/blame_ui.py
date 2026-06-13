@@ -282,6 +282,9 @@ def _render_html() -> str:
         display: grid;
         gap: 2px;
       }
+      .tree-row {
+        padding-left: calc(8px + (var(--depth, 0) * 16px));
+      }
       .tree-node {
         margin: 0;
         padding: 0;
@@ -292,7 +295,7 @@ def _render_html() -> str:
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 8px 6px calc(8px + (var(--depth, 0) * 16px));
+        padding: 6px 8px;
         border-radius: 8px;
         color: var(--muted);
       }
@@ -319,10 +322,6 @@ def _render_html() -> str:
         margin-left: 12px;
         padding-left: 12px;
         border-left: 1px solid rgba(93, 107, 130, 0.18);
-      }
-      .tree-entry {
-        --depth: 0;
-        padding-left: calc(var(--depth) * 16px);
       }
       .tree-file {
         display: block;
@@ -631,9 +630,11 @@ def _render_html() -> str:
         const container = document.createElement("div");
         container.className = "tree-branch";
         for (const node of nodes) {
+          const row = document.createElement("div");
+          row.className = "tree-row";
+          row.style.setProperty("--depth", depth.toString());
           if (node.kind === "dir") {
             const details = document.createElement("details");
-            details.style.setProperty("--depth", depth.toString());
             details.open = depth < 2;
             details.className = "tree-node tree-folder";
             const summary = document.createElement("summary");
@@ -643,18 +644,17 @@ def _render_html() -> str:
             children.className = "tree-children";
             children.appendChild(renderTreeNodes(node.children, depth + 1));
             details.appendChild(children);
-            container.appendChild(details);
+            row.appendChild(details);
           } else {
             const button = document.createElement("button");
             button.className =
-              "tree-file tree-entry" +
-              (node.path === state.app.selected_file ? " active" : "");
-            button.style.setProperty("--depth", depth.toString());
+              "tree-file" + (node.path === state.app.selected_file ? " active" : "");
             button.textContent = node.name;
             button.dataset.path = node.path;
             button.addEventListener("click", () => loadFile(node.path));
-            container.appendChild(button);
+            row.appendChild(button);
           }
+          container.appendChild(row);
         }
         return container;
       }

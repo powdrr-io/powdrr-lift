@@ -32,6 +32,20 @@ changes:
     summary: Implement the SQLite-backed branch snapshot store and file/span lookup path.
     affects: []
     rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale branch or parent heads, refresh the snapshot when needed, and provide fast per-file and per-span provenance lookups.
+  - file: src/powdrr_lift/core/index.py
+    span:
+      start_line: 1
+      end_line: 668
+    summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed index.
+    affects: []
+    rationale: Reuse the existing changelog replay logic for branch snapshots, provenance records, and file-line attribution in the persistent code index.
+  - file: src/powdrr_lift/change_log_validation.py
+    span:
+      start_line: 1
+      end_line: 216
+    summary: Ignore changelog artifact files when validating the branch diff against the proposed changelog.
+    affects: []
+    rationale: Prevent the validation workflow from treating the PR changelog file itself as a missing source change.
   - file: tests/test_code_index.py
     span:
       start_line: 1
@@ -39,4 +53,18 @@ changes:
     summary: Add regression coverage for stale-branch refresh and span lookups.
     affects: []
     rationale: Prove the SQLite store is created, refreshes when new commits land on the branch, and still resolves the original change rationale after later line shifts.
+  - file: tests/test_changelog_index.py
+    span:
+      start_line: 1
+      end_line: 108
+    summary: Cover lineage tracking across later insertions and changelog artifact provenance.
+    affects: []
+    rationale: Verify the mainline index preserves per-line attribution after later commits and still records the changelog artifact as a provenance-bearing file.
+  - file: tests/test_change_log_validation.py
+    span:
+      start_line: 1
+      end_line: 153
+    summary: Add regression coverage for ignoring the changelog artifact during validation.
+    affects: []
+    rationale: Ensure the validator accepts the PR changelog file as repository metadata rather than a missing source change.
 relationship_changes: []

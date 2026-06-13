@@ -412,10 +412,7 @@ def test_refresh_code_index_rebuilds_when_parent_snapshot_changes(
         ).fetchone()
 
     assert feature_row["index_version"] == code_index_store.INDEX_CACHE_VERSION
-    assert (
-        feature_row["parent_index_version"]
-        == code_index_store.INDEX_CACHE_VERSION
-    )
+    assert feature_row["parent_index_version"] == code_index_store.INDEX_CACHE_VERSION
     assert main_row["index_version"] == code_index_store.INDEX_CACHE_VERSION
 
 

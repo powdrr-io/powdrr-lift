@@ -248,9 +248,7 @@ def _provenance_to_blame_provenance(
         intent_problem=provenance.intent_problem,
         intent_goal=provenance.intent_goal,
         file_path=provenance.file,
-        span_start=(
-            None if provenance.span is None else provenance.span.start_line
-        ),
+        span_start=(None if provenance.span is None else provenance.span.start_line),
         span_end=None if provenance.span is None else provenance.span.end_line,
         summary=provenance.summary,
         rationale=provenance.rationale,

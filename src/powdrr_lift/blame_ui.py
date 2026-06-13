@@ -283,7 +283,7 @@ def _render_html() -> str:
         gap: 2px;
       }
       .tree-row {
-        padding-left: calc(8px + (var(--depth, 0) * 16px));
+        padding-left: calc(8px + (var(--depth, 0) * 8px));
       }
       .tree-node {
         margin: 0;
@@ -319,8 +319,8 @@ def _render_html() -> str:
         content: "▾";
       }
       .tree-children {
-        margin-left: 12px;
-        padding-left: 12px;
+        margin-left: 6px;
+        padding-left: 6px;
         border-left: 1px solid rgba(93, 107, 130, 0.18);
       }
       .tree-file {

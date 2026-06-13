@@ -389,9 +389,7 @@ def _build_commit_changes(
         fallback_document = _load_pr_description_document(repo_root, commit.pr_number)
 
     fallback_changes_by_file = (
-        {}
-        if fallback_document is None
-        else _group_declared_changes(fallback_document)
+        {} if fallback_document is None else _group_declared_changes(fallback_document)
     )
     commit_changes: list[ProvenanceRecord] = []
     for file_patch in file_patches:

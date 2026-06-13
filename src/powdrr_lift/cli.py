@@ -7,7 +7,10 @@ from pathlib import Path
 
 from powdrr_lift.core import (
     create_change_log_template,
+    lookup_edit_context,
+    parse_line_ranges,
     parse_validation_report,
+    render_edit_context_report,
     resolve_repo_root,
     validate_change_log_yaml,
 )
@@ -84,6 +87,41 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate_parser.set_defaults(func=_run_evaluate)
 
+    edit_context_parser = subparsers.add_parser(
+        "edit-context",
+        aliases=["edit_context"],
+        help="Report changelog-backed context for a file and line ranges.",
+    )
+    edit_context_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to inspect. Defaults to the current branch.",
+    )
+    edit_context_parser.add_argument(
+        "--file",
+        required=True,
+        help="Repository-relative file path to inspect.",
+    )
+    edit_context_parser.add_argument(
+        "--range",
+        dest="line_ranges",
+        action="append",
+        required=True,
+        metavar="START:END",
+        help="Line range to inspect. May be repeated.",
+    )
+    edit_context_parser.add_argument(
+        "--parent-branch",
+        required=True,
+        help="Reference parent branch used to build the index.",
+    )
+    edit_context_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    edit_context_parser.set_defaults(func=_run_edit_context)
+
     return parser
 
 
@@ -146,6 +184,20 @@ def _run_evaluate(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
     return 0 if report.validation_successful else 1
+
+
+def _run_edit_context(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    branch_name = args.branch_name or _current_branch(repo_root)
+    report = lookup_edit_context(
+        args.file,
+        parse_line_ranges(args.line_ranges),
+        branch_name=branch_name,
+        parent_branch=args.parent_branch,
+        repo_root=repo_root,
+    )
+    sys.stdout.write(render_edit_context_report(report))
+    return 0
 
 
 def _current_branch(repo_root: Path) -> str:

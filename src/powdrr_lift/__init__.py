@@ -19,9 +19,13 @@ __all__ = [
     "Intent",
     "ChangelogDocument",
     "BranchState",
+    "EditContextLine",
+    "EditContextRange",
+    "EditContextReport",
     "code_index_db_path",
     "lookup_code_provenance",
     "lookup_code_provenance_span",
+    "lookup_edit_context",
     "ProvenanceRecord",
     "RelationshipChange",
     "Span",
@@ -29,8 +33,11 @@ __all__ = [
     "build_changelog_index",
     "refresh_code_index",
     "parse_change_log",
+    "parse_line_range",
+    "parse_line_ranges",
     "build_validation_report",
     "parse_validation_report",
+    "render_edit_context_report",
     "validate_change_log_yaml",
     "ValidationIssue",
     "ValidationReport",
@@ -86,6 +93,43 @@ def __getattr__(name: str) -> Any:
             "ChangelogDocument": ChangelogDocument,
             "ProvenanceRecord": ProvenanceRecord,
             "SourceIndex": SourceIndex,
+        }[name]
+
+    if name in {
+        "EditContextLine",
+        "EditContextRange",
+        "EditContextReport",
+    }:
+        from powdrr_lift.core.edit_context import (
+            EditContextLine,
+            EditContextRange,
+            EditContextReport,
+        )
+
+        return {
+            "EditContextLine": EditContextLine,
+            "EditContextRange": EditContextRange,
+            "EditContextReport": EditContextReport,
+        }[name]
+
+    if name in {
+        "lookup_edit_context",
+        "parse_line_range",
+        "parse_line_ranges",
+        "render_edit_context_report",
+    }:
+        from powdrr_lift.core.edit_context import (
+            lookup_edit_context,
+            parse_line_range,
+            parse_line_ranges,
+            render_edit_context_report,
+        )
+
+        return {
+            "lookup_edit_context": lookup_edit_context,
+            "parse_line_range": parse_line_range,
+            "parse_line_ranges": parse_line_ranges,
+            "render_edit_context_report": render_edit_context_report,
         }[name]
 
     if name in {

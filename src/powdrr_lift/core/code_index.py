@@ -198,6 +198,61 @@ class CodeIndexStore:
 
         return [_row_to_provenance_record(row) for row in rows]
 
+    def lookup_lines(
+        self,
+        branch_name: str,
+        path: str,
+        start_line: int,
+        end_line: int,
+    ) -> list[tuple[int, ProvenanceRecord | None]]:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT
+                  fl.line_number,
+                  fl.provenance_record_id,
+                  pr.kind,
+                  pr.pr_number,
+                  pr.commit_sha,
+                  pr.commit_timestamp,
+                  pr.changelog_path,
+                  pr.title,
+                  pr.change_id,
+                  pr.intent_problem,
+                  pr.intent_goal,
+                  pr.file_path,
+                  pr.span_start,
+                  pr.span_end,
+                  pr.summary,
+                  pr.rationale,
+                  pr.change_index
+                FROM file_line fl
+                LEFT JOIN provenance_record pr ON pr.id = fl.provenance_record_id
+                WHERE fl.branch_name = ?
+                  AND fl.file_path = ?
+                  AND fl.line_number BETWEEN ? AND ?
+                ORDER BY fl.line_number
+                """,
+                (branch_name, path, start_line, end_line),
+            ).fetchall()
+
+        records_by_line: dict[int, ProvenanceRecord | None] = {
+            row["line_number"]: (
+                None
+                if row["provenance_record_id"] is None
+                else _row_to_provenance_record(row)
+            )
+            for row in rows
+        }
+        return [
+            (line_number, records_by_line.get(line_number))
+            for line_number in range(start_line, end_line + 1)
+        ]
+
+    def branch_state_for(self, branch_name: str) -> BranchState | None:
+        return self._read_branch_state(branch_name)
+
     def _ensure_schema(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")

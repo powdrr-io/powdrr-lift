@@ -5,7 +5,10 @@ from typing import Any
 
 from powdrr_lift.core import (
     create_change_log_template,
+    lookup_edit_context,
+    parse_line_ranges,
     parse_validation_report,
+    render_edit_context_report,
     resolve_repo_root,
     validate_change_log_yaml,
 )
@@ -63,6 +66,24 @@ def build_server() -> Any:
         )
         parse_validation_report(report_yaml)
         return report_yaml
+
+    @server.tool()
+    def get_edit_context(
+        file_path: str,
+        line_ranges: list[str],
+        parent_branch: str,
+        branch_name: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        report = lookup_edit_context(
+            file_path,
+            parse_line_ranges(line_ranges),
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return render_edit_context_report(report)
 
     return server
 

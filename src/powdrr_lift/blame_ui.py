@@ -835,6 +835,9 @@ def _render_html() -> str:
         if (kind === "implicit") {
           return "implicit: inferred from the diff";
         }
+        if (kind === "commented") {
+          return "commented: derived from the commit message body";
+        }
         return kind;
       }
 

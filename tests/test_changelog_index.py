@@ -150,6 +150,43 @@ def test_build_changelog_index_uses_pr_description_when_changelog_is_missing(
     )
 
 
+def test_build_changelog_index_uses_commit_body_when_pr_is_missing(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    _git(repo_root, "add", "src/app.py")
+    _git(
+        repo_root,
+        "commit",
+        "-m",
+        "Add helper",
+        "-m",
+        "Track intent in the commit comment.",
+    )
+
+    index = build_changelog_index(repo_root)
+
+    provenance = index.provenance_for("src/app.py", 1)
+    assert provenance is not None
+    assert provenance.kind == "commented"
+    assert provenance.title == "Add helper"
+    assert provenance.intent_problem == "Add helper"
+    assert provenance.intent_goal == "Track intent in the commit comment."
+    assert provenance.rationale == "Track intent in the commit comment."
+
+
 def _git(repo_root: Path, *args: str) -> None:
     subprocess.run(
         ["git", "-C", str(repo_root), *args],

@@ -79,6 +79,7 @@ class _CommitRecord:
     parent_sha: str | None
     timestamp: int
     subject: str
+    commit_body: str
     pr_number: int | None
     changelog_document: ChangelogDocument | None
 
@@ -203,15 +204,13 @@ def _load_mainline_commits(
         "log",
         "--first-parent",
         "--reverse",
-        "--format=%H\t%ct\t%s\t%P",
+        "--format=%H%x1f%ct%x1f%s%x1f%b%x1f%P%x1e",
         default_branch_name,
     )
     commits: list[_CommitRecord] = []
-    for line in output.splitlines():
-        if not line:
-            continue
-
-        sha, timestamp_text, subject, parents = line.split("\t", maxsplit=3)
+    for sha, timestamp_text, subject, commit_body, parents in _parse_commit_log_output(
+        output
+    ):
         parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
         pr_number = _extract_pr_number(subject)
         if pr_number is None:
@@ -221,6 +220,7 @@ def _load_mainline_commits(
                     parent_sha=parent_sha,
                     timestamp=int(timestamp_text),
                     subject=subject,
+                    commit_body=commit_body,
                     pr_number=None,
                     changelog_document=None,
                 )
@@ -250,6 +250,7 @@ def _load_mainline_commits(
                 parent_sha=parent_sha,
                 timestamp=int(timestamp_text),
                 subject=subject,
+                commit_body=commit_body,
                 pr_number=pr_number,
                 changelog_document=changelog_document,
             )
@@ -366,19 +367,22 @@ def _build_commit_changes(
     file_patches: Sequence[_FilePatch],
 ) -> list[ProvenanceRecord]:
     if commit.changelog_document is None:
-        fallback_document = (
-            None
-            if commit.pr_number is None
-            else _load_pr_description_document(repo_root, commit.pr_number)
-        )
+        if commit.pr_number is None:
+            return [
+                _build_commit_comment_provenance(
+                    commit=commit,
+                    file_patch=file_patch,
+                )
+                for file_patch in file_patches
+            ]
+
+        fallback_document = _load_pr_description_document(repo_root, commit.pr_number)
         if fallback_document is None:
             return []
 
         commit_document = fallback_document
-        fallback_document = None
     else:
         commit_document = commit.changelog_document
-        fallback_document = None
 
     declared_changes_by_file = _group_declared_changes(commit_document)
     if commit.pr_number is not None and any(
@@ -387,10 +391,9 @@ def _build_commit_changes(
         for file_patch in file_patches
     ):
         fallback_document = _load_pr_description_document(repo_root, commit.pr_number)
+        if fallback_document is not None:
+            declared_changes_by_file = _group_declared_changes(fallback_document)
 
-    fallback_changes_by_file = (
-        {} if fallback_document is None else _group_declared_changes(fallback_document)
-    )
     commit_changes: list[ProvenanceRecord] = []
     for file_patch in file_patches:
         if _is_changelog_artifact_path(file_patch.path, commit.pr_number):
@@ -414,22 +417,8 @@ def _build_commit_changes(
                         file_patch=file_patch,
                         change=change,
                         change_index=change_index,
-                    )
                 )
-            continue
-
-        fallback_declared_changes = fallback_changes_by_file.get(file_patch.path, [])
-        if fallback_declared_changes:
-            for change_index, change in enumerate(fallback_declared_changes):
-                commit_changes.append(
-                    _build_declared_provenance(
-                        commit=commit,
-                        changelog_document=fallback_document or commit_document,
-                        file_patch=file_patch,
-                        change=change,
-                        change_index=change_index,
-                    )
-                )
+            )
             continue
 
         commit_changes.append(
@@ -495,6 +484,29 @@ def _build_artifact_provenance(
     )
 
 
+def _build_commit_comment_provenance(
+    commit: _CommitRecord,
+    file_patch: _FilePatch,
+) -> ProvenanceRecord:
+    comment_body = commit.commit_body.strip()
+    return ProvenanceRecord(
+        kind="commented",
+        pr_number=None,
+        commit_sha=commit.sha,
+        commit_timestamp=commit.timestamp,
+        changelog_path=str(_commit_comment_path(commit.sha)),
+        title=commit.subject,
+        change_id=None,
+        intent_problem=commit.subject,
+        intent_goal=comment_body or commit.subject,
+        file=file_patch.path,
+        span=_resolve_patch_span(file_patch),
+        summary=commit.subject,
+        rationale=comment_body or "No commit body was provided.",
+        change_index=None,
+    )
+
+
 def _build_implicit_provenance(
     repo_root: Path,
     commit: _CommitRecord,
@@ -520,6 +532,10 @@ def _build_implicit_provenance(
         ),
         change_index=None,
     )
+
+
+def _commit_comment_path(commit_sha: str) -> Path:
+    return Path(".powdrr-lift") / "state" / f"commit-{commit_sha[:12]}-comment.md"
 
 
 def _group_declared_changes(
@@ -904,3 +920,22 @@ def _git_output(repo_root: Path, *args: str) -> str:
         text=True,
     )
     return process.stdout
+
+
+def _parse_commit_log_output(
+    output: str,
+) -> list[tuple[str, str, str, str, str]]:
+    records: list[tuple[str, str, str, str, str]] = []
+    for record in output.split("\x1e"):
+        record = record.lstrip("\n")
+        if not record:
+            continue
+
+        parts = record.split("\x1f", maxsplit=4)
+        if len(parts) != 5:
+            continue
+
+        sha, timestamp_text, subject, commit_body, parents = parts
+        records.append((sha, timestamp_text, subject, commit_body, parents))
+
+    return records

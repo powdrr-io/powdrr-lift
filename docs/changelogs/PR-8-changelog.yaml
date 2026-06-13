@@ -1,5 +1,5 @@
 version: 1
-change_id: 7
+change_id: 8
 title: Add changelog provenance index
 intent:
   problem: There was no persistent private store for replaying changelog documents into a line-level provenance index across branch refreshes.

@@ -117,6 +117,7 @@ def build_changelog_index(
 
     changes: list[ProvenanceRecord] = []
     line_state: dict[str, list[ProvenanceRecord | None]] = {}
+    changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
 
     for commit in commits:
         file_patches = _collect_file_patches(
@@ -130,6 +131,13 @@ def build_changelog_index(
             file_patches,
         )
         changes.extend(commit_changes)
+        for record in commit_changes:
+            if record.file is None:
+                continue
+
+            changes_by_commit_and_file.setdefault((commit.sha, record.file), []).append(
+                record
+            )
 
         for file_patch in file_patches:
             _apply_file_patch(
@@ -140,6 +148,11 @@ def build_changelog_index(
             )
 
     _normalize_line_state(repo_root_path, line_state)
+    _backfill_line_state_from_blame(
+        repo_root_path,
+        line_state,
+        changes_by_commit_and_file,
+    )
     documents = list(document_by_pr.values())
     return SourceIndex(
         repo_root=repo_root_path,
@@ -353,9 +366,31 @@ def _build_commit_changes(
     file_patches: Sequence[_FilePatch],
 ) -> list[ProvenanceRecord]:
     if commit.changelog_document is None:
-        return []
+        fallback_document = (
+            None
+            if commit.pr_number is None
+            else _load_pr_description_document(repo_root, commit.pr_number)
+        )
+        if fallback_document is None:
+            return []
 
-    declared_changes_by_file = _group_declared_changes(commit.changelog_document)
+        commit_document = fallback_document
+        fallback_document = None
+    else:
+        commit_document = commit.changelog_document
+        fallback_document = None
+
+    declared_changes_by_file = _group_declared_changes(commit_document)
+    if commit.pr_number is not None and any(
+        not _is_changelog_artifact_path(file_patch.path, commit.pr_number)
+        and file_patch.path not in declared_changes_by_file
+        for file_patch in file_patches
+    ):
+        fallback_document = _load_pr_description_document(repo_root, commit.pr_number)
+
+    fallback_changes_by_file = (
+        {} if fallback_document is None else _group_declared_changes(fallback_document)
+    )
     commit_changes: list[ProvenanceRecord] = []
     for file_patch in file_patches:
         if _is_changelog_artifact_path(file_patch.path, commit.pr_number):
@@ -363,7 +398,7 @@ def _build_commit_changes(
                 _build_artifact_provenance(
                     repo_root=repo_root,
                     commit=commit,
-                    changelog_document=commit.changelog_document,
+                    changelog_document=commit_document,
                     file_patch=file_patch,
                 )
             )
@@ -375,7 +410,21 @@ def _build_commit_changes(
                 commit_changes.append(
                     _build_declared_provenance(
                         commit=commit,
-                        changelog_document=commit.changelog_document,
+                        changelog_document=commit_document,
+                        file_patch=file_patch,
+                        change=change,
+                        change_index=change_index,
+                    )
+                )
+            continue
+
+        fallback_declared_changes = fallback_changes_by_file.get(file_patch.path, [])
+        if fallback_declared_changes:
+            for change_index, change in enumerate(fallback_declared_changes):
+                commit_changes.append(
+                    _build_declared_provenance(
+                        commit=commit,
+                        changelog_document=fallback_document or commit_document,
                         file_patch=file_patch,
                         change=change,
                         change_index=change_index,
@@ -387,7 +436,7 @@ def _build_commit_changes(
             _build_implicit_provenance(
                 repo_root=repo_root,
                 commit=commit,
-                changelog_document=commit.changelog_document,
+                changelog_document=fallback_document or commit_document,
                 file_patch=file_patch,
             )
         )
@@ -611,6 +660,40 @@ def _normalize_line_state(
             del file_lines[current_line_count:]
 
 
+def _backfill_line_state_from_blame(
+    repo_root: Path,
+    line_state: dict[str, list[ProvenanceRecord | None]],
+    changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]],
+) -> None:
+    for file_path, file_lines in line_state.items():
+        if all(provenance is not None for provenance in file_lines):
+            continue
+
+        blame_output = _git_output(
+            repo_root,
+            "blame",
+            "--line-porcelain",
+            "--",
+            file_path,
+        )
+        if blame_output == "":
+            continue
+
+        for commit_sha, start_line, line_count in _parse_blame_porcelain(blame_output):
+            records = changes_by_commit_and_file.get((commit_sha, file_path))
+            if not records:
+                continue
+
+            provenance = _select_backfill_provenance(records, start_line)
+            if provenance is None:
+                continue
+
+            for line_number in range(start_line, start_line + line_count):
+                index = line_number - 1
+                if 0 <= index < len(file_lines) and file_lines[index] is None:
+                    file_lines[index] = provenance
+
+
 def _collect_file_patches(
     repo_root: Path,
     commit_sha: str,
@@ -691,6 +774,49 @@ def _parse_patch_hunks(patch_output: str) -> list[_PatchHunk]:
         hunks.append(current_hunk)
 
     return hunks
+
+
+def _parse_blame_porcelain(blame_output: str) -> list[tuple[str, int, int]]:
+    blame_entries: list[tuple[str, int, int]] = []
+    for line in blame_output.splitlines():
+        if len(line) < 41:
+            continue
+
+        commit_sha = line[:40]
+        if any(character not in "0123456789abcdef" for character in commit_sha):
+            continue
+
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+
+        try:
+            final_line = int(parts[2])
+            line_count = int(parts[3])
+        except ValueError:
+            continue
+
+        blame_entries.append((commit_sha, final_line, line_count))
+
+    return blame_entries
+
+
+def _select_backfill_provenance(
+    records: Sequence[ProvenanceRecord],
+    line_number: int,
+) -> ProvenanceRecord | None:
+    matching_records = [
+        record
+        for record in records
+        if record.span is not None
+        and record.span.start_line is not None
+        and record.span.end_line is not None
+        and record.span.start_line <= line_number <= record.span.end_line
+    ]
+    if matching_records:
+        return min(matching_records, key=_span_sort_key)
+
+    return records[0] if records else None
 
 
 def _resolve_patch_span(file_patch: _FilePatch) -> Span:

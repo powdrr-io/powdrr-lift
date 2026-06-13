@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core import (
+    blame_view_state_to_data,
+    build_blame_view_state,
     create_change_log_template,
     lookup_edit_context,
     parse_line_ranges,
@@ -84,6 +87,22 @@ def build_server() -> Any:
             repo_root=repo_root_path,
         )
         return render_edit_context_report(report)
+
+    @server.tool()
+    def get_blame_view(
+        file_path: str | None = None,
+        branch_name: str | None = None,
+        parent_branch: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        state = build_blame_view_state(
+            repo_root=repo_root_path,
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            selected_file=file_path,
+        )
+        return json.dumps(blame_view_state_to_data(state), ensure_ascii=False)
 
     return server
 

@@ -5,6 +5,8 @@ import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import main
 
@@ -142,6 +144,46 @@ def test_cli_evaluate_uses_pr_changelog_path(tmp_path: Path) -> None:
     assert "Next: include docs/changelogs/PR-123-changelog.yaml in the PR." in (
         stderr.getvalue()
     )
+
+
+def test_cli_blame_ui_invokes_local_server(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    captured: dict[str, object] = {}
+
+    def _fake_serve_blame_ui(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr("powdrr_lift.cli.serve_blame_ui", _fake_serve_blame_ui)
+
+    exit_code = main(
+        [
+            "blame-ui",
+            "feature/change-log",
+            "--repo-root",
+            str(repo_root),
+            "--parent-branch",
+            "main",
+            "--file",
+            "src/app.py",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8123",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured == {
+        "repo_root": repo_root,
+        "branch_name": "feature/change-log",
+        "parent_branch": "main",
+        "selected_file": "src/app.py",
+        "host": "0.0.0.0",
+        "port": 8123,
+    }
 
 
 def _create_repo_with_feature_branch(tmp_path: Path) -> Path:

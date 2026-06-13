@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     create_change_log_template,
     lookup_edit_context,
@@ -122,6 +123,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     edit_context_parser.set_defaults(func=_run_edit_context)
 
+    blame_ui_parser = subparsers.add_parser(
+        "blame-ui",
+        aliases=["blame_ui"],
+        help="Start a local GitHub-style blame viewer powered by the index.",
+    )
+    blame_ui_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch to inspect. Defaults to the current branch.",
+    )
+    blame_ui_parser.add_argument(
+        "--branch-name",
+        dest="branch_name_flag",
+        help="Branch to inspect. Defaults to the current branch.",
+    )
+    blame_ui_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    blame_ui_parser.add_argument(
+        "--parent-branch",
+        help="Reference parent branch used to build the index.",
+    )
+    blame_ui_parser.add_argument(
+        "--file",
+        dest="selected_file",
+        help="Initial file to show in the blame UI.",
+    )
+    blame_ui_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the UI server to.",
+    )
+    blame_ui_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind the UI server to.",
+    )
+    blame_ui_parser.set_defaults(func=_run_blame_ui)
+
     return parser
 
 
@@ -197,6 +240,22 @@ def _run_edit_context(args: argparse.Namespace) -> int:
         repo_root=repo_root,
     )
     sys.stdout.write(render_edit_context_report(report))
+    return 0
+
+
+def _run_blame_ui(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    branch_name = (
+        args.branch_name_flag or args.branch_name or _current_branch(repo_root)
+    )
+    serve_blame_ui(
+        repo_root=repo_root,
+        branch_name=branch_name,
+        parent_branch=args.parent_branch,
+        selected_file=args.selected_file,
+        host=args.host,
+        port=args.port,
+    )
     return 0
 
 

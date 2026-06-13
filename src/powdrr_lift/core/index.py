@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from powdrr_lift.change_log_parser import Change, ChangeLog, Span, parse_change_log
+from powdrr_lift.change_log_parser import (
+    Change,
+    ChangeLog,
+    Intent,
+    Span,
+    parse_change_log,
+)
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 
 _PR_FILE_NAME_RE = re.compile(r"^PR-(\d+)-changelog\.yaml$")
@@ -131,9 +138,7 @@ def build_changelog_index(
             )
 
     _normalize_line_state(repo_root_path, line_state)
-    documents = [
-        document_by_pr.get(document.pr_number, document) for document in documents
-    ]
+    documents = list(document_by_pr.values())
     return SourceIndex(
         repo_root=repo_root_path,
         default_branch_name=default_branch_name,
@@ -208,6 +213,11 @@ def _load_mainline_commits(
             continue
 
         changelog_document = document_by_pr.get(pr_number)
+        if changelog_document is None:
+            changelog_document = _load_pr_description_document(repo_root, pr_number)
+            if changelog_document is not None:
+                document_by_pr[pr_number] = changelog_document
+
         if changelog_document is not None:
             changelog_document = ChangelogDocument(
                 pr_number=changelog_document.pr_number,
@@ -231,6 +241,108 @@ def _load_mainline_commits(
         )
 
     return commits
+
+
+def _load_pr_description_document(
+    repo_root: Path,
+    pr_number: int,
+) -> ChangelogDocument | None:
+    metadata = _fetch_pr_metadata(repo_root, "view", str(pr_number))
+    if metadata is None:
+        return None
+
+    return _build_pr_description_document(repo_root, metadata)
+
+
+def _load_branch_pr_description_document(
+    repo_root: Path,
+    branch_name: str,
+    parent_branch: str,
+) -> ChangelogDocument | None:
+    metadata = _fetch_pr_metadata(
+        repo_root,
+        "list",
+        "--head",
+        branch_name,
+        "--base",
+        parent_branch,
+        "--state",
+        "all",
+        "--limit",
+        "1",
+    )
+    if metadata is None:
+        return None
+
+    return _build_pr_description_document(repo_root, metadata)
+
+
+def _build_pr_description_document(
+    repo_root: Path,
+    metadata: dict[str, object],
+) -> ChangelogDocument:
+    pr_number = int(str(metadata["number"]))
+    title = str(metadata.get("title") or f"PR {pr_number}")
+    body = str(metadata.get("body") or "")
+    description_path = _description_changelog_path(repo_root, pr_number)
+    return ChangelogDocument(
+        pr_number=pr_number,
+        changelog_path=description_path,
+        changelog=ChangeLog(
+            version=1,
+            change_id=str(pr_number),
+            title=title,
+            intent=Intent(
+                problem=title,
+                goal=body.strip() or title,
+            ),
+        ),
+        commit_sha=None,
+        commit_timestamp=None,
+        commit_subject=None,
+    )
+
+
+def _description_changelog_path(repo_root: Path, pr_number: int) -> Path:
+    return repo_root / ".powdrr-lift" / "state" / f"PR-{pr_number}-description.md"
+
+
+def _fetch_pr_metadata(
+    repo_root: Path,
+    *gh_args: str,
+) -> dict[str, object] | None:
+    try:
+        output = _gh_output(
+            repo_root,
+            *gh_args,
+            "--json",
+            "number,title,body",
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+
+    data = json.loads(output)
+    if isinstance(data, list):
+        if not data:
+            return None
+
+        data = data[0]
+
+    if not isinstance(data, dict):
+        return None
+
+    return data
+
+
+def _gh_output(repo_root: Path, *args: str) -> str:
+    process = subprocess.run(
+        ["gh", *args],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return process.stdout
 
 
 def _build_commit_changes(

@@ -16,6 +16,7 @@ from powdrr_lift.core.index import (
     _collect_file_patches,
     _CommitRecord,
     _git_output,
+    _load_branch_pr_description_document,
 )
 
 
@@ -538,6 +539,12 @@ def _build_branch_index(
 ) -> SourceIndex:
     branch_document = _resolve_branch_document(repo_root, parent_branch, branch_name)
     if branch_document is None:
+        branch_document = _load_branch_pr_description_document(
+            repo_root,
+            branch_name,
+            parent_branch,
+        )
+    if branch_document is None:
         return parent_index
 
     line_state: dict[str, list[ProvenanceRecord | None]] = {
@@ -607,9 +614,7 @@ def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
                 commit_changes=commit_changes,
             )
 
-    documents = [
-        document_by_pr.get(document.pr_number, document) for document in documents
-    ]
+    documents = list(document_by_pr.values())
     return SourceIndex(
         repo_root=repo_root,
         default_branch_name=ref,

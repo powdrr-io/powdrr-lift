@@ -3,12 +3,14 @@ change_id: 7
 title: Add changelog provenance index
 intent:
   problem: There was no persistent private store for replaying changelog documents into a line-level provenance index across branch refreshes.
-  goal: Build a smart SQLite-backed provenance index in `.powdrr-lift/state/code_index.db` that maps current source lines back to the changelog change that introduced them and refreshes when the branch or parent branch changes.
+  goal: Build a smart SQLite-backed provenance index in `.powdrr-lift/state/code_index.db` that maps current source lines back to the change that introduced them, refreshes when the branch or parent branch changes, and falls back to PR descriptions when a commit history entry has no changelog file.
 decisions:
   - id: INDEX-001
     summary: Replay merged PR changelog docs in mainline order and transform line provenance through later diffs.
   - id: INDEX-002
     summary: Persist branch snapshots in SQLite keyed by branch and parent branch heads for fast file/span lookup and refresh checks.
+  - id: INDEX-003
+    summary: Use PR descriptions as the provenance source when a history entry has no changelog artifact.
 entities: []
 changes:
   - file: src/powdrr_lift/__init__.py
@@ -28,50 +30,29 @@ changes:
   - file: src/powdrr_lift/core/code_index.py
     span:
       start_line: 1
-      end_line: 834
-    summary: Implement the SQLite-backed branch snapshot store and file/span lookup path.
+      end_line: 842
+    summary: Implement the SQLite-backed branch snapshot store and file/span lookup path with PR-description fallback for missing changelog files.
     affects: []
-    rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale branch or parent heads, refresh the snapshot when needed, and provide fast per-file and per-span provenance lookups.
-  - file: .gitignore
-    span:
-      start_line: 1
-      end_line: 22
-    summary: Ignore the private SQLite state directory for the code index.
-    affects: []
-    rationale: Prevent the local `.powdrr-lift/` state directory from showing up as a tracked change or leaking into commits.
+    rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale branch or parent heads, refresh the snapshot when needed, and hydrate branch history from PR descriptions when the changelog artifact is missing.
   - file: src/powdrr_lift/core/index.py
     span:
       start_line: 1
-      end_line: 668
+      end_line: 780
     summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed index.
     affects: []
-    rationale: Reuse the existing changelog replay logic for branch snapshots, provenance records, and file-line attribution in the persistent code index.
-  - file: src/powdrr_lift/change_log_validation.py
-    span:
-      start_line: 1
-      end_line: 216
-    summary: Ignore changelog artifact files when validating the branch diff against the proposed changelog.
-    affects: []
-    rationale: Prevent the validation workflow from treating the PR changelog file itself as a missing source change.
+    rationale: Reuse the existing changelog replay logic for branch snapshots, provenance records, file-line attribution, and PR description fallback in the persistent code index.
   - file: tests/test_code_index.py
     span:
       start_line: 1
-      end_line: 109
-    summary: Add regression coverage for stale-branch refresh and span lookups.
+      end_line: 175
+    summary: Add regression coverage for stale-branch refresh, span lookups, and PR-description fallback.
     affects: []
-    rationale: Prove the SQLite store is created, refreshes when new commits land on the branch, and still resolves the original change rationale after later line shifts.
+    rationale: Prove the SQLite store is created, refreshes when new commits land on the branch, still resolves the original change rationale after later line shifts, and can build provenance from PR descriptions when no changelog file exists.
   - file: tests/test_changelog_index.py
     span:
       start_line: 1
-      end_line: 108
-    summary: Cover lineage tracking across later insertions and changelog artifact provenance.
+      end_line: 159
+    summary: Cover lineage tracking across later insertions, changelog artifact provenance, and PR-description fallback.
     affects: []
-    rationale: Verify the mainline index preserves per-line attribution after later commits and still records the changelog artifact as a provenance-bearing file.
-  - file: tests/test_change_log_validation.py
-    span:
-      start_line: 1
-      end_line: 153
-    summary: Add regression coverage for ignoring the changelog artifact during validation.
-    affects: []
-    rationale: Ensure the validator accepts the PR changelog file as repository metadata rather than a missing source change.
+    rationale: Verify the mainline index preserves per-line attribution after later commits, still records the changelog artifact as a provenance-bearing file, and uses the PR body when the changelog file is absent.
 relationship_changes: []

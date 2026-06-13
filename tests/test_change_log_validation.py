@@ -106,7 +106,7 @@ def test_validate_change_log_yaml_reports_missing_changes(
 def test_validate_change_log_yaml_reports_span_mismatch(
     tmp_path: Path,
 ) -> None:
-    repo_root = _create_repo_with_sparse_feature_branch(tmp_path)
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
     proposed_yaml = """
     version: 1
     change_id: 7
@@ -123,9 +123,33 @@ def test_validate_change_log_yaml_reports_span_mismatch(
     changes:
       - file: src/app.py
         span:
-          start_line: 1
-          end_line: 6
-        summary: Update the application content.
+          start_line: 2
+          end_line: 2
+        summary: Update the first line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
+          start_line: 4
+          end_line: 4
+        summary: Update the second line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
+          start_line: 6
+          end_line: 7
+        summary: Update the third line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
+          start_line: 8
+          end_line: 8
+        summary: Update the fourth line.
         affects:
           - AppService
         rationale: Needed for the feature.
@@ -140,8 +164,49 @@ def test_validate_change_log_yaml_reports_span_mismatch(
     )
 
     assert report.validation_successful is False
-    assert report.issues[0].code == "span_mismatch"
-    assert report.issues[0].path == "src/app.py"
+    assert any(issue.code == "span_mismatch" for issue in report.issues)
+    assert any(issue.path == "src/app.py" for issue in report.issues)
+
+
+def test_validate_change_log_yaml_reports_missing_hunk_entries(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Sparse application changes
+
+    intent:
+      problem: The application should update four separate lines.
+      goal: Preserve each diff hunk as a distinct changelog entry.
+
+    decisions:
+      - id: ADR-101
+        summary: Keep the file entry scoped to the changed lines.
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 2
+          end_line: 2
+        summary: Update the first line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert sum(issue.code == "missing_change" for issue in report.issues) == 3
+    assert all(issue.path == "src/app.py" for issue in report.issues)
 
 
 def test_validate_change_log_yaml_ignores_changelog_artifact(
@@ -258,6 +323,11 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
 
 
 def _create_repo_with_sparse_feature_branch(tmp_path: Path) -> Path:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    return repo_root
+
+
+def _create_repo_with_multi_hunk_feature_branch(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
 
@@ -276,6 +346,8 @@ def _create_repo_with_sparse_feature_branch(tmp_path: Path) -> Path:
                 "line 4",
                 "line 5",
                 "line 6",
+                "line 7",
+                "line 8",
             ]
         )
         + "\n",
@@ -290,11 +362,13 @@ def _create_repo_with_sparse_feature_branch(tmp_path: Path) -> Path:
         "\n".join(
             [
                 "line 1",
+                "line 2 updated",
                 "line 3",
-                "line 4",
+                "line 4 updated",
                 "line 5",
-                "line 6",
+                "line 6 updated",
                 "line 7",
+                "line 8 updated",
             ]
         )
         + "\n",

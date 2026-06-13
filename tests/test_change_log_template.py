@@ -88,7 +88,7 @@ def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
     _git(repo_root, "config", "user.name", "Test User")
     _git(repo_root, "config", "user.email", "test@example.com")
 
-    sparse_source = "\n".join(f"line {index}" for index in range(1, 7)) + "\n"
+    sparse_source = "\n".join(f"line {index}" for index in range(1, 9)) + "\n"
     (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
     (repo_root / "src").mkdir()
     (repo_root / "src" / "app.py").write_text(sparse_source, encoding="utf-8")
@@ -100,11 +100,13 @@ def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
         "\n".join(
             [
                 "line 1",
+                "line 2 updated",
                 "line 3",
-                "line 4",
+                "line 4 updated",
                 "line 5",
-                "line 6",
+                "line 6 updated",
                 "line 7",
+                "line 8 updated",
             ]
         )
         + "\n",
@@ -121,9 +123,14 @@ def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert [change.file for change in change_log.changes] == ["src/app.py"]
-    assert change_log.changes[0].span.start_line == 2
-    assert change_log.changes[0].span.end_line == 6
+    assert [change.file for change in change_log.changes] == [
+        "src/app.py",
+        "src/app.py",
+        "src/app.py",
+        "src/app.py",
+    ]
+    assert [change.span.start_line for change in change_log.changes] == [2, 4, 6, 8]
+    assert [change.span.end_line for change in change_log.changes] == [2, 4, 6, 8]
 
 
 def _git(repo_root: Path, *args: str) -> None:

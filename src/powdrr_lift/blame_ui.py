@@ -423,7 +423,7 @@ def _render_html() -> str:
           <div class="tree-list" id="tree"></div>
         </aside>
         <main class="pane">
-          <div class="pane-header">Blame</div>
+          <div class="pane-header">CODE</div>
           <div class="blame-pane" id="blame"></div>
         </main>
         <aside class="pane">

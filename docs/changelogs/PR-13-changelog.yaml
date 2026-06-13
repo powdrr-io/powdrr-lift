@@ -1,0 +1,580 @@
+version: 1
+change_id: 13
+title: Index entities and relationships
+intent:
+  problem: Changelog provenance tracked code spans but did not normalize entities
+    or model relationships across the repository graph.
+  goal: Normalize changelog entities into a repository-wide graph, persist that graph
+    in the code index, and validate entity lifecycle and relationship references.
+decisions:
+- id: graph-model
+  summary: Store changelog provenance as a normalized entity graph alongside line-level
+    provenance.
+entities:
+- id: PublicAPI
+  type: Package
+  action: added
+- id: ChangelogIndex
+  type: Indexer
+  action: added
+- id: EntityGraph
+  type: Graph
+  action: added
+- id: CodeIndexCache
+  type: Storage
+  action: added
+- id: ChangelogParser
+  type: Parser
+  action: added
+- id: ChangeLogTemplate
+  type: Template
+  action: added
+- id: ChangeLogValidator
+  type: Validator
+  action: added
+changes:
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 19
+    end_line: 20
+  summary: Export the new graph and index APIs from the package surface.
+  affects: &id001
+  - PublicAPI
+  - ChangelogIndex
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 74
+    end_line: 78
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 148
+    end_line: 149
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 151
+    end_line: 151
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 153
+    end_line: 153
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 157
+    end_line: 158
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 160
+    end_line: 160
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 167
+    end_line: 168
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 172
+    end_line: 172
+  summary: Export the new graph and index APIs from the package surface.
+  affects: *id001
+  rationale: Keep the top-level package aligned with the graph-aware indexing and
+    validation workflow.
+- file: src/powdrr_lift/change_log_parser/parse_change_log.py
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Parse entity lifecycle metadata from changelogs.
+  affects: &id002
+  - ChangelogParser
+  rationale: Preserve entity action data so the indexer and validator can reason about
+    graph lifecycle.
+- file: src/powdrr_lift/change_log_parser/parse_change_log.py
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Parse entity lifecycle metadata from changelogs.
+  affects: *id002
+  rationale: Preserve entity action data so the indexer and validator can reason about
+    graph lifecycle.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 77
+    end_line: 79
+  summary: Teach the template how to describe entity lifecycle and graph relationships.
+  affects: &id003
+  - ChangeLogTemplate
+  - ChangelogIndex
+  rationale: Prompt the agent to mark added or deleted entities and describe relationship
+    changes explicitly.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 82
+    end_line: 89
+  summary: Teach the template how to describe entity lifecycle and graph relationships.
+  affects: *id003
+  rationale: Prompt the agent to mark added or deleted entities and describe relationship
+    changes explicitly.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Validate entity lifecycle and relationship references against graph history.
+  affects: &id004
+  - ChangeLogValidator
+  - EntityGraph
+  rationale: Reject unknown relationships and require new entities to be explicitly
+    added.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 18
+    end_line: 21
+  summary: Validate entity lifecycle and relationship references against graph history.
+  affects: *id004
+  rationale: Reject unknown relationships and require new entities to be explicitly
+    added.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 102
+    end_line: 106
+  summary: Validate entity lifecycle and relationship references against graph history.
+  affects: *id004
+  rationale: Reject unknown relationships and require new entities to be explicitly
+    added.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Validate entity lifecycle and relationship references against graph history.
+  affects: *id004
+  rationale: Reject unknown relationships and require new entities to be explicitly
+    added.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 121
+    end_line: 170
+  summary: Validate entity lifecycle and relationship references against graph history.
+  affects: *id004
+  rationale: Reject unknown relationships and require new entities to be explicitly
+    added.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 33
+    end_line: 34
+  summary: Expose the graph model and ref-based index builder from the core package.
+  affects: &id005
+  - PublicAPI
+  - ChangelogIndex
+  - EntityGraph
+  rationale: Keep core imports stable for callers that need the normalized graph.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Expose the graph model and ref-based index builder from the core package.
+  affects: *id005
+  rationale: Keep core imports stable for callers that need the normalized graph.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Expose the graph model and ref-based index builder from the core package.
+  affects: *id005
+  rationale: Keep core imports stable for callers that need the normalized graph.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 85
+    end_line: 86
+  summary: Expose the graph model and ref-based index builder from the core package.
+  affects: *id005
+  rationale: Keep core imports stable for callers that need the normalized graph.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 91
+    end_line: 91
+  summary: Expose the graph model and ref-based index builder from the core package.
+  affects: *id005
+  rationale: Keep core imports stable for callers that need the normalized graph.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 102
+    end_line: 102
+  summary: Expose the graph model and ref-based index builder from the core package.
+  affects: *id005
+  rationale: Keep core imports stable for callers that need the normalized graph.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: &id006
+  - CodeIndexCache
+  - EntityGraph
+  - ChangelogIndex
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 339
+    end_line: 364
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 469
+    end_line: 489
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 512
+    end_line: 540
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 582
+    end_line: 588
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 620
+    end_line: 627
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 669
+    end_line: 712
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 838
+    end_line: 838
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 891
+    end_line: 891
+  summary: Persist the entity graph alongside the branch-aware SQLite code index.
+  affects: *id006
+  rationale: Cache normalized entities and relationships so provenance lookups stay
+    local and fast.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 37
+    end_line: 66
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: &id007
+  - ChangelogIndex
+  - EntityGraph
+  - ChangelogParser
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 150
+    end_line: 262
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 266
+    end_line: 266
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 157
+    end_line: 157
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 306
+    end_line: 306
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 167
+    end_line: 196
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 345
+    end_line: 345
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 377
+    end_line: 427
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 602
+    end_line: 668
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 1148
+    end_line: 1155
+  summary: Build a normalized repository-wide entity and relationship graph from changelog
+    history.
+  affects: *id007
+  rationale: Turn changelog documents into a stable graph model while keeping line-level
+    provenance intact.
+- file: tests/test_change_log_template.py
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Cover the new entity lifecycle guidance in the template.
+  affects:
+  - ChangeLogTemplate
+  rationale: Prevent the changelog instructions from regressing.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: &id008
+  - ChangeLogValidator
+  - EntityGraph
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 81
+    end_line: 85
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: *id008
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 129
+    end_line: 133
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: *id008
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 198
+    end_line: 202
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: *id008
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 252
+    end_line: 256
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: *id008
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 289
+    end_line: 416
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: *id008
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 473
+    end_line: 527
+  summary: Cover entity lifecycle and relationship validation rules.
+  affects: *id008
+  rationale: Lock in the graph integrity rules for new and existing entities.
+- file: tests/test_changelog_index.py
+  span:
+    start_line: 190
+    end_line: 347
+  summary: Cover entity graph normalization across changelog documents.
+  affects:
+  - EntityGraph
+  - ChangelogIndex
+  rationale: Ensure repeated entities collapse to one graph node and invalid edges
+    stay out of the graph.
+- file: tests/test_parse_change_log.py
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Cover parsing of entity lifecycle metadata.
+  affects: &id009
+  - ChangelogParser
+  rationale: Ensure the parser preserves entity action fields.
+- file: tests/test_parse_change_log.py
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Cover parsing of entity lifecycle metadata.
+  affects: *id009
+  rationale: Ensure the parser preserves entity action fields.
+relationship_changes:
+- action: add
+  source: ChangelogIndex
+  target: EntityGraph
+  relationship: builds
+  rationale: The indexer now turns changelog documents into a normalized entity graph.
+- action: add
+  source: CodeIndexCache
+  target: EntityGraph
+  relationship: persists
+  rationale: The SQLite cache stores entity and relationship provenance for fast local
+    lookup.
+- action: add
+  source: ChangeLogValidator
+  target: EntityGraph
+  relationship: validates_against
+  rationale: Validation now checks entity lifecycle and relationship references against
+    the graph history.
+- action: add
+  source: ChangeLogTemplate
+  target: ChangeLogValidator
+  relationship: guides
+  rationale: The template teaches the agent to produce entity data that validation
+    can enforce.
+- action: add
+  source: PublicAPI
+  target: ChangelogIndex
+  relationship: exposes
+  rationale: The package surface exports the new index builders and graph types to
+    callers.

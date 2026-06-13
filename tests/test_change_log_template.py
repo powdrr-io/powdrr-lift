@@ -42,6 +42,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "Compared against default branch `main`." in template_text
     assert "change_id: null" in template_text
     assert "decisions:" in template_text
+    assert "List the repository entities relevant to this change." in template_text
+    assert "relationship_changes" in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 

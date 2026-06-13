@@ -69,7 +69,13 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# List the repository entities affected by this change.",
+        "# List the repository entities relevant to this change.",
+        "# Include both direct and adjacent components that matter to the",
+        "# architecture: services, CLIs, storage systems, transport systems,",
+        "# caches, infrastructure, CI/CD, integrations, dependencies, and",
+        "# similar components.",
+        "# Use `entities` to name the relevant systems and `relationship_changes`",
+        "# to describe how their relationships are changing.",
         "entities: []",
         "# Each change entry should map one diff hunk.",
     ]
@@ -102,6 +108,9 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
     lines.extend(
         [
             "# Relationship changes are optional and can remain empty.",
+            "# Use them to capture how the change affects relationships between",
+            "# entities, such as newly introduced dependencies, removed",
+            "# integrations, changed ownership, or altered data/traffic flow.",
             "relationship_changes: []",
             "",
         ]

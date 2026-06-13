@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import powdrr_lift.core.code_index as code_index_store
 import powdrr_lift.core.index as core_index
 from powdrr_lift import (
     Span,
@@ -410,9 +411,12 @@ def test_refresh_code_index_rebuilds_when_parent_snapshot_changes(
             ("main",),
         ).fetchone()
 
-    assert feature_row["index_version"] == 2
-    assert feature_row["parent_index_version"] == 2
-    assert main_row["index_version"] == 2
+    assert feature_row["index_version"] == code_index_store.INDEX_CACHE_VERSION
+    assert (
+        feature_row["parent_index_version"]
+        == code_index_store.INDEX_CACHE_VERSION
+    )
+    assert main_row["index_version"] == code_index_store.INDEX_CACHE_VERSION
 
 
 def _git(repo_root: Path, *args: str) -> None:

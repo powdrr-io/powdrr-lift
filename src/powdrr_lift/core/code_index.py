@@ -12,14 +12,16 @@ from powdrr_lift.core.index import (
     ProvenanceRecord,
     SourceIndex,
     _apply_file_patch,
+    _backfill_line_state_from_blame,
     _build_commit_changes,
     _collect_file_patches,
     _CommitRecord,
     _git_output,
     _load_branch_pr_description_document,
+    _normalize_line_state,
 )
 
-INDEX_CACHE_VERSION = 2
+INDEX_CACHE_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -651,6 +653,7 @@ def _build_branch_index(
     if all(document.pr_number != branch_document.pr_number for document in documents):
         documents.append(branch_document)
     changes = list(parent_index.changes)
+    changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
 
     commits = _collect_branch_commits(repo_root, parent_branch, branch_name)
     for commit in commits:
@@ -666,6 +669,13 @@ def _build_branch_index(
             file_patches,
         )
         changes.extend(commit_changes)
+        for record in commit_changes:
+            if record.file is None:
+                continue
+
+            changes_by_commit_and_file.setdefault((commit.sha, record.file), []).append(
+                record
+            )
         for file_patch in file_patches:
             _apply_file_patch(
                 line_state=line_state,
@@ -674,6 +684,12 @@ def _build_branch_index(
                 commit_changes=commit_changes,
             )
 
+    _normalize_line_state(repo_root, line_state)
+    _backfill_line_state_from_blame(
+        repo_root,
+        line_state,
+        changes_by_commit_and_file,
+    )
     return SourceIndex(
         repo_root=repo_root,
         default_branch_name=parent_branch,
@@ -690,6 +706,7 @@ def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
 
     changes: list[ProvenanceRecord] = []
     line_state: dict[str, list[ProvenanceRecord | None]] = {}
+    changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
 
     for commit in commits:
         file_patches = _collect_file_patches(
@@ -703,6 +720,13 @@ def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
             file_patches,
         )
         changes.extend(commit_changes)
+        for record in commit_changes:
+            if record.file is None:
+                continue
+
+            changes_by_commit_and_file.setdefault((commit.sha, record.file), []).append(
+                record
+            )
         for file_patch in file_patches:
             _apply_file_patch(
                 line_state=line_state,
@@ -711,6 +735,12 @@ def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
                 commit_changes=commit_changes,
             )
 
+    _normalize_line_state(repo_root, line_state)
+    _backfill_line_state_from_blame(
+        repo_root,
+        line_state,
+        changes_by_commit_and_file,
+    )
     documents = list(document_by_pr.values())
     return SourceIndex(
         repo_root=repo_root,

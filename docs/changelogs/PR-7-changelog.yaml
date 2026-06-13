@@ -13,20 +13,6 @@ decisions:
     summary: Use PR descriptions as the provenance source when a history entry has no changelog artifact.
 entities: []
 changes:
-  - file: src/powdrr_lift/__init__.py
-    span:
-      start_line: 1
-      end_line: 114
-    summary: Export the branch snapshot and SQLite lookup APIs from the top-level package.
-    affects: []
-    rationale: Make the private code index store and its refresh/lookup helpers available to library callers without reaching into internal modules.
-  - file: src/powdrr_lift/core/__init__.py
-    span:
-      start_line: 1
-      end_line: 71
-    summary: Re-export the SQLite-backed code index API through the core package.
-    affects: []
-    rationale: Keep the core package aligned with the rest of the thin-wrapper module layout and surface the new index and lookup functions consistently.
   - file: src/powdrr_lift/core/code_index.py
     span:
       start_line: 1

@@ -213,13 +213,16 @@ def test_refresh_code_index_uses_commit_body_when_pr_is_missing(
     assert provenance.kind == "commented"
     assert provenance.title == "Add helper"
     assert provenance.intent_goal == "Track intent in the commit comment."
-    assert lookup_code_provenance(
-        "src/app.py",
-        1,
-        branch_name="feature/code-index",
-        parent_branch="main",
-        repo_root=repo_root,
-    ).kind == "commented"
+    assert (
+        lookup_code_provenance(
+            "src/app.py",
+            1,
+            branch_name="feature/code-index",
+            parent_branch="main",
+            repo_root=repo_root,
+        ).kind
+        == "commented"
+    )
 
 
 def test_refresh_code_index_uses_sparse_spans_from_pr_description(

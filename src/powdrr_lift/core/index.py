@@ -417,8 +417,8 @@ def _build_commit_changes(
                         file_patch=file_patch,
                         change=change,
                         change_index=change_index,
+                    )
                 )
-            )
             continue
 
         commit_changes.append(

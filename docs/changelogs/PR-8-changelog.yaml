@@ -1,0 +1,423 @@
+version: 1
+change_id: 8
+title: Add changelog provenance index
+intent:
+  problem: There was no persistent private store for replaying changelog documents
+    into a line-level provenance index across branch refreshes.
+  goal: Build a smart SQLite-backed provenance index in `.powdrr-lift/state/code_index.db`
+    that maps current source lines back to the change that introduced them, refreshes
+    when the branch or parent branch changes, and falls back to PR descriptions when
+    a commit history entry has no changelog file.
+decisions:
+- id: INDEX-001
+  summary: Replay merged PR changelog docs in mainline order and transform line provenance
+    through later diffs.
+- id: INDEX-002
+  summary: Persist branch snapshots in SQLite keyed by branch and parent branch heads
+    for fast file/span lookup and refresh checks.
+- id: INDEX-003
+  summary: Use PR descriptions as the provenance source when a history entry has no
+    changelog artifact.
+entities: []
+changes:
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 84
+    end_line: 84
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 89
+    end_line: 89
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 91
+    end_line: 91
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 164
+    end_line: 167
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 173
+    end_line: 180
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 177
+    end_line: 177
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 186
+    end_line: 186
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 191
+    end_line: 191
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 223
+    end_line: 223
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_template.py
+  span:
+    start_line: 283
+    end_line: 286
+  summary: Render one changelog entry per diff hunk.
+  affects: []
+  rationale: Generate the template from hunk-level diff entries, omit rename-only
+    files, and keep the instruction text aligned with the diff hunk contract.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 69
+    end_line: 69
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 97
+    end_line: 149
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 151
+    end_line: 160
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 108
+    end_line: 108
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/change_log_validation.py
+  span:
+    start_line: 163
+    end_line: 166
+  summary: Add span-aware changelog validation.
+  affects: []
+  rationale: Validate each proposed hunk against the branch diff, regardless of order,
+    and report missing or unexpected hunks.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Implement the SQLite-backed branch snapshot store and file/span lookup
+    path with PR-description fallback for missing changelog files.
+  affects: []
+  rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale
+    branch or parent heads, refresh the snapshot when needed, and hydrate branch history
+    from PR descriptions when the changelog artifact is missing.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 541
+    end_line: 546
+  summary: Implement the SQLite-backed branch snapshot store and file/span lookup
+    path with PR-description fallback for missing changelog files.
+  affects: []
+  rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale
+    branch or parent heads, refresh the snapshot when needed, and hydrate branch history
+    from PR descriptions when the changelog artifact is missing.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 617
+    end_line: 617
+  summary: Implement the SQLite-backed branch snapshot store and file/span lookup
+    path with PR-description fallback for missing changelog files.
+  affects: []
+  rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale
+    branch or parent heads, refresh the snapshot when needed, and hydrate branch history
+    from PR descriptions when the changelog artifact is missing.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 10
+    end_line: 16
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 97
+    end_line: 97
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 218
+    end_line: 222
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 248
+    end_line: 349
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 680
+    end_line: 680
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 682
+    end_line: 682
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 697
+    end_line: 697
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 699
+    end_line: 702
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 704
+    end_line: 704
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 707
+    end_line: 710
+  summary: Extend the provenance model and file-patch replay helpers used by the SQLite-backed
+    index.
+  affects: []
+  rationale: Reuse the existing changelog replay logic for branch snapshots, provenance
+    records, file-line attribution, and PR description fallback in the persistent
+    code index.
+- file: tests/test_change_log_template.py
+  span:
+    start_line: 83
+    end_line: 135
+  summary: Add regression coverage for hunk-level template generation.
+  affects: []
+  rationale: Ensure sparse multi-hunk diffs render one changelog entry per hunk and
+    rename-only diffs stay out of the template.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 106
+    end_line: 211
+  summary: Add regression coverage for multi-hunk changelog validation.
+  affects: []
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 293
+    end_line: 307
+  summary: Add regression coverage for multi-hunk changelog validation.
+  affects: []
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 309
+    end_line: 309
+  summary: Add regression coverage for multi-hunk changelog validation.
+  affects: []
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 191
+    end_line: 191
+  summary: Add regression coverage for multi-hunk changelog validation.
+  affects: []
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
+- file: tests/test_change_log_validation.py
+  span:
+    start_line: 325
+    end_line: 382
+  summary: Add regression coverage for multi-hunk changelog validation.
+  affects: []
+  rationale: Ensure missing hunk counts are detected and that valid hunk spans pass
+    even when listed in a different order.
+- file: tests/test_changelog_index.py
+  span:
+    start_line: 6
+    end_line: 8
+  summary: Cover lineage tracking across later insertions, changelog artifact provenance,
+    and PR-description fallback.
+  affects: []
+  rationale: Verify the mainline index preserves per-line attribution after later
+    commits, still records the changelog artifact as a provenance-bearing file, and
+    uses the PR body when the changelog file is absent.
+- file: tests/test_changelog_index.py
+  span:
+    start_line: 105
+    end_line: 152
+  summary: Cover lineage tracking across later insertions, changelog artifact provenance,
+    and PR-description fallback.
+  affects: []
+  rationale: Verify the mainline index preserves per-line attribution after later
+    commits, still records the changelog artifact as a provenance-bearing file, and
+    uses the PR body when the changelog file is absent.
+- file: tests/test_code_index.py
+  span:
+    start_line: 7
+    end_line: 15
+  summary: Add regression coverage for stale-branch refresh, span lookups, and PR-description
+    fallback.
+  affects: []
+  rationale: Prove the SQLite store is created, refreshes when new commits land on
+    the branch, still resolves the original change rationale after later line shifts,
+    and can build provenance from PR descriptions when no changelog file exists.
+- file: tests/test_code_index.py
+  span:
+    start_line: 108
+    end_line: 253
+  summary: Add regression coverage for stale-branch refresh, span lookups, and PR-description
+    fallback.
+  affects: []
+  rationale: Prove the SQLite store is created, refreshes when new commits land on
+    the branch, still resolves the original change rationale after later line shifts,
+    and can build provenance from PR descriptions when no changelog file exists.
+relationship_changes: []

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,6 +10,7 @@ import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.change_log_template import (
+    BranchDiffEntry,
     _collect_branch_diff_entries,
     _resolve_default_branch,
     _resolve_repo_root,
@@ -65,6 +67,7 @@ def build_validation_report(
         for entry in diff_entries
         if not _is_changelog_artifact_path(entry.path)
     ]
+    expected_change_files = list(dict.fromkeys(expected_change_files))
 
     issues: list[ValidationIssue] = []
     proposed_change_files: list[str] = []
@@ -92,27 +95,81 @@ def build_validation_report(
         for change in change_log.changes
         if change.file is not None and change.file != ""
     ]
+    expected_change_entries_by_file: dict[str, list[BranchDiffEntry]] = {}
+    for entry in diff_entries:
+        if _is_changelog_artifact_path(entry.path):
+            continue
 
-    missing_change_files = [
-        file_path
-        for file_path in expected_change_files
-        if file_path not in proposed_change_files
-    ]
-    for file_path in missing_change_files:
-        issues.append(
-            ValidationIssue(
-                code="missing_change",
-                message=f"Missing change entry for {file_path}",
-                path=file_path,
-            )
+        expected_change_entries_by_file.setdefault(entry.path, []).append(entry)
+
+    proposed_change_entries_by_file: dict[str, list] = {}
+    for change in change_log.changes:
+        if change.file is None or change.file == "":
+            continue
+
+        proposed_change_entries_by_file.setdefault(change.file, []).append(change)
+
+    for file_path, expected_entries in expected_change_entries_by_file.items():
+        proposed_entries = proposed_change_entries_by_file.get(file_path, [])
+        expected_spans = Counter(
+            (entry.start_line, entry.end_line) for entry in expected_entries
         )
+        proposed_spans: Counter[tuple[int, int]] = Counter()
+        for change_index, proposed_entry in enumerate(proposed_entries, start=1):
+            if (
+                proposed_entry.span.start_line is None
+                or proposed_entry.span.end_line is None
+                or proposed_entry.span.start_line > proposed_entry.span.end_line
+            ):
+                issues.append(
+                    ValidationIssue(
+                        code="span_mismatch",
+                        message=(
+                            f"Span for {file_path} change {change_index} is invalid: "
+                            f"{proposed_entry.span.start_line}-"
+                            f"{proposed_entry.span.end_line}"
+                        ),
+                        path=file_path,
+                    )
+                )
+                continue
 
-    unexpected_change_files = [
-        file_path
-        for file_path in proposed_change_files
-        if file_path not in expected_change_files
-    ]
-    for file_path in unexpected_change_files:
+            proposed_spans[
+                (proposed_entry.span.start_line, proposed_entry.span.end_line)
+            ] += 1
+
+        for span, count in expected_spans.items():
+            difference = count - proposed_spans.get(span, 0)
+            for _ in range(max(0, difference)):
+                issues.append(
+                    ValidationIssue(
+                        code="missing_change",
+                        message=(
+                            f"Missing change entry for {file_path} "
+                            f"({span[0]}-{span[1]})"
+                        ),
+                        path=file_path,
+                    )
+                )
+
+        for span, count in proposed_spans.items():
+            difference = count - expected_spans.get(span, 0)
+            for _ in range(max(0, difference)):
+                issues.append(
+                    ValidationIssue(
+                        code="unexpected_change",
+                        message=(
+                            f"Unexpected change entry for {file_path} "
+                            f"({span[0]}-{span[1]}) does not appear in the branch diff"
+                        ),
+                        path=file_path,
+                    )
+                )
+
+    for file_path in proposed_change_entries_by_file:
+        if file_path in expected_change_entries_by_file:
+            continue
+
         issues.append(
             ValidationIssue(
                 code="unexpected_change",

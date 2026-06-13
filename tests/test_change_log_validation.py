@@ -103,6 +103,111 @@ def test_validate_change_log_yaml_reports_missing_changes(
     assert report.issues[0].path == "tests/test_app.py"
 
 
+def test_validate_change_log_yaml_allows_hunks_in_any_order(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Sparse application changes
+
+    intent:
+      problem: The application should skip a bad line and append a new one.
+      goal: Preserve the change in a narrow file span.
+
+    decisions:
+      - id: ADR-101
+        summary: Keep the file entry scoped to the changed lines.
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 8
+          end_line: 8
+        summary: Update the fourth line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
+          start_line: 2
+          end_line: 2
+        summary: Update the first line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
+          start_line: 6
+          end_line: 6
+        summary: Update the third line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: src/app.py
+        span:
+          start_line: 4
+          end_line: 4
+        summary: Update the second line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
+def test_validate_change_log_yaml_reports_missing_hunk_entries(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Sparse application changes
+
+    intent:
+      problem: The application should update four separate lines.
+      goal: Preserve each diff hunk as a distinct changelog entry.
+
+    decisions:
+      - id: ADR-101
+        summary: Keep the file entry scoped to the changed lines.
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 2
+          end_line: 2
+        summary: Update the first line.
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert sum(issue.code == "missing_change" for issue in report.issues) == 3
+    assert all(issue.path == "src/app.py" for issue in report.issues)
+
+
 def test_validate_change_log_yaml_ignores_changelog_artifact(
     tmp_path: Path,
 ) -> None:
@@ -184,11 +289,26 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     _git(repo_root, "config", "user.email", "test@example.com")
 
     (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text(
+        "\n".join(
+            [
+                "line 1",
+                "line 2",
+                "line 3",
+                "line 4",
+                "line 5",
+                "line 6",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     _git(repo_root, "add", "README.md")
+    _git(repo_root, "add", "src/app.py")
     _git(repo_root, "commit", "-m", "Initial commit")
 
     _git(repo_root, "checkout", "-b", "feature/change-log")
-    (repo_root / "src").mkdir()
     (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
     (repo_root / "tests").mkdir()
     (repo_root / "tests" / "test_app.py").write_text(
@@ -197,6 +317,64 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     )
     _git(repo_root, "add", "src/app.py", "tests/test_app.py")
     _git(repo_root, "commit", "-m", "Add application files")
+
+    return repo_root
+
+
+def _create_repo_with_sparse_feature_branch(tmp_path: Path) -> Path:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    return repo_root
+
+
+def _create_repo_with_multi_hunk_feature_branch(tmp_path: Path) -> Path:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text(
+        "\n".join(
+            [
+                "line 1",
+                "line 2",
+                "line 3",
+                "line 4",
+                "line 5",
+                "line 6",
+                "line 7",
+                "line 8",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "add", "src/app.py")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "src" / "app.py").write_text(
+        "\n".join(
+            [
+                "line 1",
+                "line 2 updated",
+                "line 3",
+                "line 4 updated",
+                "line 5",
+                "line 6 updated",
+                "line 7",
+                "line 8 updated",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py")
+    _git(repo_root, "commit", "-m", "Sparse application changes")
 
     return repo_root
 

@@ -71,7 +71,7 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    summary: null",
         "# List the repository entities affected by this change.",
         "entities: []",
-        "# Each change entry should map one changed file.",
+        "# Each change entry should map one diff hunk.",
     ]
 
     if diff_entries:
@@ -81,14 +81,14 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                 [
                     "  -",
                     "    # File changed on branch; keep this path aligned with",
-                    "    # the diff.",
+                    "    # the diff hunk.",
                     f"    file: {diff_entry.path}",
                     "    span:",
-                    "      # First changed line in this file.",
+                    "      # First changed line in this hunk.",
                     f"      start_line: {diff_entry.start_line}",
-                    "      # Last changed line in this file.",
+                    "      # Last changed line in this hunk.",
                     f"      end_line: {diff_entry.end_line}",
-                    "    # Short description of the file-level change.",
+                    "    # Short description of the hunk-level change.",
                     "    summary: null",
                     "    # List of entity ids affected by this change.",
                     "    affects: []",
@@ -161,30 +161,40 @@ def _collect_branch_diff_entries(
         if status.startswith(("R", "C")) and len(parts) >= 3:
             path = parts[2]
 
-        start_line, end_line = _collect_file_span(
+        if status[0] in {"R", "C"} and status[1:] == "100":
+            continue
+
+        if _is_changelog_artifact_path(path):
+            continue
+
+        spans = _collect_file_spans(
             repo_root,
             default_branch_name,
             branch_name,
             path,
         )
-        entries.append(
-            BranchDiffEntry(
-                status=status,
-                path=path,
-                start_line=start_line,
-                end_line=end_line,
+        if not spans:
+            continue
+
+        for start_line, end_line in spans:
+            entries.append(
+                BranchDiffEntry(
+                    status=status,
+                    path=path,
+                    start_line=start_line,
+                    end_line=end_line,
+                )
             )
-        )
 
     return entries
 
 
-def _collect_file_span(
+def _collect_file_spans(
     repo_root: Path,
     default_branch_name: str,
     branch_name: str,
     path: str,
-) -> tuple[int, int]:
+) -> list[tuple[int, int]]:
     diff_output = _git_output(
         repo_root,
         "diff",
@@ -216,11 +226,9 @@ def _collect_file_span(
             span_ranges.append((old_start, old_start + old_count - 1))
 
     if not span_ranges:
-        return 1, 1
+        return []
 
-    start_line = min(span[0] for span in span_ranges)
-    end_line = max(span[1] for span in span_ranges)
-    return start_line, end_line
+    return span_ranges
 
 
 def _resolve_repo_root(repo_root: str | Path | None) -> Path:
@@ -276,6 +284,10 @@ def _git_output(repo_root: Path, *args: str) -> str:
         text=True,
     )
     return process.stdout
+
+
+def _is_changelog_artifact_path(path: str) -> bool:
+    return path.startswith("docs/changelogs/PR-") and path.endswith("-changelog.yaml")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

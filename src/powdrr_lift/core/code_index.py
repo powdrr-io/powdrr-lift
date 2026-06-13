@@ -35,27 +35,27 @@ def code_index_db_path(repo_root: str | Path | None = None) -> Path:
 
 def refresh_code_index(
     branch_name: str | None = None,
-    parent_branch: str | None = None,
+    *,
+    parent_branch: str,
     repo_root: str | Path | None = None,
 ) -> SourceIndex:
     repo_root_path = _resolve_repo_root(repo_root)
     store = CodeIndexStore(repo_root_path)
     resolved_branch = branch_name or _current_branch(repo_root_path)
-    resolved_parent = parent_branch or _resolve_default_branch(repo_root_path)
-    return store.refresh(resolved_branch, resolved_parent)
+    return store.refresh(resolved_branch, parent_branch)
 
 
 def lookup_code_provenance(
     path: str,
     line_number: int,
     branch_name: str | None = None,
-    parent_branch: str | None = None,
+    *,
+    parent_branch: str,
     repo_root: str | Path | None = None,
 ) -> ProvenanceRecord | None:
     store = CodeIndexStore(_resolve_repo_root(repo_root))
     resolved_branch = branch_name or _current_branch(store.repo_root)
-    resolved_parent = parent_branch or _resolve_default_branch(store.repo_root)
-    store.refresh(resolved_branch, resolved_parent)
+    store.refresh(resolved_branch, parent_branch)
     return store.lookup(resolved_branch, path, line_number)
 
 
@@ -64,13 +64,13 @@ def lookup_code_provenance_span(
     start_line: int,
     end_line: int,
     branch_name: str | None = None,
-    parent_branch: str | None = None,
+    *,
+    parent_branch: str,
     repo_root: str | Path | None = None,
 ) -> list[ProvenanceRecord]:
     store = CodeIndexStore(_resolve_repo_root(repo_root))
     resolved_branch = branch_name or _current_branch(store.repo_root)
-    resolved_parent = parent_branch or _resolve_default_branch(store.repo_root)
-    store.refresh(resolved_branch, resolved_parent)
+    store.refresh(resolved_branch, parent_branch)
     return store.lookup_span(resolved_branch, path, start_line, end_line)
 
 

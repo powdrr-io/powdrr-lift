@@ -28,10 +28,17 @@ changes:
   - file: src/powdrr_lift/core/code_index.py
     span:
       start_line: 1
-      end_line: 837
+      end_line: 834
     summary: Implement the SQLite-backed branch snapshot store and file/span lookup path.
     affects: []
     rationale: Persist branch state in `.powdrr-lift/state/code_index.db`, detect stale branch or parent heads, refresh the snapshot when needed, and provide fast per-file and per-span provenance lookups.
+  - file: .gitignore
+    span:
+      start_line: 1
+      end_line: 22
+    summary: Ignore the private SQLite state directory for the code index.
+    affects: []
+    rationale: Prevent the local `.powdrr-lift/` state directory from showing up as a tracked change or leaking into commits.
   - file: src/powdrr_lift/core/index.py
     span:
       start_line: 1

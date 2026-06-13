@@ -18,4 +18,5 @@ build/
 .worktrees/
 .aider.*
 .aider/
+.powdrr-lift/
 uv.lock

@@ -812,6 +812,16 @@ def _render_html() -> str:
                 ${escapeHtml(provenance.rationale || "No rationale recorded.")}
               </div>
             </div>
+            <div class="detail-card">
+              <div class="detail-label">Entities</div>
+              <div class="detail-text">
+                ${
+                  provenance.affects && provenance.affects.length
+                    ? escapeHtml(provenance.affects.join(", "))
+                    : "No entities recorded."
+                }
+              </div>
+            </div>
           </div>
         `;
       }

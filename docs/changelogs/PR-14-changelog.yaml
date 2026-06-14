@@ -1,0 +1,649 @@
+version: 1
+change_id: 14
+title: Add entity context lookups
+intent:
+  problem: Agents could inspect file spans and provenance, but they could not ask
+    for entity-specific references or relationship context directly.
+  goal: Let agents look up entity references, entity relationships, and affected entities
+    from code spans using the normalized changelog index.
+decisions:
+- id: entity-context-api
+  summary: Add explicit entity reference and relationship lookup APIs on top of the
+    normalized provenance index.
+entities:
+- id: PublicAPI
+  type: Package
+  action: added
+- id: CLI
+  type: CLI
+  action: added
+- id: MCPServer
+  type: MCP
+  action: added
+- id: EditContextLookup
+  type: Report
+  action: added
+- id: EntityLookup
+  type: Report
+  action: added
+- id: EntityReferenceReport
+  type: Report
+  action: added
+- id: EntityRelationshipReport
+  type: Report
+  action: added
+- id: EntityGraph
+  type: Graph
+  action: added
+- id: CodeIndexCache
+  type: Storage
+  action: added
+- id: BlameView
+  type: UI
+  action: added
+changes:
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 32
+    end_line: 33
+  summary: Expose the new entity context APIs from the package surface.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  - EditContextLookup
+  - CodeIndexCache
+  rationale: Keep the top-level package aligned with the new entity lookup workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 37
+    end_line: 38
+  summary: Expose the new entity context APIs from the package surface.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  - EditContextLookup
+  - CodeIndexCache
+  rationale: Keep the top-level package aligned with the new entity lookup workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 61
+    end_line: 62
+  summary: Expose the new entity context APIs from the package surface.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  - EditContextLookup
+  - CodeIndexCache
+  rationale: Keep the top-level package aligned with the new entity lookup workflow.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 218
+    end_line: 243
+  summary: Expose the new entity context APIs from the package surface.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  - EditContextLookup
+  - CodeIndexCache
+  rationale: Keep the top-level package aligned with the new entity lookup workflow.
+- file: src/powdrr_lift/blame_ui.py
+  span:
+    start_line: 815
+    end_line: 824
+  summary: Show affected entities in the blame UI details pane.
+  affects:
+  - BlameView
+  - EntityLookup
+  rationale: Let the UI surface the same entity context that edit lookups return.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Add CLI commands for entity references and relationships.
+  affects:
+  - CLI
+  - EntityLookup
+  - EditContextLookup
+  rationale: Give shell users a direct way to inspect entity context and graph edges.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 17
+    end_line: 18
+  summary: Add CLI commands for entity references and relationships.
+  affects:
+  - CLI
+  - EntityLookup
+  - EditContextLookup
+  rationale: Give shell users a direct way to inspect entity context and graph edges.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 130
+    end_line: 183
+  summary: Add CLI commands for entity references and relationships.
+  affects:
+  - CLI
+  - EntityLookup
+  - EditContextLookup
+  rationale: Give shell users a direct way to inspect entity context and graph edges.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 304
+    end_line: 329
+  summary: Add CLI commands for entity references and relationships.
+  affects:
+  - CLI
+  - EntityLookup
+  - EditContextLookup
+  rationale: Give shell users a direct way to inspect entity context and graph edges.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 31
+    end_line: 38
+  summary: Expose the new entity context reports from the core package.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  rationale: Keep core imports stable for callers that need entity lookups.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 88
+    end_line: 89
+  summary: Expose the new entity context reports from the core package.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  rationale: Keep core imports stable for callers that need entity lookups.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 120
+    end_line: 121
+  summary: Expose the new entity context reports from the core package.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  rationale: Keep core imports stable for callers that need entity lookups.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 129
+    end_line: 130
+  summary: Expose the new entity context reports from the core package.
+  affects:
+  - PublicAPI
+  - EntityLookup
+  rationale: Keep core imports stable for callers that need entity lookups.
+- file: src/powdrr_lift/core/blame_view.py
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Carry affected entities through blame provenance serialization.
+  affects:
+  - BlameView
+  - EntityLookup
+  rationale: Preserve the affects block so downstream views can show entity context.
+- file: src/powdrr_lift/core/blame_view.py
+  span:
+    start_line: 256
+    end_line: 256
+  summary: Carry affected entities through blame provenance serialization.
+  affects:
+  - BlameView
+  - EntityLookup
+  rationale: Preserve the affects block so downstream views can show entity context.
+- file: src/powdrr_lift/core/blame_view.py
+  span:
+    start_line: 380
+    end_line: 380
+  summary: Carry affected entities through blame provenance serialization.
+  affects:
+  - BlameView
+  - EntityLookup
+  rationale: Preserve the affects block so downstream views can show entity context.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 152
+    end_line: 152
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 180
+    end_line: 191
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 231
+    end_line: 248
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 264
+    end_line: 264
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 290
+    end_line: 299
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 304
+    end_line: 307
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 316
+    end_line: 467
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 520
+    end_line: 531
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 710
+    end_line: 714
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 755
+    end_line: 759
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 845
+    end_line: 848
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 968
+    end_line: 980
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 1299
+    end_line: 1303
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 1322
+    end_line: 1322
+  summary: Persist affects data and add entity lookup queries to the code index.
+  affects:
+  - CodeIndexCache
+  - EntityGraph
+  - EntityLookup
+  rationale: Make entity references and relationships fast to query from the local
+    SQLite cache.
+- file: src/powdrr_lift/core/edit_context.py
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Include affected entities in file and line edit context.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Help agents see which entities a code area touches when they inspect
+    spans.
+- file: src/powdrr_lift/core/edit_context.py
+  span:
+    start_line: 87
+    end_line: 88
+  summary: Include affected entities in file and line edit context.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Help agents see which entities a code area touches when they inspect
+    spans.
+- file: src/powdrr_lift/core/edit_context.py
+  span:
+    start_line: 102
+    end_line: 107
+  summary: Include affected entities in file and line edit context.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Help agents see which entities a code area touches when they inspect
+    spans.
+- file: src/powdrr_lift/core/edit_context.py
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Include affected entities in file and line edit context.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Help agents see which entities a code area touches when they inspect
+    spans.
+- file: src/powdrr_lift/core/edit_context.py
+  span:
+    start_line: 172
+    end_line: 172
+  summary: Include affected entities in file and line edit context.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Help agents see which entities a code area touches when they inspect
+    spans.
+- file: src/powdrr_lift/core/edit_context.py
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Include affected entities in file and line edit context.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Help agents see which entities a code area touches when they inspect
+    spans.
+- file: src/powdrr_lift/core/entity_context.py
+  span:
+    start_line: 1
+    end_line: 188
+  summary: Add dedicated entity reference and relationship report builders.
+  affects:
+  - EntityLookup
+  - EntityReferenceReport
+  - EntityRelationshipReport
+  rationale: Provide one place to shape entity-specific context for CLI and MCP callers.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Normalize affected entities into the provenance model.
+  affects:
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Carry affects data through the changelog index so entity context can
+    be queried later.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 691
+    end_line: 691
+  summary: Normalize affected entities into the provenance model.
+  affects:
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Carry affects data through the changelog index so entity context can
+    be queried later.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 718
+    end_line: 718
+  summary: Normalize affected entities into the provenance model.
+  affects:
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Carry affects data through the changelog index so entity context can
+    be queried later.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 742
+    end_line: 742
+  summary: Normalize affected entities into the provenance model.
+  affects:
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Carry affects data through the changelog index so entity context can
+    be queried later.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 770
+    end_line: 770
+  summary: Normalize affected entities into the provenance model.
+  affects:
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Carry affects data through the changelog index so entity context can
+    be queried later.
+- file: src/powdrr_lift/core/index.py
+  span:
+    start_line: 1161
+    end_line: 1174
+  summary: Normalize affected entities into the provenance model.
+  affects:
+  - EntityGraph
+  - CodeIndexCache
+  rationale: Carry affects data through the changelog index so entity context can
+    be queried later.
+- file: src/powdrr_lift/mcp_server.py
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Expose entity reference and relationship tools over MCP.
+  affects:
+  - MCPServer
+  - EntityLookup
+  rationale: Let agent-native clients query entity context without shelling out.
+- file: src/powdrr_lift/mcp_server.py
+  span:
+    start_line: 17
+    end_line: 18
+  summary: Expose entity reference and relationship tools over MCP.
+  affects:
+  - MCPServer
+  - EntityLookup
+  rationale: Let agent-native clients query entity context without shelling out.
+- file: src/powdrr_lift/mcp_server.py
+  span:
+    start_line: 95
+    end_line: 126
+  summary: Expose entity reference and relationship tools over MCP.
+  affects:
+  - MCPServer
+  - EntityLookup
+  rationale: Let agent-native clients query entity context without shelling out.
+- file: tests/test_code_index.py
+  span:
+    start_line: 335
+    end_line: 335
+  summary: Cover persistence of affected-entity provenance in the code index.
+  affects:
+  - CodeIndexCache
+  rationale: Prevent the SQLite cache from dropping affects data during refreshes.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 34
+    end_line: 35
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 117
+    end_line: 121
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 128
+    end_line: 129
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 156
+    end_line: 159
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 166
+    end_line: 167
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 195
+    end_line: 198
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_edit_context.py
+  span:
+    start_line: 205
+    end_line: 206
+  summary: Cover edit context output that includes affected entities.
+  affects:
+  - EditContextLookup
+  - EntityLookup
+  rationale: Lock in the file-span context that agents need before editing code.
+- file: tests/test_entity_context.py
+  span:
+    start_line: 1
+    end_line: 221
+  summary: Cover the new entity reference and relationship lookups.
+  affects:
+  - EntityLookup
+  - EntityReferenceReport
+  - EntityRelationshipReport
+  rationale: Prevent the entity-specific reports and CLI output from regressing.
+relationship_changes:
+- action: add
+  source: CLI
+  target: EntityLookup
+  relationship: exposes
+  rationale: The CLI now exposes entity reference and relationship commands.
+- action: add
+  source: MCPServer
+  target: EntityLookup
+  relationship: exposes
+  rationale: The MCP server now serves entity reference and relationship tools.
+- action: add
+  source: EditContextLookup
+  target: EntityLookup
+  relationship: includes
+  rationale: Edit context now includes the entities related to each code area.
+- action: add
+  source: CodeIndexCache
+  target: EntityGraph
+  relationship: stores
+  rationale: The SQLite cache stores normalized entity and relationship context.
+- action: add
+  source: PublicAPI
+  target: EntityLookup
+  relationship: exports
+  rationale: The package surface exports the new entity lookup reports and helpers.

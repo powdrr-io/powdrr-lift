@@ -79,6 +79,7 @@ class ProvenanceRecord:
     span: Span | None
     summary: str | None
     rationale: str | None
+    affects: tuple[str, ...] = field(default_factory=tuple)
     change_index: int | None = None
 
 
@@ -687,6 +688,7 @@ def _build_declared_provenance(
         span=change.span,
         summary=change.summary,
         rationale=change.rationale,
+        affects=_normalize_entity_ids(change.affects),
         change_index=change_index,
     )
 
@@ -713,6 +715,7 @@ def _build_artifact_provenance(
         span=span,
         summary=f"Create changelog artifact for PR {commit.pr_number}",
         rationale="Store the validated PR changelog alongside the code change.",
+        affects=(),
         change_index=None,
     )
 
@@ -736,6 +739,7 @@ def _build_commit_comment_provenance(
         span=_resolve_patch_span(file_patch),
         summary=commit.subject,
         rationale=comment_body or "No commit body was provided.",
+        affects=(),
         change_index=None,
     )
 
@@ -763,6 +767,7 @@ def _build_implicit_provenance(
         rationale=(
             "Captured from the PR changelog because no explicit file entry matched."
         ),
+        affects=(),
         change_index=None,
     )
 
@@ -1151,6 +1156,20 @@ def _normalize_entity_id(entity_id: str | None) -> str | None:
 
     normalized_entity_id = entity_id.strip()
     return normalized_entity_id or None
+
+
+def _normalize_entity_ids(entity_ids: Sequence[str]) -> tuple[str, ...]:
+    normalized_entity_ids: list[str] = []
+    seen_entity_ids: set[str] = set()
+    for entity_id in entity_ids:
+        normalized_entity_id = _normalize_entity_id(entity_id)
+        if normalized_entity_id is None or normalized_entity_id in seen_entity_ids:
+            continue
+
+        seen_entity_ids.add(normalized_entity_id)
+        normalized_entity_ids.append(normalized_entity_id)
+
+    return tuple(normalized_entity_ids)
 
 
 def _git_output(repo_root: Path, *args: str) -> str:

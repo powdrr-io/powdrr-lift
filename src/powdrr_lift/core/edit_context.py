@@ -23,6 +23,7 @@ class EditContextRange:
     start_line: int
     end_line: int
     lines: list[EditContextLine] = field(default_factory=list)
+    related_entities: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +84,8 @@ def lookup_edit_context(
             raise ValueError("Line range end must be greater than or equal to start.")
 
         lines: list[EditContextLine] = []
+        related_entities: list[str] = []
+        seen_related_entities: set[str] = set()
         for line_number, provenance in store.lookup_lines(
             resolved_branch,
             file_path,
@@ -96,6 +99,12 @@ def lookup_edit_context(
                     matching_changes.append(provenance)
                     provenance_ref = len(matching_changes)
                     change_ref_by_record[provenance] = provenance_ref
+                for entity_name in provenance.affects:
+                    if entity_name in seen_related_entities:
+                        continue
+
+                    seen_related_entities.add(entity_name)
+                    related_entities.append(entity_name)
 
             lines.append(
                 EditContextLine(
@@ -109,6 +118,7 @@ def lookup_edit_context(
                 start_line=start_line,
                 end_line=end_line,
                 lines=lines,
+                related_entities=related_entities,
             )
         )
 
@@ -159,6 +169,7 @@ def _edit_context_report_to_data(report: EditContextReport) -> dict[str, Any]:
                 ),
                 "summary": change.summary,
                 "rationale": change.rationale,
+                "affects": list(change.affects),
                 "change_index": change.change_index,
             }
             for change_ref, change in enumerate(report.matching_changes, start=1)
@@ -174,6 +185,7 @@ def _edit_context_report_to_data(report: EditContextReport) -> dict[str, Any]:
                     }
                     for line in requested_range.lines
                 ],
+                "related_entities": requested_range.related_entities,
             }
             for requested_range in report.requested_ranges
         ],

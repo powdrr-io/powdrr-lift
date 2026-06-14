@@ -31,6 +31,8 @@ def test_lookup_edit_context_preserves_prior_intent_and_line_refs(
     assert [
         requested_range.start_line for requested_range in report.requested_ranges
     ] == [1, 3]
+    assert report.requested_ranges[0].related_entities == ["AppService"]
+    assert report.requested_ranges[1].related_entities == ["AppService"]
 
     first_range = report.requested_ranges[0]
     second_range = report.requested_ranges[1]
@@ -81,6 +83,7 @@ def test_cli_edit_context_emits_yaml_report(tmp_path: Path) -> None:
     assert report["file_path"] == "src/app.py"
     assert report["matching_changes"][0]["pr_number"] == 3
     assert report["requested_ranges"][0]["lines"][0]["provenance_ref"] == 1
+    assert report["requested_ranges"][0]["related_entities"] == ["AppService"]
 
 
 def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
@@ -111,13 +114,19 @@ def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
           problem: The repository has no application scaffold.
           goal: Add the initial application file.
 
+        entities:
+          - id: AppService
+            type: Service
+            action: added
+
         changes:
           - file: src/app.py
             span:
               start_line: 1
               end_line: 3
             summary: Add the initial application scaffold.
-            affects: []
+            affects:
+              - AppService
             rationale: Bootstrap the application file.
         """,
         encoding="utf-8",
@@ -144,13 +153,18 @@ def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
           problem: The app scaffold needs an introductory line.
           goal: Insert the intro line above the app scaffold.
 
+        entities:
+          - id: AppService
+            type: Service
+
         changes:
           - file: src/app.py
             span:
               start_line: 1
               end_line: 1
             summary: Add the intro line.
-            affects: []
+            affects:
+              - AppService
             rationale: Make the application start with an intro line.
         """,
         encoding="utf-8",
@@ -178,13 +192,18 @@ def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
           problem: The app needs a banner before the intro line.
           goal: Add the new banner line.
 
+        entities:
+          - id: AppService
+            type: Service
+
         changes:
           - file: src/app.py
             span:
               start_line: 1
               end_line: 1
             summary: Add the banner line.
-            affects: []
+            affects:
+              - AppService
             rationale: Add the new banner line.
         """,
         encoding="utf-8",

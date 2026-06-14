@@ -1,6 +1,6 @@
 ---
 name: review-pr-changelog
-description: "Use when reviewing a pull request that should include a changelog YAML. Check for the changelog first, validate it, then review each change against the PR intent and report the feedback."
+description: "Use during code review when the change includes a changelog. This skill complements general code-review skills; do not replace normal review. Check for the changelog first, validate it, then review each change against the PR intent and report the feedback."
 ---
 
 # Review PR Changelog
@@ -14,6 +14,7 @@ Use this skill when a PR needs changelog-focused review.
    - If it is missing, report that as feedback and stop.
 2. Validate the changelog YAML.
    - Run the changelog validation flow used by `powdrr-lift` for that PR.
+   - Example: `powdrr-lift evaluate-pr-against-changelog --pr-number <num>`
    - If validation fails, report the validation errors and stop.
 3. Review the changelog against the PR intent.
    - Read the PR title and description to determine intent.

@@ -28,6 +28,14 @@ from powdrr_lift.core.edit_context import (
     parse_line_ranges,
     render_edit_context_report,
 )
+from powdrr_lift.core.entity_context import (
+    EntityReferenceReport,
+    EntityRelationshipReport,
+    lookup_entity_references,
+    lookup_entity_relationships,
+    render_entity_reference_report,
+    render_entity_relationship_report,
+)
 from powdrr_lift.core.index import (
     ChangelogDocument,
     EntityGraph,
@@ -77,6 +85,8 @@ __all__ = [
     "EditContextLine",
     "EditContextRange",
     "EditContextReport",
+    "EntityReferenceReport",
+    "EntityRelationshipReport",
     "ChangelogDocument",
     "Change",
     "ChangeLog",
@@ -107,6 +117,8 @@ __all__ = [
     "create_change_log_template",
     "lookup_code_provenance",
     "lookup_code_provenance_span",
+    "lookup_entity_references",
+    "lookup_entity_relationships",
     "lookup_edit_context",
     "parse_change_log",
     "parse_line_range",
@@ -114,6 +126,8 @@ __all__ = [
     "parse_validation_report",
     "render_change_log_template",
     "render_edit_context_report",
+    "render_entity_reference_report",
+    "render_entity_relationship_report",
     "resolve_default_branch",
     "resolve_repo_root",
     "refresh_code_index",

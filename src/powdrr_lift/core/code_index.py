@@ -22,11 +22,12 @@ from powdrr_lift.core.index import (
     _CommitRecord,
     _git_output,
     _load_branch_pr_description_document,
+    _normalize_entity_id,
     _normalize_line_state,
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 5
+INDEX_CACHE_VERSION = 6
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +149,7 @@ class CodeIndexStore:
             row = connection.execute(
                 """
                 SELECT
+                  pr.id,
                   pr.kind,
                   pr.pr_number,
                   pr.commit_sha,
@@ -175,7 +177,18 @@ class CodeIndexStore:
         if row is None:
             return None
 
-        return _row_to_provenance_record(row)
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            affects_by_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"]],
+            )
+
+        return _row_to_provenance_record(
+            row,
+            affects=affects_by_id.get(row["id"], ()),
+        )
 
     def lookup_span(
         self,
@@ -215,7 +228,24 @@ class CodeIndexStore:
                 (branch_name, path, start_line, end_line),
             ).fetchall()
 
-        return [_row_to_provenance_record(row) for row in rows]
+        if not rows:
+            return []
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            affects_by_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in rows],
+            )
+
+        return [
+            _row_to_provenance_record(
+                row,
+                affects=affects_by_id.get(row["id"], ()),
+            )
+            for row in rows
+        ]
 
     def lookup_lines(
         self,
@@ -231,6 +261,7 @@ class CodeIndexStore:
                 SELECT
                   fl.line_number,
                   fl.provenance_record_id,
+                  pr.id,
                   pr.kind,
                   pr.pr_number,
                   pr.commit_sha,
@@ -256,11 +287,24 @@ class CodeIndexStore:
                 (branch_name, path, start_line, end_line),
             ).fetchall()
 
+            affects_by_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [
+                    row["provenance_record_id"]
+                    for row in rows
+                    if row["provenance_record_id"] is not None
+                ],
+            )
+
         records_by_line: dict[int, ProvenanceRecord | None] = {
             row["line_number"]: (
                 None
                 if row["provenance_record_id"] is None
-                else _row_to_provenance_record(row)
+                else _row_to_provenance_record(
+                    row,
+                    affects=affects_by_id.get(row["provenance_record_id"], ()),
+                )
             )
             for row in rows
         }
@@ -268,6 +312,158 @@ class CodeIndexStore:
             (line_number, records_by_line.get(line_number))
             for line_number in range(start_line, end_line + 1)
         ]
+
+    def _load_provenance_affects(
+        self,
+        connection: sqlite3.Connection,
+        branch_name: str,
+        provenance_ids: list[int],
+    ) -> dict[int, tuple[str, ...]]:
+        if not provenance_ids:
+            return {}
+
+        placeholders = ", ".join("?" for _ in provenance_ids)
+        rows = connection.execute(
+            f"""
+            SELECT provenance_record_id, entity_id
+            FROM provenance_affect
+            WHERE branch_name = ?
+              AND provenance_record_id IN ({placeholders})
+            ORDER BY provenance_record_id, entity_id
+            """,
+            [branch_name, *provenance_ids],
+        ).fetchall()
+
+        affects_by_id: dict[int, list[str]] = {}
+        for row in rows:
+            affects_by_id.setdefault(row["provenance_record_id"], []).append(
+                row["entity_id"]
+            )
+
+        return {
+            provenance_id: tuple(entities)
+            for provenance_id, entities in affects_by_id.items()
+        }
+
+    def lookup_entity_references(
+        self,
+        branch_name: str,
+        entity_name: str,
+    ) -> list[ProvenanceRecord]:
+        normalized_entity_name = _normalize_entity_id(entity_name)
+        if normalized_entity_name is None:
+            return []
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT
+                  pr.id,
+                  pr.kind,
+                  pr.pr_number,
+                  pr.commit_sha,
+                  pr.commit_timestamp,
+                  pr.changelog_path,
+                  pr.title,
+                  pr.change_id,
+                  pr.intent_problem,
+                  pr.intent_goal,
+                  pr.file_path,
+                  pr.span_start,
+                  pr.span_end,
+                  pr.summary,
+                  pr.rationale,
+                  pr.change_index
+                FROM provenance_record pr
+                JOIN provenance_affect pa ON pa.provenance_record_id = pr.id
+                WHERE pa.branch_name = ?
+                  AND pa.entity_id = ?
+                  AND pr.branch_name = ?
+                ORDER BY pr.commit_timestamp, pr.id
+                """,
+                (branch_name, normalized_entity_name, branch_name),
+            ).fetchall()
+
+            if not rows:
+                return []
+
+            affects_by_provenance_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in rows],
+            )
+
+        return [
+            _row_to_provenance_record(
+                row,
+                affects=affects_by_provenance_id.get(row["id"], ()),
+            )
+            for row in rows
+        ]
+
+    def lookup_entity_relationships(
+        self,
+        branch_name: str,
+        entity_name: str,
+    ) -> tuple[list[EntityOccurrence], list[RelationshipOccurrence]]:
+        normalized_entity_name = _normalize_entity_id(entity_name)
+        if normalized_entity_name is None:
+            return [], []
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            entity_rows = connection.execute(
+                """
+                SELECT entity_id, entity_type, action, pr_number, commit_sha,
+                       commit_timestamp, changelog_path
+                FROM entity_occurrence
+                WHERE branch_name = ?
+                  AND entity_id = ?
+                ORDER BY id
+                """,
+                (branch_name, normalized_entity_name),
+            ).fetchall()
+            relationship_rows = connection.execute(
+                """
+                SELECT source_entity_id, target_entity_id, relationship, action,
+                       rationale, pr_number, commit_sha, commit_timestamp,
+                       changelog_path
+                FROM relationship_record
+                WHERE branch_name = ?
+                  AND (source_entity_id = ? OR target_entity_id = ?)
+                ORDER BY id
+                """,
+                (branch_name, normalized_entity_name, normalized_entity_name),
+            ).fetchall()
+
+        entity_occurrences = [
+            EntityOccurrence(
+                entity_id=row["entity_id"],
+                entity_type=row["entity_type"],
+                action=row["action"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+            for row in entity_rows
+        ]
+        relationship_occurrences = [
+            RelationshipOccurrence(
+                source=row["source_entity_id"],
+                target=row["target_entity_id"],
+                relationship=row["relationship"],
+                action=row["action"],
+                rationale=row["rationale"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+            for row in relationship_rows
+        ]
+        return entity_occurrences, relationship_occurrences
 
     def branch_state_for(self, branch_name: str) -> BranchState | None:
         return self._read_branch_state(branch_name)
@@ -320,6 +516,18 @@ class CodeIndexStore:
                   rationale TEXT,
                   change_index INTEGER
                 );
+
+                CREATE TABLE IF NOT EXISTS provenance_affect (
+                  branch_name TEXT NOT NULL,
+                  provenance_record_id INTEGER NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  PRIMARY KEY (branch_name, provenance_record_id, entity_id),
+                  FOREIGN KEY (provenance_record_id) REFERENCES provenance_record(id)
+                    ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_provenance_affect_lookup
+                  ON provenance_affect(branch_name, entity_id, provenance_record_id);
 
                 CREATE TABLE IF NOT EXISTS file_line (
                   branch_name TEXT NOT NULL,
@@ -499,6 +707,11 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
+            affects_by_provenance_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in provenance_rows],
+            )
             line_rows = connection.execute(
                 """
                 SELECT line_number, file_path, provenance_record_id
@@ -539,7 +752,11 @@ class CodeIndexStore:
         ]
 
         provenance_by_id = {
-            row["id"]: _row_to_provenance_record(row) for row in provenance_rows
+            row["id"]: _row_to_provenance_record(
+                row,
+                affects=affects_by_provenance_id.get(row["id"], ()),
+            )
+            for row in provenance_rows
         }
         file_lines: dict[str, list[ProvenanceRecord | None]] = {}
         for row in line_rows:
@@ -623,6 +840,10 @@ class CodeIndexStore:
             )
             connection.execute(
                 "DELETE FROM relationship_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM provenance_affect WHERE branch_name = ?",
                 (branch_name,),
             )
             connection.execute(
@@ -744,6 +965,19 @@ class CodeIndexStore:
                     raise RuntimeError("Missing provenance row id after insert.")
 
                 provenance_id_by_record[id(record)] = provenance_id
+                for entity_id in record.affects:
+                    connection.execute(
+                        """
+                        INSERT INTO provenance_affect (
+                          branch_name, provenance_record_id, entity_id
+                        ) VALUES (?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            provenance_id,
+                            entity_id,
+                        ),
+                    )
 
             for file_path, lines in index.file_lines.items():
                 for line_number, line_record_ref in enumerate(lines, start=1):
@@ -1062,7 +1296,11 @@ def _resolve_branch_document(
     return None
 
 
-def _row_to_provenance_record(row: sqlite3.Row) -> ProvenanceRecord:
+def _row_to_provenance_record(
+    row: sqlite3.Row,
+    *,
+    affects: tuple[str, ...] = (),
+) -> ProvenanceRecord:
     return ProvenanceRecord(
         kind=row["kind"],
         pr_number=row["pr_number"],
@@ -1081,6 +1319,7 @@ def _row_to_provenance_record(row: sqlite3.Row) -> ProvenanceRecord:
         ),
         summary=row["summary"],
         rationale=row["rationale"],
+        affects=affects,
         change_index=row["change_index"],
     )
 

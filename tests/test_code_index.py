@@ -332,6 +332,7 @@ def test_backfill_line_state_from_blame_fills_missing_lines(
         span=Span(start_line=2, end_line=2),
         summary="Backfill missing provenance.",
         rationale="Use local blame data to fill gaps.",
+        affects=(),
         change_index=0,
     )
     line_state: dict[str, list[core_index.ProvenanceRecord | None]] = {

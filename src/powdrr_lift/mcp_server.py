@@ -9,9 +9,13 @@ from powdrr_lift.core import (
     build_blame_view_state,
     create_change_log_template,
     lookup_edit_context,
+    lookup_entity_references,
+    lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
     render_edit_context_report,
+    render_entity_reference_report,
+    render_entity_relationship_report,
     resolve_repo_root,
     validate_change_log_yaml,
 )
@@ -87,6 +91,38 @@ def build_server() -> Any:
             repo_root=repo_root_path,
         )
         return render_edit_context_report(report)
+
+    @server.tool()
+    def get_entity_references(
+        entity_name: str,
+        parent_branch: str,
+        branch_name: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        report = lookup_entity_references(
+            entity_name,
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return render_entity_reference_report(report)
+
+    @server.tool()
+    def get_entity_relationships(
+        entity_name: str,
+        parent_branch: str,
+        branch_name: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        report = lookup_entity_relationships(
+            entity_name,
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return render_entity_relationship_report(report)
 
     @server.tool()
     def get_blame_view(

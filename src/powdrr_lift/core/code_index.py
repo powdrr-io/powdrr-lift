@@ -773,23 +773,7 @@ class CodeIndexStore:
             lines[row["line_number"] - 1] = provenance_record
 
         documents = [
-            ChangelogDocument(
-                pr_number=row["pr_number"],
-                changelog_path=Path(row["changelog_path"]),
-                changelog=ChangeLog(
-                    version=1,
-                    change_id=row["change_id"],
-                    title=row["title"],
-                    intent=Intent(
-                        problem=row["intent_problem"],
-                        goal=row["intent_goal"],
-                    ),
-                ),
-                commit_sha=row["commit_sha"],
-                commit_timestamp=row["commit_timestamp"],
-                commit_subject=row["commit_subject"],
-            )
-            for row in document_rows
+            _load_changelog_document_from_cache_row(row) for row in document_rows
         ]
         changes = [provenance_by_id[row["id"]] for row in provenance_rows]
         return SourceIndex(
@@ -1326,6 +1310,31 @@ def _row_to_provenance_record(
 
 def _span_from_row(row: sqlite3.Row) -> Span:
     return Span(start_line=row["span_start"], end_line=row["span_end"])
+
+
+def _load_changelog_document_from_cache_row(row: sqlite3.Row) -> ChangelogDocument:
+    changelog_path = Path(row["changelog_path"])
+    if changelog_path.exists():
+        changelog = parse_change_log(changelog_path.read_text(encoding="utf-8"))
+    else:
+        changelog = ChangeLog(
+            version=1,
+            change_id=row["change_id"],
+            title=row["title"],
+            intent=Intent(
+                problem=row["intent_problem"],
+                goal=row["intent_goal"],
+            ),
+        )
+
+    return ChangelogDocument(
+        pr_number=row["pr_number"],
+        changelog_path=changelog_path,
+        changelog=changelog,
+        commit_sha=row["commit_sha"],
+        commit_timestamp=row["commit_timestamp"],
+        commit_subject=row["commit_subject"],
+    )
 
 
 def _current_branch(repo_root: Path) -> str:

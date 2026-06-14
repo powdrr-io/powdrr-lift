@@ -29,11 +29,14 @@ __all__ = [
     "EditContextLine",
     "EditContextRange",
     "EditContextReport",
+    "EntityDecisionOccurrence",
+    "EntityDecisionReport",
     "EntityReferenceReport",
     "EntityRelationshipReport",
     "code_index_db_path",
     "lookup_code_provenance",
     "lookup_code_provenance_span",
+    "lookup_entity_decisions",
     "lookup_entity_references",
     "lookup_entity_relationships",
     "lookup_edit_context",
@@ -58,6 +61,7 @@ __all__ = [
     "build_validation_report",
     "parse_validation_report",
     "render_edit_context_report",
+    "render_entity_decision_report",
     "render_entity_reference_report",
     "render_entity_relationship_report",
     "validate_change_log_yaml",
@@ -216,27 +220,39 @@ def __getattr__(name: str) -> Any:
         }[name]
 
     if name in {
+        "EntityDecisionOccurrence",
+        "EntityDecisionReport",
         "EntityReferenceReport",
         "EntityRelationshipReport",
+        "lookup_entity_decisions",
         "lookup_entity_references",
         "lookup_entity_relationships",
+        "render_entity_decision_report",
         "render_entity_reference_report",
         "render_entity_relationship_report",
     }:
         from powdrr_lift.core.entity_context import (
+            EntityDecisionOccurrence,
+            EntityDecisionReport,
             EntityReferenceReport,
             EntityRelationshipReport,
+            lookup_entity_decisions,
             lookup_entity_references,
             lookup_entity_relationships,
+            render_entity_decision_report,
             render_entity_reference_report,
             render_entity_relationship_report,
         )
 
         return {
+            "EntityDecisionOccurrence": EntityDecisionOccurrence,
+            "EntityDecisionReport": EntityDecisionReport,
             "EntityReferenceReport": EntityReferenceReport,
             "EntityRelationshipReport": EntityRelationshipReport,
+            "lookup_entity_decisions": lookup_entity_decisions,
             "lookup_entity_references": lookup_entity_references,
             "lookup_entity_relationships": lookup_entity_relationships,
+            "render_entity_decision_report": render_entity_decision_report,
             "render_entity_reference_report": render_entity_reference_report,
             "render_entity_relationship_report": render_entity_relationship_report,
         }[name]

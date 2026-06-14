@@ -1,0 +1,396 @@
+version: 1
+change_id: 16
+title: Add entity decision lookup
+intent:
+  problem: The index could answer entity references and relationships, but there was
+    no way to ask which PR decisions mention a given entity.
+  goal: Expose a CLI/MCP lookup that returns the decisions from PRs mentioning an
+    entity, while keeping cached changelog documents hydrated with full metadata.
+decisions:
+- id: ARCH-ENTITY-002
+  summary: Rehydrate cached changelog documents from disk so indexed entity lookups
+    retain full PR metadata.
+- id: ARCH-ENTITY-003
+  summary: Expose a dedicated entity decision lookup through the shared CLI, MCP,
+    and public API surfaces.
+entities:
+- id: CLI
+  type: CLI
+- id: CodeIndexCache
+  type: Cache
+- id: EntityLookup
+  type: Module
+- id: MCPServer
+  type: MCP
+- id: PublicAPI
+  type: Package
+- id: EntityDecisionReport
+  type: Report
+  action: added
+- id: EntityDecisionOccurrence
+  type: Record
+  action: added
+changes:
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 32
+    end_line: 33
+  summary: Expose entity decision lookup symbols in the top-level package API.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Keep the public import surface aligned with the new lookup types.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Expose the entity decision lookup helper from the top-level package.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Allow callers to access the new lookup through `powdrr_lift`.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Expose the entity decision report renderer from the top-level package.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Keep the report rendering helper available to CLI and MCP callers.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 223
+    end_line: 224
+  summary: Lazy-load the new entity decision lookup symbols.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Avoid eager imports while extending the package API.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 227
+    end_line: 227
+  summary: Lazy-load the entity decision lookup helper.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Keep the top-level package dispatch consistent with the new API.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 230
+    end_line: 230
+  summary: Lazy-load the entity decision report renderer.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Preserve the report rendering helper without eager import cycles.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 235
+    end_line: 236
+  summary: Return the lazy-loaded entity decision report symbols.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Expose the new report types through the package dispatch table.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 239
+    end_line: 239
+  summary: Return the lazy-loaded entity decision lookup helper.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Allow the top-level package to surface the new lookup function.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 242
+    end_line: 242
+  summary: Return the lazy-loaded entity decision report renderer.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Allow the top-level package to surface the new renderer function.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 248
+    end_line: 249
+  summary: Map the new entity decision report types in the lazy loader.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Keep the package dispatch table aligned with the new data model.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 252
+    end_line: 252
+  summary: Map the entity decision lookup helper in the lazy loader.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Expose the new lookup through the module-level API.
+- file: src/powdrr_lift/__init__.py
+  span:
+    start_line: 255
+    end_line: 255
+  summary: Map the entity decision report renderer in the lazy loader.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Expose the new renderer through the module-level API.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import the entity decision lookup helper into the CLI.
+  affects:
+  - CLI
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Wire the new command through the shared core lookup layer.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import the entity decision report renderer into the CLI.
+  affects:
+  - CLI
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Render the new lookup output as YAML on stdout.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 132
+    end_line: 158
+  summary: Add the entity-decisions CLI subcommand.
+  affects:
+  - CLI
+  - EntityDecisionReport
+  rationale: Expose a command for asking which PR decisions mention an entity.
+- file: src/powdrr_lift/cli.py
+  span:
+    start_line: 359
+    end_line: 371
+  summary: Dispatch entity-decisions to the shared lookup helper.
+  affects:
+  - CLI
+  - EntityDecisionReport
+  rationale: Keep the command implementation thin and index-backed.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 34
+    end_line: 35
+  summary: Export the entity decision report types from the core package.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Keep core consumers aware of the new report data model.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Export the entity decision lookup helper from the core package.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Make the new lookup available to CLI and MCP wrappers.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Export the entity decision renderer from the core package.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Make the YAML renderer available to CLI and MCP wrappers.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 87
+    end_line: 88
+  summary: Add the entity decision report types to the core export list.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Keep the package namespace aligned with the new lookup.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 122
+    end_line: 122
+  summary: Add the entity decision lookup helper to the core export list.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Preserve the shared lookup API for callers.
+- file: src/powdrr_lift/core/__init__.py
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Add the entity decision renderer to the core export list.
+  affects:
+  - PublicAPI
+  - EntityDecisionReport
+  rationale: Preserve the shared rendering API for callers.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 776
+    end_line: 776
+  summary: Rehydrate cached changelog documents from disk when loading branch state.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: The cached index needs full changelog content for decision lookups.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 1315
+    end_line: 1339
+  summary: Rehydrate cached changelog documents from the stored file path.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: Persisted branch state must recover full changelog metadata on load.
+- file: src/powdrr_lift/core/entity_context.py
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import the full changelog document type for decision aggregation.
+  affects:
+  - EntityLookup
+  - EntityDecisionReport
+  rationale: Decision lookups operate on the indexed changelog documents.
+- file: src/powdrr_lift/core/entity_context.py
+  span:
+    start_line: 43
+    end_line: 64
+  summary: Add the entity decision occurrence report type.
+  affects:
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Represent the PR decisions returned for a named entity.
+- file: src/powdrr_lift/core/entity_context.py
+  span:
+    start_line: 96
+    end_line: 126
+  summary: Add the entity decision lookup function.
+  affects:
+  - EntityLookup
+  - EntityDecisionReport
+  rationale: Aggregate decisions from indexed PRs that mention the entity.
+- file: src/powdrr_lift/core/entity_context.py
+  span:
+    start_line: 168
+    end_line: 171
+  summary: Add the entity decision report renderer.
+  affects:
+  - EntityDecisionReport
+  rationale: Serialize the decision lookup to YAML for CLI and MCP callers.
+- file: src/powdrr_lift/core/entity_context.py
+  span:
+    start_line: 247
+    end_line: 347
+  summary: Serialize the entity decision report fields.
+  affects:
+  - EntityDecisionReport
+  - EntityDecisionOccurrence
+  rationale: Keep the report payload stable for downstream consumers.
+- file: src/powdrr_lift/mcp_server.py
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import the entity decision lookup helper into the MCP server.
+  affects:
+  - MCPServer
+  - EntityDecisionReport
+  rationale: Expose the new lookup through the shared server wiring.
+- file: src/powdrr_lift/mcp_server.py
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import the entity decision renderer into the MCP server.
+  affects:
+  - MCPServer
+  - EntityDecisionReport
+  rationale: Serialize the MCP response as YAML.
+- file: src/powdrr_lift/mcp_server.py
+  span:
+    start_line: 113
+    end_line: 128
+  summary: Expose the entity decision lookup as an MCP tool.
+  affects:
+  - MCPServer
+  - EntityDecisionReport
+  rationale: Mirror the CLI decision lookup for MCP-capable clients.
+- file: tests/test_entity_context.py
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import the entity decision lookup in the entity-context tests.
+  affects:
+  - EntityDecisionReport
+  rationale: Cover the new entity decision surface in unit tests.
+- file: tests/test_entity_context.py
+  span:
+    start_line: 18
+    end_line: 41
+  summary: Add a direct lookup test for entity decisions.
+  affects:
+  - EntityDecisionReport
+  - EntityLookup
+  rationale: Verify the cached index returns the expected PR decisions.
+- file: tests/test_entity_context.py
+  span:
+    start_line: 106
+    end_line: 125
+  summary: Add CLI coverage for the entity decision command.
+  affects:
+  - CLI
+  - EntityDecisionReport
+  rationale: Verify the new subcommand emits YAML with the expected decisions.
+- file: tests/test_entity_context.py
+  span:
+    start_line: 176
+    end_line: 179
+  summary: Add decision metadata to the PR-1 changelog fixture.
+  affects:
+  - EntityDecisionReport
+  rationale: Give the test fixture a decision to aggregate.
+- file: tests/test_entity_context.py
+  span:
+    start_line: 227
+    end_line: 230
+  summary: Add decision metadata to the PR-2 changelog fixture.
+  affects:
+  - EntityDecisionReport
+  rationale: Give the second test fixture PR a second decision to aggregate.
+relationship_changes:
+- action: update
+  source: CLI
+  target: EntityDecisionReport
+  relationship: invokes
+  rationale: The CLI command returns the indexed entity decision report.
+- action: update
+  source: MCPServer
+  target: EntityDecisionReport
+  relationship: exposes
+  rationale: The MCP server surfaces the same entity decision lookup.
+- action: update
+  source: CodeIndexCache
+  target: EntityDecisionReport
+  relationship: rehydrates
+  rationale: Cached changelog documents are rehydrated before the lookup runs.
+- action: update
+  source: EntityLookup
+  target: EntityDecisionReport
+  relationship: returns
+  rationale: The shared entity context layer now returns decision metadata too.
+- action: update
+  source: PublicAPI
+  target: EntityDecisionReport
+  relationship: exports
+  rationale: The new report and helper are available through the package API.

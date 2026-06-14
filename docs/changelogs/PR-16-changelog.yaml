@@ -5,11 +5,12 @@ intent:
   problem: The index could answer entity references and relationships, but there was
     no way to ask which PR decisions mention a given entity.
   goal: Expose a CLI/MCP lookup that returns the decisions from PRs mentioning an
-    entity, while keeping cached changelog documents hydrated with full metadata.
+    entity, while keeping the cached index self-contained with only the structured
+    changelog data needed for lookup.
 decisions:
 - id: ARCH-ENTITY-002
-  summary: Persist full parsed changelog payloads in SQLite so indexed entity
-    lookups retain full PR metadata.
+  summary: Persist normalized changelog data in SQLite so indexed entity lookups
+    retain the PR metadata they need.
 - id: ARCH-ENTITY-003
   summary: Expose a dedicated entity decision lookup through the shared CLI, MCP,
     and public API surfaces.
@@ -258,34 +259,34 @@ changes:
   span:
     start_line: 32
     end_line: 32
-  summary: Bump the cache version after changing serialized payload storage.
+  summary: Bump the cache version after changing normalized cache storage.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Force stale cache rows to rebuild with the new payload format.
+  rationale: Force stale cache rows to rebuild with the new cache layout.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 492
     end_line: 492
-  summary: Store serialized changelog payloads in the branch document table.
+  summary: Store branch documents in the cache metadata table.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Persist parsed changelogs in the branch cache for later lookup.
+  rationale: Persist the PR metadata needed to reconstruct changelog lookups.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 596
     end_line: 606
-  summary: Backfill the branch document table with serialized payload support.
+  summary: Add normalized decision storage to the cache schema.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Migrate existing caches so changelog payloads remain available.
+  rationale: Migrate existing caches so decision metadata remains available.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 684
     end_line: 685
-  summary: Load serialized changelog payloads when reading cached branch documents.
+  summary: Load normalized decision rows when reading cached branch documents.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
@@ -294,7 +295,7 @@ changes:
   span:
     start_line: 791
     end_line: 791
-  summary: Load cached changelog documents from the branch cache.
+  summary: Load cached changelog documents from normalized cache rows.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
@@ -303,29 +304,29 @@ changes:
   span:
     start_line: 870
     end_line: 873
-  summary: Serialize changelog payloads before storing branch documents.
+  summary: Store decision metadata alongside branch documents.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Persist full parsed changelog payloads in SQLite.
+  rationale: Persist the parsed decision records in SQLite.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 879
     end_line: 879
-  summary: Serialize the changelog payload into the cached branch document row.
+  summary: Persist each decision entry with its branch snapshot.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Store the parsed changelog document alongside the branch snapshot.
+  rationale: Store the parsed changelog decisions alongside the branch snapshot.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 1331
     end_line: 1355
-  summary: Deserialize cached changelog documents from the stored payload.
+  summary: Reconstruct cached changelog documents from normalized rows.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Recover full changelog metadata without rereading files.
+  rationale: Recover the PR metadata needed for lookup without rereading files.
 - file: src/powdrr_lift/core/entity_context.py
   span:
     start_line: 12

@@ -242,23 +242,24 @@ changes:
   span:
     start_line: 5
     end_line: 5
-  summary: Import `asdict` for changelog serialization.
-  affects:
-  - CodeIndexCache
-  rationale: Serialize parsed changelog payloads before caching them in SQLite.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 8
-    end_line: 10
-  summary: Import YAML and parser types for cached changelog payloads.
+  summary: Import the changelog model types needed for normalized cache storage.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Load and serialize parsed changelog payloads through the cache.
+  rationale: Persist structured changelog rows instead of raw YAML blobs.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 32
-    end_line: 32
+    start_line: 9
+    end_line: 18
+  summary: Import parser and model helpers for normalized changelog caching.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: Rebuild cached changelog documents from structured records.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 40
+    end_line: 40
   summary: Bump the cache version after changing normalized cache storage.
   affects:
   - CodeIndexCache
@@ -266,8 +267,8 @@ changes:
   rationale: Force stale cache rows to rebuild with the new cache layout.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 492
-    end_line: 492
+    start_line: 510
+    end_line: 518
   summary: Store branch documents in the cache metadata table.
   affects:
   - CodeIndexCache
@@ -275,8 +276,8 @@ changes:
   rationale: Persist the PR metadata needed to reconstruct changelog lookups.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 596
-    end_line: 606
+    start_line: 612
+    end_line: 623
   summary: Add normalized decision storage to the cache schema.
   affects:
   - CodeIndexCache
@@ -284,8 +285,8 @@ changes:
   rationale: Migrate existing caches so decision metadata remains available.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 684
-    end_line: 685
+    start_line: 708
+    end_line: 716
   summary: Load normalized decision rows when reading cached branch documents.
   affects:
   - CodeIndexCache
@@ -293,17 +294,26 @@ changes:
   rationale: Reconstruct cached changelog documents without touching disk.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 791
-    end_line: 791
-  summary: Load cached changelog documents from normalized cache rows.
+    start_line: 766
+    end_line: 766
+  summary: Prepare cached changelog documents from normalized cache rows.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
   rationale: Keep branch-state loads self-contained for decision lookups.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 870
-    end_line: 873
+    start_line: 768
+    end_line: 768
+  summary: Finalize cached changelog document reconstruction.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: Keep the reconstructed document path inside SQLite-backed cache data.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 795
+    end_line: 805
   summary: Store decision metadata alongside branch documents.
   affects:
   - CodeIndexCache
@@ -311,8 +321,8 @@ changes:
   rationale: Persist the parsed decision records in SQLite.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 879
-    end_line: 879
+    start_line: 829
+    end_line: 835
   summary: Persist each decision entry with its branch snapshot.
   affects:
   - CodeIndexCache
@@ -320,8 +330,26 @@ changes:
   rationale: Store the parsed changelog decisions alongside the branch snapshot.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 1331
-    end_line: 1355
+    start_line: 916
+    end_line: 918
+  summary: Reconstruct normalized changelog documents from cached rows.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: Recover the PR metadata needed for lookup without rereading files.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 934
+    end_line: 949
+  summary: Rebuild cached changelog documents from normalized branch rows.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: Recreate the structured changelog view directly from SQLite.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 1392
+    end_line: 1470
   summary: Reconstruct cached changelog documents from normalized rows.
   affects:
   - CodeIndexCache
@@ -473,8 +501,8 @@ relationship_changes:
   source: CodeIndexCache
   target: EntityDecisionReport
   relationship: stores
-  rationale: Serialized changelog payloads are written to SQLite so the lookup
-    stays file-independent.
+  rationale: Normalized changelog rows are written to SQLite so the lookup stays
+    file-independent.
 - action: update
   source: EntityLookup
   target: EntityDecisionReport

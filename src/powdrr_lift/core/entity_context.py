@@ -9,6 +9,7 @@ import yaml
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.code_index import CodeIndexStore, _current_branch
 from powdrr_lift.core.index import (
+    ChangelogDocument,
     EntityOccurrence,
     ProvenanceRecord,
     RelationshipOccurrence,
@@ -39,6 +40,28 @@ class EntityRelationshipReport:
     relationships: list[RelationshipOccurrence] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class EntityDecisionOccurrence:
+    pr_number: int
+    decision_id: str | None
+    decision_summary: str | None
+    title: str | None
+    changelog_path: str
+    intent_problem: str | None
+    intent_goal: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class EntityDecisionReport:
+    branch_name: str
+    parent_branch: str
+    branch_head_sha: str
+    parent_head_sha: str
+    indexed_at: int
+    entity_name: str
+    decisions: list[EntityDecisionOccurrence] = field(default_factory=list)
+
+
 def lookup_entity_references(
     entity_name: str,
     branch_name: str | None = None,
@@ -67,6 +90,37 @@ def lookup_entity_references(
             resolved_branch,
             normalized_entity_name,
         ),
+    )
+
+
+def lookup_entity_decisions(
+    entity_name: str,
+    branch_name: str | None = None,
+    *,
+    parent_branch: str,
+    repo_root: str | Path | None = None,
+) -> EntityDecisionReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    store = CodeIndexStore(repo_root_path)
+    resolved_branch = branch_name or _current_branch(repo_root_path)
+    source_index = store.refresh(resolved_branch, parent_branch)
+    branch_state = store.branch_state_for(resolved_branch)
+    if branch_state is None:
+        raise RuntimeError(f"Missing branch state for {resolved_branch!r}.")
+
+    normalized_entity_name = _normalize_entity_id(entity_name) or entity_name.strip()
+    decisions = _collect_entity_decisions(
+        source_index.documents,
+        normalized_entity_name,
+    )
+    return EntityDecisionReport(
+        branch_name=resolved_branch,
+        parent_branch=parent_branch,
+        branch_head_sha=branch_state.branch_head_sha,
+        parent_head_sha=branch_state.parent_head_sha,
+        indexed_at=branch_state.indexed_at,
+        entity_name=normalized_entity_name,
+        decisions=decisions,
     )
 
 
@@ -109,6 +163,10 @@ def render_entity_reference_report(report: EntityReferenceReport) -> str:
 
 def render_entity_relationship_report(report: EntityRelationshipReport) -> str:
     return yaml.safe_dump(_entity_relationship_report_to_data(report), sort_keys=False)
+
+
+def render_entity_decision_report(report: EntityDecisionReport) -> str:
+    return yaml.safe_dump(_entity_decision_report_to_data(report), sort_keys=False)
 
 
 def _entity_reference_report_to_data(report: EntityReferenceReport) -> dict[str, Any]:
@@ -186,3 +244,104 @@ def _entity_relationship_report_to_data(
             for relationship in report.relationships
         ],
     }
+
+
+def _entity_decision_report_to_data(report: EntityDecisionReport) -> dict[str, Any]:
+    return {
+        "branch_name": report.branch_name,
+        "parent_branch": report.parent_branch,
+        "branch_head_sha": report.branch_head_sha,
+        "parent_head_sha": report.parent_head_sha,
+        "indexed_at": report.indexed_at,
+        "entity_name": report.entity_name,
+        "decisions": [
+            {
+                "pr_number": decision.pr_number,
+                "decision_id": decision.decision_id,
+                "decision_summary": decision.decision_summary,
+                "title": decision.title,
+                "changelog_path": decision.changelog_path,
+                "intent_problem": decision.intent_problem,
+                "intent_goal": decision.intent_goal,
+            }
+            for decision in report.decisions
+        ],
+    }
+
+
+def _collect_entity_decisions(
+    documents: list[ChangelogDocument],
+    entity_name: str,
+) -> list[EntityDecisionOccurrence]:
+    normalized_entity_name = _normalize_entity_id(entity_name)
+    if normalized_entity_name is None:
+        return []
+
+    occurrences: list[EntityDecisionOccurrence] = []
+    seen: set[tuple[int, str | None, str | None, str]] = set()
+    for document in documents:
+        if not _document_mentions_entity(document, normalized_entity_name):
+            continue
+
+        for decision in document.changelog.decisions:
+            occurrence = EntityDecisionOccurrence(
+                pr_number=document.pr_number,
+                decision_id=decision.id,
+                decision_summary=decision.summary,
+                title=document.changelog.title,
+                changelog_path=str(document.changelog_path),
+                intent_problem=document.changelog.intent.problem,
+                intent_goal=document.changelog.intent.goal,
+            )
+            occurrence_key = (
+                occurrence.pr_number,
+                occurrence.decision_id,
+                occurrence.decision_summary,
+                occurrence.changelog_path,
+            )
+            if occurrence_key in seen:
+                continue
+
+            seen.add(occurrence_key)
+            occurrences.append(occurrence)
+
+    occurrences.sort(
+        key=lambda occurrence: (
+            occurrence.pr_number,
+            occurrence.decision_id or "",
+            occurrence.decision_summary or "",
+            occurrence.changelog_path,
+        )
+    )
+    return occurrences
+
+
+def _document_mentions_entity(
+    document: ChangelogDocument,
+    entity_name: str,
+) -> bool:
+    if any(
+        _normalize_entity_id(entity.id) == entity_name
+        for entity in document.changelog.entities
+    ):
+        return True
+
+    if any(
+        entity_name
+        in {
+            _normalize_entity_id(affect)
+            for affect in change.affects
+            if _normalize_entity_id(affect) is not None
+        }
+        for change in document.changelog.changes
+    ):
+        return True
+
+    return any(
+        entity_name
+        in {
+            _normalize_entity_id(relationship_change.source),
+            _normalize_entity_id(relationship_change.target),
+        }
+        for relationship_change in document.changelog.relationship_changes
+    )

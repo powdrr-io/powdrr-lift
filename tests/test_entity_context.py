@@ -8,10 +8,35 @@ from pathlib import Path
 import yaml
 
 from powdrr_lift import (
+    lookup_entity_decisions,
     lookup_entity_references,
     lookup_entity_relationships,
 )
 from powdrr_lift.cli import main
+
+
+def test_lookup_entity_decisions_returns_matching_pr_decisions(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_entity_branch(tmp_path)
+
+    report = lookup_entity_decisions(
+        "AppService",
+        branch_name="feature/entity-context",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    assert report.entity_name == "AppService"
+    assert [decision.pr_number for decision in report.decisions] == [1, 2]
+    assert [decision.decision_id for decision in report.decisions] == [
+        "ARCH-001",
+        "ARCH-002",
+    ]
+    assert [decision.decision_summary for decision in report.decisions] == [
+        "Bootstrap the shared service.",
+        "Extend the shared service.",
+    ]
 
 
 def test_lookup_entity_references_returns_matching_file_spans(tmp_path: Path) -> None:
@@ -82,6 +107,26 @@ def test_cli_entity_lookup_commands_emit_yaml(tmp_path: Path) -> None:
     with redirect_stdout(stdout):
         exit_code = main(
             [
+                "entity-decisions",
+                "feature/entity-context",
+                "--repo-root",
+                str(repo_root),
+                "--parent-branch",
+                "main",
+                "--entity",
+                "AppService",
+            ]
+        )
+
+    assert exit_code == 0
+    report = yaml.safe_load(stdout.getvalue())
+    assert report["entity_name"] == "AppService"
+    assert [entry["pr_number"] for entry in report["decisions"]] == [1, 2]
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
                 "entity-relationships",
                 "feature/entity-context",
                 "--repo-root",
@@ -127,6 +172,10 @@ def _create_repo_with_entity_branch(tmp_path: Path) -> Path:
         intent:
           problem: AppService does not exist.
           goal: Introduce the shared service.
+
+        decisions:
+          - id: ARCH-001
+            summary: Bootstrap the shared service.
 
         entities:
           - id: AppService
@@ -174,6 +223,10 @@ def _create_repo_with_entity_branch(tmp_path: Path) -> Path:
         intent:
           problem: AppService needs a second change.
           goal: Update the app service implementation.
+
+        decisions:
+          - id: ARCH-002
+            summary: Extend the shared service.
 
         entities:
           - id: AppService

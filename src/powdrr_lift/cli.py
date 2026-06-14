@@ -9,11 +9,13 @@ from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     create_change_log_template,
     lookup_edit_context,
+    lookup_entity_decisions,
     lookup_entity_references,
     lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
     render_edit_context_report,
+    render_entity_decision_report,
     render_entity_reference_report,
     render_entity_relationship_report,
     resolve_repo_root,
@@ -126,6 +128,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to use when running git commands.",
     )
     edit_context_parser.set_defaults(func=_run_edit_context)
+
+    entity_decisions_parser = subparsers.add_parser(
+        "entity-decisions",
+        aliases=["entity_decisions"],
+        help="Report changelog decisions for PRs that mention an entity.",
+    )
+    entity_decisions_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to inspect. Defaults to the current branch.",
+    )
+    entity_decisions_parser.add_argument(
+        "--entity",
+        required=True,
+        help="Canonical entity name to inspect.",
+    )
+    entity_decisions_parser.add_argument(
+        "--parent-branch",
+        required=True,
+        help="Reference parent branch used to build the index.",
+    )
+    entity_decisions_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    entity_decisions_parser.set_defaults(func=_run_entity_decisions)
 
     entity_references_parser = subparsers.add_parser(
         "entity-references",
@@ -324,6 +353,19 @@ def _run_entity_relationships(args: argparse.Namespace) -> int:
         repo_root=repo_root,
     )
     sys.stdout.write(render_entity_relationship_report(report))
+    return 0
+
+
+def _run_entity_decisions(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    branch_name = args.branch_name or _current_branch(repo_root)
+    report = lookup_entity_decisions(
+        args.entity,
+        branch_name=branch_name,
+        parent_branch=args.parent_branch,
+        repo_root=repo_root,
+    )
+    sys.stdout.write(render_entity_decision_report(report))
     return 0
 
 

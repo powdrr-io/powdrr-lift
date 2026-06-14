@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from powdrr_lift.change_log_parser import ChangeLog, Intent, Span, parse_change_log
+from powdrr_lift.change_log_parser import (
+    Change,
+    ChangeLog,
+    Decision,
+    Entity,
+    Intent,
+    RelationshipChange,
+    Span,
+    parse_change_log,
+)
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 from powdrr_lift.core.index import (
     ChangelogDocument,
@@ -27,7 +37,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 6
+INDEX_CACHE_VERSION = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -497,6 +507,15 @@ class CodeIndexStore:
                   PRIMARY KEY (branch_name, pr_number)
                 );
 
+                CREATE TABLE IF NOT EXISTS branch_decision (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  decision_index INTEGER NOT NULL,
+                  decision_id TEXT,
+                  decision_summary TEXT,
+                  PRIMARY KEY (branch_name, pr_number, decision_index)
+                );
+
                 CREATE TABLE IF NOT EXISTS provenance_record (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
                   branch_name TEXT NOT NULL,
@@ -590,6 +609,18 @@ class CodeIndexStore:
                     ADD COLUMN parent_index_version INTEGER NOT NULL DEFAULT 0
                     """
                 )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS branch_decision (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  decision_index INTEGER NOT NULL,
+                  decision_id TEXT,
+                  decision_summary TEXT,
+                  PRIMARY KEY (branch_name, pr_number, decision_index)
+                )
+                """
+            )
 
     def _ensure_parent_index(self, parent_branch: str) -> SourceIndex:
         current_state = self._read_branch_state(parent_branch)
@@ -674,6 +705,15 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
+            decision_rows = connection.execute(
+                """
+                SELECT pr_number, decision_index, decision_id, decision_summary
+                FROM branch_decision
+                WHERE branch_name = ?
+                ORDER BY pr_number, decision_index
+                """,
+                (branch_name,),
+            ).fetchall()
             entity_rows = connection.execute(
                 """
                 SELECT entity_id, entity_type, action, pr_number, commit_sha,
@@ -723,7 +763,9 @@ class CodeIndexStore:
             ).fetchall()
 
         entities_by_id: dict[str, list[EntityOccurrence]] = {}
+        entities_by_pr: dict[int, list[sqlite3.Row]] = {}
         for row in entity_rows:
+            entities_by_pr.setdefault(row["pr_number"], []).append(row)
             entities_by_id.setdefault(row["entity_id"], []).append(
                 EntityOccurrence(
                     entity_id=row["entity_id"],
@@ -750,6 +792,17 @@ class CodeIndexStore:
             )
             for row in relationship_rows
         ]
+        relationships_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in relationship_rows:
+            relationships_by_pr.setdefault(row["pr_number"], []).append(row)
+
+        decisions_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in decision_rows:
+            decisions_by_pr.setdefault(row["pr_number"], []).append(row)
+
+        provenance_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in provenance_rows:
+            provenance_by_pr.setdefault(row["pr_number"], []).append(row)
 
         provenance_by_id = {
             row["id"]: _row_to_provenance_record(
@@ -773,21 +826,13 @@ class CodeIndexStore:
             lines[row["line_number"] - 1] = provenance_record
 
         documents = [
-            ChangelogDocument(
-                pr_number=row["pr_number"],
-                changelog_path=Path(row["changelog_path"]),
-                changelog=ChangeLog(
-                    version=1,
-                    change_id=row["change_id"],
-                    title=row["title"],
-                    intent=Intent(
-                        problem=row["intent_problem"],
-                        goal=row["intent_goal"],
-                    ),
-                ),
-                commit_sha=row["commit_sha"],
-                commit_timestamp=row["commit_timestamp"],
-                commit_subject=row["commit_subject"],
+            _load_changelog_document_from_cache_row(
+                row,
+                affects_by_provenance_id=affects_by_provenance_id,
+                decision_rows=decisions_by_pr.get(row["pr_number"], ()),
+                entity_rows=entities_by_pr.get(row["pr_number"], ()),
+                relationship_rows=relationships_by_pr.get(row["pr_number"], ()),
+                provenance_rows=provenance_by_pr.get(row["pr_number"], ()),
             )
             for row in document_rows
         ]
@@ -868,9 +913,9 @@ class CodeIndexStore:
                 connection.execute(
                     """
                     INSERT INTO branch_document (
-                      branch_name, pr_number, changelog_path, commit_sha,
-                      commit_timestamp, commit_subject, title, change_id,
-                      intent_problem, intent_goal
+                      branch_name, pr_number, changelog_path,
+                      commit_sha, commit_timestamp, commit_subject, title,
+                      change_id, intent_problem, intent_goal
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -886,6 +931,22 @@ class CodeIndexStore:
                         document.changelog.intent.goal,
                     ),
                 )
+                for decision_index, decision in enumerate(document.changelog.decisions):
+                    connection.execute(
+                        """
+                        INSERT INTO branch_decision (
+                          branch_name, pr_number, decision_index, decision_id,
+                          decision_summary
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            decision_index,
+                            decision.id,
+                            decision.summary,
+                        ),
+                    )
 
             for entity_id, occurrences in index.entity_graph.entities.items():
                 for occurrence in occurrences:
@@ -1326,6 +1387,85 @@ def _row_to_provenance_record(
 
 def _span_from_row(row: sqlite3.Row) -> Span:
     return Span(start_line=row["span_start"], end_line=row["span_end"])
+
+
+def _load_changelog_document_from_cache_row(
+    row: sqlite3.Row,
+    *,
+    affects_by_provenance_id: dict[int, tuple[str, ...]],
+    decision_rows: Sequence[sqlite3.Row],
+    entity_rows: Sequence[sqlite3.Row],
+    relationship_rows: Sequence[sqlite3.Row],
+    provenance_rows: Sequence[sqlite3.Row],
+) -> ChangelogDocument:
+    changelog_path = Path(row["changelog_path"])
+    decisions = [
+        Decision(
+            id=decision_row["decision_id"],
+            summary=decision_row["decision_summary"],
+        )
+        for decision_row in decision_rows
+    ]
+    entities = [
+        Entity(
+            id=entity_row["entity_id"],
+            type=entity_row["entity_type"],
+            action=entity_row["action"],
+        )
+        for entity_row in entity_rows
+    ]
+    changes = [
+        Change(
+            file=provenance_row["file_path"],
+            span=(
+                Span(
+                    start_line=provenance_row["span_start"],
+                    end_line=provenance_row["span_end"],
+                )
+                if provenance_row["span_start"] is not None
+                or provenance_row["span_end"] is not None
+                else Span()
+            ),
+            summary=provenance_row["summary"],
+            affects=list(affects_by_provenance_id.get(provenance_row["id"], ())),
+            rationale=provenance_row["rationale"],
+        )
+        for provenance_row in provenance_rows
+        if provenance_row["kind"] == "declared"
+    ]
+    relationship_changes = [
+        RelationshipChange(
+            action=relationship_row["action"],
+            source=relationship_row["source_entity_id"],
+            target=relationship_row["target_entity_id"],
+            relationship=relationship_row["relationship"],
+            rationale=relationship_row["rationale"],
+        )
+        for relationship_row in relationship_rows
+    ]
+
+    changelog = ChangeLog(
+        version=1,
+        change_id=row["change_id"],
+        title=row["title"],
+        intent=Intent(
+            problem=row["intent_problem"],
+            goal=row["intent_goal"],
+        ),
+        decisions=decisions,
+        entities=entities,
+        changes=changes,
+        relationship_changes=relationship_changes,
+    )
+
+    return ChangelogDocument(
+        pr_number=row["pr_number"],
+        changelog_path=changelog_path,
+        changelog=changelog,
+        commit_sha=row["commit_sha"],
+        commit_timestamp=row["commit_timestamp"],
+        commit_subject=row["commit_subject"],
+    )
 
 
 def _current_branch(repo_root: Path) -> str:

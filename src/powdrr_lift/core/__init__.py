@@ -1,3 +1,5 @@
+from typing import Any
+
 from powdrr_lift.core.blame_view import (
     BlameChunk,
     BlameFileView,
@@ -66,13 +68,6 @@ from powdrr_lift.core.template import (
     create_change_log_template,
     render_change_log_template,
 )
-from powdrr_lift.core.validate import (
-    ValidationIssue,
-    ValidationReport,
-    build_validation_report,
-    parse_validation_report,
-    validate_change_log_yaml,
-)
 
 __all__ = [
     "BranchDiffEntry",
@@ -104,7 +99,6 @@ __all__ = [
     "SourceIndex",
     "ValidationIssue",
     "ValidationReport",
-    "build_validation_report",
     "blame_file_view_to_data",
     "blame_tree_node_to_data",
     "blame_view_state_to_data",
@@ -131,5 +125,33 @@ __all__ = [
     "resolve_default_branch",
     "resolve_repo_root",
     "refresh_code_index",
+    "build_validation_report",
     "validate_change_log_yaml",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in {
+        "ValidationIssue",
+        "ValidationReport",
+        "build_validation_report",
+        "parse_validation_report",
+        "validate_change_log_yaml",
+    }:
+        from powdrr_lift.core.validate import (
+            ValidationIssue,
+            ValidationReport,
+            build_validation_report,
+            parse_validation_report,
+            validate_change_log_yaml,
+        )
+
+        return {
+            "ValidationIssue": ValidationIssue,
+            "ValidationReport": ValidationReport,
+            "build_validation_report": build_validation_report,
+            "parse_validation_report": parse_validation_report,
+            "validate_change_log_yaml": validate_change_log_yaml,
+        }[name]
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

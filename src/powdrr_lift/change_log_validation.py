@@ -118,7 +118,7 @@ def build_validation_report(
 
         proposed_change_entries_by_file.setdefault(change.file, []).append(change)
 
-    known_entity_ids = set(
+    parent_entity_ids = set(
         build_changelog_index_at_ref(
             repo_root=repo_root_path,
             ref=default_branch_name,
@@ -127,13 +127,27 @@ def build_validation_report(
     proposed_entity_ids = set(proposed_entities_by_id)
 
     for entity_id, entity in proposed_entities_by_id.items():
-        if entity_id not in known_entity_ids and entity.action != "added":
+        if entity.action == "added":
+            if entity_id in parent_entity_ids:
+                issues.append(
+                    ValidationIssue(
+                        code="entity_already_exists",
+                        message=(
+                            f"Entity {entity_id} is already present in the parent "
+                            "branch graph and should not be marked added."
+                        ),
+                        path=None,
+                    )
+                )
+            continue
+
+        if entity_id not in parent_entity_ids:
             issues.append(
                 ValidationIssue(
-                    code="entity_not_marked_added",
+                    code="entity_missing_from_parent",
                     message=(
-                        f"Entity {entity_id} is new to the graph and must be "
-                        "marked added."
+                        f"Entity {entity_id} does not exist in the parent branch "
+                        "graph and must be marked added."
                     ),
                     path=None,
                 )

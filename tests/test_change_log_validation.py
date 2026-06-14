@@ -371,7 +371,48 @@ def test_validate_change_log_yaml_requires_new_entities_to_be_marked_added(
     )
 
     assert report.validation_successful is False
-    assert any(issue.code == "entity_not_marked_added" for issue in report.issues)
+    assert any(issue.code == "entity_missing_from_parent" for issue in report.issues)
+
+
+def test_validate_change_log_yaml_rejects_added_entities_that_already_exist(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_entity_history(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 8
+    title: Reuse application service
+
+    intent:
+      problem: The shared service already exists.
+      goal: Do not mark an existing entity as new.
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 2
+          end_line: 2
+        summary: Update the service usage.
+        affects:
+          - AppService
+        rationale: The existing service is still relevant.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "entity_already_exists" for issue in report.issues)
 
 
 def test_validate_change_log_yaml_allows_existing_entities_without_action(
@@ -412,6 +453,46 @@ def test_validate_change_log_yaml_allows_existing_entities_without_action(
 
     assert report.validation_successful is True
     assert report.issues == []
+
+
+def test_validate_change_log_yaml_requires_non_added_entities_to_exist_in_parent(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 8
+    title: Reuse application service
+
+    intent:
+      problem: The shared service does not exist in the parent graph.
+      goal: Ensure non-added entities must already exist.
+
+    entities:
+      - id: BrandNewService
+        type: Service
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 2
+          end_line: 2
+        summary: Update the service usage.
+        affects:
+          - BrandNewService
+        rationale: The entity is not new according to the changelog.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "entity_missing_from_parent" for issue in report.issues)
 
 
 def test_validate_change_log_yaml_reports_invalid_yaml(tmp_path: Path) -> None:

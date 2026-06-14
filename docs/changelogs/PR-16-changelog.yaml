@@ -240,61 +240,33 @@ changes:
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 5
-    end_line: 8
-  summary: Import serialization helpers for cached changelog payloads.
+    end_line: 5
+  summary: Import `asdict` for changelog serialization.
+  affects:
+  - CodeIndexCache
+  rationale: Serialize parsed changelog payloads before caching them in SQLite.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 8
+    end_line: 10
+  summary: Import YAML and parser types for cached changelog payloads.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Serialize parsed changelogs into SQLite instead of rereading files.
+  rationale: Load and serialize parsed changelog payloads through the cache.
 - file: src/powdrr_lift/core/code_index.py
   span:
     start_line: 32
     end_line: 32
-  summary: Bump the cache version after changing cached changelog serialization.
+  summary: Bump the cache version after changing serialized payload storage.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
-  rationale: Force stale cache rows to rebuild with serialized changelog payloads.
+  rationale: Force stale cache rows to rebuild with the new payload format.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 169
-    end_line: 170
-  summary: Select serialized changelog payloads in provenance lookups.
-  affects:
-  - CodeIndexCache
-  - EntityDecisionReport
-  rationale: Keep provenance loads aligned with the new cache payload schema.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 223
-    end_line: 224
-  summary: Select serialized changelog payloads in span provenance lookups.
-  affects:
-  - CodeIndexCache
-  - EntityDecisionReport
-  rationale: Keep span queries aligned with the cached changelog payloads.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 283
-    end_line: 284
-  summary: Select serialized changelog payloads in line provenance lookups.
-  affects:
-  - CodeIndexCache
-  - EntityDecisionReport
-  rationale: Keep line-by-line provenance queries aligned with the cache schema.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 382
-    end_line: 383
-  summary: Select serialized changelog payloads in entity reference lookups.
-  affects:
-  - CodeIndexCache
-  - EntityDecisionReport
-  rationale: Keep entity-reference queries aligned with the cache schema.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 496
-    end_line: 496
+    start_line: 492
+    end_line: 492
   summary: Store serialized changelog payloads in the branch document table.
   affects:
   - CodeIndexCache
@@ -302,17 +274,8 @@ changes:
   rationale: Persist parsed changelogs in the branch cache for later lookup.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 515
-    end_line: 515
-  summary: Store serialized changelog payloads in the provenance table.
-  affects:
-  - CodeIndexCache
-  - EntityDecisionReport
-  rationale: Keep provenance rows self-contained inside SQLite.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 601
-    end_line: 609
+    start_line: 596
+    end_line: 606
   summary: Backfill the branch document table with serialized payload support.
   affects:
   - CodeIndexCache
@@ -320,8 +283,8 @@ changes:
   rationale: Migrate existing caches so changelog payloads remain available.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 689
-    end_line: 690
+    start_line: 684
+    end_line: 685
   summary: Load serialized changelog payloads when reading cached branch documents.
   affects:
   - CodeIndexCache
@@ -329,17 +292,17 @@ changes:
   rationale: Reconstruct cached changelog documents without touching disk.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 795
-    end_line: 797
-  summary: Load cached changelog documents from the serialized branch cache.
+    start_line: 791
+    end_line: 791
+  summary: Load cached changelog documents from the branch cache.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
   rationale: Keep branch-state loads self-contained for decision lookups.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 875
-    end_line: 884
+    start_line: 870
+    end_line: 873
   summary: Serialize changelog payloads before storing branch documents.
   affects:
   - CodeIndexCache
@@ -347,22 +310,22 @@ changes:
   rationale: Persist full parsed changelog payloads in SQLite.
 - file: src/powdrr_lift/core/code_index.py
   span:
-    start_line: 1336
-    end_line: 1338
+    start_line: 879
+    end_line: 879
+  summary: Serialize the changelog payload into the cached branch document row.
+  affects:
+  - CodeIndexCache
+  - EntityDecisionReport
+  rationale: Store the parsed changelog document alongside the branch snapshot.
+- file: src/powdrr_lift/core/code_index.py
+  span:
+    start_line: 1331
+    end_line: 1355
   summary: Deserialize cached changelog documents from the stored payload.
   affects:
   - CodeIndexCache
   - EntityDecisionReport
   rationale: Recover full changelog metadata without rereading files.
-- file: src/powdrr_lift/core/code_index.py
-  span:
-    start_line: 1350
-    end_line: 1358
-  summary: Serialize and deserialize cached changelog payloads.
-  affects:
-  - CodeIndexCache
-  - EntityDecisionReport
-  rationale: Keep cached changelog data self-contained inside SQLite.
 - file: src/powdrr_lift/core/entity_context.py
   span:
     start_line: 12
@@ -478,8 +441,8 @@ changes:
   rationale: Give the second test fixture PR a second decision to aggregate.
 - file: tests/test_code_index.py
   span:
-    start_line: 14
-    end_line: 14
+    start_line: 15
+    end_line: 15
   summary: Import the entity decision lookup helper into the code-index tests.
   affects:
   - CodeIndexCache
@@ -488,7 +451,7 @@ changes:
 - file: tests/test_code_index.py
   span:
     start_line: 179
-    end_line: 266
+    end_line: 268
   summary: Add a cache-only regression for entity decision lookups.
   affects:
   - CodeIndexCache

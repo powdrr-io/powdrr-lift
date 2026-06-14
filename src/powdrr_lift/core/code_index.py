@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
-from powdrr_lift.change_log_parser import ChangeLog, Intent, Span, parse_change_log
+import yaml
+
+from powdrr_lift.change_log_parser import ChangeLog, Span, parse_change_log
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 from powdrr_lift.core.index import (
     ChangelogDocument,
@@ -27,7 +29,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 6
+INDEX_CACHE_VERSION = 7
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,6 +489,7 @@ class CodeIndexStore:
                   branch_name TEXT NOT NULL,
                   pr_number INTEGER NOT NULL,
                   changelog_path TEXT NOT NULL,
+                  changelog_yaml TEXT NOT NULL,
                   commit_sha TEXT,
                   commit_timestamp INTEGER,
                   commit_subject TEXT,
@@ -590,6 +593,17 @@ class CodeIndexStore:
                     ADD COLUMN parent_index_version INTEGER NOT NULL DEFAULT 0
                     """
                 )
+            branch_document_info = connection.execute(
+                "PRAGMA table_info(branch_document)"
+            ).fetchall()
+            branch_document_columns = {row[1] for row in branch_document_info}
+            if "changelog_yaml" not in branch_document_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_document
+                    ADD COLUMN changelog_yaml TEXT NOT NULL DEFAULT ''
+                    """
+                )
 
     def _ensure_parent_index(self, parent_branch: str) -> SourceIndex:
         current_state = self._read_branch_state(parent_branch)
@@ -667,7 +681,8 @@ class CodeIndexStore:
             document_rows = connection.execute(
                 """
                 SELECT pr_number, changelog_path, commit_sha, commit_timestamp,
-                       commit_subject, title, change_id, intent_problem, intent_goal
+                       commit_subject, title, change_id, intent_problem, intent_goal,
+                       changelog_yaml
                 FROM branch_document
                 WHERE branch_name = ?
                 ORDER BY pr_number
@@ -852,15 +867,16 @@ class CodeIndexStore:
                 connection.execute(
                     """
                     INSERT INTO branch_document (
-                      branch_name, pr_number, changelog_path, commit_sha,
-                      commit_timestamp, commit_subject, title, change_id,
-                      intent_problem, intent_goal
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      branch_name, pr_number, changelog_path, changelog_yaml,
+                      commit_sha, commit_timestamp, commit_subject, title,
+                      change_id, intent_problem, intent_goal
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         branch_name,
                         document.pr_number,
                         str(document.changelog_path),
+                        _serialize_changelog(document.changelog),
                         document.commit_sha,
                         document.commit_timestamp,
                         document.commit_subject,
@@ -1314,18 +1330,7 @@ def _span_from_row(row: sqlite3.Row) -> Span:
 
 def _load_changelog_document_from_cache_row(row: sqlite3.Row) -> ChangelogDocument:
     changelog_path = Path(row["changelog_path"])
-    if changelog_path.exists():
-        changelog = parse_change_log(changelog_path.read_text(encoding="utf-8"))
-    else:
-        changelog = ChangeLog(
-            version=1,
-            change_id=row["change_id"],
-            title=row["title"],
-            intent=Intent(
-                problem=row["intent_problem"],
-                goal=row["intent_goal"],
-            ),
-        )
+    changelog = _deserialize_changelog(row["changelog_yaml"])
 
     return ChangelogDocument(
         pr_number=row["pr_number"],
@@ -1335,6 +1340,17 @@ def _load_changelog_document_from_cache_row(row: sqlite3.Row) -> ChangelogDocume
         commit_timestamp=row["commit_timestamp"],
         commit_subject=row["commit_subject"],
     )
+
+
+def _serialize_changelog(changelog: ChangeLog) -> str:
+    return yaml.safe_dump(asdict(changelog), sort_keys=False)
+
+
+def _deserialize_changelog(changelog_yaml: str | None) -> ChangeLog:
+    if not changelog_yaml:
+        raise RuntimeError("Cached changelog document is missing serialized content.")
+
+    return parse_change_log(changelog_yaml)
 
 
 def _current_branch(repo_root: Path) -> str:

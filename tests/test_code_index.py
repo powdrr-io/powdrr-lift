@@ -12,6 +12,7 @@ from powdrr_lift import (
     Span,
     code_index_db_path,
     lookup_code_provenance,
+    lookup_entity_decisions,
     refresh_code_index,
 )
 
@@ -172,6 +173,96 @@ def test_refresh_code_index_uses_pr_description_when_changelog_is_missing(
     assert (
         index.provenance_for("src/app.py", 1).intent_goal
         == "Introduce the app file without a changelog artifact."
+    )
+
+
+def test_refresh_code_index_rehydrates_changelog_documents_from_sqlite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/code-index")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    changelog_path = repo_root / "docs" / "changelogs" / "PR-42-changelog.yaml"
+    changelog_path.write_text(
+        """
+        version: 1
+        change_id: 42
+        title: Add CLI decision lookup
+
+        intent:
+          problem: The code index could not answer questions about decisions.
+          goal: Keep the changelog payload in SQLite and expose decision lookup.
+
+        decisions:
+          - id: ARCH-042
+            summary: Persist full changelog payloads in SQLite.
+
+        entities:
+          - id: CLI
+            type: CLI
+            action: added
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Add the example application line.
+            affects: [CLI]
+            rationale: This line stands in for the user-facing CLI entry point.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-42-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Add CLI decision lookup (#42)")
+
+    index = refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+    assert index.documents[0].changelog.decisions[0].summary == (
+        "Persist full changelog payloads in SQLite."
+    )
+
+    changelog_path.unlink()
+
+    def _fail_parse_change_log(_: str) -> object:
+        raise AssertionError("refresh_code_index should not reread changelog files")
+
+    monkeypatch.setattr(core_index, "parse_change_log", _fail_parse_change_log)
+
+    refreshed = refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+    assert refreshed.documents[0].changelog.decisions[0].summary == (
+        "Persist full changelog payloads in SQLite."
+    )
+
+    report = lookup_entity_decisions(
+        "CLI",
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+    assert report.decisions[0].decision_summary == (
+        "Persist full changelog payloads in SQLite."
     )
 
 

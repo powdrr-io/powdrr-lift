@@ -1,362 +1,178 @@
-# ChangeLog template generated from branch `codex/changelog-entity-references`.
-# Compared against default branch `main`.
-#
-# Instructions for the coding agent:
-# - Keep this file valid YAML.
-# - Replace each `null` with concrete values when they are known.
-# - Leave a list empty only when the section truly does not apply.
-# - Use the prefilled `changes` entries as the starting point for the files
-#   that differ from the default branch.
-# - Add or remove `changes` items as needed so every meaningful change is
-#   represented exactly once.
-# - Keep `version: 1` unless the schema changes.
-#
-# Diff summary:
-#   M src/powdrr_lift/change_log_template.py
-#   M src/powdrr_lift/change_log_template.py
-#   M src/powdrr_lift/change_log_validation.py
-#   M src/powdrr_lift/change_log_validation.py
-#   M src/powdrr_lift/change_log_validation.py
-#   M src/powdrr_lift/change_log_validation.py
-#   M src/powdrr_lift/core/__init__.py
-#   M src/powdrr_lift/core/__init__.py
-#   M src/powdrr_lift/core/__init__.py
-#   M src/powdrr_lift/core/__init__.py
-#   M src/powdrr_lift/core/__init__.py
-#   M tests/test_change_log_template.py
-#   M tests/test_change_log_validation.py
-#   M tests/test_change_log_validation.py
 version: 1
-# Use the PR number here.
 change_id: 15
-# Brief title for the pull request.
 title: Tighten entity lifecycle validation
 intent:
-  # Describe the underlying problem.
   problem: Entity changelog entries could mark existing components as added or
     omit `added` for new components, which made entity provenance drift from the
     parent graph.
-  # Describe the intended outcome.
   goal: Align template guidance and validation with the parent-branch entity
     graph so new entities are marked added only when truly new and existing
     entities are only listed as affected.
-# List each decision or ADR used by this change.
 decisions:
-  -
-    # Decision identifier, such as an ADR number.
-    id: ARCH-ENTITY-001
-    # Short summary of the decision.
+  - id: ARCH-ENTITY-001
     summary: Treat the parent branch entity graph as the source of truth for
       entity lifecycle validation.
-# List the repository entities relevant to this change.
-# Include both direct and adjacent components that matter to the
-# architecture: services, CLIs, storage systems, transport systems,
-# caches, infrastructure, CI/CD, integrations, dependencies, and
-# similar components.
-# Use `action: added` only when the entity is truly new relative to the
-# parent branch's entity graph. Otherwise leave `action` null and list
-# the entity as affected or referenced by the change.
-# Use `entities` to name the relevant systems and `relationship_changes`
-# to describe how their relationships are changing.
 entities:
-  -
-    # Canonical entity name used across the repository graph.
-    id: CLI
-    # Optional type, such as Service, CLI, Cache, or Storage.
+  - id: CLI
     type: CLI
-    # Use added only for a truly new entity; otherwise leave null.
     action: null
-  -
-    # Canonical entity name used across the repository graph.
-    id: ChangeLogTemplate
-    # Optional type, such as Service, CLI, Cache, or Storage.
+  - id: ChangeLogTemplate
     type: Template
-    # Use added only for a truly new entity; otherwise leave null.
     action: null
-  -
-    # Canonical entity name used across the repository graph.
-    id: ChangeLogValidator
-    # Optional type, such as Service, CLI, Cache, or Storage.
+  - id: ChangeLogValidator
     type: Validation
-    # Use added only for a truly new entity; otherwise leave null.
     action: null
-  -
-    # Canonical entity name used across the repository graph.
-    id: EntityGraph
-    # Optional type, such as Service, CLI, Cache, or Storage.
+  - id: EntityGraph
     type: Graph
-    # Use added only for a truly new entity; otherwise leave null.
     action: null
-  -
-    # Canonical entity name used across the repository graph.
-    id: PublicAPI
-    # Optional type, such as Service, CLI, Cache, or Storage.
+  - id: PublicAPI
     type: Package
-    # Use added only for a truly new entity; otherwise leave null.
     action: null
-# Each change entry should map one diff hunk.
 changes:
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/change_log_template.py
+  - file: src/powdrr_lift/change_log_template.py
     span:
-      # First changed line in this hunk.
       start_line: 77
-      # Last changed line in this hunk.
       end_line: 79
-    # Short description of the hunk-level change.
     summary: Clarify that only truly new entities should be marked added.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogTemplate
       - CLI
-    # Why the change was made.
     rationale: Keep the template aligned with parent-graph validation rules.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/change_log_template.py
+  - file: src/powdrr_lift/change_log_template.py
     span:
-      # First changed line in this hunk.
       start_line: 88
-      # Last changed line in this hunk.
       end_line: 88
-    # Short description of the hunk-level change.
     summary: Tighten the entity action guidance in the template body.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogTemplate
       - CLI
-    # Why the change was made.
     rationale: Prevent authors from marking existing entities as newly added.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/change_log_validation.py
+  - file: src/powdrr_lift/change_log_validation.py
     span:
-      # First changed line in this hunk.
       start_line: 121
-      # Last changed line in this hunk.
       end_line: 121
-    # Short description of the hunk-level change.
     summary: Track the parent branch entity graph separately for validation.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogValidator
       - EntityGraph
-    # Why the change was made.
     rationale: Validation must compare proposed entities against the parent graph.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/change_log_validation.py
+  - file: src/powdrr_lift/change_log_validation.py
     span:
-      # First changed line in this hunk.
       start_line: 130
-      # Last changed line in this hunk.
       end_line: 144
-    # Short description of the hunk-level change.
     summary: Reject entities marked added when they already exist.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogValidator
       - EntityGraph
-    # Why the change was made.
     rationale: Added entities must be new relative to the parent branch graph.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/change_log_validation.py
+  - file: src/powdrr_lift/change_log_validation.py
     span:
-      # First changed line in this hunk.
       start_line: 147
-      # Last changed line in this hunk.
       end_line: 147
-    # Short description of the hunk-level change.
     summary: Use a dedicated issue code for already-existing added entities.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogValidator
-    # Why the change was made.
     rationale: Surface the exact entity lifecycle violation in validation.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/change_log_validation.py
+  - file: src/powdrr_lift/change_log_validation.py
     span:
-      # First changed line in this hunk.
       start_line: 149
-      # Last changed line in this hunk.
       end_line: 150
-    # Short description of the hunk-level change.
     summary: Require non-added entities to already exist in the parent graph.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogValidator
       - EntityGraph
-    # Why the change was made.
     rationale: Existing entities should be referenced, not introduced as new.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/core/__init__.py
+  - file: src/powdrr_lift/core/__init__.py
     span:
-      # First changed line in this hunk.
       start_line: 1
-      # Last changed line in this hunk.
       end_line: 2
-    # Short description of the hunk-level change.
     summary: Add an explicit typing import for the lazy export hook.
-    # List of entity ids affected by this change.
     affects:
       - PublicAPI
-    # Why the change was made.
     rationale: Support the new lazy module dispatch without type errors.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/core/__init__.py
+  - file: src/powdrr_lift/core/__init__.py
     span:
-      # First changed line in this hunk.
       start_line: 69
-      # Last changed line in this hunk.
       end_line: 75
-    # Short description of the hunk-level change.
     summary: Remove eager validation imports from the core package init.
-    # List of entity ids affected by this change.
     affects:
       - PublicAPI
       - ChangeLogValidator
-    # Why the change was made.
     rationale: Avoid importing validation before the package is fully initialized.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/core/__init__.py
+  - file: src/powdrr_lift/core/__init__.py
     span:
-      # First changed line in this hunk.
       start_line: 107
-      # Last changed line in this hunk.
       end_line: 107
-    # Short description of the hunk-level change.
     summary: Keep the public validation export list in sync.
-    # List of entity ids affected by this change.
     affects:
       - PublicAPI
-    # Why the change was made.
     rationale: Preserve the exported validation API surface.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/core/__init__.py
+  - file: src/powdrr_lift/core/__init__.py
     span:
-      # First changed line in this hunk.
       start_line: 128
-      # Last changed line in this hunk.
       end_line: 128
-    # Short description of the hunk-level change.
     summary: Register lazy validation access on the core package.
-    # List of entity ids affected by this change.
     affects:
       - PublicAPI
-    # Why the change was made.
     rationale: Expose the validation helpers without eager imports.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: src/powdrr_lift/core/__init__.py
+  - file: src/powdrr_lift/core/__init__.py
     span:
-      # First changed line in this hunk.
       start_line: 131
-      # Last changed line in this hunk.
       end_line: 157
-    # Short description of the hunk-level change.
     summary: Teach the core package to lazy-load validation exports.
-    # List of entity ids affected by this change.
     affects:
       - PublicAPI
       - ChangeLogValidator
-    # Why the change was made.
     rationale: Break the circular import between core and validation.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: tests/test_change_log_template.py
+  - file: tests/test_change_log_template.py
     span:
-      # First changed line in this hunk.
       start_line: 46
-      # Last changed line in this hunk.
       end_line: 49
-    # Short description of the hunk-level change.
     summary: Update the template regression expectation for the new guidance.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogTemplate
       - CLI
-    # Why the change was made.
     rationale: Ensure the generated template keeps the new instruction text.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: tests/test_change_log_validation.py
+  - file: tests/test_change_log_validation.py
     span:
-      # First changed line in this hunk.
       start_line: 374
-      # Last changed line in this hunk.
       end_line: 415
-    # Short description of the hunk-level change.
     summary: Add validation coverage for the new entity lifecycle rules.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogValidator
       - EntityGraph
-    # Why the change was made.
     rationale: Prevent regressions in both directions of the parent-graph check.
-  -
-    # File changed on branch; keep this path aligned with
-    # the diff hunk.
-    file: tests/test_change_log_validation.py
+  - file: tests/test_change_log_validation.py
     span:
-      # First changed line in this hunk.
       start_line: 458
-      # Last changed line in this hunk.
       end_line: 497
-    # Short description of the hunk-level change.
     summary: Add coverage for rejecting non-added entities missing from parent.
-    # List of entity ids affected by this change.
     affects:
       - ChangeLogValidator
       - EntityGraph
-    # Why the change was made.
     rationale: Keep the validator aligned with the parent-graph existence check.
 relationship_changes:
-  -
-    action: update
+  - action: update
     source: CLI
     target: ChangeLogTemplate
     relationship: generates
     rationale: The CLI now emits instructions that match the stricter entity rules.
-  -
-    action: update
+  - action: update
     source: CLI
     target: ChangeLogValidator
     relationship: invokes
     rationale: The evaluate workflow uses the updated validator to check entity lifecycle state.
-  -
-    action: update
+  - action: update
     source: ChangeLogTemplate
     target: ChangeLogValidator
     relationship: aligns_with
     rationale: Template guidance now mirrors the parent-graph validation rules.
-  -
-    action: update
+  - action: update
     source: ChangeLogValidator
     target: EntityGraph
     relationship: compares_against
     rationale: Validation checks proposed entities against the parent branch graph.
-  -
-    action: update
+  - action: update
     source: PublicAPI
     target: ChangeLogValidator
     relationship: lazy_loads

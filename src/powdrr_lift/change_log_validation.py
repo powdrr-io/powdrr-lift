@@ -76,6 +76,44 @@ def build_validation_report(
     issues: list[ValidationIssue] = []
     proposed_change_files: list[str] = []
 
+    if _contains_instruction_comments(proposed_change_log_yaml):
+        issues.append(
+            ValidationIssue(
+                code="instructions_not_removed",
+                message=(
+                    "The changelog file still contains instruction comments. "
+                    "Remove them before validating the final artifact."
+                ),
+            )
+        )
+        return ValidationReport(
+            validation_successful=False,
+            branch_name=branch_name,
+            default_branch_name=default_branch_name,
+            expected_change_files=expected_change_files,
+            proposed_change_files=proposed_change_files,
+            issues=issues,
+        )
+
+    if _contains_null_entity_actions(proposed_change_log_yaml):
+        issues.append(
+            ValidationIssue(
+                code="entity_action_null_not_allowed",
+                message=(
+                    "Entity entries must omit action when the entity is not new. "
+                    "Do not write action: null."
+                ),
+            )
+        )
+        return ValidationReport(
+            validation_successful=False,
+            branch_name=branch_name,
+            default_branch_name=default_branch_name,
+            expected_change_files=expected_change_files,
+            proposed_change_files=proposed_change_files,
+            issues=issues,
+        )
+
     try:
         change_log = parse_change_log(proposed_change_log_yaml)
     except Exception as exc:  # noqa: BLE001
@@ -344,3 +382,15 @@ def _parse_sequence(raw_data: object | None) -> Sequence[object]:
 
 def _is_changelog_artifact_path(path: str) -> bool:
     return path.startswith("docs/changelogs/PR-") and path.endswith("-changelog.yaml")
+
+
+def _contains_instruction_comments(yaml_content: str) -> bool:
+    return any(
+        line.lstrip().startswith("#")
+        for line in yaml_content.splitlines()
+        if line.strip()
+    )
+
+
+def _contains_null_entity_actions(yaml_content: str) -> bool:
+    return any(line.strip() == "action: null" for line in yaml_content.splitlines())

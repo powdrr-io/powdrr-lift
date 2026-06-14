@@ -15,19 +15,14 @@ decisions:
 entities:
   - id: CLI
     type: CLI
-    action: null
   - id: ChangeLogTemplate
     type: Template
-    action: null
   - id: ChangeLogValidator
     type: Validation
-    action: null
   - id: EntityGraph
     type: Graph
-    action: null
   - id: PublicAPI
     type: Package
-    action: null
 changes:
   - file: src/powdrr_lift/change_log_template.py
     span:

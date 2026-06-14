@@ -85,8 +85,7 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Optional type, such as Service, CLI, Cache, or Storage.",
         "    type: null",
-        "    # Use added only for a truly new entity; otherwise leave null.",
-        "    action: null",
+        "    # Add `action: added` only when this entity is truly new.",
         "# Each change entry should map one diff hunk.",
     ]
 

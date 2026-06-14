@@ -510,6 +510,89 @@ def test_validate_change_log_yaml_reports_invalid_yaml(tmp_path: Path) -> None:
     assert report.issues[0].code == "invalid_yaml"
 
 
+def test_validate_change_log_yaml_rejects_instruction_comments(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    # Keep this file valid YAML.
+    version: 1
+    change_id: 7
+    title: Add application files
+
+    intent:
+      problem: Missing files
+      goal: Ship the new files
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert report.issues[0].code == "instructions_not_removed"
+
+
+def test_validate_change_log_yaml_rejects_null_entity_actions(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add application files
+
+    intent:
+      problem: Missing files
+      goal: Ship the new files
+
+    entities:
+      - id: AppService
+        type: Service
+        action: null
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert report.issues[0].code == "entity_action_null_not_allowed"
+
+
 def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

@@ -43,7 +43,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "change_id: null" in template_text
     assert "decisions:" in template_text
     assert "List the repository entities relevant to this change." in template_text
-    assert "Use `action` to mark an entity as `added`" in template_text
+    assert "Add `action: added` only when this entity is truly new." in template_text
+    assert "action: null" not in template_text
     assert "relationship_changes" in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text

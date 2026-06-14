@@ -1,0 +1,174 @@
+version: 1
+change_id: 15
+title: Tighten entity lifecycle validation
+intent:
+  problem: Entity changelog entries could mark existing components as added or
+    omit `added` for new components, which made entity provenance drift from the
+    parent graph.
+  goal: Align template guidance and validation with the parent-branch entity
+    graph so new entities are marked added only when truly new and existing
+    entities are only listed as affected.
+decisions:
+  - id: ARCH-ENTITY-001
+    summary: Treat the parent branch entity graph as the source of truth for
+      entity lifecycle validation.
+entities:
+  - id: CLI
+    type: CLI
+  - id: ChangeLogTemplate
+    type: Template
+  - id: ChangeLogValidator
+    type: Validation
+  - id: EntityGraph
+    type: Graph
+  - id: PublicAPI
+    type: Package
+changes:
+  - file: src/powdrr_lift/change_log_template.py
+    span:
+      start_line: 77
+      end_line: 79
+    summary: Clarify that only truly new entities should be marked added.
+    affects:
+      - ChangeLogTemplate
+      - CLI
+    rationale: Keep the template aligned with parent-graph validation rules.
+  - file: src/powdrr_lift/change_log_template.py
+    span:
+      start_line: 88
+      end_line: 88
+    summary: Tighten the entity action guidance in the template body.
+    affects:
+      - ChangeLogTemplate
+      - CLI
+    rationale: Prevent authors from marking existing entities as newly added.
+  - file: src/powdrr_lift/change_log_validation.py
+    span:
+      start_line: 121
+      end_line: 121
+    summary: Track the parent branch entity graph separately for validation.
+    affects:
+      - ChangeLogValidator
+      - EntityGraph
+    rationale: Validation must compare proposed entities against the parent graph.
+  - file: src/powdrr_lift/change_log_validation.py
+    span:
+      start_line: 130
+      end_line: 144
+    summary: Reject entities marked added when they already exist.
+    affects:
+      - ChangeLogValidator
+      - EntityGraph
+    rationale: Added entities must be new relative to the parent branch graph.
+  - file: src/powdrr_lift/change_log_validation.py
+    span:
+      start_line: 147
+      end_line: 147
+    summary: Use a dedicated issue code for already-existing added entities.
+    affects:
+      - ChangeLogValidator
+    rationale: Surface the exact entity lifecycle violation in validation.
+  - file: src/powdrr_lift/change_log_validation.py
+    span:
+      start_line: 149
+      end_line: 150
+    summary: Require non-added entities to already exist in the parent graph.
+    affects:
+      - ChangeLogValidator
+      - EntityGraph
+    rationale: Existing entities should be referenced, not introduced as new.
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 1
+      end_line: 2
+    summary: Add an explicit typing import for the lazy export hook.
+    affects:
+      - PublicAPI
+    rationale: Support the new lazy module dispatch without type errors.
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 69
+      end_line: 75
+    summary: Remove eager validation imports from the core package init.
+    affects:
+      - PublicAPI
+      - ChangeLogValidator
+    rationale: Avoid importing validation before the package is fully initialized.
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 107
+      end_line: 107
+    summary: Keep the public validation export list in sync.
+    affects:
+      - PublicAPI
+    rationale: Preserve the exported validation API surface.
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 128
+      end_line: 128
+    summary: Register lazy validation access on the core package.
+    affects:
+      - PublicAPI
+    rationale: Expose the validation helpers without eager imports.
+  - file: src/powdrr_lift/core/__init__.py
+    span:
+      start_line: 131
+      end_line: 157
+    summary: Teach the core package to lazy-load validation exports.
+    affects:
+      - PublicAPI
+      - ChangeLogValidator
+    rationale: Break the circular import between core and validation.
+  - file: tests/test_change_log_template.py
+    span:
+      start_line: 46
+      end_line: 49
+    summary: Update the template regression expectation for the new guidance.
+    affects:
+      - ChangeLogTemplate
+      - CLI
+    rationale: Ensure the generated template keeps the new instruction text.
+  - file: tests/test_change_log_validation.py
+    span:
+      start_line: 374
+      end_line: 415
+    summary: Add validation coverage for the new entity lifecycle rules.
+    affects:
+      - ChangeLogValidator
+      - EntityGraph
+    rationale: Prevent regressions in both directions of the parent-graph check.
+  - file: tests/test_change_log_validation.py
+    span:
+      start_line: 458
+      end_line: 497
+    summary: Add coverage for rejecting non-added entities missing from parent.
+    affects:
+      - ChangeLogValidator
+      - EntityGraph
+    rationale: Keep the validator aligned with the parent-graph existence check.
+relationship_changes:
+  - action: update
+    source: CLI
+    target: ChangeLogTemplate
+    relationship: generates
+    rationale: The CLI now emits instructions that match the stricter entity rules.
+  - action: update
+    source: CLI
+    target: ChangeLogValidator
+    relationship: invokes
+    rationale: The evaluate workflow uses the updated validator to check entity lifecycle state.
+  - action: update
+    source: ChangeLogTemplate
+    target: ChangeLogValidator
+    relationship: aligns_with
+    rationale: Template guidance now mirrors the parent-graph validation rules.
+  - action: update
+    source: ChangeLogValidator
+    target: EntityGraph
+    relationship: compares_against
+    rationale: Validation checks proposed entities against the parent branch graph.
+  - action: update
+    source: PublicAPI
+    target: ChangeLogValidator
+    relationship: lazy_loads
+    rationale: Core re-exports now avoid the validation import cycle.

@@ -74,9 +74,9 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "# architecture: services, CLIs, storage systems, transport systems,",
         "# caches, infrastructure, CI/CD, integrations, dependencies, and",
         "# similar components.",
-        "# Use `action` to mark an entity as `added` when it first appears,",
-        "# `deleted` when it is removed, or leave it null if it already exists",
-        "# and is simply being touched by this change.",
+        "# Use `action: added` only when the entity is truly new relative to the",
+        "# parent branch's entity graph. Otherwise leave `action` null and list",
+        "# the entity as affected or referenced by the change.",
         "# Use `entities` to name the relevant systems and `relationship_changes`",
         "# to describe how their relationships are changing.",
         "entities:",
@@ -85,8 +85,7 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Optional type, such as Service, CLI, Cache, or Storage.",
         "    type: null",
-        "    # Use added, deleted, or null.",
-        "    action: null",
+        "    # Add `action: added` only when this entity is truly new.",
         "# Each change entry should map one diff hunk.",
     ]
 

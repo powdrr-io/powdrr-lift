@@ -1,118 +1,57 @@
 # powdrr-lift
 
-`powdrr-lift` parses structured changelog YAML into typed Python objects and
-exposes the same core logic through a CLI and an MCP server.
+GATHER STRUCTURED CONTEXT -> SYNTHESIZE UPDATED CONTEXT -> LEVERAGE CURATED CONTEXT
 
-## Layout
+`powdrr-lift` is an agent persistent memory system. However it is not Yet Another Memory
+System. `powdrr-lift` is an opinionated coding agent memory system that:
 
-- `src/powdrr_lift/` contains the importable library code.
-- `tests/` contains `pytest`-based tests.
-- `pyproject.toml` is the single source of packaging and tooling config.
+* Requires the agent to submit a changelog with every PR
+* Synthesizes current state from a set of changelogs
+* Curates and provides relevant context during design, implementation, and review
 
-## Setup
+`powdrr-lift` is designed for individuals and teams focused on increasing code quality,
+increasing code understandability, decreasing token costs, and decreasing time wasted.
 
-```bash
-uv sync --extra dev
-```
+## How It Works
 
-## Common commands
+1. Install `powdrrlift` skills to your favorite coding agent
+2. Prompt and use your agent, the agent will pickup up skills automatically
+3. Explicitly use the skills for even better planning, coding output, and code reviews
+4. Explore the `powdrrlift` UI to get insights into the reasons and relationships in your code
 
-```bash
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src tests
-```
+## What You Will Notice
 
-## CLI
+* Code reviews with granular context about why each change was made
+* Plans that account for past decisions and explicitly call out where things need to change
+* Code generation that stays on task and avoids throwaway work
+* Less tokens spent with more output generated
 
-The CLI is designed for a PR workflow with progressive disclosure:
+## Get Started
 
-1. Generate a template in `docs/changelogs/PR-<num>-changelog.yaml`.
-2. Fill out the template using the inline instructions.
-3. Validate the filled-out file.
-4. Include the validated file in the PR.
+(Coming Soon)
+Mac
+```brew install powdrr-lift```
 
-Create a template for a PR:
 
-```bash
-powdrr-lift init --pr-number 123
-```
+## Background
 
-Validate the PR changelog file:
+All memory systems operate bypointing the agent at the most relevant aspects of an ever-growing
+context. The standand approach is to treat context as an ever-growing conversation between 
+human and agent. Conversations can be difficult to follow even for participants, necessitating
+clarifying questions. Trying to understand a conversation post hoc as an observer is an imperfect
+process, leading to semantic loss.
 
-```bash
-powdrr-lift evaluate-pr-against-changelog --pr-number 123
-```
+`powdrr-lift` takes a different approach. The human-agent conversation builds a great shared understanding
+of intent, decisions, affected entities, and reasoning along with some artifacts like code, documents, images, and models.
+`powdrr-lift` provides a way to capture the intent/decisions/entities/reasoning as an additional
+structured artifact. This structure removes the ambuiguity of the conversation format. This further enables
+a high fidelity way to synthesize changes over hundreds or thousands of revisions into a highly detailed and
+accurate semantic graph.
 
-## Example
+'powdrr-lift' leverages the semantic graph in future operations. The next operation after code changes and
+validation is review. The semantic graph information helps inform the review in two key ways:
 
-```python
-from powdrr_lift import parse_change_log
+* Information in the current change helps inform the reviewer on the granular decisions and reasoning
+* Information from previous changes helps inform the reviewer on previous decisions, what is ok to change and what should not be changed
 
-change_log = parse_change_log(your_yaml_text)
-print(change_log.title)
-```
-
-## ChangeLog template
-
-Generate a parser-safe template from a branch diff:
-
-```bash
-uv run python -m powdrr_lift.change_log_template feature/my-branch
-```
-
-## Validation
-
-Validate a proposed ChangeLog YAML file against a branch diff:
-
-```python
-from powdrr_lift import validate_change_log_yaml
-
-report_yaml = validate_change_log_yaml(proposed_yaml, branch_name="feature/my-branch")
-```
-
-## Edit context
-
-Inspect prior intent for a file and line ranges before editing code:
-
-```bash
-powdrr-lift edit-context --file src/app.py --range 10:20 --parent-branch main
-```
-
-## Blame UI
-
-Open a local blame-style view of the repository, powered by the cached index:
-
-```bash
-powdrr-lift blame-ui --parent-branch main --file src/app.py
-```
-
-The UI has three panes:
-
-- a file tree on the left
-- blame-grouped source in the center
-- PR intent and change rationale on the right
-
-The first time you open it, the CLI refreshes the local SQLite index if needed.
-After that, the UI reads only from the repository and local index files.
-
-## Skills
-
-Installable skills live under `skills/`. The repo currently ships a
-`prepare-pr-changelog` skill that drives the PR changelog workflow with the
-`powdrr-lift` CLI, plus a `review-pr-changelog` skill that checks PRs for a
-changelog and reviews each changelog change against the PR intent. It also
-ships a `code-edit-context` skill that asks for index-backed context before
-editing code so prior intent can be preserved or explicitly superseded.
-
-## MCP
-
-Run the MCP server locally:
-
-```bash
-powdrr-lift-mcp
-```
-
-The server exposes `get_edit_context`, `get_blame_view`, and the changelog
-workflow tools.
+'powdrr-lift' leverages the semantic graph for planning. 

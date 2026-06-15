@@ -2,10 +2,14 @@ from typing import Any
 
 from powdrr_lift.change_log_parser import (
     Change,
+    ChangeFile,
+    ChangeGuidance,
+    ChangeInvariant,
     ChangeLog,
     Decision,
     Entity,
     Intent,
+    RelatedSection,
     RelationshipChange,
     Span,
     parse_change_log,
@@ -13,6 +17,9 @@ from powdrr_lift.change_log_parser import (
 
 __all__ = [
     "Change",
+    "ChangeFile",
+    "ChangeGuidance",
+    "ChangeInvariant",
     "ChangeLog",
     "Decision",
     "Entity",
@@ -43,6 +50,7 @@ __all__ = [
     "ProvenanceRecord",
     "RelationshipChange",
     "RelationshipOccurrence",
+    "RelatedSection",
     "RepoTreeNode",
     "Span",
     "create_change_log_template",

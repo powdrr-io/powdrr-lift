@@ -53,6 +53,89 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
     assert change_log.relationship_changes[0].relationship == "stores_refresh_tokens"
 
 
+def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> None:
+    change_log = parse_change_log(
+        """
+        version: 2
+        change_id: CHG-2026-002
+        title: Expand review workflow metadata
+
+        intent:
+          problem: The changelog format needs richer change-level structure.
+          goal: Capture files, entities, invariants, and guidance per hunk.
+
+        decisions:
+          - id: ADR-200
+            summary: Keep version 1 support while introducing version 2.
+
+        changes:
+          - files:
+              - path: src/review/workflow.py
+                type: modified
+            entities:
+              added:
+                - id: ReviewSkill
+                  type: Skill
+              removed:
+                - id: LegacyReviewNote
+                  type: Document
+              relationships:
+                - action: altered
+                  source: ReviewSkill
+                  target: ChangelogValidation
+                  relationship: references
+                  rationale: The review skill now points at the validation CLI.
+            invariants:
+              - id: INV-001
+                description: Review guidance remains changelog-aware.
+                action: added
+                related:
+                  files:
+                    - src/review/workflow.py
+                  entities:
+                    - ReviewSkill
+              - id: INV-002
+                description: Validation remains a required step.
+                action: altered
+                related:
+                  guidance:
+                    - GUID-001
+            guidance:
+              - id: GUID-001
+                description: Show the validation command explicitly.
+                action: added
+                related:
+                  files:
+                    - src/review/workflow.py
+                  entities:
+                    - ChangelogValidation
+                """
+    )
+
+    assert change_log.version == 2
+    assert change_log.change_id == "CHG-2026-002"
+    assert change_log.title == "Expand review workflow metadata"
+    assert change_log.decisions[0].id == "ADR-200"
+    assert [entity.id for entity in change_log.entities] == [
+        "ReviewSkill",
+        "LegacyReviewNote",
+    ]
+    assert [entity.action for entity in change_log.entities] == [
+        "added",
+        "removed",
+    ]
+    assert change_log.relationship_changes[0].action == "altered"
+    assert change_log.changes[0].file == "src/review/workflow.py"
+    assert change_log.changes[0].files[0].type == "modified"
+    assert change_log.changes[0].entities[0].id == "ReviewSkill"
+    assert change_log.changes[0].entities[0].action == "added"
+    assert change_log.changes[0].entities[1].id == "LegacyReviewNote"
+    assert change_log.changes[0].entities[1].action == "removed"
+    assert change_log.changes[0].entity_relationships[0].target == "ChangelogValidation"
+    assert change_log.changes[0].invariants[0].related.entities == ["ReviewSkill"]
+    assert change_log.changes[0].guidance[0].related.files == ["src/review/workflow.py"]
+
+
 def test_empty_yaml_returns_empty_changelog() -> None:
     change_log = parse_change_log("")
 

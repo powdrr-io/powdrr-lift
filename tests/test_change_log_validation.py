@@ -61,6 +61,150 @@ def test_validate_change_log_yaml_reports_success_when_changes_match(
     assert report.proposed_change_files == ["src/app.py", "tests/test_app.py"]
 
 
+def test_validate_change_log_yaml_reports_success_for_version_two_changes(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    decisions:
+      - id: ADR-200
+        summary: Introduce version 2 of the changelog schema.
+
+    changes:
+      - files:
+          - path: src/app.py
+            type: modified
+        entities:
+          added:
+            - id: AppService
+              type: Service
+          removed: []
+          relationships: []
+        invariants:
+          - id: INV-001
+            description: The app service remains available.
+            action: added
+            related:
+              files:
+                - src/app.py
+              entities:
+                - AppService
+        guidance:
+          - id: GUID-001
+            description: Keep the example command visible.
+            action: added
+            related:
+              files:
+                - src/app.py
+              entities:
+                - AppService
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+      - files:
+          - path: tests/test_app.py
+            type: modified
+        entities:
+          added:
+            - id: TestSuite
+              type: Suite
+          removed: []
+          relationships: []
+        invariants:
+          - id: INV-002
+            description: The app test remains present.
+            action: added
+            related:
+              files:
+                - tests/test_app.py
+              entities:
+                - TestSuite
+        guidance:
+          - id: GUID-002
+            description: Keep the test command visible.
+            action: added
+            related:
+              files:
+                - tests/test_app.py
+              entities:
+                - TestSuite
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add the review workflow test.
+        rationale: Keep the second hunk focused on the test harness.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+    assert report.expected_change_files == ["src/app.py", "tests/test_app.py"]
+    assert report.proposed_change_files == ["src/app.py", "tests/test_app.py"]
+
+
+def test_validate_change_log_yaml_rejects_version_two_top_level_entities(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    entities:
+      - id: LegacyTopLevelEntity
+        type: Service
+        action: added
+
+    changes:
+      - files:
+          - path: src/app.py
+            type: modified
+        entities:
+          added:
+            - id: AppService
+              type: Service
+          removed: []
+          relationships: []
+        invariants: []
+        guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(
+        issue.code == "top_level_entities_not_allowed" for issue in report.issues
+    )
+
+
 def test_validate_change_log_yaml_reports_missing_changes(
     tmp_path: Path,
 ) -> None:

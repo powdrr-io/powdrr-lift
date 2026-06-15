@@ -4,11 +4,11 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
-from powdrr_lift.change_log_parser import Change, parse_change_log
+from powdrr_lift.change_log_parser import Change, RelatedSection, parse_change_log
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
     _collect_branch_diff_entries,
@@ -115,6 +115,26 @@ def build_validation_report(
         )
 
     try:
+        raw_change_log = _load_yaml_mapping(proposed_change_log_yaml)
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            ValidationIssue(
+                code="invalid_yaml",
+                message=f"Could not parse proposed change log YAML: {exc}",
+            )
+        )
+        return ValidationReport(
+            validation_successful=False,
+            branch_name=branch_name,
+            default_branch_name=default_branch_name,
+            expected_change_files=expected_change_files,
+            proposed_change_files=proposed_change_files,
+            issues=issues,
+        )
+
+    version = _normalize_version(raw_change_log.get("version"))
+
+    try:
         change_log = parse_change_log(proposed_change_log_yaml)
     except Exception as exc:  # noqa: BLE001
         issues.append(
@@ -131,6 +151,29 @@ def build_validation_report(
             proposed_change_files=proposed_change_files,
             issues=issues,
         )
+
+    if version == 2:
+        if "entities" in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="top_level_entities_not_allowed",
+                    message=(
+                        "Version 2 changelogs must not include a top-level "
+                        "entities section."
+                    ),
+                )
+            )
+
+        if "relationship_changes" in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="top_level_relationship_changes_not_allowed",
+                    message=(
+                        "Version 2 changelogs must move relationship changes "
+                        "under each change entry."
+                    ),
+                )
+            )
 
     proposed_change_files = [
         change.file
@@ -191,34 +234,60 @@ def build_validation_report(
                 )
             )
 
-    for relationship_change in change_log.relationship_changes:
-        source = _normalize_entity_id(relationship_change.source)
-        target = _normalize_entity_id(relationship_change.target)
-        if source is None or target is None:
-            issues.append(
-                ValidationIssue(
-                    code="relationship_unknown_entity",
-                    message=(
-                        "Relationship references must name both source and target "
-                        "entities."
-                    ),
+    if version == 2:
+        for change_index, change in enumerate(change_log.changes, start=1):
+            file_paths = [
+                file_entry.path
+                for file_entry in change.files
+                if file_entry.path is not None and file_entry.path != ""
+            ]
+            if not file_paths:
+                issues.append(
+                    ValidationIssue(
+                        code="missing_files_section",
+                        message=(
+                            f"Change {change_index} must include at least one file "
+                            "entry."
+                        ),
+                        path=change.file,
+                    )
                 )
-            )
-            continue
 
-        missing_entities = [
-            name for name in (source, target) if name not in proposed_entity_ids
-        ]
-        for entity_id in missing_entities:
-            issues.append(
-                ValidationIssue(
-                    code="relationship_unknown_entity",
-                    message=(
-                        f"Relationship references entity {entity_id}, but that entity "
-                        "is not described in the file entities section."
-                    ),
-                )
+            _validate_v2_change(
+                issues=issues,
+                change=change,
+                change_index=change_index,
             )
+    else:
+        for relationship_change in change_log.relationship_changes:
+            source = _normalize_entity_id(relationship_change.source)
+            target = _normalize_entity_id(relationship_change.target)
+            if source is None or target is None:
+                issues.append(
+                    ValidationIssue(
+                        code="relationship_unknown_entity",
+                        message=(
+                            "Relationship references must name both source and "
+                            "target entities."
+                        ),
+                    )
+                )
+                continue
+
+            missing_entities = [
+                name for name in (source, target) if name not in proposed_entity_ids
+            ]
+            for entity_id in missing_entities:
+                issues.append(
+                    ValidationIssue(
+                        code="relationship_unknown_entity",
+                        message=(
+                            f"Relationship references entity {entity_id}, but "
+                            "that entity is not described in the file entities "
+                            "section."
+                        ),
+                    )
+                )
 
     for file_path, expected_entries in expected_change_entries_by_file.items():
         proposed_entries = proposed_change_entries_by_file.get(file_path, [])
@@ -394,3 +463,311 @@ def _contains_instruction_comments(yaml_content: str) -> bool:
 
 def _contains_null_entity_actions(yaml_content: str) -> bool:
     return any(line.strip() == "action: null" for line in yaml_content.splitlines())
+
+
+def _load_yaml_mapping(yaml_content: str) -> dict[str, Any]:
+    loaded_content = yaml.safe_load(yaml_content)
+    if loaded_content is None:
+        return {}
+
+    if not isinstance(loaded_content, Mapping):
+        raise ValueError("Change log YAML must decode to a mapping.")
+
+    return dict(loaded_content)
+
+
+def _normalize_version(raw_version: object | None) -> int | str | None:
+    if isinstance(raw_version, str) and raw_version.isdigit():
+        return int(raw_version)
+
+    return cast(int | str | None, raw_version)
+
+
+def _contains_nonempty_value(raw_value: object | None) -> bool:
+    if raw_value is None:
+        return False
+
+    if isinstance(raw_value, str):
+        return raw_value.strip() != ""
+
+    if isinstance(raw_value, Mapping):
+        return any(_contains_nonempty_value(value) for value in raw_value.values())
+
+    if isinstance(raw_value, Sequence):
+        return any(_contains_nonempty_value(value) for value in raw_value)
+
+    return True
+
+
+def _validate_v2_change(
+    *,
+    issues: list[ValidationIssue],
+    change: Change,
+    change_index: int,
+) -> None:
+    file_types = {"added", "deleted", "modified", "renamed", "copied"}
+    file_paths = [
+        file_entry.path
+        for file_entry in change.files
+        if file_entry.path is not None and file_entry.path != ""
+    ]
+    if len(file_paths) != len(change.files):
+        issues.append(
+            ValidationIssue(
+                code="file_entry_missing_path",
+                message=(
+                    f"Change {change_index} includes a file entry without a path."
+                ),
+                path=change.file,
+            )
+        )
+
+    for file_entry_index, file_entry in enumerate(change.files, start=1):
+        if file_entry.type is None or file_entry.type.strip() == "":
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_missing_type",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} "
+                        "must include a file type."
+                    ),
+                    path=file_entry.path,
+                )
+            )
+            continue
+
+        if file_entry.type not in file_types:
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_invalid_type",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} "
+                        f"uses unsupported type {file_entry.type!r}."
+                    ),
+                    path=file_entry.path,
+                )
+            )
+
+    entity_ids_in_change = {
+        normalized_entity_id
+        for entity in change.entities
+        if (normalized_entity_id := _normalize_entity_id(entity.id)) is not None
+    }
+    for entity in change.entities:
+        normalized_entity_id = _normalize_entity_id(entity.id)
+        if normalized_entity_id is None:
+            issues.append(
+                ValidationIssue(
+                    code="entity_missing_id",
+                    message=(
+                        f"Change {change_index} contains an entity entry without an id."
+                    ),
+                    path=change.file,
+                )
+            )
+            continue
+
+        if entity.action not in {"added", "removed"}:
+            issues.append(
+                ValidationIssue(
+                    code="entity_action_invalid",
+                    message=(
+                        f"Entity {normalized_entity_id} in change {change_index} "
+                        "must be marked as added or removed."
+                    ),
+                    path=change.file,
+                )
+            )
+
+    for relationship_change in change.entity_relationships:
+        source = _normalize_entity_id(relationship_change.source)
+        target = _normalize_entity_id(relationship_change.target)
+        if source is None or target is None:
+            issues.append(
+                ValidationIssue(
+                    code="relationship_unknown_entity",
+                    message=(
+                        f"Change {change_index} relationship entries must name both "
+                        "source and target entities."
+                    ),
+                    path=change.file,
+                )
+            )
+            continue
+
+        missing_entities = [
+            entity_id
+            for entity_id in (source, target)
+            if entity_id not in entity_ids_in_change
+        ]
+        for entity_id in missing_entities:
+            issues.append(
+                ValidationIssue(
+                    code="relationship_unknown_entity",
+                    message=(
+                        f"Relationship references entity {entity_id}, but that "
+                        "entity is not listed in the change entities section."
+                    ),
+                    path=change.file,
+                )
+            )
+
+    available_files = set(file_paths)
+    available_entities = set(entity_ids_in_change)
+    available_invariants = {
+        invariant_id
+        for invariant in change.invariants
+        if (invariant_id := _normalize_entity_id(invariant.id)) is not None
+    }
+    available_guidance = {
+        guidance_id
+        for guidance in change.guidance
+        if (guidance_id := _normalize_entity_id(guidance.id)) is not None
+    }
+
+    for item_index, invariant in enumerate(change.invariants, start=1):
+        _validate_lifecycle_item(
+            issues=issues,
+            change_index=change_index,
+            item_index=item_index,
+            item_kind="invariant",
+            item_id=invariant.id,
+            description=invariant.description,
+            action=invariant.action,
+            related=invariant.related,
+            available_files=available_files,
+            available_entities=available_entities,
+            available_invariants=available_invariants,
+            available_guidance=available_guidance,
+            path=change.file,
+        )
+
+    for item_index, guidance in enumerate(change.guidance, start=1):
+        _validate_lifecycle_item(
+            issues=issues,
+            change_index=change_index,
+            item_index=item_index,
+            item_kind="guidance",
+            item_id=guidance.id,
+            description=guidance.description,
+            action=guidance.action,
+            related=guidance.related,
+            available_files=available_files,
+            available_entities=available_entities,
+            available_invariants=available_invariants,
+            available_guidance=available_guidance,
+            path=change.file,
+        )
+
+
+def _validate_lifecycle_item(
+    *,
+    issues: list[ValidationIssue],
+    change_index: int,
+    item_index: int,
+    item_kind: str,
+    item_id: str | None,
+    description: str | None,
+    action: str | None,
+    related: RelatedSection | None,
+    available_files: set[str],
+    available_entities: set[str],
+    available_invariants: set[str],
+    available_guidance: set[str],
+    path: str | None,
+) -> None:
+    normalized_item_id = _normalize_entity_id(item_id)
+    if normalized_item_id is None:
+        issues.append(
+            ValidationIssue(
+                code=f"{item_kind}_missing_id",
+                message=(
+                    f"Change {change_index} {item_kind} entry {item_index} must "
+                    "include an id."
+                ),
+                path=path,
+            )
+        )
+
+    if description is None or str(description).strip() == "":
+        issues.append(
+            ValidationIssue(
+                code=f"{item_kind}_missing_description",
+                message=(
+                    f"Change {change_index} {item_kind} entry {item_index} must "
+                    "include a description."
+                ),
+                path=path,
+            )
+        )
+
+    if action not in {"added", "removed", "altered"}:
+        issues.append(
+            ValidationIssue(
+                code=f"{item_kind}_invalid_action",
+                message=(
+                    f"Change {change_index} {item_kind} entry {item_index} must "
+                    "use action added, removed, or altered."
+                ),
+                path=path,
+            )
+        )
+
+    if related is None:
+        return
+
+    for file_id in related.files:
+        if file_id not in available_files:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_file",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references file {file_id}, but that file is not listed in "
+                        "the change files section."
+                    ),
+                    path=path,
+                )
+            )
+
+    for entity_id in related.entities:
+        if entity_id not in available_entities:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_entity",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references entity {entity_id}, but that entity is not "
+                        "listed in the change entities section."
+                    ),
+                    path=path,
+                )
+            )
+
+    for invariant_id in related.invariants:
+        if invariant_id not in available_invariants:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_invariant",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references invariant {invariant_id}, but that invariant is "
+                        "not listed in the change invariants section."
+                    ),
+                    path=path,
+                )
+            )
+
+    for guidance_id in related.guidance:
+        if guidance_id not in available_guidance:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_guidance",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references guidance {guidance_id}, but that guidance is "
+                        "not listed in the change guidance section."
+                    ),
+                    path=path,
+                )
+            )

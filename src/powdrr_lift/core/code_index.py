@@ -37,7 +37,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 8
+INDEX_CACHE_VERSION = 9
 
 
 @dataclass(frozen=True, slots=True)
@@ -497,6 +497,7 @@ class CodeIndexStore:
                   branch_name TEXT NOT NULL,
                   pr_number INTEGER NOT NULL,
                   changelog_path TEXT NOT NULL,
+                  changelog_version INTEGER NOT NULL DEFAULT 1,
                   commit_sha TEXT,
                   commit_timestamp INTEGER,
                   commit_subject TEXT,
@@ -609,6 +610,17 @@ class CodeIndexStore:
                     ADD COLUMN parent_index_version INTEGER NOT NULL DEFAULT 0
                     """
                 )
+            branch_document_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(branch_document)")
+            }
+            if "changelog_version" not in branch_document_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_document
+                    ADD COLUMN changelog_version INTEGER NOT NULL DEFAULT 1
+                    """
+                )
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS branch_decision (
@@ -698,7 +710,8 @@ class CodeIndexStore:
             document_rows = connection.execute(
                 """
                 SELECT pr_number, changelog_path, commit_sha, commit_timestamp,
-                       commit_subject, title, change_id, intent_problem, intent_goal
+                       commit_subject, title, change_id, intent_problem,
+                       intent_goal, changelog_version
                 FROM branch_document
                 WHERE branch_name = ?
                 ORDER BY pr_number
@@ -913,15 +926,18 @@ class CodeIndexStore:
                 connection.execute(
                     """
                     INSERT INTO branch_document (
-                      branch_name, pr_number, changelog_path,
+                      branch_name, pr_number, changelog_path, changelog_version,
                       commit_sha, commit_timestamp, commit_subject, title,
                       change_id, intent_problem, intent_goal
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         branch_name,
                         document.pr_number,
                         str(document.changelog_path),
+                        int(str(document.changelog.version))
+                        if str(document.changelog.version).isdigit()
+                        else 1,
                         document.commit_sha,
                         document.commit_timestamp,
                         document.commit_subject,
@@ -1445,7 +1461,7 @@ def _load_changelog_document_from_cache_row(
     ]
 
     changelog = ChangeLog(
-        version=1,
+        version=row["changelog_version"],
         change_id=row["change_id"],
         title=row["title"],
         intent=Intent(

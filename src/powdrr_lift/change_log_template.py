@@ -52,7 +52,7 @@ def render_change_log_template(
 
 def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
     lines = [
-        "version: 1",
+        "version: 2",
         "# Use the PR number here.",
         "change_id: null",
         "# Brief title for the pull request.",
@@ -69,23 +69,6 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# List the repository entities relevant to this change.",
-        "# Include both direct and adjacent components that matter to the",
-        "# architecture: services, CLIs, storage systems, transport systems,",
-        "# caches, infrastructure, CI/CD, integrations, dependencies, and",
-        "# similar components.",
-        "# Use `action: added` only when the entity is truly new relative to the",
-        "# parent branch's entity graph. Otherwise leave `action` null and list",
-        "# the entity as affected or referenced by the change.",
-        "# Use `entities` to name the relevant systems and `relationship_changes`",
-        "# to describe how their relationships are changing.",
-        "entities:",
-        "  -",
-        "    # Canonical entity name used across the repository graph.",
-        "    id: null",
-        "    # Optional type, such as Service, CLI, Cache, or Storage.",
-        "    type: null",
-        "    # Add `action: added` only when this entity is truly new.",
         "# Each change entry should map one diff hunk.",
     ]
 
@@ -95,9 +78,17 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
             lines.extend(
                 [
                     "  -",
-                    "    # File changed on branch; keep this path aligned with",
-                    "    # the diff hunk.",
-                    f"    file: {diff_entry.path}",
+                    "    files:",
+                    "      -",
+                    "        # File path and type for this hunk.",
+                    f"        path: {diff_entry.path}",
+                    f"        type: {_normalize_change_type(diff_entry.status)}",
+                    "    entities:",
+                    "      added: []",
+                    "      removed: []",
+                    "      relationships: []",
+                    "    invariants: []",
+                    "    guidance: []",
                     "    span:",
                     "      # First changed line in this hunk.",
                     f"      start_line: {diff_entry.start_line}",
@@ -105,8 +96,6 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     f"      end_line: {diff_entry.end_line}",
                     "    # Short description of the hunk-level change.",
                     "    summary: null",
-                    "    # List of entity ids affected by this change.",
-                    "    affects: []",
                     "    # Why the change was made.",
                     "    rationale: null",
                 ]
@@ -116,11 +105,6 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
 
     lines.extend(
         [
-            "# Relationship changes are optional and can remain empty.",
-            "# Use them to capture how the change affects relationships between",
-            "# entities, such as newly introduced dependencies, removed",
-            "# integrations, changed ownership, or altered data/traffic flow.",
-            "relationship_changes: []",
             "",
         ]
     )
@@ -150,7 +134,15 @@ def _render_header(
         "#   that differ from the default branch.\n"
         "# - Add or remove `changes` items as needed so every meaningful change is\n"
         "#   represented exactly once.\n"
-        "# - Keep `version: 1` unless the schema changes.\n"
+        "# - Keep `version: 2` unless the schema changes.\n"
+        "# - For each change, fill `files` with the current file paths and file-type\n"
+        "#   labels for the hunks in that change.\n"
+        "# - Use `entities.added` for new entities, `entities.removed` for removed\n"
+        "#   entities, and `entities.relationships` for relationship changes.\n"
+        "# - Put invariant updates in `invariants` and guidance updates in\n"
+        "#   `guidance`.\n"
+        "# - Use the `related` section on invariants and guidance to point at the\n"
+        "#   relevant file, entity, invariant, or guidance ids.\n"
         "#\n"
         "# Diff summary:\n"
         f"{diff_lines}"
@@ -306,6 +298,18 @@ def _git_output(repo_root: Path, *args: str) -> str:
 
 def _is_changelog_artifact_path(path: str) -> bool:
     return path.startswith("docs/changelogs/PR-") and path.endswith("-changelog.yaml")
+
+
+def _normalize_change_type(status: str) -> str:
+    if status.startswith("A"):
+        return "added"
+    if status.startswith("D"):
+        return "deleted"
+    if status.startswith("R"):
+        return "renamed"
+    if status.startswith("C"):
+        return "copied"
+    return "modified"
 
 
 def main(argv: Sequence[str] | None = None) -> int:

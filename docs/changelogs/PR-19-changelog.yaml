@@ -15,777 +15,842 @@ changes:
 - files:
   - path: src/powdrr_lift/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 5
+      end_line: 7
+    summary: Update __init__.py lines 5-7 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 5
-    end_line: 7
-  summary: Update __init__.py lines 5-7 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 12
+      end_line: 12
+    summary: Update __init__.py lines 12-12 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 12
-    end_line: 12
-  summary: Update __init__.py lines 12-12 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 20
+      end_line: 22
+    summary: Update __init__.py lines 20-22 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 20
-    end_line: 22
-  summary: Update __init__.py lines 20-22 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 53
+      end_line: 53
+    summary: Update __init__.py lines 53-53 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 53
-    end_line: 53
-  summary: Update __init__.py lines 53-53 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 3
+      end_line: 5
+    summary: Update __init__.py lines 3-5 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 3
-    end_line: 5
-  summary: Update __init__.py lines 3-5 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 10
+      end_line: 10
+    summary: Update __init__.py lines 10-10 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 10
-    end_line: 10
-  summary: Update __init__.py lines 10-10 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 18
+      end_line: 20
+    summary: Update __init__.py lines 18-20 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 18
-    end_line: 20
-  summary: Update __init__.py lines 18-20 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 25
+      end_line: 25
+    summary: Update __init__.py lines 25-25 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 25
-    end_line: 25
-  summary: Update __init__.py lines 25-25 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 5
+      end_line: 5
+    summary: Update parse_change_log.py lines 5-5 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 5
-    end_line: 5
-  summary: Update parse_change_log.py lines 5-5 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 35
+      end_line: 64
+    summary: Update parse_change_log.py lines 35-64 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 35
-    end_line: 64
-  summary: Update parse_change_log.py lines 35-64 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 72
+      end_line: 76
+    summary: Update parse_change_log.py lines 72-76 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 72
-    end_line: 76
-  summary: Update parse_change_log.py lines 72-76 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 109
+      end_line: 124
+    summary: Update parse_change_log.py lines 109-124 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 109
-    end_line: 124
-  summary: Update parse_change_log.py lines 109-124 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 132
+      end_line: 133
+    summary: Update parse_change_log.py lines 132-133 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 132
-    end_line: 133
-  summary: Update parse_change_log.py lines 132-133 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 135
+      end_line: 135
+    summary: Update parse_change_log.py lines 135-135 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 135
-    end_line: 135
-  summary: Update parse_change_log.py lines 135-135 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 137
+      end_line: 142
+    summary: Update parse_change_log.py lines 137-142 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 137
-    end_line: 142
-  summary: Update parse_change_log.py lines 137-142 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 147
+      end_line: 153
+    summary: Update parse_change_log.py lines 147-153 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 147
-    end_line: 153
-  summary: Update parse_change_log.py lines 147-153 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 181
+      end_line: 181
+    summary: Update parse_change_log.py lines 181-181 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 181
-    end_line: 181
-  summary: Update parse_change_log.py lines 181-181 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 183
+      end_line: 215
+    summary: Update parse_change_log.py lines 183-215 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 183
-    end_line: 215
-  summary: Update parse_change_log.py lines 183-215 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 217
+      end_line: 217
+    summary: Update parse_change_log.py lines 217-217 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 217
-    end_line: 217
-  summary: Update parse_change_log.py lines 217-217 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 220
+      end_line: 220
+    summary: Update parse_change_log.py lines 220-220 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 220
-    end_line: 220
-  summary: Update parse_change_log.py lines 220-220 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 222
+      end_line: 226
+    summary: Update parse_change_log.py lines 222-226 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 222
-    end_line: 226
-  summary: Update parse_change_log.py lines 222-226 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 230
+      end_line: 323
+    summary: Update parse_change_log.py lines 230-323 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 230
-    end_line: 320
-  summary: Update parse_change_log.py lines 230-320 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 337
+      end_line: 341
+    summary: Update parse_change_log.py lines 337-341 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 334
-    end_line: 338
-  summary: Update parse_change_log.py lines 334-338 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 360
+      end_line: 381
+    summary: Update parse_change_log.py lines 360-381 for version 2 schema support.
+    rationale: Teach the parser to read the new nested changelog structure while preserving
+      the legacy version 1 layout.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 357
-    end_line: 378
-  summary: Update parse_change_log.py lines 357-378 for version 2 schema support.
-  rationale: Teach the parser to read the new nested changelog structure while preserving
-    the legacy version 1 layout.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 55
+      end_line: 55
+    summary: Update change_log_template.py lines 55-55 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 55
-    end_line: 55
-  summary: Update change_log_template.py lines 55-55 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 72
+      end_line: 88
+    summary: Update change_log_template.py lines 72-88 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 72
-    end_line: 88
-  summary: Update change_log_template.py lines 72-88 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 81
+      end_line: 97
+    summary: Update change_log_template.py lines 81-97 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 81
-    end_line: 91
-  summary: Update change_log_template.py lines 81-91 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 108
+      end_line: 109
+    summary: Update change_log_template.py lines 108-109 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 108
-    end_line: 109
-  summary: Update change_log_template.py lines 108-109 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 119
+      end_line: 123
+    summary: Update change_log_template.py lines 119-123 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 119
-    end_line: 123
-  summary: Update change_log_template.py lines 119-123 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 143
+      end_line: 153
+    summary: Update change_log_template.py lines 143-153 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 137
-    end_line: 145
-  summary: Update change_log_template.py lines 137-145 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 311
+      end_line: 322
+    summary: Update change_log_template.py lines 311-322 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 303
-    end_line: 314
-  summary: Update change_log_template.py lines 303-314 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 7
+      end_line: 7
+    summary: Update change_log_validation.py lines 7-7 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 7
-    end_line: 7
-  summary: Update change_log_validation.py lines 7-7 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 11
+      end_line: 11
+    summary: Update change_log_validation.py lines 11-11 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 11
-    end_line: 11
-  summary: Update change_log_validation.py lines 11-11 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 117
+      end_line: 136
+    summary: Update change_log_validation.py lines 117-136 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 117
-    end_line: 136
-  summary: Update change_log_validation.py lines 117-136 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 155
+      end_line: 177
+    summary: Update change_log_validation.py lines 155-177 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 155
-    end_line: 177
-  summary: Update change_log_validation.py lines 155-177 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 237
+      end_line: 253
+    summary: Update change_log_validation.py lines 237-253 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 237
-    end_line: 253
-  summary: Update change_log_validation.py lines 237-253 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 255
+      end_line: 259
+    summary: Update change_log_validation.py lines 255-259 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 255
-    end_line: 259
-  summary: Update change_log_validation.py lines 255-259 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 261
+      end_line: 275
+    summary: Update change_log_validation.py lines 261-275 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 261
-    end_line: 275
-  summary: Update change_log_validation.py lines 261-275 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 277
+      end_line: 289
+    summary: Update change_log_validation.py lines 277-289 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 277
-    end_line: 289
-  summary: Update change_log_validation.py lines 277-289 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 221
+      end_line: 221
+    summary: Update change_log_validation.py lines 221-221 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 221
-    end_line: 221
-  summary: Update change_log_validation.py lines 221-221 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 466
+      end_line: 773
+    summary: Update change_log_validation.py lines 466-773 for version 2 schema support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 466
-    end_line: 773
-  summary: Update change_log_validation.py lines 466-773 for version 2 schema support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: src/powdrr_lift/core/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 63
+      end_line: 65
+    summary: Update __init__.py lines 63-65 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 63
-    end_line: 65
-  summary: Update __init__.py lines 63-65 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/core/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 70
+      end_line: 70
+    summary: Update __init__.py lines 70-70 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 70
-    end_line: 70
-  summary: Update __init__.py lines 70-70 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/core/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 97
+      end_line: 99
+    summary: Update __init__.py lines 97-99 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 97
-    end_line: 99
-  summary: Update __init__.py lines 97-99 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/core/__init__.py
     type: modified
+    entities: []
+    span:
+      start_line: 106
+      end_line: 106
+    summary: Update __init__.py lines 106-106 for version 2 schema support.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 106
-    end_line: 106
-  summary: Update __init__.py lines 106-106 for version 2 schema support.
-  rationale: Expose the new schema helper types and keep the public package surface
-    aligned with the parser refactor.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 40
+      end_line: 40
+    summary: Update code_index.py lines 40-40 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 40
-    end_line: 40
-  summary: Update code_index.py lines 40-40 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 500
+      end_line: 500
+    summary: Update code_index.py lines 500-500 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 500
-    end_line: 500
-  summary: Update code_index.py lines 500-500 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 613
+      end_line: 623
+    summary: Update code_index.py lines 613-623 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 613
-    end_line: 623
-  summary: Update code_index.py lines 613-623 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 713
+      end_line: 714
+    summary: Update code_index.py lines 713-714 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 713
-    end_line: 714
-  summary: Update code_index.py lines 713-714 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 929
+      end_line: 929
+    summary: Update code_index.py lines 929-929 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 929
-    end_line: 929
-  summary: Update code_index.py lines 929-929 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 932
+      end_line: 932
+    summary: Update code_index.py lines 932-932 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 932
-    end_line: 932
-  summary: Update code_index.py lines 932-932 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 938
+      end_line: 940
+    summary: Update code_index.py lines 938-940 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 938
-    end_line: 940
-  summary: Update code_index.py lines 938-940 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/code_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 1464
+      end_line: 1464
+    summary: Update code_index.py lines 1464-1464 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 1464
-    end_line: 1464
-  summary: Update code_index.py lines 1464-1464 for version 2 schema support.
-  rationale: Persist the changelog version in the cache so the index can load and
-    normalize both schema versions correctly.
 - files:
   - path: src/powdrr_lift/core/schemas.py
     type: modified
+    entities: []
+    span:
+      start_line: 3
+      end_line: 5
+    summary: Update schemas.py lines 3-5 for version 2 schema support.
+    rationale: Re-export the new schema dataclasses from the core compatibility layer.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 3
-    end_line: 5
-  summary: Update schemas.py lines 3-5 for version 2 schema support.
-  rationale: Re-export the new schema dataclasses from the core compatibility layer.
 - files:
   - path: src/powdrr_lift/core/schemas.py
     type: modified
+    entities: []
+    span:
+      start_line: 10
+      end_line: 10
+    summary: Update schemas.py lines 10-10 for version 2 schema support.
+    rationale: Re-export the new schema dataclasses from the core compatibility layer.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 10
-    end_line: 10
-  summary: Update schemas.py lines 10-10 for version 2 schema support.
-  rationale: Re-export the new schema dataclasses from the core compatibility layer.
 - files:
   - path: src/powdrr_lift/core/schemas.py
     type: modified
+    entities: []
+    span:
+      start_line: 18
+      end_line: 20
+    summary: Update schemas.py lines 18-20 for version 2 schema support.
+    rationale: Re-export the new schema dataclasses from the core compatibility layer.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 18
-    end_line: 20
-  summary: Update schemas.py lines 18-20 for version 2 schema support.
-  rationale: Re-export the new schema dataclasses from the core compatibility layer.
 - files:
   - path: src/powdrr_lift/core/schemas.py
     type: modified
+    entities: []
+    span:
+      start_line: 25
+      end_line: 25
+    summary: Update schemas.py lines 25-25 for version 2 schema support.
+    rationale: Re-export the new schema dataclasses from the core compatibility layer.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 25
-    end_line: 25
-  summary: Update schemas.py lines 25-25 for version 2 schema support.
-  rationale: Re-export the new schema dataclasses from the core compatibility layer.
 - files:
   - path: tests/test_change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 43
+      end_line: 43
+    summary: Update test_change_log_template.py lines 43-43 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 43
-    end_line: 43
-  summary: Update test_change_log_template.py lines 43-43 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: tests/test_change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 46
+      end_line: 50
+    summary: Update test_change_log_template.py lines 46-50 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 46
-    end_line: 50
-  summary: Update test_change_log_template.py lines 46-50 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: tests/test_change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 55
+      end_line: 55
+    summary: Update test_change_log_template.py lines 55-55 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 55
-    end_line: 55
-  summary: Update test_change_log_template.py lines 55-55 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: tests/test_change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 62
+      end_line: 74
+    summary: Update test_change_log_template.py lines 62-74 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 62
-    end_line: 70
-  summary: Update test_change_log_template.py lines 62-70 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: tests/test_change_log_template.py
     type: modified
+    entities: []
+    span:
+      start_line: 101
+      end_line: 101
+    summary: Update test_change_log_template.py lines 101-101 for version 2 schema support.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 97
-    end_line: 97
-  summary: Update test_change_log_template.py lines 97-97 for version 2 schema support.
-  rationale: Generate version 2 templates with nested change sections and remove the
-    old top-level entities guidance.
 - files:
   - path: tests/test_change_log_validation.py
     type: modified
+    entities: []
+    span:
+      start_line: 64
+      end_line: 201
+    summary: Update test_change_log_validation.py lines 64-201 for version 2 schema
+      support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 64
-    end_line: 207
-  summary: Update test_change_log_validation.py lines 64-207 for version 2 schema
-    support.
-  rationale: Validate the new nested schema, the per-change relationships, and the
-    version-specific rules.
 - files:
   - path: tests/test_changelog_index.py
     type: modified
+    entities: []
+    span:
+      start_line: 288
+      end_line: 343
+    summary: Update test_changelog_index.py lines 288-343 for version 2 schema support.
+    rationale: Add regression coverage for the version 2 parser, validator, template,
+      and index behavior.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 288
-    end_line: 345
-  summary: Update test_changelog_index.py lines 288-345 for version 2 schema support.
-  rationale: Add regression coverage for the version 2 parser, validator, template,
-    and index behavior.
 - files:
   - path: tests/test_parse_change_log.py
     type: modified
+    entities: []
+    span:
+      start_line: 56
+      end_line: 138
+    summary: Update test_parse_change_log.py lines 56-138 for version 2 schema support.
+    rationale: Add regression coverage for the version 2 parser, validator, template,
+      and index behavior.
   entities: []
   invariants: []
   guidance: []
-  span:
-    start_line: 56
-    end_line: 138
-  summary: Update test_parse_change_log.py lines 56-138 for version 2 schema support.
-  rationale: Add regression coverage for the version 2 parser, validator, template,
-    and index behavior.

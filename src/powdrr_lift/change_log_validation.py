@@ -175,11 +175,19 @@ def build_validation_report(
                 )
             )
 
-    proposed_change_files = [
-        change.file
-        for change in change_log.changes
-        if change.file is not None and change.file != ""
-    ]
+    if version == 2:
+        proposed_change_files = [
+            file_entry.path
+            for change in change_log.changes
+            for file_entry in change.files
+            if file_entry.path is not None and file_entry.path != ""
+        ]
+    else:
+        proposed_change_files = [
+            change.file
+            for change in change_log.changes
+            if change.file is not None and change.file != ""
+        ]
     proposed_entities_by_id = {
         entity_id: entity
         for entity in change_log.entities
@@ -192,12 +200,22 @@ def build_validation_report(
 
         expected_change_entries_by_file.setdefault(entry.path, []).append(entry)
 
-    proposed_change_entries_by_file: dict[str, list[Change]] = {}
-    for change in change_log.changes:
-        if change.file is None or change.file == "":
-            continue
+    proposed_change_entries_by_file: dict[str, list[Any]] = {}
+    if version == 2:
+        for change in change_log.changes:
+            for file_entry in change.files:
+                if file_entry.path is None or file_entry.path == "":
+                    continue
 
-        proposed_change_entries_by_file.setdefault(change.file, []).append(change)
+                proposed_change_entries_by_file.setdefault(file_entry.path, []).append(
+                    file_entry
+                )
+    else:
+        for change in change_log.changes:
+            if change.file is None or change.file == "":
+                continue
+
+            proposed_change_entries_by_file.setdefault(change.file, []).append(change)
 
     parent_entity_ids = set(
         build_changelog_index_at_ref(
@@ -236,12 +254,7 @@ def build_validation_report(
 
     if version == 2:
         for change_index, change in enumerate(change_log.changes, start=1):
-            file_paths = [
-                file_entry.path
-                for file_entry in change.files
-                if file_entry.path is not None and file_entry.path != ""
-            ]
-            if not file_paths:
+            if not change.files:
                 issues.append(
                     ValidationIssue(
                         code="missing_files_section",
@@ -506,23 +519,20 @@ def _validate_v2_change(
     change_index: int,
 ) -> None:
     file_types = {"added", "deleted", "modified", "renamed", "copied"}
-    file_paths = [
-        file_entry.path
-        for file_entry in change.files
-        if file_entry.path is not None and file_entry.path != ""
-    ]
-    if len(file_paths) != len(change.files):
-        issues.append(
-            ValidationIssue(
-                code="file_entry_missing_path",
-                message=(
-                    f"Change {change_index} includes a file entry without a path."
-                ),
-                path=change.file,
-            )
-        )
-
     for file_entry_index, file_entry in enumerate(change.files, start=1):
+        if file_entry.path is None or file_entry.path.strip() == "":
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_missing_path",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} "
+                        "must include a path."
+                    ),
+                    path=change.file,
+                )
+            )
+            continue
+
         if file_entry.type is None or file_entry.type.strip() == "":
             issues.append(
                 ValidationIssue(
@@ -548,6 +558,67 @@ def _validate_v2_change(
                 )
             )
 
+        if file_entry.span.start_line is None or file_entry.span.end_line is None:
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_missing_span",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} must "
+                        "include a span."
+                    ),
+                    path=file_entry.path,
+                )
+            )
+        elif file_entry.span.start_line > file_entry.span.end_line:
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_invalid_span",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} has "
+                        f"an invalid span {file_entry.span.start_line}-"
+                        f"{file_entry.span.end_line}."
+                    ),
+                    path=file_entry.path,
+                )
+            )
+
+        if file_entry.summary is None or str(file_entry.summary).strip() == "":
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_missing_summary",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} "
+                        "must include a summary."
+                    ),
+                    path=file_entry.path,
+                )
+            )
+
+        if file_entry.rationale is None or str(file_entry.rationale).strip() == "":
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_missing_rationale",
+                    message=(
+                        f"Change {change_index} file entry {file_entry_index} "
+                        "must include a rationale."
+                    ),
+                    path=file_entry.path,
+                )
+            )
+
+        for entity_index, entity in enumerate(file_entry.entities, start=1):
+            if _normalize_entity_id(entity.id) is None:
+                issues.append(
+                    ValidationIssue(
+                        code="file_entry_entity_missing_id",
+                        message=(
+                            f"Change {change_index} file entry {file_entry_index} "
+                            f"entity {entity_index} must include an id."
+                        ),
+                        path=file_entry.path,
+                    )
+                )
+
     entity_ids_in_change = {
         normalized_entity_id
         for entity in change.entities
@@ -567,53 +638,30 @@ def _validate_v2_change(
             )
             continue
 
-        if entity.action not in {"added", "removed"}:
+        if entity.action not in {"added", "deleted", "modified"}:
             issues.append(
                 ValidationIssue(
                     code="entity_action_invalid",
                     message=(
                         f"Entity {normalized_entity_id} in change {change_index} "
-                        "must be marked as added or removed."
+                        "must be marked as added, deleted, or modified."
                     ),
                     path=change.file,
                 )
             )
 
-    for relationship_change in change.entity_relationships:
-        source = _normalize_entity_id(relationship_change.source)
-        target = _normalize_entity_id(relationship_change.target)
-        if source is None or target is None:
-            issues.append(
-                ValidationIssue(
-                    code="relationship_unknown_entity",
-                    message=(
-                        f"Change {change_index} relationship entries must name both "
-                        "source and target entities."
-                    ),
-                    path=change.file,
-                )
-            )
-            continue
-
-        missing_entities = [
-            entity_id
-            for entity_id in (source, target)
-            if entity_id not in entity_ids_in_change
-        ]
-        for entity_id in missing_entities:
-            issues.append(
-                ValidationIssue(
-                    code="relationship_unknown_entity",
-                    message=(
-                        f"Relationship references entity {entity_id}, but that "
-                        "entity is not listed in the change entities section."
-                    ),
-                    path=change.file,
-                )
-            )
-
-    available_files = set(file_paths)
-    available_entities = set(entity_ids_in_change)
+    available_files = {
+        file_entry.path
+        for file_entry in change.files
+        if file_entry.path is not None and file_entry.path != ""
+    }
+    available_entities = {
+        normalized_entity_id
+        for file_entry in change.files
+        for entity in file_entry.entities
+        if (normalized_entity_id := _normalize_entity_id(entity.id)) is not None
+    }
+    available_entities.update(entity_ids_in_change)
     available_invariants = {
         invariant_id
         for invariant in change.invariants

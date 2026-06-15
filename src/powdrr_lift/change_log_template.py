@@ -83,27 +83,19 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     "        # File path and type for this hunk.",
                     f"        path: {diff_entry.path}",
                     f"        type: {_normalize_change_type(diff_entry.status)}",
-                    "    entities:",
-                    "      -",
-                    "        # Canonical entity id used across the repository graph.",
-                    "        id: null",
-                    "        # Optional type, such as Service, CLI, Cache, or Storage.",
-                    "        type: null",
-                    "        # Mark added for new entities and removed for deletions.",
-                    "        action: null",
-                    "        # Optional relationship updates involving this entity.",
-                    "        relationships: []",
+                    "        entities: []",
+                    "        span:",
+                    "          # First changed line in this file entry.",
+                    f"          start_line: {diff_entry.start_line}",
+                    "          # Last changed line in this file entry.",
+                    f"          end_line: {diff_entry.end_line}",
+                    "        # Short summary for this file entry.",
+                    "        summary: null",
+                    "        # Why this file entry changed.",
+                    "        rationale: null",
+                    "    entities: []",
                     "    invariants: []",
                     "    guidance: []",
-                    "    span:",
-                    "      # First changed line in this hunk.",
-                    f"      start_line: {diff_entry.start_line}",
-                    "      # Last changed line in this hunk.",
-                    f"      end_line: {diff_entry.end_line}",
-                    "    # Short description of the hunk-level change.",
-                    "    summary: null",
-                    "    # Why the change was made.",
-                    "    rationale: null",
                 ]
             )
     else:
@@ -143,10 +135,10 @@ def _render_header(
         "# - Keep `version: 2` unless the schema changes.\n"
         "# - For each change, fill `files` with the current file paths and file-type\n"
         "#   labels for the hunks in that change.\n"
-        "# - Use one `entities` list per change.\n"
-        "# - Mark new entities with `action: added` and removed entities with\n"
-        "#   `action: removed`.\n"
-        "# - Put entity relationship updates under the entity entry they belong to.\n"
+        "# - Put each file's related entities inside that file entry.\n"
+        "# - Use one `entities` list per change for entity lifecycle changes.\n"
+        "# - Mark new entities with `action: added`, removed entities with\n"
+        "#   `action: deleted`, and changed entities with `action: modified`.\n"
         "# - Put invariant updates in `invariants` and guidance updates in\n"
         "#   `guidance`.\n"
         "# - Use the `related` section on invariants and guidance to point at the\n"

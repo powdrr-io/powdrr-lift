@@ -82,6 +82,16 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
       - files:
           - path: src/app.py
             type: modified
+            entities:
+              - id: AppService
+                type: Service
+              - id: CacheLayer
+                type: Cache
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Add the review skill wiring.
+            rationale: Keep the first hunk focused on the skill metadata.
         entities:
           - id: AppService
             type: Service
@@ -104,14 +114,17 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
                 - src/app.py
               entities:
                 - AppService
-        span:
-          start_line: 1
-          end_line: 1
-        summary: Add the review skill wiring.
-        rationale: Keep the first hunk focused on the skill metadata.
       - files:
           - path: tests/test_app.py
             type: modified
+            entities:
+              - id: TestSuite
+                type: Suite
+            span:
+              start_line: 1
+              end_line: 2
+            summary: Add the review workflow test.
+            rationale: Keep the second hunk focused on the test harness.
         entities:
           - id: TestSuite
             type: Suite
@@ -134,11 +147,6 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
                 - tests/test_app.py
               entities:
                 - TestSuite
-        span:
-          start_line: 1
-          end_line: 2
-        summary: Add the review workflow test.
-        rationale: Keep the second hunk focused on the test harness.
     """
 
     report = parse_validation_report(
@@ -177,6 +185,14 @@ def test_validate_change_log_yaml_rejects_version_two_top_level_entities(
       - files:
           - path: src/app.py
             type: modified
+            entities:
+              - id: AppService
+                type: Service
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Add app code.
+            rationale: Needed for the feature.
         entities:
           - id: AppService
             type: Service

@@ -44,6 +44,10 @@ class RelatedSection:
 class ChangeFile:
     path: str | None = None
     type: str | None = None
+    entities: list[Entity] = field(default_factory=list)
+    span: Span = field(default_factory=Span)
+    summary: str | None = None
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +75,6 @@ class Change:
     rationale: str | None = None
     files: list[ChangeFile] = field(default_factory=list)
     entities: list[Entity] = field(default_factory=list)
-    entity_relationships: list[RelationshipChange] = field(default_factory=list)
     invariants: list[ChangeInvariant] = field(default_factory=list)
     guidance: list[ChangeGuidance] = field(default_factory=list)
 
@@ -135,11 +138,6 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
         changes=changes,
         relationship_changes=[
             *top_level_relationship_changes,
-            *[
-                relationship
-                for change in changes
-                for relationship in change.entity_relationships
-            ],
         ],
     )
 
@@ -181,9 +179,7 @@ def _parse_entity(raw_entity: object) -> Entity:
 def _parse_change(raw_change: object, *, version: int | str | None) -> Change:
     data = _parse_mapping(raw_change)
     files = _parse_change_files(data, version=version)
-    nested_entities, nested_relationships = _parse_change_entities(
-        data, version=version
-    )
+    nested_entities, _ = _parse_change_entities(data, version=version)
     invariants = [
         _parse_invariant(invariant_data)
         for invariant_data in _parse_sequence(data.get("invariants"))
@@ -196,32 +192,36 @@ def _parse_change(raw_change: object, *, version: int | str | None) -> Change:
     derived_affects = _normalize_entity_ids(
         [
             *legacy_affects,
+            *[
+                entity.id
+                for file_entry in files
+                for entity in file_entry.entities
+                if entity.id is not None
+            ],
             *[entity.id for entity in nested_entities if entity.id is not None],
-            *[
-                relationship.source
-                for relationship in nested_relationships
-                if relationship.source is not None
-            ],
-            *[
-                relationship.target
-                for relationship in nested_relationships
-                if relationship.target is not None
-            ],
         ]
     )
     primary_file = data.get("file")
     if primary_file is None:
         primary_file = files[0].path if files else None
+    primary_span = data.get("span")
+    if primary_span is None and files:
+        primary_span = files[0].span
+    primary_summary = data.get("summary")
+    if primary_summary is None and files:
+        primary_summary = files[0].summary
+    primary_rationale = data.get("rationale")
+    if primary_rationale is None and files:
+        primary_rationale = files[0].rationale
 
     return Change(
         file=primary_file,
-        span=_parse_span(data.get("span")),
-        summary=data.get("summary"),
+        span=_coerce_span(primary_span),
+        summary=primary_summary,
         affects=list(derived_affects if version == 2 else legacy_affects),
-        rationale=data.get("rationale"),
+        rationale=primary_rationale,
         files=files,
         entities=nested_entities,
-        entity_relationships=nested_relationships,
         invariants=invariants,
         guidance=guidance,
     )
@@ -240,10 +240,15 @@ def _parse_change_files(
                 ChangeFile(
                     path=file_data.get("path"),
                     type=file_data.get("type"),
+                    entities=[
+                        _parse_entity(entity_data)
+                        for entity_data in _parse_sequence(file_data.get("entities"))
+                    ],
+                    span=_parse_span(file_data.get("span")),
+                    summary=file_data.get("summary"),
+                    rationale=file_data.get("rationale"),
                 )
             )
-        if not files and data.get("file") is not None:
-            files.append(ChangeFile(path=data.get("file"), type=data.get("type")))
         return files
 
     if data.get("file") is not None:
@@ -257,13 +262,11 @@ def _parse_change_entities(
     version: int | str | None,
 ) -> tuple[list[Entity], list[RelationshipChange]]:
     if version == 2:
-        entities: list[Entity] = []
-        relationships: list[RelationshipChange] = []
-        for raw_entity in _parse_sequence(data.get("entities")):
-            entity, entity_relationships = _parse_entity_with_relationships(raw_entity)
-            entities.append(entity)
-            relationships.extend(entity_relationships)
-        return entities, relationships
+        entities = [
+            _parse_entity(entity_data)
+            for entity_data in _parse_sequence(data.get("entities"))
+        ]
+        return entities, []
 
     entities = [
         _parse_entity(entity_data)
@@ -274,23 +277,6 @@ def _parse_change_entities(
         for relationship_data in _parse_sequence(data.get("relationship_changes"))
     ]
     return entities, relationships
-
-
-def _parse_entity_with_relationships(
-    raw_entity: object,
-) -> tuple[Entity, list[RelationshipChange]]:
-    data = _parse_mapping(raw_entity)
-    return (
-        Entity(
-            id=data.get("id"),
-            type=data.get("type"),
-            action=data.get("action"),
-        ),
-        [
-            _parse_relationship_change(relationship_data)
-            for relationship_data in _parse_sequence(data.get("relationships"))
-        ],
-    )
 
 
 def _parse_invariant(raw_invariant: object) -> ChangeInvariant:
@@ -337,6 +323,13 @@ def _parse_relationship_change(raw_relationship_change: object) -> RelationshipC
 def _parse_span(raw_span: object | None) -> Span:
     data = _parse_mapping(raw_span)
     return Span(start_line=data.get("start_line"), end_line=data.get("end_line"))
+
+
+def _coerce_span(raw_span: object | None) -> Span:
+    if isinstance(raw_span, Span):
+        return raw_span
+
+    return _parse_span(raw_span)
 
 
 def _parse_mapping(raw_data: object | None) -> dict[str, Any]:

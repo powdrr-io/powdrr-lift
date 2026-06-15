@@ -47,7 +47,6 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "entities:" in template_text
     assert "invariants:" in template_text
     assert "guidance:" in template_text
-    assert "action: null" in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 
@@ -67,11 +66,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
         "added",
         "added",
     ]
-    assert [change.entities[0].action for change in change_log.changes] == [
-        None,
-        None,
-    ]
-    assert [entity.id for entity in change_log.entities] == [None, None]
+    assert [change.files[0].entities for change in change_log.changes] == [[], []]
+    assert [change.entities for change in change_log.changes] == [[], []]
     assert change_log.decisions == [Decision()]
 
 

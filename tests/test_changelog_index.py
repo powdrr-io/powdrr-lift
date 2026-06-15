@@ -317,17 +317,20 @@ def test_build_changelog_index_normalizes_version_two_changes(
           - files:
               - path: src/app.py
                 type: modified
+                entities:
+                  - id: ReviewSkill
+                    type: Skill
+                span:
+                  start_line: 1
+                  end_line: 1
+                summary: Introduce ReviewSkill.
+                rationale: ReviewSkill is now part of the system.
             entities:
               - id: ReviewSkill
                 type: Skill
                 action: added
             invariants: []
             guidance: []
-            span:
-              start_line: 1
-              end_line: 1
-            summary: Introduce ReviewSkill.
-            rationale: ReviewSkill is now part of the system.
         """,
         encoding="utf-8",
     )

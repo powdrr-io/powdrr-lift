@@ -72,19 +72,26 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
           - files:
               - path: src/review/workflow.py
                 type: modified
+                entities:
+                  - id: ReviewSkill
+                    type: Skill
+                  - id: ChangelogValidation
+                    type: Tool
+                span:
+                  start_line: 1
+                  end_line: 3
+                summary: Update the review workflow file.
+                rationale: Capture the file-level context.
             entities:
               - id: ReviewSkill
                 type: Skill
                 action: added
-                relationships:
-                  - action: altered
-                    source: ReviewSkill
-                    target: ChangelogValidation
-                    relationship: references
-                    rationale: The review skill now points at the validation CLI.
               - id: LegacyReviewNote
                 type: Document
-                action: removed
+                action: deleted
+              - id: ReviewSkill
+                type: Skill
+                action: modified
             invariants:
               - id: INV-001
                 description: Review guidance remains changelog-aware.
@@ -119,21 +126,31 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert [entity.id for entity in change_log.entities] == [
         "ReviewSkill",
         "LegacyReviewNote",
+        "ReviewSkill",
     ]
     assert [entity.action for entity in change_log.entities] == [
         "added",
-        "removed",
+        "deleted",
+        "modified",
     ]
-    assert change_log.relationship_changes[0].action == "altered"
     assert change_log.changes[0].file == "src/review/workflow.py"
     assert change_log.changes[0].files[0].type == "modified"
+    assert [entity.id for entity in change_log.changes[0].files[0].entities] == [
+        "ReviewSkill",
+        "ChangelogValidation",
+    ]
+    assert change_log.changes[0].files[0].span.start_line == 1
+    assert change_log.changes[0].files[0].summary == "Update the review workflow file."
+    assert change_log.changes[0].files[0].rationale == "Capture the file-level context."
     assert change_log.changes[0].entities[0].id == "ReviewSkill"
     assert change_log.changes[0].entities[0].action == "added"
     assert change_log.changes[0].entities[1].id == "LegacyReviewNote"
-    assert change_log.changes[0].entities[1].action == "removed"
-    assert change_log.changes[0].entity_relationships[0].target == "ChangelogValidation"
+    assert change_log.changes[0].entities[1].action == "deleted"
+    assert change_log.changes[0].entities[2].id == "ReviewSkill"
+    assert change_log.changes[0].entities[2].action == "modified"
     assert change_log.changes[0].invariants[0].related.entities == ["ReviewSkill"]
     assert change_log.changes[0].guidance[0].related.files == ["src/review/workflow.py"]
+    assert change_log.relationship_changes == []
 
 
 def test_empty_yaml_returns_empty_changelog() -> None:

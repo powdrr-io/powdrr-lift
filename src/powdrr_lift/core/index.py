@@ -9,12 +9,17 @@ from pathlib import Path
 
 from powdrr_lift.change_log_parser import (
     Change,
+    ChangeFile,
     ChangeLog,
+    Entity,
     Intent,
     Span,
     parse_change_log,
 )
-from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
+from powdrr_lift.change_log_template import (
+    _resolve_default_branch,
+    _resolve_repo_root,
+)
 
 _PR_FILE_NAME_RE = re.compile(r"^PR-(\d+)-changelog\.yaml$")
 _PR_SUBJECT_RE = re.compile(r"\(#(?P<pr_number>\d+)\)")
@@ -576,13 +581,14 @@ def _build_commit_changes(
 
         declared_changes = declared_changes_by_file.get(file_patch.path, [])
         if declared_changes:
-            for change_index, change in enumerate(declared_changes):
+            for change_index, (change, file_entry) in enumerate(declared_changes):
                 commit_changes.append(
                     _build_declared_provenance(
                         commit=commit,
                         changelog_document=commit_document,
                         file_patch=file_patch,
                         change=change,
+                        file_entry=file_entry,
                         change_index=change_index,
                     )
                 )
@@ -633,6 +639,25 @@ def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
                 )
             )
 
+        for change in changelog_document.changelog.changes:
+            for file_entry in change.files:
+                for entity in file_entry.entities:
+                    entity_id = _normalize_entity_id(entity.id)
+                    if entity_id is None:
+                        continue
+
+                    entity_occurrences.setdefault(entity_id, []).append(
+                        EntityOccurrence(
+                            entity_id=entity_id,
+                            entity_type=entity.type,
+                            action=entity.action,
+                            pr_number=changelog_document.pr_number,
+                            commit_sha=changelog_document.commit_sha,
+                            commit_timestamp=changelog_document.commit_timestamp,
+                            changelog_path=changelog_path,
+                        )
+                    )
+
         for relationship_change in changelog_document.changelog.relationship_changes:
             source = _normalize_entity_id(relationship_change.source)
             target = _normalize_entity_id(relationship_change.target)
@@ -672,6 +697,7 @@ def _build_declared_provenance(
     changelog_document: ChangelogDocument,
     file_patch: _FilePatch,
     change: Change,
+    file_entry: ChangeFile,
     change_index: int,
 ) -> ProvenanceRecord:
     return ProvenanceRecord(
@@ -685,10 +711,15 @@ def _build_declared_provenance(
         intent_problem=changelog_document.changelog.intent.problem,
         intent_goal=changelog_document.changelog.intent.goal,
         file=file_patch.path,
-        span=change.span,
-        summary=change.summary,
-        rationale=change.rationale,
-        affects=_normalize_entity_ids(change.affects),
+        span=file_entry.span,
+        summary=file_entry.summary or change.summary,
+        rationale=file_entry.rationale or change.rationale,
+        affects=_normalize_entity_ids(
+            [
+                *[entity.id for entity in file_entry.entities if entity.id is not None],
+                *[entity.id for entity in change.entities if entity.id is not None],
+            ]
+        ),
         change_index=change_index,
     )
 
@@ -778,15 +809,38 @@ def _commit_comment_path(commit_sha: str) -> Path:
 
 def _group_declared_changes(
     changelog_document: ChangelogDocument,
-) -> dict[str, list[Change]]:
-    grouped: dict[str, list[Change]] = {}
+) -> dict[str, list[tuple[Change, ChangeFile]]]:
+    grouped: dict[str, list[tuple[Change, ChangeFile]]] = {}
     for change in changelog_document.changelog.changes:
+        if change.files:
+            for file_entry in change.files:
+                if file_entry.path is None or file_entry.path == "":
+                    continue
+
+                grouped.setdefault(file_entry.path, []).append((change, file_entry))
+            continue
+
         if change.file is None or change.file == "":
             continue
 
-        grouped.setdefault(change.file, []).append(change)
+        synthetic_file_entry = ChangeFile(
+            path=change.file,
+            type=None,
+            entities=[
+                _build_change_entity_reference(entity_id)
+                for entity_id in change.affects
+            ],
+            span=change.span,
+            summary=change.summary,
+            rationale=change.rationale,
+        )
+        grouped.setdefault(change.file, []).append((change, synthetic_file_entry))
 
     return grouped
+
+
+def _build_change_entity_reference(entity_id: str) -> Entity:
+    return Entity(id=entity_id, type=None, action=None)
 
 
 def _apply_file_patch(

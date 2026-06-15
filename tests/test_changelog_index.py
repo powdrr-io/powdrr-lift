@@ -318,11 +318,9 @@ def test_build_changelog_index_normalizes_version_two_changes(
               - path: src/app.py
                 type: modified
             entities:
-              added:
-                - id: ReviewSkill
-                  type: Skill
-              removed: []
-              relationships: []
+              - id: ReviewSkill
+                type: Skill
+                action: added
             invariants: []
             guidance: []
             span:

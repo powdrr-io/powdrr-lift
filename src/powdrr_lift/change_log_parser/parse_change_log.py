@@ -257,22 +257,13 @@ def _parse_change_entities(
     version: int | str | None,
 ) -> tuple[list[Entity], list[RelationshipChange]]:
     if version == 2:
-        entity_section = _parse_mapping(data.get("entities"))
-        added = [
-            _parse_entity_with_action(entity_data, "added")
-            for entity_data in _parse_sequence(entity_section.get("added"))
-        ]
-        removed = [
-            _parse_entity_with_action(entity_data, "removed")
-            for entity_data in _parse_sequence(entity_section.get("removed"))
-        ]
-        relationships = [
-            _parse_relationship_change(relationship_data)
-            for relationship_data in _parse_sequence(
-                entity_section.get("relationships")
-            )
-        ]
-        return [*added, *removed], relationships
+        entities: list[Entity] = []
+        relationships: list[RelationshipChange] = []
+        for raw_entity in _parse_sequence(data.get("entities")):
+            entity, entity_relationships = _parse_entity_with_relationships(raw_entity)
+            entities.append(entity)
+            relationships.extend(entity_relationships)
+        return entities, relationships
 
     entities = [
         _parse_entity(entity_data)
@@ -285,9 +276,21 @@ def _parse_change_entities(
     return entities, relationships
 
 
-def _parse_entity_with_action(raw_entity: object, action: str) -> Entity:
+def _parse_entity_with_relationships(
+    raw_entity: object,
+) -> tuple[Entity, list[RelationshipChange]]:
     data = _parse_mapping(raw_entity)
-    return Entity(id=data.get("id"), type=data.get("type"), action=action)
+    return (
+        Entity(
+            id=data.get("id"),
+            type=data.get("type"),
+            action=data.get("action"),
+        ),
+        [
+            _parse_relationship_change(relationship_data)
+            for relationship_data in _parse_sequence(data.get("relationships"))
+        ],
+    )
 
 
 def _parse_invariant(raw_invariant: object) -> ChangeInvariant:

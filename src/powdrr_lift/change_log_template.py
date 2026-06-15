@@ -84,9 +84,15 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     f"        path: {diff_entry.path}",
                     f"        type: {_normalize_change_type(diff_entry.status)}",
                     "    entities:",
-                    "      added: []",
-                    "      removed: []",
-                    "      relationships: []",
+                    "      -",
+                    "        # Canonical entity id used across the repository graph.",
+                    "        id: null",
+                    "        # Optional type, such as Service, CLI, Cache, or Storage.",
+                    "        type: null",
+                    "        # Mark added for new entities and removed for deletions.",
+                    "        action: null",
+                    "        # Optional relationship updates involving this entity.",
+                    "        relationships: []",
                     "    invariants: []",
                     "    guidance: []",
                     "    span:",
@@ -137,8 +143,10 @@ def _render_header(
         "# - Keep `version: 2` unless the schema changes.\n"
         "# - For each change, fill `files` with the current file paths and file-type\n"
         "#   labels for the hunks in that change.\n"
-        "# - Use `entities.added` for new entities, `entities.removed` for removed\n"
-        "#   entities, and `entities.relationships` for relationship changes.\n"
+        "# - Use one `entities` list per change.\n"
+        "# - Mark new entities with `action: added` and removed entities with\n"
+        "#   `action: removed`.\n"
+        "# - Put entity relationship updates under the entity entry they belong to.\n"
         "# - Put invariant updates in `invariants` and guidance updates in\n"
         "#   `guidance`.\n"
         "# - Use the `related` section on invariants and guidance to point at the\n"

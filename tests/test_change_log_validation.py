@@ -83,11 +83,9 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
           - path: src/app.py
             type: modified
         entities:
-          added:
-            - id: AppService
-              type: Service
-          removed: []
-          relationships: []
+          - id: AppService
+            type: Service
+            action: added
         invariants:
           - id: INV-001
             description: The app service remains available.
@@ -115,11 +113,9 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
           - path: tests/test_app.py
             type: modified
         entities:
-          added:
-            - id: TestSuite
-              type: Suite
-          removed: []
-          relationships: []
+          - id: TestSuite
+            type: Suite
+            action: added
         invariants:
           - id: INV-002
             description: The app test remains present.
@@ -182,11 +178,9 @@ def test_validate_change_log_yaml_rejects_version_two_top_level_entities(
           - path: src/app.py
             type: modified
         entities:
-          added:
-            - id: AppService
-              type: Service
-          removed: []
-          relationships: []
+          - id: AppService
+            type: Service
+            action: added
         invariants: []
         guidance: []
     """

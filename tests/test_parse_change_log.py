@@ -73,18 +73,18 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
               - path: src/review/workflow.py
                 type: modified
             entities:
-              added:
-                - id: ReviewSkill
-                  type: Skill
-              removed:
-                - id: LegacyReviewNote
-                  type: Document
-              relationships:
-                - action: altered
-                  source: ReviewSkill
-                  target: ChangelogValidation
-                  relationship: references
-                  rationale: The review skill now points at the validation CLI.
+              - id: ReviewSkill
+                type: Skill
+                action: added
+                relationships:
+                  - action: altered
+                    source: ReviewSkill
+                    target: ChangelogValidation
+                    relationship: references
+                    rationale: The review skill now points at the validation CLI.
+              - id: LegacyReviewNote
+                type: Document
+                action: removed
             invariants:
               - id: INV-001
                 description: Review guidance remains changelog-aware.

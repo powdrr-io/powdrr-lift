@@ -69,30 +69,39 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Each change entry should map one diff hunk.",
+        "# Each change entry should group one file path.",
     ]
 
     if diff_entries:
         lines.append("changes:")
-        for diff_entry in diff_entries:
+        for grouped_entries in _group_branch_diff_entries_by_path(diff_entries):
             lines.extend(
                 [
                     "  -",
                     "    files:",
-                    "      -",
-                    "        # File path and type for this hunk.",
-                    f"        path: {diff_entry.path}",
-                    f"        type: {_normalize_change_type(diff_entry.status)}",
-                    "        entities: []",
-                    "        span:",
-                    "          # First changed line in this file entry.",
-                    f"          start_line: {diff_entry.start_line}",
-                    "          # Last changed line in this file entry.",
-                    f"          end_line: {diff_entry.end_line}",
-                    "        # Short summary for this file entry.",
-                    "        summary: null",
-                    "        # Why this file entry changed.",
-                    "        rationale: null",
+                ]
+            )
+            for diff_entry in grouped_entries:
+                lines.extend(
+                    [
+                        "      -",
+                        "        # File path and type for this hunk.",
+                        f"        path: {diff_entry.path}",
+                        f"        type: {_normalize_change_type(diff_entry.status)}",
+                        "        entities: []",
+                        "        span:",
+                        "          # First changed line in this file entry.",
+                        f"          start_line: {diff_entry.start_line}",
+                        "          # Last changed line in this file entry.",
+                        f"          end_line: {diff_entry.end_line}",
+                        "        # Short summary for this file entry.",
+                        "        summary: null",
+                        "        # Why this file entry changed.",
+                        "        rationale: null",
+                    ]
+                )
+            lines.extend(
+                [
                     "    entities: []",
                     "    invariants: []",
                     "    guidance: []",
@@ -135,6 +144,7 @@ def _render_header(
         "# - Keep `version: 2` unless the schema changes.\n"
         "# - For each change, fill `files` with the current file paths and file-type\n"
         "#   labels for the hunks in that change.\n"
+        "# - Group hunks for the same file under one change entry.\n"
         "# - Put each file's related entities inside that file entry.\n"
         "# - Use one `entities` list per change for entity lifecycle changes.\n"
         "# - Mark new entities with `action: added`, removed entities with\n"
@@ -197,6 +207,25 @@ def _collect_branch_diff_entries(
             )
 
     return entries
+
+
+def _group_branch_diff_entries_by_path(
+    diff_entries: Sequence[BranchDiffEntry],
+) -> list[list[BranchDiffEntry]]:
+    grouped_entries: list[list[BranchDiffEntry]] = []
+    grouped_by_path: dict[str, list[BranchDiffEntry]] = {}
+    for entry in diff_entries:
+        grouped_by_path.setdefault(entry.path, []).append(entry)
+
+    seen_paths: set[str] = set()
+    for entry in diff_entries:
+        if entry.path in seen_paths:
+            continue
+
+        grouped_entries.append(grouped_by_path[entry.path])
+        seen_paths.add(entry.path)
+
+    return grouped_entries
 
 
 def _collect_file_spans(

@@ -607,7 +607,7 @@ def _validate_v2_change(
             )
 
         for entity_index, entity in enumerate(file_entry.entities, start=1):
-            if _normalize_entity_id(entity.id) is None:
+            if _normalize_entity_id(entity) is None:
                 issues.append(
                     ValidationIssue(
                         code="file_entry_entity_missing_id",
@@ -621,11 +621,11 @@ def _validate_v2_change(
 
     entity_ids_in_change = {
         normalized_entity_id
-        for entity in change.entities
-        if (normalized_entity_id := _normalize_entity_id(entity.id)) is not None
+        for change_entity in change.entities
+        if (normalized_entity_id := _normalize_entity_id(change_entity.id)) is not None
     }
-    for entity in change.entities:
-        normalized_entity_id = _normalize_entity_id(entity.id)
+    for change_entity in change.entities:
+        normalized_entity_id = _normalize_entity_id(change_entity.id)
         if normalized_entity_id is None:
             issues.append(
                 ValidationIssue(
@@ -638,7 +638,7 @@ def _validate_v2_change(
             )
             continue
 
-        if entity.action not in {"added", "deleted", "modified"}:
+        if change_entity.action not in {"added", "deleted", "modified"}:
             issues.append(
                 ValidationIssue(
                     code="entity_action_invalid",
@@ -655,13 +655,7 @@ def _validate_v2_change(
         for file_entry in change.files
         if file_entry.path is not None and file_entry.path != ""
     }
-    available_entities = {
-        normalized_entity_id
-        for file_entry in change.files
-        for entity in file_entry.entities
-        if (normalized_entity_id := _normalize_entity_id(entity.id)) is not None
-    }
-    available_entities.update(entity_ids_in_change)
+    available_entities = set(entity_ids_in_change)
     available_invariants = {
         invariant_id
         for invariant in change.invariants

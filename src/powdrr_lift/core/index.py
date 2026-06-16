@@ -11,7 +11,6 @@ from powdrr_lift.change_log_parser import (
     Change,
     ChangeFile,
     ChangeLog,
-    Entity,
     Intent,
     Span,
     parse_change_log,
@@ -641,16 +640,16 @@ def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
 
         for change in changelog_document.changelog.changes:
             for file_entry in change.files:
-                for entity in file_entry.entities:
-                    entity_id = _normalize_entity_id(entity.id)
+                for entity_id_raw in file_entry.entities:
+                    entity_id = _normalize_entity_id(entity_id_raw)
                     if entity_id is None:
                         continue
 
                     entity_occurrences.setdefault(entity_id, []).append(
                         EntityOccurrence(
                             entity_id=entity_id,
-                            entity_type=entity.type,
-                            action=entity.action,
+                            entity_type=None,
+                            action=None,
                             pr_number=changelog_document.pr_number,
                             commit_sha=changelog_document.commit_sha,
                             commit_timestamp=changelog_document.commit_timestamp,
@@ -714,12 +713,7 @@ def _build_declared_provenance(
         span=file_entry.span,
         summary=file_entry.summary or change.summary,
         rationale=file_entry.rationale or change.rationale,
-        affects=_normalize_entity_ids(
-            [
-                *[entity.id for entity in file_entry.entities if entity.id is not None],
-                *[entity.id for entity in change.entities if entity.id is not None],
-            ]
-        ),
+        affects=_normalize_entity_ids(change.affects),
         change_index=change_index,
     )
 
@@ -826,10 +820,7 @@ def _group_declared_changes(
         synthetic_file_entry = ChangeFile(
             path=change.file,
             type=None,
-            entities=[
-                _build_change_entity_reference(entity_id)
-                for entity_id in change.affects
-            ],
+            entities=list(change.affects),
             span=change.span,
             summary=change.summary,
             rationale=change.rationale,
@@ -837,10 +828,6 @@ def _group_declared_changes(
         grouped.setdefault(change.file, []).append((change, synthetic_file_entry))
 
     return grouped
-
-
-def _build_change_entity_reference(entity_id: str) -> Entity:
-    return Entity(id=entity_id, type=None, action=None)
 
 
 def _apply_file_patch(

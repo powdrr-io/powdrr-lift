@@ -135,7 +135,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     ]
     assert change_log.changes[0].file == "src/review/workflow.py"
     assert change_log.changes[0].files[0].type == "modified"
-    assert [entity.id for entity in change_log.changes[0].files[0].entities] == [
+    assert change_log.changes[0].files[0].entities == [
         "ReviewSkill",
         "ChangelogValidation",
     ]

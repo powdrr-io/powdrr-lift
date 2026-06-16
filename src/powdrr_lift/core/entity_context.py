@@ -327,11 +327,30 @@ def _document_mentions_entity(
         return True
 
     if any(
+        _normalize_entity_id(entity.id) == entity_name
+        for change in document.changelog.changes
+        for entity in change.entities
+    ):
+        return True
+
+    if any(
         entity_name
         in {
             _normalize_entity_id(affect)
             for affect in change.affects
             if _normalize_entity_id(affect) is not None
+        }
+        for change in document.changelog.changes
+    ):
+        return True
+
+    if any(
+        entity_name
+        in {
+            _normalize_entity_id(entity_id)
+            for file_entry in change.files
+            for entity_id in file_entry.entities
+            if _normalize_entity_id(entity_id) is not None
         }
         for change in document.changelog.changes
     ):

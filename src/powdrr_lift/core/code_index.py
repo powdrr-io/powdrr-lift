@@ -8,6 +8,7 @@ from pathlib import Path
 
 from powdrr_lift.change_log_parser import (
     Change,
+    ChangeFile,
     ChangeLog,
     Decision,
     Entity,
@@ -1445,6 +1446,29 @@ def _load_changelog_document_from_cache_row(
             summary=provenance_row["summary"],
             affects=list(affects_by_provenance_id.get(provenance_row["id"], ())),
             rationale=provenance_row["rationale"],
+            files=[
+                ChangeFile(
+                    path=provenance_row["file_path"],
+                    type=None,
+                    entities=list(
+                        affects_by_provenance_id.get(provenance_row["id"], ())
+                    ),
+                    span=(
+                        Span(
+                            start_line=provenance_row["span_start"],
+                            end_line=provenance_row["span_end"],
+                        )
+                        if provenance_row["span_start"] is not None
+                        or provenance_row["span_end"] is not None
+                        else Span()
+                    ),
+                    summary=provenance_row["summary"],
+                    rationale=provenance_row["rationale"],
+                )
+            ],
+            entities=[],
+            invariants=[],
+            guidance=[],
         )
         for provenance_row in provenance_rows
         if provenance_row["kind"] == "declared"

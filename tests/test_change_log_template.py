@@ -170,14 +170,27 @@ def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert [change.file for change in change_log.changes] == [
+    assert [change.file for change in change_log.changes] == ["src/app.py"]
+    assert [file_entry.path for file_entry in change_log.changes[0].files] == [
         "src/app.py",
         "src/app.py",
         "src/app.py",
         "src/app.py",
     ]
-    assert [change.span.start_line for change in change_log.changes] == [2, 4, 6, 8]
-    assert [change.span.end_line for change in change_log.changes] == [2, 4, 6, 8]
+    assert [
+        file_entry.span.start_line for file_entry in change_log.changes[0].files
+    ] == [
+        2,
+        4,
+        6,
+        8,
+    ]
+    assert [file_entry.span.end_line for file_entry in change_log.changes[0].files] == [
+        2,
+        4,
+        6,
+        8,
+    ]
 
 
 def _git(repo_root: Path, *args: str) -> None:

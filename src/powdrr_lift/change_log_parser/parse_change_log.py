@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, cast
+from typing import Any, Dict, List, cast
 
 import yaml
 
@@ -58,7 +58,6 @@ class ChangeEntityRelationship:
 class Span:
     start_line: int | None = None
     end_line: int | None = None
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,17 +122,17 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
 def _parse_change_log_v1(version: int, data: Dict[str, Any]) -> ChangeLog:
     top_level_entities = [
         _parse_entity(entity_data)
-        for entity_data in _parse_sequence(data.get("entities"))
+        for entity_data in _ensure_is_sequence(data.get("entities"))
     ]
     top_level_relationship_changes = [
         _parse_relationship_change(relationship_change_data)
-        for relationship_change_data in _parse_sequence(
+        for relationship_change_data in _ensure_is_sequence(
             data.get("relationship_changes")
         )
     ]
     changes = [
         _parse_change_v1(change_data, version=version)
-        for change_data in _parse_sequence(data.get("changes"))
+        for change_data in _ensure_is_sequence(data.get("changes"))
     ]
 
     parsed_entities = [
@@ -157,17 +156,17 @@ def _parse_change_log_v1(version: int, data: Dict[str, Any]) -> ChangeLog:
 def _parse_change_log_v2(version: int, data: Dict[str, Any]) -> ChangeLog:
     top_level_entities = [
         _parse_entity(entity_data)
-        for entity_data in _parse_sequence(data.get("entities"))
+        for entity_data in _ensure_is_sequence(data.get("entities"))
     ]
     top_level_relationship_changes = [
         _parse_relationship_change(relationship_change_data)
-        for relationship_change_data in _parse_sequence(
+        for relationship_change_data in _ensure_is_sequence(
             data.get("relationship_changes")
         )
     ]
     changes = [
         _parse_change(change_data, version=version)
-        for change_data in _parse_sequence(data.get("changes"))
+        for change_data in _ensure_is_sequence(data.get("changes"))
     ]
 
     parsed_entities = [
@@ -208,7 +207,7 @@ def _parse_decision(raw_decision: object | None) -> Decision:
 def _parse_decisions(data: Mapping[str, Any]) -> list[Decision]:
     decisions = [
         _parse_decision(decision_data)
-        for decision_data in _parse_sequence(data.get("decisions"))
+        for decision_data in _ensure_is_sequence(data.get("decisions"))
     ]
 
     if not decisions and data.get("decision") is not None:
@@ -232,11 +231,11 @@ def _parse_entity_id(raw_entity: object) -> str | None:
     return _normalize_entity_id(str(raw_entity))
 
 
-def _parse_change_v1(raw_change: object, *, version: int | str | None) -> Change:
+def _parse_change_v1(raw_change: object, *, version: int | str | None) -> ChangeFile:
     data = _parse_mapping(raw_change)
     files = _parse_change_files(data, version=version)
     nested_entities = _parse_change_entities(data, version=version)
-    legacy_affects = [str(affect) for affect in _parse_sequence(data.get("affects"))]
+    legacy_affects = [str(affect) for affect in _ensure_is_sequence(data.get("affects"))]
     derived_affects = _normalize_entity_ids(
         [
             *legacy_affects,
@@ -257,7 +256,7 @@ def _parse_change_v1(raw_change: object, *, version: int | str | None) -> Change
     if primary_rationale is None and files:
         primary_rationale = files[0].rationale
 
-    return Change(
+    return ChangeFile(
         file=primary_file,
         span=_coerce_span(primary_span),
         summary=primary_summary,
@@ -275,10 +274,10 @@ def _parse_change_files(
 ) -> list[ChangeFile]:
     files: list[ChangeFile] = []
     if version == 2:
-        for raw_file in _parse_sequence(data.get("files")):
+        for raw_file in _ensure_is_sequence(data.get("files")):
             file_data = _parse_mapping(raw_file)
             file_entities: list[str] = []
-            for entity_id in _parse_sequence(file_data.get("entities")):
+            for entity_id in _ensure_is_sequence(file_data.get("entities")):
                 normalized_entity_id = _parse_entity_id(entity_id)
                 if normalized_entity_id is not None:
                     file_entities.append(normalized_entity_id)
@@ -328,12 +327,12 @@ def _parse_change_entities(
     if version == 2:
         return [
             _parse_entity(entity_data)
-            for entity_data in _parse_sequence(data.get("entities"))
+            for entity_data in _ensure_is_sequence(data.get("entities"))
         ]
 
     return [
         _parse_entity(entity_data)
-        for entity_data in _parse_sequence(data.get("entities"))
+        for entity_data in _ensure_is_sequence(data.get("entities"))
     ]
 
 
@@ -357,19 +356,39 @@ def _parse_guidance(raw_guidance: object) -> ChangeGuidance:
     )
 
 
+def _parse_related(raw_related: object | None) -> RelatedSection:
+    data = _parse_mapping(raw_related)
+    return RelatedSection(
+        files=_parse_references(data.get("files")),
+        entities=_parse_references(data.get("entities")),
+        invariants=_parse_references(data.get("invariants")),
+        guidance=_parse_references(data.get("guidance")),
+    )  
+
+
+def _parse_references(raw_referenes: object | None) -> Sequence[Reference]:
+    data = _ensure_is_sequence(raw_referenes)
+    return [
+        Reference(
+            id=data.get("id"),
+            reasoning=data.get("reasoning")
+        )
+    ]ß
+
+
 def _parse_related_section(raw_related: object | None) -> RelatedSection:
     data = _parse_mapping(raw_related)
     return RelatedSection(
-        files=[str(item) for item in _parse_sequence(data.get("files"))],
-        entities=[str(item) for item in _parse_sequence(data.get("entities"))],
-        invariants=[str(item) for item in _parse_sequence(data.get("invariants"))],
-        guidance=[str(item) for item in _parse_sequence(data.get("guidance"))],
+        files=[_parse_relation(item) for item in _ensure_is_sequence(data.get("files"))],
+        entities=[str(item) for item in _ensure_is_sequence(data.get("entities"))],
+        invariants=[str(item) for item in _ensure_is_sequence(data.get("invariants"))],
+        guidance=[str(item) for item in _ensure_is_sequence(data.get("guidance"))],
     )
 
 
-def _parse_relationship_change(raw_relationship_change: object) -> RelationshipChange:
+def _parse_relationship_change(raw_relationship_change: object) -> ChangeEntityRelationship:
     data = _parse_mapping(raw_relationship_change)
-    return RelationshipChange(
+    return ChangeEntityRelationship(
         action=data.get("action"),
         source=data.get("source"),
         target=data.get("target"),
@@ -400,7 +419,7 @@ def _parse_mapping(raw_data: object | None) -> dict[str, Any]:
     return dict(raw_data)
 
 
-def _parse_sequence(raw_data: object | None) -> Sequence[object]:
+def _ensure_is_sequence(raw_data: object | None) -> Sequence[object]:
     if raw_data is None:
         return ()
 

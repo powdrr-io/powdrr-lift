@@ -638,25 +638,6 @@ def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
                 )
             )
 
-        for change in changelog_document.changelog.changes:
-            for file_entry in change.files:
-                for entity_id_raw in file_entry.entities:
-                    entity_id = _normalize_entity_id(entity_id_raw)
-                    if entity_id is None:
-                        continue
-
-                    entity_occurrences.setdefault(entity_id, []).append(
-                        EntityOccurrence(
-                            entity_id=entity_id,
-                            entity_type=None,
-                            action=None,
-                            pr_number=changelog_document.pr_number,
-                            commit_sha=changelog_document.commit_sha,
-                            commit_timestamp=changelog_document.commit_timestamp,
-                            changelog_path=changelog_path,
-                        )
-                    )
-
         for relationship_change in changelog_document.changelog.relationship_changes:
             source = _normalize_entity_id(relationship_change.source)
             target = _normalize_entity_id(relationship_change.target)
@@ -713,7 +694,12 @@ def _build_declared_provenance(
         span=file_entry.span,
         summary=file_entry.summary or change.summary,
         rationale=file_entry.rationale or change.rationale,
-        affects=_normalize_entity_ids(change.affects),
+        affects=_normalize_entity_ids(
+            [
+                *file_entry.entities,
+                *change.affects,
+            ]
+        ),
         change_index=change_index,
     )
 

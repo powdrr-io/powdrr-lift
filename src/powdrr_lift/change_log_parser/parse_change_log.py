@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any, Dict, cast
 
 import yaml
 
@@ -15,16 +15,43 @@ class Intent:
 
 @dataclass(frozen=True, slots=True)
 class Decision:
-    id: str | None = None
-    summary: str | None = None
+    id: str 
+    summary: str
     replaces: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class Entity:
+class Reference:
+    id: str
+    reasoning: str
+
+
+@dataclass(frozen=True, slots=True)
+class RelatedSection:
+    files: list[Reference] = field(default_factory=list)
+    entities: list[Reference] = field(default_factory=list)
+    invariants: list[Reference] = field(default_factory=list)
+    guidance: list[Reference] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeEntity:
+    id: str 
+    type: str
+    action: str
+    related: RelatedSection | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeEntityRelationship:
     id: str | None = None
     type: str | None = None
-    action: str | None = None
+    parent_entity: str
+    child_entity: str
+    relationship: str
+    description: str | None = None
+    action: str | None = None  
+    related: RelatedSection | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,22 +60,15 @@ class Span:
     end_line: int | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class RelatedSection:
-    files: list[str] = field(default_factory=list)
-    entities: list[str] = field(default_factory=list)
-    invariants: list[str] = field(default_factory=list)
-    guidance: list[str] = field(default_factory=list)
-
 
 @dataclass(frozen=True, slots=True)
 class ChangeFile:
     path: str | None = None
     type: str | None = None
-    entities: list[str] = field(default_factory=list)
     span: Span = field(default_factory=Span)
     summary: str | None = None
     rationale: str | None = None
+    related: RelatedSection | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +76,7 @@ class ChangeInvariant:
     id: str | None = None
     description: str | None = None
     action: str | None = None
-    related: RelatedSection = field(default_factory=RelatedSection)
+    related: RelatedSection | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,29 +84,7 @@ class ChangeGuidance:
     id: str | None = None
     description: str | None = None
     action: str | None = None
-    related: RelatedSection = field(default_factory=RelatedSection)
-
-
-@dataclass(frozen=True, slots=True)
-class Change:
-    file: str | None = None
-    span: Span = field(default_factory=Span)
-    summary: str | None = None
-    affects: list[str] = field(default_factory=list)
-    rationale: str | None = None
-    files: list[ChangeFile] = field(default_factory=list)
-    entities: list[Entity] = field(default_factory=list)
-    invariants: list[ChangeInvariant] = field(default_factory=list)
-    guidance: list[ChangeGuidance] = field(default_factory=list)
-
-
-@dataclass(frozen=True, slots=True)
-class RelationshipChange:
-    action: str | None = None
-    source: str | None = None
-    target: str | None = None
-    relationship: str | None = None
-    rationale: str | None = None
+    related: RelatedSection | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,9 +94,11 @@ class ChangeLog:
     title: str | None = None
     intent: Intent = field(default_factory=Intent)
     decisions: list[Decision] = field(default_factory=list)
-    entities: list[Entity] = field(default_factory=list)
-    changes: list[Change] = field(default_factory=list)
-    relationship_changes: list[RelationshipChange] = field(default_factory=list)
+    file_changes: list[ChangeFile] = field(default_factory=list)
+    entity_relationship_changes: list[ChangeEntityRelationship] = field(default_factory=list)
+    entity_changes: list[ChangeEntity] = field(default_factory=list)
+    guidance_changes: list[ChangeGuidance]
+    invariant_changes: list[ChangeInvariant]
 
 
 def parse_change_log(yaml_content: str) -> ChangeLog:
@@ -111,6 +111,50 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
 
     data = dict(loaded_content)
     version = _normalize_version(data.get("version"))
+
+    if version == 1:
+        _parse_change_log_v1(version, data)
+    elif version == 2:
+        _parse_change_log_v2(version, data)
+    else:
+        raise Exception("Unknown change log version")
+    
+
+def _parse_change_log_v1(version: int, data: Dict[str, Any]) -> ChangeLog:
+    top_level_entities = [
+        _parse_entity(entity_data)
+        for entity_data in _parse_sequence(data.get("entities"))
+    ]
+    top_level_relationship_changes = [
+        _parse_relationship_change(relationship_change_data)
+        for relationship_change_data in _parse_sequence(
+            data.get("relationship_changes")
+        )
+    ]
+    changes = [
+        _parse_change_v1(change_data, version=version)
+        for change_data in _parse_sequence(data.get("changes"))
+    ]
+
+    parsed_entities = [
+        *(top_level_entities if version != 2 else []),
+        *[entity for change in changes for entity in change.entities],
+    ]
+    parsed_relationship_changes = top_level_relationship_changes if version != 2 else []
+
+    return ChangeLog(
+        version=data.get("version"),
+        change_id=data.get("change_id", data.get("pr_id")),
+        title=data.get("title"),
+        intent=_parse_intent(data.get("intent")),
+        decisions=_parse_decisions(data),
+        entities=parsed_entities,
+        changes=changes,
+        relationship_changes=parsed_relationship_changes,
+    )
+
+
+def _parse_change_log_v2(version: int, data: Dict[str, Any]) -> ChangeLog:
     top_level_entities = [
         _parse_entity(entity_data)
         for entity_data in _parse_sequence(data.get("entities"))
@@ -141,7 +185,7 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
         entities=parsed_entities,
         changes=changes,
         relationship_changes=parsed_relationship_changes,
-    )
+    )    
 
 
 def _normalize_version(raw_version: object | None) -> int | str | None:
@@ -188,18 +232,10 @@ def _parse_entity_id(raw_entity: object) -> str | None:
     return _normalize_entity_id(str(raw_entity))
 
 
-def _parse_change(raw_change: object, *, version: int | str | None) -> Change:
+def _parse_change_v1(raw_change: object, *, version: int | str | None) -> Change:
     data = _parse_mapping(raw_change)
     files = _parse_change_files(data, version=version)
     nested_entities = _parse_change_entities(data, version=version)
-    invariants = [
-        _parse_invariant(invariant_data)
-        for invariant_data in _parse_sequence(data.get("invariants"))
-    ]
-    guidance = [
-        _parse_guidance(guidance_data)
-        for guidance_data in _parse_sequence(data.get("guidance"))
-    ]
     legacy_affects = [str(affect) for affect in _parse_sequence(data.get("affects"))]
     derived_affects = _normalize_entity_ids(
         [
@@ -229,8 +265,6 @@ def _parse_change(raw_change: object, *, version: int | str | None) -> Change:
         rationale=primary_rationale,
         files=files,
         entities=nested_entities,
-        invariants=invariants,
-        guidance=guidance,
     )
 
 

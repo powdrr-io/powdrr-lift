@@ -69,7 +69,8 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Each change entry should group one file path.",
+        "# Each change entry should group the files, entities, invariants, and",
+        "# guidance for one logical change.",
     ]
 
     if diff_entries:
@@ -98,12 +99,21 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                         "        summary: null",
                         "        # Why this file entry changed.",
                         "        rationale: null",
+                        "        # Optional related ids for this file entry.",
+                        "        related:",
+                        "          files: []",
+                        "          entities: []",
+                        "          invariants: []",
+                        "          guidance: []",
                     ]
                 )
             lines.extend(
                 [
+                    "    # List entities added, deleted, or modified by this change.",
                     "    entities: []",
+                    "    # List invariants added, removed, or altered by this change.",
                     "    invariants: []",
+                    "    # List guidance items changed by this change.",
                     "    guidance: []",
                 ]
             )
@@ -142,17 +152,15 @@ def _render_header(
         "# - Add or remove `changes` items as needed so every meaningful change is\n"
         "#   represented exactly once.\n"
         "# - Keep `version: 2` unless the schema changes.\n"
-        "# - For each change, fill `files` with the current file paths and file-type\n"
-        "#   labels for the hunks in that change.\n"
-        "# - Group hunks for the same file under one change entry.\n"
-        "# - Put each file's related entities inside that file entry.\n"
-        "# - Use one `entities` list per change for entity lifecycle changes.\n"
-        "# - Mark new entities with `action: added`, removed entities with\n"
-        "#   `action: deleted`, and changed entities with `action: modified`.\n"
-        "# - Put invariant updates in `invariants` and guidance updates in\n"
+        "# - For each change, use `files` for the affected files and their spans.\n"
+        "# - Put `path`, `type`, `entities`, `span`, `summary`, and `rationale`\n"
+        "#   on each file entry.\n"
+        "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
+        "#   `action: deleted`, or `action: modified`.\n"
+        "# - Put invariant changes in `invariants` and guidance changes in\n"
         "#   `guidance`.\n"
-        "# - Use the `related` section on invariants and guidance to point at the\n"
-        "#   relevant file, entity, invariant, or guidance ids.\n"
+        "# - Use the `related` section on file, invariant, and guidance entries to\n"
+        "#   point at the relevant file, entity, invariant, or guidance ids.\n"
         "#\n"
         "# Diff summary:\n"
         f"{diff_lines}"

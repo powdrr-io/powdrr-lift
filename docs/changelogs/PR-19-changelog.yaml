@@ -2,15 +2,15 @@ version: 2
 change_id: 19
 title: Add changelog version 2
 intent:
-  problem: The repository is being migrated from version 1 changelog documents to a version
-    2 schema with nested files, entities, invariants, and guidance, while keeping version
-    1 parsing and indexing support intact.
-  goal: Introduce changelog version 2, update the parser, template, validation, and cache/index
-    support, and keep the existing version 1 format readable.
+  problem: The repository is being migrated from version 1 changelog documents to
+    a version 2 schema with nested files, entities, invariants, and guidance, while
+    keeping version 1 parsing and indexing support intact.
+  goal: Introduce changelog version 2, update the parser, template, validation, and
+    cache/index support, and keep the existing version 1 format readable.
 decisions:
 - id: ADR-001
-  summary: Introduce version 2 of the changelog schema while preserving version 1 parsing
-    and indexing support.
+  summary: Introduce version 2 of the changelog schema while preserving version 1
+    parsing and indexing support.
 changes:
 - files:
   - path: src/powdrr_lift/__init__.py
@@ -20,8 +20,13 @@ changes:
       start_line: 5
       end_line: 7
     summary: Update __init__.py lines 5-7 for version 2 schema support.
-    rationale: Expose the new schema helper types and keep the public package surface aligned
-      with the parser refactor.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/__init__.py
     type: modified
     entities: []
@@ -29,8 +34,13 @@ changes:
       start_line: 12
       end_line: 12
     summary: Update src/powdrr_lift/__init__.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/__init__.py while preserving the
-      new schema.
+    rationale: Capture the current diff for src/powdrr_lift/__init__.py while preserving
+      the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/__init__.py
     type: modified
     entities: []
@@ -38,8 +48,13 @@ changes:
       start_line: 20
       end_line: 22
     summary: Update src/powdrr_lift/__init__.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/__init__.py while preserving the
-      new schema.
+    rationale: Capture the current diff for src/powdrr_lift/__init__.py while preserving
+      the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/__init__.py
     type: modified
     entities: []
@@ -47,8 +62,13 @@ changes:
       start_line: 53
       end_line: 53
     summary: Update src/powdrr_lift/__init__.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/__init__.py while preserving the
-      new schema.
+    rationale: Capture the current diff for src/powdrr_lift/__init__.py while preserving
+      the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -60,35 +80,58 @@ changes:
       start_line: 3
       end_line: 5
     summary: Update __init__.py lines 3-5 for version 2 schema support.
-    rationale: Expose the new schema helper types and keep the public package surface aligned
-      with the parser refactor.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
     entities: []
     span:
       start_line: 10
       end_line: 10
-    summary: Update src/powdrr_lift/change_log_parser/__init__.py for changelog v2 support.
+    summary: Update src/powdrr_lift/change_log_parser/__init__.py for changelog v2
+      support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/__init__.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
     entities: []
     span:
       start_line: 18
       end_line: 20
-    summary: Update src/powdrr_lift/change_log_parser/__init__.py for changelog v2 support.
+    summary: Update src/powdrr_lift/change_log_parser/__init__.py for changelog v2
+      support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/__init__.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/__init__.py
     type: modified
     entities: []
     span:
       start_line: 25
       end_line: 25
-    summary: Update src/powdrr_lift/change_log_parser/__init__.py for changelog v2 support.
+    summary: Update src/powdrr_lift/change_log_parser/__init__.py for changelog v2
+      support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/__init__.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -102,136 +145,431 @@ changes:
     summary: Update parse_change_log.py lines 5-5 for version 2 schema support.
     rationale: Teach the parser to read the new nested changelog structure while preserving
       the legacy version 1 layout.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 35
-      end_line: 68
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 20
+      end_line: 34
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 76
-      end_line: 79
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 42
+      end_line: 42
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 112
-      end_line: 127
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 46
+      end_line: 55
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 135
-      end_line: 136
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 59
+      end_line: 62
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 138
-      end_line: 138
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 40
+      end_line: 40
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 140
-      end_line: 140
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 66
+      end_line: 66
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 70
+      end_line: 72
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 74
+      end_line: 90
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 92
+      end_line: 95
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 119
+      end_line: 143
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
       start_line: 145
-      end_line: 151
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      end_line: 147
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 179
-      end_line: 179
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 151
+      end_line: 152
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 181
-      end_line: 216
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 154
+      end_line: 183
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog
+      v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
       while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 218
-      end_line: 226
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 185
+      end_line: 186
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 185-186
+      for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
-      while preserving the new schema.
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 230
-      end_line: 309
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 192
+      end_line: 195
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 192-195
+      for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
-      while preserving the new schema.
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 323
-      end_line: 334
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 200
+      end_line: 204
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 200-204
+      for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
-      while preserving the new schema.
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_parser/parse_change_log.py
     type: modified
     entities: []
     span:
-      start_line: 353
-      end_line: 374
-    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py for changelog v2
-      support.
+      start_line: 210
+      end_line: 210
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 210-210
+      for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
-      while preserving the new schema.
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 112
+      end_line: 112
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 112-112
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 115
+      end_line: 115
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 115-115
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 219
+      end_line: 224
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 219-224
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 227
+      end_line: 242
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 227-242
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 244
+      end_line: 272
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 244-272
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 274
+      end_line: 432
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 274-432
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 436
+      end_line: 454
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 436-454
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 457
+      end_line: 460
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 457-460
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 463
+      end_line: 467
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 463-467
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 480
+      end_line: 480
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 480-480
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    entities: []
+    span:
+      start_line: 488
+      end_line: 549
+    summary: Update src/powdrr_lift/change_log_parser/parse_change_log.py lines 488-549
+      for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_parser/parse_change_log.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -243,26 +581,55 @@ changes:
       start_line: 55
       end_line: 55
     summary: Update change_log_template.py lines 55-55 for version 2 schema support.
-    rationale: Generate version 2 templates with nested change sections and remove the old
-      top-level entities guidance.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_template.py
     type: modified
     entities: []
     span:
       start_line: 72
-      end_line: 88
+      end_line: 72
     summary: Update src/powdrr_lift/change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 77
+      end_line: 77
+    summary: Update src/powdrr_lift/change_log_template.py for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_template.py
     type: modified
     entities: []
     span:
       start_line: 81
-      end_line: 98
+      end_line: 107
     summary: Update src/powdrr_lift/change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_template.py
     type: modified
     entities: []
@@ -270,26 +637,57 @@ changes:
       start_line: 119
       end_line: 123
     summary: Update src/powdrr_lift/change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_template.py
     type: modified
     entities: []
     span:
-      start_line: 135
-      end_line: 145
+      start_line: 144
+      end_line: 155
     summary: Update src/powdrr_lift/change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_template.py
     type: modified
     entities: []
     span:
-      start_line: 303
-      end_line: 314
-    summary: Update src/powdrr_lift/change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py while preserving
-      the new schema.
+      start_line: 212
+      end_line: 230
+    summary: Update src/powdrr_lift/change_log_template.py lines 212-230 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 332
+      end_line: 343
+    summary: Update src/powdrr_lift/change_log_template.py lines 332-343 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_template.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -301,8 +699,13 @@ changes:
       start_line: 7
       end_line: 7
     summary: Update change_log_validation.py lines 7-7 for version 2 schema support.
-    rationale: Validate the new nested schema, the per-change relationships, and the version-specific
-      rules.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -310,8 +713,13 @@ changes:
       start_line: 11
       end_line: 11
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -319,8 +727,13 @@ changes:
       start_line: 117
       end_line: 136
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -328,8 +741,13 @@ changes:
       start_line: 155
       end_line: 190
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -337,8 +755,13 @@ changes:
       start_line: 203
       end_line: 216
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -346,8 +769,13 @@ changes:
       start_line: 218
       end_line: 218
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -355,8 +783,13 @@ changes:
       start_line: 255
       end_line: 266
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -364,8 +797,13 @@ changes:
       start_line: 268
       end_line: 272
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -373,8 +811,13 @@ changes:
       start_line: 274
       end_line: 288
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -382,8 +825,13 @@ changes:
       start_line: 290
       end_line: 302
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
@@ -391,17 +839,27 @@ changes:
       start_line: 221
       end_line: 221
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/change_log_validation.py
     type: modified
     entities: []
     span:
       start_line: 479
-      end_line: 821
+      end_line: 815
     summary: Update src/powdrr_lift/change_log_validation.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py while
-      preserving the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/change_log_validation.py
+      while preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -413,8 +871,13 @@ changes:
       start_line: 63
       end_line: 65
     summary: Update __init__.py lines 63-65 for version 2 schema support.
-    rationale: Expose the new schema helper types and keep the public package surface aligned
-      with the parser refactor.
+    rationale: Expose the new schema helper types and keep the public package surface
+      aligned with the parser refactor.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/__init__.py
     type: modified
     entities: []
@@ -422,8 +885,13 @@ changes:
       start_line: 70
       end_line: 70
     summary: Update src/powdrr_lift/core/__init__.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/__init__.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/__init__.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/__init__.py
     type: modified
     entities: []
@@ -431,8 +899,13 @@ changes:
       start_line: 97
       end_line: 99
     summary: Update src/powdrr_lift/core/__init__.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/__init__.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/__init__.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/__init__.py
     type: modified
     entities: []
@@ -440,8 +913,13 @@ changes:
       start_line: 106
       end_line: 106
     summary: Update src/powdrr_lift/core/__init__.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/__init__.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/__init__.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -450,74 +928,418 @@ changes:
     type: modified
     entities: []
     span:
+      start_line: 11
+      end_line: 13
+    summary: Update code_index.py lines 40-40 for version 2 schema support.
+    rationale: Persist the changelog version in the cache so the index can load and
+      normalize both schema versions correctly.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 18
+      end_line: 18
+    summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
       start_line: 40
       end_line: 40
-    summary: Update code_index.py lines 40-40 for version 2 schema support.
-    rationale: Persist the changelog version in the cache so the index can load and normalize
-      both schema versions correctly.
+    summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 500
-      end_line: 500
+      start_line: 45
+      end_line: 45
     summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 613
-      end_line: 623
+      start_line: 505
+      end_line: 505
     summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 713
-      end_line: 714
+      start_line: 598
+      end_line: 700
     summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 929
-      end_line: 929
+      start_line: 721
+      end_line: 731
     summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 932
-      end_line: 932
+      start_line: 821
+      end_line: 822
     summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 938
-      end_line: 940
-    summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+      start_line: 750
+      end_line: 754
+    summary: Update src/powdrr_lift/core/code_index.py lines 750-754 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/code_index.py
     type: modified
     entities: []
     span:
-      start_line: 1464
-      end_line: 1464
-    summary: Update src/powdrr_lift/core/code_index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while preserving
-      the new schema.
+      start_line: 880
+      end_line: 965
+    summary: Update src/powdrr_lift/core/code_index.py lines 880-965 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 793
+      end_line: 797
+    summary: Update src/powdrr_lift/core/code_index.py lines 793-797 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 968
+      end_line: 969
+    summary: Update src/powdrr_lift/core/code_index.py lines 968-969 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 985
+      end_line: 987
+    summary: Update src/powdrr_lift/core/code_index.py lines 985-987 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1002
+      end_line: 1032
+    summary: Update src/powdrr_lift/core/code_index.py lines 1002-1032 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1038
+      end_line: 1063
+    summary: Update src/powdrr_lift/core/code_index.py lines 1038-1063 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1119
+      end_line: 1150
+    summary: Update src/powdrr_lift/core/code_index.py lines 1119-1150 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1177
+      end_line: 1177
+    summary: Update src/powdrr_lift/core/code_index.py lines 1177-1177 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1180
+      end_line: 1180
+    summary: Update src/powdrr_lift/core/code_index.py lines 1180-1180 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1186
+      end_line: 1188
+    summary: Update src/powdrr_lift/core/code_index.py lines 1186-1188 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1215
+      end_line: 1374
+    summary: Update src/powdrr_lift/core/code_index.py lines 1215-1374 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1823
+      end_line: 1830
+    summary: Update src/powdrr_lift/core/code_index.py lines 1823-1830 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1841
+      end_line: 1844
+    summary: Update src/powdrr_lift/core/code_index.py lines 1841-1844 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1846
+      end_line: 1849
+    summary: Update src/powdrr_lift/core/code_index.py lines 1846-1849 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1851
+      end_line: 2019
+    summary: Update src/powdrr_lift/core/code_index.py lines 1851-2019 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 2032
+      end_line: 2032
+    summary: Update src/powdrr_lift/core/code_index.py lines 2032-2032 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 2055
+      end_line: 2288
+    summary: Update src/powdrr_lift/core/code_index.py lines 2055-2288 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/code_index.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  entities: []
+  invariants: []
+  guidance: []
+- files:
+  - path: src/powdrr_lift/core/entity_context.py
+    type: modified
+    entities: []
+    span:
+      start_line: 329
+      end_line: 335
+    summary: Update src/powdrr_lift/core/entity_context.py lines 329-335 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/entity_context.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: src/powdrr_lift/core/entity_context.py
+    type: modified
+    entities: []
+    span:
+      start_line: 347
+      end_line: 358
+    summary: Update src/powdrr_lift/core/entity_context.py lines 347-358 for changelog
+      v2 support.
+    rationale: Capture the current diff for src/powdrr_lift/core/entity_context.py
+      while preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -531,105 +1353,123 @@ changes:
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 14
-      end_line: 14
+      start_line: 18
+      end_line: 21
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 19
-      end_line: 22
+      start_line: 583
+      end_line: 583
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 584
-      end_line: 584
+      start_line: 590
+      end_line: 590
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 591
-      end_line: 591
+      start_line: 680
+      end_line: 680
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 642
-      end_line: 660
+      start_line: 694
+      end_line: 702
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 700
-      end_line: 700
+      start_line: 792
+      end_line: 793
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 714
-      end_line: 722
+      start_line: 795
+      end_line: 802
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/index.py
     type: modified
     entities: []
     span:
-      start_line: 812
-      end_line: 813
+      start_line: 806
+      end_line: 814
     summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
     rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
       the new schema.
-  - path: src/powdrr_lift/core/index.py
-    type: modified
-    entities: []
-    span:
-      start_line: 815
-      end_line: 822
-    summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
-      the new schema.
-  - path: src/powdrr_lift/core/index.py
-    type: modified
-    entities: []
-    span:
-      start_line: 826
-      end_line: 837
-    summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
-      the new schema.
-  - path: src/powdrr_lift/core/index.py
-    type: modified
-    entities: []
-    span:
-      start_line: 842
-      end_line: 845
-    summary: Update src/powdrr_lift/core/index.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/index.py while preserving
-      the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -642,6 +1482,11 @@ changes:
       end_line: 5
     summary: Update schemas.py lines 3-5 for version 2 schema support.
     rationale: Re-export the new schema dataclasses from the core compatibility layer.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/schemas.py
     type: modified
     entities: []
@@ -649,8 +1494,13 @@ changes:
       start_line: 10
       end_line: 10
     summary: Update src/powdrr_lift/core/schemas.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/schemas.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/schemas.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/schemas.py
     type: modified
     entities: []
@@ -658,8 +1508,13 @@ changes:
       start_line: 18
       end_line: 20
     summary: Update src/powdrr_lift/core/schemas.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/schemas.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/schemas.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: src/powdrr_lift/core/schemas.py
     type: modified
     entities: []
@@ -667,8 +1522,13 @@ changes:
       start_line: 25
       end_line: 25
     summary: Update src/powdrr_lift/core/schemas.py for changelog v2 support.
-    rationale: Capture the current diff for src/powdrr_lift/core/schemas.py while preserving
-      the new schema.
+    rationale: Capture the current diff for src/powdrr_lift/core/schemas.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -680,8 +1540,13 @@ changes:
       start_line: 43
       end_line: 43
     summary: Update test_change_log_template.py lines 43-43 for version 2 schema support.
-    rationale: Generate version 2 templates with nested change sections and remove the old
-      top-level entities guidance.
+    rationale: Generate version 2 templates with nested change sections and remove
+      the old top-level entities guidance.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: tests/test_change_log_template.py
     type: modified
     entities: []
@@ -689,8 +1554,13 @@ changes:
       start_line: 46
       end_line: 49
     summary: Update tests/test_change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for tests/test_change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for tests/test_change_log_template.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: tests/test_change_log_template.py
     type: modified
     entities: []
@@ -698,8 +1568,13 @@ changes:
       start_line: 54
       end_line: 54
     summary: Update tests/test_change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for tests/test_change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for tests/test_change_log_template.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: tests/test_change_log_template.py
     type: modified
     entities: []
@@ -707,8 +1582,13 @@ changes:
       start_line: 61
       end_line: 70
     summary: Update tests/test_change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for tests/test_change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for tests/test_change_log_template.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: tests/test_change_log_template.py
     type: modified
     entities: []
@@ -716,8 +1596,43 @@ changes:
       start_line: 97
       end_line: 97
     summary: Update tests/test_change_log_template.py for changelog v2 support.
-    rationale: Capture the current diff for tests/test_change_log_template.py while preserving
-      the new schema.
+    rationale: Capture the current diff for tests/test_change_log_template.py while
+      preserving the new schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: tests/test_change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 173
+      end_line: 174
+    summary: Update tests/test_change_log_template.py lines 173-174 for changelog
+      v2 support.
+    rationale: Capture the current diff for tests/test_change_log_template.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: tests/test_change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 180
+      end_line: 193
+    summary: Update tests/test_change_log_template.py lines 180-193 for changelog
+      v2 support.
+    rationale: Capture the current diff for tests/test_change_log_template.py while
+      preserving the v2 schema.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -728,9 +1643,15 @@ changes:
     span:
       start_line: 64
       end_line: 217
-    summary: Update test_change_log_validation.py lines 64-201 for version 2 schema support.
-    rationale: Validate the new nested schema, the per-change relationships, and the version-specific
-      rules.
+    summary: Update test_change_log_validation.py lines 64-201 for version 2 schema
+      support.
+    rationale: Validate the new nested schema, the per-change relationships, and the
+      version-specific rules.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -742,8 +1663,13 @@ changes:
       start_line: 288
       end_line: 346
     summary: Update test_changelog_index.py lines 288-343 for version 2 schema support.
-    rationale: Add regression coverage for the version 2 parser, validator, template, and
-      index behavior.
+    rationale: Add regression coverage for the version 2 parser, validator, template,
+      and index behavior.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []
@@ -755,8 +1681,13 @@ changes:
       start_line: 56
       end_line: 155
     summary: Update test_parse_change_log.py lines 56-138 for version 2 schema support.
-    rationale: Add regression coverage for the version 2 parser, validator, template, and
-      index behavior.
+    rationale: Add regression coverage for the version 2 parser, validator, template,
+      and index behavior.
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   entities: []
   invariants: []
   guidance: []

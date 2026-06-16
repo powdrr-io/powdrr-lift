@@ -47,6 +47,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "entities:" in template_text
     assert "invariants:" in template_text
     assert "guidance:" in template_text
+    assert "related:" in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 

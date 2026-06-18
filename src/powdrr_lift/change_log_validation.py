@@ -20,12 +20,12 @@ from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,
 )
+from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.index import (
     _file_change_entity_ids,
     _normalize_entity_id,
     build_changelog_index_at_ref,
 )
-from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 
 
 @dataclass(frozen=True, slots=True)

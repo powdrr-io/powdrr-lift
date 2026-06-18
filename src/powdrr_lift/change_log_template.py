@@ -91,6 +91,14 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     "    summary: null",
                     "    # Why this file entry changed.",
                     "    rationale: null",
+                    "    # Related ids for this file entry.",
+                    "    # Remove this block entirely if it does not point",
+                    "    # to anything.",
+                    "    related:",
+                    "      files: []",
+                    "      entities: []",
+                    "      invariants: []",
+                    "      guidance: []",
                 ]
             )
     else:
@@ -140,6 +148,7 @@ def _render_header(
         "# - Put `path`, `type`, `span`, `summary`, `rationale`, and optional\n"
         "#   `related` on each file entry.\n"
         "# - Put file-related entity ids under `related.entities`.\n"
+        "# - Remove `related` entirely if it would otherwise stay empty.\n"
         "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
         "#   `action: deleted`, or `action: modified`.\n"
         "# - Put relationship changes in `entity_relationships`.\n"

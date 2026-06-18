@@ -10,6 +10,20 @@ intent:
     documents from source tree evidence.
 decisions: []
 files:
+  - path: software_development_entity_taxonomy.md
+    type: modified
+    summary: Add the Skill entity type to the repository taxonomy.
+    rationale: Allow the installable bootstrap skill to be described as a
+      taxonomy-compliant entity in the changelog.
+    span:
+      start_line: 401
+      end_line: 401
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
   - path: skills/bootstrap/SKILL.md
     type: added
     summary: Add the bootstrap changelog skill workflow.
@@ -19,7 +33,8 @@ files:
     span:
       start_line: 1
       end_line: 32
-    entities: []
+    entities:
+      - Bootstrap skill
     related:
       files: []
       entities: []
@@ -38,7 +53,10 @@ files:
       entities: []
       invariants: []
       guidance: []
-entities: []
+entities:
+  - id: Bootstrap skill
+    type: Skill
+    action: added
 entity_relationships: []
 invariants: []
 guidance: []

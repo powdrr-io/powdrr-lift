@@ -463,3 +463,4 @@ Total entries: 400
 398. Model endpoint
 399. Experiment
 400. Notebook
+401. Skill

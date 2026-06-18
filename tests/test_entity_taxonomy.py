@@ -15,7 +15,7 @@ def test_parse_entity_taxonomy_markdown_reads_repository_taxonomy() -> None:
     )
 
     assert taxonomy.source_path == taxonomy_path
-    assert len(taxonomy.entity_types) == 400
+    assert len(taxonomy.entity_types) == 401
     assert taxonomy.entity_types[:5] == (
         "Organization",
         "Business unit",
@@ -32,3 +32,4 @@ def test_parse_entity_taxonomy_markdown_reads_repository_taxonomy() -> None:
         "Business unit",
         "Engineering team",
     )
+    assert taxonomy.entity_types[-1] == "Skill"

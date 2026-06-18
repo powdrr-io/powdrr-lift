@@ -81,23 +81,25 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     files:
       - path: src/app.py
         type: modified
-        entities:
-          - AppService
-          - Cache
         span:
           start_line: 1
           end_line: 1
         summary: Add the review skill wiring.
         rationale: Keep the first hunk focused on the skill metadata.
+        related:
+          entities:
+            - AppService
+            - Cache
       - path: tests/test_app.py
         type: modified
-        entities:
-          - TestSuite
         span:
           start_line: 1
           end_line: 2
         summary: Add the review workflow test.
         rationale: Keep the second hunk focused on the test harness.
+        related:
+          entities:
+            - TestSuite
 
     entities:
       - id: AppService
@@ -176,22 +178,24 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
     files:
       - path: src/app.py
         type: modified
-        entities:
-          - AppService
         span:
           start_line: 1
           end_line: 1
         summary: Add app code.
         rationale: Needed for the feature.
+        related:
+          entities:
+            - AppService
       - path: tests/test_app.py
         type: modified
-        entities:
-          - TestSuite
         span:
           start_line: 1
           end_line: 2
         summary: Add app test.
         rationale: Needed for the feature.
+        related:
+          entities:
+            - TestSuite
 
     entities:
       - id: LegacyTopLevelEntity
@@ -220,6 +224,103 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
 
     assert report.validation_successful is True
     assert report.issues == []
+
+
+def test_validate_change_log_yaml_rejects_version_two_file_entities_on_file_entry(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Needed for the feature.
+        entities:
+          - AppService
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "file_entry_entities_not_allowed",
+    ]
+
+
+def test_validate_change_log_yaml_rejects_version_two_empty_related_block(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    files:
+      - path: src/app.py
+        type: modified
+        related:
+          files: []
+          entities: []
+          invariants: []
+          guidance: []
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Needed for the feature.
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["file_entry_empty_related"]
 
 
 def test_validate_change_log_yaml_rejects_version_two_changes(
@@ -855,13 +956,24 @@ def test_validate_change_log_yaml_rejects_unknown_added_entity_types_in_v2(
     files:
       - path: src/app.py
         type: modified
-        entities:
-          - AppService
         span:
           start_line: 1
           end_line: 1
         summary: Add app code.
         rationale: Needed for the feature.
+        related:
+          entities:
+            - AppService
+      - path: tests/test_app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add app test.
+        rationale: Needed for the feature.
+        related:
+          entities:
+            - TestSuite
 
     entities:
       - id: AppService

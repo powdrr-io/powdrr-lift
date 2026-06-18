@@ -76,14 +76,15 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
         files:
           - path: src/review/workflow.py
             type: modified
-            entities:
-              - ReviewSkill
-              - ChangelogValidation
             span:
               start_line: 1
               end_line: 3
             summary: Update the review workflow file.
             rationale: Capture the file-level context.
+            related:
+              entities:
+                - ReviewSkill
+                - ChangelogValidation
 
         entities:
           - id: ReviewSkill
@@ -147,6 +148,10 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert (change_log.file_changes or [])[0].path == "src/review/workflow.py"
     assert (change_log.file_changes or [])[0].type == "modified"
     assert (change_log.file_changes or [])[0].entities == [
+        "ReviewSkill",
+        "ChangelogValidation",
+    ]
+    assert (change_log.file_changes or [])[0].related.entities == [
         "ReviewSkill",
         "ChangelogValidation",
     ]

@@ -1,21 +1,27 @@
 from powdrr_lift.change_log_parser.parse_change_log import (
-    Change,
+    ChangeEntity,
+    ChangeEntityRelationship,
+    ChangeFile,
+    ChangeGuidance,
+    ChangeInvariant,
     ChangeLog,
     Decision,
-    Entity,
     Intent,
-    RelationshipChange,
+    RelatedSection,
     Span,
     parse_change_log,
 )
 
 __all__ = [
-    "Change",
+    "ChangeEntity",
+    "ChangeEntityRelationship",
+    "ChangeFile",
+    "ChangeGuidance",
+    "ChangeInvariant",
     "ChangeLog",
     "Decision",
-    "Entity",
     "Intent",
-    "RelationshipChange",
+    "RelatedSection",
     "Span",
     "parse_change_log",
 ]

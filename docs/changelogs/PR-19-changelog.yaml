@@ -1,0 +1,79 @@
+version: 2
+change_id: 19
+title: Add changelog version 2
+intent:
+  problem: The repository is being migrated from version 1 changelog documents to
+    a version 2 schema with top-level files, entities, entity_relationships,
+    invariants, and guidance while keeping version 1 parsing and indexing support
+    intact.
+  goal: Introduce changelog version 2, update the parser, template, validation,
+    and cache/index support, and keep the existing version 1 format readable.
+decisions:
+  - id: ADR-001
+    summary: Introduce version 2 of the changelog schema while preserving version
+      1 parsing and indexing support.
+files:
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    summary: Expose the new schema helper types from the top-level package.
+    rationale: Keep the public package surface aligned with the parser refactor.
+  - path: src/powdrr_lift/change_log_parser/__init__.py
+    type: modified
+    summary: Re-export the new changelog schema dataclasses.
+    rationale: Keep parser imports consistent across the codebase.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    summary: Parse the new top-level changelog schema.
+    rationale: Teach the parser to read the new version 2 layout.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    summary: Render templates using top-level files and related sections.
+    rationale: Generate changelog scaffolds in the new schema.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    summary: Validate the new top-level changelog sections.
+    rationale: Ensure proposed changelogs match the new schema.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Re-export the new schema helpers from core.
+    rationale: Keep downstream imports aligned with the schema rename.
+  - path: src/powdrr_lift/core/code_index.py
+    type: modified
+    summary: Persist and reconstruct the new changelog shape.
+    rationale: Keep cached changelog data compatible with version 2.
+  - path: src/powdrr_lift/core/entity_context.py
+    type: modified
+    summary: Read entity changes from the new changelog fields.
+    rationale: Keep entity lookup and edit context behavior working.
+  - path: src/powdrr_lift/core/index.py
+    type: modified
+    summary: Index file changes and entity metadata from the new schema.
+    rationale: Preserve provenance and graph building across versions.
+  - path: src/powdrr_lift/core/schemas.py
+    type: modified
+    summary: Re-export the renamed schema types.
+    rationale: Keep type imports consistent across core modules.
+  - path: tests/test_change_log_template.py
+    type: modified
+    summary: Assert the template renders the new top-level layout.
+    rationale: Keep template behavior covered by tests.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    summary: Validate new-format changelog YAML fixtures.
+    rationale: Ensure the validation rules match the new schema.
+  - path: tests/test_changelog_index.py
+    type: modified
+    summary: Update changelog index fixtures for the new layout.
+    rationale: Keep index parsing tests aligned with version 2.
+  - path: tests/test_cli.py
+    type: modified
+    summary: Update CLI assertions for the new schema.
+    rationale: Keep CLI parsing tests aligned with version 2.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    summary: Assert parsing of the new top-level sections.
+    rationale: Keep parser behavior covered by tests.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

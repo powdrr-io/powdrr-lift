@@ -13,6 +13,8 @@ from powdrr_lift.core.index import (
     EntityOccurrence,
     ProvenanceRecord,
     RelationshipOccurrence,
+    _document_entity_changes,
+    _file_change_entity_ids,
     _normalize_entity_id,
 )
 
@@ -283,7 +285,7 @@ def _collect_entity_decisions(
         if not _document_mentions_entity(document, normalized_entity_name):
             continue
 
-        for decision in document.changelog.decisions:
+        for decision in document.changelog.decisions or []:
             occurrence = EntityDecisionOccurrence(
                 pr_number=document.pr_number,
                 decision_id=decision.id,
@@ -322,18 +324,14 @@ def _document_mentions_entity(
 ) -> bool:
     if any(
         _normalize_entity_id(entity.id) == entity_name
-        for entity in document.changelog.entities
+        for entity in _document_entity_changes(document)
     ):
         return True
 
     if any(
-        entity_name
-        in {
-            _normalize_entity_id(affect)
-            for affect in change.affects
-            if _normalize_entity_id(affect) is not None
-        }
-        for change in document.changelog.changes
+        _normalize_entity_id(entity_id) == entity_name
+        for file_change in document.changelog.file_changes
+        for entity_id in _file_change_entity_ids(file_change)
     ):
         return True
 
@@ -343,5 +341,5 @@ def _document_mentions_entity(
             _normalize_entity_id(relationship_change.source),
             _normalize_entity_id(relationship_change.target),
         }
-        for relationship_change in document.changelog.relationship_changes
+        for relationship_change in document.changelog.entity_relationship_changes or []
     )

@@ -7,14 +7,20 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 from powdrr_lift.change_log_parser import (
-    Change,
+    ChangeEntity,
+    ChangeFile,
     ChangeLog,
     Intent,
     Span,
     parse_change_log,
 )
-from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
+from powdrr_lift.change_log_template import (
+    _resolve_default_branch,
+    _resolve_repo_root,
+)
 
 _PR_FILE_NAME_RE = re.compile(r"^PR-(\d+)-changelog\.yaml$")
 _PR_SUBJECT_RE = re.compile(r"\(#(?P<pr_number>\d+)\)")
@@ -576,14 +582,14 @@ def _build_commit_changes(
 
         declared_changes = declared_changes_by_file.get(file_patch.path, [])
         if declared_changes:
-            for change_index, change in enumerate(declared_changes):
+            for file_change, file_change_index in declared_changes:
                 commit_changes.append(
                     _build_declared_provenance(
                         commit=commit,
                         changelog_document=commit_document,
                         file_patch=file_patch,
-                        change=change,
-                        change_index=change_index,
+                        file_entry=file_change,
+                        file_change_index=file_change_index,
                     )
                 )
             continue
@@ -611,12 +617,13 @@ def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
             continue
 
         seen_documents.add(changelog_path)
+        document_entities = _document_entity_changes(changelog_document)
         entity_ids_in_document = {
             normalized_entity_id
-            for entity in changelog_document.changelog.entities
+            for entity in document_entities
             if (normalized_entity_id := _normalize_entity_id(entity.id)) is not None
         }
-        for entity in changelog_document.changelog.entities:
+        for entity in document_entities:
             entity_id = _normalize_entity_id(entity.id)
             if entity_id is None:
                 continue
@@ -633,7 +640,9 @@ def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
                 )
             )
 
-        for relationship_change in changelog_document.changelog.relationship_changes:
+        for relationship_change in (
+            changelog_document.changelog.entity_relationship_changes or []
+        ):
             source = _normalize_entity_id(relationship_change.source)
             target = _normalize_entity_id(relationship_change.target)
             if (
@@ -667,12 +676,58 @@ def _build_entity_graph(documents: Sequence[ChangelogDocument]) -> EntityGraph:
     )
 
 
+def _document_entity_changes(document: ChangelogDocument) -> list[ChangeEntity]:
+    if document.changelog.version != 1 or not document.changelog_path.exists():
+        return list(document.changelog.entity_changes or [])
+
+    try:
+        raw_content = yaml.safe_load(
+            document.changelog_path.read_text(encoding="utf-8")
+        )
+    except Exception:  # noqa: BLE001
+        return list(document.changelog.entity_changes or [])
+
+    if not isinstance(raw_content, dict):
+        return list(document.changelog.entity_changes or [])
+
+    raw_entities = raw_content.get("entities")
+    if not isinstance(raw_entities, list):
+        return list(document.changelog.entity_changes or [])
+
+    parsed_entities: list[ChangeEntity] = []
+    for raw_entity in raw_entities:
+        if not isinstance(raw_entity, dict):
+            continue
+
+        parsed_entities.append(
+            ChangeEntity(
+                id=_normalize_entity_id(raw_entity.get("id")),
+                type=(
+                    None
+                    if raw_entity.get("type") is None
+                    else str(raw_entity.get("type")).strip() or None
+                ),
+                action=(
+                    None
+                    if raw_entity.get("action") is None
+                    else str(raw_entity.get("action")).strip() or None
+                ),
+            )
+        )
+
+    return parsed_entities or list(document.changelog.entity_changes or [])
+
+
+def _file_change_entity_ids(file_change: ChangeFile) -> list[str]:
+    return list(file_change.entities or file_change.related.entities)
+
+
 def _build_declared_provenance(
     commit: _CommitRecord,
     changelog_document: ChangelogDocument,
     file_patch: _FilePatch,
-    change: Change,
-    change_index: int,
+    file_entry: ChangeFile,
+    file_change_index: int,
 ) -> ProvenanceRecord:
     return ProvenanceRecord(
         kind="declared",
@@ -685,11 +740,11 @@ def _build_declared_provenance(
         intent_problem=changelog_document.changelog.intent.problem,
         intent_goal=changelog_document.changelog.intent.goal,
         file=file_patch.path,
-        span=change.span,
-        summary=change.summary,
-        rationale=change.rationale,
-        affects=_normalize_entity_ids(change.affects),
-        change_index=change_index,
+        span=file_entry.span,
+        summary=file_entry.summary,
+        rationale=file_entry.rationale,
+        affects=_normalize_entity_ids(_file_change_entity_ids(file_entry)),
+        change_index=file_change_index,
     )
 
 
@@ -778,13 +833,17 @@ def _commit_comment_path(commit_sha: str) -> Path:
 
 def _group_declared_changes(
     changelog_document: ChangelogDocument,
-) -> dict[str, list[Change]]:
-    grouped: dict[str, list[Change]] = {}
-    for change in changelog_document.changelog.changes:
-        if change.file is None or change.file == "":
+) -> dict[str, list[tuple[ChangeFile, int]]]:
+    grouped: dict[str, list[tuple[ChangeFile, int]]] = {}
+    for file_change_index, file_change in enumerate(
+        changelog_document.changelog.file_changes
+    ):
+        if file_change.path is None or file_change.path == "":
             continue
 
-        grouped.setdefault(change.file, []).append(change)
+        grouped.setdefault(file_change.path, []).append(
+            (file_change, file_change_index)
+        )
 
     return grouped
 

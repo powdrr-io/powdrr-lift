@@ -40,22 +40,32 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     template_text = output_path.read_text(encoding="utf-8")
     assert "branch `feature/change-log`" in template_text
     assert "Compared against default branch `main`." in template_text
+    assert "version: 2" in template_text
     assert "change_id: null" in template_text
     assert "decisions:" in template_text
-    assert "List the repository entities relevant to this change." in template_text
-    assert "Add `action: added` only when this entity is truly new." in template_text
-    assert "action: null" not in template_text
-    assert "relationship_changes" in template_text
+    assert "files:" in template_text
+    assert "entities:" in template_text
+    assert "entity_relationships:" in template_text
+    assert "invariants:" in template_text
+    assert "guidance:" in template_text
+    assert "related:" in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 
     change_log = parse_change_log(template_text)
-    assert [change.file for change in change_log.changes] == [
+    assert change_log.version == 2
+    assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "tests/test_app.py",
     ]
-    assert [change.span.start_line for change in change_log.changes] == [1, 1]
-    assert [change.span.end_line for change in change_log.changes] == [1, 2]
+    assert [change.span.start_line for change in change_log.file_changes] == [1, 1]
+    assert [change.span.end_line for change in change_log.file_changes] == [1, 2]
+    assert [change.type for change in change_log.file_changes] == [
+        "added",
+        "added",
+    ]
+    assert [change.entities for change in change_log.file_changes] == [[], []]
+    assert change_log.entity_changes == []
     assert change_log.decisions == [Decision()]
 
 
@@ -80,8 +90,10 @@ def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert change_log.changes == []
+    assert change_log.file_changes == []
+    assert change_log.entity_changes == []
     assert change_log.decisions == [Decision()]
+    assert change_log.version == 2
 
 
 def test_create_change_log_template_ignores_rename_only_diff(tmp_path: Path) -> None:
@@ -111,7 +123,7 @@ def test_create_change_log_template_ignores_rename_only_diff(tmp_path: Path) -> 
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert change_log.changes == []
+    assert change_log.file_changes == []
 
 
 def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
@@ -157,14 +169,30 @@ def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert [change.file for change in change_log.changes] == [
+    assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "src/app.py",
         "src/app.py",
         "src/app.py",
     ]
-    assert [change.span.start_line for change in change_log.changes] == [2, 4, 6, 8]
-    assert [change.span.end_line for change in change_log.changes] == [2, 4, 6, 8]
+    assert [file_entry.path for file_entry in change_log.file_changes] == [
+        "src/app.py",
+        "src/app.py",
+        "src/app.py",
+        "src/app.py",
+    ]
+    assert [file_entry.span.start_line for file_entry in change_log.file_changes] == [
+        2,
+        4,
+        6,
+        8,
+    ]
+    assert [file_entry.span.end_line for file_entry in change_log.file_changes] == [
+        2,
+        4,
+        6,
+        8,
+    ]
 
 
 def _git(repo_root: Path, *args: str) -> None:

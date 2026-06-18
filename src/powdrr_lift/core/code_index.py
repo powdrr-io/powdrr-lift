@@ -7,12 +7,15 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from powdrr_lift.change_log_parser import (
-    Change,
+    ChangeEntity,
+    ChangeEntityRelationship,
+    ChangeFile,
+    ChangeGuidance,
+    ChangeInvariant,
     ChangeLog,
     Decision,
-    Entity,
     Intent,
-    RelationshipChange,
+    RelatedSection,
     Span,
     parse_change_log,
 )
@@ -30,6 +33,8 @@ from powdrr_lift.core.index import (
     _build_entity_graph,
     _collect_file_patches,
     _CommitRecord,
+    _document_entity_changes,
+    _file_change_entity_ids,
     _git_output,
     _load_branch_pr_description_document,
     _normalize_entity_id,
@@ -37,7 +42,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 8
+INDEX_CACHE_VERSION = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -497,6 +502,7 @@ class CodeIndexStore:
                   branch_name TEXT NOT NULL,
                   pr_number INTEGER NOT NULL,
                   changelog_path TEXT NOT NULL,
+                  changelog_version INTEGER NOT NULL DEFAULT 1,
                   commit_sha TEXT,
                   commit_timestamp INTEGER,
                   commit_subject TEXT,
@@ -589,6 +595,109 @@ class CodeIndexStore:
                   commit_timestamp INTEGER,
                   changelog_path TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS change_file_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  file_index INTEGER NOT NULL,
+                  path TEXT,
+                  type TEXT,
+                  span_start INTEGER,
+                  span_end INTEGER,
+                  summary TEXT,
+                  rationale TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_file_entity (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  file_index INTEGER NOT NULL,
+                  entity_index INTEGER NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, file_index, entity_index
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_entity_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  scope TEXT NOT NULL,
+                  change_index INTEGER,
+                  entity_index INTEGER NOT NULL,
+                  entity_id TEXT,
+                  entity_type TEXT,
+                  action TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_entity_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  scope TEXT NOT NULL,
+                  change_index INTEGER,
+                  entity_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, scope, change_index, entity_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_invariant_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  invariant_index INTEGER NOT NULL,
+                  invariant_id TEXT,
+                  description TEXT,
+                  action TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_invariant_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  invariant_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, invariant_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_guidance_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  guidance_index INTEGER NOT NULL,
+                  guidance_id TEXT,
+                  description TEXT,
+                  action TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_guidance_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  guidance_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, guidance_index,
+                    related_index, related_kind, related_id
+                  )
+                );
                 """
             )
             branch_state_info = connection.execute(
@@ -607,6 +716,17 @@ class CodeIndexStore:
                     """
                     ALTER TABLE branch_state
                     ADD COLUMN parent_index_version INTEGER NOT NULL DEFAULT 0
+                    """
+                )
+            branch_document_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(branch_document)")
+            }
+            if "changelog_version" not in branch_document_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_document
+                    ADD COLUMN changelog_version INTEGER NOT NULL DEFAULT 1
                     """
                 )
             connection.execute(
@@ -698,7 +818,8 @@ class CodeIndexStore:
             document_rows = connection.execute(
                 """
                 SELECT pr_number, changelog_path, commit_sha, commit_timestamp,
-                       commit_subject, title, change_id, intent_problem, intent_goal
+                       commit_subject, title, change_id, intent_problem,
+                       intent_goal, changelog_version
                 FROM branch_document
                 WHERE branch_name = ?
                 ORDER BY pr_number
@@ -747,11 +868,6 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
-            affects_by_provenance_id = self._load_provenance_affects(
-                connection,
-                branch_name,
-                [row["id"] for row in provenance_rows],
-            )
             line_rows = connection.execute(
                 """
                 SELECT line_number, file_path, provenance_record_id
@@ -761,41 +877,96 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
-
-        entities_by_id: dict[str, list[EntityOccurrence]] = {}
-        entities_by_pr: dict[int, list[sqlite3.Row]] = {}
-        for row in entity_rows:
-            entities_by_pr.setdefault(row["pr_number"], []).append(row)
-            entities_by_id.setdefault(row["entity_id"], []).append(
-                EntityOccurrence(
-                    entity_id=row["entity_id"],
-                    entity_type=row["entity_type"],
-                    action=row["action"],
-                    pr_number=row["pr_number"],
-                    commit_sha=row["commit_sha"],
-                    commit_timestamp=row["commit_timestamp"],
-                    changelog_path=row["changelog_path"],
-                )
+            change_file_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, file_index, path, type, span_start,
+                       span_end, summary, rationale
+                FROM change_file_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, file_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_file_entity_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, file_index, entity_index, entity_id
+                FROM change_file_entity
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, file_index, entity_index
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_entity_rows = connection.execute(
+                """
+                SELECT pr_number, scope, change_index, entity_index, entity_id,
+                       entity_type, action
+                FROM change_entity_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, scope, change_index, entity_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_entity_related_rows = connection.execute(
+                """
+                SELECT pr_number, scope, change_index, entity_index, related_index,
+                       related_kind, related_id
+                FROM change_entity_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, scope, change_index, entity_index,
+                         related_index, related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_invariant_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, invariant_index, invariant_id,
+                       description, action
+                FROM change_invariant_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, invariant_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_invariant_related_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, invariant_index, related_index,
+                       related_kind, related_id
+                FROM change_invariant_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, invariant_index,
+                         related_index, related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_guidance_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, guidance_index, guidance_id,
+                       description, action
+                FROM change_guidance_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, guidance_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_guidance_related_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, guidance_index, related_index,
+                       related_kind, related_id
+                FROM change_guidance_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, guidance_index,
+                         related_index, related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            affects_by_provenance_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in provenance_rows],
             )
 
-        relationship_records = [
-            RelationshipOccurrence(
-                source=row["source_entity_id"],
-                target=row["target_entity_id"],
-                relationship=row["relationship"],
-                action=row["action"],
-                rationale=row["rationale"],
-                pr_number=row["pr_number"],
-                commit_sha=row["commit_sha"],
-                commit_timestamp=row["commit_timestamp"],
-                changelog_path=row["changelog_path"],
-            )
-            for row in relationship_rows
-        ]
-        relationships_by_pr: dict[int, list[sqlite3.Row]] = {}
-        for row in relationship_rows:
-            relationships_by_pr.setdefault(row["pr_number"], []).append(row)
-
+        entities_by_id = _group_entity_occurrences(entity_rows)
+        relationship_records = _build_relationship_occurrences(relationship_rows)
         decisions_by_pr: dict[int, list[sqlite3.Row]] = {}
         for row in decision_rows:
             decisions_by_pr.setdefault(row["pr_number"], []).append(row)
@@ -811,6 +982,9 @@ class CodeIndexStore:
             )
             for row in provenance_rows
         }
+        entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in entity_rows:
+            entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
         file_lines: dict[str, list[ProvenanceRecord | None]] = {}
         for row in line_rows:
             file_lines.setdefault(row["file_path"], [])
@@ -825,13 +999,68 @@ class CodeIndexStore:
             )
             lines[row["line_number"] - 1] = provenance_record
 
+        change_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_file_rows:
+            change_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        file_entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_file_entity_rows:
+            file_entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_entity_rows:
+            change_entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_entity_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_entity_related_rows:
+            change_entity_related_rows_by_pr.setdefault(row["pr_number"], []).append(
+                row
+            )
+        change_invariant_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_invariant_rows:
+            change_invariant_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_invariant_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_invariant_related_rows:
+            change_invariant_related_rows_by_pr.setdefault(row["pr_number"], []).append(
+                row
+            )
+        change_guidance_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_guidance_rows:
+            change_guidance_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_guidance_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_guidance_related_rows:
+            change_guidance_related_rows_by_pr.setdefault(row["pr_number"], []).append(
+                row
+            )
+
         documents = [
             _load_changelog_document_from_cache_row(
                 row,
                 affects_by_provenance_id=affects_by_provenance_id,
                 decision_rows=decisions_by_pr.get(row["pr_number"], ()),
-                entity_rows=entities_by_pr.get(row["pr_number"], ()),
-                relationship_rows=relationships_by_pr.get(row["pr_number"], ()),
+                entity_rows=entity_rows_by_pr.get(row["pr_number"], ()),
+                relationship_rows=[
+                    relationship_row
+                    for relationship_row in relationship_rows
+                    if relationship_row["pr_number"] == row["pr_number"]
+                ],
+                change_file_rows=change_rows_by_pr.get(row["pr_number"], ()),
+                change_file_entity_rows=file_entity_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_entity_rows=change_entity_rows_by_pr.get(row["pr_number"], ()),
+                change_entity_related_rows=change_entity_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_invariant_rows=change_invariant_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_invariant_related_rows=change_invariant_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_guidance_rows=change_guidance_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_guidance_related_rows=change_guidance_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
                 provenance_rows=provenance_by_pr.get(row["pr_number"], ()),
             )
             for row in document_rows
@@ -888,6 +1117,38 @@ class CodeIndexStore:
                 (branch_name,),
             )
             connection.execute(
+                "DELETE FROM change_file_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_file_entity WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_entity_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_entity_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_invariant_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_invariant_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_guidance_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_guidance_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
                 "DELETE FROM provenance_affect WHERE branch_name = ?",
                 (branch_name,),
             )
@@ -913,15 +1174,18 @@ class CodeIndexStore:
                 connection.execute(
                     """
                     INSERT INTO branch_document (
-                      branch_name, pr_number, changelog_path,
+                      branch_name, pr_number, changelog_path, changelog_version,
                       commit_sha, commit_timestamp, commit_subject, title,
                       change_id, intent_problem, intent_goal
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         branch_name,
                         document.pr_number,
                         str(document.changelog_path),
+                        int(str(document.changelog.version))
+                        if str(document.changelog.version).isdigit()
+                        else 1,
                         document.commit_sha,
                         document.commit_timestamp,
                         document.commit_subject,
@@ -931,7 +1195,9 @@ class CodeIndexStore:
                         document.changelog.intent.goal,
                     ),
                 )
-                for decision_index, decision in enumerate(document.changelog.decisions):
+                for decision_index, decision in enumerate(
+                    document.changelog.decisions or []
+                ):
                     connection.execute(
                         """
                         INSERT INTO branch_decision (
@@ -946,6 +1212,141 @@ class CodeIndexStore:
                             decision.id,
                             decision.summary,
                         ),
+                    )
+
+                for file_change_index, file_change in enumerate(
+                    document.changelog.file_changes
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_file_record (
+                          branch_name, pr_number, change_index, file_index, path,
+                          type, span_start, span_end, summary, rationale
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            file_change_index,
+                            0,
+                            file_change.path,
+                            file_change.type,
+                            file_change.span.start_line,
+                            file_change.span.end_line,
+                            file_change.summary,
+                            file_change.rationale,
+                        ),
+                    )
+
+                    for entity_index, entity_id in enumerate(
+                        _file_change_entity_ids(file_change)
+                    ):
+                        connection.execute(
+                            """
+                            INSERT INTO change_file_entity (
+                              branch_name, pr_number, change_index, file_index,
+                              entity_index, entity_id
+                            ) VALUES (?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                branch_name,
+                                document.pr_number,
+                                file_change_index,
+                                0,
+                                entity_index,
+                                entity_id,
+                            ),
+                        )
+
+                for entity_change_index, entity_change in enumerate(
+                    _document_entity_changes(document)
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_entity_record (
+                          branch_name, pr_number, scope, change_index, entity_index,
+                          entity_id, entity_type, action
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            "document",
+                            None,
+                            entity_change_index,
+                            entity_change.id,
+                            entity_change.type,
+                            entity_change.action,
+                        ),
+                    )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="document",
+                        change_index=None,
+                        entity_index=entity_change_index,
+                        related=entity_change.related,
+                    )
+
+                for invariant_index, invariant in enumerate(
+                    document.changelog.invariant_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_invariant_record (
+                          branch_name, pr_number, change_index, invariant_index,
+                          invariant_id, description, action
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            invariant_index,
+                            invariant_index,
+                            invariant.id,
+                            invariant.description,
+                            invariant.action,
+                        ),
+                    )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="invariant",
+                        change_index=invariant_index,
+                        item_index=invariant_index,
+                        related=invariant.related,
+                    )
+
+                for guidance_index, guidance in enumerate(
+                    document.changelog.guidance_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_guidance_record (
+                          branch_name, pr_number, change_index, guidance_index,
+                          guidance_id, description, action
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            guidance_index,
+                            guidance_index,
+                            guidance.id,
+                            guidance.description,
+                            guidance.action,
+                        ),
+                    )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="guidance",
+                        change_index=guidance_index,
+                        item_index=guidance_index,
+                        related=guidance.related,
                     )
 
             for entity_id, occurrences in index.entity_graph.entities.items():
@@ -1396,6 +1797,14 @@ def _load_changelog_document_from_cache_row(
     decision_rows: Sequence[sqlite3.Row],
     entity_rows: Sequence[sqlite3.Row],
     relationship_rows: Sequence[sqlite3.Row],
+    change_file_rows: Sequence[sqlite3.Row],
+    change_file_entity_rows: Sequence[sqlite3.Row],
+    change_entity_rows: Sequence[sqlite3.Row],
+    change_entity_related_rows: Sequence[sqlite3.Row],
+    change_invariant_rows: Sequence[sqlite3.Row],
+    change_invariant_related_rows: Sequence[sqlite3.Row],
+    change_guidance_rows: Sequence[sqlite3.Row],
+    change_guidance_related_rows: Sequence[sqlite3.Row],
     provenance_rows: Sequence[sqlite3.Row],
 ) -> ChangelogDocument:
     changelog_path = Path(row["changelog_path"])
@@ -1406,35 +1815,91 @@ def _load_changelog_document_from_cache_row(
         )
         for decision_row in decision_rows
     ]
-    entities = [
-        Entity(
-            id=entity_row["entity_id"],
-            type=entity_row["entity_type"],
-            action=entity_row["action"],
-        )
-        for entity_row in entity_rows
+    document_entity_rows = [
+        entity_row
+        for entity_row in change_entity_rows
+        if entity_row["scope"] == "document"
     ]
-    changes = [
-        Change(
-            file=provenance_row["file_path"],
-            span=(
-                Span(
-                    start_line=provenance_row["span_start"],
-                    end_line=provenance_row["span_end"],
-                )
-                if provenance_row["span_start"] is not None
-                or provenance_row["span_end"] is not None
-                else Span()
-            ),
-            summary=provenance_row["summary"],
-            affects=list(affects_by_provenance_id.get(provenance_row["id"], ())),
-            rationale=provenance_row["rationale"],
+
+    source_entity_rows = document_entity_rows if document_entity_rows else entity_rows
+
+    file_entities_by_change: dict[int, dict[int, list[str]]] = {}
+    for row_data in change_file_entity_rows:
+        file_entities_by_change.setdefault(row_data["change_index"], {}).setdefault(
+            row_data["file_index"],
+            [],
+        ).append(row_data["entity_id"])
+
+    file_changes: list[ChangeFile] = []
+    for file_row in change_file_rows:
+        entities_for_file = file_entities_by_change.get(
+            file_row["change_index"], {}
+        ).get(
+            file_row["file_index"],
+            [],
         )
-        for provenance_row in provenance_rows
-        if provenance_row["kind"] == "declared"
+        file_changes.append(
+            ChangeFile(
+                path=file_row["path"],
+                type=file_row["type"],
+                entities=list(entities_for_file),
+                span=Span(
+                    start_line=file_row["span_start"],
+                    end_line=file_row["span_end"],
+                ),
+                summary=file_row["summary"],
+                rationale=file_row["rationale"],
+            )
+        )
+
+    entity_related_by_change: dict[int | None, dict[int, RelatedSection]] = {}
+    for scope_row in change_entity_related_rows:
+        if scope_row["scope"] == "document":
+            related = entity_related_by_change.setdefault(
+                scope_row["change_index"],
+                {},
+            ).setdefault(scope_row["entity_index"], RelatedSection())
+            _append_related_item(
+                related,
+                scope_row["related_kind"],
+                scope_row["related_id"],
+            )
+
+    entity_changes_with_related: list[ChangeEntity] = []
+    for entity_index, entity_row in enumerate(source_entity_rows):
+        related = entity_related_by_change.get(None, {}).get(
+            entity_index,
+            RelatedSection(),
+        )
+        entity_changes_with_related.append(
+            ChangeEntity(
+                id=entity_row["entity_id"],
+                type=entity_row["entity_type"],
+                action=entity_row["action"],
+                related=related,
+            )
+        )
+
+    invariant_changes: list[ChangeInvariant] = [
+        ChangeInvariant(
+            id=invariant_row["invariant_id"],
+            description=invariant_row["description"],
+            action=invariant_row["action"],
+        )
+        for invariant_row in change_invariant_rows
     ]
-    relationship_changes = [
-        RelationshipChange(
+
+    guidance_changes: list[ChangeGuidance] = [
+        ChangeGuidance(
+            id=guidance_row["guidance_id"],
+            description=guidance_row["description"],
+            action=guidance_row["action"],
+        )
+        for guidance_row in change_guidance_rows
+    ]
+
+    entity_relationship_changes = [
+        ChangeEntityRelationship(
             action=relationship_row["action"],
             source=relationship_row["source_entity_id"],
             target=relationship_row["target_entity_id"],
@@ -1445,7 +1910,7 @@ def _load_changelog_document_from_cache_row(
     ]
 
     changelog = ChangeLog(
-        version=1,
+        version=row["changelog_version"],
         change_id=row["change_id"],
         title=row["title"],
         intent=Intent(
@@ -1453,9 +1918,11 @@ def _load_changelog_document_from_cache_row(
             goal=row["intent_goal"],
         ),
         decisions=decisions,
-        entities=entities,
-        changes=changes,
-        relationship_changes=relationship_changes,
+        entity_changes=entity_changes_with_related,
+        file_changes=file_changes,
+        entity_relationship_changes=entity_relationship_changes,
+        invariant_changes=invariant_changes,
+        guidance_changes=guidance_changes,
     )
 
     return ChangelogDocument(
@@ -1466,6 +1933,240 @@ def _load_changelog_document_from_cache_row(
         commit_timestamp=row["commit_timestamp"],
         commit_subject=row["commit_subject"],
     )
+
+
+def _append_related_item(
+    related: RelatedSection,
+    related_kind: str,
+    related_id: str,
+) -> None:
+    if related_kind == "file":
+        related.files.append(related_id)
+    elif related_kind == "entity":
+        related.entities.append(related_id)
+    elif related_kind == "invariant":
+        related.invariants.append(related_id)
+    elif related_kind == "guidance":
+        related.guidance.append(related_id)
+
+
+def _write_related_section_rows(
+    connection: sqlite3.Connection,
+    *,
+    branch_name: str,
+    pr_number: int,
+    scope: str,
+    change_index: int | None,
+    entity_index: int | None = None,
+    item_index: int | None = None,
+    related: RelatedSection | None = None,
+) -> None:
+    if related is None:
+        return
+
+    if scope in {"document", "change"}:
+        if entity_index is None:
+            raise ValueError("Entity related rows require an entity index.")
+
+        for related_index, related_id in enumerate(related.files):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "file",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.entities):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "entity",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.invariants):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "invariant",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.guidance):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "guidance",
+                    related_id,
+                ),
+            )
+        return
+
+    if scope in {"invariant", "guidance"}:
+        if item_index is None:
+            raise ValueError("Lifecycle related rows require an item index.")
+
+        table_name = (
+            "change_invariant_related"
+            if scope == "invariant"
+            else "change_guidance_related"
+        )
+        index_column = "invariant_index" if scope == "invariant" else "guidance_index"
+        for related_index, related_id in enumerate(related.files):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "file",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.entities):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "entity",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.invariants):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "invariant",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.guidance):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "guidance",
+                    related_id,
+                ),
+            )
+
+
+def _group_entity_occurrences(
+    entity_rows: Sequence[sqlite3.Row],
+) -> dict[str, list[EntityOccurrence]]:
+    entities_by_id: dict[str, list[EntityOccurrence]] = {}
+    for row in entity_rows:
+        entities_by_id.setdefault(row["entity_id"], []).append(
+            EntityOccurrence(
+                entity_id=row["entity_id"],
+                entity_type=row["entity_type"],
+                action=row["action"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+        )
+
+    return entities_by_id
+
+
+def _build_relationship_occurrences(
+    relationship_rows: Sequence[sqlite3.Row],
+) -> list[RelationshipOccurrence]:
+    return [
+        RelationshipOccurrence(
+            source=row["source_entity_id"],
+            target=row["target_entity_id"],
+            relationship=row["relationship"],
+            action=row["action"],
+            rationale=row["rationale"],
+            pr_number=row["pr_number"],
+            commit_sha=row["commit_sha"],
+            commit_timestamp=row["commit_timestamp"],
+            changelog_path=row["changelog_path"],
+        )
+        for row in relationship_rows
+    ]
 
 
 def _current_branch(repo_root: Path) -> str:

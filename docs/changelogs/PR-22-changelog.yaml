@@ -1,0 +1,723 @@
+version: 2
+change_id: 22
+title: Populate related sections in changelog templates
+intent:
+  problem: Generated changelog templates only prefilled part of the related context, and file entries were not round-tripping full related data through the code index.
+  goal: Prefill related sections for generated changelog entries, persist file related data in the SQLite code index, and cover the behavior with regression tests.
+decisions: []
+files:
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 6
+      end_line: 6
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 9
+      end_line: 9
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 20
+      end_line: 27
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 42
+      end_line: 47
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 52
+      end_line: 52
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 63
+      end_line: 63
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 66
+      end_line: 66
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 70
+      end_line: 76
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - changelog-template
+        - powdrr-lift-cli
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 101
+      end_line: 103
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 120
+      end_line: 124
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 126
+      end_line: 169
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 193
+      end_line: 391
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 417
+      end_line: 421
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 427
+      end_line: 429
+    summary: Update template generation to prefill and explain related sections.
+    rationale: Keep the changelog scaffold aligned with the new related-section workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 45
+      end_line: 45
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 625
+      end_line: 638
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - CodeIndexCache
+        - EntityGraph
+        - ChangelogIndex
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 913
+      end_line: 923
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - CodeIndexCache
+        - EntityDecisionReport
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1033
+      end_line: 1035
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - CodeIndexCache
+        - EntityDecisionReport
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1076
+      end_line: 1078
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - ChangelogIndex
+        - CodeIndexCache
+        - EntityGraph
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1158
+      end_line: 1161
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1295
+      end_line: 1303
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - CodeIndexCache
+        - EntityGraph
+        - EntityLookup
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1846
+      end_line: 1846
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1878
+      end_line: 1889
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - CodeIndexCache
+        - EntityDecisionReport
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1898
+      end_line: 1901
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities:
+        - CodeIndexCache
+        - EntityDecisionReport
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 1913
+      end_line: 1913
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 2024
+      end_line: 2024
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: src/powdrr_lift/core/code_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 2030
+      end_line: 2107
+    summary: Persist and reconstruct file related sections in the code index.
+    rationale: Keep file-level related metadata round-tripping through the SQLite cache.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - tests/test_change_log_template.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_change_log_template.py
+    type: modified
+    entities: []
+    span:
+      start_line: 72
+      end_line: 170
+    summary: Add regression coverage for prefilled related sections in templates.
+    rationale: Lock the new template instructions and related-section defaults in place.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_changelog_index.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 3
+      end_line: 3
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 10
+      end_line: 10
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 207
+      end_line: 211
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities:
+        - EntityGraph
+        - ChangelogIndex
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 240
+      end_line: 246
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities:
+        - EntityGraph
+        - ChangelogIndex
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 316
+      end_line: 320
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities:
+        - EntityGraph
+        - ChangelogIndex
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 343
+      end_line: 369
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities:
+        - EntityGraph
+        - ChangelogIndex
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 375
+      end_line: 384
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities:
+        - ChangelogIndex
+        - EntityGraph
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 387
+      end_line: 410
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities:
+        - ChangelogIndex
+        - EntityGraph
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 414
+      end_line: 420
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 422
+      end_line: 422
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 427
+      end_line: 439
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities: []
+      invariants: []
+      guidance: []
+  -
+    path: tests/test_changelog_index.py
+    type: modified
+    entities: []
+    span:
+      start_line: 443
+      end_line: 549
+    summary: Add regression coverage for version-2 related-section persistence.
+    rationale: Verify file, entity, invariant, and guidance related data round-trip through SQLite.
+    related:
+      files:
+        - src/powdrr_lift/change_log_template.py
+        - src/powdrr_lift/core/code_index.py
+        - tests/test_change_log_template.py
+      entities: []
+      invariants: []
+      guidance: []
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

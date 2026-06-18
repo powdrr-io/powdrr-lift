@@ -313,24 +313,25 @@ def test_build_changelog_index_normalizes_version_two_changes(
           problem: ReviewSkill does not exist.
           goal: Add the skill to the graph.
 
-        changes:
-          - files:
-              - path: src/app.py
-                type: modified
-                entities:
-                  - id: ReviewSkill
-                    type: Skill
-                span:
-                  start_line: 1
-                  end_line: 1
-                summary: Introduce ReviewSkill.
-                rationale: ReviewSkill is now part of the system.
+        files:
+          - path: src/app.py
+            type: modified
             entities:
-              - id: ReviewSkill
-                type: Skill
-                action: added
-            invariants: []
-            guidance: []
+              - ReviewSkill
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Introduce ReviewSkill.
+            rationale: ReviewSkill is now part of the system.
+
+        entities:
+          - id: ReviewSkill
+            type: Skill
+            action: added
+
+        entity_relationships: []
+        invariants: []
+        guidance: []
         """,
         encoding="utf-8",
     )

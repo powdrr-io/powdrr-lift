@@ -31,7 +31,7 @@ def test_cli_init_writes_template(tmp_path: Path) -> None:
     assert output_path.exists()
     assert str(output_path) in stdout.getvalue()
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert [change.file for change in change_log.changes] == [
+    assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "tests/test_app.py",
     ]

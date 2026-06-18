@@ -35,7 +35,7 @@ class RelatedSection:
 
 
 @dataclass(frozen=True, slots=True)
-class Entity:
+class ChangeEntity:
     id: str | None = None
     type: str | None = None
     action: str | None = None
@@ -43,7 +43,7 @@ class Entity:
 
 
 @dataclass(frozen=True, slots=True)
-class RelationshipChange:
+class ChangeEntityRelationship:
     id: str | None = None
     type: str | None = None
     source: str | None = None
@@ -83,28 +83,19 @@ class ChangeGuidance:
 
 
 @dataclass(frozen=True, slots=True)
-class Change:
-    file: str | None = None
-    span: Span = field(default_factory=Span)
-    summary: str | None = None
-    affects: list[str] = field(default_factory=list)
-    rationale: str | None = None
-    files: list[ChangeFile] = field(default_factory=list)
-    entities: list[Entity] = field(default_factory=list)
-    invariants: list[ChangeInvariant] = field(default_factory=list)
-    guidance: list[ChangeGuidance] = field(default_factory=list)
-
-
-@dataclass(frozen=True, slots=True)
 class ChangeLog:
     version: int | str | None = None
     change_id: str | None = None
     title: str | None = None
     intent: Intent = field(default_factory=Intent)
     decisions: list[Decision] = field(default_factory=list)
-    entities: list[Entity] = field(default_factory=list)
-    changes: list[Change] = field(default_factory=list)
-    relationship_changes: list[RelationshipChange] = field(default_factory=list)
+    file_changes: list[ChangeFile] = field(default_factory=list)
+    entity_changes: list[ChangeEntity] = field(default_factory=list)
+    entity_relationship_changes: list[ChangeEntityRelationship] = field(
+        default_factory=list
+    )
+    invariant_changes: list[ChangeInvariant] = field(default_factory=list)
+    guidance_changes: list[ChangeGuidance] = field(default_factory=list)
 
 
 def parse_change_log(yaml_content: str) -> ChangeLog:
@@ -120,75 +111,135 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
     if version == 1:
         return _parse_change_log_v1(data)
     if version == 2:
-        return _parse_change_log_v2(data)
+        return _parse_change_log_v2(_normalize_legacy_v2_content(data))
 
     raise ValueError("Unknown change log version")
 
 
 def _parse_change_log_v1(data: Mapping[str, Any]) -> ChangeLog:
-    top_level_entities = [
-        _parse_entity(entity_data)
-        for entity_data in _ensure_is_sequence(data.get("entities"))
+    file_changes = [
+        _parse_file_change_v1(change_data)
+        for change_data in _ensure_sequence(data.get("changes"))
     ]
-    top_level_relationship_changes = [
-        _parse_relationship_change(relationship_change_data)
-        for relationship_change_data in _ensure_is_sequence(
-            data.get("relationship_changes")
-        )
-    ]
-    changes = [
-        _parse_change_v1(change_data)
-        for change_data in _ensure_is_sequence(data.get("changes"))
-    ]
-
     return ChangeLog(
         version=_normalize_version(data.get("version")),
         change_id=_coerce_optional_str(data.get("change_id", data.get("pr_id"))),
         title=_coerce_optional_str(data.get("title")),
         intent=_parse_intent(data.get("intent")),
         decisions=_parse_decisions(data),
-        entities=[
-            *top_level_entities,
-            *[entity for change in changes for entity in change.entities],
+        entity_changes=[
+            _parse_entity(entity_data)
+            for entity_data in _ensure_sequence(data.get("entities"))
         ],
-        changes=changes,
-        relationship_changes=top_level_relationship_changes,
+        file_changes=file_changes,
+        entity_relationship_changes=[
+            _parse_relationship_change(relationship_change_data)
+            for relationship_change_data in _ensure_sequence(
+                data.get("relationship_changes")
+            )
+        ],
     )
 
 
 def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
-    top_level_entities = [
-        _parse_entity(entity_data)
-        for entity_data in _ensure_is_sequence(data.get("entities"))
-    ]
-    top_level_relationship_changes = [
-        _parse_relationship_change(relationship_change_data)
-        for relationship_change_data in _ensure_is_sequence(
-            data.get("relationship_changes")
-        )
-    ]
-    changes = [
-        _parse_change_v2(change_data)
-        for change_data in _ensure_is_sequence(data.get("changes"))
-    ]
-
     return ChangeLog(
         version=_normalize_version(data.get("version")),
         change_id=_coerce_optional_str(data.get("change_id", data.get("pr_id"))),
         title=_coerce_optional_str(data.get("title")),
         intent=_parse_intent(data.get("intent")),
         decisions=_parse_decisions(data),
-        entities=[
-            *top_level_entities,
-            *[entity for change in changes for entity in change.entities],
-        ],
-        changes=changes,
-        relationship_changes=top_level_relationship_changes,
+        file_changes=_parse_change_files(data),
+        entity_changes=_parse_change_entities(data),
+        entity_relationship_changes=_parse_change_entity_relationships(data),
+        invariant_changes=_parse_change_invariants(data),
+        guidance_changes=_parse_change_guidance(data),
     )
 
 
+def _normalize_legacy_v2_content(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    if "changes" not in data or "files" in data:
+        return data
+
+    file_changes: list[object] = []
+    entity_changes: list[object] = []
+    entity_relationship_changes: list[object] = []
+    invariant_changes: list[object] = []
+    guidance_changes: list[object] = []
+
+    for raw_change in _ensure_sequence(data.get("changes")):
+        if not isinstance(raw_change, Mapping):
+            continue
+
+        raw_files = raw_change.get("files")
+        if isinstance(raw_files, Sequence) and not isinstance(raw_files, (str, bytes)):
+            file_changes.extend(raw_files)
+        elif raw_change.get("path") is not None or raw_change.get("file") is not None:
+            file_changes.append(_coerce_legacy_file_change(raw_change))
+
+        raw_entities = raw_change.get("entities")
+        if isinstance(raw_entities, Sequence) and not isinstance(
+            raw_entities, (str, bytes)
+        ):
+            entity_changes.extend(raw_entities)
+
+        raw_relationships = raw_change.get("entity_relationships")
+        if isinstance(raw_relationships, Sequence) and not isinstance(
+            raw_relationships, (str, bytes)
+        ):
+            entity_relationship_changes.extend(raw_relationships)
+
+        raw_invariants = raw_change.get("invariants")
+        if isinstance(raw_invariants, Sequence) and not isinstance(
+            raw_invariants, (str, bytes)
+        ):
+            invariant_changes.extend(raw_invariants)
+
+        raw_guidance = raw_change.get("guidance")
+        if isinstance(raw_guidance, Sequence) and not isinstance(
+            raw_guidance, (str, bytes)
+        ):
+            guidance_changes.extend(raw_guidance)
+
+    normalized = dict(data)
+    normalized.pop("changes", None)
+    normalized["files"] = file_changes
+    normalized["entities"] = entity_changes
+    normalized["entity_relationships"] = entity_relationship_changes
+    normalized["invariants"] = invariant_changes
+    normalized["guidance"] = guidance_changes
+
+    raw_relationships = normalized.pop("relationship_changes", None)
+    if isinstance(raw_relationships, Sequence) and not isinstance(
+        raw_relationships, (str, bytes)
+    ):
+        normalized["entity_relationships"] = [
+            *cast(list[object], normalized["entity_relationships"]),
+            *raw_relationships,
+        ]
+
+    return normalized
+
+
+def _coerce_legacy_file_change(raw_change: Mapping[str, Any]) -> dict[str, object]:
+    path = _coerce_optional_str(raw_change.get("path", raw_change.get("file")))
+    return {
+        "path": path,
+        "type": _coerce_optional_str(raw_change.get("type")),
+        "entities": [
+            _normalize_entity_id(_coerce_optional_str(value.get("id")))
+            if isinstance(value, Mapping)
+            else _normalize_entity_id(str(value))
+            for value in _ensure_sequence(raw_change.get("affects"))
+        ],
+        "span": raw_change.get("span"),
+        "summary": _coerce_optional_str(raw_change.get("summary")),
+        "rationale": _coerce_optional_str(raw_change.get("rationale")),
+        "related": raw_change.get("related"),
+    }
+
+
 def _parse_intent(raw_intent: object | None) -> Intent:
-    data = _parse_mapping(raw_intent)
+    data = _ensure_mapping(raw_intent)
     return Intent(
         problem=_coerce_optional_str(data.get("problem")),
         goal=_coerce_optional_str(data.get("goal")),
@@ -196,7 +247,7 @@ def _parse_intent(raw_intent: object | None) -> Intent:
 
 
 def _parse_decision(raw_decision: object | None) -> Decision:
-    data = _parse_mapping(raw_decision)
+    data = _ensure_mapping(raw_decision)
     return Decision(
         id=_coerce_optional_str(data.get("id")),
         summary=_coerce_optional_str(data.get("summary")),
@@ -207,16 +258,16 @@ def _parse_decision(raw_decision: object | None) -> Decision:
 def _parse_decisions(data: Mapping[str, Any]) -> list[Decision]:
     decisions = [
         _parse_decision(decision_data)
-        for decision_data in _ensure_is_sequence(data.get("decisions"))
+        for decision_data in _ensure_sequence(data.get("decisions"))
     ]
     if not decisions and data.get("decision") is not None:
         decisions.append(_parse_decision(data.get("decision")))
     return decisions
 
 
-def _parse_entity(raw_entity: object) -> Entity:
-    data = _parse_mapping(raw_entity)
-    return Entity(
+def _parse_entity(raw_entity: object) -> ChangeEntity:
+    data = _ensure_mapping(raw_entity)
+    return ChangeEntity(
         id=_coerce_optional_str(data.get("id")),
         type=_coerce_optional_str(data.get("type")),
         action=_coerce_optional_str(data.get("action")),
@@ -224,9 +275,11 @@ def _parse_entity(raw_entity: object) -> Entity:
     )
 
 
-def _parse_relationship_change(raw_relationship_change: object) -> RelationshipChange:
-    data = _parse_mapping(raw_relationship_change)
-    return RelationshipChange(
+def _parse_relationship_change(
+    raw_relationship_change: object,
+) -> ChangeEntityRelationship:
+    data = _ensure_mapping(raw_relationship_change)
+    return ChangeEntityRelationship(
         id=_coerce_optional_str(data.get("id")),
         type=_coerce_optional_str(data.get("type")),
         source=_coerce_optional_str(data.get("source")),
@@ -239,137 +292,33 @@ def _parse_relationship_change(raw_relationship_change: object) -> RelationshipC
     )
 
 
-def _parse_change_v1(raw_change: object) -> Change:
-    data = _parse_mapping(raw_change)
-    files = _parse_change_files(data)
-    entities = _parse_change_entities(data)
-    invariants = _parse_change_invariants(data)
-    guidance = _parse_change_guidance(data)
-
-    primary_file = _coerce_optional_str(data.get("file"))
-    if primary_file is None and files:
-        primary_file = files[0].path
-
-    primary_span = _coerce_span(data.get("span"))
-    if primary_span.start_line is None and primary_span.end_line is None and files:
-        primary_span = files[0].span
-
-    primary_summary = _coerce_optional_str(data.get("summary"))
-    if primary_summary is None and files:
-        primary_summary = files[0].summary
-
-    primary_rationale = _coerce_optional_str(data.get("rationale"))
-    if primary_rationale is None and files:
-        primary_rationale = files[0].rationale
-
-    affects = _normalize_entity_ids(
-        [
-            *[str(affect) for affect in _ensure_is_sequence(data.get("affects"))],
-            *[entity_id for file_entry in files for entity_id in file_entry.entities],
-            *[entity.id for entity in entities if entity.id is not None],
-        ]
-    )
-
-    return Change(
-        file=primary_file,
-        span=primary_span,
-        summary=primary_summary,
-        affects=list(affects),
-        rationale=primary_rationale,
-        files=files
-        or (
-            [
-                ChangeFile(
-                    path=primary_file,
-                    span=primary_span,
-                    summary=primary_summary,
-                    rationale=primary_rationale,
-                    entities=list(affects),
-                )
-            ]
-            if primary_file is not None
-            else []
-        ),
-        entities=entities,
-        invariants=invariants,
-        guidance=guidance,
-    )
-
-
-def _parse_change_v2(raw_change: object) -> Change:
-    data = _parse_mapping(raw_change)
-    files = _parse_change_files(data)
-    if not files and data.get("file") is not None:
-        files = [
-            ChangeFile(
-                path=_coerce_optional_str(data.get("file")),
-                type=_coerce_optional_str(data.get("type")),
-                entities=[
-                    entity_id
-                    for entity_id in _normalize_entity_ids(
-                        [
-                            str(affect)
-                            for affect in _ensure_is_sequence(data.get("affects"))
-                        ]
-                    )
-                ],
-                span=_coerce_span(data.get("span")),
-                summary=_coerce_optional_str(data.get("summary")),
-                rationale=_coerce_optional_str(data.get("rationale")),
-                related=_parse_related_section(data.get("related")),
-            )
-        ]
-
-    entities = _parse_change_entities(data)
-    invariants = _parse_change_invariants(data)
-    guidance = _parse_change_guidance(data)
-
-    primary_file = _coerce_optional_str(data.get("file"))
-    if primary_file is None and files:
-        primary_file = files[0].path
-
-    primary_span = _coerce_span(data.get("span"))
-    if primary_span.start_line is None and primary_span.end_line is None and files:
-        primary_span = files[0].span
-
-    primary_summary = _coerce_optional_str(data.get("summary"))
-    if primary_summary is None and files:
-        primary_summary = files[0].summary
-
-    primary_rationale = _coerce_optional_str(data.get("rationale"))
-    if primary_rationale is None and files:
-        primary_rationale = files[0].rationale
-
-    affects = _normalize_entity_ids(
-        [
-            *[str(affect) for affect in _ensure_is_sequence(data.get("affects"))],
-            *[entity_id for file_entry in files for entity_id in file_entry.entities],
-            *[entity.id for entity in entities if entity.id is not None],
-        ]
-    )
-
-    return Change(
-        file=primary_file,
-        span=primary_span,
-        summary=primary_summary,
-        affects=list(affects),
-        rationale=primary_rationale,
-        files=files,
-        entities=entities,
-        invariants=invariants,
-        guidance=guidance,
+def _parse_file_change_v1(raw_change: object) -> ChangeFile:
+    data = _ensure_mapping(raw_change)
+    path = _coerce_optional_str(data.get("path", data.get("file")))
+    span = _coerce_span(data.get("span"))
+    entities = _parse_id_sequence(data.get("affects"))
+    summary = _coerce_optional_str(data.get("summary"))
+    rationale = _coerce_optional_str(data.get("rationale"))
+    return ChangeFile(
+        path=path,
+        entities=list(entities),
+        span=span,
+        summary=summary,
+        rationale=rationale,
+        related=RelatedSection(entities=list(entities)),
     )
 
 
 def _parse_change_files(data: Mapping[str, Any]) -> list[ChangeFile]:
     files: list[ChangeFile] = []
-    for raw_file in _ensure_is_sequence(data.get("files")):
-        file_data = _parse_mapping(raw_file)
+    for raw_file in _ensure_sequence(data.get("files")):
+        file_data = _ensure_mapping(raw_file)
+        entities = _parse_id_sequence(file_data.get("entities"))
         files.append(
             ChangeFile(
                 path=_coerce_optional_str(file_data.get("path")),
                 type=_coerce_optional_str(file_data.get("type")),
-                entities=_parse_id_sequence(file_data.get("entities")),
+                entities=entities,
                 span=_coerce_span(file_data.get("span")),
                 summary=_coerce_optional_str(file_data.get("summary")),
                 rationale=_coerce_optional_str(file_data.get("rationale")),
@@ -379,29 +328,40 @@ def _parse_change_files(data: Mapping[str, Any]) -> list[ChangeFile]:
     return files
 
 
-def _parse_change_entities(data: Mapping[str, Any]) -> list[Entity]:
+def _parse_change_entities(data: Mapping[str, Any]) -> list[ChangeEntity]:
     return [
         _parse_entity(entity_data)
-        for entity_data in _ensure_is_sequence(data.get("entities"))
+        for entity_data in _ensure_sequence(data.get("entities"))
+    ]
+
+
+def _parse_change_entity_relationships(
+    data: Mapping[str, Any],
+) -> list[ChangeEntityRelationship]:
+    return [
+        _parse_relationship_change(relationship_change_data)
+        for relationship_change_data in _ensure_sequence(
+            data.get("entity_relationships")
+        )
     ]
 
 
 def _parse_change_invariants(data: Mapping[str, Any]) -> list[ChangeInvariant]:
     return [
         _parse_invariant(invariant_data)
-        for invariant_data in _ensure_is_sequence(data.get("invariants"))
+        for invariant_data in _ensure_sequence(data.get("invariants"))
     ]
 
 
 def _parse_change_guidance(data: Mapping[str, Any]) -> list[ChangeGuidance]:
     return [
         _parse_guidance(guidance_data)
-        for guidance_data in _ensure_is_sequence(data.get("guidance"))
+        for guidance_data in _ensure_sequence(data.get("guidance"))
     ]
 
 
 def _parse_invariant(raw_invariant: object) -> ChangeInvariant:
-    data = _parse_mapping(raw_invariant)
+    data = _ensure_mapping(raw_invariant)
     return ChangeInvariant(
         id=_coerce_optional_str(data.get("id")),
         description=_coerce_optional_str(data.get("description")),
@@ -411,7 +371,7 @@ def _parse_invariant(raw_invariant: object) -> ChangeInvariant:
 
 
 def _parse_guidance(raw_guidance: object) -> ChangeGuidance:
-    data = _parse_mapping(raw_guidance)
+    data = _ensure_mapping(raw_guidance)
     return ChangeGuidance(
         id=_coerce_optional_str(data.get("id")),
         description=_coerce_optional_str(data.get("description")),
@@ -424,7 +384,7 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
     if raw_related is None:
         return RelatedSection()
 
-    data = _parse_mapping(raw_related)
+    data = _ensure_mapping(raw_related)
     return RelatedSection(
         files=_parse_id_sequence(data.get("files")),
         entities=_parse_id_sequence(data.get("entities")),
@@ -435,7 +395,7 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
 
 def _parse_id_sequence(raw_values: object | None) -> list[str]:
     values: list[str] = []
-    for raw_value in _ensure_is_sequence(raw_values):
+    for raw_value in _ensure_sequence(raw_values):
         normalized_value = _parse_id_value(raw_value)
         if normalized_value is not None:
             values.append(normalized_value)
@@ -453,7 +413,7 @@ def _parse_id_value(raw_value: object) -> str | None:
 
 
 def _parse_span(raw_span: object | None) -> Span:
-    data = _parse_mapping(raw_span)
+    data = _ensure_mapping(raw_span)
     return Span(
         start_line=_coerce_int(data.get("start_line")),
         end_line=_coerce_int(data.get("end_line")),
@@ -467,7 +427,7 @@ def _coerce_span(raw_span: object | None) -> Span:
     return _parse_span(raw_span)
 
 
-def _parse_mapping(raw_data: object | None) -> dict[str, Any]:
+def _ensure_mapping(raw_data: object | None) -> dict[str, Any]:
     if raw_data is None:
         return {}
 
@@ -477,7 +437,7 @@ def _parse_mapping(raw_data: object | None) -> dict[str, Any]:
     return dict(raw_data)
 
 
-def _ensure_is_sequence(raw_data: object | None) -> Sequence[object]:
+def _ensure_sequence(raw_data: object | None) -> Sequence[object]:
     if raw_data is None:
         return ()
 

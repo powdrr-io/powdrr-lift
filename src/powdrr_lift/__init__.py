@@ -1,28 +1,27 @@
 from typing import Any
 
 from powdrr_lift.change_log_parser import (
-    Change,
+    ChangeEntity,
+    ChangeEntityRelationship,
     ChangeFile,
     ChangeGuidance,
     ChangeInvariant,
     ChangeLog,
     Decision,
-    Entity,
     Intent,
     RelatedSection,
-    RelationshipChange,
     Span,
     parse_change_log,
 )
 
 __all__ = [
-    "Change",
+    "ChangeEntity",
+    "ChangeEntityRelationship",
     "ChangeFile",
     "ChangeGuidance",
     "ChangeInvariant",
     "ChangeLog",
     "Decision",
-    "Entity",
     "EntityGraph",
     "EntityOccurrence",
     "Intent",
@@ -48,7 +47,6 @@ __all__ = [
     "lookup_entity_relationships",
     "lookup_edit_context",
     "ProvenanceRecord",
-    "RelationshipChange",
     "RelationshipOccurrence",
     "RelatedSection",
     "RepoTreeNode",

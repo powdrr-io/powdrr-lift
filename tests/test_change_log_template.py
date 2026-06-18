@@ -45,6 +45,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "decisions:" in template_text
     assert "files:" in template_text
     assert "entities:" in template_text
+    assert "entity_relationships:" in template_text
     assert "invariants:" in template_text
     assert "guidance:" in template_text
     assert "related:" in template_text
@@ -53,22 +54,18 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
 
     change_log = parse_change_log(template_text)
     assert change_log.version == 2
-    assert [change.file for change in change_log.changes] == [
+    assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "tests/test_app.py",
     ]
-    assert [change.span.start_line for change in change_log.changes] == [1, 1]
-    assert [change.span.end_line for change in change_log.changes] == [1, 2]
-    assert [change.files[0].path for change in change_log.changes] == [
-        "src/app.py",
-        "tests/test_app.py",
-    ]
-    assert [change.files[0].type for change in change_log.changes] == [
+    assert [change.span.start_line for change in change_log.file_changes] == [1, 1]
+    assert [change.span.end_line for change in change_log.file_changes] == [1, 2]
+    assert [change.type for change in change_log.file_changes] == [
         "added",
         "added",
     ]
-    assert [change.files[0].entities for change in change_log.changes] == [[], []]
-    assert [change.entities for change in change_log.changes] == [[], []]
+    assert [change.entities for change in change_log.file_changes] == [[], []]
+    assert change_log.entity_changes == []
     assert change_log.decisions == [Decision()]
 
 
@@ -93,7 +90,8 @@ def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert change_log.changes == []
+    assert change_log.file_changes == []
+    assert change_log.entity_changes == []
     assert change_log.decisions == [Decision()]
     assert change_log.version == 2
 
@@ -125,7 +123,7 @@ def test_create_change_log_template_ignores_rename_only_diff(tmp_path: Path) -> 
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert change_log.changes == []
+    assert change_log.file_changes == []
 
 
 def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
@@ -171,22 +169,25 @@ def test_create_change_log_template_tracks_sparse_spans(tmp_path: Path) -> None:
     )
 
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
-    assert [change.file for change in change_log.changes] == ["src/app.py"]
-    assert [file_entry.path for file_entry in change_log.changes[0].files] == [
+    assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "src/app.py",
         "src/app.py",
         "src/app.py",
     ]
-    assert [
-        file_entry.span.start_line for file_entry in change_log.changes[0].files
-    ] == [
+    assert [file_entry.path for file_entry in change_log.file_changes] == [
+        "src/app.py",
+        "src/app.py",
+        "src/app.py",
+        "src/app.py",
+    ]
+    assert [file_entry.span.start_line for file_entry in change_log.file_changes] == [
         2,
         4,
         6,
         8,
     ]
-    assert [file_entry.span.end_line for file_entry in change_log.changes[0].files] == [
+    assert [file_entry.span.end_line for file_entry in change_log.file_changes] == [
         2,
         4,
         6,

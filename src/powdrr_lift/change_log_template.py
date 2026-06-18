@@ -69,56 +69,48 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Each change entry should group the files, entities, invariants, and",
-        "# guidance for one logical change.",
+        "# Each file entry should record the files that changed and their",
+        "# associated metadata.",
     ]
 
     if diff_entries:
-        lines.append("changes:")
-        for grouped_entries in _group_branch_diff_entries_by_path(diff_entries):
+        lines.append("files:")
+        for diff_entry in diff_entries:
             lines.extend(
                 [
                     "  -",
-                    "    files:",
-                ]
-            )
-            for diff_entry in grouped_entries:
-                lines.extend(
-                    [
-                        "      -",
-                        "        # File path and type for this hunk.",
-                        f"        path: {diff_entry.path}",
-                        f"        type: {_normalize_change_type(diff_entry.status)}",
-                        "        entities: []",
-                        "        span:",
-                        "          # First changed line in this file entry.",
-                        f"          start_line: {diff_entry.start_line}",
-                        "          # Last changed line in this file entry.",
-                        f"          end_line: {diff_entry.end_line}",
-                        "        # Short summary for this file entry.",
-                        "        summary: null",
-                        "        # Why this file entry changed.",
-                        "        rationale: null",
-                        "        # Optional related ids for this file entry.",
-                        "        related:",
-                        "          files: []",
-                        "          entities: []",
-                        "          invariants: []",
-                        "          guidance: []",
-                    ]
-                )
-            lines.extend(
-                [
-                    "    # List entities added, deleted, or modified by this change.",
+                    "    # File path and type for this hunk.",
+                    f"    path: {diff_entry.path}",
+                    f"    type: {_normalize_change_type(diff_entry.status)}",
                     "    entities: []",
-                    "    # List invariants added, removed, or altered by this change.",
-                    "    invariants: []",
-                    "    # List guidance items changed by this change.",
-                    "    guidance: []",
+                    "    span:",
+                    "      # First changed line in this file entry.",
+                    f"      start_line: {diff_entry.start_line}",
+                    "      # Last changed line in this file entry.",
+                    f"      end_line: {diff_entry.end_line}",
+                    "    # Short summary for this file entry.",
+                    "    summary: null",
+                    "    # Why this file entry changed.",
+                    "    rationale: null",
+                    "    # Optional related ids for this file entry.",
+                    "    related:",
+                    "      files: []",
+                    "      entities: []",
+                    "      invariants: []",
+                    "      guidance: []",
                 ]
             )
     else:
-        lines.append("changes: []")
+        lines.append("files: []")
+
+    lines.extend(
+        [
+            "entities: []",
+            "entity_relationships: []",
+            "invariants: []",
+            "guidance: []",
+        ]
+    )
 
     lines.extend(
         [
@@ -147,16 +139,16 @@ def _render_header(
         "# - Keep this file valid YAML.\n"
         "# - Replace each `null` with concrete values when they are known.\n"
         "# - Leave a list empty only when the section truly does not apply.\n"
-        "# - Use the prefilled `changes` entries as the starting point for the files\n"
+        "# - Use the prefilled `files` entries as the starting point for the file\n"
         "#   that differ from the default branch.\n"
-        "# - Add or remove `changes` items as needed so every meaningful change is\n"
-        "#   represented exactly once.\n"
+        "# - Add or remove `files` items as needed so every meaningful file change\n"
+        "#   is represented exactly once.\n"
         "# - Keep `version: 2` unless the schema changes.\n"
-        "# - For each change, use `files` for the affected files and their spans.\n"
-        "# - Put `path`, `type`, `entities`, `span`, `summary`, and `rationale`\n"
-        "#   on each file entry.\n"
+        "# - Put `path`, `type`, `entities`, `span`, `summary`, `rationale`, and\n"
+        "#   `related` on each file entry.\n"
         "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
         "#   `action: deleted`, or `action: modified`.\n"
+        "# - Put relationship changes in `entity_relationships`.\n"
         "# - Put invariant changes in `invariants` and guidance changes in\n"
         "#   `guidance`.\n"
         "# - Use the `related` section on file, invariant, and guidance entries to\n"

@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +15,14 @@ class BranchDiffEntry:
     path: str
     start_line: int
     end_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class RelatedSectionPreview:
+    files: tuple[str, ...] = ()
+    entities: tuple[str, ...] = ()
+    invariants: tuple[str, ...] = ()
+    guidance: tuple[str, ...] = ()
 
 
 def create_change_log_template(
@@ -30,10 +39,17 @@ def create_change_log_template(
         default_branch_name,
         branch_name,
     )
+    related_sections_by_entry = _collect_related_sections_by_entry(
+        repo_root_path,
+        branch_name,
+        default_branch_name,
+        diff_entries,
+    )
     template = render_change_log_template(
         branch_name=branch_name,
         default_branch_name=default_branch_name,
         diff_entries=diff_entries,
+        related_sections_by_entry=related_sections_by_entry,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(template, encoding="utf-8")
@@ -44,13 +60,20 @@ def render_change_log_template(
     branch_name: str,
     default_branch_name: str,
     diff_entries: Sequence[BranchDiffEntry],
+    related_sections_by_entry: Sequence[RelatedSectionPreview] | None = None,
 ) -> str:
     header = _render_header(branch_name, default_branch_name, diff_entries)
-    body = _render_template_body(diff_entries)
+    body = _render_template_body(diff_entries, related_sections_by_entry)
     return f"{header}\n{body}"
 
 
-def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
+def _render_template_body(
+    diff_entries: Sequence[BranchDiffEntry],
+    related_sections_by_entry: Sequence[RelatedSectionPreview] | None = None,
+) -> str:
+    if related_sections_by_entry is None:
+        related_sections_by_entry = [RelatedSectionPreview()] * len(diff_entries)
+
     lines = [
         "version: 2",
         "# Use the PR number here.",
@@ -75,7 +98,9 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
 
     if diff_entries:
         lines.append("files:")
-        for diff_entry in diff_entries:
+        for diff_entry, related_section in zip(
+            diff_entries, related_sections_by_entry, strict=False
+        ):
             lines.extend(
                 [
                     "  -",
@@ -91,14 +116,59 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     "    summary: null",
                     "    # Why this file entry changed.",
                     "    rationale: null",
+                    "    # Review the related list before filling out the rest of",
+                    "    # the change. Keep entries that are still relevant, add",
+                    "    # missing ones, remove stale ones, and use the final",
+                    "    # list to decide what belongs in entities, entity",
+                    "    # relationships, invariants, and guidance.",
                     "    # Related ids for this file entry.",
                     "    # Remove this block entirely if it does not point",
                     "    # to anything.",
                     "    related:",
-                    "      files: []",
-                    "      entities: []",
-                    "      invariants: []",
-                    "      guidance: []",
+                    *(
+                        ["      files: []"]
+                        if not related_section.files
+                        else [
+                            "      files:",
+                            *(
+                                f"        - {related_file}"
+                                for related_file in related_section.files
+                            ),
+                        ]
+                    ),
+                    *(
+                        ["      entities: []"]
+                        if not related_section.entities
+                        else [
+                            "      entities:",
+                            *(
+                                f"        - {related_entity}"
+                                for related_entity in related_section.entities
+                            ),
+                        ]
+                    ),
+                    *(
+                        ["      invariants: []"]
+                        if not related_section.invariants
+                        else [
+                            "      invariants:",
+                            *(
+                                f"        - {related_invariant}"
+                                for related_invariant in related_section.invariants
+                            ),
+                        ]
+                    ),
+                    *(
+                        ["      guidance: []"]
+                        if not related_section.guidance
+                        else [
+                            "      guidance:",
+                            *(
+                                f"        - {related_guidance}"
+                                for related_guidance in related_section.guidance
+                            ),
+                        ]
+                    ),
                 ]
             )
     else:
@@ -120,6 +190,205 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
     )
 
     return "\n".join(lines)
+
+
+def _collect_related_sections_by_entry(
+    repo_root: Path,
+    branch_name: str,
+    default_branch_name: str,
+    diff_entries: Sequence[BranchDiffEntry],
+) -> list[RelatedSectionPreview]:
+    from powdrr_lift.core.code_index import CodeIndexStore
+
+    store = CodeIndexStore(repo_root)
+    source_index = store.refresh(branch_name, default_branch_name)
+
+    related_sections_by_entry: list[RelatedSectionPreview] = []
+    all_diff_paths = [diff_entry.path for diff_entry in diff_entries]
+    for diff_entry in diff_entries:
+        related_entities = _dedupe_string_values(
+            [
+                *_collect_related_entities_from_documents(
+                    source_index.documents,
+                    path=diff_entry.path,
+                    start_line=diff_entry.start_line,
+                    end_line=diff_entry.end_line,
+                ),
+                *_collect_related_entities_for_span(
+                    store,
+                    branch_names=(default_branch_name, branch_name),
+                    path=diff_entry.path,
+                    start_line=diff_entry.start_line,
+                    end_line=diff_entry.end_line,
+                ),
+            ]
+        )
+        related_sections_by_entry.append(
+            RelatedSectionPreview(
+                files=_dedupe_strings(
+                    path for path in all_diff_paths if path != diff_entry.path
+                ),
+                entities=tuple(related_entities),
+                invariants=_collect_related_lifecycle_ids(
+                    source_index.documents,
+                    item_kind="invariant",
+                    current_file_path=diff_entry.path,
+                    related_entity_names=related_entities,
+                ),
+                guidance=_collect_related_lifecycle_ids(
+                    source_index.documents,
+                    item_kind="guidance",
+                    current_file_path=diff_entry.path,
+                    related_entity_names=related_entities,
+                ),
+            )
+        )
+
+    return related_sections_by_entry
+
+
+def _collect_related_entities_for_span(
+    store: Any,
+    *,
+    branch_names: Sequence[str],
+    path: str,
+    start_line: int,
+    end_line: int,
+) -> list[str]:
+    related_entities: list[str] = []
+    seen_entities: set[str] = set()
+    lookup_lines = store.lookup_lines
+    for branch_name in branch_names:
+        for _, provenance in lookup_lines(branch_name, path, start_line, end_line):
+            if provenance is None:
+                continue
+
+            for entity_name in provenance.affects:
+                if entity_name in seen_entities:
+                    continue
+
+                seen_entities.add(entity_name)
+                related_entities.append(entity_name)
+
+    return related_entities
+
+
+def _collect_related_entities_from_documents(
+    documents: Sequence[object],
+    *,
+    path: str,
+    start_line: int,
+    end_line: int,
+) -> list[str]:
+    related_entities: list[str] = []
+    seen_entities: set[str] = set()
+    for document in documents:
+        changelog = getattr(document, "changelog", None)
+        if changelog is None:
+            continue
+
+        file_changes = getattr(changelog, "file_changes", ())
+        for file_change in file_changes:
+            if getattr(file_change, "path", None) != path:
+                continue
+
+            file_span = getattr(file_change, "span", None)
+            file_start = getattr(file_span, "start_line", None)
+            file_end = getattr(file_span, "end_line", None)
+            if (
+                file_start is None
+                or file_end is None
+                or file_start > end_line
+                or file_end < start_line
+            ):
+                continue
+
+            related = getattr(file_change, "related", None)
+            candidate_entities = (
+                getattr(related, "entities", ())
+                if related is not None
+                else getattr(file_change, "entities", ())
+            )
+            for entity_name in candidate_entities:
+                if entity_name in seen_entities:
+                    continue
+
+                seen_entities.add(entity_name)
+                related_entities.append(entity_name)
+
+    return related_entities
+
+
+def _collect_related_lifecycle_ids(
+    documents: Sequence[object],
+    *,
+    item_kind: str,
+    current_file_path: str,
+    related_entity_names: Sequence[str],
+) -> tuple[str, ...]:
+    related_ids: list[str] = []
+    seen_ids: set[str] = set()
+    related_entity_set = set(related_entity_names)
+    related_file_set = {current_file_path}
+
+    for document in documents:
+        changelog = getattr(document, "changelog", None)
+        if changelog is None:
+            continue
+
+        if item_kind == "invariant":
+            items = getattr(changelog, "invariant_changes", ())
+        else:
+            items = getattr(changelog, "guidance_changes", ())
+
+        for item in items:
+            item_id = getattr(item, "id", None)
+            item_id_value = str(item_id).strip() if item_id is not None else ""
+            related = getattr(item, "related", None)
+            if item_id_value == "" or item_id_value in seen_ids or related is None:
+                continue
+
+            if _related_section_matches(
+                related,
+                related_file_set=related_file_set,
+                related_entity_set=related_entity_set,
+            ):
+                seen_ids.add(item_id_value)
+                related_ids.append(item_id_value)
+
+    return tuple(related_ids)
+
+
+def _related_section_matches(
+    related: object,
+    *,
+    related_file_set: set[str],
+    related_entity_set: set[str],
+) -> bool:
+    related_files = set(getattr(related, "files", ()))
+    related_entities = set(getattr(related, "entities", ()))
+    return bool(
+        related_files.intersection(related_file_set)
+        or related_entities.intersection(related_entity_set)
+    )
+
+
+def _dedupe_strings(values: Iterable[str]) -> tuple[str, ...]:
+    return _dedupe_string_values(values)
+
+
+def _dedupe_string_values(values: Iterable[str]) -> tuple[str, ...]:
+    seen_values: set[str] = set()
+    deduped_values: list[str] = []
+    for raw_value in values:
+        value = str(raw_value).strip()
+        if not value or value in seen_values:
+            continue
+
+        seen_values.add(value)
+        deduped_values.append(value)
+
+    return tuple(deduped_values)
 
 
 def _render_header(
@@ -147,6 +416,11 @@ def _render_header(
         "# - Keep `version: 2` unless the schema changes.\n"
         "# - Put `path`, `type`, `span`, `summary`, `rationale`, and optional\n"
         "#   `related` on each file entry.\n"
+        "# - Review each prefilled `related` section before you fill in the rest\n"
+        "#   of the changelog. Keep entries that are still relevant, add\n"
+        "#   missing ones, and remove stale ones.\n"
+        "# - Use the final related lists to help fill out `entities`,\n"
+        "#   `entity_relationships`, `invariants`, and `guidance`.\n"
         "# - Put file-related entity ids under `related.entities`.\n"
         "# - Use `related.files`, `related.invariants`, and `related.guidance`\n"
         "#   when this file change needs to point at supporting files or at the\n"
@@ -157,8 +431,9 @@ def _render_header(
         "# - Put relationship changes in `entity_relationships`.\n"
         "# - Put invariant changes in `invariants` and guidance changes in\n"
         "#   `guidance`.\n"
-        "# - Use the `related` section on file, invariant, and guidance entries to\n"
-        "#   point at the relevant file, entity, invariant, or guidance ids.\n"
+        "# - Use `related` on file, entity, relationship, invariant, and guidance\n"
+        "#   entries to point at the relevant file, entity, invariant, or\n"
+        "#   guidance ids.\n"
         "#\n"
         "# Diff summary:\n"
         f"{diff_lines}"

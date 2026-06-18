@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import sqlite3
 import subprocess
 from pathlib import Path
 
 import pytest
 
 import powdrr_lift.core.index as core_index
-from powdrr_lift import build_changelog_index
+from powdrr_lift import build_changelog_index, code_index_db_path, refresh_code_index
 
 
 def test_build_changelog_index_tracks_lineage_across_later_insertions(
@@ -203,6 +204,11 @@ def test_build_changelog_index_normalizes_entities_and_relationships(
 
     (repo_root / "src").mkdir()
     (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "tests").mkdir()
+    (repo_root / "tests" / "test_app.py").write_text(
+        "def test_app():\n    assert True\n",
+        encoding="utf-8",
+    )
     (repo_root / "docs").mkdir()
     (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
     (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
@@ -231,7 +237,13 @@ def test_build_changelog_index_normalizes_entities_and_relationships(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
+    _git(
+        repo_root,
+        "add",
+        "src/app.py",
+        "tests/test_app.py",
+        "docs/changelogs/PR-1-changelog.yaml",
+    )
     _git(repo_root, "commit", "-m", "Introduce Foo (#1)")
 
     (repo_root / "src" / "app.py").write_text(
@@ -301,6 +313,11 @@ def test_build_changelog_index_normalizes_version_two_changes(
 
     (repo_root / "src").mkdir()
     (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "tests").mkdir()
+    (repo_root / "tests" / "test_app.py").write_text(
+        "def test_app():\n    assert True\n",
+        encoding="utf-8",
+    )
     (repo_root / "docs").mkdir()
     (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
     (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
@@ -323,26 +340,212 @@ def test_build_changelog_index_normalizes_version_two_changes(
               end_line: 1
             summary: Introduce ReviewSkill.
             rationale: ReviewSkill is now part of the system.
+            related:
+              files:
+                - tests/test_app.py
+              entities:
+                - ReviewSkill
+              invariants:
+                - INV-001
+              guidance:
+                - GUID-001
+          - path: tests/test_app.py
+            type: modified
+            entities:
+              - ReviewSkill
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Exercise ReviewSkill.
+            rationale: Keep the test aligned with the new skill.
+            related:
+              files:
+                - src/app.py
+              entities:
+                - ReviewSkill
+              invariants:
+                - INV-001
+              guidance:
+                - GUID-001
 
         entities:
           - id: ReviewSkill
             type: Skill
             action: added
+            related:
+              files:
+                - src/app.py
+                - tests/test_app.py
+              entities:
+                - ReviewSkill
+              invariants:
+                - INV-001
+              guidance:
+                - GUID-001
 
         entity_relationships: []
-        invariants: []
-        guidance: []
+
+        invariants:
+          - id: INV-001
+            description: ReviewSkill remains documented in the graph.
+            action: added
+            related:
+              files:
+                - src/app.py
+              entities:
+                - ReviewSkill
+              guidance:
+                - GUID-001
+
+        guidance:
+          - id: GUID-001
+            description: Keep ReviewSkill test coverage up to date.
+            action: added
+            related:
+              files:
+                - tests/test_app.py
+              entities:
+                - ReviewSkill
+              invariants:
+                - INV-001
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
+    _git(
+        repo_root,
+        "add",
+        "src/app.py",
+        "tests/test_app.py",
+        "docs/changelogs/PR-1-changelog.yaml",
+    )
     _git(repo_root, "commit", "-m", "Introduce ReviewSkill (#1)")
+    _git(repo_root, "branch", "feature/code-index", "main")
 
     index = build_changelog_index(repo_root)
 
     assert index.documents[0].changelog.version == 2
+    assert [
+        file_change.path for file_change in index.documents[0].changelog.file_changes
+    ] == ["src/app.py", "tests/test_app.py"]
+    assert index.documents[0].changelog.file_changes[0].related.files == [
+        "tests/test_app.py",
+    ]
+    assert index.documents[0].changelog.file_changes[0].related.entities == [
+        "ReviewSkill"
+    ]
+    assert index.documents[0].changelog.file_changes[0].related.invariants == [
+        "INV-001"
+    ]
+    assert index.documents[0].changelog.file_changes[0].related.guidance == ["GUID-001"]
     assert index.entity_graph.entities["ReviewSkill"][0].action == "added"
     assert index.provenance_for("src/app.py", 1).affects == ("ReviewSkill",)
+
+    refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    db_path = code_index_db_path(repo_root)
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        file_related_rows = connection.execute(
+            """
+            SELECT change_index, file_index, related_kind, related_id
+            FROM change_file_related
+            WHERE branch_name = ?
+            ORDER BY change_index, file_index, related_index
+            """,
+            ("feature/code-index",),
+        ).fetchall()
+        entity_related_rows = connection.execute(
+            """
+            SELECT scope, change_index, entity_index, related_kind, related_id
+            FROM change_entity_related
+            WHERE branch_name = ?
+            ORDER BY scope, change_index, entity_index, related_index
+            """,
+            ("feature/code-index",),
+        ).fetchall()
+        invariant_related_rows = connection.execute(
+            """
+            SELECT change_index, invariant_index, related_kind, related_id
+            FROM change_invariant_related
+            WHERE branch_name = ?
+            ORDER BY change_index, invariant_index, related_index
+            """,
+            ("feature/code-index",),
+        ).fetchall()
+        guidance_related_rows = connection.execute(
+            """
+            SELECT change_index, guidance_index, related_kind, related_id
+            FROM change_guidance_related
+            WHERE branch_name = ?
+            ORDER BY change_index, guidance_index, related_index
+            """,
+            ("feature/code-index",),
+        ).fetchall()
+
+    assert {
+        (
+            row["change_index"],
+            row["file_index"],
+            row["related_kind"],
+            row["related_id"],
+        )
+        for row in file_related_rows
+    } == {
+        (0, 0, "file", "tests/test_app.py"),
+        (0, 0, "entity", "ReviewSkill"),
+        (0, 0, "invariant", "INV-001"),
+        (0, 0, "guidance", "GUID-001"),
+        (1, 0, "file", "src/app.py"),
+        (1, 0, "entity", "ReviewSkill"),
+        (1, 0, "invariant", "INV-001"),
+        (1, 0, "guidance", "GUID-001"),
+    }
+    assert {
+        (
+            row["scope"],
+            row["change_index"],
+            row["entity_index"],
+            row["related_kind"],
+            row["related_id"],
+        )
+        for row in entity_related_rows
+    } == {
+        ("document", None, 0, "file", "src/app.py"),
+        ("document", None, 0, "file", "tests/test_app.py"),
+        ("document", None, 0, "entity", "ReviewSkill"),
+        ("document", None, 0, "invariant", "INV-001"),
+        ("document", None, 0, "guidance", "GUID-001"),
+    }
+    assert {
+        (
+            row["change_index"],
+            row["invariant_index"],
+            row["related_kind"],
+            row["related_id"],
+        )
+        for row in invariant_related_rows
+    } == {
+        (0, 0, "file", "src/app.py"),
+        (0, 0, "entity", "ReviewSkill"),
+        (0, 0, "guidance", "GUID-001"),
+    }
+    assert {
+        (
+            row["change_index"],
+            row["guidance_index"],
+            row["related_kind"],
+            row["related_id"],
+        )
+        for row in guidance_related_rows
+    } == {
+        (0, 0, "file", "tests/test_app.py"),
+        (0, 0, "entity", "ReviewSkill"),
+        (0, 0, "invariant", "INV-001"),
+    }
 
 
 def test_build_changelog_index_skips_relationships_for_undeclared_entities(

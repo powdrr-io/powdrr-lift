@@ -42,7 +42,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 10
+INDEX_CACHE_VERSION = 11
 
 
 @dataclass(frozen=True, slots=True)
@@ -622,6 +622,20 @@ class CodeIndexStore:
                   )
                 );
 
+                CREATE TABLE IF NOT EXISTS change_file_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  file_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, file_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
                 CREATE TABLE IF NOT EXISTS change_entity_record (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
                   branch_name TEXT NOT NULL,
@@ -896,6 +910,17 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
+            change_file_related_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, file_index, related_index,
+                       related_kind, related_id
+                FROM change_file_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, file_index, related_index,
+                         related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
             change_entity_rows = connection.execute(
                 """
                 SELECT pr_number, scope, change_index, entity_index, entity_id,
@@ -1005,6 +1030,9 @@ class CodeIndexStore:
         file_entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
         for row in change_file_entity_rows:
             file_entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        file_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_file_related_rows:
+            file_related_rows_by_pr.setdefault(row["pr_number"], []).append(row)
         change_entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
         for row in change_entity_rows:
             change_entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
@@ -1043,6 +1071,9 @@ class CodeIndexStore:
                 ],
                 change_file_rows=change_rows_by_pr.get(row["pr_number"], ()),
                 change_file_entity_rows=file_entity_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_file_related_rows=file_related_rows_by_pr.get(
                     row["pr_number"], ()
                 ),
                 change_entity_rows=change_entity_rows_by_pr.get(row["pr_number"], ()),
@@ -1122,6 +1153,10 @@ class CodeIndexStore:
             )
             connection.execute(
                 "DELETE FROM change_file_entity WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_file_related WHERE branch_name = ?",
                 (branch_name,),
             )
             connection.execute(
@@ -1257,6 +1292,15 @@ class CodeIndexStore:
                                 entity_id,
                             ),
                         )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="file",
+                        change_index=file_change_index,
+                        file_index=0,
+                        related=file_change.related,
+                    )
 
                 for entity_change_index, entity_change in enumerate(
                     _document_entity_changes(document)
@@ -1799,6 +1843,7 @@ def _load_changelog_document_from_cache_row(
     relationship_rows: Sequence[sqlite3.Row],
     change_file_rows: Sequence[sqlite3.Row],
     change_file_entity_rows: Sequence[sqlite3.Row],
+    change_file_related_rows: Sequence[sqlite3.Row],
     change_entity_rows: Sequence[sqlite3.Row],
     change_entity_related_rows: Sequence[sqlite3.Row],
     change_invariant_rows: Sequence[sqlite3.Row],
@@ -1830,6 +1875,18 @@ def _load_changelog_document_from_cache_row(
             [],
         ).append(row_data["entity_id"])
 
+    file_related_by_change: dict[int, dict[int, RelatedSection]] = {}
+    for row_data in change_file_related_rows:
+        file_related = file_related_by_change.setdefault(
+            row_data["change_index"],
+            {},
+        ).setdefault(row_data["file_index"], RelatedSection())
+        _append_related_item(
+            file_related,
+            row_data["related_kind"],
+            row_data["related_id"],
+        )
+
     file_changes: list[ChangeFile] = []
     for file_row in change_file_rows:
         entities_for_file = file_entities_by_change.get(
@@ -1837,6 +1894,10 @@ def _load_changelog_document_from_cache_row(
         ).get(
             file_row["file_index"],
             [],
+        )
+        related_for_file = file_related_by_change.get(file_row["change_index"], {}).get(
+            file_row["file_index"],
+            RelatedSection(),
         )
         file_changes.append(
             ChangeFile(
@@ -1849,6 +1910,7 @@ def _load_changelog_document_from_cache_row(
                 ),
                 summary=file_row["summary"],
                 rationale=file_row["rationale"],
+                related=related_for_file,
             )
         )
 
@@ -1959,9 +2021,88 @@ def _write_related_section_rows(
     change_index: int | None,
     entity_index: int | None = None,
     item_index: int | None = None,
+    file_index: int | None = None,
     related: RelatedSection | None = None,
 ) -> None:
     if related is None:
+        return
+
+    if scope == "file":
+        if file_index is None:
+            raise ValueError("File related rows require a file index.")
+
+        for related_index, related_id in enumerate(related.files):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "file",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.entities):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "entity",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.invariants):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "invariant",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.guidance):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "guidance",
+                    related_id,
+                ),
+            )
         return
 
     if scope in {"document", "change"}:

@@ -1,0 +1,195 @@
+version: 2
+change_id: 23
+title: Simplify file related metadata
+intent:
+  problem: The changelog template and validator still treated file-entry
+    related metadata as optional scaffolding instead of a canonical place for
+    file references.
+  goal: Make file-entry related metadata explicit, reject empty related blocks,
+    and keep the parser and tests aligned with the new shape.
+decisions: []
+files:
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 240
+      end_line: 243
+    summary: Preserve file related entities from the new related block.
+    rationale: Let v2 file entries keep entity references while the schema moves
+      them out of the top-level file entity field.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 252
+      end_line: 252
+    summary: Reuse the parsed related section on file entries.
+    rationale: Keep the file dataclass linked to the canonical related block.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 85
+      end_line: 85
+    summary: Stop emitting file-entry entities in the scaffold.
+    rationale: Move file references into related metadata instead of the legacy
+      file entity field.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 94
+      end_line: 96
+    summary: Add removal guidance to the scaffolded related block.
+    rationale: Tell authors to delete empty related blocks rather than leave
+      placeholder sections behind.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 148
+      end_line: 148
+    summary: Make file-entry related metadata optional in the instructions.
+    rationale: Clarify that file entries only need related metadata when they
+      actually reference other items.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 150
+      end_line: 154
+    summary: Document the canonical placement for file related references.
+    rationale: Explain when to use related.entities, related.files,
+      related.invariants, and related.guidance.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 165
+      end_line: 165
+    summary: Validate v2 file sections before parsing the changelog.
+    rationale: Reject deprecated file-entry shapes and empty related blocks
+      early with explicit fix guidance.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 696
+      end_line: 736
+    summary: Add explicit schema checks for v2 file entries.
+    rationale: Block top-level file entities and require a non-empty related
+      block when related metadata is present.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 51
+      end_line: 53
+    summary: Assert the scaffold includes related removal guidance.
+    rationale: Keep the template test aligned with the updated instructional
+      text.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 70
+      end_line: 73
+    summary: Assert parsed file entries keep empty related lists empty.
+    rationale: Confirm the template parser still reads the generated scaffold.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 84
+      end_line: 86
+    summary: Move v2 file entity references into related.entities.
+    rationale: Keep the happy-path fixture aligned with the updated file-entry
+      schema.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 89
+      end_line: 92
+    summary: Attach the second v2 file entry through related.entities.
+    rationale: Cover the second file hunk with the canonical related shape.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 94
+      end_line: 95
+    summary: Keep top-level entities separate from file metadata.
+    rationale: Validate entity lifecycle changes independently of file entries.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 100
+      end_line: 102
+    summary: Use related.entities on the final file entry in the success case.
+    rationale: Ensure the happy-path fixture uses the canonical file-entry
+      placement.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 179
+      end_line: 180
+    summary: Use related.entities in the top-level-entities success fixture.
+    rationale: Keep the fixture valid while still testing document-level entity
+      additions.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 186
+      end_line: 188
+    summary: Move the first acceptance-test file entry to related.entities.
+    rationale: Keep the acceptance fixture valid under the updated schema.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 188
+      end_line: 189
+    summary: Keep the second acceptance-test file entry in related.entities.
+    rationale: Exercise the same schema on the second file hunk.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 196
+      end_line: 198
+    summary: Move the third acceptance-test file entry to related.entities.
+    rationale: Cover all file hunks in the acceptance fixture.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 229
+      end_line: 325
+    summary: Add negative cases for file entities and empty related blocks.
+    rationale: Verify the new validation behavior and its fix-it guidance.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 858
+      end_line: 859
+    summary: Use related.entities in the unknown-type v2 fixture.
+    rationale: Ensure the taxonomy failure is exercised after the schema
+      migration.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 964
+      end_line: 976
+    summary: Add a second file entry to the unknown-type fixture.
+    rationale: Keep the taxonomy failure test aligned with the two-file diff.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 79
+      end_line: 81
+    summary: Parse v2 file entities from related.entities.
+    rationale: Update the parser fixture to the canonical file-entry shape.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 84
+      end_line: 87
+    summary: Preserve related entities in parsed file dataclasses.
+    rationale: Confirm the parser exposes the related links on file changes.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 154
+      end_line: 157
+    summary: Assert the parsed file carries related.entities.
+    rationale: Verify the version two parser maps the new file-entry shape.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

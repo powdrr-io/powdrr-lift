@@ -82,7 +82,6 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     "    # File path and type for this hunk.",
                     f"    path: {diff_entry.path}",
                     f"    type: {_normalize_change_type(diff_entry.status)}",
-                    "    entities: []",
                     "    span:",
                     "      # First changed line in this file entry.",
                     f"      start_line: {diff_entry.start_line}",
@@ -92,12 +91,6 @@ def _render_template_body(diff_entries: Sequence[BranchDiffEntry]) -> str:
                     "    summary: null",
                     "    # Why this file entry changed.",
                     "    rationale: null",
-                    "    # Optional related ids for this file entry.",
-                    "    related:",
-                    "      files: []",
-                    "      entities: []",
-                    "      invariants: []",
-                    "      guidance: []",
                 ]
             )
     else:
@@ -144,8 +137,9 @@ def _render_header(
         "# - Add or remove `files` items as needed so every meaningful file change\n"
         "#   is represented exactly once.\n"
         "# - Keep `version: 2` unless the schema changes.\n"
-        "# - Put `path`, `type`, `entities`, `span`, `summary`, `rationale`, and\n"
+        "# - Put `path`, `type`, `span`, `summary`, `rationale`, and optional\n"
         "#   `related` on each file entry.\n"
+        "# - Put file-related entity ids under `related.entities`.\n"
         "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
         "#   `action: deleted`, or `action: modified`.\n"
         "# - Put relationship changes in `entity_relationships`.\n"

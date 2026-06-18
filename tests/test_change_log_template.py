@@ -49,9 +49,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "invariants:" in template_text
     assert "guidance:" in template_text
     assert "    related:" in template_text
-    assert "Remove this block entirely if it does not point to anything." in (
-        template_text
-    )
+    assert "Remove this block entirely if it does not point" in template_text
+    assert "to anything." in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 

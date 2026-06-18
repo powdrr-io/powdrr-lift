@@ -83,7 +83,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         type: modified
         entities:
           - AppService
-          - CacheLayer
+          - Cache
         span:
           start_line: 1
           end_line: 1
@@ -104,7 +104,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         type: Service
         action: added
       - id: TestSuite
-        type: Suite
+        type: Test suite
         action: added
 
     entity_relationships: []
@@ -201,7 +201,7 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
         type: Service
         action: added
       - id: TestSuite
-        type: Suite
+        type: Test suite
         action: added
 
     entity_relationships: []
@@ -798,6 +798,94 @@ def test_validate_change_log_yaml_rejects_null_entity_actions(
     assert report.issues[0].code == "entity_action_null_not_allowed"
 
 
+def test_validate_change_log_yaml_rejects_unknown_added_entity_types(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add application files
+
+    intent:
+      problem: Missing files
+      goal: Ship the new files
+
+    entities:
+      - id: AppService
+        type: NotARealType
+        action: added
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "entity_type_not_allowed" for issue in report.issues)
+
+
+def test_validate_change_log_yaml_rejects_unknown_added_entity_types_in_v2(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    files:
+      - path: src/app.py
+        type: modified
+        entities:
+          - AppService
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Needed for the feature.
+
+    entities:
+      - id: AppService
+        type: NotARealType
+        action: added
+
+    entity_relationships: []
+
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "entity_type_not_allowed" for issue in report.issues)
+
+
 def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -825,6 +913,7 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     _git(repo_root, "add", "README.md")
     _git(repo_root, "add", "src/app.py")
     _git(repo_root, "commit", "-m", "Initial commit")
+    _write_taxonomy_file(repo_root)
 
     _git(repo_root, "checkout", "-b", "feature/change-log")
     (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
@@ -850,6 +939,7 @@ def _create_repo_with_entity_history(tmp_path: Path) -> Path:
     (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
     (repo_root / "src").mkdir()
     (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    _write_taxonomy_file(repo_root)
     (repo_root / "docs").mkdir()
     (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
     (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
@@ -894,6 +984,16 @@ def _create_repo_with_entity_history(tmp_path: Path) -> Path:
     return repo_root
 
 
+def _write_taxonomy_file(repo_root: Path) -> None:
+    taxonomy_source = Path(__file__).resolve().parents[1] / (
+        "software_development_entity_taxonomy.md"
+    )
+    (repo_root / "software_development_entity_taxonomy.md").write_text(
+        taxonomy_source.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+
 def _create_repo_with_sparse_feature_branch(tmp_path: Path) -> Path:
     repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
     return repo_root
@@ -928,6 +1028,7 @@ def _create_repo_with_multi_hunk_feature_branch(tmp_path: Path) -> Path:
     _git(repo_root, "add", "README.md")
     _git(repo_root, "add", "src/app.py")
     _git(repo_root, "commit", "-m", "Initial commit")
+    _write_taxonomy_file(repo_root)
 
     _git(repo_root, "checkout", "-b", "feature/change-log")
     (repo_root / "src" / "app.py").write_text(

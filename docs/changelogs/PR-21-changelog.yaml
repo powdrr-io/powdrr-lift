@@ -1,0 +1,44 @@
+version: 2
+change_id: 21
+title: Add bootstrap changelog skill
+intent:
+  problem: The repository needs an installable skill that can guide an agent
+    through repository analysis, taxonomy-based entity selection, changelog v2
+    drafting, validation, and commit preparation.
+  goal: Add a bootstrap skill under skills/bootstrap with matching UI metadata
+    so other agents can install it and use it to draft validated changelog v2
+    documents from source tree evidence.
+decisions: []
+files:
+  - path: skills/bootstrap/SKILL.md
+    type: added
+    summary: Add the bootstrap changelog skill workflow.
+    rationale: Provide an installable skill that tells an agent how to analyze
+      repo evidence, map entities to the taxonomy, draft a validated changelog
+      v2 document, and commit it.
+    span:
+      start_line: 1
+      end_line: 32
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: skills/bootstrap/agents/openai.yaml
+    type: added
+    summary: Add UI metadata for the bootstrap skill.
+    rationale: Make the skill discoverable and installable in other agents.
+    span:
+      start_line: 1
+      end_line: 4
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

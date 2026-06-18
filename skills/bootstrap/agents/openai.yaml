@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bootstrap Changelog"
+  short_description: "Draft validated changelog v2 docs"
+  default_prompt: "Use $bootstrap to analyze the repo, map entities to the taxonomy, draft a validated changelog v2, and commit it."

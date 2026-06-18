@@ -237,7 +237,10 @@ def _parse_change_files(data: Mapping[str, Any]) -> list[ChangeFile]:
     files: list[ChangeFile] = []
     for raw_file in _ensure_sequence(data.get("files")):
         file_data = _ensure_mapping(raw_file)
-        entities = _parse_id_sequence(file_data.get("entities"))
+        related = _parse_related_section(file_data.get("related"))
+        entities = _parse_id_sequence(file_data.get("entities")) or list(
+            related.entities
+        )
         files.append(
             ChangeFile(
                 path=_coerce_optional_str(file_data.get("path")),
@@ -246,7 +249,7 @@ def _parse_change_files(data: Mapping[str, Any]) -> list[ChangeFile]:
                 span=_coerce_span(file_data.get("span")),
                 summary=_coerce_optional_str(file_data.get("summary")),
                 rationale=_coerce_optional_str(file_data.get("rationale")),
-                related=_parse_related_section(file_data.get("related")),
+                related=related,
             )
         )
     return files

@@ -107,7 +107,6 @@ def _render_template_body(
                     "    # File path and type for this hunk.",
                     f"    path: {diff_entry.path}",
                     f"    type: {_normalize_change_type(diff_entry.status)}",
-                    "    entities: []",
                     "    span:",
                     "      # First changed line in this file entry.",
                     f"      start_line: {diff_entry.start_line}",
@@ -122,6 +121,9 @@ def _render_template_body(
                     "    # missing ones, remove stale ones, and use the final",
                     "    # list to decide what belongs in entities, entity",
                     "    # relationships, invariants, and guidance.",
+                    "    # Related ids for this file entry.",
+                    "    # Remove this block entirely if it does not point",
+                    "    # to anything.",
                     "    related:",
                     *(
                         ["      files: []"]
@@ -412,13 +414,18 @@ def _render_header(
         "# - Add or remove `files` items as needed so every meaningful file change\n"
         "#   is represented exactly once.\n"
         "# - Keep `version: 2` unless the schema changes.\n"
-        "# - Put `path`, `type`, `entities`, `span`, `summary`, `rationale`, and\n"
+        "# - Put `path`, `type`, `span`, `summary`, `rationale`, and optional\n"
         "#   `related` on each file entry.\n"
         "# - Review each prefilled `related` section before you fill in the rest\n"
         "#   of the changelog. Keep entries that are still relevant, add\n"
         "#   missing ones, and remove stale ones.\n"
         "# - Use the final related lists to help fill out `entities`,\n"
         "#   `entity_relationships`, `invariants`, and `guidance`.\n"
+        "# - Put file-related entity ids under `related.entities`.\n"
+        "# - Use `related.files`, `related.invariants`, and `related.guidance`\n"
+        "#   when this file change needs to point at supporting files or at the\n"
+        "#   invariant or guidance entries it drives.\n"
+        "# - Remove `related` entirely if it would otherwise stay empty.\n"
         "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
         "#   `action: deleted`, or `action: modified`.\n"
         "# - Put relationship changes in `entity_relationships`.\n"

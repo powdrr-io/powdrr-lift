@@ -1,0 +1,88 @@
+version: 2
+change_id: 21
+title: Add bootstrap changelog skill
+intent:
+  problem: The repository needs an installable skill that can guide an agent
+    through repository analysis, taxonomy-based entity selection, changelog v2
+    drafting, validation, and commit preparation.
+  goal: Add a bootstrap skill under skills/bootstrap with matching UI metadata
+    so other agents can install it and use it to draft validated changelog v2
+    documents from source tree evidence.
+decisions: []
+files:
+  - path: software_development_entity_taxonomy.md
+    type: modified
+    summary: Add the Skill entity type to the repository taxonomy.
+    rationale: Allow the installable bootstrap skill to be described as a
+      taxonomy-compliant entity in the changelog.
+    span:
+      start_line: 466
+      end_line: 466
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: skills/bootstrap/SKILL.md
+    type: added
+    summary: Add the bootstrap changelog skill workflow.
+    rationale: Provide an installable skill that tells an agent how to analyze
+      repo evidence, map entities to the taxonomy, draft a validated changelog
+      v2 document, and commit it.
+    span:
+      start_line: 1
+      end_line: 32
+    entities:
+      - Bootstrap skill
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: skills/bootstrap/agents/openai.yaml
+    type: added
+    summary: Add UI metadata for the bootstrap skill.
+    rationale: Make the skill discoverable and installable in other agents.
+    span:
+      start_line: 1
+      end_line: 4
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: tests/test_entity_taxonomy.py
+    type: modified
+    summary: Assert the taxonomy parser reads the new Skill entity type.
+    rationale: Keep the taxonomy parser test aligned with the repository file.
+    span:
+      start_line: 18
+      end_line: 18
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+  - path: tests/test_entity_taxonomy.py
+    type: modified
+    summary: Assert the Skill entity remains the final taxonomy entry.
+    rationale: Keep the taxonomy parser test aligned with the repository file.
+    span:
+      start_line: 35
+      end_line: 35
+    entities: []
+    related:
+      files: []
+      entities: []
+      invariants: []
+      guidance: []
+entities:
+  - id: Bootstrap skill
+    type: Skill
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []

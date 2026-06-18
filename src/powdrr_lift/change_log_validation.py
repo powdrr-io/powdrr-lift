@@ -162,6 +162,7 @@ def build_validation_report(
                     ),
                 )
             )
+        _validate_v2_file_sections(raw_change_log, issues)
         if issues:
             return ValidationReport(
                 validation_successful=False,
@@ -690,6 +691,47 @@ def _contains_nonempty_value(raw_value: object | None) -> bool:
         return any(_contains_nonempty_value(value) for value in raw_value)
 
     return True
+
+
+def _validate_v2_file_sections(
+    raw_change_log: Mapping[str, Any],
+    issues: list[ValidationIssue],
+) -> None:
+    for file_change_index, raw_file_change in enumerate(
+        _parse_sequence(raw_change_log.get("files")),
+        start=1,
+    ):
+        file_data = _parse_mapping(raw_file_change)
+        file_path = (
+            None if file_data.get("path") is None else str(file_data.get("path"))
+        )
+
+        if "entities" in file_data:
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_entities_not_allowed",
+                    message=(
+                        f"File change {file_change_index} must move entity ids into "
+                        "related.entities and remove the top-level entities field."
+                    ),
+                    path=file_path,
+                )
+            )
+
+        if "related" in file_data and not _contains_nonempty_value(
+            file_data.get("related")
+        ):
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_empty_related",
+                    message=(
+                        f"File change {file_change_index} has an empty related "
+                        "block. Remove related unless it includes at least one "
+                        "file, entity, invariant, or guidance reference."
+                    ),
+                    path=file_path,
+                )
+            )
 
 
 def _validate_v2_file_change(

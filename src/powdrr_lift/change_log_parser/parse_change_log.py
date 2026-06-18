@@ -111,7 +111,7 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
     if version == 1:
         return _parse_change_log_v1(data)
     if version == 2:
-        return _parse_change_log_v2(_normalize_legacy_v2_content(data))
+        return _parse_change_log_v2(data)
 
     raise ValueError("Unknown change log version")
 
@@ -142,6 +142,12 @@ def _parse_change_log_v1(data: Mapping[str, Any]) -> ChangeLog:
 
 
 def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
+    if "changes" in data:
+        raise ValueError(
+            "Version 2 changelogs must use top-level files, entities, "
+            "entity_relationships, invariants, and guidance sections."
+        )
+
     return ChangeLog(
         version=_normalize_version(data.get("version")),
         change_id=_coerce_optional_str(data.get("change_id", data.get("pr_id"))),
@@ -154,88 +160,6 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         invariant_changes=_parse_change_invariants(data),
         guidance_changes=_parse_change_guidance(data),
     )
-
-
-def _normalize_legacy_v2_content(data: Mapping[str, Any]) -> Mapping[str, Any]:
-    if "changes" not in data or "files" in data:
-        return data
-
-    file_changes: list[object] = []
-    entity_changes: list[object] = []
-    entity_relationship_changes: list[object] = []
-    invariant_changes: list[object] = []
-    guidance_changes: list[object] = []
-
-    for raw_change in _ensure_sequence(data.get("changes")):
-        if not isinstance(raw_change, Mapping):
-            continue
-
-        raw_files = raw_change.get("files")
-        if isinstance(raw_files, Sequence) and not isinstance(raw_files, (str, bytes)):
-            file_changes.extend(raw_files)
-        elif raw_change.get("path") is not None or raw_change.get("file") is not None:
-            file_changes.append(_coerce_legacy_file_change(raw_change))
-
-        raw_entities = raw_change.get("entities")
-        if isinstance(raw_entities, Sequence) and not isinstance(
-            raw_entities, (str, bytes)
-        ):
-            entity_changes.extend(raw_entities)
-
-        raw_relationships = raw_change.get("entity_relationships")
-        if isinstance(raw_relationships, Sequence) and not isinstance(
-            raw_relationships, (str, bytes)
-        ):
-            entity_relationship_changes.extend(raw_relationships)
-
-        raw_invariants = raw_change.get("invariants")
-        if isinstance(raw_invariants, Sequence) and not isinstance(
-            raw_invariants, (str, bytes)
-        ):
-            invariant_changes.extend(raw_invariants)
-
-        raw_guidance = raw_change.get("guidance")
-        if isinstance(raw_guidance, Sequence) and not isinstance(
-            raw_guidance, (str, bytes)
-        ):
-            guidance_changes.extend(raw_guidance)
-
-    normalized = dict(data)
-    normalized.pop("changes", None)
-    normalized["files"] = file_changes
-    normalized["entities"] = entity_changes
-    normalized["entity_relationships"] = entity_relationship_changes
-    normalized["invariants"] = invariant_changes
-    normalized["guidance"] = guidance_changes
-
-    raw_relationships = normalized.pop("relationship_changes", None)
-    if isinstance(raw_relationships, Sequence) and not isinstance(
-        raw_relationships, (str, bytes)
-    ):
-        normalized["entity_relationships"] = [
-            *cast(list[object], normalized["entity_relationships"]),
-            *raw_relationships,
-        ]
-
-    return normalized
-
-
-def _coerce_legacy_file_change(raw_change: Mapping[str, Any]) -> dict[str, object]:
-    path = _coerce_optional_str(raw_change.get("path", raw_change.get("file")))
-    return {
-        "path": path,
-        "type": _coerce_optional_str(raw_change.get("type")),
-        "entities": [
-            _normalize_entity_id(_coerce_optional_str(value.get("id")))
-            if isinstance(value, Mapping)
-            else _normalize_entity_id(str(value))
-            for value in _ensure_sequence(raw_change.get("affects"))
-        ],
-        "span": raw_change.get("span"),
-        "summary": _coerce_optional_str(raw_change.get("summary")),
-        "rationale": _coerce_optional_str(raw_change.get("rationale")),
-        "related": raw_change.get("related"),
-    }
 
 
 def _parse_intent(raw_intent: object | None) -> Intent:

@@ -140,6 +140,37 @@ def build_validation_report(
 
     version = _normalize_version(raw_change_log.get("version"))
 
+    if version == 2:
+        if "changes" in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="top_level_changes_not_allowed",
+                    message=(
+                        "Version 2 changelogs must use top-level files, entities, "
+                        "entity_relationships, invariants, and guidance sections."
+                    ),
+                )
+            )
+        if "relationship_changes" in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="top_level_relationship_changes_not_allowed",
+                    message=(
+                        "Version 2 changelogs must move relationship changes "
+                        "to the entity_relationships section."
+                    ),
+                )
+            )
+        if issues:
+            return ValidationReport(
+                validation_successful=False,
+                branch_name=branch_name,
+                default_branch_name=default_branch_name,
+                expected_change_files=expected_change_files,
+                proposed_change_files=proposed_change_files,
+                issues=issues,
+            )
+
     try:
         change_log = parse_change_log(proposed_change_log_yaml)
     except Exception as exc:  # noqa: BLE001
@@ -158,30 +189,11 @@ def build_validation_report(
             issues=issues,
         )
 
-    if version == 2:
-        if "relationship_changes" in raw_change_log:
-            issues.append(
-                ValidationIssue(
-                    code="top_level_relationship_changes_not_allowed",
-                    message=(
-                        "Version 2 changelogs must move relationship changes "
-                        "to the entity_relationships section."
-                    ),
-                )
-            )
-
-    if version == 2:
-        proposed_change_files = [
-            file_change.path
-            for file_change in change_log.file_changes
-            if file_change.path is not None and file_change.path != ""
-        ]
-    else:
-        proposed_change_files = [
-            file_change.path
-            for file_change in change_log.file_changes
-            if file_change.path is not None and file_change.path != ""
-        ]
+    proposed_change_files = [
+        file_change.path
+        for file_change in change_log.file_changes
+        if file_change.path is not None and file_change.path != ""
+    ]
     if version == 1:
         proposed_entities = [
             _parse_validation_entity(entity_data)

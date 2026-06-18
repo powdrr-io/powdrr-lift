@@ -222,6 +222,50 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
     assert report.issues == []
 
 
+def test_validate_change_log_yaml_rejects_version_two_changes(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    changes:
+      - files:
+          - path: src/app.py
+            type: modified
+            entities:
+              - AppService
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Add app code.
+            rationale: Needed for the feature.
+        entities:
+          - id: AppService
+            type: Service
+            action: added
+        invariants: []
+        guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["top_level_changes_not_allowed"]
+
+
 def test_validate_change_log_yaml_reports_missing_changes(
     tmp_path: Path,
 ) -> None:

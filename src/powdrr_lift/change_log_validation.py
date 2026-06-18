@@ -25,6 +25,7 @@ from powdrr_lift.core.index import (
     _normalize_entity_id,
     build_changelog_index_at_ref,
 )
+from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +208,51 @@ def build_validation_report(
         for entity in proposed_entities
         if (entity_id := _normalize_entity_id(entity.id)) is not None
     }
+    added_entities = [
+        entity for entity in proposed_entities if entity.action == "added"
+    ]
+    allowed_entity_types: set[str] | None = None
+    if added_entities:
+        try:
+            allowed_entity_types = set(
+                load_entity_taxonomy(repo_root_path).entity_types
+            )
+        except FileNotFoundError:
+            issues.append(
+                ValidationIssue(
+                    code="entity_taxonomy_missing",
+                    message=(
+                        "Entity validation requires "
+                        "software_development_entity_taxonomy.md at the repo root."
+                    ),
+                )
+            )
+            return ValidationReport(
+                validation_successful=False,
+                branch_name=branch_name,
+                default_branch_name=default_branch_name,
+                expected_change_files=expected_change_files,
+                proposed_change_files=proposed_change_files,
+                issues=issues,
+            )
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                ValidationIssue(
+                    code="entity_taxonomy_invalid",
+                    message=(
+                        "Could not parse software_development_entity_taxonomy.md: "
+                        f"{exc}"
+                    ),
+                )
+            )
+            return ValidationReport(
+                validation_successful=False,
+                branch_name=branch_name,
+                default_branch_name=default_branch_name,
+                expected_change_files=expected_change_files,
+                proposed_change_files=proposed_change_files,
+                issues=issues,
+            )
     expected_change_entries_by_file: dict[str, list[BranchDiffEntry]] = {}
     for entry in diff_entries:
         if _is_changelog_artifact_path(entry.path):
@@ -253,6 +299,12 @@ def build_validation_report(
                         path=None,
                     )
                 )
+            _validate_added_entity_type(
+                issues=issues,
+                entity=entity,
+                entity_id=entity_id,
+                allowed_entity_types=allowed_entity_types,
+            )
             continue
 
         if entity_id not in parent_entity_ids:
@@ -286,6 +338,7 @@ def build_validation_report(
                 issues=issues,
                 entity_change=entity_change,
                 entity_change_index=entity_change_index,
+                allowed_entity_types=allowed_entity_types,
             )
 
         for invariant_change_index, invariant_change in enumerate(
@@ -735,6 +788,7 @@ def _validate_v2_entity_change(
     issues: list[ValidationIssue],
     entity_change: ChangeEntity,
     entity_change_index: int,
+    allowed_entity_types: set[str] | None = None,
 ) -> None:
     normalized_entity_id = _normalize_entity_id(entity_change.id)
     if normalized_entity_id is None:
@@ -750,6 +804,14 @@ def _validate_v2_entity_change(
         )
         return
 
+    if entity_change.action == "added":
+        _validate_added_entity_type(
+            issues=issues,
+            entity=entity_change,
+            entity_id=normalized_entity_id,
+            allowed_entity_types=allowed_entity_types,
+        )
+
     if entity_change.action not in {"added", "deleted", "modified"}:
         issues.append(
             ValidationIssue(
@@ -758,6 +820,42 @@ def _validate_v2_entity_change(
                     f"Entity {normalized_entity_id} in entity change "
                     f"{entity_change_index} must be marked as added, deleted, "
                     "or modified."
+                ),
+                path=None,
+            )
+        )
+
+
+def _validate_added_entity_type(
+    *,
+    issues: list[ValidationIssue],
+    entity: ChangeEntity,
+    entity_id: str,
+    allowed_entity_types: set[str] | None,
+) -> None:
+    if allowed_entity_types is None:
+        return
+
+    entity_type = entity.type.strip() if entity.type is not None else ""
+    if entity_type == "":
+        issues.append(
+            ValidationIssue(
+                code="entity_type_missing",
+                message=(
+                    f"Entity {entity_id} is marked added but does not include a type."
+                ),
+                path=None,
+            )
+        )
+        return
+
+    if entity_type not in allowed_entity_types:
+        issues.append(
+            ValidationIssue(
+                code="entity_type_not_allowed",
+                message=(
+                    f"Entity {entity_id} is marked added with unsupported type "
+                    f"{entity_type!r}."
                 ),
                 path=None,
             )

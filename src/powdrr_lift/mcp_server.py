@@ -7,7 +7,9 @@ from typing import Any
 from powdrr_lift.core import (
     blame_view_state_to_data,
     build_blame_view_state,
+    codebase_state_default_output_path,
     create_change_log_template,
+    create_codebase_state,
     lookup_edit_context,
     lookup_entity_decisions,
     lookup_entity_references,
@@ -141,6 +143,26 @@ def build_server() -> Any:
             repo_root=repo_root_path,
         )
         return render_entity_relationship_report(report)
+
+    @server.tool()
+    def get_codebase_state(
+        branch_name: str | None = None,
+        parent_branch: str | None = None,
+        output_path: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_codebase_state(
+            branch_name=branch_name,
+            output_path=(
+                codebase_state_default_output_path(repo_root_path)
+                if output_path is None
+                else Path(output_path)
+            ),
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
 
     @server.tool()
     def get_blame_view(

@@ -69,6 +69,105 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert change_log.decisions == [Decision()]
 
 
+def test_create_change_log_template_populates_full_related_sections(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text(
+        "print('hello')\nprint('world')\n",
+        encoding="utf-8",
+    )
+    (repo_root / "tests").mkdir()
+    (repo_root / "tests" / "test_app.py").write_text(
+        "def test_app():\n    assert True\n",
+        encoding="utf-8",
+    )
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 1
+        title: Add application scaffold
+
+        intent:
+          problem: The repository had no application entry point.
+          goal: Introduce the initial application and test files.
+
+        entities:
+          - id: AppService
+            type: Component
+            action: added
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 2
+            summary: Add the application scaffold.
+            affects:
+              - AppService
+            rationale: Bootstrap the app file.
+          - file: tests/test_app.py
+            span:
+              start_line: 1
+              end_line: 2
+            summary: Add the initial test scaffold.
+            affects:
+              - AppService
+            rationale: Cover the app file.
+        """,
+        encoding="utf-8",
+    )
+    _git(
+        repo_root,
+        "add",
+        "src/app.py",
+        "tests/test_app.py",
+        "docs/changelogs/PR-1-changelog.yaml",
+    )
+    _git(repo_root, "commit", "-m", "Add application scaffold")
+
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "src" / "app.py").write_text(
+        "print('hello')\nprint('world v2')\n",
+        encoding="utf-8",
+    )
+    (repo_root / "tests" / "test_app.py").write_text(
+        "def test_app():\n    assert True is True\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "tests/test_app.py")
+    _git(repo_root, "commit", "-m", "Update application scaffold")
+
+    output_path = create_change_log_template(
+        branch_name="feature/change-log",
+        output_path=tmp_path / "change-log.template.yaml",
+        repo_root=repo_root,
+    )
+
+    template_text = output_path.read_text(encoding="utf-8")
+    assert "Review each prefilled `related` section" in template_text
+
+    change_log = parse_change_log(template_text)
+    assert [change.path for change in change_log.file_changes] == [
+        "src/app.py",
+        "tests/test_app.py",
+    ]
+    assert change_log.file_changes[0].related.files == ["tests/test_app.py"]
+    assert change_log.file_changes[1].related.files == ["src/app.py"]
+    assert change_log.file_changes[0].related.entities == ["AppService"]
+    assert change_log.file_changes[1].related.entities == ["AppService"]
+    assert change_log.file_changes[0].related.invariants == []
+    assert change_log.file_changes[0].related.guidance == []
+
+
 def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

@@ -42,7 +42,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
 )
 
-INDEX_CACHE_VERSION = 11
+INDEX_CACHE_VERSION = 13
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,9 +56,72 @@ class BranchState:
     indexed_at: int
 
 
+@dataclass(frozen=True, slots=True)
+class CurrentDecisionRecord:
+    pr_number: int
+    decision_index: int
+    decision_id: str | None
+    decision_summary: str | None
+    decision_status: str
+    replaces_decision_id: str | None
+    commit_sha: str | None
+    commit_timestamp: int | None
+    changelog_path: str
+    title: str | None
+    change_id: str | None
+    intent_problem: str | None
+    intent_goal: str | None
+
+
+@dataclass(slots=True)
+class _DecisionState:
+    decision_index: int
+    decision_id: str | None
+    decision_summary: str | None
+    decision_status: str = "current"
+    replaces_decision_id: str | None = None
+
+
 def code_index_db_path(repo_root: str | Path | None = None) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
     return repo_root_path / ".powdrr-lift" / "state" / "code_index.db"
+
+
+def _collect_decision_states(
+    decisions: Sequence[Decision],
+) -> list[_DecisionState]:
+    decision_states: list[_DecisionState] = []
+    decision_state_index_by_id: dict[str, int] = {}
+
+    for decision_index, decision in enumerate(decisions):
+        decision_id = _normalize_text(decision.id)
+        decision_summary = _normalize_text(decision.summary)
+        replaces_decision_id = _normalize_text(decision.replaces)
+        decision_state = _DecisionState(
+            decision_index=decision_index,
+            decision_id=decision_id,
+            decision_summary=decision_summary,
+            replaces_decision_id=replaces_decision_id,
+        )
+        decision_states.append(decision_state)
+
+        if replaces_decision_id is not None:
+            replaced_index = decision_state_index_by_id.get(replaces_decision_id)
+            if replaced_index is not None:
+                decision_states[replaced_index].decision_status = "superseded"
+
+        if decision_id is not None:
+            decision_state_index_by_id[decision_id] = decision_index
+
+    return decision_states
+
+
+def _normalize_text(value: object | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized_value = str(value).strip()
+    return normalized_value or None
 
 
 def refresh_code_index(
@@ -480,6 +543,58 @@ class CodeIndexStore:
         ]
         return entity_occurrences, relationship_occurrences
 
+    def lookup_current_decisions(
+        self,
+        branch_name: str,
+    ) -> list[CurrentDecisionRecord]:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT
+                  bd.pr_number,
+                  bd.decision_index,
+                  bd.decision_id,
+                  bd.decision_summary,
+                  bd.decision_status,
+                  bd.replaces_decision_id,
+                  doc.commit_sha,
+                  doc.commit_timestamp,
+                  doc.changelog_path,
+                  doc.title,
+                  doc.change_id,
+                  doc.intent_problem,
+                  doc.intent_goal
+                FROM branch_decision bd
+                JOIN branch_document doc
+                  ON doc.branch_name = bd.branch_name
+                 AND doc.pr_number = bd.pr_number
+                WHERE bd.branch_name = ?
+                  AND bd.decision_status = 'current'
+                ORDER BY doc.commit_timestamp, bd.decision_index
+                """,
+                (branch_name,),
+            ).fetchall()
+
+        return [
+            CurrentDecisionRecord(
+                pr_number=row["pr_number"],
+                decision_index=row["decision_index"],
+                decision_id=row["decision_id"],
+                decision_summary=row["decision_summary"],
+                decision_status=row["decision_status"],
+                replaces_decision_id=row["replaces_decision_id"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+                title=row["title"],
+                change_id=row["change_id"],
+                intent_problem=row["intent_problem"],
+                intent_goal=row["intent_goal"],
+            )
+            for row in rows
+        ]
+
     def branch_state_for(self, branch_name: str) -> BranchState | None:
         return self._read_branch_state(branch_name)
 
@@ -519,6 +634,8 @@ class CodeIndexStore:
                   decision_index INTEGER NOT NULL,
                   decision_id TEXT,
                   decision_summary TEXT,
+                  decision_status TEXT NOT NULL DEFAULT 'current',
+                  replaces_decision_id TEXT,
                   PRIMARY KEY (branch_name, pr_number, decision_index)
                 );
 
@@ -751,10 +868,30 @@ class CodeIndexStore:
                   decision_index INTEGER NOT NULL,
                   decision_id TEXT,
                   decision_summary TEXT,
+                  decision_status TEXT NOT NULL DEFAULT 'current',
+                  replaces_decision_id TEXT,
                   PRIMARY KEY (branch_name, pr_number, decision_index)
                 )
                 """
             )
+            branch_decision_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(branch_decision)")
+            }
+            if "decision_status" not in branch_decision_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_decision
+                    ADD COLUMN decision_status TEXT NOT NULL DEFAULT 'current'
+                    """
+                )
+            if "replaces_decision_id" not in branch_decision_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_decision
+                    ADD COLUMN replaces_decision_id TEXT
+                    """
+                )
 
     def _ensure_parent_index(self, parent_branch: str) -> SourceIndex:
         current_state = self._read_branch_state(parent_branch)
@@ -842,7 +979,8 @@ class CodeIndexStore:
             ).fetchall()
             decision_rows = connection.execute(
                 """
-                SELECT pr_number, decision_index, decision_id, decision_summary
+                SELECT pr_number, decision_index, decision_id, decision_summary,
+                       decision_status, replaces_decision_id
                 FROM branch_decision
                 WHERE branch_name = ?
                 ORDER BY pr_number, decision_index
@@ -1230,22 +1368,24 @@ class CodeIndexStore:
                         document.changelog.intent.goal,
                     ),
                 )
-                for decision_index, decision in enumerate(
+                for decision_state in _collect_decision_states(
                     document.changelog.decisions or []
                 ):
                     connection.execute(
                         """
                         INSERT INTO branch_decision (
                           branch_name, pr_number, decision_index, decision_id,
-                          decision_summary
-                        ) VALUES (?, ?, ?, ?, ?)
+                          decision_summary, decision_status, replaces_decision_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             branch_name,
                             document.pr_number,
-                            decision_index,
-                            decision.id,
-                            decision.summary,
+                            decision_state.decision_index,
+                            decision_state.decision_id,
+                            decision_state.decision_summary,
+                            decision_state.decision_status,
+                            decision_state.replaces_decision_id,
                         ),
                     )
 

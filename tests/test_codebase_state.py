@@ -7,7 +7,12 @@ from pathlib import Path
 
 import yaml
 
-from powdrr_lift import build_codebase_state_report, codebase_state_default_output_path
+from powdrr_lift import (
+    build_codebase_state_report,
+    build_current_decisions_report,
+    build_invariants_report,
+    codebase_state_default_output_path,
+)
 from powdrr_lift.cli import main
 
 
@@ -36,10 +41,45 @@ def test_build_codebase_state_report_collates_current_state(tmp_path: Path) -> N
     assert [decision.key for decision in report.decisions] == ["DEC-001"]
     assert len(report.decisions[0].sources) == 2
     assert report.decisions[0].summary == "Define the current codebase snapshot."
+    assert report.decisions[0].status == "current"
+    assert report.decisions[0].replaces is None
     assert [intent.problem for intent in report.intents] == [
         "Keep the state description up to date."
     ]
     assert len(report.intents[0].sources) == 2
+
+
+def test_build_current_decisions_report_returns_only_current_decisions(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_state_branch(tmp_path)
+
+    report = build_current_decisions_report(
+        branch_name="feature/state",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    assert [decision.decision_id for decision in report.decisions] == ["DEC-001"]
+    assert report.decisions[0].status == "current"
+    assert report.decisions[0].replaces is None
+    assert len(report.decisions[0].sources) == 2
+
+
+def test_build_invariants_report_returns_current_invariants(tmp_path: Path) -> None:
+    repo_root = _create_repo_with_state_branch(tmp_path)
+
+    report = build_invariants_report(
+        branch_name="feature/state",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    assert [item.id for item in report.invariants] == ["inv-1"]
+    assert report.invariants[0].description == (
+        "Keep the service boundary explicit and current."
+    )
+    assert report.invariants[0].last_action == "altered"
 
 
 def test_cli_codebase_state_writes_default_file(tmp_path: Path) -> None:
@@ -66,7 +106,49 @@ def test_cli_codebase_state_writes_default_file(tmp_path: Path) -> None:
     report = yaml.safe_load(expected_output_path.read_text(encoding="utf-8"))
     assert [entity["id"] for entity in report["entities"]] == ["Alpha"]
     assert [decision["key"] for decision in report["decisions"]] == ["DEC-001"]
+    assert report["decisions"][0]["status"] == "current"
     assert len(report["decisions"][0]["sources"]) == 2
+
+
+def test_cli_current_decisions_and_invariants_write_yaml(tmp_path: Path) -> None:
+    repo_root = _create_repo_with_state_branch(tmp_path)
+
+    decisions_stdout = io.StringIO()
+    with redirect_stdout(decisions_stdout):
+        exit_code = main(
+            [
+                "current-decisions",
+                "feature/state",
+                "--repo-root",
+                str(repo_root),
+                "--parent-branch",
+                "main",
+            ]
+        )
+
+    assert exit_code == 0
+    decisions_report = yaml.safe_load(decisions_stdout.getvalue())
+    assert [decision["decision_id"] for decision in decisions_report["decisions"]] == [
+        "DEC-001"
+    ]
+    assert decisions_report["decisions"][0]["status"] == "current"
+
+    invariants_stdout = io.StringIO()
+    with redirect_stdout(invariants_stdout):
+        exit_code = main(
+            [
+                "invariants",
+                "feature/state",
+                "--repo-root",
+                str(repo_root),
+                "--parent-branch",
+                "main",
+            ]
+        )
+
+    assert exit_code == 0
+    invariants_report = yaml.safe_load(invariants_stdout.getvalue())
+    assert [item["id"] for item in invariants_report["invariants"]] == ["inv-1"]
 
 
 def _create_repo_with_state_branch(tmp_path: Path) -> Path:

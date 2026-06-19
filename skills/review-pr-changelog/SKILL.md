@@ -21,7 +21,13 @@ Use this skill when a PR needs changelog-focused review.
    - For each `change` entry, compare the file, summary, affects list, and rationale to the PR intent.
    - Ask whether the change supports the intent.
    - Ask whether the change is strictly necessary to satisfy the intent.
-4. Report feedback for every change.
+4. Check the branch-level invariants and decisions.
+   - Call `get_invariants` to retrieve the current invariants.
+   - Call `get_current_decisions` to retrieve only decisions that are still current.
+   - Use a separate subagent for each invariant to verify it still holds after the PR.
+   - Use a separate subagent for each current decision to verify the PR honors it.
+   - If the PR introduces a decision that supersedes a previous decision, the new decision must explicitly mark `replaces`; otherwise fail the review.
+5. Report feedback for every change.
    - Call out any change that does not support the intent.
    - Call out any change that seems unnecessary or over-scoped.
    - Keep the feedback specific to the individual change entry.
@@ -32,4 +38,5 @@ Use this skill when a PR needs changelog-focused review.
 - Treat a missing changelog as a blocking review issue.
 - Treat an invalid changelog as a blocking review issue.
 - When the changelog is valid, every change entry should receive a judgment.
+- Treat a missing `replaces` on a superseding decision as a blocking review issue.
 - Prefer concise, actionable review comments over broad summaries.

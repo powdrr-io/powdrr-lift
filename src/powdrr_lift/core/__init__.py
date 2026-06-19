@@ -30,9 +30,13 @@ from powdrr_lift.core.codebase_state import (
     CodebaseStateReport,
     CodebaseStateSource,
     build_codebase_state_report,
+    build_current_decisions_report,
+    build_invariants_report,
     codebase_state_default_output_path,
     create_codebase_state,
     render_codebase_state_report,
+    render_current_decisions_report,
+    render_invariants_report,
 )
 from powdrr_lift.core.edit_context import (
     EditContextLine,
@@ -140,6 +144,8 @@ __all__ = [
     "build_blame_view_state",
     "build_repo_tree",
     "build_codebase_state_report",
+    "build_current_decisions_report",
+    "build_invariants_report",
     "collect_branch_diff_entries",
     "codebase_state_default_output_path",
     "create_change_log_template",
@@ -165,6 +171,8 @@ __all__ = [
     "refresh_code_index",
     "build_validation_report",
     "validate_change_log_yaml",
+    "render_current_decisions_report",
+    "render_invariants_report",
 ]
 
 

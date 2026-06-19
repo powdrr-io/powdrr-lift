@@ -1,4 +1,4 @@
 interface:
   display_name: "Review PR Changelog"
   short_description: "Review PR changelogs against PR intent"
-  default_prompt: "Use $review-pr-changelog when reviewing a pull request. First check for a changelog YAML and stop with feedback if it is missing. Then validate the changelog and stop with feedback if it fails. If it is valid, review each change against the PR intent and report whether it supports the intent and is strictly necessary."
+  default_prompt: "Use $review-pr-changelog when reviewing a pull request. First check for a changelog YAML and stop with feedback if it is missing. Then validate the changelog and stop with feedback if it fails. If it is valid, review each change against the PR intent. Next, call the invariants endpoint and the current-decisions endpoint, use a separate subagent for each invariant, use a separate subagent for each current decision, and fail the review if a superseding decision is missing a replaces reference. Report whether each change supports the intent and is strictly necessary."

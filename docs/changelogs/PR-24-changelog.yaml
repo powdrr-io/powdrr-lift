@@ -1,0 +1,225 @@
+version: 2
+change_id: 24
+title: Add codebase state endpoint
+intent:
+  problem: Agents needed a single changelog-derived snapshot of the current
+    codebase state.
+  goal: Add a CLI command and MCP tool that write a YAML snapshot containing
+    the current entities, relationships, invariants, guidance, decisions, and
+    intents from the changelog index.
+decisions:
+  - id: ARCH-001
+    summary: Generate the codebase state solely from the changelog index and
+      surface it through both CLI and MCP entry points.
+files:
+  - path: src/powdrr_lift/core/codebase_state.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 490
+    summary: Implement the changelog-indexed codebase state snapshot builder and
+      YAML serializer.
+    rationale: Provide the shared replay logic that materializes current
+      entities, relationships, invariants, guidance, decisions, and intents
+      from the changelog index.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 10
+      end_line: 11
+    summary: Import the codebase state helpers into the CLI.
+    rationale: Reuse the shared snapshot builder and default output path helper
+      from the core module.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 215
+      end_line: 243
+    summary: Add the codebase-state CLI subcommand.
+    rationale: Provide a shell-friendly entry point for generating the
+      changelog-derived codebase snapshot.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 390
+      end_line: 406
+    summary: Add the codebase-state command handler.
+    rationale: Resolve the branch, generate the snapshot, and print the output
+      path after writing the YAML file.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 17
+      end_line: 29
+    summary: Expose the new codebase state core module from the package
+      namespace.
+    rationale: Make the snapshot models and helpers available through the shared
+      core import path.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 100
+      end_line: 106
+    summary: Add the codebase state types to core.__all__.
+    rationale: Keep the exported type surface aligned with the new snapshot
+      report models.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 142
+      end_line: 142
+    summary: Export build_codebase_state_report from core.__all__.
+    rationale: Expose the main snapshot builder alongside the other core
+      report helpers.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 144
+      end_line: 144
+    summary: Export codebase_state_default_output_path from core.__all__.
+    rationale: Let callers discover the default snapshot location from the
+      shared core namespace.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 146
+      end_line: 146
+    summary: Export create_codebase_state from core.__all__.
+    rationale: Keep the file-writing helper available through the shared core
+      API.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 158
+      end_line: 158
+    summary: Export render_codebase_state_report from core.__all__.
+    rationale: Make the YAML serializer available to callers that want the
+      rendered snapshot.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 35
+      end_line: 41
+    summary: Add the codebase state types to the package exports.
+    rationale: Keep the top-level API aligned with the new snapshot report
+      models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 62
+      end_line: 62
+    summary: Export build_codebase_state_report from the package root.
+    rationale: Make the snapshot builder available from the public package
+      surface.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 68
+      end_line: 69
+    summary: Export the codebase-state file helpers from the package root.
+    rationale: Expose the default output path and file-writing helper alongside
+      the rest of the top-level API.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 80
+      end_line: 80
+    summary: Export render_codebase_state_report from the package root.
+    rationale: Keep the rendered snapshot helper available to downstream
+      callers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 106
+      end_line: 146
+    summary: Lazy-load the codebase state exports.
+    rationale: Expose the new API without forcing the package to import the
+      snapshot builder eagerly.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 10
+      end_line: 10
+    summary: Import the codebase state helpers into the MCP server.
+    rationale: Reuse the shared snapshot builder and default output path helper
+      in the MCP tool implementation.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 12
+      end_line: 12
+    summary: Import the codebase state file writer into the MCP server.
+    rationale: Reuse the shared snapshot builder entry point in the MCP tool
+      implementation.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 147
+      end_line: 166
+    summary: Add the get_codebase_state MCP tool.
+    rationale: Expose the changelog-derived codebase snapshot to MCP clients.
+  - path: tests/test_codebase_state.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 186
+    summary: Cover the codebase state report builder and CLI output.
+    rationale: Prove that the snapshot builder collapses current state from the
+      changelog index and that the CLI writes the expected YAML file.
+  - path: tests/test_mcp_server.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 26
+    summary: Cover MCP registration for the codebase state tool.
+    rationale: Prove that the server registers the new snapshot tool on the MCP
+      surface.
+entities:
+  - id: codebase-state
+    type: Subcommand
+    action: added
+    related:
+      files:
+        - src/powdrr_lift/cli.py
+        - src/powdrr_lift/core/codebase_state.py
+        - src/powdrr_lift/core/__init__.py
+        - src/powdrr_lift/__init__.py
+  - id: get_codebase_state
+    type: Request handler
+    action: added
+    related:
+      files:
+        - src/powdrr_lift/mcp_server.py
+        - src/powdrr_lift/core/codebase_state.py
+        - src/powdrr_lift/core/__init__.py
+        - src/powdrr_lift/__init__.py
+entity_relationships:
+  - source: codebase-state
+    target: get_codebase_state
+    relationship: mirrors
+    description: Both entry points materialize the same changelog-derived
+      snapshot and return the same YAML structure.
+    rationale: Keep the CLI and MCP surfaces aligned while sharing the core
+      builder.
+invariants:
+  - id: index-only-source
+    description: Build the snapshot from the changelog index and branch
+      metadata rather than the live working tree.
+    action: added
+  - id: replay-order
+    description: Replay changelog documents in order so deleted or removed
+      items disappear from the current snapshot.
+    action: added
+  - id: default-output-path
+    description: Write the snapshot to `.powdrr-lift/state/codebase-state.yaml`
+      when no output path is supplied.
+    action: added
+guidance:
+  - id: cli-generation
+    description: Use `powdrr-lift codebase-state` to materialize the snapshot
+      file after the changelog index is updated.
+    action: added
+  - id: mcp-access
+    description: Use `get_codebase_state` when the snapshot is needed through
+      the MCP interface.
+    action: added

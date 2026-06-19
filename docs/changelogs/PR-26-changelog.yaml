@@ -1,0 +1,2287 @@
+version: 2
+change_id: 26
+title: Add changelog review endpoints
+intent:
+  problem: Changelog review needed direct access to the current invariants and current decisions,
+    and the changelog index needed to distinguish current decisions from superseded ones.
+  goal: Add validation, indexing, CLI, MCP, and review-skill support for globally unique changelog
+    ids, current invariants, and current decisions.
+decisions:
+- id: ARCH-002
+  summary: Track decision status in SQLite and expose current-decision and invariant reporting
+    through CLI and MCP entry points.
+- id: ARCH-003
+  summary: Require globally unique changelog ids and explicit supersession references when
+    a new decision replaces an older one.
+files:
+- path: skills/review-pr-changelog/SKILL.md
+  type: modified
+  span:
+    start_line: 24
+    end_line: 30
+  summary: Add review steps that fetch current invariants and current decisions before producing
+    feedback.
+  rationale: The review workflow needs direct access to the authoritative current invariants
+    and decisions before it can judge the PR.
+  related:
+    files:
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+    - review-superseding-decisions
+- path: skills/review-pr-changelog/SKILL.md
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Add blocking guidance for superseding decisions without replaces references.
+  rationale: A superseding decision is blocking when the changelog does not say what it replaces.
+  related:
+    files:
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+    - review-superseding-decisions
+- path: skills/review-pr-changelog/agents/openai.yaml
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Update the review agent prompt to follow the new invariants and current-decisions
+    workflow.
+  rationale: The agent prompt needs to mirror the updated review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+    - review-superseding-decisions
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Update the package root exports for the new review surface.
+  rationale: Keep the public package surface aligned with the new review helpers.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Expose the current-decision and invariant report builders from the package root.
+  rationale: Expose the shared report builders to callers at the package boundary.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Expose the current-decision report types from the package root.
+  rationale: Keep the report types accessible from the package root.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Expose the current-decision report renderer from the package root.
+  rationale: Keep the report renderer accessible from the package root.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 118
+    end_line: 118
+  summary: Expose the invariant report types from the package root.
+  rationale: Keep the invariant report types accessible from the package root.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Expose the invariant report renderer from the package root.
+  rationale: Keep the invariant report renderer accessible from the package root.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 123
+  summary: Add the current-decision CLI helpers to the package root exports.
+  rationale: Expose the CLI helpers alongside the rest of the public API.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Add the invariant CLI helpers to the package root exports.
+  rationale: Expose the invariant CLI helpers alongside the rest of the public API.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 136
+    end_line: 137
+  summary: Update lazy loading for the current-decision exports.
+  rationale: Maintain lazy loading for the current-decision exports.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 142
+  summary: Update lazy loading for the invariant exports.
+  rationale: Maintain lazy loading for the invariant exports.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 153
+  summary: Add current-decision exports to __all__.
+  rationale: Preserve the explicit export surface.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Add invariant exports to __all__.
+  rationale: Preserve the explicit export surface.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 158
+    end_line: 158
+  summary: Add the remaining invariant helpers to __all__.
+  rationale: Preserve the explicit export surface.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 160
+  summary: Add the remaining invariant serializer to __all__.
+  rationale: Preserve the explicit export surface.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - PublicAPI
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Import the changelog model needed for cross-section id validation.
+  rationale: The validator needs the full changelog model to inspect every id-bearing section.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - ChangeLogValidator
+    invariants:
+    - unique-changelog-ids
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 213
+    end_line: 213
+  summary: Run the global changelog-id uniqueness check during validation.
+  rationale: Global uniqueness must fail fast before any downstream indexing happens.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - ChangeLogValidator
+    invariants:
+    - unique-changelog-ids
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 909
+    end_line: 955
+  summary: Reject duplicate ids across decisions, entities, relationships, invariants, and
+    guidance.
+  rationale: Duplicate ids would make review guidance and indexing ambiguous.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - ChangeLogValidator
+    invariants:
+    - unique-changelog-ids
+    guidance: []
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Import the current-decision and invariant report builders.
+  rationale: The CLI needs the shared report builders to generate the new outputs.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Import the current-decision renderer.
+  rationale: The current-decision renderer is reused by the CLI handler.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Import the invariant renderer.
+  rationale: The invariant renderer is reused by the CLI handler.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 262
+  summary: Add the invariants CLI subcommand.
+  rationale: The review workflow needs a shell entry point for current invariants.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 438
+    end_line: 461
+  summary: Add the invariants CLI handler.
+  rationale: The shell entry point needs to emit the invariant report as YAML.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 34
+  summary: Update src/powdrr_lift/core/__init__.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 39
+  summary: Update src/powdrr_lift/core/__init__.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 148
+  summary: Update src/powdrr_lift/core/__init__.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 175
+  summary: Update src/powdrr_lift/core/__init__.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    - current-decisions
+    - invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Bump the cache schema version for the decision-status migration.
+  rationale: The cache schema version must change when the persisted decision state changes.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 59
+    end_line: 84
+  summary: Add the current-decision record and helper state classes.
+  rationale: The index needs concrete records for current-decision reporting.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 126
+  summary: Collect decision state and normalize decision metadata before persistence.
+  rationale: Decision status has to be derived before writing to SQLite.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 597
+  summary: Add a lookup for current decisions in the SQLite index.
+  rationale: The report endpoint needs a query that returns only current decisions.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 637
+    end_line: 638
+  summary: Add decision-status columns to the branch_decision schema.
+  rationale: The database schema must persist decision status in the table itself.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 871
+    end_line: 872
+  summary: Keep the decision-status columns in the schema bootstrap path.
+  rationale: New databases should start with the decision-status columns already present.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 877
+    end_line: 894
+  summary: Migrate existing branch_decision tables to add decision-status columns.
+  rationale: Existing databases need a migration path for the new columns.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 982
+    end_line: 983
+  summary: Read the decision-status columns back from branch_decision.
+  rationale: The report builder needs to read the persisted status back out.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1371
+    end_line: 1371
+  summary: Persist decision status and supersession information into branch_decision.
+  rationale: The refresh path has to persist current versus superseded state atomically.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1378
+    end_line: 1379
+  summary: Update src/powdrr_lift/core/code_index.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1384
+    end_line: 1388
+  summary: Update src/powdrr_lift/core/code_index.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    - decision_status
+    - replaces_decision_id
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 14
+  summary: Import the branch-state helper needed for the new reports.
+  rationale: The report builders depend on the branch-state helper.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 62
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 119
+  summary: Define dedicated codebase-state reports for current decisions and invariants.
+  rationale: Separate report models keep the current-decision and invariant outputs clear.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 134
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 136
+    end_line: 148
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 152
+    end_line: 192
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 207
+  summary: Render the current-decisions report to YAML.
+  rationale: The CLI and MCP surfaces both need the same current-decision YAML.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 236
+    end_line: 236
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 239
+    end_line: 239
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 261
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 390
+    end_line: 390
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 398
+    end_line: 412
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 417
+    end_line: 418
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 421
+    end_line: 432
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 434
+    end_line: 435
+  summary: Update src/powdrr_lift/core/codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 534
+    end_line: 535
+  summary: Build the current-decisions report data structure.
+  rationale: The current-decision report needs a dedicated serialization helper.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 680
+  summary: Build the invariants report data structure.
+  rationale: The invariant report needs a dedicated serialization helper.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    - CurrentDecisionRecord
+    invariants:
+    - current-decisions-only
+    - current-invariants-only
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Import the current-decision and invariant report builders.
+  rationale: The MCP server needs the shared report builders.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Import the current-decision renderer.
+  rationale: The current-decision tool reuses the shared renderer.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Import the invariant renderer.
+  rationale: The invariant tool reuses the shared renderer.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 151
+    end_line: 178
+  summary: Add the get_invariants MCP tool.
+  rationale: The review workflow needs an MCP tool for invariants.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 165
+    end_line: 238
+  summary: Update tests/test_change_log_validation.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - ChangeLogValidator
+    invariants:
+    - unique-changelog-ids
+    guidance: []
+- path: tests/test_code_index.py
+  type: modified
+  span:
+    start_line: 269
+    end_line: 350
+  summary: Update tests/test_code_index.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_codebase_state.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodeIndexStore
+    - CurrentDecisionRecord
+    - branch_decision
+    invariants:
+    - decision-status-tracking
+    - explicit-supersession
+    guidance: []
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 15
+  summary: Update tests/test_codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 45
+  summary: Update tests/test_codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 84
+  summary: Update tests/test_codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Update tests/test_codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 153
+  summary: Update tests/test_codebase_state.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_mcp_server.py
+    entities:
+    - CodebaseStateDecisionReport
+    - CodebaseStateInvariantReport
+    invariants: []
+    guidance:
+    - review-branch-invariants
+    - review-current-decisions
+- path: tests/test_mcp_server.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 28
+  summary: Update tests/test_mcp_server.py for the new changelog review workflow.
+  rationale: Keep the implementation aligned with the new review workflow.
+  related:
+    files:
+    - skills/review-pr-changelog/SKILL.md
+    - skills/review-pr-changelog/agents/openai.yaml
+    - src/powdrr_lift/__init__.py
+    - src/powdrr_lift/change_log_validation.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_change_log_validation.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+    entities:
+    - get_current_decisions
+    - get_invariants
+    invariants: []
+    guidance: []
+entities:
+- id: PublicAPI
+  type: Public API
+  action: modified
+  related:
+    files:
+    - src/powdrr_lift/__init__.py
+- id: ChangeLogValidator
+  type: Function
+  action: modified
+  related:
+    files:
+    - src/powdrr_lift/change_log_validation.py
+    - tests/test_change_log_validation.py
+- id: CurrentDecisionRecord
+  type: Class
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - tests/test_code_index.py
+    - tests/test_codebase_state.py
+- id: CodeIndexStore
+  type: Class
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/code_index.py
+    - src/powdrr_lift/core/codebase_state.py
+    - tests/test_code_index.py
+- id: branch_decision
+  type: Table
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/code_index.py
+    - tests/test_code_index.py
+- id: decision_status
+  type: Column
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/code_index.py
+    - tests/test_code_index.py
+- id: replaces_decision_id
+  type: Column
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/code_index.py
+    - tests/test_code_index.py
+- id: CodebaseStateDecisionReport
+  type: Class
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_codebase_state.py
+- id: CodebaseStateInvariantReport
+  type: Class
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/mcp_server.py
+    - tests/test_codebase_state.py
+- id: current-decisions
+  type: Subcommand
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/__init__.py
+- id: invariants
+  type: Subcommand
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/cli.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/__init__.py
+- id: get_current_decisions
+  type: Request handler
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/mcp_server.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/__init__.py
+- id: get_invariants
+  type: Request handler
+  action: added
+  related:
+    files:
+    - src/powdrr_lift/mcp_server.py
+    - src/powdrr_lift/core/codebase_state.py
+    - src/powdrr_lift/core/__init__.py
+    - src/powdrr_lift/__init__.py
+entity_relationships:
+- source: current-decisions
+  target: get_current_decisions
+  relationship: mirrors
+  description: The CLI subcommand and MCP tool surface the same current-decision report.
+  rationale: Keep the CLI and MCP surfaces aligned.
+- source: invariants
+  target: get_invariants
+  relationship: mirrors
+  description: The CLI subcommand and MCP tool surface the same invariant report.
+  rationale: Keep the CLI and MCP surfaces aligned.
+- source: branch_decision
+  target: decision_status
+  relationship: stores
+  description: The SQLite branch_decision table stores whether each decision is current or
+    superseded.
+  rationale: Persist the current-state filter in the index.
+- source: branch_decision
+  target: replaces_decision_id
+  relationship: stores
+  description: The SQLite branch_decision table stores the decision id replaced by a superseding
+    decision.
+  rationale: Persist explicit supersession links in the index.
+invariants:
+- id: unique-changelog-ids
+  description: Every decision, entity, relationship, invariant, and guidance id within a changelog
+    file must be unique.
+  action: added
+- id: decision-status-tracking
+  description: SQLite must track whether each indexed decision is current or superseded.
+  action: added
+- id: current-decisions-only
+  description: The current-decisions report must exclude superseded decisions.
+  action: added
+- id: current-invariants-only
+  description: The invariants report must include only the currently active invariants.
+  action: added
+- id: explicit-supersession
+  description: A decision that supersedes an earlier decision must explicitly name the decision
+    it replaces.
+  action: added
+guidance:
+- id: review-branch-invariants
+  description: Call `get_invariants` and assign one subagent per invariant to check whether
+    the PR still satisfies it.
+  action: added
+- id: review-current-decisions
+  description: Call `get_current_decisions` and assign one subagent per current decision to
+    check whether the PR honors it.
+  action: added
+- id: review-superseding-decisions
+  description: Fail the review if a superseding decision does not explicitly declare which
+    previous decision it replaces.
+  action: added

@@ -7,6 +7,8 @@ from typing import Any
 from powdrr_lift.core import (
     blame_view_state_to_data,
     build_blame_view_state,
+    build_current_decisions_report,
+    build_invariants_report,
     codebase_state_default_output_path,
     create_change_log_template,
     create_codebase_state,
@@ -16,10 +18,12 @@ from powdrr_lift.core import (
     lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
+    render_current_decisions_report,
     render_edit_context_report,
     render_entity_decision_report,
     render_entity_reference_report,
     render_entity_relationship_report,
+    render_invariants_report,
     resolve_repo_root,
     validate_change_log_yaml,
 )
@@ -143,6 +147,34 @@ def build_server() -> Any:
             repo_root=repo_root_path,
         )
         return render_entity_relationship_report(report)
+
+    @server.tool()
+    def get_invariants(
+        parent_branch: str,
+        branch_name: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        report = build_invariants_report(
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return render_invariants_report(report)
+
+    @server.tool()
+    def get_current_decisions(
+        parent_branch: str,
+        branch_name: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        report = build_current_decisions_report(
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return render_current_decisions_report(report)
 
     @server.tool()
     def get_codebase_state(

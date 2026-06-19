@@ -7,6 +7,8 @@ from pathlib import Path
 
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
+    build_current_decisions_report,
+    build_invariants_report,
     codebase_state_default_output_path,
     create_change_log_template,
     create_codebase_state,
@@ -16,10 +18,12 @@ from powdrr_lift.core import (
     lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
+    render_current_decisions_report,
     render_edit_context_report,
     render_entity_decision_report,
     render_entity_reference_report,
     render_entity_relationship_report,
+    render_invariants_report,
     resolve_repo_root,
     validate_change_log_yaml,
 )
@@ -212,6 +216,50 @@ def build_parser() -> argparse.ArgumentParser:
     )
     entity_relationships_parser.set_defaults(func=_run_entity_relationships)
 
+    invariants_parser = subparsers.add_parser(
+        "invariants",
+        aliases=["invariants_report"],
+        help="Report current invariants for the branch.",
+    )
+    invariants_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to inspect. Defaults to the current branch.",
+    )
+    invariants_parser.add_argument(
+        "--parent-branch",
+        required=True,
+        help="Reference parent branch used to build the index.",
+    )
+    invariants_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    invariants_parser.set_defaults(func=_run_invariants)
+
+    current_decisions_parser = subparsers.add_parser(
+        "current-decisions",
+        aliases=["current_decisions"],
+        help="Report the current decisions for the branch.",
+    )
+    current_decisions_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to inspect. Defaults to the current branch.",
+    )
+    current_decisions_parser.add_argument(
+        "--parent-branch",
+        required=True,
+        help="Reference parent branch used to build the index.",
+    )
+    current_decisions_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    current_decisions_parser.set_defaults(func=_run_current_decisions)
+
     codebase_state_parser = subparsers.add_parser(
         "codebase-state",
         aliases=["codebase_state"],
@@ -384,6 +432,30 @@ def _run_entity_relationships(args: argparse.Namespace) -> int:
         repo_root=repo_root,
     )
     sys.stdout.write(render_entity_relationship_report(report))
+    return 0
+
+
+def _run_invariants(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    branch_name = args.branch_name or _current_branch(repo_root)
+    report = build_invariants_report(
+        branch_name=branch_name,
+        parent_branch=args.parent_branch,
+        repo_root=repo_root,
+    )
+    sys.stdout.write(render_invariants_report(report))
+    return 0
+
+
+def _run_current_decisions(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    branch_name = args.branch_name or _current_branch(repo_root)
+    report = build_current_decisions_report(
+        branch_name=branch_name,
+        parent_branch=args.parent_branch,
+        repo_root=repo_root,
+    )
+    sys.stdout.write(render_current_decisions_report(report))
     return 0
 
 

@@ -7,7 +7,11 @@ from typing import Any
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
-from powdrr_lift.core.code_index import CodeIndexStore, _current_branch
+from powdrr_lift.core.code_index import (
+    BranchState,
+    CodeIndexStore,
+    _current_branch,
+)
 from powdrr_lift.core.index import ChangelogDocument, SourceIndex
 
 _DEFAULT_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "codebase-state.yaml"
@@ -54,6 +58,8 @@ class CodebaseStateDecision:
     key: str
     decision_id: str | None
     summary: str | None
+    status: str | None
+    replaces: str | None
     sources: list[CodebaseStateSource] = field(default_factory=list)
 
 
@@ -80,6 +86,37 @@ class CodebaseStateReport:
     intents: list[CodebaseStateIntent] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class CodebaseStateDecisionReport:
+    repo_root: str
+    branch_name: str
+    parent_branch: str
+    branch_head_sha: str
+    parent_head_sha: str
+    indexed_at: int
+    decisions: list[CodebaseStateDecision] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class CodebaseStateInvariantReport:
+    repo_root: str
+    branch_name: str
+    parent_branch: str
+    branch_head_sha: str
+    parent_head_sha: str
+    indexed_at: int
+    invariants: list[CodebaseStateLifecycleItem] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class _CodebaseStateSnapshot:
+    store: CodeIndexStore
+    source_index: SourceIndex
+    branch_name: str
+    parent_branch: str
+    branch_state: BranchState
+
+
 def build_codebase_state_report(
     branch_name: str | None = None,
     *,
@@ -90,25 +127,82 @@ def build_codebase_state_report(
     resolved_branch = branch_name or _current_branch(repo_root_path)
     resolved_parent_branch = parent_branch or _resolve_default_branch(repo_root_path)
 
-    store = CodeIndexStore(repo_root_path)
-    source_index = store.refresh(resolved_branch, resolved_parent_branch)
-    branch_state = store.branch_state_for(resolved_branch)
-    if branch_state is None:
-        raise RuntimeError(f"Missing branch state for {resolved_branch!r}.")
-
-    return _build_codebase_state_report(
+    state = _load_codebase_state_state(
         repo_root_path=repo_root_path,
         branch_name=resolved_branch,
         parent_branch=resolved_parent_branch,
-        source_index=source_index,
-        branch_head_sha=branch_state.branch_head_sha,
-        parent_head_sha=branch_state.parent_head_sha,
-        indexed_at=branch_state.indexed_at,
+    )
+
+    return _build_codebase_state_report(state)
+
+
+def build_current_decisions_report(
+    branch_name: str | None = None,
+    *,
+    parent_branch: str | None = None,
+    repo_root: str | Path | None = None,
+) -> CodebaseStateDecisionReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    resolved_branch = branch_name or _current_branch(repo_root_path)
+    resolved_parent_branch = parent_branch or _resolve_default_branch(repo_root_path)
+    state = _load_codebase_state_state(
+        repo_root_path=repo_root_path,
+        branch_name=resolved_branch,
+        parent_branch=resolved_parent_branch,
+    )
+
+    current_decisions = _collect_current_decisions(state.store, resolved_branch)
+    return CodebaseStateDecisionReport(
+        repo_root=str(repo_root_path),
+        branch_name=resolved_branch,
+        parent_branch=resolved_parent_branch,
+        branch_head_sha=state.branch_state.branch_head_sha,
+        parent_head_sha=state.branch_state.parent_head_sha,
+        indexed_at=state.branch_state.indexed_at,
+        decisions=current_decisions,
+    )
+
+
+def build_invariants_report(
+    branch_name: str | None = None,
+    *,
+    parent_branch: str | None = None,
+    repo_root: str | Path | None = None,
+) -> CodebaseStateInvariantReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    resolved_branch = branch_name or _current_branch(repo_root_path)
+    resolved_parent_branch = parent_branch or _resolve_default_branch(repo_root_path)
+    state = _load_codebase_state_state(
+        repo_root_path=repo_root_path,
+        branch_name=resolved_branch,
+        parent_branch=resolved_parent_branch,
+    )
+
+    invariants = _collect_current_lifecycle_items(
+        state.source_index.documents,
+        kind="invariants",
+    )
+    return CodebaseStateInvariantReport(
+        repo_root=str(repo_root_path),
+        branch_name=resolved_branch,
+        parent_branch=resolved_parent_branch,
+        branch_head_sha=state.branch_state.branch_head_sha,
+        parent_head_sha=state.branch_state.parent_head_sha,
+        indexed_at=state.branch_state.indexed_at,
+        invariants=invariants,
     )
 
 
 def render_codebase_state_report(report: CodebaseStateReport) -> str:
     return yaml.safe_dump(_codebase_state_report_to_data(report), sort_keys=False)
+
+
+def render_current_decisions_report(report: CodebaseStateDecisionReport) -> str:
+    return yaml.safe_dump(_current_decisions_report_to_data(report), sort_keys=False)
+
+
+def render_invariants_report(report: CodebaseStateInvariantReport) -> str:
+    return yaml.safe_dump(_invariants_report_to_data(report), sort_keys=False)
 
 
 def create_codebase_state(
@@ -139,17 +233,10 @@ def codebase_state_default_output_path(repo_root: str | Path | None = None) -> P
 
 
 def _build_codebase_state_report(
-    *,
-    repo_root_path: Path,
-    branch_name: str,
-    parent_branch: str,
-    source_index: SourceIndex,
-    branch_head_sha: str,
-    parent_head_sha: str,
-    indexed_at: int,
+    state: _CodebaseStateSnapshot,
 ) -> CodebaseStateReport:
     documents = sorted(
-        source_index.documents,
+        state.source_index.documents,
         key=_document_sort_key,
     )
     entities = _collect_current_entities(documents)
@@ -166,12 +253,12 @@ def _build_codebase_state_report(
     intents = _collect_intents(documents)
 
     return CodebaseStateReport(
-        repo_root=str(repo_root_path),
-        branch_name=branch_name,
-        parent_branch=parent_branch,
-        branch_head_sha=branch_head_sha,
-        parent_head_sha=parent_head_sha,
-        indexed_at=indexed_at,
+        repo_root=str(state.store.repo_root),
+        branch_name=state.branch_name,
+        parent_branch=state.parent_branch,
+        branch_head_sha=state.branch_state.branch_head_sha,
+        parent_head_sha=state.branch_state.parent_head_sha,
+        indexed_at=state.branch_state.indexed_at,
         entities=entities,
         relationships=relationships,
         invariants=invariants,
@@ -300,31 +387,52 @@ def _collect_decisions(
     documents: list[ChangelogDocument],
 ) -> list[CodebaseStateDecision]:
     decision_rows: dict[str, CodebaseStateDecision] = {}
+    decision_row_key_by_id: dict[str, str] = {}
     for document in documents:
         source = _document_source(document)
         for index, decision in enumerate(document.changelog.decisions or [], start=1):
             decision_id = _normalize_text(decision.id)
             summary = _normalize_text(decision.summary)
+            replaces = _normalize_text(decision.replaces)
             key = decision_id or summary or f"pr-{document.pr_number}-decision-{index}"
-            if key not in decision_rows:
+            if replaces is not None:
+                replaced_key = decision_row_key_by_id.get(replaces)
+                if replaced_key is not None and replaced_key in decision_rows:
+                    replaced_row = decision_rows[replaced_key]
+                    decision_rows[replaced_key] = CodebaseStateDecision(
+                        key=replaced_row.key,
+                        decision_id=replaced_row.decision_id,
+                        summary=replaced_row.summary,
+                        status="superseded",
+                        replaces=replaced_row.replaces,
+                        sources=list(replaced_row.sources),
+                    )
+
+            existing = decision_rows.get(key)
+            if existing is None:
                 decision_rows[key] = CodebaseStateDecision(
                     key=key,
                     decision_id=decision_id,
                     summary=summary,
+                    status="current",
+                    replaces=replaces,
                     sources=[source],
                 )
-                continue
+            else:
+                sources = list(existing.sources)
+                if source not in sources:
+                    sources.append(source)
+                decision_rows[key] = CodebaseStateDecision(
+                    key=key,
+                    decision_id=existing.decision_id or decision_id,
+                    summary=existing.summary or summary,
+                    status=existing.status or "current",
+                    replaces=existing.replaces or replaces,
+                    sources=sources,
+                )
 
-            existing = decision_rows[key]
-            sources = list(existing.sources)
-            if source not in sources:
-                sources.append(source)
-            decision_rows[key] = CodebaseStateDecision(
-                key=key,
-                decision_id=existing.decision_id or decision_id,
-                summary=existing.summary or summary,
-                sources=sources,
-            )
+            if decision_id is not None:
+                decision_row_key_by_id[decision_id] = key
 
     return sorted(
         decision_rows.values(),
@@ -423,6 +531,8 @@ def _codebase_state_report_to_data(report: CodebaseStateReport) -> dict[str, Any
                 "key": decision.key,
                 "decision_id": decision.decision_id,
                 "summary": decision.summary,
+                "status": decision.status,
+                "replaces": decision.replaces,
                 "sources": [_source_to_data(source) for source in decision.sources],
             }
             for decision in report.decisions
@@ -446,6 +556,125 @@ def _source_to_data(source: CodebaseStateSource) -> dict[str, Any]:
         "changelog_path": source.changelog_path,
         "title": source.title,
         "change_id": source.change_id,
+    }
+
+
+def _load_codebase_state_state(
+    *,
+    repo_root_path: Path,
+    branch_name: str,
+    parent_branch: str,
+) -> _CodebaseStateSnapshot:
+    store = CodeIndexStore(repo_root_path)
+    source_index = store.refresh(branch_name, parent_branch)
+    branch_state = store.branch_state_for(branch_name)
+    if branch_state is None:
+        raise RuntimeError(f"Missing branch state for {branch_name!r}.")
+
+    return _CodebaseStateSnapshot(
+        store=store,
+        source_index=source_index,
+        branch_name=branch_name,
+        parent_branch=parent_branch,
+        branch_state=branch_state,
+    )
+
+
+def _collect_current_decisions(
+    store: CodeIndexStore,
+    branch_name: str,
+) -> list[CodebaseStateDecision]:
+    decision_rows: dict[str, CodebaseStateDecision] = {}
+    for current_decision in store.lookup_current_decisions(branch_name):
+        key = (
+            current_decision.decision_id
+            or current_decision.decision_summary
+            or (
+                f"pr-{current_decision.pr_number}-decision-"
+                f"{current_decision.decision_index}"
+            )
+        )
+        source = CodebaseStateSource(
+            pr_number=current_decision.pr_number,
+            commit_sha=current_decision.commit_sha,
+            commit_timestamp=current_decision.commit_timestamp,
+            changelog_path=current_decision.changelog_path,
+            title=current_decision.title,
+            change_id=current_decision.change_id,
+        )
+        existing = decision_rows.get(key)
+        if existing is None:
+            decision_rows[key] = CodebaseStateDecision(
+                key=key,
+                decision_id=current_decision.decision_id,
+                summary=current_decision.decision_summary,
+                status=current_decision.decision_status,
+                replaces=current_decision.replaces_decision_id,
+                sources=[source],
+            )
+            continue
+
+        sources = list(existing.sources)
+        if source not in sources:
+            sources.append(source)
+        decision_rows[key] = CodebaseStateDecision(
+            key=key,
+            decision_id=existing.decision_id or current_decision.decision_id,
+            summary=existing.summary or current_decision.decision_summary,
+            status=existing.status or current_decision.decision_status,
+            replaces=existing.replaces or current_decision.replaces_decision_id,
+            sources=sources,
+        )
+
+    return sorted(
+        decision_rows.values(),
+        key=lambda decision: (decision.sources[0].commit_timestamp or -1, decision.key),
+    )
+
+
+def _current_decisions_report_to_data(
+    report: CodebaseStateDecisionReport,
+) -> dict[str, Any]:
+    return {
+        "repo_root": report.repo_root,
+        "branch_name": report.branch_name,
+        "parent_branch": report.parent_branch,
+        "branch_head_sha": report.branch_head_sha,
+        "parent_head_sha": report.parent_head_sha,
+        "indexed_at": report.indexed_at,
+        "decisions": [
+            {
+                "key": decision.key,
+                "decision_id": decision.decision_id,
+                "summary": decision.summary,
+                "status": decision.status,
+                "replaces": decision.replaces,
+                "sources": [_source_to_data(source) for source in decision.sources],
+            }
+            for decision in report.decisions
+        ],
+    }
+
+
+def _invariants_report_to_data(
+    report: CodebaseStateInvariantReport,
+) -> dict[str, Any]:
+    return {
+        "repo_root": report.repo_root,
+        "branch_name": report.branch_name,
+        "parent_branch": report.parent_branch,
+        "branch_head_sha": report.branch_head_sha,
+        "parent_head_sha": report.parent_head_sha,
+        "indexed_at": report.indexed_at,
+        "invariants": [
+            {
+                "id": item.id,
+                "description": item.description,
+                "last_action": item.last_action,
+                "source": _source_to_data(item.source),
+            }
+            for item in report.invariants
+        ],
     }
 
 

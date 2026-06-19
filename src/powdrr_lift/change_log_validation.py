@@ -11,6 +11,7 @@ import yaml
 from powdrr_lift.change_log_parser import (
     ChangeEntity,
     ChangeFile,
+    ChangeLog,
     RelatedSection,
     parse_change_log,
 )
@@ -209,6 +210,7 @@ def build_validation_report(
         for entity in proposed_entities
         if (entity_id := _normalize_entity_id(entity.id)) is not None
     }
+    _validate_unique_changelog_ids(change_log, issues)
     added_entities = [
         entity for entity in proposed_entities if entity.action == "added"
     ]
@@ -902,6 +904,53 @@ def _validate_added_entity_type(
                 path=None,
             )
         )
+
+
+def _validate_unique_changelog_ids(
+    change_log: ChangeLog,
+    issues: list[ValidationIssue],
+) -> None:
+    seen_ids: dict[str, tuple[str, int]] = {}
+
+    def _register(raw_id: str | None, section: str, item_index: int) -> None:
+        normalized_id = _normalize_entity_id(raw_id)
+        if normalized_id is None:
+            return
+
+        previous = seen_ids.get(normalized_id)
+        if previous is not None:
+            issues.append(
+                ValidationIssue(
+                    code="duplicate_changelog_id",
+                    message=(
+                        f"Changelog id {normalized_id!r} is repeated in "
+                        f"{section} {item_index} and {previous[0]} {previous[1]}. "
+                        "All changelog ids must be unique across the entire file."
+                    ),
+                    path=None,
+                )
+            )
+            return
+
+        seen_ids[normalized_id] = (section, item_index)
+
+    for index, decision in enumerate(change_log.decisions or [], start=1):
+        _register(decision.id, "decision", index)
+
+    for index, entity in enumerate(change_log.entity_changes or [], start=1):
+        _register(entity.id, "entity", index)
+
+    for index, relationship in enumerate(
+        change_log.entity_relationship_changes or [],
+        start=1,
+    ):
+        _register(relationship.id, "relationship", index)
+
+    for index, invariant in enumerate(change_log.invariant_changes or [], start=1):
+        _register(invariant.id, "invariant", index)
+
+    for index, guidance in enumerate(change_log.guidance_changes or [], start=1):
+        _register(guidance.id, "guidance", index)
 
 
 def _validate_v2_lifecycle_item(

@@ -39,6 +39,7 @@ __all__ = [
     "CodebaseStateRelationship",
     "CodebaseStateReport",
     "CodebaseStateSource",
+    "build_current_decisions_report",
     "EditContextLine",
     "EditContextRange",
     "EditContextReport",
@@ -60,6 +61,7 @@ __all__ = [
     "Span",
     "create_change_log_template",
     "build_codebase_state_report",
+    "build_invariants_report",
     "build_changelog_index",
     "build_changelog_index_at_ref",
     "build_blame_file_view",
@@ -78,9 +80,11 @@ __all__ = [
     "parse_validation_report",
     "render_edit_context_report",
     "render_codebase_state_report",
+    "render_current_decisions_report",
     "render_entity_decision_report",
     "render_entity_reference_report",
     "render_entity_relationship_report",
+    "render_invariants_report",
     "validate_change_log_yaml",
     "ValidationIssue",
     "ValidationReport",
@@ -111,10 +115,14 @@ def __getattr__(name: str) -> Any:
         "CodebaseStateRelationship",
         "CodebaseStateReport",
         "CodebaseStateSource",
+        "build_current_decisions_report",
         "build_codebase_state_report",
+        "build_invariants_report",
         "codebase_state_default_output_path",
         "create_codebase_state",
+        "render_current_decisions_report",
         "render_codebase_state_report",
+        "render_invariants_report",
     }:
         from powdrr_lift.core.codebase_state import (
             CodebaseStateDecision,
@@ -125,9 +133,13 @@ def __getattr__(name: str) -> Any:
             CodebaseStateReport,
             CodebaseStateSource,
             build_codebase_state_report,
+            build_current_decisions_report,
+            build_invariants_report,
             codebase_state_default_output_path,
             create_codebase_state,
             render_codebase_state_report,
+            render_current_decisions_report,
+            render_invariants_report,
         )
 
         return {
@@ -138,10 +150,14 @@ def __getattr__(name: str) -> Any:
             "CodebaseStateRelationship": CodebaseStateRelationship,
             "CodebaseStateReport": CodebaseStateReport,
             "CodebaseStateSource": CodebaseStateSource,
+            "build_current_decisions_report": build_current_decisions_report,
             "build_codebase_state_report": build_codebase_state_report,
+            "build_invariants_report": build_invariants_report,
             "codebase_state_default_output_path": codebase_state_default_output_path,
             "create_codebase_state": create_codebase_state,
+            "render_current_decisions_report": render_current_decisions_report,
             "render_codebase_state_report": render_codebase_state_report,
+            "render_invariants_report": render_invariants_report,
         }[name]
 
     if name in {

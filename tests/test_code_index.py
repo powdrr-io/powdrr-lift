@@ -266,6 +266,115 @@ def test_refresh_code_index_rehydrates_changelog_documents_from_sqlite(
     )
 
 
+def test_refresh_code_index_tracks_superseded_decisions_in_sqlite(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/code-index")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('v1')\n", encoding="utf-8")
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 1
+        title: Add the initial app
+
+        intent:
+          problem: The app does not exist yet.
+          goal: Introduce the first implementation.
+
+        decisions:
+          - id: ADR-001
+            summary: Start with the first implementation.
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Add the first implementation.
+            affects: []
+            rationale: Bootstrap the app.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Add initial app (#1)")
+
+    (repo_root / "src" / "app.py").write_text("print('v2')\n", encoding="utf-8")
+    (repo_root / "docs" / "changelogs" / "PR-2-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 2
+        title: Replace the first implementation
+
+        intent:
+          problem: The first implementation is not good enough.
+          goal: Replace it with a better version.
+
+        decisions:
+          - id: ADR-002
+            summary: Replace the first implementation.
+            replaces: ADR-001
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Replace the first implementation.
+            affects: []
+            rationale: Swap in the improved version.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-2-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Replace initial app (#2)")
+
+    refresh_code_index(
+        branch_name="feature/code-index",
+        parent_branch="main",
+        repo_root=repo_root,
+    )
+
+    with sqlite3.connect(code_index_store.code_index_db_path(repo_root)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT decision_id, decision_status, replaces_decision_id
+            FROM branch_decision
+            WHERE branch_name = ?
+            ORDER BY decision_index
+            """,
+            ("feature/code-index",),
+        ).fetchall()
+
+    assert [
+        (row["decision_id"], row["decision_status"], row["replaces_decision_id"])
+        for row in rows
+    ] == [
+        ("ADR-001", "superseded", None),
+        ("ADR-002", "current", "ADR-001"),
+    ]
+
+    store = code_index_store.CodeIndexStore(repo_root)
+    current_decisions = store.lookup_current_decisions("feature/code-index")
+    assert [record.decision_id for record in current_decisions] == ["ADR-002"]
+    assert current_decisions[0].replaces_decision_id == "ADR-001"
+
+
 def test_refresh_code_index_uses_commit_body_when_pr_is_missing(
     tmp_path: Path,
 ) -> None:

@@ -1,0 +1,462 @@
+version: 2
+change_id: 27
+title: Track coedited files in review context
+intent:
+  problem: The changelog review workflow could not reliably surface sibling code areas
+    edited in the same changelog, and new templates still seeded related.files even
+    though that information should come from the changelog index.
+  goal: Derive coedited files from shared changelog file entries, surface them through
+    edit-context, blame, and entity-reference lookups, and update the review skill
+    and template accordingly.
+decisions:
+- id: coedited-files-from-changelog
+  summary: Derive coedited files from sibling file entries in the same changelog document.
+- id: review-context-surface
+  summary: Surface coedited files in edit-context, blame, and entity-reference lookups
+    so review workflows can inspect sibling code areas.
+files:
+- path: skills/review-pr-changelog/SKILL.md
+  type: modified
+  span:
+    start_line: 22
+    end_line: 23
+  summary: Update the review skill to inspect coedited files.
+  rationale: The review workflow needs sibling code areas from the same changelog
+    before judging each change.
+- path: skills/review-pr-changelog/agents/openai.yaml
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Update the review-agent prompt to inspect coedited files.
+  rationale: Keep the agent prompt aligned with the new review workflow.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Stop seeding related.files in new changelog templates.
+  rationale: New templates should focus on entities, invariants, and guidance, with
+    coedited files derived from the changelog index instead of hand-filled related
+    file lists.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 138
+  summary: Stop seeding related.files in new changelog templates.
+  rationale: New templates should focus on entities, invariants, and guidance, with
+    coedited files derived from the changelog index instead of hand-filled related
+    file lists.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 207
+    end_line: 207
+  summary: Stop seeding related.files in new changelog templates.
+  rationale: New templates should focus on entities, invariants, and guidance, with
+    coedited files derived from the changelog index instead of hand-filled related
+    file lists.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 230
+  summary: Stop seeding related.files in new changelog templates.
+  rationale: New templates should focus on entities, invariants, and guidance, with
+    coedited files derived from the changelog index instead of hand-filled related
+    file lists.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 409
+    end_line: 411
+  summary: Stop seeding related.files in new changelog templates.
+  rationale: New templates should focus on entities, invariants, and guidance, with
+    coedited files derived from the changelog index instead of hand-filled related
+    file lists.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 418
+    end_line: 420
+  summary: Stop seeding related.files in new changelog templates.
+  rationale: New templates should focus on entities, invariants, and guidance, with
+    coedited files derived from the changelog index instead of hand-filled related
+    file lists.
+- path: src/powdrr_lift/core/blame_view.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 57
+  summary: Expose coedited files in blame provenance output.
+  rationale: The blame view needs the sibling file areas associated with each provenance
+    record.
+- path: src/powdrr_lift/core/blame_view.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 258
+  summary: Expose coedited files in blame provenance output.
+  rationale: The blame view needs the sibling file areas associated with each provenance
+    record.
+- path: src/powdrr_lift/core/blame_view.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 383
+  summary: Expose coedited files in blame provenance output.
+  rationale: The blame view needs the sibling file areas associated with each provenance
+    record.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 150
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 164
+    end_line: 175
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 278
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 283
+    end_line: 283
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 337
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 343
+    end_line: 343
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 400
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 409
+    end_line: 411
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 501
+    end_line: 504
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 510
+    end_line: 510
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1162
+    end_line: 1167
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1183
+    end_line: 1183
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1988
+    end_line: 1988
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2009
+    end_line: 2009
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2014
+    end_line: 2073
+  summary: Hydrate coedited files in provenance lookup results and SQLite reloads.
+  rationale: The index must reconstruct sibling file areas from shared changelog entries
+    for every lookup path.
+- path: src/powdrr_lift/core/edit_context.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Expose coedited files in edit-context output.
+  rationale: The edit-context tool needs sibling code areas for each requested span.
+- path: src/powdrr_lift/core/edit_context.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Expose coedited files in edit-context output.
+  rationale: The edit-context tool needs sibling code areas for each requested span.
+- path: src/powdrr_lift/core/edit_context.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 93
+  summary: Expose coedited files in edit-context output.
+  rationale: The edit-context tool needs sibling code areas for each requested span.
+- path: src/powdrr_lift/core/edit_context.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 112
+  summary: Expose coedited files in edit-context output.
+  rationale: The edit-context tool needs sibling code areas for each requested span.
+- path: src/powdrr_lift/core/edit_context.py
+  type: modified
+  span:
+    start_line: 127
+    end_line: 127
+  summary: Expose coedited files in edit-context output.
+  rationale: The edit-context tool needs sibling code areas for each requested span.
+- path: src/powdrr_lift/core/edit_context.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 195
+  summary: Expose coedited files in edit-context output.
+  rationale: The edit-context tool needs sibling code areas for each requested span.
+- path: src/powdrr_lift/core/entity_context.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 205
+  summary: Expose coedited files in entity-reference output.
+  rationale: Entity lookups should include sibling code areas from the same provenance.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 89
+  summary: Track coedited files in provenance records.
+  rationale: The source index needs to preserve sibling file areas from each changelog
+    entry.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 748
+    end_line: 751
+  summary: Track coedited files in provenance records.
+  rationale: The source index needs to preserve sibling file areas from each changelog
+    entry.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 779
+    end_line: 779
+  summary: Track coedited files in provenance records.
+  rationale: The source index needs to preserve sibling file areas from each changelog
+    entry.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 804
+    end_line: 804
+  summary: Track coedited files in provenance records.
+  rationale: The source index needs to preserve sibling file areas from each changelog
+    entry.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 833
+    end_line: 833
+  summary: Track coedited files in provenance records.
+  rationale: The source index needs to preserve sibling file areas from each changelog
+    entry.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 859
+    end_line: 879
+  summary: Track coedited files in provenance records.
+  rationale: The source index needs to preserve sibling file areas from each changelog
+    entry.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 170
+  summary: Update the template test for the new related-section shape.
+  rationale: The generator no longer prepopulates related.files.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 345
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 362
+    end_line: 363
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 378
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 394
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 405
+    end_line: 406
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 419
+    end_line: 419
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 498
+    end_line: 498
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 502
+    end_line: 502
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 517
+    end_line: 518
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 532
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 545
+    end_line: 545
+  summary: Update the changelog-index round-trip test for coedited-file behavior.
+  rationale: The SQLite index should reflect the new file-related metadata shape.
+- path: tests/test_code_index.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 196
+  summary: Cover coedited-file derivation in the code index.
+  rationale: The index must return sibling file areas from shared changelog entries.
+- path: tests/test_edit_context.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Cover coedited files in edit-context output.
+  rationale: The edit-context API should surface sibling code areas for each requested
+    span.
+- path: tests/test_edit_context.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 88
+  summary: Cover coedited files in edit-context output.
+  rationale: The edit-context API should surface sibling code areas for each requested
+    span.
+- path: tests/test_edit_context.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 190
+  summary: Cover coedited files in edit-context output.
+  rationale: The edit-context API should surface sibling code areas for each requested
+    span.
+- path: tests/test_edit_context.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 221
+  summary: Cover coedited files in edit-context output.
+  rationale: The edit-context API should surface sibling code areas for each requested
+    span.
+- path: tests/test_edit_context.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Cover coedited files in edit-context output.
+  rationale: The edit-context API should surface sibling code areas for each requested
+    span.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

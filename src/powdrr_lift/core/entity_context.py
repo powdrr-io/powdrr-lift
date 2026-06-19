@@ -202,6 +202,7 @@ def _entity_reference_report_to_data(report: EntityReferenceReport) -> dict[str,
                 "summary": reference.summary,
                 "rationale": reference.rationale,
                 "affects": list(reference.affects),
+                "coedited_files": list(reference.coedited_files),
                 "change_index": reference.change_index,
             }
             for reference in report.references

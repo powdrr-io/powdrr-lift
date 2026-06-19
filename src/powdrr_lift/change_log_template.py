@@ -19,7 +19,6 @@ class BranchDiffEntry:
 
 @dataclass(frozen=True, slots=True)
 class RelatedSectionPreview:
-    files: tuple[str, ...] = ()
     entities: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
     guidance: tuple[str, ...] = ()
@@ -126,17 +125,6 @@ def _render_template_body(
                     "    # to anything.",
                     "    related:",
                     *(
-                        ["      files: []"]
-                        if not related_section.files
-                        else [
-                            "      files:",
-                            *(
-                                f"        - {related_file}"
-                                for related_file in related_section.files
-                            ),
-                        ]
-                    ),
-                    *(
                         ["      entities: []"]
                         if not related_section.entities
                         else [
@@ -204,7 +192,6 @@ def _collect_related_sections_by_entry(
     source_index = store.refresh(branch_name, default_branch_name)
 
     related_sections_by_entry: list[RelatedSectionPreview] = []
-    all_diff_paths = [diff_entry.path for diff_entry in diff_entries]
     for diff_entry in diff_entries:
         related_entities = _dedupe_string_values(
             [
@@ -225,9 +212,6 @@ def _collect_related_sections_by_entry(
         )
         related_sections_by_entry.append(
             RelatedSectionPreview(
-                files=_dedupe_strings(
-                    path for path in all_diff_paths if path != diff_entry.path
-                ),
                 entities=tuple(related_entities),
                 invariants=_collect_related_lifecycle_ids(
                     source_index.documents,
@@ -422,18 +406,18 @@ def _render_header(
         "# - Use the final related lists to help fill out `entities`,\n"
         "#   `entity_relationships`, `invariants`, and `guidance`.\n"
         "# - Put file-related entity ids under `related.entities`.\n"
-        "# - Use `related.files`, `related.invariants`, and `related.guidance`\n"
-        "#   when this file change needs to point at supporting files or at the\n"
-        "#   invariant or guidance entries it drives.\n"
+        "# - Use `related.entities`, `related.invariants`, and `related.guidance`\n"
+        "#   when this file change needs to point at supporting code areas or at\n"
+        "#   the invariant or guidance entries it drives.\n"
         "# - Remove `related` entirely if it would otherwise stay empty.\n"
         "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
         "#   `action: deleted`, or `action: modified`.\n"
         "# - Put relationship changes in `entity_relationships`.\n"
         "# - Put invariant changes in `invariants` and guidance changes in\n"
         "#   `guidance`.\n"
-        "# - Use `related` on file, entity, relationship, invariant, and guidance\n"
-        "#   entries to point at the relevant file, entity, invariant, or\n"
-        "#   guidance ids.\n"
+        "# - Use `related` on entity, relationship, invariant, and guidance\n"
+        "#   entries to point at the relevant entity, invariant, or guidance\n"
+        "#   ids.\n"
         "#\n"
         "# Diff summary:\n"
         f"{diff_lines}"

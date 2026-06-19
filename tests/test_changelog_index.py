@@ -341,8 +341,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
             summary: Introduce ReviewSkill.
             rationale: ReviewSkill is now part of the system.
             related:
-              files:
-                - tests/test_app.py
               entities:
                 - ReviewSkill
               invariants:
@@ -359,8 +357,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
             summary: Exercise ReviewSkill.
             rationale: Keep the test aligned with the new skill.
             related:
-              files:
-                - src/app.py
               entities:
                 - ReviewSkill
               invariants:
@@ -373,9 +369,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
             type: Skill
             action: added
             related:
-              files:
-                - src/app.py
-                - tests/test_app.py
               entities:
                 - ReviewSkill
               invariants:
@@ -390,8 +383,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
             description: ReviewSkill remains documented in the graph.
             action: added
             related:
-              files:
-                - src/app.py
               entities:
                 - ReviewSkill
               guidance:
@@ -402,8 +393,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
             description: Keep ReviewSkill test coverage up to date.
             action: added
             related:
-              files:
-                - tests/test_app.py
               entities:
                 - ReviewSkill
               invariants:
@@ -427,9 +416,7 @@ def test_build_changelog_index_normalizes_version_two_changes(
     assert [
         file_change.path for file_change in index.documents[0].changelog.file_changes
     ] == ["src/app.py", "tests/test_app.py"]
-    assert index.documents[0].changelog.file_changes[0].related.files == [
-        "tests/test_app.py",
-    ]
+    assert index.documents[0].changelog.file_changes[0].related.files == []
     assert index.documents[0].changelog.file_changes[0].related.entities == [
         "ReviewSkill"
     ]
@@ -495,11 +482,9 @@ def test_build_changelog_index_normalizes_version_two_changes(
         )
         for row in file_related_rows
     } == {
-        (0, 0, "file", "tests/test_app.py"),
         (0, 0, "entity", "ReviewSkill"),
         (0, 0, "invariant", "INV-001"),
         (0, 0, "guidance", "GUID-001"),
-        (1, 0, "file", "src/app.py"),
         (1, 0, "entity", "ReviewSkill"),
         (1, 0, "invariant", "INV-001"),
         (1, 0, "guidance", "GUID-001"),
@@ -514,8 +499,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
         )
         for row in entity_related_rows
     } == {
-        ("document", None, 0, "file", "src/app.py"),
-        ("document", None, 0, "file", "tests/test_app.py"),
         ("document", None, 0, "entity", "ReviewSkill"),
         ("document", None, 0, "invariant", "INV-001"),
         ("document", None, 0, "guidance", "GUID-001"),
@@ -529,7 +512,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
         )
         for row in invariant_related_rows
     } == {
-        (0, 0, "file", "src/app.py"),
         (0, 0, "entity", "ReviewSkill"),
         (0, 0, "guidance", "GUID-001"),
     }
@@ -542,7 +524,6 @@ def test_build_changelog_index_normalizes_version_two_changes(
         )
         for row in guidance_related_rows
     } == {
-        (0, 0, "file", "tests/test_app.py"),
         (0, 0, "entity", "ReviewSkill"),
         (0, 0, "invariant", "INV-001"),
     }

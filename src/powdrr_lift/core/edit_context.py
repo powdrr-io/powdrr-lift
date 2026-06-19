@@ -24,6 +24,7 @@ class EditContextRange:
     end_line: int
     lines: list[EditContextLine] = field(default_factory=list)
     related_entities: list[str] = field(default_factory=list)
+    coedited_files: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +69,7 @@ def lookup_edit_context(
     repo_root_path = _resolve_repo_root(repo_root)
     store = CodeIndexStore(repo_root_path)
     resolved_branch = branch_name or _current_branch(repo_root_path)
-    store.refresh(resolved_branch, parent_branch)
+    source_index = store.refresh(resolved_branch, parent_branch)
     branch_state = store.branch_state_for(resolved_branch)
     if branch_state is None:
         raise RuntimeError(f"Missing branch state for {resolved_branch!r}.")
@@ -86,12 +87,10 @@ def lookup_edit_context(
         lines: list[EditContextLine] = []
         related_entities: list[str] = []
         seen_related_entities: set[str] = set()
-        for line_number, provenance in store.lookup_lines(
-            resolved_branch,
-            file_path,
-            start_line,
-            end_line,
-        ):
+        coedited_files: list[str] = []
+        seen_coedited_files: set[str] = set()
+        for line_number in range(start_line, end_line + 1):
+            provenance = source_index.provenance_for(file_path, line_number)
             provenance_ref = None
             if provenance is not None:
                 provenance_ref = change_ref_by_record.get(provenance)
@@ -105,6 +104,12 @@ def lookup_edit_context(
 
                     seen_related_entities.add(entity_name)
                     related_entities.append(entity_name)
+                for related_file in provenance.coedited_files:
+                    if related_file == file_path or related_file in seen_coedited_files:
+                        continue
+
+                    seen_coedited_files.add(related_file)
+                    coedited_files.append(related_file)
 
             lines.append(
                 EditContextLine(
@@ -119,6 +124,7 @@ def lookup_edit_context(
                 end_line=end_line,
                 lines=lines,
                 related_entities=related_entities,
+                coedited_files=coedited_files,
             )
         )
 
@@ -186,6 +192,7 @@ def _edit_context_report_to_data(report: EditContextReport) -> dict[str, Any]:
                     for line in requested_range.lines
                 ],
                 "related_entities": requested_range.related_entities,
+                "coedited_files": requested_range.coedited_files,
             }
             for requested_range in report.requested_ranges
         ],

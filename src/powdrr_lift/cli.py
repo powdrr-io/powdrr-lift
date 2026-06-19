@@ -7,9 +7,12 @@ from pathlib import Path
 
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
+    architecture_specification_default_output_path,
+    build_architecture_specification_validation_report,
     build_current_decisions_report,
     build_invariants_report,
     codebase_state_default_output_path,
+    create_architecture_specification_template,
     create_change_log_template,
     create_codebase_state,
     lookup_edit_context,
@@ -25,6 +28,7 @@ from powdrr_lift.core import (
     render_entity_relationship_report,
     render_invariants_report,
     resolve_repo_root,
+    validate_architecture_specification_yaml,
     validate_change_log_yaml,
 )
 
@@ -289,6 +293,66 @@ def build_parser() -> argparse.ArgumentParser:
     )
     codebase_state_parser.set_defaults(func=_run_codebase_state)
 
+    architecture_specification_parser = subparsers.add_parser(
+        "architecture-specification",
+        aliases=["architecture_specification"],
+        help="Generate an architecture specification template.",
+    )
+    architecture_specification_parser.add_argument(
+        "--entity-type",
+        dest="entity_types",
+        action="append",
+        required=True,
+        help="Allowed entity type. May be repeated.",
+    )
+    architecture_specification_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the template to this path instead of "
+            "docs/architecture/architecture-specification.yaml."
+        ),
+    )
+    architecture_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    architecture_specification_parser.add_argument(
+        "--title",
+        help="Optional title to embed in the template.",
+    )
+    architecture_specification_parser.set_defaults(func=_run_architecture_specification)
+
+    evaluate_architecture_specification_parser = subparsers.add_parser(
+        "evaluate-architecture-specification",
+        aliases=["evaluate_architecture_specification"],
+        help="Validate an architecture specification against allowed entity types.",
+    )
+    evaluate_architecture_specification_parser.add_argument(
+        "--entity-type",
+        dest="entity_types",
+        action="append",
+        required=True,
+        help="Allowed entity type. May be repeated.",
+    )
+    evaluate_architecture_specification_parser.add_argument(
+        "--input",
+        type=Path,
+        help=(
+            "Read the proposed architecture specification YAML from this file "
+            "instead of the default template path."
+        ),
+    )
+    evaluate_architecture_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    evaluate_architecture_specification_parser.set_defaults(
+        func=_run_evaluate_architecture_specification
+    )
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -474,6 +538,41 @@ def _run_codebase_state(args: argparse.Namespace) -> int:
         print(f"Wrote codebase state to {output_path}")
 
     return 0
+
+
+def _run_architecture_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_architecture_specification_template(
+        args.entity_types,
+        output_path=args.output,
+        repo_root=repo_root,
+        title=args.title,
+    )
+    if args.output is None:
+        default_output = architecture_specification_default_output_path(repo_root)
+        print(f"Wrote architecture specification template to {default_output}")
+    else:
+        print(f"Wrote architecture specification template to {output_path}")
+
+    return 0
+
+
+def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    input_path = args.input or architecture_specification_default_output_path(repo_root)
+    proposed_yaml = _read_input(input_path)
+    report = build_architecture_specification_validation_report(
+        proposed_yaml,
+        entity_types=args.entity_types,
+    )
+    report_yaml = validate_architecture_specification_yaml(
+        proposed_yaml,
+        entity_types=args.entity_types,
+    )
+    sys.stdout.write(report_yaml)
+    if not report_yaml.endswith("\n"):
+        sys.stdout.write("\n")
+    return 0 if report.validation_successful else 1
 
 
 def _run_entity_decisions(args: argparse.Namespace) -> int:

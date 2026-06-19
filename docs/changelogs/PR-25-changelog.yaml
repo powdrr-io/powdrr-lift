@@ -1,0 +1,54 @@
+version: 2
+change_id: 25
+title: Add synchronize-code-and-state skill
+intent:
+  problem: The repository needs an installable skill that can reconcile the
+    generated codebase state with the source tree and changelog index after
+    code or state drift.
+  goal: Add a skill under skills/synchronize-code-and-state that tells an
+    agent to generate the current codebase state, compare it to the source
+    tree, resolve mismatches by changing code and/or the changelog while
+    preserving intent, and validate the result before committing.
+decisions:
+  - id: skill-reconciliation-flow
+    summary: Start by generating the codebase state snapshot, then let the
+      agent decide whether code, the changelog, or both should move to restore
+      agreement.
+files:
+  - path: skills/synchronize-code-and-state/SKILL.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 43
+    summary: Add the synchronize-code-and-state skill workflow and guardrails.
+    rationale: Provide an installable skill that explains how to generate the
+      state snapshot, compare it against the source tree, reconcile drift, and
+      validate before commit.
+    related:
+      files:
+        - skills/synchronize-code-and-state/agents/openai.yaml
+      entities:
+        - synchronize-code-and-state
+      invariants: []
+      guidance: []
+  - path: skills/synchronize-code-and-state/agents/openai.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 4
+    summary: Add UI metadata for the synchronize-code-and-state skill.
+    rationale: Make the installable skill discoverable in Codex skill lists.
+    related:
+      files:
+        - skills/synchronize-code-and-state/SKILL.md
+      entities:
+        - synchronize-code-and-state
+      invariants: []
+      guidance: []
+entities:
+  - id: synchronize-code-and-state
+    type: Skill
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []

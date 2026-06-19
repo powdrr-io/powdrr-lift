@@ -1,0 +1,449 @@
+version: 2
+change_id: 28
+title: Add specify-architecture skill and endpoints
+intent:
+  problem: Agents need a reusable skill and matching CLI/MCP workflow for
+    drafting architecture specifications from an allowed entity-type set and
+    validating that the specification only references listed entities.
+  goal: Add an installable specify-architecture skill plus CLI and MCP
+    endpoints that can generate an architecture-specification template, guide
+    the agent to fill it, validate the result, and iterate until the
+    specification passes validation.
+decisions:
+  - id: arch-spec-surface
+    summary: Expose the architecture-specification workflow through both CLI
+      and MCP entry points so the same behavior is available to terminal and
+      agent callers.
+  - id: arch-spec-validation-rules
+    summary: Treat the provided entity-type list as authoritative and require
+      every relationship, invariant, and guidance reference to point at an
+      entity listed in the specification.
+files:
+  - path: skills/specify-architecture/SKILL.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 41
+    summary: Add the specify-architecture skill workflow and guardrails.
+    rationale: Provide installable instructions for creating, filling, and
+      validating architecture specifications with the new CLI and MCP
+      endpoints.
+    related:
+      files:
+        - skills/specify-architecture/agents/openai.yaml
+      entities:
+        - specify-architecture
+  - path: skills/specify-architecture/agents/openai.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 4
+    summary: Add UI metadata for the specify-architecture skill.
+    rationale: Make the new skill discoverable in Codex skill lists and
+      default prompts.
+    related:
+      files:
+        - skills/specify-architecture/SKILL.md
+      entities:
+        - specify-architecture
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 642
+    summary: Implement architecture-specification template rendering and
+      validation.
+    rationale: Centralize the template writer, validation report models, and
+      validation rules that back the new CLI and MCP surfaces.
+    related:
+      files:
+        - src/powdrr_lift/cli.py
+        - src/powdrr_lift/mcp_server.py
+        - tests/test_architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+        - create_architecture_specification
+        - validate_architecture_specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 10
+      end_line: 11
+    summary: Import architecture-specification helpers into the CLI.
+    rationale: Reuse the shared template and validation helpers from the core
+      module.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 15
+      end_line: 15
+    summary: Import the architecture-specification template writer into the
+      CLI.
+    rationale: Reuse the shared template writer from the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 31
+      end_line: 31
+    summary: Import the architecture-specification validator into the CLI.
+    rationale: Reuse the shared validation helper from the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 296
+      end_line: 355
+    summary: Add the architecture-specification CLI subcommands.
+    rationale: Provide a shell entry point for generating and validating
+      architecture specifications.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 543
+      end_line: 577
+    summary: Add the architecture-specification CLI handlers.
+    rationale: Wire the subcommands to the shared template generator and
+      validator.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 8
+      end_line: 8
+    summary: Import the architecture-specification default output helper into
+      the MCP server.
+    rationale: Reuse the shared default output path helper in the MCP tool
+      implementation.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - create_architecture_specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 14
+      end_line: 14
+    summary: Import the architecture-specification template writer into the
+      MCP server.
+    rationale: Reuse the shared template writer in the MCP tool
+      implementation.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - create_architecture_specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 30
+      end_line: 30
+    summary: Import the architecture-specification validator into the MCP
+      server.
+    rationale: Reuse the shared validation helper in the MCP tool
+      implementation.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - validate_architecture_specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 202
+      end_line: 233
+    summary: Add the architecture-specification MCP tools.
+    rationale: Expose template generation and validation through MCP.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - create_architecture_specification
+        - validate_architecture_specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 3
+      end_line: 11
+    summary: Import the architecture-specification helpers into the core
+      namespace.
+    rationale: Make the new template and validation helpers available through
+      the shared core package path.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+        - create_architecture_specification
+        - validate_architecture_specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 113
+      end_line: 114
+    summary: Export the architecture-specification validation types.
+    rationale: Keep the core package export list aligned with the new
+      validation report models.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 142
+      end_line: 142
+    summary: Export the architecture-specification default output helper.
+    rationale: Make the template output path helper available through the core
+      package.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 158
+      end_line: 158
+    summary: Export the architecture-specification validation builder.
+    rationale: Keep the shared validation builder in the core export surface.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 164
+      end_line: 164
+    summary: Export the architecture-specification template writer.
+    rationale: Make the shared template writer available through the core
+      package.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - create_architecture_specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 183
+      end_line: 183
+    summary: Export the architecture-specification template renderer.
+    rationale: Keep the YAML template renderer accessible from the core
+      namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 189
+      end_line: 189
+    summary: Export the architecture-specification YAML validator.
+    rationale: Make the shared validation helper available through the core
+      namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 42
+      end_line: 46
+    summary: Add architecture-specification helpers to the package exports.
+    rationale: Keep the top-level API aligned with the new architecture
+      specification workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+        - create_architecture_specification
+        - validate_architecture_specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 92
+      end_line: 92
+    summary: Export the architecture-specification template renderer.
+    rationale: Expose the YAML template renderer from the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 94
+      end_line: 94
+    summary: Export the architecture-specification YAML validator.
+    rationale: Expose the validation helper from the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - evaluate-architecture-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 107
+      end_line: 149
+    summary: Lazy-load the architecture-specification helpers from the
+      package root.
+    rationale: Keep the top-level package API available without forcing eager
+      imports of the new architecture specification module.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+        - create_architecture_specification
+        - validate_architecture_specification
+  - path: tests/test_architecture_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 214
+    summary: Cover architecture-specification template generation and
+      validation.
+    rationale: Prove that the template generator and validator enforce the
+      allowed entity types and reference rules.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+        - src/powdrr_lift/cli.py
+      entities:
+        - architecture-specification
+        - evaluate-architecture-specification
+  - path: tests/test_mcp_server.py
+    type: modified
+    span:
+      start_line: 27
+      end_line: 28
+    summary: Cover MCP registration for the architecture-specification tools.
+    rationale: Prove that the server registers the new template and
+      validation MCP endpoints.
+    related:
+      files:
+        - src/powdrr_lift/mcp_server.py
+      entities:
+        - create_architecture_specification
+        - validate_architecture_specification
+entities:
+  - id: specify-architecture
+    type: Skill
+    action: added
+  - id: architecture-specification
+    type: Subcommand
+    action: added
+  - id: evaluate-architecture-specification
+    type: Subcommand
+    action: added
+  - id: create_architecture_specification
+    type: Request handler
+    action: added
+  - id: validate_architecture_specification
+    type: Request handler
+    action: added
+entity_relationships:
+  - source: specify-architecture
+    target: architecture-specification
+    relationship: guides
+    description: The skill tells agents to use the template-generation CLI to
+      create an architecture specification before filling it out.
+    rationale: Keep the installable skill aligned with the new CLI workflow.
+  - source: specify-architecture
+    target: evaluate-architecture-specification
+    relationship: guides
+    description: The skill tells agents to validate and iterate on the
+      architecture specification until it passes.
+    rationale: Make validation part of the core skill workflow.
+  - source: architecture-specification
+    target: create_architecture_specification
+    relationship: mirrors
+    description: The CLI command and MCP tool generate the same starter
+      architecture specification template.
+    rationale: Keep the shell and MCP surfaces behaviorally equivalent.
+  - source: evaluate-architecture-specification
+    target: validate_architecture_specification
+    relationship: mirrors
+    description: The CLI command and MCP tool validate the same architecture
+      specification rules.
+    rationale: Keep the shell and MCP validation entry points aligned.
+invariants:
+  - id: allowed-entity-types-only
+    description: Architecture specifications may only assign entity types from
+      the entity type list supplied to the template generator or validator.
+    rationale: Prevent specs from drifting outside the repository's approved
+      taxonomy.
+    action: added
+  - id: referenced-entities-must-exist
+    description: Any entity mentioned in an entity relationship, invariant, or
+      guidance item must appear in the entities section.
+    rationale: Keep relationships and prose grounded in entities that are
+      actually present in the specification.
+    action: added
+  - id: shared-workflow-surface
+    description: The CLI and MCP surfaces should expose the same template
+      creation and validation behavior.
+    rationale: Let the skill work the same way in both terminal and agent
+      contexts.
+    action: added
+guidance:
+  - id: generate-first
+    description: Use the template-generation endpoint first, then populate the
+      entities, entity relationships, invariants, and guidance sections.
+    rationale: Start from the repository-approved scaffold instead of inventing
+      a specification shape.
+    action: added
+  - id: validate-and-iterate
+    description: Run the validation endpoint after filling the template and
+      revise the specification until validation succeeds.
+    rationale: Keep the architecture specification aligned with the enforced
+      reference rules.
+    action: added
+  - id: preserve-intent
+    description: When validation fails, adjust the specification to preserve
+      the intended architecture rather than weakening the rules.
+    rationale: Favor best judgment that keeps the spec, the code, and the
+      repository's existing intent in agreement.
+    action: added

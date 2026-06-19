@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core import (
+    architecture_specification_default_output_path,
     blame_view_state_to_data,
     build_blame_view_state,
     build_current_decisions_report,
     build_invariants_report,
     codebase_state_default_output_path,
+    create_architecture_specification_template,
     create_change_log_template,
     create_codebase_state,
     lookup_edit_context,
@@ -25,6 +27,7 @@ from powdrr_lift.core import (
     render_entity_relationship_report,
     render_invariants_report,
     resolve_repo_root,
+    validate_architecture_specification_yaml,
     validate_change_log_yaml,
 )
 
@@ -195,6 +198,38 @@ def build_server() -> Any:
             repo_root=repo_root_path,
         )
         return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def create_architecture_specification(
+        entity_types: list[str],
+        output_path: str | None = None,
+        title: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_architecture_specification_template(
+            entity_types,
+            output_path=(
+                architecture_specification_default_output_path(repo_root_path)
+                if output_path is None
+                else Path(output_path)
+            ),
+            repo_root=repo_root_path,
+            title=title,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def validate_architecture_specification(
+        architecture_specification_yaml: str,
+        entity_types: list[str],
+        repo_root: str | None = None,
+    ) -> str:
+        _ = resolve_repo_root(repo_root)
+        return validate_architecture_specification_yaml(
+            architecture_specification_yaml,
+            entity_types=entity_types,
+        )
 
     @server.tool()
     def get_blame_view(

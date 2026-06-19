@@ -39,6 +39,11 @@ __all__ = [
     "CodebaseStateRelationship",
     "CodebaseStateReport",
     "CodebaseStateSource",
+    "ArchitectureSpecificationValidationIssue",
+    "ArchitectureSpecificationValidationReport",
+    "architecture_specification_default_output_path",
+    "build_architecture_specification_validation_report",
+    "create_architecture_specification_template",
     "build_current_decisions_report",
     "EditContextLine",
     "EditContextRange",
@@ -84,7 +89,9 @@ __all__ = [
     "render_entity_decision_report",
     "render_entity_reference_report",
     "render_entity_relationship_report",
+    "render_architecture_specification_template",
     "render_invariants_report",
+    "validate_architecture_specification_yaml",
     "validate_change_log_yaml",
     "ValidationIssue",
     "ValidationReport",
@@ -96,6 +103,49 @@ def __getattr__(name: str) -> Any:
         from powdrr_lift.change_log_template import create_change_log_template
 
         return create_change_log_template
+
+    if name in {
+        "ArchitectureSpecificationValidationIssue",
+        "ArchitectureSpecificationValidationReport",
+        "architecture_specification_default_output_path",
+        "build_architecture_specification_validation_report",
+        "create_architecture_specification_template",
+        "render_architecture_specification_template",
+        "validate_architecture_specification_yaml",
+    }:
+        from powdrr_lift.core.architecture_specification import (
+            ArchitectureSpecificationValidationIssue,
+            ArchitectureSpecificationValidationReport,
+            architecture_specification_default_output_path,
+            build_architecture_specification_validation_report,
+            create_architecture_specification_template,
+            render_architecture_specification_template,
+            validate_architecture_specification_yaml,
+        )
+
+        return {
+            "ArchitectureSpecificationValidationIssue": (
+                ArchitectureSpecificationValidationIssue
+            ),
+            "ArchitectureSpecificationValidationReport": (
+                ArchitectureSpecificationValidationReport
+            ),
+            "architecture_specification_default_output_path": (
+                architecture_specification_default_output_path
+            ),
+            "build_architecture_specification_validation_report": (
+                build_architecture_specification_validation_report
+            ),
+            "create_architecture_specification_template": (
+                create_architecture_specification_template
+            ),
+            "render_architecture_specification_template": (
+                render_architecture_specification_template
+            ),
+            "validate_architecture_specification_yaml": (
+                validate_architecture_specification_yaml
+            ),
+        }[name]
 
     if name == "build_changelog_index":
         from powdrr_lift.core.index import build_changelog_index

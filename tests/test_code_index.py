@@ -285,35 +285,6 @@ def test_refresh_code_index_tracks_superseded_decisions_in_sqlite(
     (repo_root / "src" / "app.py").write_text("print('v1')\n", encoding="utf-8")
     (repo_root / "docs").mkdir()
     (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
-    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
-        """
-        version: 1
-        change_id: 1
-        title: Add the initial app
-
-        intent:
-          problem: The app does not exist yet.
-          goal: Introduce the first implementation.
-
-        decisions:
-          - id: ADR-001
-            summary: Start with the first implementation.
-
-        changes:
-          - file: src/app.py
-            span:
-              start_line: 1
-              end_line: 1
-            summary: Add the first implementation.
-            affects: []
-            rationale: Bootstrap the app.
-        """,
-        encoding="utf-8",
-    )
-    _git(repo_root, "add", "src/app.py", "docs/changelogs/PR-1-changelog.yaml")
-    _git(repo_root, "commit", "-m", "Add initial app (#1)")
-
-    (repo_root / "src" / "app.py").write_text("print('v2')\n", encoding="utf-8")
     (repo_root / "docs" / "changelogs" / "PR-2-changelog.yaml").write_text(
         """
         version: 1
@@ -325,6 +296,8 @@ def test_refresh_code_index_tracks_superseded_decisions_in_sqlite(
           goal: Replace it with a better version.
 
         decisions:
+          - id: ADR-001
+            summary: Start with the first implementation.
           - id: ADR-002
             summary: Replace the first implementation.
             replaces: ADR-001

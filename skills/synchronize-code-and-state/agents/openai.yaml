@@ -1,0 +1,4 @@
+interface:
+  display_name: "Synchronize Code and State"
+  short_description: "Reconcile indexed state with source code"
+  default_prompt: "Use $synchronize-code-and-state to generate the codebase state snapshot, compare it to the source tree, reconcile mismatches by changing code or the changelog, validate the result, and commit it."

@@ -14,6 +14,13 @@ from powdrr_lift.core.blame_view import (
     build_blame_view_state,
     build_repo_tree,
 )
+from powdrr_lift.core.code_index import (
+    BranchState,
+    code_index_db_path,
+    lookup_code_provenance,
+    lookup_code_provenance_span,
+    refresh_code_index,
+)
 from powdrr_lift.core.codebase_state import (
     CodebaseStateDecision,
     CodebaseStateEntity,
@@ -26,13 +33,6 @@ from powdrr_lift.core.codebase_state import (
     codebase_state_default_output_path,
     create_codebase_state,
     render_codebase_state_report,
-)
-from powdrr_lift.core.code_index import (
-    BranchState,
-    code_index_db_path,
-    lookup_code_provenance,
-    lookup_code_provenance_span,
-    refresh_code_index,
 )
 from powdrr_lift.core.edit_context import (
     EditContextLine,

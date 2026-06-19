@@ -7,7 +7,9 @@ from pathlib import Path
 
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
+    codebase_state_default_output_path,
     create_change_log_template,
+    create_codebase_state,
     lookup_edit_context,
     lookup_entity_decisions,
     lookup_entity_references,
@@ -210,6 +212,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     entity_relationships_parser.set_defaults(func=_run_entity_relationships)
 
+    codebase_state_parser = subparsers.add_parser(
+        "codebase-state",
+        aliases=["codebase_state"],
+        help="Generate a changelog-derived snapshot of the current codebase.",
+    )
+    codebase_state_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to inspect. Defaults to the current branch.",
+    )
+    codebase_state_parser.add_argument(
+        "--parent-branch",
+        help="Reference parent branch used to build the index.",
+    )
+    codebase_state_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the snapshot to this path instead of "
+            ".powdrr-lift/state/codebase-state.yaml."
+        ),
+    )
+    codebase_state_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    codebase_state_parser.set_defaults(func=_run_codebase_state)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -353,6 +384,23 @@ def _run_entity_relationships(args: argparse.Namespace) -> int:
         repo_root=repo_root,
     )
     sys.stdout.write(render_entity_relationship_report(report))
+    return 0
+
+
+def _run_codebase_state(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_codebase_state(
+        branch_name=args.branch_name,
+        output_path=args.output,
+        parent_branch=args.parent_branch,
+        repo_root=repo_root,
+    )
+    if args.output is None:
+        default_output = codebase_state_default_output_path(repo_root)
+        print(f"Wrote codebase state to {default_output}")
+    else:
+        print(f"Wrote codebase state to {output_path}")
+
     return 0
 
 

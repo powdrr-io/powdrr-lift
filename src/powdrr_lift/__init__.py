@@ -32,6 +32,13 @@ __all__ = [
     "BlameLine",
     "BlameProvenance",
     "BlameViewState",
+    "CodebaseStateDecision",
+    "CodebaseStateEntity",
+    "CodebaseStateIntent",
+    "CodebaseStateLifecycleItem",
+    "CodebaseStateRelationship",
+    "CodebaseStateReport",
+    "CodebaseStateSource",
     "EditContextLine",
     "EditContextRange",
     "EditContextReport",
@@ -52,11 +59,14 @@ __all__ = [
     "RepoTreeNode",
     "Span",
     "create_change_log_template",
+    "build_codebase_state_report",
     "build_changelog_index",
     "build_changelog_index_at_ref",
     "build_blame_file_view",
     "build_blame_view_state",
     "build_repo_tree",
+    "codebase_state_default_output_path",
+    "create_codebase_state",
     "refresh_code_index",
     "parse_change_log",
     "parse_line_range",
@@ -67,6 +77,7 @@ __all__ = [
     "build_validation_report",
     "parse_validation_report",
     "render_edit_context_report",
+    "render_codebase_state_report",
     "render_entity_decision_report",
     "render_entity_reference_report",
     "render_entity_relationship_report",
@@ -91,6 +102,47 @@ def __getattr__(name: str) -> Any:
         from powdrr_lift.core.index import build_changelog_index_at_ref
 
         return build_changelog_index_at_ref
+
+    if name in {
+        "CodebaseStateDecision",
+        "CodebaseStateEntity",
+        "CodebaseStateIntent",
+        "CodebaseStateLifecycleItem",
+        "CodebaseStateRelationship",
+        "CodebaseStateReport",
+        "CodebaseStateSource",
+        "build_codebase_state_report",
+        "codebase_state_default_output_path",
+        "create_codebase_state",
+        "render_codebase_state_report",
+    }:
+        from powdrr_lift.core.codebase_state import (
+            CodebaseStateDecision,
+            CodebaseStateEntity,
+            CodebaseStateIntent,
+            CodebaseStateLifecycleItem,
+            CodebaseStateRelationship,
+            CodebaseStateReport,
+            CodebaseStateSource,
+            build_codebase_state_report,
+            codebase_state_default_output_path,
+            create_codebase_state,
+            render_codebase_state_report,
+        )
+
+        return {
+            "CodebaseStateDecision": CodebaseStateDecision,
+            "CodebaseStateEntity": CodebaseStateEntity,
+            "CodebaseStateIntent": CodebaseStateIntent,
+            "CodebaseStateLifecycleItem": CodebaseStateLifecycleItem,
+            "CodebaseStateRelationship": CodebaseStateRelationship,
+            "CodebaseStateReport": CodebaseStateReport,
+            "CodebaseStateSource": CodebaseStateSource,
+            "build_codebase_state_report": build_codebase_state_report,
+            "codebase_state_default_output_path": codebase_state_default_output_path,
+            "create_codebase_state": create_codebase_state,
+            "render_codebase_state_report": render_codebase_state_report,
+        }[name]
 
     if name in {
         "BranchState",

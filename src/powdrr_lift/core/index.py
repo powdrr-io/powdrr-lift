@@ -86,6 +86,7 @@ class ProvenanceRecord:
     summary: str | None
     rationale: str | None
     affects: tuple[str, ...] = field(default_factory=tuple)
+    coedited_files: tuple[str, ...] = field(default_factory=tuple)
     change_index: int | None = None
 
 
@@ -744,6 +745,10 @@ def _build_declared_provenance(
         summary=file_entry.summary,
         rationale=file_entry.rationale,
         affects=_normalize_entity_ids(_file_change_entity_ids(file_entry)),
+        coedited_files=_collect_coedited_file_paths(
+            changelog_document.changelog.file_changes,
+            file_patch.path,
+        ),
         change_index=file_change_index,
     )
 
@@ -771,6 +776,7 @@ def _build_artifact_provenance(
         summary=f"Create changelog artifact for PR {commit.pr_number}",
         rationale="Store the validated PR changelog alongside the code change.",
         affects=(),
+        coedited_files=(),
         change_index=None,
     )
 
@@ -795,6 +801,7 @@ def _build_commit_comment_provenance(
         summary=commit.subject,
         rationale=comment_body or "No commit body was provided.",
         affects=(),
+        coedited_files=(),
         change_index=None,
     )
 
@@ -823,6 +830,7 @@ def _build_implicit_provenance(
             "Captured from the PR changelog because no explicit file entry matched."
         ),
         affects=(),
+        coedited_files=(),
         change_index=None,
     )
 
@@ -846,6 +854,27 @@ def _group_declared_changes(
         )
 
     return grouped
+
+
+def _collect_coedited_file_paths(
+    file_changes: Sequence[ChangeFile],
+    current_path: str,
+) -> tuple[str, ...]:
+    coedited_paths: list[str] = []
+    seen_paths: set[str] = {current_path}
+    for file_change in file_changes:
+        path = file_change.path
+        if path is None:
+            continue
+
+        normalized_path = path.strip()
+        if not normalized_path or normalized_path in seen_paths:
+            continue
+
+        seen_paths.add(normalized_path)
+        coedited_paths.append(normalized_path)
+
+    return tuple(coedited_paths)
 
 
 def _apply_file_patch(

@@ -54,6 +54,7 @@ class BlameProvenance:
     rationale: str | None
     change_index: int | None
     affects: list[str] = field(default_factory=list)
+    coedited_files: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +255,7 @@ def _provenance_to_blame_provenance(
         summary=provenance.summary,
         rationale=provenance.rationale,
         affects=list(provenance.affects),
+        coedited_files=list(provenance.coedited_files),
         change_index=provenance.change_index,
     )
 
@@ -378,6 +380,7 @@ def blame_file_view_to_data(view: BlameFileView) -> dict[str, Any]:
                 "summary": provenance.summary,
                 "rationale": provenance.rationale,
                 "affects": provenance.affects,
+                "coedited_files": provenance.coedited_files,
                 "change_index": provenance.change_index,
             }
             for provenance in view.provenances

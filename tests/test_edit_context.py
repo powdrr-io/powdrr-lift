@@ -32,6 +32,7 @@ def test_lookup_edit_context_preserves_prior_intent_and_line_refs(
         requested_range.start_line for requested_range in report.requested_ranges
     ] == [1, 3]
     assert report.requested_ranges[0].related_entities == ["AppService"]
+    assert report.requested_ranges[0].coedited_files == ["src/logger.py"]
     assert report.requested_ranges[1].related_entities == ["AppService"]
 
     first_range = report.requested_ranges[0]
@@ -84,6 +85,7 @@ def test_cli_edit_context_emits_yaml_report(tmp_path: Path) -> None:
     assert report["matching_changes"][0]["pr_number"] == 3
     assert report["requested_ranges"][0]["lines"][0]["provenance_ref"] == 1
     assert report["requested_ranges"][0]["related_entities"] == ["AppService"]
+    assert report["requested_ranges"][0]["coedited_files"] == ["src/logger.py"]
 
 
 def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
@@ -182,6 +184,10 @@ def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
         "banner\nintro\nalpha\nbeta\ngamma\n",
         encoding="utf-8",
     )
+    (repo_root / "src" / "logger.py").write_text(
+        "def log(message):\n    return message\n",
+        encoding="utf-8",
+    )
     (repo_root / "docs" / "changelogs" / "PR-3-changelog.yaml").write_text(
         """
         version: 1
@@ -205,6 +211,14 @@ def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
             affects:
               - AppService
             rationale: Add the new banner line.
+          - file: src/logger.py
+            span:
+              start_line: 1
+              end_line: 2
+            summary: Add a logger helper.
+            affects:
+              - AppService
+            rationale: Support the app banner logging.
         """,
         encoding="utf-8",
     )
@@ -212,6 +226,7 @@ def _create_repo_with_edit_context_branch(tmp_path: Path) -> Path:
         repo_root,
         "add",
         "src/app.py",
+        "src/logger.py",
         "docs/changelogs/PR-3-changelog.yaml",
     )
     _git(repo_root, "commit", "-m", "Add banner line (#3)")

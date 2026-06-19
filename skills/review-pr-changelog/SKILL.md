@@ -19,6 +19,8 @@ Use this skill when a PR needs changelog-focused review.
 3. Review the changelog against the PR intent.
    - Read the PR title and description to determine intent.
    - For each `change` entry, compare the file, summary, affects list, and rationale to the PR intent.
+   - Use `get_edit_context` for each changed file span to gather the matching provenance and the other code areas edited in the same changelog entry.
+   - Use `coedited_files` to identify sibling code areas that should be reviewed alongside the searched span.
    - Ask whether the change supports the intent.
    - Ask whether the change is strictly necessary to satisfy the intent.
 4. Check the branch-level invariants and decisions.

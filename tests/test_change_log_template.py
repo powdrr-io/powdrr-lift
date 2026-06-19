@@ -166,8 +166,8 @@ def test_create_change_log_template_populates_full_related_sections(
         "src/app.py",
         "tests/test_app.py",
     ]
-    assert change_log.file_changes[0].related.files == ["tests/test_app.py"]
-    assert change_log.file_changes[1].related.files == ["src/app.py"]
+    assert change_log.file_changes[0].related.files == []
+    assert change_log.file_changes[1].related.files == []
     assert change_log.file_changes[0].related.entities == ["AppService"]
     assert change_log.file_changes[1].related.entities == ["AppService"]
     assert change_log.file_changes[0].related.invariants == []

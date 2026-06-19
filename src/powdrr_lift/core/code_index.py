@@ -146,8 +146,8 @@ def lookup_code_provenance(
 ) -> ProvenanceRecord | None:
     store = CodeIndexStore(_resolve_repo_root(repo_root))
     resolved_branch = branch_name or _current_branch(store.repo_root)
-    store.refresh(resolved_branch, parent_branch)
-    return store.lookup(resolved_branch, path, line_number)
+    source_index = store.refresh(resolved_branch, parent_branch)
+    return source_index.provenance_for(path, line_number)
 
 
 def lookup_code_provenance_span(
@@ -161,8 +161,18 @@ def lookup_code_provenance_span(
 ) -> list[ProvenanceRecord]:
     store = CodeIndexStore(_resolve_repo_root(repo_root))
     resolved_branch = branch_name or _current_branch(store.repo_root)
-    store.refresh(resolved_branch, parent_branch)
-    return store.lookup_span(resolved_branch, path, start_line, end_line)
+    source_index = store.refresh(resolved_branch, parent_branch)
+    seen_records: set[ProvenanceRecord] = set()
+    provenances: list[ProvenanceRecord] = []
+    for line_number in range(start_line, end_line + 1):
+        provenance = source_index.provenance_for(path, line_number)
+        if provenance is None or provenance in seen_records:
+            continue
+
+        seen_records.add(provenance)
+        provenances.append(provenance)
+
+    return provenances
 
 
 class CodeIndexStore:
@@ -262,10 +272,15 @@ class CodeIndexStore:
                 branch_name,
                 [row["id"]],
             )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                [row],
+                _load_change_file_rows(connection, branch_name),
+            )
 
         return _row_to_provenance_record(
             row,
             affects=affects_by_id.get(row["id"], ()),
+            coedited_files=coedited_files_by_id.get(row["id"], ()),
         )
 
     def lookup_span(
@@ -316,11 +331,16 @@ class CodeIndexStore:
                 branch_name,
                 [row["id"] for row in rows],
             )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                rows,
+                _load_change_file_rows(connection, branch_name),
+            )
 
         return [
             _row_to_provenance_record(
                 row,
                 affects=affects_by_id.get(row["id"], ()),
+                coedited_files=coedited_files_by_id.get(row["id"], ()),
             )
             for row in rows
         ]
@@ -374,6 +394,10 @@ class CodeIndexStore:
                     if row["provenance_record_id"] is not None
                 ],
             )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                [row for row in rows if row["provenance_record_id"] is not None],
+                _load_change_file_rows(connection, branch_name),
+            )
 
         records_by_line: dict[int, ProvenanceRecord | None] = {
             row["line_number"]: (
@@ -382,6 +406,9 @@ class CodeIndexStore:
                 else _row_to_provenance_record(
                     row,
                     affects=affects_by_id.get(row["provenance_record_id"], ()),
+                    coedited_files=coedited_files_by_id.get(
+                        row["provenance_record_id"], ()
+                    ),
                 )
             )
             for row in rows
@@ -471,11 +498,16 @@ class CodeIndexStore:
                 branch_name,
                 [row["id"] for row in rows],
             )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                rows,
+                _load_change_file_rows(connection, branch_name),
+            )
 
         return [
             _row_to_provenance_record(
                 row,
                 affects=affects_by_provenance_id.get(row["id"], ()),
+                coedited_files=coedited_files_by_id.get(row["id"], ()),
             )
             for row in rows
         ]
@@ -1127,6 +1159,12 @@ class CodeIndexStore:
                 branch_name,
                 [row["id"] for row in provenance_rows],
             )
+            coedited_files_by_provenance_id = (
+                _load_coedited_file_paths_by_provenance_id(
+                    provenance_rows,
+                    change_file_rows,
+                )
+            )
 
         entities_by_id = _group_entity_occurrences(entity_rows)
         relationship_records = _build_relationship_occurrences(relationship_rows)
@@ -1142,6 +1180,7 @@ class CodeIndexStore:
             row["id"]: _row_to_provenance_record(
                 row,
                 affects=affects_by_provenance_id.get(row["id"], ()),
+                coedited_files=coedited_files_by_provenance_id.get(row["id"], ()),
             )
             for row in provenance_rows
         }
@@ -1946,6 +1985,7 @@ def _row_to_provenance_record(
     row: sqlite3.Row,
     *,
     affects: tuple[str, ...] = (),
+    coedited_files: tuple[str, ...] = (),
 ) -> ProvenanceRecord:
     return ProvenanceRecord(
         kind=row["kind"],
@@ -1966,8 +2006,69 @@ def _row_to_provenance_record(
         summary=row["summary"],
         rationale=row["rationale"],
         affects=affects,
+        coedited_files=coedited_files,
         change_index=row["change_index"],
     )
+
+
+def _load_change_file_rows(
+    connection: sqlite3.Connection,
+    branch_name: str,
+) -> list[sqlite3.Row]:
+    connection.row_factory = sqlite3.Row
+    return connection.execute(
+        """
+        SELECT pr_number, change_index, file_index, path
+        FROM change_file_record
+        WHERE branch_name = ?
+        ORDER BY pr_number, change_index, file_index, id
+        """,
+        (branch_name,),
+    ).fetchall()
+
+
+def _load_coedited_file_paths_by_provenance_id(
+    provenance_rows: Sequence[sqlite3.Row],
+    change_file_rows: Sequence[sqlite3.Row],
+) -> dict[int, tuple[str, ...]]:
+    paths_by_pr: dict[int, list[str]] = {}
+    for row in change_file_rows:
+        pr_number = row["pr_number"]
+        path = row["path"]
+        if pr_number is None or path is None:
+            continue
+
+        normalized_path = str(path).strip()
+        if not normalized_path:
+            continue
+
+        paths = paths_by_pr.setdefault(pr_number, [])
+        if normalized_path not in paths:
+            paths.append(normalized_path)
+
+    coedited_files_by_provenance_id: dict[int, tuple[str, ...]] = {}
+    for row in provenance_rows:
+        provenance_id = row["id"]
+        pr_number = row["pr_number"]
+        change_index = row["change_index"]
+        file_path = row["file_path"]
+        if (
+            provenance_id is None
+            or pr_number is None
+            or change_index is None
+            or file_path is None
+        ):
+            continue
+
+        current_path = str(file_path).strip()
+        if not current_path:
+            continue
+
+        coedited_files_by_provenance_id[provenance_id] = tuple(
+            path for path in paths_by_pr.get(pr_number, []) if path != current_path
+        )
+
+    return coedited_files_by_provenance_id
 
 
 def _span_from_row(row: sqlite3.Row) -> Span:

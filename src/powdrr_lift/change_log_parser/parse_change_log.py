@@ -83,6 +83,18 @@ class ChangeGuidance:
 
 
 @dataclass(frozen=True, slots=True)
+class ChangeFeatureState:
+    id: str | None = None
+    state: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeProposedPRState:
+    id: str | None = None
+    state: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ChangeLog:
     version: int | str | None = None
     change_id: str | None = None
@@ -96,6 +108,8 @@ class ChangeLog:
     )
     invariant_changes: list[ChangeInvariant] = field(default_factory=list)
     guidance_changes: list[ChangeGuidance] = field(default_factory=list)
+    feature_changes: list[ChangeFeatureState] = field(default_factory=list)
+    pr_changes: list[ChangeProposedPRState] = field(default_factory=list)
 
 
 def parse_change_log(yaml_content: str) -> ChangeLog:
@@ -138,6 +152,8 @@ def _parse_change_log_v1(data: Mapping[str, Any]) -> ChangeLog:
                 data.get("relationship_changes")
             )
         ],
+        feature_changes=[],
+        pr_changes=[],
     )
 
 
@@ -145,7 +161,8 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
     if "changes" in data:
         raise ValueError(
             "Version 2 changelogs must use top-level files, entities, "
-            "entity_relationships, invariants, and guidance sections."
+            "entity_relationships, invariants, guidance, features, and prs "
+            "sections."
         )
 
     return ChangeLog(
@@ -159,6 +176,8 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         entity_relationship_changes=_parse_change_entity_relationships(data),
         invariant_changes=_parse_change_invariants(data),
         guidance_changes=_parse_change_guidance(data),
+        feature_changes=_parse_change_features(data),
+        pr_changes=_parse_change_prs(data),
     )
 
 
@@ -287,6 +306,20 @@ def _parse_change_guidance(data: Mapping[str, Any]) -> list[ChangeGuidance]:
     ]
 
 
+def _parse_change_features(data: Mapping[str, Any]) -> list[ChangeFeatureState]:
+    return [
+        _parse_feature_state(feature_data)
+        for feature_data in _ensure_sequence(data.get("features"))
+    ]
+
+
+def _parse_change_prs(data: Mapping[str, Any]) -> list[ChangeProposedPRState]:
+    return [
+        _parse_proposed_pr_state(pr_data)
+        for pr_data in _ensure_sequence(data.get("prs"))
+    ]
+
+
 def _parse_invariant(raw_invariant: object) -> ChangeInvariant:
     data = _ensure_mapping(raw_invariant)
     return ChangeInvariant(
@@ -304,6 +337,22 @@ def _parse_guidance(raw_guidance: object) -> ChangeGuidance:
         description=_coerce_optional_str(data.get("description")),
         action=_coerce_optional_str(data.get("action")),
         related=_parse_related_section(data.get("related")),
+    )
+
+
+def _parse_feature_state(raw_feature: object) -> ChangeFeatureState:
+    data = _ensure_mapping(raw_feature)
+    return ChangeFeatureState(
+        id=_coerce_optional_str(data.get("id")),
+        state=_coerce_optional_str(data.get("state")),
+    )
+
+
+def _parse_proposed_pr_state(raw_pr: object) -> ChangeProposedPRState:
+    data = _ensure_mapping(raw_pr)
+    return ChangeProposedPRState(
+        id=_coerce_optional_str(data.get("id")),
+        state=_coerce_optional_str(data.get("state")),
     )
 
 

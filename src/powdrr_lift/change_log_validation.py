@@ -21,6 +21,7 @@ from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,
 )
+from powdrr_lift.core.codebase_state import build_codebase_state_report
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.index import (
     _file_change_entity_ids,
@@ -149,7 +150,8 @@ def build_validation_report(
                     code="top_level_changes_not_allowed",
                     message=(
                         "Version 2 changelogs must use top-level files, entities, "
-                        "entity_relationships, invariants, and guidance sections."
+                        "entity_relationships, invariants, guidance, features, and "
+                        "prs sections."
                     ),
                 )
             )
@@ -414,6 +416,52 @@ def build_validation_report(
                     if _normalize_entity_id(guidance.id) is not None
                 },
                 path=None,
+            )
+
+        available_feature_ids = _load_available_feature_ids(repo_root_path)
+        known_pr_ids = _load_known_proposed_pr_ids(repo_root_path)
+
+        for feature_change_index, feature_change in enumerate(
+            change_log.feature_changes or [],
+            start=1,
+        ):
+            _validate_v2_state_change(
+                issues=issues,
+                section_name="features",
+                item_index=feature_change_index,
+                item_id=feature_change.id,
+                state=feature_change.state,
+                available_ids=available_feature_ids,
+                unavailable_id_code="unknown_feature_id",
+                unavailable_id_message=(
+                    "Feature id {item_id!r} is not listed in the current codebase "
+                    "state."
+                ),
+                invalid_state_code="invalid_feature_state",
+                invalid_state_message=(
+                    "Feature state must be in_progress or completed."
+                ),
+            )
+
+        for pr_change_index, pr_change in enumerate(
+            change_log.pr_changes or [], start=1
+        ):
+            _validate_v2_state_change(
+                issues=issues,
+                section_name="prs",
+                item_index=pr_change_index,
+                item_id=pr_change.id,
+                state=pr_change.state,
+                available_ids=known_pr_ids,
+                unavailable_id_code="unknown_proposed_pr_id",
+                unavailable_id_message=(
+                    "Proposed PR id {item_id!r} is not listed in the current "
+                    "changelog index."
+                ),
+                invalid_state_code="invalid_pr_state",
+                invalid_state_message=(
+                    "Proposed PR state must be in_progress or completed."
+                ),
             )
 
         for relationship_change in change_log.entity_relationship_changes or []:
@@ -1064,3 +1112,78 @@ def _validate_v2_lifecycle_item(
                     path=path,
                 )
             )
+
+
+def _validate_v2_state_change(
+    *,
+    issues: list[ValidationIssue],
+    section_name: str,
+    item_index: int,
+    item_id: str | None,
+    state: str | None,
+    available_ids: set[str],
+    unavailable_id_code: str,
+    unavailable_id_message: str,
+    invalid_state_code: str,
+    invalid_state_message: str,
+) -> None:
+    normalized_item_id = _normalize_entity_id(item_id)
+    item_label = section_name[:-1] if section_name.endswith("s") else section_name
+    path_prefix = f"{section_name}[{item_index - 1}]"
+
+    if normalized_item_id is None:
+        issues.append(
+            ValidationIssue(
+                code=f"{item_label}_missing_id",
+                message=f"Change {item_index} {item_label} entry must include an id.",
+                path=f"{path_prefix}.id",
+            )
+        )
+    elif normalized_item_id not in available_ids:
+        issues.append(
+            ValidationIssue(
+                code=unavailable_id_code,
+                message=unavailable_id_message.format(item_id=normalized_item_id),
+                path=f"{path_prefix}.id",
+            )
+        )
+
+    if state not in {"in_progress", "completed"}:
+        issues.append(
+            ValidationIssue(
+                code=invalid_state_code,
+                message=invalid_state_message,
+                path=f"{path_prefix}.state",
+            )
+        )
+
+
+def _load_available_feature_ids(repo_root: Path) -> set[str]:
+    try:
+        report = build_codebase_state_report(repo_root=repo_root)
+    except Exception:  # noqa: BLE001
+        return set()
+
+    return {
+        entity.id
+        for entity in report.entities
+        if _normalize_entity_id(entity.id) is not None
+    }
+
+
+def _load_known_proposed_pr_ids(repo_root: Path) -> set[str]:
+    pr_dir = repo_root / "docs" / "changelogs"
+    if not pr_dir.exists():
+        return set()
+
+    known_pr_ids: set[str] = set()
+    for changelog_path in pr_dir.glob("PR-*-changelog.yaml"):
+        name = changelog_path.name
+        if not name.startswith("PR-") or not name.endswith("-changelog.yaml"):
+            continue
+
+        pr_id = name.removeprefix("PR-").removesuffix("-changelog.yaml")
+        if pr_id:
+            known_pr_ids.add(pr_id)
+
+    return known_pr_ids

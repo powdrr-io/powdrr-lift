@@ -48,6 +48,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "entity_relationships:" in template_text
     assert "invariants:" in template_text
     assert "guidance:" in template_text
+    assert "features:" in template_text
+    assert "prs:" in template_text
     assert "    related:" in template_text
     assert "Remove this block entirely if it does not point" in template_text
     assert "to anything." in template_text
@@ -72,6 +74,8 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
         [],
     ]
     assert change_log.entity_changes == []
+    assert change_log.feature_changes == []
+    assert change_log.pr_changes == []
     assert change_log.decisions == [Decision()]
 
 
@@ -172,6 +176,8 @@ def test_create_change_log_template_populates_full_related_sections(
     assert change_log.file_changes[1].related.entities == ["AppService"]
     assert change_log.file_changes[0].related.invariants == []
     assert change_log.file_changes[0].related.guidance == []
+    assert change_log.feature_changes == []
+    assert change_log.pr_changes == []
 
 
 def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:

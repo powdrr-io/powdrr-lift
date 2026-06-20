@@ -1,0 +1,295 @@
+version: 2
+change_id: 31
+title: Add feature and PR state sections to changelogs
+intent:
+  problem: Version 2 changelogs can describe files, entities, relationships,
+    invariants, and guidance, but they cannot yet record the lifecycle state of
+    a feature or proposed PR.
+  goal: Extend the changelog format and validator so version 2 documents can
+    track feature and proposed PR state updates using in_progress or completed
+    states.
+decisions:
+  - id: changelog-state-sections
+    summary: Add optional top-level features and prs sections to version 2
+      changelogs.
+  - id: changelog-state-validation
+    summary: Validate feature ids against the current codebase state and
+      proposed PR ids against existing changelog files, while constraining state
+      values to in_progress or completed.
+files:
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 6
+      end_line: 6
+    summary: Export the new feature state dataclass from the package root.
+    rationale: Keep the top-level package API aligned with the parser models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 11
+      end_line: 11
+    summary: Export the proposed PR state dataclass from the package root.
+    rationale: Keep the top-level package API aligned with the parser models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 23
+      end_line: 23
+    summary: Add the feature state dataclass to the package exports.
+    rationale: Make the new parser model available from the package namespace.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 27
+      end_line: 27
+    summary: Add the proposed PR state dataclass to the package exports.
+    rationale: Make the new parser model available from the package namespace.
+  - path: src/powdrr_lift/change_log_parser/__init__.py
+    type: modified
+    span:
+      start_line: 4
+      end_line: 4
+    summary: Export the feature state dataclass from the parser package.
+    rationale: Expose the new changelog model through the parser API.
+  - path: src/powdrr_lift/change_log_parser/__init__.py
+    type: modified
+    span:
+      start_line: 9
+      end_line: 9
+    summary: Export the proposed PR state dataclass from the parser package.
+    rationale: Expose the new changelog model through the parser API.
+  - path: src/powdrr_lift/change_log_parser/__init__.py
+    type: modified
+    span:
+      start_line: 21
+      end_line: 21
+    summary: Add the feature state dataclass to parser __all__.
+    rationale: Keep the parser export list in sync with the new model.
+  - path: src/powdrr_lift/change_log_parser/__init__.py
+    type: modified
+    span:
+      start_line: 25
+      end_line: 25
+    summary: Add the proposed PR state dataclass to parser __all__.
+    rationale: Keep the parser export list in sync with the new model.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 85
+      end_line: 96
+    summary: Add dataclasses for feature and proposed PR state entries.
+    rationale: Represent the new top-level changelog sections in the parser
+      model.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 111
+      end_line: 112
+    summary: Store feature and proposed PR state changes on ChangeLog.
+    rationale: Preserve the new top-level sections in parsed changelog
+      objects.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 155
+      end_line: 156
+    summary: Initialize the new state change lists for version 1 changelogs.
+    rationale: Keep the version 1 parser compatible with the extended model.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 164
+      end_line: 165
+    summary: Expand the version 2 schema message to mention features and prs.
+    rationale: Keep the parser error message aligned with the new top-level
+      sections.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 179
+      end_line: 180
+    summary: Parse the feature and proposed PR state lists for version 2.
+    rationale: Carry the new top-level sections through the parser.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 309
+      end_line: 322
+    summary: Parse the new features and prs sections from version 2 YAML.
+    rationale: Map the new top-level sections into parser dataclasses.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 343
+      end_line: 358
+    summary: Parse individual feature and proposed PR state entries.
+    rationale: Capture the id and state values for each state update.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 171
+      end_line: 175
+    summary: Add features and prs sections to generated changelog templates.
+    rationale: Guide authors to fill in state updates with the new format.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 24
+      end_line: 24
+    summary: Import codebase state reporting for feature validation.
+    rationale: Reuse the current codebase state as the feature catalog.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 153
+      end_line: 154
+    summary: Expand the version 2 schema message to include features and prs.
+    rationale: Keep the validator error message aligned with the extended
+      schema.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 421
+      end_line: 466
+    summary: Validate feature and proposed PR state entries.
+    rationale: Enforce known ids and the allowed in_progress and completed
+      states.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 1115
+      end_line: 1189
+    summary: Add helpers for feature and proposed PR state validation.
+    rationale: Centralize id catalog lookup and state validation logic for the
+      new sections.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 108
+      end_line: 108
+    summary: Export the feature state dataclass through the core namespace.
+    rationale: Keep the shared core API aligned with the parser models.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 113
+      end_line: 113
+    summary: Export the proposed PR state dataclass through the core namespace.
+    rationale: Keep the shared core API aligned with the parser models.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 157
+      end_line: 157
+    summary: Add the feature state dataclass to core.__all__.
+    rationale: Keep the exported core surface consistent with the parser.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 161
+      end_line: 161
+    summary: Add the proposed PR state dataclass to core.__all__.
+    rationale: Keep the exported core surface consistent with the parser.
+  - path: src/powdrr_lift/core/schemas.py
+    type: modified
+    span:
+      start_line: 4
+      end_line: 4
+    summary: Import the feature state dataclass into the schema shim.
+    rationale: Keep the compatibility layer aligned with the parser models.
+  - path: src/powdrr_lift/core/schemas.py
+    type: modified
+    span:
+      start_line: 9
+      end_line: 9
+    summary: Import the proposed PR state dataclass into the schema shim.
+    rationale: Keep the compatibility layer aligned with the parser models.
+  - path: src/powdrr_lift/core/schemas.py
+    type: modified
+    span:
+      start_line: 21
+      end_line: 21
+    summary: Export the feature state dataclass from the schema shim.
+    rationale: Keep the compatibility layer export list in sync.
+  - path: src/powdrr_lift/core/schemas.py
+    type: modified
+    span:
+      start_line: 25
+      end_line: 25
+    summary: Export the proposed PR state dataclass from the schema shim.
+    rationale: Keep the compatibility layer export list in sync.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 51
+      end_line: 52
+    summary: Assert that templates include features and prs sections.
+    rationale: Prove the generated scaffold includes the new top-level
+      sections.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 77
+      end_line: 78
+    summary: Assert empty feature and PR state lists parse from templates.
+    rationale: Keep the template parser test aligned with the new sections.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 179
+      end_line: 180
+    summary: Assert empty feature and PR state lists on related templates.
+    rationale: Keep the populated-template parser test aligned with the new
+      sections.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 89
+      end_line: 92
+    summary: Remove stale related hints from the validation fixture.
+    rationale: Keep the success fixture focused on the new state sections.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 145
+      end_line: 152
+    summary: Add valid feature and PR state entries to the success fixture.
+    rationale: Demonstrate that the new sections validate when they reference
+      known ids and allowed states.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 169
+      end_line: 228
+    summary: Add failure coverage for invalid feature and PR state entries.
+    rationale: Prove the validator rejects unknown ids and disallowed states.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 1169
+      end_line: 1199
+    summary: Seed a PR changelog so the proposed PR catalog exists in tests.
+    rationale: Give the validator a real PR id catalog on the feature branch.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 131
+      end_line: 136
+    summary: Parse feature and PR state sections from version 2 YAML.
+    rationale: Prove the parser maps the new top-level sections into
+      dataclasses.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 178
+      end_line: 185
+    summary: Assert parsed feature and PR state values from version 2 YAML.
+    rationale: Verify the parser preserves the ids and states for the new
+      sections.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

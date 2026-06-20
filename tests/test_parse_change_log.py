@@ -128,6 +128,12 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
                 - src/review/workflow.py
               entities:
                 - ChangelogValidation
+        features:
+          - id: ReviewSkill
+            state: in_progress
+        prs:
+          - id: 42
+            state: completed
                 """
     )
 
@@ -169,6 +175,14 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert (change_log.entity_relationship_changes or [])[0].relationship == (
         "depends_on"
     )
+    assert [feature.id for feature in (change_log.feature_changes or [])] == [
+        "ReviewSkill"
+    ]
+    assert [feature.state for feature in (change_log.feature_changes or [])] == [
+        "in_progress"
+    ]
+    assert [pr.id for pr in (change_log.pr_changes or [])] == ["42"]
+    assert [pr.state for pr in (change_log.pr_changes or [])] == ["completed"]
 
 
 def test_empty_yaml_returns_empty_changelog() -> None:

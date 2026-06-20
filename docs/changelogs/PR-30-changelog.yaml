@@ -1,0 +1,691 @@
+version: 2
+change_id: 30
+title: Add specify-prs skill and PR specification endpoints
+intent:
+  problem: Agents need a reusable workflow for drafting proposed PR
+    specifications that reference current feature ids, capture the PR goal
+    and reasoning, and validate the proposed PR id and file references before
+    proceeding.
+  goal: Add an installable specify-prs skill plus CLI and MCP endpoints that
+    can generate and validate PR specification templates.
+decisions:
+  - id: specify-prs-workflow
+    summary: Make PR specification authoring and validation a first-class skill,
+      CLI, and MCP workflow.
+  - id: pr-specification-current-features
+    summary: Source feature ids from the current codebase state when generating
+      PR specification templates, with a fallback to implementation-spec
+      files when the state snapshot is unavailable.
+  - id: pr-specification-unique-ids
+    summary: Require proposed PR ids to be globally unique within the repository.
+files:
+  - path: skills/specify-prs/SKILL.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 39
+    summary: Add the specify-prs skill workflow and guardrails.
+    rationale: Provide installable instructions for creating and validating
+      proposed PR specifications.
+    related:
+      files:
+        - skills/specify-prs/agents/openai.yaml
+      entities:
+        - specify-prs
+  - path: skills/specify-prs/agents/openai.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 7
+    summary: Add UI metadata for the specify-prs skill.
+    rationale: Make the new skill discoverable in Codex skill lists and
+      default prompts.
+    related:
+      files:
+        - skills/specify-prs/SKILL.md
+      entities:
+        - specify-prs
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 540
+    summary: Implement PR specification template rendering and validation.
+    rationale: Centralize the shared logic for template generation, feature
+      catalog lookup, unique-id validation, and file-reference validation.
+    related:
+      files:
+        - src/powdrr_lift/cli.py
+        - src/powdrr_lift/mcp_server.py
+        - tests/test_pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 15
+      end_line: 15
+    summary: Import the PR specification validation builder into the CLI.
+    rationale: Reuse the shared PR specification validation logic in the
+      command handlers.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 21
+      end_line: 21
+    summary: Import the PR specification template helpers into the CLI.
+    rationale: Reuse the shared PR specification template writer from the
+      core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 29
+      end_line: 29
+    summary: Import the PR specification output path helper into the CLI.
+    rationale: Reuse the shared PR specification default output path from the
+      core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 40
+      end_line: 40
+    summary: Import the PR specification YAML validator into the CLI.
+    rationale: Reuse the shared PR specification YAML validator in the
+      command handlers.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 369
+      end_line: 388
+    summary: Add the PR specification CLI subcommand.
+    rationale: Provide a shell entry point for generating PR specification
+      templates.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+        - skills/specify-prs/SKILL.md
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 451
+      end_line: 470
+    summary: Add the PR specification validation CLI subcommand.
+    rationale: Provide a shell entry point for validating PR specifications
+      against the current feature catalog.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+        - skills/specify-prs/SKILL.md
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 692
+      end_line: 706
+    summary: Add the PR specification CLI template writer.
+    rationale: Wire the new subcommand to the shared template generator.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 747
+      end_line: 764
+    summary: Add the PR specification CLI validator.
+    rationale: Wire the validation subcommand to the shared PR specification
+      validator.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 96
+      end_line: 104
+    summary: Export the PR specification helpers from the core namespace.
+    rationale: Make the new PR specification API available through the shared
+      core import path.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 135
+      end_line: 136
+    summary: Add PR specification validation report types to core.__all__.
+    rationale: Keep the exported type surface aligned with the new report
+      models.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 166
+      end_line: 166
+    summary: Export the PR specification default output path helper.
+    rationale: Let callers discover the default PR specification file
+      location from the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 184
+      end_line: 184
+    summary: Export the PR specification validation builder.
+    rationale: Expose the shared PR specification validation report builder
+      from the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 192
+      end_line: 192
+    summary: Export the PR specification template writer.
+    rationale: Expose the shared PR specification template generator from
+      the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 213
+      end_line: 213
+    summary: Export the PR specification template renderer.
+    rationale: Keep the YAML template renderer available through the core
+      namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 221
+      end_line: 221
+    summary: Export the PR specification YAML validator.
+    rationale: Make the shared PR specification validator available through
+      the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 46
+      end_line: 47
+    summary: Add PR specification validation types to the package exports.
+    rationale: Keep the top-level API aligned with the new PR specification
+      workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 50
+      end_line: 50
+    summary: Export the PR specification default output helper.
+    rationale: Expose the default PR specification file location from the
+      package root.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 53
+      end_line: 53
+    summary: Export the PR specification validation builder.
+    rationale: Expose the shared PR specification validation builder from the
+      package root.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 56
+      end_line: 56
+    summary: Export the PR specification template writer.
+    rationale: Keep the shared PR specification template generator available
+      from the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 104
+      end_line: 104
+    summary: Export the PR specification template renderer.
+    rationale: Keep the renderer available through the top-level package
+      namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 108
+      end_line: 108
+    summary: Export the PR specification YAML validator.
+    rationale: Keep the validator available through the top-level package
+      namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 126
+      end_line: 127
+    summary: Lazy-load PR specification validation types.
+    rationale: Expose the new API without forcing eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 130
+      end_line: 130
+    summary: Lazy-load the PR specification default output helper.
+    rationale: Keep the default output helper reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 133
+      end_line: 133
+    summary: Lazy-load the PR specification validation builder.
+    rationale: Keep the validation builder reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 136
+      end_line: 136
+    summary: Lazy-load the PR specification template writer.
+    rationale: Keep the template writer reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 139
+      end_line: 139
+    summary: Lazy-load the PR specification template renderer.
+    rationale: Keep the template renderer reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 142
+      end_line: 142
+    summary: Lazy-load the PR specification YAML validator.
+    rationale: Keep the validator reachable from the package root without
+      eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 162
+      end_line: 170
+    summary: Import the PR specification helpers during lazy loading.
+    rationale: Wire the package root to the new PR specification core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 185
+      end_line: 186
+    summary: Return the PR specification validation types from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 193
+      end_line: 195
+    summary: Return the PR specification default output helper from lazy
+      loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification-core
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 202
+      end_line: 204
+    summary: Return the PR specification validation builder from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 211
+      end_line: 211
+    summary: Return the PR specification template writer from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 218
+      end_line: 218
+    summary: Return the PR specification template renderer from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 225
+      end_line: 225
+    summary: Return the PR specification YAML validator from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 18
+      end_line: 18
+    summary: Import the PR specification template helpers into the MCP server.
+    rationale: Reuse the shared PR specification template generator from the
+      core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 26
+      end_line: 26
+    summary: Import the PR specification output helper into the MCP server.
+    rationale: Reuse the shared PR specification default output path from the
+      core module.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - pr-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 37
+      end_line: 37
+    summary: Import the PR specification validator into the MCP server.
+    rationale: Reuse the shared PR specification YAML validator in the MCP
+      tool implementation.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - evaluate-pr-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 248
+      end_line: 263
+    summary: Add the PR specification MCP template tool.
+    rationale: Expose PR specification template generation through MCP.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - create_pr_specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 289
+      end_line: 299
+    summary: Add the PR specification MCP validation tool.
+    rationale: Expose PR specification validation through MCP.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+      entities:
+        - validate_pr_specification
+  - path: tests/test_mcp_server.py
+    type: modified
+    span:
+      start_line: 31
+      end_line: 32
+    summary: Cover MCP registration for the PR specification tools.
+    rationale: Prove that the server registers the new PR specification MCP
+      endpoints.
+    related:
+      files:
+        - src/powdrr_lift/mcp_server.py
+      entities:
+        - create_pr_specification
+        - validate_pr_specification
+  - path: tests/test_pr_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 191
+    summary: Cover PR specification template generation and validation.
+    rationale: Prove that the PR specification workflow enforces current
+      feature references, globally unique proposed PR ids, and file
+      existence.
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+        - src/powdrr_lift/cli.py
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+entities:
+  - id: specify-prs
+    type: Skill
+    action: added
+  - id: pr-specification-core
+    type: Module
+    action: added
+  - id: pr-specification
+    type: Subcommand
+    action: added
+  - id: evaluate-pr-specification
+    type: Subcommand
+    action: added
+  - id: create_pr_specification
+    type: Request handler
+    action: added
+  - id: validate_pr_specification
+    type: Request handler
+    action: added
+  - id: pr-specification-tests
+    type: Test suite
+    action: added
+  - id: mcp-server-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - source: specify-prs
+    target: pr-specification
+    relationship: guides
+    description: The skill tells agents to generate a PR specification
+      template before filling it in.
+    rationale: Keep the installable skill aligned with the new CLI workflow.
+  - source: specify-prs
+    target: evaluate-pr-specification
+    relationship: guides
+    description: The skill tells agents to validate and iterate on the PR
+      specification until it passes.
+    rationale: Make validation part of the core skill workflow.
+  - source: specify-prs
+    target: create_pr_specification
+    relationship: guides
+    description: The skill tells agents to use the MCP template tool when
+      working through the PR specification workflow.
+    rationale: Keep the MCP path aligned with the CLI path.
+  - source: specify-prs
+    target: validate_pr_specification
+    relationship: guides
+    description: The skill tells agents to use the MCP validation tool when
+      working through the PR specification workflow.
+    rationale: Keep the MCP path aligned with the CLI path.
+  - source: pr-specification-core
+    target: pr-specification
+    relationship: mirrors
+    description: The CLI command and core module generate the same PR
+      specification template.
+    rationale: Keep the shell surface and core API behaviorally equivalent.
+  - source: pr-specification-core
+    target: evaluate-pr-specification
+    relationship: mirrors
+    description: The CLI command and core module validate the same PR
+      specification rules.
+    rationale: Keep the shell surface and core API aligned.
+invariants:
+  - id: unique-proposed-pr-ids
+    action: added
+    description: Proposed PR ids must not collide with existing PR
+      specification files.
+    rationale: Keep proposed PR specifications globally addressable.
+    related:
+      entities:
+        - pr-specification-core
+        - evaluate-pr-specification
+      entity_relationships:
+        - specify-prs -> evaluate-pr-specification
+guidance:
+  - id: one-template-per-pr
+    action: added
+    description: Generate one PR specification template per proposed PR.
+    rationale: Keep each proposal isolated and easy to validate.
+    related:
+      entities:
+        - specify-prs
+        - pr-specification
+      entity_relationships:
+        - specify-prs -> pr-specification
+  - id: validate-and-iterate
+    action: added
+    description: Fill the template, run validation, and fix any issues until
+      it passes.
+    rationale: Make validation the final gate before using the PR
+      specification.
+    related:
+      entities:
+        - evaluate-pr-specification
+        - validate_pr_specification
+      entity_relationships:
+        - specify-prs -> evaluate-pr-specification

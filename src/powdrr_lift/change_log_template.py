@@ -168,6 +168,11 @@ def _render_template_body(
             "entity_relationships: []",
             "invariants: []",
             "guidance: []",
+            "# Track feature and proposed PR state updates when relevant.",
+            "# Use `in_progress` when work is underway and `completed` when",
+            "# it is done.",
+            "features: []",
+            "prs: []",
         ]
     )
 

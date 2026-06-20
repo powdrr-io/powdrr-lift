@@ -86,10 +86,6 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
           end_line: 1
         summary: Add the review skill wiring.
         rationale: Keep the first hunk focused on the skill metadata.
-        related:
-          entities:
-            - AppService
-            - Cache
       - path: tests/test_app.py
         type: modified
         span:
@@ -146,6 +142,14 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
             - tests/test_app.py
           entities:
             - TestSuite
+
+    features:
+      - id: AppService
+        state: completed
+
+    prs:
+      - id: 1
+        state: completed
     """
 
     report = parse_validation_report(
@@ -160,6 +164,66 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     assert report.issues == []
     assert report.expected_change_files == ["src/app.py", "tests/test_app.py"]
     assert report.proposed_change_files == ["src/app.py", "tests/test_app.py"]
+
+
+def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+      - path: tests/test_app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add the review workflow test.
+        rationale: Keep the second hunk focused on the test harness.
+
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+
+    features:
+      - id: MissingFeature
+        state: pending
+
+    prs:
+      - id: 99
+        state: queued
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "unknown_feature_id",
+        "invalid_feature_state",
+        "unknown_proposed_pr_id",
+        "invalid_pr_state",
+    ]
 
 
 def test_validate_change_log_yaml_rejects_duplicate_ids_across_sections(
@@ -1102,6 +1166,37 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     _write_taxonomy_file(repo_root)
 
     _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "docs").mkdir()
+    (repo_root / "docs" / "changelogs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "changelogs" / "PR-1-changelog.yaml").write_text(
+        """
+        version: 1
+        change_id: 1
+        title: Introduce AppService
+
+        intent:
+          problem: AppService does not exist.
+          goal: Add the shared service to the graph.
+
+        entities:
+          - id: AppService
+            type: Service
+            action: added
+
+        changes:
+          - file: src/app.py
+            span:
+              start_line: 1
+              end_line: 1
+            summary: Introduce the shared service.
+            affects:
+              - AppService
+            rationale: AppService is part of the baseline graph.
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/changelogs/PR-1-changelog.yaml")
+    _git(repo_root, "commit", "-m", "Seed PR id catalog")
     (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
     (repo_root / "tests").mkdir()
     (repo_root / "tests" / "test_app.py").write_text(

@@ -1,0 +1,540 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, cast
+
+import yaml
+
+from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.codebase_state import build_codebase_state_report
+
+_DEFAULT_OUTPUT_PATH = Path("docs") / "prs" / "proposed-pr-specification.yaml"
+_IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "implementation"
+_PR_SPECIFICATION_DIR = Path("docs") / "prs"
+
+
+@dataclass(frozen=True, slots=True)
+class PRSpecificationValidationIssue:
+    code: str
+    message: str
+    path: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PRSpecificationValidationReport:
+    validation_successful: bool
+    proposed_pr_id: str | None
+    available_feature_ids: list[str] = field(default_factory=list)
+    known_pr_ids: list[str] = field(default_factory=list)
+    issues: list[PRSpecificationValidationIssue] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class _FeatureCatalogEntry:
+    feature_id: str
+    source_path: str
+    entity_type: str | None
+
+
+def pr_specification_default_output_path(repo_root: str | Path | None = None) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    return repo_root_path / _DEFAULT_OUTPUT_PATH
+
+
+def render_pr_specification_template(*, repo_root: str | Path | None = None) -> str:
+    repo_root_path = _resolve_repo_root(repo_root)
+    feature_catalog = _load_feature_catalog(repo_root_path)
+    if not feature_catalog:
+        raise ValueError(
+            "No current feature ids were found in the codebase state. "
+            "Generate the codebase state first and ensure it contains current "
+            "entities before generating a PR specification."
+        )
+
+    lines = [
+        "# PR specification template.",
+        "#",
+        "# Instructions:",
+        "# - Create one template per proposed PR.",
+        "# - Set `id` to a globally unique proposed PR id.",
+        "# - Reference one or more current feature ids from the codebase state",
+        "#   listed below.",
+        "# - Fill in `intent.goal` and `intent.reasoning`.",
+        "# - List only repository-relative file paths in `files` when updates are",
+        "#   needed.",
+        "#",
+        "# Current feature ids:",
+        *[
+            (
+                f"# - {entry.feature_id} "
+                f"({entry.entity_type or 'entity'}, {entry.source_path})"
+            )
+            for entry in feature_catalog
+        ],
+        "version: 1",
+        "id: null",
+        "feature_ids:",
+        "  - null",
+        "intent:",
+        "  goal: null",
+        "  reasoning: null",
+        "files: []",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def create_pr_specification_template(
+    *,
+    output_path: str | Path | None = None,
+    repo_root: str | Path | None = None,
+) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_output_path.write_text(
+        render_pr_specification_template(repo_root=repo_root_path),
+        encoding="utf-8",
+    )
+    return resolved_output_path
+
+
+def validate_pr_specification_yaml(
+    proposed_pr_specification_yaml: str,
+    *,
+    repo_root: str | Path | None = None,
+) -> str:
+    report = build_pr_specification_validation_report(
+        proposed_pr_specification_yaml,
+        repo_root=repo_root,
+    )
+    return yaml.safe_dump(_report_to_data(report), sort_keys=False)
+
+
+def build_pr_specification_validation_report(
+    proposed_pr_specification_yaml: str,
+    *,
+    repo_root: str | Path | None = None,
+) -> PRSpecificationValidationReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    issues: list[PRSpecificationValidationIssue] = []
+
+    feature_catalog = _load_feature_catalog(repo_root_path)
+    available_feature_ids = [entry.feature_id for entry in feature_catalog]
+    known_pr_ids = _load_existing_pr_ids(repo_root_path)
+
+    try:
+        raw_spec = _load_yaml_mapping(proposed_pr_specification_yaml)
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            PRSpecificationValidationIssue(
+                code="invalid_yaml",
+                message=f"Could not parse proposed PR specification YAML: {exc}",
+            )
+        )
+        return PRSpecificationValidationReport(
+            validation_successful=False,
+            proposed_pr_id=None,
+            available_feature_ids=available_feature_ids,
+            known_pr_ids=known_pr_ids,
+            issues=issues,
+        )
+
+    for section_name in ("id", "feature_ids", "intent"):
+        if section_name not in raw_spec:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="missing_required_section",
+                    message=f"The {section_name} section is required.",
+                    path=section_name,
+                )
+            )
+
+    proposed_pr_id = _required_string(
+        raw_spec.get("id"),
+        path="id",
+        issues=issues,
+        issue_code="proposed_pr_id_missing",
+        issue_message="The id field is required.",
+    )
+    if proposed_pr_id is not None and proposed_pr_id in known_pr_ids:
+        issues.append(
+            PRSpecificationValidationIssue(
+                code="duplicate_proposed_pr_id",
+                message=f"Proposed PR id {proposed_pr_id!r} already exists.",
+                path="id",
+            )
+        )
+
+    feature_ids = _collect_feature_ids(
+        _coerce_sequence(
+            raw_spec.get("feature_ids"),
+            path="feature_ids",
+            issues=issues,
+            issue_code="invalid_feature_ids_section",
+            issue_message="feature_ids must be a list of feature id strings.",
+        ),
+        available_feature_ids=set(available_feature_ids),
+        issues=issues,
+    )
+    if not feature_ids:
+        issues.append(
+            PRSpecificationValidationIssue(
+                code="no_feature_ids_defined",
+                message="Reference at least one feature id.",
+                path="feature_ids",
+            )
+        )
+
+    intent = _coerce_mapping(
+        raw_spec.get("intent"),
+        path="intent",
+        issues=issues,
+        issue_code="invalid_intent_section",
+        issue_message="intent must be a mapping with goal and reasoning.",
+    )
+    if intent is not None:
+        _required_string(
+            intent.get("goal"),
+            path="intent.goal",
+            issues=issues,
+            issue_code="intent_goal_missing",
+            issue_message="The intent.goal field is required.",
+        )
+        _required_string(
+            intent.get("reasoning"),
+            path="intent.reasoning",
+            issues=issues,
+            issue_code="intent_reasoning_missing",
+            issue_message="The intent.reasoning field is required.",
+        )
+
+    _collect_file_paths(
+        _coerce_sequence(
+            raw_spec.get("files"),
+            path="files",
+            issues=issues,
+            issue_code="invalid_files_section",
+            issue_message="files must be a list of repository-relative paths.",
+        ),
+        repo_root_path=repo_root_path,
+        issues=issues,
+    )
+
+    return PRSpecificationValidationReport(
+        validation_successful=not issues,
+        proposed_pr_id=proposed_pr_id,
+        available_feature_ids=available_feature_ids,
+        known_pr_ids=known_pr_ids,
+        issues=issues,
+    )
+
+
+def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
+    try:
+        codebase_state_report = build_codebase_state_report(repo_root=repo_root)
+    except Exception:  # noqa: BLE001
+        codebase_state_report = None
+
+    catalog: list[_FeatureCatalogEntry] = []
+    seen_feature_ids: set[str] = set()
+    if codebase_state_report is not None and codebase_state_report.entities:
+        for entity in codebase_state_report.entities:
+            if entity.id in seen_feature_ids:
+                continue
+            seen_feature_ids.add(entity.id)
+            source_path = entity.source.changelog_path or "current codebase state"
+            catalog.append(
+                _FeatureCatalogEntry(
+                    feature_id=entity.id,
+                    source_path=source_path,
+                    entity_type=entity.type,
+                )
+            )
+        if catalog:
+            return catalog
+
+    implementation_dir = repo_root / _IMPLEMENTATION_SPECIFICATION_DIR
+    if not implementation_dir.exists():
+        return catalog
+
+    for specification_path in sorted(implementation_dir.rglob("*.yaml")):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        features = _coerce_sequence(
+            raw_spec.get("features"),
+            path=f"{specification_path}#features",
+            issues=[],
+            issue_code="invalid_feature_registry",
+            issue_message="",
+        )
+        for feature in features:
+            if not isinstance(feature, Mapping):
+                continue
+            feature_id = _optional_string(feature.get("id"))
+            if feature_id is None or feature_id in seen_feature_ids:
+                continue
+            seen_feature_ids.add(feature_id)
+            catalog.append(
+                _FeatureCatalogEntry(
+                    feature_id=feature_id,
+                    source_path=str(specification_path.relative_to(repo_root)),
+                    entity_type="feature",
+                )
+            )
+
+    return catalog
+
+
+def _load_existing_pr_ids(repo_root: Path) -> list[str]:
+    pr_dir = repo_root / _PR_SPECIFICATION_DIR
+    if not pr_dir.exists():
+        return []
+
+    pr_ids: list[str] = []
+    seen_ids: set[str] = set()
+    for specification_path in sorted(pr_dir.rglob("*.yaml")):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        proposed_pr_id = _optional_string(raw_spec.get("id"))
+        if proposed_pr_id is None or proposed_pr_id in seen_ids:
+            continue
+
+        seen_ids.add(proposed_pr_id)
+        pr_ids.append(proposed_pr_id)
+
+    return pr_ids
+
+
+def _collect_feature_ids(
+    raw_feature_ids: Sequence[object],
+    *,
+    available_feature_ids: set[str],
+    issues: list[PRSpecificationValidationIssue],
+) -> set[str]:
+    feature_ids: set[str] = set()
+    for index, raw_feature_id in enumerate(raw_feature_ids):
+        feature_id = _required_string(
+            raw_feature_id,
+            path=f"feature_ids[{index}]",
+            issues=issues,
+            issue_code="feature_id_missing",
+            issue_message="Each feature id must be a string.",
+        )
+        if feature_id is None:
+            continue
+
+        if feature_id in feature_ids:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="duplicate_feature_id",
+                    message=f"Feature id {feature_id!r} appears more than once.",
+                    path=f"feature_ids[{index}]",
+                )
+            )
+            continue
+
+        if feature_id not in available_feature_ids:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="unknown_feature_id",
+                    message=(
+                        f"Feature id {feature_id!r} is not listed in the current "
+                        "implementation specifications."
+                    ),
+                    path=f"feature_ids[{index}]",
+                )
+            )
+            continue
+
+        feature_ids.add(feature_id)
+
+    return feature_ids
+
+
+def _collect_file_paths(
+    raw_files: Sequence[object],
+    *,
+    repo_root_path: Path,
+    issues: list[PRSpecificationValidationIssue],
+) -> set[str]:
+    file_paths: set[str] = set()
+    for index, raw_file in enumerate(raw_files):
+        path_value: object
+        if isinstance(raw_file, Mapping):
+            path_value = raw_file.get("path")
+        else:
+            path_value = raw_file
+
+        file_path = _required_string(
+            path_value,
+            path=f"files[{index}]",
+            issues=issues,
+            issue_code="file_path_missing",
+            issue_message="Each file entry must be a path string.",
+        )
+        if file_path is None:
+            continue
+
+        if file_path in file_paths:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="duplicate_file_path",
+                    message=f"File path {file_path!r} appears more than once.",
+                    path=f"files[{index}]",
+                )
+            )
+            continue
+
+        resolved_file_path = Path(file_path)
+        if not resolved_file_path.is_absolute():
+            resolved_file_path = repo_root_path / resolved_file_path
+        if not resolved_file_path.exists():
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="unknown_referenced_file",
+                    message=(
+                        f"Referenced file {file_path!r} does not exist in the "
+                        "repository."
+                    ),
+                    path=f"files[{index}]",
+                )
+            )
+            continue
+
+        file_paths.add(file_path)
+
+    return file_paths
+
+
+def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:
+    loaded = yaml.safe_load(raw_yaml)
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, Mapping):
+        raise TypeError("Top-level PR specification must be a mapping.")
+    return cast(Mapping[str, Any], loaded)
+
+
+def _coerce_sequence(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[PRSpecificationValidationIssue],
+    issue_code: str,
+    issue_message: str,
+) -> Sequence[object]:
+    if raw_value is None:
+        return ()
+    if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes)):
+        return raw_value
+    issues.append(
+        PRSpecificationValidationIssue(
+            code=issue_code,
+            message=issue_message,
+            path=path,
+        )
+    )
+    return ()
+
+
+def _coerce_mapping(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[PRSpecificationValidationIssue],
+    issue_code: str,
+    issue_message: str,
+) -> Mapping[str, Any] | None:
+    if isinstance(raw_value, Mapping):
+        return cast(Mapping[str, Any], raw_value)
+
+    issues.append(
+        PRSpecificationValidationIssue(
+            code=issue_code,
+            message=issue_message,
+            path=path,
+        )
+    )
+    return None
+
+
+def _required_string(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[PRSpecificationValidationIssue],
+    issue_code: str,
+    issue_message: str,
+) -> str | None:
+    if raw_value is None:
+        issues.append(
+            PRSpecificationValidationIssue(
+                code=issue_code,
+                message=issue_message,
+                path=path,
+            )
+        )
+        return None
+
+    value = str(raw_value).strip()
+    if value == "":
+        issues.append(
+            PRSpecificationValidationIssue(
+                code=issue_code,
+                message=issue_message,
+                path=path,
+            )
+        )
+        return None
+
+    return value
+
+
+def _optional_string(raw_value: object) -> str | None:
+    if raw_value is None:
+        return None
+
+    value = str(raw_value).strip()
+    return value or None
+
+
+def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+    if output_path is None:
+        return repo_root / _DEFAULT_OUTPUT_PATH
+
+    resolved_output_path = Path(output_path)
+    if not resolved_output_path.is_absolute():
+        resolved_output_path = repo_root / resolved_output_path
+    return resolved_output_path
+
+
+def _report_to_data(
+    report: PRSpecificationValidationReport,
+) -> Mapping[str, Any]:
+    return {
+        "validation_successful": report.validation_successful,
+        "proposed_pr_id": report.proposed_pr_id,
+        "available_feature_ids": report.available_feature_ids,
+        "known_pr_ids": report.known_pr_ids,
+        "issues": [
+            {
+                "code": issue.code,
+                "message": issue.message,
+                **({"path": issue.path} if issue.path is not None else {}),
+            }
+            for issue in report.issues
+        ],
+    }

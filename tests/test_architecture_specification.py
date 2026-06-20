@@ -35,6 +35,8 @@ def test_create_architecture_specification_template_writes_default_file(
     assert str(output_path) in stdout.getvalue()
     template_text = output_path.read_text(encoding="utf-8")
     assert "# Allowed entity types:" in template_text
+    assert "# - Set `id` to a date-based identifier" in template_text
+    assert "id: null" in template_text
     assert "# - Service" in template_text
     assert "# - Skill" in template_text
 
@@ -42,6 +44,7 @@ def test_create_architecture_specification_template_writes_default_file(
     assert rendered_template["version"] == 1
     assert [section for section in rendered_template] == [
         "version",
+        "id",
         "title",
         "entities",
         "entity_relationships",
@@ -53,6 +56,7 @@ def test_create_architecture_specification_template_writes_default_file(
 def test_validate_architecture_specification_reports_invalid_types_and_links() -> None:
     proposed_spec = """
     version: 1
+    id: 2026-06-19
     title: Demo architecture
 
     entities:
@@ -105,6 +109,7 @@ def test_validate_architecture_specification_reports_invalid_types_and_links() -
 def test_validate_architecture_specification_reports_success_for_valid_spec() -> None:
     proposed_spec = """
     version: 1
+    id: 2026-06-19
     title: Demo architecture
 
     entities:
@@ -154,6 +159,7 @@ def test_cli_validate_architecture_specification_reports_yaml(
     spec_path.write_text(
         """
         version: 1
+        id: 2026-06-19
         title: Demo architecture
 
         entities:

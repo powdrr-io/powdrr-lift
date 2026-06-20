@@ -14,6 +14,8 @@ from powdrr_lift.core import (
     create_architecture_specification_template,
     create_change_log_template,
     create_codebase_state,
+    create_implementation_specification_template,
+    implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
     lookup_entity_references,
@@ -29,6 +31,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
+    validate_implementation_specification_yaml,
 )
 
 
@@ -220,6 +223,26 @@ def build_server() -> Any:
         return rendered_output_path.read_text(encoding="utf-8")
 
     @server.tool()
+    def create_implementation_specification(
+        architecture_specification_path: str | None = None,
+        output_path: str | None = None,
+        title: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_implementation_specification_template(
+            architecture_specification_path=architecture_specification_path,
+            output_path=(
+                implementation_specification_default_output_path(repo_root_path)
+                if output_path is None
+                else Path(output_path)
+            ),
+            repo_root=repo_root_path,
+            title=title,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
     def validate_architecture_specification(
         architecture_specification_yaml: str,
         entity_types: list[str],
@@ -229,6 +252,19 @@ def build_server() -> Any:
         return validate_architecture_specification_yaml(
             architecture_specification_yaml,
             entity_types=entity_types,
+        )
+
+    @server.tool()
+    def validate_implementation_specification(
+        implementation_specification_yaml: str,
+        architecture_specification_path: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        return validate_implementation_specification_yaml(
+            implementation_specification_yaml,
+            architecture_specification_path=architecture_specification_path,
+            repo_root=repo_root_path,
         )
 
     @server.tool()

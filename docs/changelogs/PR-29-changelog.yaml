@@ -1,0 +1,800 @@
+version: 2
+change_id: 29
+title: Add specify-implementation skill and endpoints
+intent:
+  problem: Agents need a reusable workflow for authoring implementation specs
+    against a specific architecture version, including architecture ids,
+    entity and relationship references, and globally unique feature and
+    decision ids.
+  goal: Add an installable specify-implementation skill plus CLI and MCP
+    endpoints that can generate an implementation-specification template,
+    validate implementation specs against an architecture specification, and
+    iterate until validation passes.
+decisions:
+  - id: implementation-spec-flow
+    summary: Make implementation specification creation and validation a
+      first-class CLI and MCP workflow, parallel to architecture
+      specification.
+  - id: architecture-id-required
+    summary: Require architecture specifications to carry an id and use that
+      id as the version key for implementation specifications.
+  - id: implementation-ids-unique
+    summary: Require feature and decision ids to be globally unique within an
+      implementation specification.
+files:
+  - path: skills/specify-architecture/SKILL.md
+    type: modified
+    span:
+      start_line: 19
+      end_line: 19
+    summary: Add guidance to set the architecture specification id.
+    rationale: Make the source architecture version explicit so the new
+      implementation workflow can reference it.
+    related:
+      files:
+        - skills/specify-implementation/SKILL.md
+      entities:
+        - specify-architecture
+  - path: skills/specify-implementation/SKILL.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 41
+    summary: Add the specify-implementation skill workflow and guardrails.
+    rationale: Provide installable instructions for creating and validating
+      implementation specifications against a specific architecture version.
+    related:
+      files:
+        - skills/specify-implementation/agents/openai.yaml
+      entities:
+        - specify-implementation
+  - path: skills/specify-implementation/agents/openai.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 4
+    summary: Add UI metadata for the specify-implementation skill.
+    rationale: Make the new skill discoverable in Codex skill lists and
+      default prompts.
+    related:
+      files:
+        - skills/specify-implementation/SKILL.md
+      entities:
+        - specify-implementation
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span:
+      start_line: 52
+      end_line: 52
+    summary: Add the architecture id hint to the template instructions.
+    rationale: Guide authors to use a date-based architecture id.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span:
+      start_line: 63
+      end_line: 63
+    summary: Add the architecture id field to the architecture template.
+    rationale: Make the architecture version key explicit in the generated
+      specification.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span:
+      start_line: 169
+      end_line: 175
+    summary: Require an architecture id when validating architecture specs.
+    rationale: Ensure implementation specs can refer to a concrete
+      architecture version.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - architecture-specification
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 793
+    summary: Implement implementation-specification template rendering and
+      validation.
+    rationale: Centralize the shared logic for template generation, architecture
+      version lookup, unique-id validation, and reference validation.
+    related:
+      files:
+        - src/powdrr_lift/cli.py
+        - src/powdrr_lift/mcp_server.py
+        - tests/test_implementation_specification.py
+      entities:
+        - implementation-specification
+        - evaluate-implementation-specification
+        - create_implementation_specification
+        - validate_implementation_specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 13
+      end_line: 13
+    summary: Import the implementation-spec validation builder into the CLI.
+    rationale: Reuse the shared implementation-spec validation logic in the
+      command handlers.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 19
+      end_line: 20
+    summary: Import the implementation-spec template helpers into the CLI.
+    rationale: Reuse the shared implementation-spec template writer and default
+      output path from the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 36
+      end_line: 36
+    summary: Import the implementation-spec validator into the CLI.
+    rationale: Reuse the shared implementation-spec YAML validator in the
+      command handlers.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 331
+      end_line: 364
+    summary: Add the implementation-specification CLI subcommand.
+    rationale: Provide a shell entry point for generating implementation
+      specification templates.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+        - skills/specify-implementation/SKILL.md
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 394
+      end_line: 426
+    summary: Add the implementation-specification validation CLI subcommand.
+    rationale: Provide a shell entry point for validating implementation
+      specifications against an architecture specification.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+        - skills/specify-implementation/SKILL.md
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 631
+      end_line: 647
+    summary: Add the implementation-specification CLI template writer.
+    rationale: Wire the new subcommand to the shared template generator.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 666
+      end_line: 687
+    summary: Add the implementation-specification CLI validator.
+    rationale: Wire the validation subcommand to the shared implementation
+      specification validator.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 71
+      end_line: 79
+    summary: Export the implementation-specification helpers from the core
+      namespace.
+    rationale: Make the new implementation-specification API available
+      through the shared core import path.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+        - evaluate-implementation-specification
+        - create_implementation_specification
+        - validate_implementation_specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 124
+      end_line: 125
+    summary: Add implementation-spec validation report types to core.__all__.
+    rationale: Keep the exported type surface aligned with the new report
+      models.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 154
+      end_line: 154
+    summary: Export the implementation-spec default output path helper.
+    rationale: Let callers discover the default implementation-spec file
+      location from the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 171
+      end_line: 171
+    summary: Export the implementation-spec validation builder.
+    rationale: Expose the shared implementation-spec validation report
+      builder from the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 178
+      end_line: 178
+    summary: Export the implementation-spec template writer.
+    rationale: Expose the shared implementation-spec template generator from
+      the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - create_implementation_specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 198
+      end_line: 198
+    summary: Export the implementation-spec template renderer.
+    rationale: Keep the YAML template renderer available through the core
+      namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 205
+      end_line: 205
+    summary: Export the implementation-spec YAML validator.
+    rationale: Make the shared implementation-spec validator available through
+      the core namespace.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 44
+      end_line: 45
+    summary: Add implementation-spec validation types to the package exports.
+    rationale: Keep the top-level API aligned with the new implementation
+      specification workflow.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 47
+      end_line: 47
+    summary: Export the implementation-spec default output helper.
+    rationale: Expose the default implementation-spec file location from the
+      package root.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 49
+      end_line: 49
+    summary: Export the implementation-spec validation builder.
+    rationale: Expose the shared implementation-spec validation builder from
+      the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 51
+      end_line: 51
+    summary: Export the implementation-spec template writer.
+    rationale: Keep the shared implementation-spec template generator
+      available from the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - create_implementation_specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 98
+      end_line: 98
+    summary: Export the implementation-spec template renderer.
+    rationale: Keep the shared implementation-spec YAML renderer available
+      from the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 101
+      end_line: 101
+    summary: Export the implementation-spec YAML validator.
+    rationale: Keep the shared implementation-spec validator available from
+      the package root.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 117
+      end_line: 118
+    summary: Lazy-load implementation-spec validation types.
+    rationale: Expose the new API without forcing eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 120
+      end_line: 120
+    summary: Lazy-load the implementation-spec default output helper.
+    rationale: Keep the default output helper reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 122
+      end_line: 122
+    summary: Lazy-load the implementation-spec validation builder.
+    rationale: Keep the validation builder reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 124
+      end_line: 124
+    summary: Lazy-load the implementation-spec template writer.
+    rationale: Keep the template writer reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - create_implementation_specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 126
+      end_line: 126
+    summary: Lazy-load the implementation-spec template renderer.
+    rationale: Keep the template renderer reachable from the package root
+      without eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 128
+      end_line: 128
+    summary: Lazy-load the implementation-spec YAML validator.
+    rationale: Keep the validator reachable from the package root without
+      eager imports.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 139
+      end_line: 147
+    summary: Import the implementation-spec helpers during lazy loading.
+    rationale: Wire the package root to the new implementation-spec core
+      module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+        - evaluate-implementation-specification
+        - create_implementation_specification
+        - validate_implementation_specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 156
+      end_line: 161
+    summary: Return the implementation-spec validation types from lazy
+      loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 165
+      end_line: 167
+    summary: Return the implementation-spec default output helper from lazy
+      loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 171
+      end_line: 173
+    summary: Return the implementation-spec validation builder from lazy
+      loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 177
+      end_line: 179
+    summary: Return the implementation-spec template writer from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - create_implementation_specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 183
+      end_line: 185
+    summary: Return the implementation-spec template renderer from lazy
+      loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 189
+      end_line: 191
+    summary: Return the implementation-spec YAML validator from lazy loading.
+    rationale: Keep the package-level API consistent with the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 17
+      end_line: 18
+    summary: Import the implementation-spec template helpers into the MCP
+      server.
+    rationale: Reuse the shared implementation-spec template generator and
+      default output path from the core module.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - implementation-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 34
+      end_line: 34
+    summary: Import the implementation-spec validator into the MCP server.
+    rationale: Reuse the shared implementation-spec YAML validator in the MCP
+      tool implementation.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - evaluate-implementation-specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 225
+      end_line: 244
+    summary: Add the implementation-specification MCP template tool.
+    rationale: Expose implementation-spec template generation through MCP.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - create_implementation_specification
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 257
+      end_line: 269
+    summary: Add the implementation-specification MCP validation tool.
+    rationale: Expose implementation-spec validation through MCP.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+      entities:
+        - validate_implementation_specification
+  - path: tests/test_architecture_specification.py
+    type: modified
+    span:
+      start_line: 38
+      end_line: 39
+    summary: Assert the architecture template includes the id hint and field.
+    rationale: Prove the architecture template now scaffolds the new id field.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: tests/test_architecture_specification.py
+    type: modified
+    span:
+      start_line: 47
+      end_line: 47
+    summary: Assert the architecture template serializes the id field.
+    rationale: Prove the rendered architecture template includes the new id
+      slot.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: tests/test_architecture_specification.py
+    type: modified
+    span:
+      start_line: 59
+      end_line: 59
+    summary: Add the architecture id to the invalid-spec fixture.
+    rationale: Keep the invalid-spec fixture focused on the intended type and
+      relationship failures.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: tests/test_architecture_specification.py
+    type: modified
+    span:
+      start_line: 112
+      end_line: 112
+    summary: Add the architecture id to the valid-spec fixture.
+    rationale: Keep the valid-spec fixture aligned with the new required
+      architecture id.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: tests/test_architecture_specification.py
+    type: modified
+    span:
+      start_line: 162
+      end_line: 162
+    summary: Add the architecture id to the CLI validation fixture.
+    rationale: Keep the CLI validation fixture aligned with the new required
+      architecture id.
+    related:
+      files:
+        - src/powdrr_lift/core/architecture_specification.py
+      entities:
+        - architecture-specification
+  - path: tests/test_implementation_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 220
+    summary: Cover implementation-spec template generation and validation.
+    rationale: Prove that the implementation-spec workflow enforces the
+      architecture version, reference rules, and uniqueness rules.
+    related:
+      files:
+        - src/powdrr_lift/core/implementation_specification.py
+        - src/powdrr_lift/cli.py
+      entities:
+        - implementation-specification
+        - evaluate-implementation-specification
+  - path: tests/test_mcp_server.py
+    type: modified
+    span:
+      start_line: 29
+      end_line: 30
+    summary: Cover MCP registration for the implementation-spec tools.
+    rationale: Prove that the server registers the new implementation-spec MCP
+      endpoints.
+    related:
+      files:
+        - src/powdrr_lift/mcp_server.py
+      entities:
+        - create_implementation_specification
+        - validate_implementation_specification
+entities:
+  - id: specify-architecture
+    type: Skill
+    action: modified
+  - id: specify-implementation
+    type: Skill
+    action: added
+  - id: architecture-specification
+    type: Subcommand
+    action: modified
+  - id: implementation-specification
+    type: Subcommand
+    action: added
+  - id: evaluate-implementation-specification
+    type: Subcommand
+    action: added
+  - id: create_implementation_specification
+    type: Request handler
+    action: added
+  - id: validate_implementation_specification
+    type: Request handler
+    action: added
+entity_relationships:
+  - source: specify-implementation
+    target: specify-architecture
+    relationship: depends_on
+    description: The implementation skill expects the source architecture
+      specification to exist and have an id before the template is generated.
+    rationale: Keep implementation specs grounded in a concrete architecture
+      version.
+  - source: specify-implementation
+    target: implementation-specification
+    relationship: guides
+    description: The skill tells agents to create and fill the implementation
+      template before validating it.
+    rationale: Keep the installable skill aligned with the new CLI workflow.
+  - source: specify-implementation
+    target: evaluate-implementation-specification
+    relationship: guides
+    description: The skill tells agents to validate and iterate on the
+      implementation spec until it passes.
+    rationale: Make validation part of the core skill workflow.
+  - source: implementation-specification
+    target: create_implementation_specification
+    relationship: mirrors
+    description: The CLI command and MCP tool generate the same starter
+      implementation specification template.
+    rationale: Keep the shell and MCP template surfaces behaviorally
+      equivalent.
+  - source: evaluate-implementation-specification
+    target: validate_implementation_specification
+    relationship: mirrors
+    description: The CLI command and MCP tool validate the same implementation
+      specification rules.
+    rationale: Keep the shell and MCP validation entry points aligned.
+  - source: implementation-specification
+    target: architecture-specification
+    relationship: depends_on
+    description: Implementation specifications are generated and validated
+      against a specific architecture version.
+    rationale: Keep implementation specs constrained to the architecture they
+      reference.
+invariants:
+  - id: architecture-id-must-exist
+    description: An implementation specification must reference an architecture
+      specification id that exists in the selected architecture specification.
+    rationale: Ensure implementation specs are tied to a concrete architecture
+      version.
+    action: added
+  - id: architecture-references-must-exist
+    description: Any entity or relationship mentioned in an implementation
+      spec must exist in the selected architecture specification.
+    rationale: Keep implementation specs grounded in architecture data rather
+      than invented references.
+    action: added
+  - id: implementation-ids-must-be-unique
+    description: Feature ids and decision ids must be globally unique within an
+      implementation specification.
+    rationale: Prevent collisions across the feature and decision sections.
+    action: added
+guidance:
+  - id: create-template-first
+    description: Use the implementation-specification template generator first,
+      then fill in the architecture id, entities, relationships, features, and
+      decisions.
+    rationale: Start from the repository-approved scaffold instead of inventing
+      the implementation spec shape.
+    action: added
+  - id: validate-and-iterate
+    description: Run the implementation-specification validator after filling
+      the template and revise the spec until it succeeds.
+    rationale: Keep the implementation spec aligned with the enforced
+      architecture and uniqueness rules.
+    action: added
+  - id: preserve-architecture-intent
+    description: When validation fails, prefer fixes that preserve the intended
+      architecture and the implementation plan rather than weakening the rules.
+    rationale: Favor best judgment that keeps the spec, the code, and the
+      repository's intent in agreement.
+    action: added

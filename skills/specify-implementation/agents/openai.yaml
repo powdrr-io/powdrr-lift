@@ -1,0 +1,4 @@
+interface:
+  display_name: "Specify Implementation"
+  short_description: "Draft and validate implementation specs"
+  default_prompt: "Use $specify-implementation to create the implementation specification template, fill it from the architecture id and allowed entity and relationship ids, then validate and adjust until it passes."

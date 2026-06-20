@@ -16,6 +16,7 @@ Use this skill to produce an architecture specification that stays consistent wi
    - If using MCP, call `create_architecture_specification` with the same
      allowed entity type list.
    - Provide the full allowed entity type set every time you generate the template.
+   - Set `id` to a date-based identifier, for example `2026-06-19`.
    - Use the default file at `docs/architecture/architecture-specification.yaml` unless the task calls for a different path.
 2. Fill out the template.
    - Keep each entity's `type` within the provided entity type set.

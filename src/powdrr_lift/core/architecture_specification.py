@@ -49,6 +49,7 @@ def render_architecture_specification_template(
         "#",
         "# Instructions:",
         "# - Fill in the sections below with the intended architecture.",
+        "# - Set `id` to a date-based identifier, for example 2026-06-19.",
         "# - Choose each entity type from the allowed entity types listed here.",
         "# - Use `related.entities` and `related.entity_relationships` in",
         "#   invariants and guidance whenever they refer to a specific entity",
@@ -59,6 +60,7 @@ def render_architecture_specification_template(
         "# Allowed entity types:",
         *[f"# - {entity_type}" for entity_type in normalized_entity_types],
         "version: 1",
+        "id: null",
         "title: null",
         "entities:",
         "  - id: null",
@@ -164,6 +166,13 @@ def build_architecture_specification_validation_report(
         )
 
     title = _optional_string(raw_spec.get("title"))
+    _required_string(
+        raw_spec.get("id"),
+        path="id",
+        issues=issues,
+        issue_code="architecture_id_missing",
+        issue_message="The id field is required.",
+    )
 
     for section_name in (
         "entities",

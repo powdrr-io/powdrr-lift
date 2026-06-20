@@ -10,11 +10,14 @@ from powdrr_lift.core import (
     architecture_specification_default_output_path,
     build_architecture_specification_validation_report,
     build_current_decisions_report,
+    build_implementation_specification_validation_report,
     build_invariants_report,
     codebase_state_default_output_path,
     create_architecture_specification_template,
     create_change_log_template,
     create_codebase_state,
+    create_implementation_specification_template,
+    implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
     lookup_entity_references,
@@ -30,6 +33,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
+    validate_implementation_specification_yaml,
 )
 
 
@@ -324,6 +328,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     architecture_specification_parser.set_defaults(func=_run_architecture_specification)
 
+    implementation_specification_parser = subparsers.add_parser(
+        "implementation-specification",
+        aliases=["implementation_specification"],
+        help="Generate an implementation specification template.",
+    )
+    implementation_specification_parser.add_argument(
+        "--architecture-specification",
+        type=Path,
+        help=(
+            "Read the source architecture specification from this path instead "
+            "of docs/architecture/architecture-specification.yaml."
+        ),
+    )
+    implementation_specification_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the template to this path instead of "
+            "docs/implementation/implementation-specification.yaml."
+        ),
+    )
+    implementation_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    implementation_specification_parser.add_argument(
+        "--title",
+        help="Optional title to embed in the template.",
+    )
+    implementation_specification_parser.set_defaults(
+        func=_run_implementation_specification
+    )
+
     evaluate_architecture_specification_parser = subparsers.add_parser(
         "evaluate-architecture-specification",
         aliases=["evaluate_architecture_specification"],
@@ -351,6 +389,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate_architecture_specification_parser.set_defaults(
         func=_run_evaluate_architecture_specification
+    )
+
+    evaluate_implementation_specification_parser = subparsers.add_parser(
+        "evaluate-implementation-specification",
+        aliases=["evaluate_implementation_specification"],
+        help=(
+            "Validate an implementation specification against an architecture "
+            "specification."
+        ),
+    )
+    evaluate_implementation_specification_parser.add_argument(
+        "--architecture-specification",
+        type=Path,
+        help=(
+            "Read the source architecture specification from this path instead "
+            "of docs/architecture/architecture-specification.yaml."
+        ),
+    )
+    evaluate_implementation_specification_parser.add_argument(
+        "--input",
+        type=Path,
+        help=(
+            "Read the proposed implementation specification YAML from this file "
+            "instead of the default template path."
+        ),
+    )
+    evaluate_implementation_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    evaluate_implementation_specification_parser.set_defaults(
+        func=_run_evaluate_implementation_specification
     )
 
     blame_ui_parser = subparsers.add_parser(
@@ -557,6 +628,23 @@ def _run_architecture_specification(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_implementation_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_implementation_specification_template(
+        architecture_specification_path=args.architecture_specification,
+        output_path=args.output,
+        repo_root=repo_root,
+        title=args.title,
+    )
+    if args.output is None:
+        default_output = implementation_specification_default_output_path(repo_root)
+        print(f"Wrote implementation specification template to {default_output}")
+    else:
+        print(f"Wrote implementation specification template to {output_path}")
+
+    return 0
+
+
 def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     input_path = args.input or architecture_specification_default_output_path(repo_root)
@@ -568,6 +656,28 @@ def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
     report_yaml = validate_architecture_specification_yaml(
         proposed_yaml,
         entity_types=args.entity_types,
+    )
+    sys.stdout.write(report_yaml)
+    if not report_yaml.endswith("\n"):
+        sys.stdout.write("\n")
+    return 0 if report.validation_successful else 1
+
+
+def _run_evaluate_implementation_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    input_path = args.input or implementation_specification_default_output_path(
+        repo_root
+    )
+    proposed_yaml = _read_input(input_path)
+    report = build_implementation_specification_validation_report(
+        proposed_yaml,
+        architecture_specification_path=args.architecture_specification,
+        repo_root=repo_root,
+    )
+    report_yaml = validate_implementation_specification_yaml(
+        proposed_yaml,
+        architecture_specification_path=args.architecture_specification,
+        repo_root=repo_root,
     )
     sys.stdout.write(report_yaml)
     if not report_yaml.endswith("\n"):

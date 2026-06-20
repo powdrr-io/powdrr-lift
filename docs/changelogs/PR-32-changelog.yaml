@@ -1,0 +1,486 @@
+version: 2
+change_id: 32
+title: Add specify-system skill and system specification endpoints
+intent:
+  problem: Agents need a reusable workflow for drafting system descriptions
+    that separate requirements from approach, enforce same-section supersedence
+    rules, and expose the workflow through both CLI and MCP.
+  goal: Add an installable specify-system skill plus CLI and MCP endpoints
+    that can generate and validate system specification templates.
+decisions:
+  - id: specify-system-workflow
+    summary: Make system specification authoring and validation a first-class
+      skill, CLI, and MCP workflow.
+  - id: system-specification-state-rules
+    summary: Validate requirement and approach entries with added, removed,
+      and supercedes state rules, including same-section supersedence and
+      unique ids.
+  - id: system-specification-api-surface
+    summary: Expose the new system specification helpers through the package
+      root, core namespace, CLI, and MCP server.
+files:
+  - path: skills/specify-system/SKILL.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 39
+    summary: Add the specify-system skill workflow and guardrails.
+    rationale: Provide installable instructions for generating and validating
+      system specifications.
+  - path: skills/specify-system/agents/openai.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 7
+    summary: Add UI metadata for the specify-system skill.
+    rationale: Make the new skill discoverable in Codex skill lists and
+      default prompts.
+  - path: src/powdrr_lift/core/system_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 545
+    summary: Implement system specification template rendering and validation.
+    rationale: Centralize the shared logic for template generation,
+      same-section supersedence rules, and state validation.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 16
+      end_line: 16
+    summary: Import the system specification validation builder into the CLI.
+    rationale: Reuse the shared system specification validation logic in the
+      command handlers.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 23
+      end_line: 23
+    summary: Import the system specification template helpers into the CLI.
+    rationale: Reuse the shared system specification template writer from the
+      core module.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 39
+      end_line: 39
+    summary: Import the system specification output path helper into the CLI.
+    rationale: Reuse the shared system specification default output path from
+      the core module.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 44
+      end_line: 44
+    summary: Import the system specification YAML validator into the CLI.
+    rationale: Reuse the shared system specification YAML validator in the
+      command handlers.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 373
+      end_line: 396
+    summary: Add the system specification CLI subcommand.
+    rationale: Provide a shell entry point for generating system
+      specification templates.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 479
+      end_line: 500
+    summary: Add the system specification validation CLI subcommand.
+    rationale: Provide a shell entry point for validating system
+      specifications.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 742
+      end_line: 757
+    summary: Add the system specification CLI template writer.
+    rationale: Wire the new subcommand to the shared template generator.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 813
+      end_line: 830
+    summary: Add the system specification CLI validator.
+    rationale: Wire the validation subcommand to the shared system
+      specification validator.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 19
+      end_line: 19
+    summary: Import the system specification template helper into the MCP server.
+    rationale: Reuse the shared system specification template generator in
+      the MCP tool handlers.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 35
+      end_line: 35
+    summary: Import the system specification default output helper into the MCP server.
+    rationale: Reuse the shared system specification default output path in
+      the MCP tool handlers.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 40
+      end_line: 40
+    summary: Import the system specification YAML validator into the MCP server.
+    rationale: Reuse the shared system specification validator in the MCP
+      tool handlers.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 251
+      end_line: 268
+    summary: Add the system specification template MCP tool.
+    rationale: Provide an MCP entry point for generating system
+      specifications.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 311
+      end_line: 321
+    summary: Add the system specification validation MCP tool.
+    rationale: Provide an MCP entry point for validating system
+      specifications.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 120
+      end_line: 128
+    summary: Import the system specification API into the core namespace.
+    rationale: Make the new system specification helpers available through
+      the shared core import path.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 146
+      end_line: 147
+    summary: Export the system specification validation types from core.__all__.
+    rationale: Keep the exported type surface aligned with the new report
+      models.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 181
+      end_line: 181
+    summary: Export the system specification default output path helper.
+    rationale: Let callers discover the default system specification file
+      location from the core namespace.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 200
+      end_line: 200
+    summary: Export the system specification validation report builder.
+    rationale: Expose the shared system specification validation report
+      builder from the core namespace.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 209
+      end_line: 209
+    summary: Export the system specification template writer.
+    rationale: Expose the shared system specification template generator from
+      the core namespace.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 231
+      end_line: 231
+    summary: Export the system specification template renderer.
+    rationale: Keep the YAML template renderer available through the core
+      namespace.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 240
+      end_line: 240
+    summary: Export the system specification YAML validator.
+    rationale: Make the shared system specification validator available
+      through the core namespace.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 50
+      end_line: 51
+    summary: Export the system specification validation issues at the package root.
+    rationale: Keep the top-level package API aligned with the new system
+      specification helpers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 56
+      end_line: 56
+    summary: Export the system specification default output path helper.
+    rationale: Keep the top-level package API aligned with the new system
+      specification helpers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 60
+      end_line: 60
+    summary: Export the system specification validation report builder.
+    rationale: Keep the top-level package API aligned with the new system
+      specification helpers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 64
+      end_line: 64
+    summary: Export the system specification template writer.
+    rationale: Keep the top-level package API aligned with the new system
+      specification helpers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 113
+      end_line: 113
+    summary: Export the system specification template renderer.
+    rationale: Keep the top-level package API aligned with the new system
+      specification helpers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 118
+      end_line: 118
+    summary: Export the system specification YAML validator.
+    rationale: Keep the top-level package API aligned with the new system
+      specification helpers.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 137
+      end_line: 138
+    summary: Add the system specification validation types to the package lookup.
+    rationale: Keep lazy imports aligned with the new validation models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 143
+      end_line: 143
+    summary: Add the system specification default output helper to the package lookup.
+    rationale: Keep lazy imports aligned with the new validation models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 147
+      end_line: 147
+    summary: Add the system specification report builder to the package lookup.
+    rationale: Keep lazy imports aligned with the new validation models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 151
+      end_line: 151
+    summary: Add the system specification template writer to the package lookup.
+    rationale: Keep lazy imports aligned with the new validation models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 155
+      end_line: 155
+    summary: Add the system specification template renderer to the package lookup.
+    rationale: Keep lazy imports aligned with the new validation models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 159
+      end_line: 159
+    summary: Add the system specification YAML validator to the package lookup.
+    rationale: Keep lazy imports aligned with the new validation models.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 189
+      end_line: 197
+    summary: Import the system specification helpers in the package lookup.
+    rationale: Make the new system specification helpers available lazily from
+      the package root.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 212
+      end_line: 215
+    summary: Register the system specification validation types in the package lookup.
+    rationale: Keep lazy import return values aligned with the exported
+      validation types.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 224
+      end_line: 226
+    summary: Register the system specification default output helper in the package lookup.
+    rationale: Keep lazy import return values aligned with the exported helper.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 236
+      end_line: 238
+    summary: Register the system specification report builder in the package lookup.
+    rationale: Keep lazy import return values aligned with the exported helper.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 248
+      end_line: 250
+    summary: Register the system specification template writer in the package lookup.
+    rationale: Keep lazy import return values aligned with the exported helper.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 258
+      end_line: 260
+    summary: Register the system specification template renderer in the package lookup.
+    rationale: Keep lazy import return values aligned with the exported helper.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 268
+      end_line: 268
+    summary: Register the system specification YAML validator in the package lookup.
+    rationale: Keep lazy import return values aligned with the exported helper.
+  - path: tests/test_system_specification.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 181
+    summary: Add tests for the system specification template and validator.
+    rationale: Prove the new CLI command and validation rules behave as
+      intended.
+  - path: tests/test_mcp_server.py
+    type: modified
+    span:
+      start_line: 31
+      end_line: 32
+    summary: Verify the MCP server registers the new system specification tools.
+    rationale: Keep the MCP registration surface in sync with the new
+      endpoints.
+  - path: skills/bootstrap/SKILL.md
+    type: modified
+    span:
+      start_line: 15
+      end_line: 19
+    summary: Add a template-generation step to the bootstrap changelog workflow.
+    rationale: Ensure PR changelog drafting starts from the generated template
+      instead of a handwritten file.
+  - path: skills/bootstrap/SKILL.md
+    type: modified
+    span:
+      start_line: 23
+      end_line: 23
+    summary: Renumber the bootstrap validation step after adding template generation.
+    rationale: Keep the bootstrap workflow step ordering consistent.
+  - path: skills/bootstrap/SKILL.md
+    type: modified
+    span:
+      start_line: 26
+      end_line: 26
+    summary: Renumber the bootstrap commit step after adding template generation.
+    rationale: Keep the bootstrap workflow step ordering consistent.
+  - path: skills/bootstrap/agents/openai.yaml
+    type: modified
+    span:
+      start_line: 4
+      end_line: 4
+    summary: Update the bootstrap skill prompt to mention template generation.
+    rationale: Keep the installable skill metadata aligned with the updated
+      bootstrap workflow.
+entities:
+  - id: specify-system
+    type: Skill
+    action: added
+  - id: system-specification-core
+    type: Module
+    action: added
+  - id: system-specification
+    type: Subcommand
+    action: added
+  - id: evaluate-system-specification
+    type: Subcommand
+    action: added
+  - id: create_system_specification
+    type: Request handler
+    action: added
+  - id: validate_system_specification
+    type: Request handler
+    action: added
+  - id: system-specification-tests
+    type: Test suite
+    action: added
+  - id: mcp-server-tests
+    type: Test suite
+    action: modified
+entity_relationships:
+  - source: specify-system
+    target: system-specification
+    relationship: guides
+    description: The skill tells agents to generate a system specification
+      template before filling it in.
+    rationale: Keep the installable skill aligned with the CLI workflow.
+  - source: specify-system
+    target: evaluate-system-specification
+    relationship: guides
+    description: The skill tells agents to validate and iterate on the system
+      specification until it passes.
+    rationale: Make validation part of the core skill workflow.
+  - source: specify-system
+    target: create_system_specification
+    relationship: guides
+    description: The skill tells agents to use the MCP template tool when
+      working through the system specification workflow.
+    rationale: Keep the MCP path aligned with the CLI path.
+  - source: specify-system
+    target: validate_system_specification
+    relationship: guides
+    description: The skill tells agents to use the MCP validation tool when
+      working through the system specification workflow.
+    rationale: Keep the MCP path aligned with the CLI path.
+  - source: system-specification-core
+    target: system-specification
+    relationship: mirrors
+    description: The CLI command and core module generate the same system
+      specification template.
+    rationale: Keep the shell surface and core API behaviorally equivalent.
+  - source: system-specification-core
+    target: evaluate-system-specification
+    relationship: mirrors
+    description: The CLI command and core module validate the same system
+      specification rules.
+    rationale: Keep the shell surface and core API aligned.
+  - source: system-specification-core
+    target: create_system_specification
+    relationship: mirrors
+    description: The CLI command and MCP tool generate the same system
+      specification template.
+    rationale: Keep the shell and MCP template surfaces behaviorally
+      equivalent.
+  - source: evaluate-system-specification
+    target: validate_system_specification
+    relationship: mirrors
+    description: The CLI command and MCP tool validate the same system
+      specification rules.
+    rationale: Keep the shell and MCP validation entry points aligned.
+invariants:
+  - id: system-specification-state-invariant
+    action: added
+    description: Requirement and approach items must use added, removed, or
+      supercedes, with description and same-section supersedence rules enforced
+      by the validator.
+    rationale: Keep the system specification format internally consistent.
+guidance:
+  - id: create-template-first
+    action: added
+    description: Generate the system specification template first, then fill
+      in the requirements and approach sections.
+    rationale: Start from the repository-approved scaffold instead of
+      inventing the system spec shape.
+  - id: validate-and-iterate
+    action: added
+    description: Run the system specification validator after filling the
+      template and revise the spec until it succeeds.
+    rationale: Keep the system spec aligned with the enforced state and
+      supersedence rules.

@@ -12,14 +12,18 @@ Use this skill to turn repo evidence into a validated `docs/changelogs/PR-<num>-
 1. Identify the PR number and repository root.
 2. Read the source tree, specs, and any design docs that describe the change.
 3. Read `software_development_entity_taxonomy.md` and use only entity types from that file.
-4. Draft the changelog in version 2 format.
+4. Generate the changelog template first.
+   - Run `powdrr-lift init --pr-number <num>`.
+   - Use the generated `docs/changelogs/PR-<num>-changelog.yaml` as the starting point.
+   - Do not hand-write the file from scratch unless the template generator is unavailable.
+5. Draft the changelog in version 2 format.
    - Include `files`, `entities`, `entity_relationships`, `invariants`, and `guidance`.
    - Base every entry on evidence from the repo.
    - Do not invent entities, relationships, or rationale.
-5. Validate the draft.
+6. Validate the draft.
    - Run `powdrr-lift evaluate-pr-against-changelog --pr-number <num>`.
    - Fix validation issues before continuing.
-6. Commit the changelog.
+7. Commit the changelog.
    - Commit only after validation passes.
    - Keep the commit scoped to the changelog unless the user explicitly asked for more.
 

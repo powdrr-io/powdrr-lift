@@ -43,12 +43,17 @@ __all__ = [
     "ArchitectureSpecificationValidationReport",
     "ImplementationSpecificationValidationIssue",
     "ImplementationSpecificationValidationReport",
+    "PRSpecificationValidationIssue",
+    "PRSpecificationValidationReport",
     "architecture_specification_default_output_path",
     "implementation_specification_default_output_path",
+    "pr_specification_default_output_path",
     "build_architecture_specification_validation_report",
     "build_implementation_specification_validation_report",
+    "build_pr_specification_validation_report",
     "create_architecture_specification_template",
     "create_implementation_specification_template",
+    "create_pr_specification_template",
     "build_current_decisions_report",
     "EditContextLine",
     "EditContextRange",
@@ -96,9 +101,11 @@ __all__ = [
     "render_entity_relationship_report",
     "render_architecture_specification_template",
     "render_implementation_specification_template",
+    "render_pr_specification_template",
     "render_invariants_report",
     "validate_architecture_specification_yaml",
     "validate_implementation_specification_yaml",
+    "validate_pr_specification_yaml",
     "validate_change_log_yaml",
     "ValidationIssue",
     "ValidationReport",
@@ -116,16 +123,23 @@ def __getattr__(name: str) -> Any:
         "ArchitectureSpecificationValidationReport",
         "ImplementationSpecificationValidationIssue",
         "ImplementationSpecificationValidationReport",
+        "PRSpecificationValidationIssue",
+        "PRSpecificationValidationReport",
         "architecture_specification_default_output_path",
         "implementation_specification_default_output_path",
+        "pr_specification_default_output_path",
         "build_architecture_specification_validation_report",
         "build_implementation_specification_validation_report",
+        "build_pr_specification_validation_report",
         "create_architecture_specification_template",
         "create_implementation_specification_template",
+        "create_pr_specification_template",
         "render_architecture_specification_template",
         "render_implementation_specification_template",
+        "render_pr_specification_template",
         "validate_architecture_specification_yaml",
         "validate_implementation_specification_yaml",
+        "validate_pr_specification_yaml",
     }:
         from powdrr_lift.core.architecture_specification import (
             ArchitectureSpecificationValidationIssue,
@@ -145,6 +159,15 @@ def __getattr__(name: str) -> Any:
             render_implementation_specification_template,
             validate_implementation_specification_yaml,
         )
+        from powdrr_lift.core.pr_specification import (
+            PRSpecificationValidationIssue,
+            PRSpecificationValidationReport,
+            build_pr_specification_validation_report,
+            create_pr_specification_template,
+            pr_specification_default_output_path,
+            render_pr_specification_template,
+            validate_pr_specification_yaml,
+        )
 
         return {
             "ArchitectureSpecificationValidationIssue": (
@@ -159,11 +182,16 @@ def __getattr__(name: str) -> Any:
             "ImplementationSpecificationValidationReport": (
                 ImplementationSpecificationValidationReport
             ),
+            "PRSpecificationValidationIssue": PRSpecificationValidationIssue,
+            "PRSpecificationValidationReport": PRSpecificationValidationReport,
             "architecture_specification_default_output_path": (
                 architecture_specification_default_output_path
             ),
             "implementation_specification_default_output_path": (
                 implementation_specification_default_output_path
+            ),
+            "pr_specification_default_output_path": (
+                pr_specification_default_output_path
             ),
             "build_architecture_specification_validation_report": (
                 build_architecture_specification_validation_report
@@ -171,24 +199,30 @@ def __getattr__(name: str) -> Any:
             "build_implementation_specification_validation_report": (
                 build_implementation_specification_validation_report
             ),
+            "build_pr_specification_validation_report": (
+                build_pr_specification_validation_report
+            ),
             "create_architecture_specification_template": (
                 create_architecture_specification_template
             ),
             "create_implementation_specification_template": (
                 create_implementation_specification_template
             ),
+            "create_pr_specification_template": create_pr_specification_template,
             "render_architecture_specification_template": (
                 render_architecture_specification_template
             ),
             "render_implementation_specification_template": (
                 render_implementation_specification_template
             ),
+            "render_pr_specification_template": render_pr_specification_template,
             "validate_architecture_specification_yaml": (
                 validate_architecture_specification_yaml
             ),
             "validate_implementation_specification_yaml": (
                 validate_implementation_specification_yaml
             ),
+            "validate_pr_specification_yaml": validate_pr_specification_yaml,
         }[name]
 
     if name == "build_changelog_index":

@@ -15,6 +15,7 @@ from powdrr_lift.core import (
     create_change_log_template,
     create_codebase_state,
     create_implementation_specification_template,
+    create_pr_specification_template,
     implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
@@ -22,6 +23,7 @@ from powdrr_lift.core import (
     lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
+    pr_specification_default_output_path,
     render_current_decisions_report,
     render_edit_context_report,
     render_entity_decision_report,
@@ -32,6 +34,7 @@ from powdrr_lift.core import (
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
     validate_implementation_specification_yaml,
+    validate_pr_specification_yaml,
 )
 
 
@@ -243,6 +246,22 @@ def build_server() -> Any:
         return rendered_output_path.read_text(encoding="utf-8")
 
     @server.tool()
+    def create_pr_specification(
+        output_path: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_pr_specification_template(
+            output_path=(
+                pr_specification_default_output_path(repo_root_path)
+                if output_path is None
+                else Path(output_path)
+            ),
+            repo_root=repo_root_path,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
     def validate_architecture_specification(
         architecture_specification_yaml: str,
         entity_types: list[str],
@@ -264,6 +283,17 @@ def build_server() -> Any:
         return validate_implementation_specification_yaml(
             implementation_specification_yaml,
             architecture_specification_path=architecture_specification_path,
+            repo_root=repo_root_path,
+        )
+
+    @server.tool()
+    def validate_pr_specification(
+        pr_specification_yaml: str,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        return validate_pr_specification_yaml(
+            pr_specification_yaml,
             repo_root=repo_root_path,
         )
 

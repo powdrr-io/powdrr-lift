@@ -28,6 +28,8 @@ def test_build_server_registers_codebase_state_tool(
     assert "validate_architecture_specification" in registered_tools
     assert "create_implementation_specification" in registered_tools
     assert "validate_implementation_specification" in registered_tools
+    assert "create_system_specification" in registered_tools
+    assert "validate_system_specification" in registered_tools
     assert "create_pr_specification" in registered_tools
     assert "validate_pr_specification" in registered_tools
     assert "get_invariants" in registered_tools

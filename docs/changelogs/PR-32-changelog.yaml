@@ -363,10 +363,24 @@ files:
     type: modified
     span:
       start_line: 15
-      end_line: 28
+      end_line: 19
     summary: Add a template-generation step to the bootstrap changelog workflow.
     rationale: Ensure PR changelog drafting starts from the generated template
       instead of a handwritten file.
+  - path: skills/bootstrap/SKILL.md
+    type: modified
+    span:
+      start_line: 23
+      end_line: 23
+    summary: Renumber the bootstrap validation step after adding template generation.
+    rationale: Keep the bootstrap workflow step ordering consistent.
+  - path: skills/bootstrap/SKILL.md
+    type: modified
+    span:
+      start_line: 26
+      end_line: 26
+    summary: Renumber the bootstrap commit step after adding template generation.
+    rationale: Keep the bootstrap workflow step ordering consistent.
   - path: skills/bootstrap/agents/openai.yaml
     type: modified
     span:

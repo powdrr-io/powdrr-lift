@@ -52,6 +52,8 @@ def render_system_specification_template(*, title: str | None = None) -> str:
         "#",
         "# Instructions:",
         "# - Fill in the requirements and approach sections.",
+        "# - Remove the boilerplate placeholder entries once the document is",
+        "#   complete.",
         "# - Set `id` to a unique identifier for this system description.",
         "# - Use `state: added` for new items and include a description.",
         "# - Use `state: removed` for retired items and leave description empty.",
@@ -180,6 +182,12 @@ def build_system_specification_validation_report(
         issues=issues,
     )
 
+    _validate_boilerplate_removed(
+        requirement_items=requirement_items,
+        approach_items=approach_items,
+        issues=issues,
+    )
+
     requirement_ids = [entry.id for entry in requirement_entries]
     approach_ids = [entry.id for entry in approach_entries]
     requirement_id_set = set(requirement_ids)
@@ -285,6 +293,56 @@ def _collect_section_items(
         )
 
     return items
+
+
+def _validate_boilerplate_removed(
+    *,
+    requirement_items: Sequence[object],
+    approach_items: Sequence[object],
+    issues: list[SystemSpecificationValidationIssue],
+) -> None:
+    for section_name, section_items in (
+        ("requirements", requirement_items),
+        ("approach", approach_items),
+    ):
+        for index, raw_item in enumerate(section_items):
+            item = _coerce_mapping(
+                raw_item,
+                path=f"{section_name}[{index}]",
+                issues=issues,
+                issue_code="invalid_section_item",
+                issue_message=(
+                    f"Each {_section_label(section_name)} entry must be a mapping."
+                ),
+            )
+            if item is None:
+                continue
+
+            if (
+                item.get("id") is None
+                and item.get("description") is None
+                and item.get("state") is None
+                and _coerce_string_list(
+                    item.get("supercedes"),
+                    path=f"{section_name}[{index}].supercedes",
+                    issues=[],
+                    issue_code="invalid_supercedes_section",
+                    issue_message=(
+                        f"{section_name}[{index}].supercedes must be a list of ids."
+                    ),
+                )
+                == []
+            ):
+                issues.append(
+                    SystemSpecificationValidationIssue(
+                        code="boilerplate_not_removed",
+                        message=(
+                            f"Remove the {section_name} boilerplate placeholder "
+                            "entry before finalizing the system specification."
+                        ),
+                        path=f"{section_name}[{index}]",
+                    )
+                )
 
 
 def _validate_section_item(

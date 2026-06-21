@@ -32,6 +32,10 @@ def test_create_system_specification_template_writes_default_file(
     template_text = output_path.read_text(encoding="utf-8")
     assert "# System specification template." in template_text
     assert "# - Set `id` to a unique identifier" in template_text
+    assert (
+        "# - Remove the boilerplate placeholder entries once the document is"
+        in template_text
+    )
     assert "requirements:" in template_text
     assert "approach:" in template_text
 
@@ -78,6 +82,33 @@ def test_validate_system_specification_reports_errors() -> None:
         "unknown_superceded_id",
         "removed_description_not_allowed",
         "supercedes_required",
+    }
+
+
+def test_validate_system_specification_flags_boilerplate() -> None:
+    proposed_spec = """
+    version: 1
+    id: sys-1
+
+    requirements:
+      - id: null
+        description: null
+        state: null
+        supercedes: []
+
+    approach:
+      - id: null
+        description: null
+        state: null
+        supercedes: []
+    """
+
+    report = build_system_specification_validation_report(proposed_spec)
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "boilerplate_not_removed",
+        "section_item_id_missing",
     }
 
 

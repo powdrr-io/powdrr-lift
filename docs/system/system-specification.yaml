@@ -13,11 +13,11 @@
 # - Set `title` if a human-readable summary is helpful.
 version: 1
 id: "2026-06-20-skill-distribution-system"
-title: "Installable skill distribution system for coding agents"
+title: "Installable skill set distribution system for coding agents"
 requirements:
   - id: req-canonical-skill-bundle
     description: >
-      Maintain a canonical skill bundle format that can be rendered into the
+      Maintain a canonical set of skill bundles that can be rendered into the
       agent-specific layouts required by Claude Code, Codex, Aider, Cursor,
       Antigravity, and OpenCode.
     state: added

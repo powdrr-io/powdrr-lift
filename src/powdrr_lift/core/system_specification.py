@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from powdrr_lift.change_log_template import _resolve_repo_root
 
@@ -37,6 +38,7 @@ class _SystemSectionItem:
     state: str | None
     supercedes: list[str]
     path: str
+    raw: dict[str, Any]
 
 
 def system_specification_default_output_path(
@@ -58,6 +60,7 @@ def render_system_specification_template(*, title: str | None = None) -> str:
         "# - Use `state: added` for new items and include a description.",
         "# - Use `state: removed` for retired items and leave description empty.",
         "# - Use `state: supercedes` when an item replaces same-section ids.",
+        "# - `supercedes` is optional; omit it unless the item replaces ids.",
         "# - Keep ids unique across both sections.",
         "# - Reference only same-section ids in `supercedes`.",
         "#",
@@ -70,12 +73,10 @@ def render_system_specification_template(*, title: str | None = None) -> str:
         "  - id: null",
         "    description: null",
         "    state: null",
-        "    supercedes: []",
         "approach:",
         "  - id: null",
         "    description: null",
         "    state: null",
-        "    supercedes: []",
         "",
     ]
 
@@ -120,6 +121,26 @@ def build_system_specification_validation_report(
 ) -> SystemSpecificationValidationReport:
     _ = _resolve_repo_root(repo_root)
     issues: list[SystemSpecificationValidationIssue] = []
+
+    try:
+        raw_node = yaml.compose(proposed_system_specification_yaml)
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            SystemSpecificationValidationIssue(
+                code="invalid_yaml",
+                message=f"Could not parse proposed system specification YAML: {exc}",
+            )
+        )
+        return SystemSpecificationValidationReport(
+            validation_successful=False,
+            system_id=None,
+            requirement_ids=[],
+            approach_ids=[],
+            issues=issues,
+        )
+
+    if raw_node is not None:
+        _collect_duplicate_key_issues(raw_node, path="", issues=issues)
 
     try:
         raw_spec = _load_yaml_mapping(proposed_system_specification_yaml)
@@ -171,6 +192,17 @@ def build_system_specification_validation_report(
         issue_message="approach must be a list of approach mappings.",
     )
 
+    _validate_boilerplate_removed(
+        requirement_items,
+        section_name="requirements",
+        issues=issues,
+    )
+    _validate_boilerplate_removed(
+        approach_items,
+        section_name="approach",
+        issues=issues,
+    )
+
     requirement_entries = _collect_section_items(
         requirement_items,
         section_name="requirements",
@@ -182,11 +214,7 @@ def build_system_specification_validation_report(
         issues=issues,
     )
 
-    _validate_boilerplate_removed(
-        requirement_items=requirement_items,
-        approach_items=approach_items,
-        issues=issues,
-    )
+    _validate_optional_title(raw_spec, issues=issues)
 
     requirement_ids = [entry.id for entry in requirement_entries]
     approach_ids = [entry.id for entry in approach_entries]
@@ -289,60 +317,109 @@ def _collect_section_items(
                     ),
                 ),
                 path=f"{section_name}[{index}]",
+                raw=item,
             )
         )
 
     return items
 
 
-def _validate_boilerplate_removed(
+def _validate_optional_title(
+    raw_spec: Mapping[str, Any],
     *,
-    requirement_items: Sequence[object],
-    approach_items: Sequence[object],
     issues: list[SystemSpecificationValidationIssue],
 ) -> None:
-    for section_name, section_items in (
-        ("requirements", requirement_items),
-        ("approach", approach_items),
-    ):
-        for index, raw_item in enumerate(section_items):
-            item = _coerce_mapping(
-                raw_item,
-                path=f"{section_name}[{index}]",
-                issues=issues,
-                issue_code="invalid_section_item",
-                issue_message=(
-                    f"Each {_section_label(section_name)} entry must be a mapping."
+    if "title" not in raw_spec:
+        return
+    if _is_empty_optional_value(raw_spec.get("title")):
+        issues.append(
+            SystemSpecificationValidationIssue(
+                code="optional_value_empty",
+                message=(
+                    "The title field is optional, but if provided it must not be empty."
                 ),
+                path="title",
             )
-            if item is None:
+        )
+
+
+def _collect_duplicate_key_issues(
+    node: Any,
+    *,
+    path: str,
+    issues: list[SystemSpecificationValidationIssue],
+) -> None:
+    if isinstance(node, MappingNode):
+        seen_keys: set[str] = set()
+        for key_node, value_node in node.value:
+            if not isinstance(key_node, ScalarNode):
                 continue
 
-            if (
-                item.get("id") is None
-                and item.get("description") is None
-                and item.get("state") is None
-                and _coerce_string_list(
-                    item.get("supercedes"),
-                    path=f"{section_name}[{index}].supercedes",
-                    issues=[],
-                    issue_code="invalid_supercedes_section",
-                    issue_message=(
-                        f"{section_name}[{index}].supercedes must be a list of ids."
-                    ),
-                )
-                == []
-            ):
+            key = key_node.value
+            child_path = f"{path}.{key}" if path else key
+            if key in seen_keys:
                 issues.append(
                     SystemSpecificationValidationIssue(
-                        code="boilerplate_not_removed",
+                        code="duplicate_key_in_section",
                         message=(
-                            f"Remove the {section_name} boilerplate placeholder "
-                            "entry before finalizing the system specification."
+                            f"Key {key!r} appears more than once in "
+                            f"{path or 'the document'}."
                         ),
-                        path=f"{section_name}[{index}]",
+                        path=child_path,
                     )
                 )
+                continue
+
+            seen_keys.add(key)
+            _collect_duplicate_key_issues(
+                value_node,
+                path=child_path,
+                issues=issues,
+            )
+    elif isinstance(node, SequenceNode):
+        for index, value_node in enumerate(node.value):
+            child_path = f"{path}[{index}]" if path else f"[{index}]"
+            _collect_duplicate_key_issues(
+                value_node,
+                path=child_path,
+                issues=issues,
+            )
+
+
+def _validate_boilerplate_removed(
+    raw_items: Sequence[object],
+    *,
+    section_name: str,
+    issues: list[SystemSpecificationValidationIssue],
+) -> None:
+    for index, raw_item in enumerate(raw_items):
+        item = _coerce_mapping(
+            raw_item,
+            path=f"{section_name}[{index}]",
+            issues=issues,
+            issue_code="invalid_section_item",
+            issue_message=(
+                f"Each {_section_label(section_name)} entry must be a mapping."
+            ),
+        )
+        if item is None:
+            continue
+
+        if (
+            _is_empty_optional_value(item.get("id"))
+            and _is_empty_optional_value(item.get("description"))
+            and _is_empty_optional_value(item.get("state"))
+        ):
+            issues.append(
+                SystemSpecificationValidationIssue(
+                    code="boilerplate_not_removed",
+                    message=(
+                        f"Remove the {section_name} boilerplate placeholder "
+                        "entry before finalizing the system specification."
+                    ),
+                    path=f"{section_name}[{index}]",
+                )
+            )
 
 
 def _validate_section_item(
@@ -389,7 +466,20 @@ def _validate_section_item(
                 )
             )
     elif item.state == "removed":
-        if item.description not in (None, ""):
+        if "description" in item.raw and _is_empty_optional_value(
+            item.raw.get("description")
+        ):
+            issues.append(
+                SystemSpecificationValidationIssue(
+                    code="optional_value_empty",
+                    message=(
+                        f"{_section_label(section_name).capitalize()} {item.id!r} "
+                        "must remove the description field when state is removed."
+                    ),
+                    path=f"{item.path}.description",
+                )
+            )
+        elif item.description not in (None, ""):
             issues.append(
                 SystemSpecificationValidationIssue(
                     code="removed_description_not_allowed",
@@ -401,7 +491,7 @@ def _validate_section_item(
                 )
             )
     else:
-        if not item.supercedes:
+        if "supercedes" not in item.raw:
             issues.append(
                 SystemSpecificationValidationIssue(
                     code="supercedes_required",
@@ -409,6 +499,19 @@ def _validate_section_item(
                         f"{_section_label(section_name).capitalize()} {item.id!r} "
                         "must list same-section ids in supercedes when state is "
                         "supercedes."
+                    ),
+                    path=f"{item.path}.supercedes",
+                )
+            )
+            return
+
+        if _is_empty_optional_value(item.raw.get("supercedes")):
+            issues.append(
+                SystemSpecificationValidationIssue(
+                    code="optional_value_empty",
+                    message=(
+                        f"{_section_label(section_name).capitalize()} {item.id!r} "
+                        "must not leave supercedes empty."
                     ),
                     path=f"{item.path}.supercedes",
                 )
@@ -546,6 +649,18 @@ def _optional_string(value: object) -> str | None:
     if isinstance(value, str):
         return value
     return None
+
+
+def _is_empty_optional_value(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, Mapping):
+        return len(value) == 0
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return len(value) == 0
+    return False
 
 
 def _required_string(

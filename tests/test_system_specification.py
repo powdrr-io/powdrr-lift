@@ -36,8 +36,13 @@ def test_create_system_specification_template_writes_default_file(
         "# - Remove the boilerplate placeholder entries once the document is"
         in template_text
     )
+    assert (
+        "# - `supercedes` is optional; omit it unless the item replaces ids."
+        in template_text
+    )
     assert "requirements:" in template_text
     assert "approach:" in template_text
+    assert "supercedes: []" not in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert rendered_template["version"] == 1
@@ -112,6 +117,57 @@ def test_validate_system_specification_flags_boilerplate() -> None:
     }
 
 
+def test_validate_system_specification_reports_duplicate_keys() -> None:
+    proposed_spec = """
+    version: 1
+    id: sys-1
+
+    requirements:
+      - id: req-a
+        description: Capture the first requirement.
+        description: Capture the first requirement again.
+        state: added
+
+    approach:
+      - id: app-a
+        description: Implement the first approach.
+        state: added
+    """
+
+    report = build_system_specification_validation_report(proposed_spec)
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "duplicate_key_in_section",
+    }
+
+
+def test_validate_system_specification_flags_empty_optional_values() -> None:
+    proposed_spec = """
+    version: 1
+    id: sys-1
+    title: ""
+
+    requirements:
+      - id: req-a
+        description: Capture the first requirement.
+        state: added
+
+    approach:
+      - id: app-a
+        description: Implement the first approach.
+        state: added
+        supercedes: []
+    """
+
+    report = build_system_specification_validation_report(proposed_spec)
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "optional_value_empty",
+    }
+
+
 def test_validate_system_specification_reports_success_for_valid_spec() -> None:
     proposed_spec = """
     version: 1
@@ -121,7 +177,6 @@ def test_validate_system_specification_reports_success_for_valid_spec() -> None:
       - id: req-a
         description: Capture the first requirement.
         state: added
-        supercedes: []
       - id: req-b
         description: Replace the old requirement.
         state: supercedes
@@ -132,10 +187,8 @@ def test_validate_system_specification_reports_success_for_valid_spec() -> None:
       - id: app-a
         description: Implement the first approach.
         state: added
-        supercedes: []
       - id: app-b
         state: removed
-        supercedes: []
     """
 
     report = build_system_specification_validation_report(proposed_spec)

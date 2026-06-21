@@ -288,10 +288,11 @@ def build_server() -> Any:
         entity_types: list[str],
         repo_root: str | None = None,
     ) -> str:
-        _ = resolve_repo_root(repo_root)
+        repo_root_path = resolve_repo_root(repo_root)
         return validate_architecture_specification_yaml(
             architecture_specification_yaml,
             entity_types=entity_types,
+            repo_root=repo_root_path,
         )
 
     @server.tool()

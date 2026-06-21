@@ -777,10 +777,12 @@ def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
     report = build_architecture_specification_validation_report(
         proposed_yaml,
         entity_types=args.entity_types,
+        repo_root=repo_root,
     )
     report_yaml = validate_architecture_specification_yaml(
         proposed_yaml,
         entity_types=args.entity_types,
+        repo_root=repo_root,
     )
     sys.stdout.write(report_yaml)
     if not report_yaml.endswith("\n"):

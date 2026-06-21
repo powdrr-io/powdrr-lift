@@ -1,0 +1,356 @@
+version: 1
+id: "2026-05-22-skill-distribution-architecture"
+title: "Skill distribution platform architecture"
+entities:
+  - id: bootstrap
+    type: Skill
+    summary: Analyze repo evidence and create validated PR changelogs.
+    rationale: Bootstrap the changelog workflow that keeps repo changes traceable via "req-shared-validation" and "app-validation-gates".
+  - id: code-edit-context
+    type: Skill
+    summary: Report changelog-backed context for a file and line ranges.
+    rationale: Support code review and edit-context workflows for agents with "req-agent-compatibility" and "app-agent-adapters".
+  - id: prepare-pr-changelog
+    type: Skill
+    summary: Generate and validate PR changelog templates.
+    rationale: Make PR preparation consistent across agent surfaces with "req-shared-validation" and "app-validation-gates".
+  - id: review-pr-changelog
+    type: Skill
+    summary: Review PR changelogs against the declared intent.
+    rationale: Catch changelog regressions before publish time with "req-shared-validation" and "app-validation-gates".
+  - id: specify-architecture
+    type: Skill
+    summary: Define architecture specs from allowed entity types.
+    rationale: Capture the system architecture in a validated repository format for "req-canonical-skill-bundle" and "app-canonical-authoring".
+  - id: specify-implementation
+    type: Skill
+    summary: Define implementation specs from a chosen architecture id.
+    rationale: Keep implementation details aligned with approved architecture under "req-upgrade-path" and "app-validation-gates".
+  - id: specify-prs
+    type: Skill
+    summary: Define proposed PR specs from feature references and intent.
+    rationale: Tie implementation work back to feature-level goals under "req-upgrade-path" and "app-validation-gates".
+  - id: specify-system
+    type: Skill
+    summary: Define system specs for the installable skill platform.
+    rationale: Preserve the product-level intent that the architecture serves with "req-canonical-skill-bundle" and "app-platform-packaging".
+  - id: synchronize-code-and-state
+    type: Skill
+    summary: Compare codebase state against the source tree and reconcile gaps.
+    rationale: Keep the generated state view and the code in agreement with "req-shared-validation" and "app-validation-gates".
+  - id: powdrr-lift-cli
+    type: CLI app
+    summary: Cross-platform command line entry point for spec generation and validation.
+    rationale: Provide one shell surface for authors and operators to satisfy "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: powdrr-lift-mcp
+    type: Service
+    summary: MCP surface that mirrors the CLI workflows for agents.
+    rationale: Let agents use the same capabilities without shell mediation under "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: skill-core-module
+    type: Module
+    summary: Shared rendering and validation logic for skill artifacts and specs.
+    rationale: Keep the CLI and MCP behaviorally aligned around "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: skill-template-file
+    type: Template file
+    summary: Canonical skill source template and generated specification documents.
+    rationale: Author once and render many target surfaces for "req-canonical-skill-bundle" and "app-canonical-authoring".
+  - id: skill-metadata-file
+    type: Configuration file
+    summary: Agent metadata that describes how a skill is surfaced in each agent.
+    rationale: Keep per-agent wrappers thin and declarative for "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package
+    type: Package
+    summary: Installable bundle containing the skills and their metadata.
+    rationale: Ship one artifact that can be installed into multiple agent ecosystems under "req-canonical-skill-bundle" and "req-single-command-install".
+  - id: homebrew
+    type: Package manager
+    summary: macOS single-command install path for the CLI and package bundle.
+    rationale: Satisfy the macOS brew-based install requirement in "req-single-command-install" and "app-platform-packaging".
+  - id: claude-code
+    type: Application
+    summary: Supported agent application that consumes the packaged skills.
+    rationale: One of the required target agents under "req-agent-compatibility" and "app-agent-adapters".
+  - id: codex
+    type: Application
+    summary: Supported agent application that consumes the packaged skills.
+    rationale: One of the required target agents under "req-agent-compatibility" and "app-agent-adapters".
+  - id: aider
+    type: Application
+    summary: Supported agent application that consumes the packaged skills.
+    rationale: One of the required target agents under "req-agent-compatibility" and "app-agent-adapters".
+  - id: cursor
+    type: Application
+    summary: Supported agent application that consumes the packaged skills.
+    rationale: One of the required target agents under "req-agent-compatibility" and "app-agent-adapters".
+  - id: antigravity
+    type: Application
+    summary: Supported agent application that consumes the packaged skills.
+    rationale: One of the required target agents under "req-agent-compatibility" and "app-agent-adapters".
+  - id: opencode
+    type: Application
+    summary: Supported agent application that consumes the packaged skills.
+    rationale: One of the required target agents under "req-agent-compatibility" and "app-agent-adapters".
+  - id: macos
+    type: Platform
+    summary: Supported macOS installation platform.
+    rationale: Required for the single-command Homebrew install path in "req-single-command-install" and "app-platform-packaging".
+  - id: windows
+    type: Platform
+    summary: Supported Windows installation platform.
+    rationale: Required for cross-platform CLI and MCP delivery in "req-cross-platform-cli-mcp" and "app-platform-packaging".
+  - id: linux
+    type: Platform
+    summary: Supported Linux installation platform.
+    rationale: Required for cross-platform CLI and MCP delivery in "req-cross-platform-cli-mcp" and "app-platform-packaging".
+entity_relationships:
+  - id: skill-package-contains-bootstrap
+    source: skill-package
+    target: bootstrap
+    relationship: contains
+    description: The distributable package includes the bootstrap skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-code-edit-context
+    source: skill-package
+    target: code-edit-context
+    relationship: contains
+    description: The distributable package includes the code-edit-context skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-prepare-pr-changelog
+    source: skill-package
+    target: prepare-pr-changelog
+    relationship: contains
+    description: The distributable package includes the prepare-pr-changelog skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-review-pr-changelog
+    source: skill-package
+    target: review-pr-changelog
+    relationship: contains
+    description: The distributable package includes the review-pr-changelog skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-specify-architecture
+    source: skill-package
+    target: specify-architecture
+    relationship: contains
+    description: The distributable package includes the specify-architecture skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-specify-implementation
+    source: skill-package
+    target: specify-implementation
+    relationship: contains
+    description: The distributable package includes the specify-implementation skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-specify-prs
+    source: skill-package
+    target: specify-prs
+    relationship: contains
+    description: The distributable package includes the specify-prs skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-specify-system
+    source: skill-package
+    target: specify-system
+    relationship: contains
+    description: The distributable package includes the specify-system skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-synchronize-code-and-state
+    source: skill-package
+    target: synchronize-code-and-state
+    relationship: contains
+    description: The distributable package includes the synchronize-code-and-state skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-targets-claude-code
+    source: skill-package
+    target: claude-code
+    relationship: targets
+    description: The packaged skills are installable in Claude Code.
+    rationale: Satisfy the required agent compatibility surface in "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package-targets-codex
+    source: skill-package
+    target: codex
+    relationship: targets
+    description: The packaged skills are installable in Codex.
+    rationale: Satisfy the required agent compatibility surface in "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package-targets-aider
+    source: skill-package
+    target: aider
+    relationship: targets
+    description: The packaged skills are installable in Aider.
+    rationale: Satisfy the required agent compatibility surface in "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package-targets-cursor
+    source: skill-package
+    target: cursor
+    relationship: targets
+    description: The packaged skills are installable in Cursor.
+    rationale: Satisfy the required agent compatibility surface in "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package-targets-antigravity
+    source: skill-package
+    target: antigravity
+    relationship: targets
+    description: The packaged skills are installable in Antigravity.
+    rationale: Satisfy the required agent compatibility surface in "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package-targets-opencode
+    source: skill-package
+    target: opencode
+    relationship: targets
+    description: The packaged skills are installable in OpenCode.
+    rationale: Satisfy the required agent compatibility surface in "req-agent-compatibility" and "app-agent-adapters".
+  - id: skill-package-supports-macos
+    source: skill-package
+    target: macos
+    relationship: supports
+    description: The packaged skills install on macOS.
+    rationale: Satisfy the platform compatibility requirement in "req-cross-platform-cli-mcp" and "app-platform-packaging".
+  - id: skill-package-supports-windows
+    source: skill-package
+    target: windows
+    relationship: supports
+    description: The packaged skills install on Windows.
+    rationale: Satisfy the platform compatibility requirement in "req-cross-platform-cli-mcp" and "app-platform-packaging".
+  - id: skill-package-supports-linux
+    source: skill-package
+    target: linux
+    relationship: supports
+    description: The packaged skills install on Linux.
+    rationale: Satisfy the platform compatibility requirement in "req-cross-platform-cli-mcp" and "app-platform-packaging".
+  - id: skill-package-contains-powdrr-lift-cli
+    source: skill-package
+    target: powdrr-lift-cli
+    relationship: contains
+    description: The distributable package includes the CLI surface.
+    rationale: Ship the install-and-validate entry point together with the skills for "req-cross-platform-cli-mcp" and "req-single-command-install".
+  - id: skill-package-contains-powdrr-lift-mcp
+    source: skill-package
+    target: powdrr-lift-mcp
+    relationship: contains
+    description: The distributable package includes the MCP surface.
+    rationale: Ship the agent-native entry point together with the skills for "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: homebrew-installs-skill-package
+    source: homebrew
+    target: skill-package
+    relationship: installs
+    description: Homebrew provides the single-command macOS install path for the packaged skill suite.
+    rationale: Satisfy the macOS installation example in "req-single-command-install" and "app-platform-packaging".
+  - id: cli-delegates-core
+    source: powdrr-lift-cli
+    target: skill-core-module
+    relationship: delegates_to
+    description: The CLI defers rendering and validation to shared core logic.
+    rationale: Keep CLI behavior aligned with the service surface for "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: mcp-delegates-core
+    source: powdrr-lift-mcp
+    target: skill-core-module
+    relationship: delegates_to
+    description: The MCP surface defers rendering and validation to shared core logic.
+    rationale: Keep MCP behavior aligned with the CLI surface for "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: cli-mcp-mirror
+    source: powdrr-lift-cli
+    target: powdrr-lift-mcp
+    relationship: mirrors
+    description: The CLI and MCP expose the same render and validate capabilities.
+    rationale: Preserve CLI and MCP parity with "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+  - id: core-renders-template
+    source: skill-core-module
+    target: skill-template-file
+    relationship: renders
+    description: The core module renders canonical skill templates and spec documents.
+    rationale: Keep authored content and generated artifacts separate for "req-canonical-skill-bundle" and "app-canonical-authoring".
+  - id: core-validates-metadata
+    source: skill-core-module
+    target: skill-metadata-file
+    relationship: validates
+    description: The core module validates the agent metadata that accompanies each skill.
+    rationale: Prevent broken agent wrappers from shipping with "req-shared-validation" and "app-validation-gates".
+  - id: core-generates-package
+    source: skill-core-module
+    target: skill-package
+    relationship: generates
+    description: The core module materializes installable skill packages from the canonical sources.
+    rationale: Preserve the single-source-of-truth authoring model for "req-canonical-skill-bundle" and "app-canonical-authoring".
+invariants:
+  - id: canonical-skill-source-invariant
+    description: The skill-package must be generated from the canonical template and metadata files rather than hand-edited as distributed content.
+    rationale: Keep the authored source of truth separate from generated artifacts by honoring "req-canonical-skill-bundle" and "app-canonical-authoring".
+    related:
+      entities:
+        - skill-core-module
+        - skill-template-file
+        - skill-metadata-file
+        - skill-package
+      entity_relationships:
+        - core-renders-template
+        - core-validates-metadata
+        - core-generates-package
+  - id: cli-mcp-parity-invariant
+    description: The CLI and MCP surfaces must expose the same generation and validation behavior.
+    rationale: Make the repo usable from both shell-first and agent-native workflows with "req-cross-platform-cli-mcp" and "app-cli-mcp-parity".
+    related:
+      entities:
+        - powdrr-lift-cli
+        - powdrr-lift-mcp
+        - skill-core-module
+      entity_relationships:
+        - cli-delegates-core
+        - mcp-delegates-core
+        - cli-mcp-mirror
+  - id: cross-platform-install-invariant
+    description: The packaged skills must install on macOS, Windows, and Linux, with a single-command Homebrew path on macOS.
+    rationale: Satisfy the installation and portability requirements in "req-single-command-install" and "req-cross-platform-cli-mcp".
+    related:
+      entities:
+        - skill-package
+        - homebrew
+        - macos
+        - windows
+        - linux
+        - powdrr-lift-cli
+      entity_relationships:
+        - skill-package-supports-macos
+        - skill-package-supports-windows
+        - skill-package-supports-linux
+        - skill-package-contains-powdrr-lift-cli
+        - skill-package-contains-powdrr-lift-mcp
+        - homebrew-installs-skill-package
+guidance:
+  - id: generate-from-canonical-source
+    description: Author the skills once in the template and metadata files, then render the installable package from the shared core module.
+    rationale: Avoid per-agent hand editing and keep the package reproducible for "req-canonical-skill-bundle" and "app-canonical-authoring".
+    related:
+      entities:
+        - skill-template-file
+        - skill-metadata-file
+        - skill-core-module
+        - skill-package
+      entity_relationships:
+        - core-renders-template
+        - core-validates-metadata
+        - core-generates-package
+  - id: validate-before-distribution
+    description: Run the CLI or MCP validation path before publishing or installing updated skills.
+    rationale: Catch template, metadata, and packaging regressions before they reach users via "req-shared-validation" and "app-validation-gates".
+    related:
+      entities:
+        - powdrr-lift-cli
+        - powdrr-lift-mcp
+        - skill-core-module
+      entity_relationships:
+        - cli-delegates-core
+        - mcp-delegates-core
+  - id: keep-agent-surfaces-thin
+    description: Keep the agent-specific metadata declarative so Claude Code, Codex, Aider, Cursor, Antigravity, and OpenCode all consume the same packaged skill content.
+    rationale: Make the distributed skill set broad without duplicating behavior per agent under "req-agent-compatibility" and "app-agent-adapters".
+    related:
+      entities:
+        - skill-metadata-file
+        - skill-package
+        - claude-code
+        - codex
+        - aider
+        - cursor
+        - antigravity
+        - opencode
+      entity_relationships:
+        - skill-package-targets-claude-code
+        - skill-package-targets-codex
+        - skill-package-targets-aider
+        - skill-package-targets-cursor
+        - skill-package-targets-antigravity
+        - skill-package-targets-opencode

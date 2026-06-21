@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +12,8 @@ import yaml
 from powdrr_lift.change_log_template import _resolve_repo_root
 
 _DEFAULT_OUTPUT_PATH = Path("docs") / "architecture" / "architecture-specification.yaml"
+_SYSTEM_SPECIFICATION_PATH = Path("docs") / "system" / "system-specification.yaml"
+_RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,9 +54,16 @@ def render_architecture_specification_template(
         "# - Fill in the sections below with the intended architecture.",
         "# - Set `id` to a date-based identifier, for example 2026-06-19.",
         "# - Choose each entity type from the allowed entity types listed here.",
+        "# - Write each rationale in English, but quote the requirement or",
+        '#   approach ids it relies on, for example "req-single-command-install".',
+        "# - Every entity and every entity relationship rationale must cite at",
+        "#   least one current requirement or approach id in quotes.",
+        "# - Every invariant and guidance rationale must cite at least one",
+        "#   current requirement or approach id in quotes.",
         "# - Use `related.entities` and `related.entity_relationships` in",
         "#   invariants and guidance whenever they refer to a specific entity",
-        "#   or relationship.",
+        "#   or relationship, and keep at least one current entity or",
+        "#   relationship listed in each item's related block.",
         "# - Keep every entity mentioned in a relationship, invariant, or",
         "#   guidance item present in the `entities` section.",
         "#",
@@ -118,10 +128,12 @@ def validate_architecture_specification_yaml(
     proposed_architecture_specification_yaml: str,
     *,
     entity_types: Sequence[str],
+    repo_root: str | Path | None = None,
 ) -> str:
     report = build_architecture_specification_validation_report(
         proposed_architecture_specification_yaml=proposed_architecture_specification_yaml,
         entity_types=entity_types,
+        repo_root=repo_root,
     )
     return yaml.safe_dump(_report_to_data(report), sort_keys=False)
 
@@ -130,6 +142,7 @@ def build_architecture_specification_validation_report(
     proposed_architecture_specification_yaml: str,
     *,
     entity_types: Sequence[str],
+    repo_root: str | Path | None = None,
 ) -> ArchitectureSpecificationValidationReport:
     allowed_entity_types = _normalize_entity_types(entity_types)
     issues: list[ArchitectureSpecificationValidationIssue] = []
@@ -144,6 +157,19 @@ def build_architecture_specification_validation_report(
             validation_successful=False,
             title=None,
             allowed_entity_types=[],
+            issues=issues,
+        )
+
+    repo_root_path = _resolve_repo_root(repo_root)
+    system_reference_ids = _load_current_system_reference_ids(
+        repo_root_path,
+        issues=issues,
+    )
+    if not system_reference_ids:
+        return ArchitectureSpecificationValidationReport(
+            validation_successful=False,
+            title=None,
+            allowed_entity_types=allowed_entity_types,
             issues=issues,
         )
 
@@ -198,6 +224,7 @@ def build_architecture_specification_validation_report(
             issue_message="entities must be a list of entity mappings.",
         ),
         allowed_entity_types=allowed_entity_types,
+        system_reference_ids=system_reference_ids,
         issues=issues,
     )
     if not entity_ids:
@@ -219,6 +246,7 @@ def build_architecture_specification_validation_report(
             ),
         ),
         entity_ids=entity_ids,
+        system_reference_ids=system_reference_ids,
         issues=issues,
     )
     _collect_related_references(
@@ -260,6 +288,7 @@ def _collect_entity_ids(
     raw_entities: Sequence[object],
     *,
     allowed_entity_types: Sequence[str],
+    system_reference_ids: set[str],
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
     entity_ids: set[str] = set()
@@ -288,6 +317,7 @@ def _collect_entity_ids(
             issue_code="entity_type_missing",
             issue_message="Each entity must include a type.",
         )
+        rationale = _optional_string(entity.get("rationale"))
         if entity_id is None or entity_type is None:
             continue
 
@@ -314,6 +344,23 @@ def _collect_entity_ids(
             )
             continue
 
+        _validate_rationale_references(
+            rationale,
+            path=f"entities[{index}].rationale",
+            system_reference_ids=system_reference_ids,
+            issues=issues,
+            require_reference=True,
+            missing_reference_code="missing_entity_rationale_reference",
+            missing_reference_message=(
+                "Each entity rationale must cite at least one current requirement "
+                "or approach id in quotes."
+            ),
+            unknown_reference_code="unknown_entity_rationale_reference",
+            unknown_reference_message=(
+                "Entity rationale references must point to current requirement "
+                "or approach ids from docs/system/system-specification.yaml."
+            ),
+        )
         entity_ids.add(entity_id)
 
     return entity_ids
@@ -323,6 +370,7 @@ def _collect_relationship_ids(
     raw_relationships: Sequence[object],
     *,
     entity_ids: set[str],
+    system_reference_ids: set[str],
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
     relationship_ids: set[str] = set()
@@ -358,6 +406,7 @@ def _collect_relationship_ids(
             issue_code="relationship_target_missing",
             issue_message="Each entity relationship must include a target.",
         )
+        rationale = _optional_string(relationship.get("rationale"))
 
         if relationship_id is None or source is None or target is None:
             continue
@@ -396,6 +445,24 @@ def _collect_relationship_ids(
                 )
             )
 
+        _validate_rationale_references(
+            rationale,
+            path=f"entity_relationships[{index}].rationale",
+            system_reference_ids=system_reference_ids,
+            issues=issues,
+            require_reference=True,
+            missing_reference_code="missing_relationship_rationale_reference",
+            missing_reference_message=(
+                "Each entity relationship rationale must cite at least one "
+                "current requirement or approach id in quotes."
+            ),
+            unknown_reference_code="unknown_relationship_rationale_reference",
+            unknown_reference_message=(
+                "Entity relationship rationale references must point to current "
+                "requirement or approach ids from "
+                "docs/system/system-specification.yaml."
+            ),
+        )
         relationship_ids.add(relationship_id)
 
     return relationship_ids
@@ -445,6 +512,7 @@ def _collect_related_references(
         if related_mapping is None:
             continue
 
+        valid_related_reference_count = 0
         for related_index, related_entity in enumerate(
             _coerce_sequence(
                 related_mapping.get("entities"),
@@ -477,6 +545,8 @@ def _collect_related_references(
                         ),
                     )
                 )
+            else:
+                valid_related_reference_count += 1
 
         for related_index, related_relationship in enumerate(
             _coerce_sequence(
@@ -514,6 +584,145 @@ def _collect_related_references(
                         ),
                     )
                 )
+            else:
+                valid_related_reference_count += 1
+
+        if valid_related_reference_count == 0:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="missing_related_reference",
+                    message=(
+                        f"Each {section_label} must reference at least one "
+                        "current entity or entity relationship in related."
+                    ),
+                    path=f"{section_name}[{index}].related",
+                )
+            )
+
+
+def _validate_rationale_references(
+    rationale: str | None,
+    *,
+    path: str,
+    system_reference_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+    require_reference: bool,
+    missing_reference_code: str,
+    missing_reference_message: str,
+    unknown_reference_code: str,
+    unknown_reference_message: str,
+) -> None:
+    if rationale is None:
+        if require_reference:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code=missing_reference_code,
+                    message=missing_reference_message,
+                    path=path,
+                )
+            )
+        return
+
+    referenced_ids = {
+        match.group(1) for match in _RATIONALE_REFERENCE_PATTERN.finditer(rationale)
+    }
+    if not referenced_ids:
+        if require_reference:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code=missing_reference_code,
+                    message=missing_reference_message,
+                    path=path,
+                )
+            )
+        return
+
+    unknown_reference_ids = sorted(
+        referenced_id
+        for referenced_id in referenced_ids
+        if referenced_id not in system_reference_ids
+    )
+    if unknown_reference_ids:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code=unknown_reference_code,
+                message=(
+                    f"Referenced ids {unknown_reference_ids!r} are not current "
+                    "requirement or approach ids."
+                ),
+                path=path,
+            )
+        )
+
+
+def _load_current_system_reference_ids(
+    repo_root: Path,
+    *,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    system_spec_path = repo_root / _SYSTEM_SPECIFICATION_PATH
+    if not system_spec_path.exists():
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="missing_system_specification",
+                message=(
+                    "docs/system/system-specification.yaml is required to "
+                    "validate architecture rationale references."
+                ),
+                path=str(_SYSTEM_SPECIFICATION_PATH),
+            )
+        )
+        return set()
+
+    try:
+        system_spec = _load_yaml_mapping(system_spec_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_system_specification",
+                message=(
+                    f"Could not parse docs/system/system-specification.yaml: {exc}"
+                ),
+                path=str(_SYSTEM_SPECIFICATION_PATH),
+            )
+        )
+        return set()
+
+    reference_ids: set[str] = set()
+    for section_name in ("requirements", "approach"):
+        raw_section = system_spec.get(section_name)
+        if not isinstance(raw_section, Sequence) or isinstance(
+            raw_section,
+            (str, bytes),
+        ):
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="invalid_system_specification",
+                    message=(
+                        f"{section_name} must be a list in "
+                        "docs/system/system-specification.yaml."
+                    ),
+                    path=f"{_SYSTEM_SPECIFICATION_PATH}.{section_name}",
+                )
+            )
+            continue
+
+        for item_index, raw_item in enumerate(raw_section):
+            item = _coerce_mapping(
+                raw_item,
+                path=f"{_SYSTEM_SPECIFICATION_PATH}.{section_name}[{item_index}]",
+                issues=issues,
+                issue_code="invalid_system_specification",
+                issue_message="System specification sections must contain mappings.",
+            )
+            if item is None:
+                continue
+
+            reference_id = _optional_string(item.get("id"))
+            if reference_id is not None:
+                reference_ids.add(reference_id)
+
+    return reference_ids
 
 
 def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:

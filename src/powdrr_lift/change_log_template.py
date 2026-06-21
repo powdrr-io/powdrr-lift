@@ -73,6 +73,22 @@ def _render_template_body(
     if related_sections_by_entry is None:
         related_sections_by_entry = [RelatedSectionPreview()] * len(diff_entries)
 
+    structured_file_paths: list[str] = []
+    file_entries: list[tuple[BranchDiffEntry, RelatedSectionPreview]] = []
+    seen_structured_file_paths: set[str] = set()
+    for diff_entry, related_section in zip(
+        diff_entries, related_sections_by_entry, strict=False
+    ):
+        if _is_structured_document_path(diff_entry.path):
+            if diff_entry.path in seen_structured_file_paths:
+                continue
+
+            seen_structured_file_paths.add(diff_entry.path)
+            structured_file_paths.append(diff_entry.path)
+            continue
+
+        file_entries.append((diff_entry, related_section))
+
     lines = [
         "version: 2",
         "# Use the PR number here.",
@@ -91,15 +107,19 @@ def _render_template_body(
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Each file entry should record the files that changed and their",
-        "# associated metadata.",
+        "# Structured document files go in `structured_files` as paths only.",
+        "# Use `files` for code and other non-structured file entries.",
     ]
 
-    if diff_entries:
+    if structured_file_paths:
+        lines.append("structured_files:")
+        lines.extend(f"  - {path}" for path in structured_file_paths)
+    else:
+        lines.append("structured_files: []")
+
+    if file_entries:
         lines.append("files:")
-        for diff_entry, related_section in zip(
-            diff_entries, related_sections_by_entry, strict=False
-        ):
+        for diff_entry, related_section in file_entries:
             lines.extend(
                 [
                     "  -",
@@ -597,6 +617,17 @@ def _git_output(repo_root: Path, *args: str) -> str:
 
 def _is_changelog_artifact_path(path: str) -> bool:
     return path.startswith("docs/changelogs/PR-") and path.endswith("-changelog.yaml")
+
+
+def _is_structured_document_path(path: str) -> bool:
+    normalized_path = path.strip()
+    if normalized_path == "README.md":
+        return True
+
+    if not normalized_path.startswith("docs/"):
+        return False
+
+    return normalized_path.endswith((".md", ".markdown", ".yaml", ".yml"))
 
 
 def _normalize_change_type(status: str) -> str:

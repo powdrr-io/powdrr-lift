@@ -7,6 +7,7 @@ intent:
 decisions:
   - id: decision-agent-platform-expansion
     summary: Capture the next-stage platform design in a dedicated design doc and implementation spec.
+structured_files: []
 files:
   - path: README.md
     type: modified
@@ -33,7 +34,7 @@ files:
     type: added
     span:
       start_line: 1
-      end_line: 170
+      end_line: 181
     summary: Add the implementation spec that frames the platform expansion work.
     rationale: Define the initial implementation scope and keep it aligned with the current architecture graph.
   - path: src/powdrr_lift/core/implementation_specification.py
@@ -372,6 +373,370 @@ files:
       end_line: 200
     summary: Add relationship action metadata to the CLI validation fixture.
     rationale: Keep the CLI fixture aligned with the new schema.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 101
+      end_line: 107
+    summary: Extend implementation template instructions to cover feature and decision actions.
+    rationale: Tell authors how to fill feature and decision state fields before validation.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 125
+      end_line: 139
+    summary: Add action and supercedes scaffolding to implementation features and decisions.
+    rationale: Prompt authors to supply the required feature and decision state fields.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 307
+      end_line: 356
+    summary: Validate feature and decision sections using the new action and supercedes rules.
+    rationale: Keep feature and decision state transitions internally coherent.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 651
+      end_line: 761
+    summary: Add action and supercedes support to implementation features.
+    rationale: Enforce the feature item rules for the implementation spec.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 764
+      end_line: 847
+    summary: Add action and supercedes support to implementation decisions.
+    rationale: Enforce the decision item rules for the implementation spec.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 113
+      end_line: 130
+    summary: Add feature and decision action and supercedes cases to the failure fixture.
+    rationale: Ensure the validator rejects unsupported or empty optional feature and decision state fields.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 172
+      end_line: 180
+    summary: Update the validation expectations for the new implementation spec errors.
+    rationale: Match the new action and supercedes validation behavior.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 212
+      end_line: 219
+    summary: Add entity action metadata to the CLI validation fixture.
+    rationale: Keep the CLI fixture aligned with the new schema.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 104
+      end_line: 104
+    summary: Add structured file tracking to the parsed change log model.
+    rationale: Keep version 2 changelogs aware of document-format file paths.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 164
+      end_line: 166
+    summary: Update the version 2 parser guidance to include structured files.
+    rationale: Keep the parser error text aligned with the expanded changelog format.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 175
+      end_line: 175
+    summary: Parse top-level structured files into the change log model.
+    rationale: Preserve document-format paths alongside file-level change entries.
+  - path: src/powdrr_lift/change_log_parser/parse_change_log.py
+    type: modified
+    span:
+      start_line: 383
+      end_line: 395
+    summary: Add a helper for parsing plain path lists in structured files.
+    rationale: Keep structured file parsing separate from entity-id parsing.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 76
+      end_line: 91
+    summary: Split structured documents from span-based file entries in the template.
+    rationale: Put document-format files in structured_files and keep spans for code files.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 110
+      end_line: 111
+    summary: Update the template instructions for structured files and regular files.
+    rationale: Tell authors which paths belong in structured_files versus files.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 114
+      end_line: 120
+    summary: Emit a structured_files section in the generated changelog template.
+    rationale: Preserve document-format paths without line spans.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 122
+      end_line: 122
+    summary: Render only non-structured entries in the files section.
+    rationale: Keep file spans reserved for code and other non-structured changes.
+  - path: src/powdrr_lift/change_log_template.py
+    type: modified
+    span:
+      start_line: 622
+      end_line: 632
+    summary: Add a structured-document path classifier for changelog generation.
+    rationale: Distinguish document-format files from span-based file entries.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 21
+      end_line: 21
+    summary: Import the structured-document path classifier into changelog validation.
+    rationale: Reuse the same document-format split in validation and template generation.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 153
+      end_line: 155
+    summary: Update the version 2 top-level section guidance for structured files.
+    rationale: Keep the validator error text aligned with the new changelog format.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 203
+      end_line: 208
+    summary: Include structured files when reporting proposed change paths.
+    rationale: Keep the validation report aware of both document and code changes.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 269
+      end_line: 270
+    summary: Track structured file paths separately from span-based file entries.
+    rationale: Keep document-format files out of the span comparison path.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 275
+      end_line: 282
+    summary: Exclude structured documents from the expected file-entry map.
+    rationale: Compare code hunks separately from document-format paths.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 286
+      end_line: 288
+    summary: Collect file changes in a single pass before splitting them by format.
+    rationale: Preserve the original file-entry ordering for validation.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 290
+      end_line: 292
+    summary: Keep the file-entry map keyed by path for later span checks.
+    rationale: Retain the diff comparison data needed for regular file entries.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 336
+      end_line: 366
+    summary: Split structured file entries from regular file entries during validation.
+    rationale: Validate document-format paths without requiring line spans.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 368
+      end_line: 368
+    summary: Validate only the regular file entries against diff spans.
+    rationale: Keep span validation focused on non-structured file changes.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 506
+      end_line: 532
+    summary: Check that structured files are present in the diff and not duplicated.
+    rationale: Ensure document-format paths are listed exactly once in structured_files.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 590
+      end_line: 590
+    summary: Keep unexpected-change reporting aligned after splitting structured files.
+    rationale: Preserve the regular file diff diagnostics after the format split.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 593
+      end_line: 601
+    summary: Compare only non-structured files against diff span counts.
+    rationale: Exclude document-format paths from span-level validation.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 657
+      end_line: 658
+    summary: Keep the unexpected-change check scoped to regular file entries.
+    rationale: Prevent structured files from being revalidated as diff hunks.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 823
+      end_line: 895
+    summary: Validate structured_files as plain paths and reject structured paths in files.
+    rationale: Enforce the split between document-format paths and span-based file entries.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 917
+      end_line: 929
+    summary: Reject structured document paths in file-entry validation.
+    rationale: Keep document-format paths out of the files section.
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 963
+      end_line: 976
+    summary: Reject structured document paths before validating file spans and metadata.
+    rationale: Stop structured files from being treated as span-based hunks.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 47
+      end_line: 47
+    summary: Assert that the generated template includes a structured_files section.
+    rationale: Verify the new changelog format exposes document-format paths separately.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 77
+      end_line: 77
+    summary: Assert that parsed templates keep structured_files empty when no document changes exist.
+    rationale: Keep the template parser aligned with the new section.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 150
+      end_line: 153
+    summary: Add a README modification to the template-generation fixture.
+    rationale: Exercise the structured_files path on a document-format change.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 162
+      end_line: 162
+    summary: Add the README fixture file to the commit for the template test.
+    rationale: Keep the structured-file template fixture in the branch diff.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 173
+      end_line: 173
+    summary: Assert that the rendered template includes structured_files.
+    rationale: Verify the new top-level section appears in generated output.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span:
+      start_line: 176
+      end_line: 176
+    summary: Assert that parsed templates preserve the README structured file path.
+    rationale: Confirm that document-format file paths survive parsing.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 68
+      end_line: 73
+    summary: Update the version 2 validation fixture to include a README structured file.
+    rationale: Exercise the new split between structured_files and files.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 87
+      end_line: 89
+    summary: Add the structured_files section to the version 2 success fixture.
+    rationale: Keep the validation fixture aligned with the new format.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 174
+      end_line: 183
+    summary: Update the validation report expectations for structured files.
+    rationale: Confirm the report includes both structured and regular changed paths.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 199
+      end_line: 199
+    summary: Add structured_files to the invalid feature/pr state fixture.
+    rationale: Keep the version 2 fixture in the new changelog format.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 264
+      end_line: 264
+    summary: Add structured_files to the duplicate-id fixture.
+    rationale: Keep the duplicate-id test aligned with the new format.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 335
+      end_line: 335
+    summary: Add structured_files to the top-level entities fixture.
+    rationale: Keep the entity-acceptance fixture in the new changelog format.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 400
+      end_line: 400
+    summary: Add structured_files to the file-entities-on-file-entry fixture.
+    rationale: Keep the file-entry validation fixture in the new changelog format.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 449
+      end_line: 449
+    summary: Add structured_files to the empty-related-block fixture.
+    rationale: Keep the empty-related-block validation aligned with the new format.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 486
+      end_line: 533
+    summary: Add a rejection test for structured document paths in the files section.
+    rationale: Ensure structured document paths are moved into structured_files.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 547
+      end_line: 548
+    summary: Add structured_files and files sections to the version 2 top-level changes rejection fixture.
+    rationale: Keep the top-level changes test isolated to the intended error.
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 1166
+      end_line: 1166
+    summary: Add structured_files to the unknown-added-entity-types fixture.
+    rationale: Keep the entity taxonomy fixture aligned with the current format.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 76
+      end_line: 78
+    summary: Add structured_files to the version 2 parser fixture.
+    rationale: Verify the parser maps document-format paths into the change log model.
+  - path: tests/test_parse_change_log.py
+    type: modified
+    span:
+      start_line: 147
+      end_line: 147
+    summary: Assert the parsed structured_files list in the version 2 parser test.
+    rationale: Confirm structured document paths are preserved by parsing.
 entities: []
 entity_relationships: []
 invariants: []

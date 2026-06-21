@@ -65,6 +65,12 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "README.md").write_text(
+        "initial\n\nUpdated for the structured file validation test.\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Update README for structured files")
     proposed_yaml = """
     version: 2
     change_id: 7
@@ -77,6 +83,9 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     decisions:
       - id: ADR-200
         summary: Introduce version 2 of the changelog schema.
+
+    structured_files:
+      - README.md
 
     files:
       - path: src/app.py
@@ -162,8 +171,16 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
 
     assert report.validation_successful is True
     assert report.issues == []
-    assert report.expected_change_files == ["src/app.py", "tests/test_app.py"]
-    assert report.proposed_change_files == ["src/app.py", "tests/test_app.py"]
+    assert report.expected_change_files == [
+        "README.md",
+        "src/app.py",
+        "tests/test_app.py",
+    ]
+    assert report.proposed_change_files == [
+        "src/app.py",
+        "tests/test_app.py",
+        "README.md",
+    ]
 
 
 def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
@@ -179,6 +196,7 @@ def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    structured_files: []
     files:
       - path: src/app.py
         type: modified
@@ -243,6 +261,7 @@ def test_validate_change_log_yaml_rejects_duplicate_ids_across_sections(
       - id: ADR-200
         summary: Introduce version 2 of the changelog schema.
 
+    structured_files: []
     files:
       - path: src/app.py
         type: modified
@@ -313,6 +332,7 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    structured_files: []
     files:
       - path: src/app.py
         type: modified
@@ -377,6 +397,7 @@ def test_validate_change_log_yaml_rejects_version_two_file_entities_on_file_entr
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    structured_files: []
     files:
       - path: src/app.py
         type: modified
@@ -425,6 +446,7 @@ def test_validate_change_log_yaml_rejects_version_two_empty_related_block(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    structured_files: []
     files:
       - path: src/app.py
         type: modified
@@ -461,6 +483,54 @@ def test_validate_change_log_yaml_rejects_version_two_empty_related_block(
     assert [issue.code for issue in report.issues] == ["file_entry_empty_related"]
 
 
+def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+
+    files:
+      - path: README.md
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the README change structured.
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "file_entry_structured_path_not_allowed",
+    ]
+
+
 def test_validate_change_log_yaml_rejects_version_two_changes(
     tmp_path: Path,
 ) -> None:
@@ -474,6 +544,8 @@ def test_validate_change_log_yaml_rejects_version_two_changes(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    structured_files: []
+    files: []
     changes:
       - files:
           - path: src/app.py
@@ -1091,6 +1163,7 @@ def test_validate_change_log_yaml_rejects_unknown_added_entity_types_in_v2(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    structured_files: []
     files:
       - path: src/app.py
         type: modified

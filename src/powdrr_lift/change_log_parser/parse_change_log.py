@@ -101,6 +101,7 @@ class ChangeLog:
     title: str | None = None
     intent: Intent = field(default_factory=Intent)
     decisions: list[Decision] = field(default_factory=list)
+    structured_files: list[str] = field(default_factory=list)
     file_changes: list[ChangeFile] = field(default_factory=list)
     entity_changes: list[ChangeEntity] = field(default_factory=list)
     entity_relationship_changes: list[ChangeEntityRelationship] = field(
@@ -160,9 +161,9 @@ def _parse_change_log_v1(data: Mapping[str, Any]) -> ChangeLog:
 def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
     if "changes" in data:
         raise ValueError(
-            "Version 2 changelogs must use top-level files, entities, "
-            "entity_relationships, invariants, guidance, features, and prs "
-            "sections."
+            "Version 2 changelogs must use top-level structured_files, files, "
+            "entities, entity_relationships, invariants, guidance, features, "
+            "and prs sections."
         )
 
     return ChangeLog(
@@ -171,6 +172,7 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         title=_coerce_optional_str(data.get("title")),
         intent=_parse_intent(data.get("intent")),
         decisions=_parse_decisions(data),
+        structured_files=_parse_path_sequence(data.get("structured_files")),
         file_changes=_parse_change_files(data),
         entity_changes=_parse_change_entities(data),
         entity_relationship_changes=_parse_change_entity_relationships(data),
@@ -374,6 +376,19 @@ def _parse_id_sequence(raw_values: object | None) -> list[str]:
     for raw_value in _ensure_sequence(raw_values):
         normalized_value = _parse_id_value(raw_value)
         if normalized_value is not None:
+            values.append(normalized_value)
+    return values
+
+
+def _parse_path_sequence(raw_values: object | None) -> list[str]:
+    values: list[str] = []
+    for raw_value in _ensure_sequence(raw_values):
+        if isinstance(raw_value, str):
+            normalized_value = raw_value.strip()
+        else:
+            normalized_value = str(raw_value).strip()
+
+        if normalized_value:
             values.append(normalized_value)
     return values
 

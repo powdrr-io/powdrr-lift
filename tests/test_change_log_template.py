@@ -44,6 +44,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "change_id: null" in template_text
     assert "decisions:" in template_text
     assert "files:" in template_text
+    assert "structured_files:" in template_text
     assert "entities:" in template_text
     assert "entity_relationships:" in template_text
     assert "invariants:" in template_text
@@ -73,6 +74,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
         [],
         [],
     ]
+    assert change_log.structured_files == []
     assert change_log.entity_changes == []
     assert change_log.feature_changes == []
     assert change_log.pr_changes == []
@@ -145,6 +147,10 @@ def test_create_change_log_template_populates_full_related_sections(
     _git(repo_root, "commit", "-m", "Add application scaffold")
 
     _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "README.md").write_text(
+        "initial\n\nUpdated for the change-log template test.\n",
+        encoding="utf-8",
+    )
     (repo_root / "src" / "app.py").write_text(
         "print('hello')\nprint('world v2')\n",
         encoding="utf-8",
@@ -153,7 +159,7 @@ def test_create_change_log_template_populates_full_related_sections(
         "def test_app():\n    assert True is True\n",
         encoding="utf-8",
     )
-    _git(repo_root, "add", "src/app.py", "tests/test_app.py")
+    _git(repo_root, "add", "README.md", "src/app.py", "tests/test_app.py")
     _git(repo_root, "commit", "-m", "Update application scaffold")
 
     output_path = create_change_log_template(
@@ -164,8 +170,10 @@ def test_create_change_log_template_populates_full_related_sections(
 
     template_text = output_path.read_text(encoding="utf-8")
     assert "Review each prefilled `related` section" in template_text
+    assert "structured_files:" in template_text
 
     change_log = parse_change_log(template_text)
+    assert change_log.structured_files == ["README.md"]
     assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "tests/test_app.py",

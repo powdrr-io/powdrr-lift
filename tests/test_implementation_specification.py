@@ -72,7 +72,7 @@ def test_create_implementation_specification_template_writes_default_file(
     assert "# - rel-1" in template_text
     assert 'architecture_id: "2026-06-19"' in template_text
     assert "    action: null" in template_text
-    assert "    supercedes: []" not in template_text
+    assert "    supercedes: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert rendered_template["version"] == 1
@@ -110,18 +110,24 @@ def test_validate_implementation_specification_reports_errors(
 
     features:
       - id: feature-a
+        action: added
         description: Implement the first feature.
+        supercedes: []
         functional_requirements:
           - Must be implemented.
       - id: feature-a
+        action: removed
         description: Duplicate feature id.
         functional_requirements:
           - Must also be implemented.
 
     decisions:
       - id: decision-a
+        action: added
         description: Choose the main approach.
+        supercedes: []
       - id: feature-a
+        action: removed
         description: Duplicate across sections.
     """
 
@@ -163,12 +169,14 @@ def test_validate_implementation_specification_reports_success_for_valid_spec(
 
     features:
       - id: feature-a
+        action: added
         description: Implement the first feature.
         functional_requirements:
           - Must be implemented.
 
     decisions:
       - id: decision-a
+        action: removed
         description: Choose the main approach.
     """
 
@@ -201,12 +209,14 @@ def test_cli_validate_implementation_specification_reports_yaml(
 
         features:
           - id: feature-a
+            action: added
             description: Implement the first feature.
             functional_requirements:
               - Must be implemented.
 
         decisions:
           - id: decision-a
+            action: removed
             description: Choose the main approach.
         """,
         encoding="utf-8",

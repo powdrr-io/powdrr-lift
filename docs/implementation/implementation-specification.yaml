@@ -116,6 +116,7 @@ entity_relationships:
     rationale: The package must keep shipping the MCP entry point.
 features:
   - id: feature-document-families
+    action: added
     description: Add current-state, diff, and issues document families for system, architecture, implementation, and proposed-PR specs so the platform can represent the same state model across `specify-system`, `specify-architecture`, `specify-implementation`, `specify-prs`, `synthesize-system`, `synthesize-architecture`, `synthesize-implementation`, and review workflows.
     functional_requirements:
       - The platform must render a current-state document that represents a complete coherent snapshot.
@@ -123,6 +124,7 @@ features:
       - The platform must render an issues document that explicitly records known incoherence.
       - The platform must validate each document family with the appropriate CLI and MCP surface.
   - id: feature-specified-template-workflows
+    action: added
     description: Give each specify skill and `create-pr-changelog` a template-generation and validation workflow.
     functional_requirements:
       - Each specify skill must expose a template generator endpoint.
@@ -130,6 +132,7 @@ features:
       - The template instructions must tell the agent how to fill the document before validation.
       - The workflow must fail closed until the filled document validates.
   - id: feature-synthesis-workflows
+    action: added
     description: Add synthesis workflows that derive start state, new state, and diff from a parent branch and a PR for `synthesize-system`, `synthesize-architecture`, and `synthesize-implementation`.
     functional_requirements:
       - Each synthesize skill must expose a parent-branch current-state endpoint.
@@ -137,6 +140,7 @@ features:
       - Each synthesize skill must expose a diff endpoint.
       - The synthesized diff must be applicable to the parent current state to produce the updated current state.
   - id: feature-review-workflows
+    action: added
     description: Add review workflows that produce diffs and inspect multiple layers of the system for inconsistencies across `review-system`, `review-architecture`, `review-implementation`, `review-pr`, and `review-pr-changelog`.
     functional_requirements:
       - Each review skill must produce a diff that describes the review target.
@@ -144,6 +148,7 @@ features:
       - Review output must inspect the surrounding specification layers, not only the changed file.
       - Review output must remain explainable enough for an agent to fix the underlying issue.
   - id: feature-context-graph
+    action: added
     description: Add context endpoints that answer code-relationship questions using the indexed graph of code and specs so agents can ask about code used together, updated together, and linked to features, decisions, requirements, entities, and lines.
     functional_requirements:
       - The platform must answer what code is used together and updated together.
@@ -151,6 +156,7 @@ features:
       - The platform must answer intent and rationale questions for a file, range, or line of code.
       - The platform must source answers from the changelog and specification graph, not just the source tree.
   - id: feature-unified-packaging
+    action: added
     description: Keep the CLI, MCP, skill set, and install story aligned across macOS, Windows, and Linux.
     functional_requirements:
       - The platform must install with a single command on each supported platform.
@@ -159,12 +165,17 @@ features:
       - The CLI and MCP must remain behaviorally aligned through shared core logic.
 decisions:
   - id: decision-single-core
+    action: added
     description: Keep rendering, validation, synthesis, and graph query logic in a shared core module.
   - id: decision-first-class-diffs
+    action: added
     description: Treat diff documents as first-class artifacts rather than opaque implementation details.
   - id: decision-explicit-incoherence
+    action: added
     description: Record intentional incoherence in issues documents instead of hiding it behind partial validation.
   - id: decision-shared-surface
+    action: added
     description: Keep the CLI and MCP surfaces mirrored so agents and operators can use either one.
   - id: decision-platform-install
+    action: added
     description: Keep the package install story single-command and cross-platform, with Homebrew for macOS.

@@ -98,7 +98,11 @@ def render_implementation_specification_template(
         "#   field when it would be empty.",
         "# - Treat entity relationships with the same item shape as entities:",
         "#   `id`, `action`, `rationale`, and optional `supercedes`.",
-        "# - Give each feature a unique id, a description, and functional",
+        "# - Give each feature and decision an `action` of `added` or",
+        "#   `removed`.",
+        "# - Include `supercedes` only when it lists one or more ids; omit the",
+        "#   field when it would be empty.",
+        "# - Give each feature a unique id, description, and functional",
         "#   requirements.",
         "# - Give each decision a unique id and description.",
         "#",
@@ -123,12 +127,16 @@ def render_implementation_specification_template(
         "    rationale: null",
         "features:",
         "  - id: null",
+        "    action: null",
         "    description: null",
+        "    supercedes: null",
         "    functional_requirements:",
         "      - null",
         "decisions:",
         "  - id: null",
+        "    action: null",
         "    description: null",
+        "    supercedes: null",
         "",
     ]
 
@@ -304,7 +312,7 @@ def build_implementation_specification_validation_report(
         item_label="entity relationship",
     )
 
-    feature_ids = _collect_features(
+    feature_ids, feature_items = _collect_features(
         _coerce_sequence(
             raw_spec.get("features"),
             path="features",
@@ -313,6 +321,12 @@ def build_implementation_specification_validation_report(
             issue_message="features must be a list of feature mappings.",
         ),
         issues=issues,
+    )
+    _validate_supercedes(
+        feature_items,
+        available_ids=feature_ids,
+        issues=issues,
+        item_label="feature",
     )
     if not feature_ids:
         issues.append(
@@ -323,7 +337,7 @@ def build_implementation_specification_validation_report(
             )
         )
 
-    decision_ids = _collect_decisions(
+    decision_ids, decision_items = _collect_decisions(
         _coerce_sequence(
             raw_spec.get("decisions"),
             path="decisions",
@@ -333,6 +347,12 @@ def build_implementation_specification_validation_report(
         ),
         issues=issues,
         used_ids=feature_ids,
+    )
+    _validate_supercedes(
+        decision_items,
+        available_ids=decision_ids,
+        issues=issues,
+        item_label="decision",
     )
     if not decision_ids:
         issues.append(
@@ -632,8 +652,9 @@ def _collect_features(
     raw_features: Sequence[object],
     *,
     issues: list[ImplementationSpecificationValidationIssue],
-) -> set[str]:
+) -> tuple[set[str], list[_ImplementationSpecificationSectionItem]]:
     feature_ids: set[str] = set()
+    items: list[_ImplementationSpecificationSectionItem] = []
     for index, raw_feature in enumerate(raw_features):
         feature = _coerce_mapping(
             raw_feature,
@@ -652,6 +673,11 @@ def _collect_features(
             issue_code="feature_id_missing",
             issue_message="Each feature must include an id.",
         )
+        action = _required_action(
+            feature.get("action"),
+            path=f"features[{index}].action",
+            issues=issues,
+        )
         description = _required_string(
             feature.get("description"),
             path=f"features[{index}].description",
@@ -659,6 +685,21 @@ def _collect_features(
             issue_code="feature_description_missing",
             issue_message="Each feature must include a description.",
         )
+        supercedes = _coerce_string_list(
+            feature.get("supercedes"),
+            path=f"features[{index}].supercedes",
+            issues=issues,
+        )
+        if "supercedes" in feature and _is_empty_optional_value(
+            feature.get("supercedes")
+        ):
+            issues.append(
+                ImplementationSpecificationValidationIssue(
+                    code="supercedes_empty",
+                    message="Each feature must omit supercedes when it has no ids.",
+                    path=f"features[{index}].supercedes",
+                )
+            )
         requirements = _coerce_sequence(
             feature.get("functional_requirements"),
             path=f"features[{index}].functional_requirements",
@@ -668,7 +709,7 @@ def _collect_features(
                 "functional_requirements must be a list of requirement strings."
             ),
         )
-        if feature_id is None or description is None:
+        if feature_id is None or action is None or description is None:
             continue
 
         if feature_id in feature_ids:
@@ -707,8 +748,17 @@ def _collect_features(
             )
 
         feature_ids.add(feature_id)
+        items.append(
+            _ImplementationSpecificationSectionItem(
+                id=feature_id,
+                action=action,
+                supercedes=supercedes,
+                path=f"features[{index}]",
+                raw=feature,
+            )
+        )
 
-    return feature_ids
+    return feature_ids, items
 
 
 def _collect_decisions(
@@ -716,9 +766,10 @@ def _collect_decisions(
     *,
     issues: list[ImplementationSpecificationValidationIssue],
     used_ids: set[str],
-) -> set[str]:
+) -> tuple[set[str], list[_ImplementationSpecificationSectionItem]]:
     decision_ids: set[str] = set()
     seen_ids: set[str] = set(used_ids)
+    items: list[_ImplementationSpecificationSectionItem] = []
     for index, raw_decision in enumerate(raw_decisions):
         decision = _coerce_mapping(
             raw_decision,
@@ -737,6 +788,11 @@ def _collect_decisions(
             issue_code="decision_id_missing",
             issue_message="Each decision must include an id.",
         )
+        action = _required_action(
+            decision.get("action"),
+            path=f"decisions[{index}].action",
+            issues=issues,
+        )
         _required_string(
             decision.get("description"),
             path=f"decisions[{index}].description",
@@ -744,7 +800,24 @@ def _collect_decisions(
             issue_code="decision_description_missing",
             issue_message="Each decision must include a description.",
         )
+        supercedes = _coerce_string_list(
+            decision.get("supercedes"),
+            path=f"decisions[{index}].supercedes",
+            issues=issues,
+        )
+        if "supercedes" in decision and _is_empty_optional_value(
+            decision.get("supercedes")
+        ):
+            issues.append(
+                ImplementationSpecificationValidationIssue(
+                    code="supercedes_empty",
+                    message="Each decision must omit supercedes when it has no ids.",
+                    path=f"decisions[{index}].supercedes",
+                )
+            )
         if decision_id is None:
+            continue
+        if action is None:
             continue
 
         if decision_id in seen_ids:
@@ -761,8 +834,17 @@ def _collect_decisions(
 
         seen_ids.add(decision_id)
         decision_ids.add(decision_id)
+        items.append(
+            _ImplementationSpecificationSectionItem(
+                id=decision_id,
+                action=action,
+                supercedes=supercedes,
+                path=f"decisions[{index}]",
+                raw=decision,
+            )
+        )
 
-    return decision_ids
+    return decision_ids, items
 
 
 def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:

@@ -33,30 +33,345 @@ files:
     type: added
     span:
       start_line: 1
-      end_line: 133
+      end_line: 170
     summary: Add the implementation spec that frames the platform expansion work.
     rationale: Define the initial implementation scope and keep it aligned with the current architecture graph.
-  - path: docs/implementation/implementation-specification.yaml
-    type: modified
-    span:
-      start_line: 1
-      end_line: 170
-    summary: Add action metadata to every entity and relationship in the implementation spec.
-    rationale: Keep the checked-in implementation spec aligned with the new schema and validation rules.
   - path: src/powdrr_lift/core/implementation_specification.py
     type: modified
     span:
       start_line: 19
-      end_line: 623
-    summary: Require action and optional supercedes fields for implementation entities and relationships.
-    rationale: Enforce the implementation spec schema in both the template generator and validator.
+      end_line: 19
+    summary: Add the allowed implementation item action set.
+    rationale: Keep the implementation validator anchored to the current item-state vocabulary.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 48
+      end_line: 56
+    summary: Add the shared implementation section item record.
+    rationale: Keep entity and relationship validation on the same item shape.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 95
+      end_line: 100
+    summary: Update template instructions for action, supercedes, and relationship shape.
+    rationale: Tell authors how to fill implementation entities and relationships before validation.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 118
+      end_line: 118
+    summary: Add action scaffolding to implementation entities.
+    rationale: Prompt authors to supply the required entity action field.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 122
+      end_line: 122
+    summary: Add action scaffolding to implementation relationships.
+    rationale: Prompt authors to supply the required relationship action field.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 257
+      end_line: 257
+    summary: Route entity validation through the shared section-item collector.
+    rationale: Validate entities with the new action and supercedes rules.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 265
+      end_line: 272
+    summary: Validate entity section items and same-section supersedence.
+    rationale: Keep entity state transitions internally coherent.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 274
+      end_line: 274
+    summary: Keep entity validation tied to collected item ids.
+    rationale: Ensure entity supersedence only targets current entity ids.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 285
+      end_line: 285
+    summary: Route relationship validation through the shared section-item collector.
+    rationale: Validate relationships with the same action and supercedes rules as entities.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 295
+      end_line: 302
+    summary: Validate relationship section items and same-section supersedence.
+    rationale: Keep relationship state transitions internally coherent.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 304
+      end_line: 304
+    summary: Keep relationship validation tied to collected item ids.
+    rationale: Ensure relationship supersedence only targets current relationship ids.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 440
+      end_line: 441
+    summary: Replace the entity-specific collector with a shared section collector.
+    rationale: Reuse one validator path for both entities and relationships.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 443
+      end_line: 443
+    summary: Accept the shared available-id set in the section collector.
+    rationale: Compare both section types against their architecture-defined ids.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 445
+      end_line: 453
+    summary: Parse shared item ids, actions, and supercedes lists.
+    rationale: Capture the fields that the implementation schema now requires.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 428
+      end_line: 429
+    summary: Skip non-mapping architecture ids while collecting available ids.
+    rationale: Keep the architecture summary builder resilient to malformed items.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 455
+      end_line: 456
+    summary: Handle malformed section entries consistently.
+    rationale: Keep invalid implementation items from passing through the validator.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 458
+      end_line: 458
+    summary: Skip malformed section entries before deduplication.
+    rationale: Avoid cascading validation noise from broken mappings.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 461
+      end_line: 475
+    summary: Require ids, actions, and non-empty supercedes lists when present.
+    rationale: Enforce the implementation spec item rules for both sections.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 478
+      end_line: 488
+    summary: Reject duplicate specification ids while collecting section items.
+    rationale: Keep each implementation item unique within the document.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 491
+      end_line: 491
+    summary: Register collected item ids for later supersedence checks.
+    rationale: Retain the set of current ids for same-section references.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 494
+      end_line: 496
+    summary: Record the raw section item for later optional-field validation.
+    rationale: Preserve the original mapping for empty-supercedes checks.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 501
+      end_line: 506
+    summary: Reject implementation items that are not in the architecture spec.
+    rationale: Keep the implementation document aligned to the architecture graph.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 500
+      end_line: 501
+    summary: Continue duplicate and membership checks before accepting a section item.
+    rationale: Preserve the collector's deduplication and architecture membership flow.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 509
+      end_line: 509
+    summary: Keep architecture item messages type-aware.
+    rationale: Make validation output clearer for entities versus relationships.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 511
+      end_line: 512
+    summary: Keep unknown item messages aligned to the selected architecture spec.
+    rationale: Explain why an item id was rejected.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 514
+      end_line: 514
+    summary: Preserve the current item path when emitting validation issues.
+    rationale: Point validation feedback at the exact item field.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 516
+      end_line: 516
+    summary: Continue collecting section items after reporting unknown architecture ids.
+    rationale: Keep the shared collector moving past rejected ids.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 519
+      end_line: 528
+    summary: Build section item records for later supersedence validation.
+    rationale: Reuse the collected item data in a second validation pass.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 530
+      end_line: 530
+    summary: Return both the current ids and the collected section records.
+    rationale: Support later same-section validation over the collected items.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 533
+      end_line: 534
+    summary: Replace the relationship-specific collector with shared supersedence validation.
+    rationale: Use one validation path for both implementation sections.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 536
+      end_line: 536
+    summary: Evaluate supersedence against the ids collected from the same section.
+    rationale: Keep same-section supersedence coherent.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 538
+      end_line: 541
+    summary: Skip items that omit supercedes during the second validation pass.
+    rationale: Treat optional supercedes as omitted when the field is absent.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 543
+      end_line: 543
+    summary: Keep empty optional supercedes values from short-circuiting validation.
+    rationale: Report empty optional values explicitly instead of ignoring them.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 546
+      end_line: 556
+    summary: Validate same-section supercedes references against the collected ids.
+    rationale: Ensure supersedence stays within entities or within relationships.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 559
+      end_line: 581
+    summary: Add required-action validation and the allowed implementation action set.
+    rationale: Enforce the allowed item-state vocabulary.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 583
+      end_line: 586
+    summary: Add coercion for optional supercedes lists.
+    rationale: Preserve same-section ids only when the list is populated.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 589
+      end_line: 628
+    summary: Add empty optional value detection for supercedes fields.
+    rationale: Flag optional supercedes values that are present but empty.
   - path: tests/test_implementation_specification.py
     type: modified
     span:
-      start_line: 1
-      end_line: 233
+      start_line: 74
+      end_line: 75
     summary: Update implementation specification tests for the new action and supercedes rules.
     rationale: Keep validation coverage in sync with the implementation spec schema changes.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 100
+      end_line: 100
+    summary: Add an invalid action case to the implementation validation test.
+    rationale: Ensure the validator rejects unsupported item states.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 102
+      end_line: 103
+    summary: Add an empty supercedes case to the implementation validation test.
+    rationale: Ensure optional supercedes values are omitted when empty.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 107
+      end_line: 107
+    summary: Add the relationship action field to the failing implementation spec fixture.
+    rationale: Keep the invalid fixture aligned with the new schema shape.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 109
+      end_line: 109
+    summary: Add the second relationship action field to the failing implementation spec fixture.
+    rationale: Keep duplicate-id coverage under the new schema.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 139
+      end_line: 140
+    summary: Update the validation expectations for the new implementation spec errors.
+    rationale: Match the new action and supercedes validation behavior.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 156
+      end_line: 156
+    summary: Add entity action metadata to the valid implementation spec fixture.
+    rationale: Keep the success fixture aligned with the new schema.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 158
+      end_line: 158
+    summary: Add the second entity action metadata entry to the valid implementation spec fixture.
+    rationale: Keep the success fixture aligned with the new schema.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 162
+      end_line: 162
+    summary: Add relationship action metadata to the valid implementation spec fixture.
+    rationale: Keep the success fixture aligned with the new schema.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 196
+      end_line: 196
+    summary: Add entity action metadata to the CLI validation fixture.
+    rationale: Keep the CLI fixture aligned with the new schema.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 200
+      end_line: 200
+    summary: Add relationship action metadata to the CLI validation fixture.
+    rationale: Keep the CLI fixture aligned with the new schema.
 entities: []
 entity_relationships: []
 invariants: []

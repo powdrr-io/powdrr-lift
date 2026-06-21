@@ -1,16 +1,3 @@
-# System specification template.
-#
-# Instructions:
-# - Fill in the requirements and approach sections.
-# - Set `id` to a unique identifier for this system description.
-# - Use `state: added` for new items and include a description.
-# - Use `state: removed` for retired items and leave description empty.
-# - Use `state: supercedes` when an item replaces same-section ids.
-# - Keep ids unique across both sections.
-# - Reference only same-section ids in `supercedes`.
-#
-# Optional title:
-# - Set `title` if a human-readable summary is helpful.
 version: 1
 id: "2026-06-20-skill-distribution-system"
 title: "Installable skill set distribution system for coding agents"

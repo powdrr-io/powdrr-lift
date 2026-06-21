@@ -8,10 +8,23 @@ decisions:
 - id: decision-agent-platform-expansion
   summary: Capture the next-stage platform design in a dedicated design doc and implementation spec.
 structured_files:
-- README.md
 - docs/design/agent-platform-expansion.md
 - docs/implementation/implementation-specification.yaml
 files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 15
+    end_line: 21
+  summary: Add the agent platform design section and link it from the README.
+  rationale: Document the new platform expansion alongside the project overview.
+- path: README.md
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Tidy the README wording around the semantic graph planning note.
+  rationale: Keep the closing planning statement aligned with the updated copy.
 - path: src/powdrr_lift/change_log_parser/parse_change_log.py
   type: modified
   span:

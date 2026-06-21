@@ -621,9 +621,6 @@ def _is_changelog_artifact_path(path: str) -> bool:
 
 def _is_structured_document_path(path: str) -> bool:
     normalized_path = path.strip()
-    if normalized_path == "README.md":
-        return True
-
     if not normalized_path.startswith("docs/"):
         return False
 

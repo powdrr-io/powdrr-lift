@@ -65,8 +65,15 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "docs" / "design").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "design" / "agent-platform-expansion.md").write_text(
+        "# Platform expansion\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/design/agent-platform-expansion.md")
+    _git(repo_root, "commit", "-m", "Add structured design doc")
     (repo_root / "README.md").write_text(
-        "initial\n\nUpdated for the structured file validation test.\n",
+        "Updated for the structured file validation test.\n",
         encoding="utf-8",
     )
     _git(repo_root, "add", "README.md")
@@ -85,9 +92,16 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         summary: Introduce version 2 of the changelog schema.
 
     structured_files:
-      - README.md
+      - docs/design/agent-platform-expansion.md
 
     files:
+      - path: README.md
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Update the README for the review workflow metadata test.
+        rationale: Keep the README change in the regular file section.
       - path: src/app.py
         type: modified
         span:
@@ -173,13 +187,15 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     assert report.issues == []
     assert report.expected_change_files == [
         "README.md",
+        "docs/design/agent-platform-expansion.md",
         "src/app.py",
         "tests/test_app.py",
     ]
     assert report.proposed_change_files == [
+        "README.md",
         "src/app.py",
         "tests/test_app.py",
-        "README.md",
+        "docs/design/agent-platform-expansion.md",
     ]
 
 
@@ -499,13 +515,13 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
     structured_files: []
 
     files:
-      - path: README.md
+      - path: docs/design/agent-platform-expansion.md
         type: modified
         span:
           start_line: 1
           end_line: 1
         summary: Add the review skill wiring.
-        rationale: Keep the README change structured.
+        rationale: Keep the document change structured.
 
     entities:
       - id: AppService

@@ -58,9 +58,12 @@ def render_architecture_specification_template(
         '#   approach ids it relies on, for example "req-single-command-install".',
         "# - Every entity and every entity relationship rationale must cite at",
         "#   least one current requirement or approach id in quotes.",
+        "# - Every invariant and guidance rationale must cite at least one",
+        "#   current requirement or approach id in quotes.",
         "# - Use `related.entities` and `related.entity_relationships` in",
         "#   invariants and guidance whenever they refer to a specific entity",
-        "#   or relationship.",
+        "#   or relationship, and keep at least one current entity or",
+        "#   relationship listed in each item's related block.",
         "# - Keep every entity mentioned in a relationship, invariant, or",
         "#   guidance item present in the `entities` section.",
         "#",
@@ -509,6 +512,7 @@ def _collect_related_references(
         if related_mapping is None:
             continue
 
+        valid_related_reference_count = 0
         for related_index, related_entity in enumerate(
             _coerce_sequence(
                 related_mapping.get("entities"),
@@ -541,6 +545,8 @@ def _collect_related_references(
                         ),
                     )
                 )
+            else:
+                valid_related_reference_count += 1
 
         for related_index, related_relationship in enumerate(
             _coerce_sequence(
@@ -578,6 +584,20 @@ def _collect_related_references(
                         ),
                     )
                 )
+            else:
+                valid_related_reference_count += 1
+
+        if valid_related_reference_count == 0:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="missing_related_reference",
+                    message=(
+                        f"Each {section_label} must reference at least one "
+                        "current entity or entity relationship in related."
+                    ),
+                    path=f"{section_name}[{index}].related",
+                )
+            )
 
 
 def _validate_rationale_references(

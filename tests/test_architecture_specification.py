@@ -249,6 +249,59 @@ def test_validate_architecture_specification_requires_quoted_rationale_ids(
     ]
 
 
+def test_validate_architecture_specification_requires_related_references(
+    tmp_path: Path,
+) -> None:
+    _write_system_specification(tmp_path)
+
+    proposed_spec = """
+    version: 1
+    id: 2026-06-19
+    title: Demo architecture
+
+    entities:
+      - id: Alpha
+        type: Service
+        rationale: Alpha satisfies "req-shared-validation".
+
+    entity_relationships:
+      - id: rel-1
+        source: Alpha
+        target: Alpha
+        relationship: depends_on
+        description: Alpha depends on itself for the demo.
+        rationale: This relationship supports "req-cross-platform-cli-mcp".
+
+    invariants:
+      - id: inv-1
+        description: Keep Alpha stable.
+        rationale: Keep Alpha stable around "req-shared-validation".
+        related:
+          entities: []
+          entity_relationships: []
+
+    guidance:
+      - id: guide-1
+        description: Mention Alpha in release notes.
+        rationale: Keep the team aligned with "app-validation-gates".
+        related:
+          entities: []
+          entity_relationships: []
+    """
+
+    report = build_architecture_specification_validation_report(
+        proposed_spec,
+        entity_types=["Service", "Skill"],
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "missing_related_reference",
+        "missing_related_reference",
+    ]
+
+
 def test_validate_architecture_specification_reports_success_for_valid_spec(
     tmp_path: Path,
 ) -> None:

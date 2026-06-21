@@ -1,0 +1,44 @@
+version: 2
+change_id: 35
+title: Document the agent platform expansion
+intent:
+  problem: The repo needed a formal design note and implementation-spec artifact for the next-stage agent platform.
+  goal: Capture the platform expansion so the specification families, synthesis workflows, review flows, and context endpoints are documented in-repo.
+decisions:
+  - id: decision-agent-platform-expansion
+    summary: Capture the next-stage platform design in a dedicated design doc and implementation spec.
+files:
+  - path: README.md
+    type: modified
+    span:
+      start_line: 15
+      end_line: 21
+    summary: Add a design section that points readers to the platform expansion design doc.
+    rationale: Keep the repository landing page aligned with the documented platform direction.
+  - path: README.md
+    type: modified
+    span:
+      start_line: 64
+      end_line: 64
+    summary: Preserve the README trailing newline after the design section addition.
+    rationale: Keep the README formatting consistent after appending the design pointer.
+  - path: docs/design/agent-platform-expansion.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 119
+    summary: Add a design document for the next-stage agent platform.
+    rationale: Capture the requested platform scope, document families, skill surface, and context graph design in one place.
+  - path: docs/implementation/implementation-specification.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 133
+    summary: Add the implementation spec that frames the platform expansion work.
+    rationale: Define the initial implementation scope and keep it aligned with the current architecture graph.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

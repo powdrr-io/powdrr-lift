@@ -36,6 +36,27 @@ files:
       end_line: 133
     summary: Add the implementation spec that frames the platform expansion work.
     rationale: Define the initial implementation scope and keep it aligned with the current architecture graph.
+  - path: docs/implementation/implementation-specification.yaml
+    type: modified
+    span:
+      start_line: 1
+      end_line: 170
+    summary: Add action metadata to every entity and relationship in the implementation spec.
+    rationale: Keep the checked-in implementation spec aligned with the new schema and validation rules.
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 19
+      end_line: 623
+    summary: Require action and optional supercedes fields for implementation entities and relationships.
+    rationale: Enforce the implementation spec schema in both the template generator and validator.
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 1
+      end_line: 233
+    summary: Update implementation specification tests for the new action and supercedes rules.
+    rationale: Keep validation coverage in sync with the implementation spec schema changes.
 entities: []
 entity_relationships: []
 invariants: []

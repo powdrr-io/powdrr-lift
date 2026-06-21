@@ -71,6 +71,8 @@ def test_create_implementation_specification_template_writes_default_file(
     assert "# - Alpha" in template_text
     assert "# - rel-1" in template_text
     assert 'architecture_id: "2026-06-19"' in template_text
+    assert "    action: null" in template_text
+    assert "    supercedes: []" not in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert rendered_template["version"] == 1
@@ -95,11 +97,16 @@ def test_validate_implementation_specification_reports_errors(
 
     entities:
       - id: Alpha
+        action: added
       - id: Ghost
+        action: maybe
+        supercedes: []
 
     entity_relationships:
       - id: rel-1
+        action: removed
       - id: rel-missing
+        action: added
 
     features:
       - id: feature-a
@@ -129,7 +136,8 @@ def test_validate_implementation_specification_reports_errors(
     assert report.available_relationship_ids == ["rel-1"]
     assert {issue.code for issue in report.issues} == {
         "architecture_id_mismatch",
-        "unknown_architecture_entity",
+        "invalid_action",
+        "supercedes_empty",
         "unknown_architecture_relationship",
         "duplicate_specification_id",
     }
@@ -145,10 +153,13 @@ def test_validate_implementation_specification_reports_success_for_valid_spec(
 
     entities:
       - id: Alpha
+        action: added
       - id: Beta
+        action: removed
 
     entity_relationships:
       - id: rel-1
+        action: added
 
     features:
       - id: feature-a
@@ -182,9 +193,11 @@ def test_cli_validate_implementation_specification_reports_yaml(
 
         entities:
           - id: Alpha
+            action: added
 
         entity_relationships:
           - id: rel-1
+            action: added
 
         features:
           - id: feature-a

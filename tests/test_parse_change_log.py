@@ -4,6 +4,7 @@ from powdrr_lift.change_log_parser import parse_change_log
 def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
     change_log = parse_change_log(
         """
+        schema: https://powdrr.io/schemas/changelog-v1
         version: 1
         change_id: CHG-2026-001
         title: Introduce JWT refresh token flow
@@ -61,6 +62,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
 def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> None:
     change_log = parse_change_log(
         """
+        schema: https://powdrr.io/schema/changelog-v2
         version: 2
         change_id: CHG-2026-002
         title: Expand review workflow metadata

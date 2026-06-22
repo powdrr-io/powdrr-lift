@@ -66,6 +66,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Add acceptance criteria, expected tests, expected outcomes,",
         "#   non-goals, and risks as concrete lists with `id` and",
         "#   `description`.",
+        "# - Keep every detail id globally unique across those five sections.",
         "#",
         "# Current feature ids:",
         *[
@@ -181,6 +182,8 @@ def build_pr_specification_validation_report(
                 )
             )
 
+    seen_detail_ids: set[str] = set()
+
     proposed_pr_id = _required_string(
         raw_spec.get("id"),
         path="id",
@@ -196,6 +199,8 @@ def build_pr_specification_validation_report(
                 path="id",
             )
         )
+    if proposed_pr_id is not None:
+        seen_detail_ids.add(proposed_pr_id)
 
     feature_ids = _collect_feature_ids(
         _coerce_sequence(
@@ -256,6 +261,7 @@ def build_pr_specification_validation_report(
                 issue_message=(f"{section_name} must be a list of detail items."),
             ),
             section_name=section_name,
+            seen_ids=seen_detail_ids,
             issues=issues,
         )
 
@@ -383,10 +389,13 @@ def _collect_detail_items(
     raw_items: Sequence[object],
     *,
     section_name: str,
+    seen_ids: set[str],
     issues: list[PRSpecificationValidationIssue],
 ) -> set[str]:
     item_ids: set[str] = set()
+    saw_any_item = False
     for index, raw_item in enumerate(raw_items):
+        saw_any_item = True
         item = _coerce_mapping(
             raw_item,
             path=f"{section_name}[{index}]",
@@ -421,22 +430,23 @@ def _collect_detail_items(
         if item_id is None:
             continue
 
-        if item_id in item_ids:
+        if item_id in seen_ids:
             issues.append(
                 PRSpecificationValidationIssue(
-                    code=f"duplicate_{section_name}_id",
+                    code="duplicate_detail_id",
                     message=(
-                        f"{section_name.replace('_', ' ').capitalize()} id "
-                        f"{item_id!r} appears more than once."
+                        f"Detail id {item_id!r} appears more than once across "
+                        "the proposed PR specification."
                     ),
                     path=f"{section_name}[{index}].id",
                 )
             )
             continue
 
+        seen_ids.add(item_id)
         item_ids.add(item_id)
 
-    if not item_ids:
+    if not saw_any_item:
         issues.append(
             PRSpecificationValidationIssue(
                 code=f"no_{section_name}_defined",

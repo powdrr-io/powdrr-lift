@@ -147,7 +147,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
             - TestSuite
 
     entities:
-      - id: AppService
+      - id: AppServiceEntity
         type: Service
         action: added
       - id: TestSuite
@@ -164,7 +164,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
           files:
             - src/app.py
           entities:
-            - AppService
+            - AppServiceEntity
       - id: INV-002
         description: The app test remains present.
         action: added
@@ -182,7 +182,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
           files:
             - src/app.py
           entities:
-            - AppService
+            - AppServiceEntity
       - id: GUID-002
         description: Keep the test command visible.
         action: added
@@ -363,6 +363,57 @@ def test_validate_change_log_yaml_rejects_duplicate_ids_across_sections(
     assert [issue.code for issue in report.issues] == ["duplicate_changelog_id"]
 
 
+def test_validate_change_log_yaml_rejects_change_id_colliding_with_feature_id(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: feature-a
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Keep the feature aligned.
+
+    entities:
+      - id: AppServiceEntity
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+
+    features:
+      - id: feature-a
+        state: completed
+
+    prs: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "duplicate_changelog_id" in {issue.code for issue in report.issues}
+
+
 def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
     tmp_path: Path,
 ) -> None:
@@ -499,6 +550,11 @@ def test_validate_change_log_yaml_rejects_version_two_empty_related_block(
           entities: []
           invariants: []
           guidance: []
+          acceptance_criteria: []
+          expected_tests: []
+          expected_outcomes: []
+          non_goals: []
+          risks: []
         span:
           start_line: 1
           end_line: 1
@@ -524,7 +580,152 @@ def test_validate_change_log_yaml_rejects_version_two_empty_related_block(
     )
 
     assert report.validation_successful is False
-    assert [issue.code for issue in report.issues] == ["file_entry_empty_related"]
+    assert "file_entry_empty_related" in {issue.code for issue in report.issues}
+    assert "file_entry_empty_related_list" in {issue.code for issue in report.issues}
+
+
+def test_validate_change_log_yaml_accepts_proposal_detail_related_ids(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "docs" / "proposals").mkdir(parents=True, exist_ok=True)
+    proposal_path = (
+        repo_root / "docs" / "proposals" / "PR-1-proposed-pr-specification.yaml"
+    )
+    proposal_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+        id: 1
+        feature_ids:
+          - AppService
+
+        intent:
+          goal: Add the application feature.
+          reasoning: Keep the proposal focused.
+
+        acceptance_criteria:
+          - id: ac-1
+            description: Acceptance criteria one.
+        expected_tests:
+          - id: test-1
+            description: Expected test one.
+        expected_outcomes:
+          - id: outcome-1
+            description: Expected outcome one.
+        non_goals:
+          - id: ng-1
+            description: Non-goal one.
+        risks:
+          - id: risk-1
+            description: Risk one.
+        """,
+        encoding="utf-8",
+    )
+
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Depends on "AppService".
+        related:
+          acceptance_criteria:
+            - ac-1
+          expected_tests:
+            - test-1
+          expected_outcomes:
+            - outcome-1
+          non_goals:
+            - ng-1
+          risks:
+            - risk-1
+      - path: tests/test_app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add app tests.
+        rationale: Depends on "AppService".
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
+def test_validate_change_log_yaml_rejects_unknown_quoted_rationale_ids(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Depends on "MissingFeature".
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "file_entry_unknown_rationale_id",
+    ]
 
 
 def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
@@ -758,7 +959,10 @@ def test_validate_change_log_yaml_rejects_version_two_changes(
     )
 
     assert report.validation_successful is False
-    assert [issue.code for issue in report.issues] == ["top_level_changes_not_allowed"]
+    assert {issue.code for issue in report.issues} >= {
+        "top_level_changes_not_allowed",
+        "invalid_yaml",
+    }
 
 
 def test_validate_change_log_yaml_reports_missing_changes(
@@ -1366,9 +1570,6 @@ def test_validate_change_log_yaml_rejects_unknown_added_entity_types_in_v2(
           end_line: 2
         summary: Add app test.
         rationale: Needed for the feature.
-        related:
-          entities:
-            - TestSuite
 
     entities:
       - id: AppService

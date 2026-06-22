@@ -51,9 +51,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "guidance:" in template_text
     assert "features:" in template_text
     assert "prs:" in template_text
-    assert "    related:" in template_text
-    assert "Remove this block entirely if it does not point" in template_text
-    assert "to anything." in template_text
+    assert "    related:" not in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
 
@@ -171,6 +169,10 @@ def test_create_change_log_template_populates_full_related_sections(
     template_text = output_path.read_text(encoding="utf-8")
     assert "Review each prefilled `related` section" in template_text
     assert "structured_files:" in template_text
+    assert "    related:" in template_text
+    assert "      entities:" in template_text
+    assert "      invariants:" not in template_text
+    assert "      guidance:" not in template_text
 
     change_log = parse_change_log(template_text)
     assert change_log.structured_files == []
@@ -185,6 +187,11 @@ def test_create_change_log_template_populates_full_related_sections(
     assert change_log.file_changes[1].related.entities == ["AppService"]
     assert change_log.file_changes[0].related.invariants == []
     assert change_log.file_changes[0].related.guidance == []
+    assert change_log.file_changes[0].related.acceptance_criteria == []
+    assert change_log.file_changes[0].related.expected_tests == []
+    assert change_log.file_changes[0].related.expected_outcomes == []
+    assert change_log.file_changes[0].related.non_goals == []
+    assert change_log.file_changes[0].related.risks == []
     assert change_log.feature_changes == []
     assert change_log.pr_changes == []
 

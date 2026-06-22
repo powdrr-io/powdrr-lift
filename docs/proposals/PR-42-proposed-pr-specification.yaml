@@ -1,0 +1,27 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: 42
+feature_ids:
+  - feature-review-workflows
+  - feature-context-graph
+intent:
+  goal: Add review workflows and graph-backed context endpoints that can inspect changes across code, features, decisions, requirements, and entities.
+  reasoning: The review surface needs more than a file diff; it needs relationship-aware context so review-system, review-architecture, review-implementation, and review-pr can surface inconsistencies, weak links, and missing constraints with enough provenance for an agent to fix them.
+acceptance_criteria:
+  - id: ac-review-diff
+    description: Review workflows produce a diff that describes the target change set.
+  - id: ac-context-lookup
+    description: Review output includes relationship-aware context for code, features, decisions, requirements, and entities.
+expected_tests:
+  - id: test-review-diff
+    description: Add or update tests that verify the review workflows emit a useful diff and context payload.
+  - id: test-context-graph
+    description: Add or update tests that confirm the context endpoints answer questions using the indexed relationship graph.
+expected_outcomes:
+  - id: outcome-review-signal
+    description: Reviewers get actionable signals about inconsistencies, weak links, and missing constraints.
+non_goals:
+  - id: ng-autofix
+    description: Do not automatically edit the reviewed document in this PR.
+risks:
+  - id: risk-overcoverage
+    description: Broad context queries may surface too much information unless the response shape is kept focused.

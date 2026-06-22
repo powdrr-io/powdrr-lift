@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: 41
+feature_ids:
+  - feature-synthesis-workflows
+intent:
+  goal: Add synthesis workflows for system, architecture, and implementation documents that derive start state, new state, and diff from a parent branch and a PR.
+  reasoning: Once the document families exist, synthesis can turn actual branch changes into coherent current-state and diff documents that review and downstream automation can consume without manually re-deriving state.
+acceptance_criteria:
+  - id: ac-synthesis-endpoints
+    description: Each synthesis workflow can derive a start state, a PR state, and a diff from the same source material.
+  - id: ac-diff-application
+    description: The diff format can be applied to a parent current state to recreate the new current state.
+expected_tests:
+  - id: test-synthesis-reporting
+    description: Add or update tests that verify the synthesis commands report the parent state, new state, and diff consistently.
+  - id: test-diff-roundtrip
+    description: Add or update tests that apply a synthesized diff and confirm the result matches the synthesized new state.
+expected_outcomes:
+  - id: outcome-synthesis-flow
+    description: Agents can derive documents from branch state instead of hand-reconstructing the changes.
+non_goals:
+  - id: ng-review
+    description: Do not add review findings or review-specific heuristics in this PR.
+risks:
+  - id: risk-diff-drift
+    description: If parent-state extraction and diff generation diverge, the synthesis output may stop replaying cleanly.

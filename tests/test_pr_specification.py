@@ -47,7 +47,6 @@ def _write_existing_pr_specification(repo_root: Path) -> Path:
         intent:
           goal: Existing PR spec.
           reasoning: Make sure ids are unique.
-        files: []
         """,
         encoding="utf-8",
     )
@@ -75,6 +74,7 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert "# PR specification template." in template_text
     assert "# - feature-a" in template_text
     assert "# - feature-b" in template_text
+    assert "Delete these instructions when you are done." in template_text
     assert "id: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
@@ -82,7 +82,11 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         "id",
         "feature_ids",
         "intent",
-        "files",
+        "acceptance_criteria",
+        "expected_tests",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
     ]
 
 
@@ -102,8 +106,21 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
-    files:
-      - src/missing.py
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: Risk one.
     """
 
     report = build_pr_specification_validation_report(
@@ -119,7 +136,6 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
         "duplicate_proposed_pr_id",
         "duplicate_feature_id",
         "unknown_feature_id",
-        "unknown_referenced_file",
     }
 
 
@@ -139,7 +155,21 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
-    files: []
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: Risk one.
     """
 
     report = build_pr_specification_validation_report(
@@ -149,6 +179,105 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
 
     assert report.validation_successful is True
     assert report.issues == []
+
+
+def test_validate_pr_specification_rejects_template_boilerplate(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposed_spec = """
+    # PR specification template.
+    #
+    # Instructions:
+    # - Create one template per proposed PR.
+    # - Set `id` to a globally unique proposed PR id.
+    # - Reference one or more current feature ids from the codebase state
+    #   listed below.
+    # - Fill in `intent.goal` and `intent.reasoning`.
+    # - Delete these instructions when you are done.
+    # - Add acceptance criteria, expected tests, expected outcomes,
+    #   non-goals, and risks as concrete lists with `id` and
+    #   `description`.
+    #
+    # Current feature ids:
+    # - feature-a (feature, docs/implementation/implementation-specification.yaml)
+    id: pr-789
+    feature_ids:
+      - feature-a
+
+    intent:
+      goal: Add a new capability.
+      reasoning: Keep the repo aligned.
+
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: Risk one.
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "template_boilerplate_not_removed",
+    }
+
+
+def test_validate_pr_specification_rejects_missing_detail_description(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: pr-790
+
+    feature_ids:
+      - feature-a
+
+    intent:
+      goal: Add a new capability.
+      reasoning: Keep the repo aligned.
+
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: ""
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "risks_description_missing",
+    }
 
 
 def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
@@ -166,7 +295,21 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
           goal: Add a new capability.
           reasoning: Keep the repo aligned.
 
-        files: []
+        acceptance_criteria:
+          - id: ac-1
+            description: Acceptance criteria one.
+        expected_tests:
+          - id: test-1
+            description: Expected test one.
+        expected_outcomes:
+          - id: outcome-1
+            description: Expected outcome one.
+        non_goals:
+          - id: ng-1
+            description: Non-goal one.
+        risks:
+          - id: risk-1
+            description: Risk one.
         """,
         encoding="utf-8",
     )

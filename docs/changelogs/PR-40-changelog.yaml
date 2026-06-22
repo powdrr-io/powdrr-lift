@@ -1,0 +1,333 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 40
+title: Add implement-pr workflow and proposed PR search endpoints
+intent:
+  problem: The repository could not yet locate and inspect proposed PRs before implementing them,
+    and the existing specify-prs guidance still described an older, files-based proposal flow.
+  goal: Add an installable implement-pr skill plus fuzzy proposed-PR search and inspection
+    endpoints, then align the existing proposal workflow instructions with the current proposed-PR
+    format.
+decisions:
+  - id: implement-pr-workflow
+    summary: Add a dedicated implement-pr skill that searches, validates, inspects, and then
+      implements a proposed PR before changelog preparation.
+  - id: proposed-pr-search-endpoints
+    summary: Expose fuzzy proposed-PR search and direct inspection through the CLI and MCP
+      surfaces.
+structured_files:
+  - docs/architecture/architecture-specification.yaml
+  - docs/implementation/implementation-specification.yaml
+files:
+  - path: skills/implement-pr/SKILL.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 41
+    summary: Add the implement-pr skill workflow instructions.
+    rationale: The repo needs an installable skill that tells an agent how to locate, validate,
+      inspect, implement, and re-check a proposed PR.
+  - path: skills/implement-pr/agents/openai.yaml
+    type: added
+    span:
+      start_line: 1
+      end_line: 6
+    summary: Add the implement-pr skill metadata.
+    rationale: The installable skill needs UI metadata so it can be surfaced to agents.
+  - path: skills/specify-prs/SKILL.md
+    type: modified
+    span:
+      start_line: 23
+      end_line: 26
+    summary: Update proposed-PR guidance to use the current detail sections.
+    rationale: The proposed-PR workflow now uses acceptance criteria, expected tests, expected
+      outcomes, non-goals, and risks instead of a files section.
+  - path: skills/specify-prs/agents/openai.yaml
+    type: modified
+    span:
+      start_line: 4
+      end_line: 4
+    summary: Update the specify-prs skill prompt to describe the current proposal sections.
+    rationale: The agent-facing prompt needs to mention the current proposed-PR structure.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 54
+      end_line: 55
+    summary: Export the proposed-PR search helper types.
+    rationale: The new CLI and MCP surfaces need the proposed-PR helper types available at the
+      package root.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 60
+      end_line: 60
+    summary: Export the proposed-PR specification path helper.
+    rationale: The show workflow needs a canonical helper for locating proposal files.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 118
+      end_line: 118
+    summary: Export the proposed-PR search report renderer.
+    rationale: The CLI and tests need the search report renderer from the package root.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 124
+      end_line: 125
+    summary: Export the proposed-PR search and show helpers.
+    rationale: The top-level package should expose the new proposed-PR lookup functions.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 147
+      end_line: 148
+    summary: Extend lazy export lookup for proposed-PR search helpers.
+    rationale: The package root must lazily expose the search and show helpers alongside the
+      existing PR specification exports.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 153
+      end_line: 153
+    summary: Include the proposed-PR path helper in the lazy export lookup.
+    rationale: The show workflow needs the canonical proposal-path helper available through
+      `powdrr_lift`.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 166
+      end_line: 166
+    summary: Include the proposed-PR search renderer in the lazy export lookup.
+    rationale: The CLI and MCP surfaces render search output through the shared core API.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 171
+      end_line: 172
+    summary: Include the proposed-PR search helpers in the lazy export lookup.
+    rationale: The top-level package should expose the same proposed-PR helpers as the core
+      module.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 193
+      end_line: 194
+    summary: Import the proposed-PR search result types from the core module.
+    rationale: The package root needs the core search result types for direct export.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 200
+      end_line: 200
+    summary: Import the proposed-PR path helper from the core module.
+    rationale: The package root needs the core proposal-path helper for direct export.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 202
+      end_line: 204
+    summary: Import the proposed-PR rendering and lookup helpers from the core module.
+    rationale: The package root needs the shared search and show helpers for direct export.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 236
+      end_line: 237
+    summary: Export the proposed-PR search result types from the package map.
+    rationale: The top-level package should expose the same search result types as the core
+      module.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 250
+      end_line: 250
+    summary: Export the proposed-PR path helper from the package map.
+    rationale: The package root should expose the canonical proposal-path helper.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 283
+      end_line: 283
+    summary: Export the proposed-PR search renderer from the package map.
+    rationale: The package root should expose the shared search report renderer.
+  - path: src/powdrr_lift/__init__.py
+    type: modified
+    span:
+      start_line: 292
+      end_line: 293
+    summary: Export the proposed-PR search and show helpers from the package map.
+    rationale: The package root should expose the same proposed-PR lookup helpers as the core
+      module.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 38
+      end_line: 38
+    summary: Import the proposed-PR search renderer into the CLI.
+    rationale: The search command needs the shared YAML report renderer.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 40
+      end_line: 41
+    summary: Import the proposed-PR search helpers into the CLI.
+    rationale: The new CLI commands need the proposed-PR search and show helpers.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 420
+      end_line: 458
+    summary: Add proposed-PR search and show CLI commands.
+    rationale: Agents need a CLI surface for fuzzy search and direct inspection of proposed PRs.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 815
+      end_line: 840
+    summary: Add CLI handlers for proposed-PR search and show commands.
+    rationale: The new CLI commands need execution paths that print the search report and the
+      selected proposed PR specification.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 97
+      end_line: 98
+    summary: Export the proposed-PR search helper types from the core package.
+    rationale: The CLI and MCP surfaces import the proposed-PR helper types through the core
+      package.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 104
+      end_line: 104
+    summary: Export the proposed-PR path helper from the core package.
+    rationale: The show workflow needs the proposal-path helper from the core package.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 106
+      end_line: 108
+    summary: Export the proposed-PR search renderer and helpers from the core package.
+    rationale: The CLI and MCP surfaces render their proposed-PR output through the shared core
+      API.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 156
+      end_line: 157
+    summary: Expose the proposed-PR search result types from the core package.
+    rationale: Tests and callers need the proposed-PR search result types available through
+      `powdrr_lift.core`.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 191
+      end_line: 191
+    summary: Expose the proposed-PR path helper from the core package.
+    rationale: The show workflow needs the proposal-path helper from the core package.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 242
+      end_line: 242
+    summary: Export the proposed-PR search renderer from the core package.
+    rationale: The CLI and MCP surfaces render their proposed-PR output through the shared core
+      API.
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    span:
+      start_line: 254
+      end_line: 255
+    summary: Finish exporting the proposed-PR lookup helpers from the core package.
+    rationale: The core package should expose the same proposed-PR lookup helpers as the root
+      package.
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 5
+      end_line: 5
+    summary: Add the sequence-matcher import for proposed-PR search scoring.
+    rationale: The search helper uses fuzzy scoring to rank proposed PR specs.
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 42
+      end_line: 70
+    summary: Add proposed-PR search result types.
+    rationale: The new lookup endpoints need a structured search result model.
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 150
+      end_line: 207
+    summary: Add the proposed-PR show and search helpers.
+    rationale: The CLI and MCP surfaces need helpers that can locate and return a proposal by
+      number or fuzzy query.
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 451
+      end_line: 625
+    summary: Load and score proposed-PR documents for fuzzy search.
+    rationale: The search endpoint must rank ingested proposed-PR specs against the query text.
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 889
+      end_line: 909
+    summary: Render proposed-PR search results as YAML.
+    rationale: The CLI and MCP surfaces return the fuzzy search report as machine-readable YAML.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 34
+      end_line: 34
+    summary: Import the proposed-PR search renderer into the MCP server.
+    rationale: The MCP search tool needs the shared YAML report renderer.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 36
+      end_line: 37
+    summary: Import the proposed-PR search helpers into the MCP server.
+    rationale: The MCP server needs the shared proposed-PR lookup helpers.
+  - path: src/powdrr_lift/mcp_server.py
+    type: modified
+    span:
+      start_line: 288
+      end_line: 309
+    summary: Add proposed-PR search and show MCP tools.
+    rationale: Agents need MCP tools that can fuzzy-search and inspect proposed PR specs.
+  - path: tests/test_mcp_server.py
+    type: modified
+    span:
+      start_line: 35
+      end_line: 36
+    summary: Cover the new proposed-PR MCP tools in the server registration test.
+    rationale: The MCP server test suite should prove the new tools are registered.
+  - path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 11
+      end_line: 15
+    summary: Import the proposed-PR lookup helpers for testing.
+    rationale: The PR specification tests need direct access to the new search and show helpers.
+  - path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 60
+      end_line: 105
+    summary: Add a proposed-PR fixture writer for the search and show tests.
+    rationale: The new tests need locally generated proposal specs to search and inspect.
+  - path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 384
+      end_line: 476
+    summary: Cover proposed-PR search, show, and CLI behavior.
+    rationale: The new lookup endpoints should be validated at both the core and CLI layers.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

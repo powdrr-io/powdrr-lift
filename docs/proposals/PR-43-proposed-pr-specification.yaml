@@ -1,3 +1,4 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
 id: 43
 feature_ids:
   - feature-unified-packaging

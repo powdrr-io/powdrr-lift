@@ -1,3 +1,4 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
 id: 41
 feature_ids:
   - feature-synthesis-workflows

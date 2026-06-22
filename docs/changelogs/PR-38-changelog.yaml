@@ -1,0 +1,581 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 38
+title: Expand changelog related references
+intent:
+  problem: Changelog related sections needed to point at proposed-PR detail items and support quoted ids from current project state.
+  goal: Allow file entries to reference proposed-PR detail sections, validate empty related lists away, and accept quoted ids from the current graph.
+decisions:
+- id: changelog-related-references
+  summary: Allow optional proposed-PR detail references and quoted rationale ids in changelog related sections.
+structured_files:
+- docs/proposals/PR-40-proposed-pr-specification.yaml
+- docs/proposals/PR-41-proposed-pr-specification.yaml
+- docs/proposals/PR-42-proposed-pr-specification.yaml
+- docs/proposals/PR-43-proposed-pr-specification.yaml
+files:
+- path: docs/blog/making-coding-agents-operate-like-professionals.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 241
+  summary: Add the agent-platform design note.
+  rationale: This document captures the system-level direction that motivated the branch.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 39
+  summary: Extend the related-section parser for proposed-PR detail lists.
+  rationale: The parser needs to preserve the new related detail lists in the changelog model.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 382
+    end_line: 386
+  summary: Parse the proposed-PR detail lists in related sections.
+  rationale: This hunk adds the new related list fields to the parsed changelog model.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 29
+  summary: Expand template preview data for proposed-PR detail lists.
+  rationale: The template preview needs to carry the new optional related reference lists.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 120
+  summary: Document that related references are optional.
+  rationale: The template instructions need to tell authors when to omit empty related blocks.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 148
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 157
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 160
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 165
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 246
+    end_line: 281
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 456
+    end_line: 458
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 463
+    end_line: 469
+  summary: Render optional related lists in the changelog template.
+  rationale: This hunk updates the rendered template body so authors can fill the new related lists and quoted ids correctly.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 180
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 216
+    end_line: 271
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 449
+    end_line: 449
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 458
+    end_line: 458
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 460
+    end_line: 460
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 463
+    end_line: 463
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 465
+    end_line: 465
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 468
+    end_line: 468
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 470
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 472
+    end_line: 473
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 488
+    end_line: 488
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 497
+    end_line: 497
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 499
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 502
+    end_line: 502
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 504
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 507
+    end_line: 507
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 509
+    end_line: 509
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 511
+    end_line: 512
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 623
+    end_line: 630
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 661
+    end_line: 668
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 822
+    end_line: 837
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 895
+    end_line: 901
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1008
+    end_line: 1039
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1041
+    end_line: 1105
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1112
+    end_line: 1112
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1415
+    end_line: 1634
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1644
+    end_line: 1644
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1648
+    end_line: 1652
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1692
+    end_line: 1700
+  summary: Update changelog validation for related-reference support.
+  rationale: This hunk strengthens changelog validation for optional related references and quoted ids.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2254
+    end_line: 2263
+  summary: Index the proposed-PR detail lists in related sections.
+  rationale: The code index needs to retain the new related detail references so they can be queried later.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2357
+    end_line: 2446
+  summary: Index the proposed-PR detail lists in related sections.
+  rationale: The code index needs to retain the new related detail references so they can be queried later.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2529
+    end_line: 2623
+  summary: Index the proposed-PR detail lists in related sections.
+  rationale: The code index needs to retain the new related detail references so they can be queried later.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2708
+    end_line: 2797
+  summary: Index the proposed-PR detail lists in related sections.
+  rationale: The code index needs to retain the new related detail references so they can be queried later.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 69
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 99
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 161
+    end_line: 175
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 186
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 203
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 264
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 266
+    end_line: 266
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 460
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 420
+  summary: Update the proposed PR template and validation rules.
+  rationale: The proposed PR workflow now uses detail sections instead of files and requires globally unique detail ids.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 54
+  summary: Update template tests for optional related references.
+  rationale: The template tests need to cover the new optional related lists and the boilerplate-free instructions.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 175
+  summary: Update template tests for optional related references.
+  rationale: The template tests need to cover the new optional related lists and the boilerplate-free instructions.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 194
+  summary: Update template tests for optional related references.
+  rationale: The template tests need to cover the new optional related lists and the boilerplate-free instructions.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 167
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 185
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 416
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 553
+    end_line: 557
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 583
+    end_line: 728
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 962
+    end_line: 965
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1369
+    end_line: 1371
+  summary: Expand validation tests for related-reference support.
+  rationale: The validation tests need to cover the new proposal-detail related references, quoted ids, and empty-related rejection.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 350
+    end_line: 359
+  summary: Update changelog index tests for the new related categories.
+  rationale: The index tests need to verify the new related detail lists are captured and persisted.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 437
+    end_line: 447
+  summary: Update changelog index tests for the new related categories.
+  rationale: The index tests need to verify the new related detail lists are captured and persisted.
+- path: tests/test_changelog_index.py
+  type: modified
+  span:
+    start_line: 509
+    end_line: 513
+  summary: Update changelog index tests for the new related categories.
+  rationale: The index tests need to verify the new related detail lists are captured and persisted.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 100
+  summary: Update parser tests for the expanded related sections.
+  rationale: The parser tests need to verify the new related detail lists round trip through the changelog model.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 182
+  summary: Update parser tests for the expanded related sections.
+  rationale: The parser tests need to verify the new related detail lists round trip through the changelog model.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 89
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 123
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 139
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 173
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 283
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 299
+    end_line: 313
+  summary: Update proposed PR spec tests for the richer template.
+  rationale: The proposed PR spec tests need to cover the new detail sections and the boilerplate-removal rule.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

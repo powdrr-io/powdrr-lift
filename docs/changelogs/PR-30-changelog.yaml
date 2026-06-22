@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schema/changelog-v2
-version: 2
 change_id: 30
 title: Add specify-prs skill and PR specification endpoints
 intent:

@@ -123,9 +123,15 @@ def parse_change_log(yaml_content: str) -> ChangeLog:
 
     data = dict(loaded_content)
     version = _normalize_version(data.get("version"))
+    if version is None:
+        version = _infer_version_from_schema(data.get("schema"))
     if version == 1:
+        if data.get("version") is None:
+            data["version"] = version
         return _parse_change_log_v1(data)
     if version == 2:
+        if data.get("version") is None:
+            data["version"] = version
         return _parse_change_log_v2(data)
 
     raise ValueError("Unknown change log version")
@@ -451,6 +457,18 @@ def _coerce_optional_str(raw_value: object | None) -> str | None:
 
     value = str(raw_value).strip()
     return value or None
+
+
+def _infer_version_from_schema(raw_schema: object | None) -> int | None:
+    if not isinstance(raw_schema, str):
+        return None
+
+    if raw_schema.endswith("changelog-v1"):
+        return 1
+    if raw_schema.endswith("changelog-v2"):
+        return 2
+
+    return None
 
 
 def _coerce_int(raw_value: object | None) -> int | None:

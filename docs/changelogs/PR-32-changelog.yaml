@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schema/changelog-v2
-version: 2
 change_id: 32
 title: Add specify-system skill and system specification endpoints
 intent:

@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schemas/changelog-v1
-version: 1
 change_id: 15
 title: Tighten entity lifecycle validation
 intent:

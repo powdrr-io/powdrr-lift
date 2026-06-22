@@ -91,7 +91,6 @@ def _render_template_body(
 
     lines = [
         "schema: https://powdrr.io/schema/changelog-v2",
-        "version: 2",
         "# Use the PR number here.",
         "change_id: null",
         "# Brief title for the pull request.",
@@ -425,7 +424,7 @@ def _render_header(
         "#   that differ from the default branch.\n"
         "# - Add or remove `files` items as needed so every meaningful file change\n"
         "#   is represented exactly once.\n"
-        "# - Keep `version: 2` and the changelog schema unless the schema changes.\n"
+        "# - Keep the changelog schema unless the schema changes.\n"
         "# - Put `path`, `type`, `span`, `summary`, `rationale`, and optional\n"
         "#   `related` on each file entry.\n"
         "# - Review each prefilled `related` section before you fill in the rest\n"

@@ -143,6 +143,8 @@ def build_validation_report(
         )
 
     version = _normalize_version(raw_change_log.get("version"))
+    if version is None:
+        version = _infer_version_from_schema(raw_change_log.get("schema"))
 
     if version == 2:
         if "changes" in raw_change_log:
@@ -803,6 +805,18 @@ def _normalize_version(raw_version: object | None) -> int | str | None:
         return int(raw_version)
 
     return cast(int | str | None, raw_version)
+
+
+def _infer_version_from_schema(raw_schema: object | None) -> int | None:
+    if not isinstance(raw_schema, str):
+        return None
+
+    if raw_schema.endswith("changelog-v1"):
+        return 1
+    if raw_schema.endswith("changelog-v2"):
+        return 2
+
+    return None
 
 
 def _contains_nonempty_value(raw_value: object | None) -> bool:

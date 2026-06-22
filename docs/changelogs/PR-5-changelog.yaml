@@ -9,14 +9,13 @@
 #   that differ from the default branch.
 # - Add or remove `changes` items as needed so every meaningful change is
 #   represented exactly once.
-# - Keep `version: 1` unless the schema changes.
+# - Keep the changelog schema unless the schema changes.
 #
 # Diff summary:
 #   M README.md
 #   A skills/prepare-pr-changelog/SKILL.md
 #   A skills/prepare-pr-changelog/agents/openai.yaml
 schema: https://powdrr.io/schemas/changelog-v1
-version: 1
 # Use the PR number here.
 change_id: 5
 # Brief title for the pull request.

@@ -114,7 +114,6 @@ def render_implementation_specification_template(
             f"# - {relationship_id}"
             for relationship_id in architecture_summary.relationship_ids
         ],
-        "version: 1",
         "title: null",
         f"architecture_id: {json.dumps(architecture_id)}",
         "entities:",

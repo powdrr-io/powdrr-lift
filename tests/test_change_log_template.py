@@ -41,7 +41,6 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "branch `feature/change-log`" in template_text
     assert "Compared against default branch `main`." in template_text
     assert "schema: https://powdrr.io/schema/changelog-v2" in template_text
-    assert "version: 2" in template_text
     assert "change_id: null" in template_text
     assert "decisions:" in template_text
     assert "files:" in template_text

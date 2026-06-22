@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schemas/system-specification-v1
-version: 1
 id: "2026-06-20-skill-distribution-system"
 title: "Installable skill set distribution system for coding agents"
 requirements:

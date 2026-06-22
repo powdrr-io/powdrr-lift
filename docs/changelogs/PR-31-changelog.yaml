@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schema/changelog-v2
-version: 2
 change_id: 31
 title: Add feature and PR state sections to changelogs
 intent:

@@ -66,7 +66,6 @@ def render_system_specification_template(*, title: str | None = None) -> str:
         "#",
         "# Optional title:",
         "# - Set `title` if a human-readable summary is helpful.",
-        "version: 1",
         "id: null",
         "title: null",
         "requirements:",

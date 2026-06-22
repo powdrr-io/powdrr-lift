@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schemas/changelog-v1
-version: 1
 change_id: 18
 title: Add changelog validation example to review skill
 intent:

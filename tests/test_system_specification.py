@@ -45,9 +45,7 @@ def test_create_system_specification_template_writes_default_file(
     assert "supercedes: []" not in template_text
 
     rendered_template = yaml.safe_load(template_text)
-    assert rendered_template["version"] == 1
     assert [section for section in rendered_template] == [
-        "version",
         "id",
         "title",
         "requirements",

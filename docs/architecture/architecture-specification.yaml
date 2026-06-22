@@ -30,6 +30,10 @@ entities:
     type: Skill
     summary: Define proposed PR specs from feature references and intent.
     rationale: Tie implementation work back to feature-level goals under "req-upgrade-path" and "app-validation-gates".
+  - id: implement-pr
+    type: Skill
+    summary: Implement changes from an identified proposed PR specification.
+    rationale: Turn validated proposed PR intent into code changes under "req-upgrade-path" and "app-validation-gates".
   - id: specify-system
     type: Skill
     summary: Define system specs for the installable skill platform.
@@ -144,6 +148,12 @@ entity_relationships:
     target: specify-prs
     relationship: contains
     description: The distributable package includes the specify-prs skill.
+    rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
+  - id: skill-package-contains-implement-pr
+    source: skill-package
+    target: implement-pr
+    relationship: contains
+    description: The distributable package includes the implement-pr skill.
     rationale: Keep the packaged skill set complete for "req-canonical-skill-bundle".
   - id: skill-package-contains-specify-system
     source: skill-package

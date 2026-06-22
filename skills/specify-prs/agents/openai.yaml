@@ -1,7 +1,7 @@
 interface:
   display_name: "Specify PRs"
   short_description: "Specify and validate proposed PRs"
-  default_prompt: "Use $specify-prs to generate a proposed PR template from the current codebase state, fill it with current feature ids, validate it, and fix any issues until it passes."
+  default_prompt: "Use $specify-prs to generate a proposed PR template from the current codebase state, fill it with current feature ids plus the required intent and detail sections, validate it, and fix any issues until it passes."
 
 policy:
   allow_implicit_invocation: true

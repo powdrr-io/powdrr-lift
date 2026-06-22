@@ -94,12 +94,18 @@ from powdrr_lift.core.pr_analysis import (
     resolve_repo_root,
 )
 from powdrr_lift.core.pr_specification import (
+    ProposedPRSearchReport,
+    ProposedPRSearchResult,
     PRSpecificationValidationIssue,
     PRSpecificationValidationReport,
     build_pr_specification_validation_report,
     create_pr_specification_template,
     pr_specification_default_output_path,
+    proposed_pr_specification_path,
     render_pr_specification_template,
+    render_proposed_pr_search_report,
+    search_proposed_pr_specifications,
+    show_proposed_pr_specification,
     validate_pr_specification_yaml,
 )
 from powdrr_lift.core.schemas import (
@@ -147,6 +153,8 @@ __all__ = [
     "SystemSpecificationValidationReport",
     "PRSpecificationValidationIssue",
     "PRSpecificationValidationReport",
+    "ProposedPRSearchReport",
+    "ProposedPRSearchResult",
     "CodebaseStateDecision",
     "CodebaseStateEntity",
     "CodebaseStateIntent",
@@ -180,6 +188,7 @@ __all__ = [
     "implementation_specification_default_output_path",
     "system_specification_default_output_path",
     "pr_specification_default_output_path",
+    "proposed_pr_specification_path",
     "ProvenanceRecord",
     "RelationshipOccurrence",
     "RepoTreeNode",
@@ -230,6 +239,7 @@ __all__ = [
     "render_implementation_specification_template",
     "render_system_specification_template",
     "render_pr_specification_template",
+    "render_proposed_pr_search_report",
     "resolve_default_branch",
     "resolve_repo_root",
     "refresh_code_index",
@@ -241,6 +251,8 @@ __all__ = [
     "validate_pr_specification_yaml",
     "render_current_decisions_report",
     "render_invariants_report",
+    "search_proposed_pr_specifications",
+    "show_proposed_pr_specification",
 ]
 
 

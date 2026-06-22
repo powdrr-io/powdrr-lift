@@ -51,10 +51,13 @@ __all__ = [
     "SystemSpecificationValidationReport",
     "PRSpecificationValidationIssue",
     "PRSpecificationValidationReport",
+    "ProposedPRSearchReport",
+    "ProposedPRSearchResult",
     "architecture_specification_default_output_path",
     "implementation_specification_default_output_path",
     "system_specification_default_output_path",
     "pr_specification_default_output_path",
+    "proposed_pr_specification_path",
     "build_architecture_specification_validation_report",
     "build_implementation_specification_validation_report",
     "build_system_specification_validation_report",
@@ -112,11 +115,14 @@ __all__ = [
     "render_implementation_specification_template",
     "render_system_specification_template",
     "render_pr_specification_template",
+    "render_proposed_pr_search_report",
     "render_invariants_report",
     "validate_architecture_specification_yaml",
     "validate_implementation_specification_yaml",
     "validate_system_specification_yaml",
     "validate_pr_specification_yaml",
+    "search_proposed_pr_specifications",
+    "show_proposed_pr_specification",
     "validate_change_log_yaml",
     "ValidationIssue",
     "ValidationReport",
@@ -138,10 +144,13 @@ def __getattr__(name: str) -> Any:
         "SystemSpecificationValidationReport",
         "PRSpecificationValidationIssue",
         "PRSpecificationValidationReport",
+        "ProposedPRSearchReport",
+        "ProposedPRSearchResult",
         "architecture_specification_default_output_path",
         "implementation_specification_default_output_path",
         "system_specification_default_output_path",
         "pr_specification_default_output_path",
+        "proposed_pr_specification_path",
         "build_architecture_specification_validation_report",
         "build_implementation_specification_validation_report",
         "build_system_specification_validation_report",
@@ -154,10 +163,13 @@ def __getattr__(name: str) -> Any:
         "render_implementation_specification_template",
         "render_system_specification_template",
         "render_pr_specification_template",
+        "render_proposed_pr_search_report",
         "validate_architecture_specification_yaml",
         "validate_implementation_specification_yaml",
         "validate_system_specification_yaml",
         "validate_pr_specification_yaml",
+        "search_proposed_pr_specifications",
+        "show_proposed_pr_specification",
     }:
         from powdrr_lift.core.architecture_specification import (
             ArchitectureSpecificationValidationIssue,
@@ -178,12 +190,18 @@ def __getattr__(name: str) -> Any:
             validate_implementation_specification_yaml,
         )
         from powdrr_lift.core.pr_specification import (
+            ProposedPRSearchReport,
+            ProposedPRSearchResult,
             PRSpecificationValidationIssue,
             PRSpecificationValidationReport,
             build_pr_specification_validation_report,
             create_pr_specification_template,
             pr_specification_default_output_path,
+            proposed_pr_specification_path,
             render_pr_specification_template,
+            render_proposed_pr_search_report,
+            search_proposed_pr_specifications,
+            show_proposed_pr_specification,
             validate_pr_specification_yaml,
         )
         from powdrr_lift.core.system_specification import (
@@ -215,6 +233,8 @@ def __getattr__(name: str) -> Any:
             ),
             "PRSpecificationValidationIssue": PRSpecificationValidationIssue,
             "PRSpecificationValidationReport": PRSpecificationValidationReport,
+            "ProposedPRSearchReport": ProposedPRSearchReport,
+            "ProposedPRSearchResult": ProposedPRSearchResult,
             "architecture_specification_default_output_path": (
                 architecture_specification_default_output_path
             ),
@@ -227,6 +247,7 @@ def __getattr__(name: str) -> Any:
             "pr_specification_default_output_path": (
                 pr_specification_default_output_path
             ),
+            "proposed_pr_specification_path": proposed_pr_specification_path,
             "build_architecture_specification_validation_report": (
                 build_architecture_specification_validation_report
             ),
@@ -259,6 +280,7 @@ def __getattr__(name: str) -> Any:
                 render_system_specification_template
             ),
             "render_pr_specification_template": render_pr_specification_template,
+            "render_proposed_pr_search_report": render_proposed_pr_search_report,
             "validate_architecture_specification_yaml": (
                 validate_architecture_specification_yaml
             ),
@@ -267,6 +289,8 @@ def __getattr__(name: str) -> Any:
             ),
             "validate_system_specification_yaml": (validate_system_specification_yaml),
             "validate_pr_specification_yaml": validate_pr_specification_yaml,
+            "search_proposed_pr_specifications": search_proposed_pr_specifications,
+            "show_proposed_pr_specification": show_proposed_pr_specification,
         }[name]
 
     if name == "build_changelog_index":

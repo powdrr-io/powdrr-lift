@@ -62,8 +62,6 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
         "# - Fill in `intent.goal` and `intent.reasoning`.",
-        "# - List only repository-relative file paths in `files` when updates are",
-        "#   needed.",
         "# - Delete these instructions when you are done.",
         "# - Add acceptance criteria, expected tests, expected outcomes,",
         "#   non-goals, and risks as concrete lists with `id` and",
@@ -83,7 +81,6 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "intent:",
         "  goal: null",
         "  reasoning: null",
-        "files: []",
         "acceptance_criteria:",
         "  - id: null",
         "    description: null",
@@ -261,18 +258,6 @@ def build_pr_specification_validation_report(
             section_name=section_name,
             issues=issues,
         )
-
-    _collect_file_paths(
-        _coerce_sequence(
-            raw_spec.get("files"),
-            path="files",
-            issues=issues,
-            issue_code="invalid_files_section",
-            issue_message="files must be a list of repository-relative paths.",
-        ),
-        repo_root_path=repo_root_path,
-        issues=issues,
-    )
 
     return PRSpecificationValidationReport(
         validation_successful=not issues,
@@ -507,61 +492,6 @@ def _collect_feature_ids(
         feature_ids.add(feature_id)
 
     return feature_ids
-
-
-def _collect_file_paths(
-    raw_files: Sequence[object],
-    *,
-    repo_root_path: Path,
-    issues: list[PRSpecificationValidationIssue],
-) -> set[str]:
-    file_paths: set[str] = set()
-    for index, raw_file in enumerate(raw_files):
-        path_value: object
-        if isinstance(raw_file, Mapping):
-            path_value = raw_file.get("path")
-        else:
-            path_value = raw_file
-
-        file_path = _required_string(
-            path_value,
-            path=f"files[{index}]",
-            issues=issues,
-            issue_code="file_path_missing",
-            issue_message="Each file entry must be a path string.",
-        )
-        if file_path is None:
-            continue
-
-        if file_path in file_paths:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="duplicate_file_path",
-                    message=f"File path {file_path!r} appears more than once.",
-                    path=f"files[{index}]",
-                )
-            )
-            continue
-
-        resolved_file_path = Path(file_path)
-        if not resolved_file_path.is_absolute():
-            resolved_file_path = repo_root_path / resolved_file_path
-        if not resolved_file_path.exists():
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="unknown_referenced_file",
-                    message=(
-                        f"Referenced file {file_path!r} does not exist in the "
-                        "repository."
-                    ),
-                    path=f"files[{index}]",
-                )
-            )
-            continue
-
-        file_paths.add(file_path)
-
-    return file_paths
 
 
 def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:

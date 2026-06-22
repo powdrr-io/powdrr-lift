@@ -4,7 +4,6 @@ feature_ids:
 intent:
   goal: Package the skill set, CLI, and MCP into a single installable distribution that works across macOS, Windows, and Linux and covers the supported coding agents.
   reasoning: The platform only becomes reusable when the same authoritative payload can be installed cleanly with one command per platform and used consistently by Claude Code, Codex, Aider, Cursor, Antigravity, and OpenCode.
-files: []
 acceptance_criteria:
   - id: ac-install-path
     description: The package installs with a single command on macOS, Windows, and Linux.

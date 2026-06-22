@@ -5,7 +5,6 @@ feature_ids:
 intent:
   goal: Add the document families and authoring workflows that make system, architecture, implementation, and proposed-PR specs first-class current-state and diff artifacts.
   reasoning: This PR establishes the schema and template-validation foundation for specify-system, specify-architecture, specify-implementation, specify-prs, create-pr-changelog, and implement-pr so later synthesis and review workflows can build on coherent documents instead of ad hoc YAML.
-files: []
 acceptance_criteria:
   - id: ac-doc-families
     description: The platform has current-state, diff, and issues document families for system, architecture, implementation, and proposed-PR specs.

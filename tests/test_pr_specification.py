@@ -47,7 +47,6 @@ def _write_existing_pr_specification(repo_root: Path) -> Path:
         intent:
           goal: Existing PR spec.
           reasoning: Make sure ids are unique.
-        files: []
         """,
         encoding="utf-8",
     )
@@ -83,7 +82,6 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         "id",
         "feature_ids",
         "intent",
-        "files",
         "acceptance_criteria",
         "expected_tests",
         "expected_outcomes",
@@ -108,8 +106,6 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
-    files:
-      - src/missing.py
     acceptance_criteria:
       - id: ac-1
         description: Acceptance criteria one.
@@ -140,7 +136,6 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
         "duplicate_proposed_pr_id",
         "duplicate_feature_id",
         "unknown_feature_id",
-        "unknown_referenced_file",
     }
 
 
@@ -160,7 +155,6 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
-    files: []
     acceptance_criteria:
       - id: ac-1
         description: Acceptance criteria one.
@@ -200,8 +194,6 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     # - Reference one or more current feature ids from the codebase state
     #   listed below.
     # - Fill in `intent.goal` and `intent.reasoning`.
-    # - List only repository-relative file paths in `files` when updates are
-    #   needed.
     # - Delete these instructions when you are done.
     # - Add acceptance criteria, expected tests, expected outcomes,
     #   non-goals, and risks as concrete lists with `id` and
@@ -217,7 +209,6 @@ def test_validate_pr_specification_rejects_template_boilerplate(
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
-    files: []
     acceptance_criteria:
       - id: ac-1
         description: Acceptance criteria one.
@@ -261,7 +252,6 @@ def test_validate_pr_specification_rejects_missing_detail_description(
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
-    files: []
     acceptance_criteria:
       - id: ac-1
         description: Acceptance criteria one.
@@ -305,7 +295,6 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
           goal: Add a new capability.
           reasoning: Keep the repo aligned.
 
-        files: []
         acceptance_criteria:
           - id: ac-1
             description: Acceptance criteria one.

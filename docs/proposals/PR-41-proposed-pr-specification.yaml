@@ -4,7 +4,6 @@ feature_ids:
 intent:
   goal: Add synthesis workflows for system, architecture, and implementation documents that derive start state, new state, and diff from a parent branch and a PR.
   reasoning: Once the document families exist, synthesis can turn actual branch changes into coherent current-state and diff documents that review and downstream automation can consume without manually re-deriving state.
-files: []
 acceptance_criteria:
   - id: ac-synthesis-endpoints
     description: Each synthesis workflow can derive a start state, a PR state, and a diff from the same source material.

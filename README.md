@@ -32,6 +32,29 @@ the code lands.
 In practice, that means less ambiguity, less wasted work, and more confidence that the
 next change is still pointing in the right direction.
 
+## How Are We Different?
+
+`powdrr-lift` is intentionally more opinionated than a generic prompt-and-patch workflow.
+That opinionatedness is the point: stronger guardrails, stronger validation, and stronger
+coherency statements.
+
+**vs. OpenSpec** - OpenSpec is a useful spec-first pattern for AI coding, but `powdrr-lift`
+goes further by making the structure more granular and more machine-checkable. That gives
+humans and agents higher-confidence validation, clearer lineage, and stronger context across
+the full hierarchy of change.
+
+**vs. Spec Kit** - Spec Kit is thorough, but it can feel heavyweight. `powdrr-lift` keeps the
+workflow structured without forcing a rigid phase-gate process. The repo is opinionated, but
+the artifacts stay directly tied to the change and are designed for continuous iteration.
+
+**vs. Kiro** - Kiro is powerful, but it is tied to a specific IDE and a narrower model/tooling
+environment. `powdrr-lift` is repo-native and assistant-agnostic, so you can use it with the
+tools and workflows you already have.
+
+**vs. nothing** - AI coding without a structured spec layer means vague prompts, weak traceability,
+and a lot of accidental drift. `powdrr-lift` replaces that with coherent artifacts, validation,
+and review surfaces that keep the work directionally aligned.
+
 ## Design
 
 The next-stage platform design is captured in

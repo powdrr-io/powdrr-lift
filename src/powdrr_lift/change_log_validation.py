@@ -517,6 +517,11 @@ def build_validation_report(
 
         for structured_file_path in proposed_structured_files:
             if structured_file_path in expected_structured_file_paths:
+                _validate_v2_structured_file_contents(
+                    issues=issues,
+                    repo_root=repo_root_path,
+                    structured_file_path=structured_file_path,
+                )
                 continue
 
             issues.append(
@@ -870,7 +875,7 @@ def _validate_v2_file_sections(
                     message=(
                         f"Structured file {structured_file_index} points to "
                         f"{structured_file_path!r}, which is not a structured "
-                        "document path."
+                        "YAML document path."
                     ),
                     path=structured_file_path,
                 )
@@ -918,7 +923,7 @@ def _validate_v2_file_sections(
                     code="file_entry_structured_path_not_allowed",
                     message=(
                         f"File change {file_change_index} points to a "
-                        "structured document path. Move it to structured_files "
+                        "structured YAML document path. Move it to structured_files "
                         "and remove its span metadata."
                     ),
                     path=file_path,
@@ -939,6 +944,72 @@ def _validate_v2_file_sections(
                     path=file_path,
                 )
             )
+
+
+def _validate_v2_structured_file_contents(
+    *,
+    issues: list[ValidationIssue],
+    repo_root: Path,
+    structured_file_path: str,
+) -> None:
+    structured_file = repo_root / structured_file_path
+    if not structured_file.exists():
+        issues.append(
+            ValidationIssue(
+                code="structured_file_missing",
+                message=(
+                    f"Structured file {structured_file_path} does not exist in the "
+                    "repository."
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    try:
+        raw_structured_content = yaml.safe_load(
+            structured_file.read_text(encoding="utf-8")
+        )
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            ValidationIssue(
+                code="structured_file_invalid_yaml",
+                message=(
+                    f"Structured file {structured_file_path} could not be parsed "
+                    f"as YAML: {exc}"
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    if not isinstance(raw_structured_content, Mapping):
+        issues.append(
+            ValidationIssue(
+                code="structured_file_invalid_yaml",
+                message=(
+                    f"Structured file {structured_file_path} must decode to a YAML "
+                    "mapping."
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    schema_value = raw_structured_content.get("schema")
+    if not isinstance(schema_value, str) or not schema_value.startswith(
+        "https://powdrr.io/schemas"
+    ):
+        issues.append(
+            ValidationIssue(
+                code="structured_file_invalid_schema",
+                message=(
+                    f"Structured file {structured_file_path} must define a schema "
+                    "value that starts with https://powdrr.io/schemas."
+                ),
+                path=structured_file_path,
+            )
+        )
 
 
 def _validate_v2_file_change(
@@ -964,7 +1035,7 @@ def _validate_v2_file_change(
                 code="file_entry_structured_path_not_allowed",
                 message=(
                     f"File change {file_change_index} points to a structured "
-                    "document path. Move it to structured_files and remove its "
+                    "YAML document path. Move it to structured_files and remove its "
                     "span metadata."
                 ),
                 path=file_change.path,

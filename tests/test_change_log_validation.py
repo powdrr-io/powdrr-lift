@@ -72,6 +72,25 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     )
     _git(repo_root, "add", "docs/design/agent-platform-expansion.md")
     _git(repo_root, "commit", "-m", "Add structured design doc")
+    (repo_root / "docs" / "implementation").mkdir(parents=True, exist_ok=True)
+    implementation_spec_path = (
+        repo_root / "docs" / "implementation" / "implementation-specification.yaml"
+    )
+    implementation_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/implementation-specification-v1
+        version: 1
+        title: "Agent platform expansion implementation"
+        architecture_id: "2026-05-22-skill-distribution-architecture"
+        entities: []
+        entity_relationships: []
+        features: []
+        decisions: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/implementation/implementation-specification.yaml")
+    _git(repo_root, "commit", "-m", "Add structured implementation spec")
     (repo_root / "README.md").write_text(
         "Updated for the structured file validation test.\n",
         encoding="utf-8",
@@ -92,7 +111,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         summary: Introduce version 2 of the changelog schema.
 
     structured_files:
-      - docs/design/agent-platform-expansion.md
+      - docs/implementation/implementation-specification.yaml
 
     files:
       - path: README.md
@@ -102,6 +121,13 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
           end_line: 1
         summary: Update the README for the review workflow metadata test.
         rationale: Keep the README change in the regular file section.
+      - path: docs/design/agent-platform-expansion.md
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the agent platform design note.
+        rationale: Keep the design note as a regular Markdown file entry.
       - path: src/app.py
         type: modified
         span:
@@ -188,14 +214,16 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     assert report.expected_change_files == [
         "README.md",
         "docs/design/agent-platform-expansion.md",
+        "docs/implementation/implementation-specification.yaml",
         "src/app.py",
         "tests/test_app.py",
     ]
     assert report.proposed_change_files == [
         "README.md",
+        "docs/design/agent-platform-expansion.md",
         "src/app.py",
         "tests/test_app.py",
-        "docs/design/agent-platform-expansion.md",
+        "docs/implementation/implementation-specification.yaml",
     ]
 
 
@@ -503,6 +531,25 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "docs" / "implementation").mkdir(parents=True, exist_ok=True)
+    implementation_spec_path = (
+        repo_root / "docs" / "implementation" / "implementation-specification.yaml"
+    )
+    implementation_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/implementation-specification-v1
+        version: 1
+        title: "Agent platform expansion implementation"
+        architecture_id: "2026-05-22-skill-distribution-architecture"
+        entities: []
+        entity_relationships: []
+        features: []
+        decisions: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/implementation/implementation-specification.yaml")
+    _git(repo_root, "commit", "-m", "Add structured implementation spec")
     proposed_yaml = """
     version: 2
     change_id: 7
@@ -515,7 +562,7 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
     structured_files: []
 
     files:
-      - path: docs/design/agent-platform-expansion.md
+      - path: docs/implementation/implementation-specification.yaml
         type: modified
         span:
           start_line: 1
@@ -545,6 +592,127 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
     assert [issue.code for issue in report.issues] == [
         "file_entry_structured_path_not_allowed",
     ]
+
+
+def test_validate_change_log_yaml_rejects_non_yaml_structured_file_entry(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files:
+      - README.md
+
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+      - path: tests/test_app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add the review workflow test.
+        rationale: Keep the second hunk focused on the test harness.
+
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "structured_file_entry_not_structured_document" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "docs" / "implementation").mkdir(parents=True, exist_ok=True)
+    implementation_spec_path = (
+        repo_root / "docs" / "implementation" / "implementation-specification.yaml"
+    )
+    implementation_spec_path.write_text(
+        """
+        schema: https://example.com/not-powdrr
+        version: 1
+        title: "Agent platform expansion implementation"
+        architecture_id: "2026-05-22-skill-distribution-architecture"
+        entities: []
+        entity_relationships: []
+        features: []
+        decisions: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/implementation/implementation-specification.yaml")
+    _git(repo_root, "commit", "-m", "Add structured implementation spec")
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files:
+      - docs/implementation/implementation-specification.yaml
+
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+      - path: tests/test_app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add the review workflow test.
+        rationale: Keep the second hunk focused on the test harness.
+
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "structured_file_invalid_schema" in {issue.code for issue in report.issues}
 
 
 def test_validate_change_log_yaml_rejects_version_two_changes(

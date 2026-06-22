@@ -8,7 +8,6 @@ decisions:
 - id: decision-agent-platform-expansion
   summary: Capture the next-stage platform design in a dedicated design doc and implementation spec.
 structured_files:
-- docs/design/agent-platform-expansion.md
 - docs/implementation/implementation-specification.yaml
 files:
 - path: README.md
@@ -25,6 +24,13 @@ files:
     end_line: 64
   summary: Tidy the README wording around the semantic graph planning note.
   rationale: Keep the closing planning statement aligned with the updated copy.
+- path: docs/design/agent-platform-expansion.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 119
+  summary: Add the agent platform design note.
+  rationale: Capture the platform expansion alongside the implementation spec.
 - path: src/powdrr_lift/change_log_parser/parse_change_log.py
   type: modified
   span:
@@ -99,7 +105,7 @@ files:
   type: modified
   span:
     start_line: 622
-    end_line: 632
+    end_line: 629
   summary: Add a structured-document path classifier for changelog generation.
   rationale: Distinguish document-format files from span-based file entries.
 - path: src/powdrr_lift/change_log_validation.py
@@ -1185,27 +1191,48 @@ files:
   span:
     start_line: 176
     end_line: 176
-  summary: Assert that parsed templates preserve the README structured file path.
-  rationale: Confirm that document-format file paths survive parsing.
+  summary: Assert that parsed templates keep structured_files empty when no document changes exist.
+  rationale: Keep the template parser aligned with the new section.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Assert that the README file remains in the parsed file changes.
+  rationale: Confirm that README stays a regular file change rather than a structured entry.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 184
+  summary: Assert that parsed file types remain added in the template fixture.
+  rationale: Confirm that the parsed file metadata preserves the added file types.
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 68
-    end_line: 73
-  summary: Update the version 2 validation fixture to include a README structured file.
+    end_line: 80
+  summary: Add a README change, a Markdown design note, and a structured implementation spec to the version 2 success fixture.
   rationale: Exercise the new split between structured_files and files.
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 87
-    end_line: 89
+    start_line: 94
+    end_line: 96
   summary: Add the structured_files section to the version 2 success fixture.
   rationale: Keep the validation fixture aligned with the new format.
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 174
-    end_line: 183
+    start_line: 98
+    end_line: 104
+  summary: Add the README file entry to the version 2 success fixture.
+  rationale: Keep README in the regular file section rather than structured_files.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 199
   summary: Update the validation report expectations for structured files.
   rationale: Confirm the report includes both structured and regular changed paths.
   related:
@@ -1216,8 +1243,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 199
-    end_line: 199
+    start_line: 215
+    end_line: 215
   summary: Add structured_files to the invalid feature/pr state fixture.
   rationale: Keep the version 2 fixture in the new changelog format.
   related:
@@ -1229,8 +1256,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 264
-    end_line: 264
+    start_line: 280
+    end_line: 280
   summary: Add structured_files to the duplicate-id fixture.
   rationale: Keep the duplicate-id test aligned with the new format.
   related:
@@ -1241,8 +1268,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 335
-    end_line: 335
+    start_line: 351
+    end_line: 351
   summary: Add structured_files to the top-level entities fixture.
   rationale: Keep the entity-acceptance fixture in the new changelog format.
   related:
@@ -1254,8 +1281,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 400
-    end_line: 400
+    start_line: 416
+    end_line: 416
   summary: Add structured_files to the file-entities-on-file-entry fixture.
   rationale: Keep the file-entry validation fixture in the new changelog format.
   related:
@@ -1267,15 +1294,15 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 449
-    end_line: 449
+    start_line: 465
+    end_line: 465
   summary: Add structured_files to the empty-related-block fixture.
   rationale: Keep the empty-related-block validation aligned with the new format.
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 486
-    end_line: 533
+    start_line: 502
+    end_line: 549
   summary: Add a rejection test for structured document paths in the files section.
   rationale: Ensure structured document paths are moved into structured_files.
   related:
@@ -1287,15 +1314,15 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 547
-    end_line: 548
+    start_line: 563
+    end_line: 564
   summary: Add structured_files and files sections to the version 2 top-level changes rejection fixture.
   rationale: Keep the top-level changes test isolated to the intended error.
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 1166
-    end_line: 1166
+    start_line: 1182
+    end_line: 1182
   summary: Add structured_files to the unknown-added-entity-types fixture.
   rationale: Keep the entity taxonomy fixture aligned with the current format.
   related:

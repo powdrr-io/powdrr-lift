@@ -107,8 +107,10 @@ def _render_template_body(
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Structured document files go in `structured_files` as paths only.",
-        "# Use `files` for code and other non-structured file entries.",
+        "# Structured YAML files go in `structured_files` as paths only.",
+        "# Structured YAML files must include a `schema` key that starts with",
+        "# `https://powdrr.io/schemas`.",
+        "# Use `files` for code, Markdown, and other non-structured file entries.",
     ]
 
     if structured_file_paths:
@@ -624,7 +626,7 @@ def _is_structured_document_path(path: str) -> bool:
     if not normalized_path.startswith("docs/"):
         return False
 
-    return normalized_path.endswith((".md", ".markdown", ".yaml", ".yml"))
+    return normalized_path.endswith((".yaml", ".yml"))
 
 
 def _normalize_change_type(status: str) -> str:

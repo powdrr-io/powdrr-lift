@@ -64,6 +64,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Fill in `intent.goal` and `intent.reasoning`.",
         "# - List only repository-relative file paths in `files` when updates are",
         "#   needed.",
+        "# - Delete these instructions when you are done.",
         "#",
         "# Current feature ids:",
         *[
@@ -140,6 +141,11 @@ def build_pr_specification_validation_report(
             known_pr_ids=known_pr_ids,
             issues=issues,
         )
+
+    _validate_template_boilerplate_removed(
+        proposed_pr_specification_yaml,
+        issues=issues,
+    )
 
     for section_name in ("id", "feature_ids", "intent"):
         if section_name not in raw_spec:
@@ -315,6 +321,31 @@ def _load_existing_pr_ids(repo_root: Path) -> list[str]:
         pr_ids.append(proposed_pr_id)
 
     return pr_ids
+
+
+def _validate_template_boilerplate_removed(
+    proposed_pr_specification_yaml: str,
+    *,
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    boilerplate_markers = (
+        "# PR specification template.",
+        "# Current feature ids:",
+        "Delete these instructions when you are done.",
+    )
+    for marker in boilerplate_markers:
+        if marker in proposed_pr_specification_yaml:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="template_boilerplate_not_removed",
+                    message=(
+                        "Remove the template instructions before validating the "
+                        "proposed PR specification."
+                    ),
+                    path=None,
+                )
+            )
+            return
 
 
 def _collect_feature_ids(

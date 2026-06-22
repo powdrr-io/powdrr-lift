@@ -75,6 +75,7 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert "# PR specification template." in template_text
     assert "# - feature-a" in template_text
     assert "# - feature-b" in template_text
+    assert "Delete these instructions when you are done." in template_text
     assert "id: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
@@ -149,6 +150,47 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
 
     assert report.validation_successful is True
     assert report.issues == []
+
+
+def test_validate_pr_specification_rejects_template_boilerplate(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposed_spec = """
+    # PR specification template.
+    #
+    # Instructions:
+    # - Create one template per proposed PR.
+    # - Set `id` to a globally unique proposed PR id.
+    # - Reference one or more current feature ids from the codebase state
+    #   listed below.
+    # - Fill in `intent.goal` and `intent.reasoning`.
+    # - List only repository-relative file paths in `files` when updates are
+    #   needed.
+    # - Delete these instructions when you are done.
+    #
+    # Current feature ids:
+    # - feature-a (feature, docs/implementation/implementation-specification.yaml)
+    id: pr-789
+    feature_ids:
+      - feature-a
+
+    intent:
+      goal: Add a new capability.
+      reasoning: Keep the repo aligned.
+
+    files: []
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "template_boilerplate_not_removed",
+    }
 
 
 def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:

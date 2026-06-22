@@ -175,15 +175,9 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
         "ReviewSkill",
         "ChangelogValidation",
     ]
-    assert (change_log.file_changes or [])[0].related.acceptance_criteria == [
-        "AC-001"
-    ]
-    assert (change_log.file_changes or [])[0].related.expected_tests == [
-        "TEST-001"
-    ]
-    assert (change_log.file_changes or [])[0].related.expected_outcomes == [
-        "OUT-001"
-    ]
+    assert (change_log.file_changes or [])[0].related.acceptance_criteria == ["AC-001"]
+    assert (change_log.file_changes or [])[0].related.expected_tests == ["TEST-001"]
+    assert (change_log.file_changes or [])[0].related.expected_outcomes == ["OUT-001"]
     assert (change_log.file_changes or [])[0].related.non_goals == ["NG-001"]
     assert (change_log.file_changes or [])[0].related.risks == ["RISK-001"]
     assert (change_log.file_changes or [])[0].span.start_line == 1

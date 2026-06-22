@@ -443,12 +443,8 @@ def test_build_changelog_index_normalizes_version_two_changes(
     assert index.documents[0].changelog.file_changes[0].related.expected_outcomes == [
         "OUT-001"
     ]
-    assert index.documents[0].changelog.file_changes[0].related.non_goals == [
-        "NG-001"
-    ]
-    assert index.documents[0].changelog.file_changes[0].related.risks == [
-        "RISK-001"
-    ]
+    assert index.documents[0].changelog.file_changes[0].related.non_goals == ["NG-001"]
+    assert index.documents[0].changelog.file_changes[0].related.risks == ["RISK-001"]
     assert index.entity_graph.entities["ReviewSkill"][0].action == "added"
     assert index.provenance_for("src/app.py", 1).affects == ("ReviewSkill",)
 

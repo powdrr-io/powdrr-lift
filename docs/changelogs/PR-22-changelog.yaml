@@ -1,4 +1,4 @@
-version: 2
+schema: https://powdrr.io/schema/changelog-v2
 change_id: 22
 title: Populate related sections in changelog templates
 intent:

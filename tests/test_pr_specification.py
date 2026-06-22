@@ -78,9 +78,7 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert "id: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
-    assert rendered_template["version"] == 1
     assert [section for section in rendered_template] == [
-        "version",
         "id",
         "feature_ids",
         "intent",

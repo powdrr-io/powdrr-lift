@@ -1,4 +1,4 @@
-version: 2
+schema: https://powdrr.io/schema/changelog-v2
 change_id: 26
 title: Add changelog review endpoints
 intent:

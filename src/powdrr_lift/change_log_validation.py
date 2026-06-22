@@ -18,6 +18,7 @@ from powdrr_lift.change_log_parser import (
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
     _collect_branch_diff_entries,
+    _is_structured_document_path,
     _resolve_default_branch,
     _resolve_repo_root,
 )
@@ -142,6 +143,8 @@ def build_validation_report(
         )
 
     version = _normalize_version(raw_change_log.get("version"))
+    if version is None:
+        version = _infer_version_from_schema(raw_change_log.get("schema"))
 
     if version == 2:
         if "changes" in raw_change_log:
@@ -149,9 +152,9 @@ def build_validation_report(
                 ValidationIssue(
                     code="top_level_changes_not_allowed",
                     message=(
-                        "Version 2 changelogs must use top-level files, entities, "
-                        "entity_relationships, invariants, guidance, features, and "
-                        "prs sections."
+                        "Version 2 changelogs must use top-level structured_files, "
+                        "files, entities, entity_relationships, invariants, "
+                        "guidance, features, and prs sections."
                     ),
                 )
             )
@@ -199,6 +202,12 @@ def build_validation_report(
         for file_change in change_log.file_changes
         if file_change.path is not None and file_change.path != ""
     ]
+    proposed_change_files.extend(
+        structured_file
+        for structured_file in change_log.structured_files
+        if structured_file is not None and structured_file != ""
+    )
+    proposed_change_files = list(dict.fromkeys(proposed_change_files))
     if version == 1:
         proposed_entities = [
             _parse_validation_entity(entity_data)
@@ -259,29 +268,30 @@ def build_validation_report(
                 issues=issues,
             )
     expected_change_entries_by_file: dict[str, list[BranchDiffEntry]] = {}
+    expected_structured_file_paths: list[str] = []
+    seen_expected_structured_file_paths: set[str] = set()
     for entry in diff_entries:
         if _is_changelog_artifact_path(entry.path):
+            continue
+
+        if _is_structured_document_path(entry.path):
+            if entry.path in seen_expected_structured_file_paths:
+                continue
+
+            seen_expected_structured_file_paths.add(entry.path)
+            expected_structured_file_paths.append(entry.path)
             continue
 
         expected_change_entries_by_file.setdefault(entry.path, []).append(entry)
 
     proposed_change_entries_by_file: dict[str, list[Any]] = {}
-    if version == 2:
-        for file_change in change_log.file_changes:
-            if file_change.path is None or file_change.path == "":
-                continue
+    for file_change in change_log.file_changes:
+        if file_change.path is None or file_change.path == "":
+            continue
 
-            proposed_change_entries_by_file.setdefault(file_change.path, []).append(
-                file_change
-            )
-    else:
-        for file_change in change_log.file_changes:
-            if file_change.path is None or file_change.path == "":
-                continue
-
-            proposed_change_entries_by_file.setdefault(file_change.path, []).append(
-                file_change
-            )
+        proposed_change_entries_by_file.setdefault(file_change.path, []).append(
+            file_change
+        )
 
     parent_entity_ids = set(
         build_changelog_index_at_ref(
@@ -325,8 +335,39 @@ def build_validation_report(
             )
 
     if version == 2:
+        proposed_structured_files = list(
+            dict.fromkeys(
+                structured_file
+                for structured_file in change_log.structured_files
+                if structured_file is not None and structured_file != ""
+            )
+        )
+        proposed_structured_file_set = set(proposed_structured_files)
+        proposed_structured_file_changes = [
+            file_change
+            for file_change in change_log.file_changes
+            if _is_structured_document_path(file_change.path or "")
+        ]
+        proposed_regular_file_changes = [
+            file_change
+            for file_change in change_log.file_changes
+            if not _is_structured_document_path(file_change.path or "")
+        ]
+
+        for file_change in proposed_structured_file_changes:
+            issues.append(
+                ValidationIssue(
+                    code="structured_file_in_files_section",
+                    message=(
+                        "Structured document files must be listed in the "
+                        "structured_files section without spans."
+                    ),
+                    path=file_change.path,
+                )
+            )
+
         for file_change_index, file_change in enumerate(
-            change_log.file_changes,
+            proposed_regular_file_changes,
             start=1,
         ):
             _validate_v2_file_change(
@@ -464,6 +505,38 @@ def build_validation_report(
                 ),
             )
 
+        for structured_file_path in expected_structured_file_paths:
+            if structured_file_path not in proposed_structured_file_set:
+                issues.append(
+                    ValidationIssue(
+                        code="missing_structured_change",
+                        message=(
+                            f"Missing structured file entry for {structured_file_path}"
+                        ),
+                        path=structured_file_path,
+                    )
+                )
+
+        for structured_file_path in proposed_structured_files:
+            if structured_file_path in expected_structured_file_paths:
+                _validate_v2_structured_file_contents(
+                    issues=issues,
+                    repo_root=repo_root_path,
+                    structured_file_path=structured_file_path,
+                )
+                continue
+
+            issues.append(
+                ValidationIssue(
+                    code="unexpected_structured_change",
+                    message=(
+                        "Structured file entry for "
+                        f"{structured_file_path} does not appear in the branch diff"
+                    ),
+                    path=structured_file_path,
+                )
+            )
+
         for relationship_change in change_log.entity_relationship_changes or []:
             source = _normalize_entity_id(relationship_change.source)
             target = _normalize_entity_id(relationship_change.target)
@@ -524,8 +597,15 @@ def build_validation_report(
                     )
                 )
 
-    for file_path, expected_entries in expected_change_entries_by_file.items():
-        proposed_entries = proposed_change_entries_by_file.get(file_path, [])
+    expected_regular_change_entries_by_file = expected_change_entries_by_file
+    proposed_regular_change_entries_by_file = {
+        file_path: entries
+        for file_path, entries in proposed_change_entries_by_file.items()
+        if not _is_structured_document_path(file_path)
+    }
+
+    for file_path, expected_entries in expected_regular_change_entries_by_file.items():
+        proposed_entries = proposed_regular_change_entries_by_file.get(file_path, [])
         expected_spans = Counter(
             (entry.start_line, entry.end_line) for entry in expected_entries
         )
@@ -581,8 +661,8 @@ def build_validation_report(
                     )
                 )
 
-    for file_path in proposed_change_entries_by_file:
-        if file_path in expected_change_entries_by_file:
+    for file_path in proposed_regular_change_entries_by_file:
+        if file_path in expected_regular_change_entries_by_file:
             continue
 
         issues.append(
@@ -727,6 +807,18 @@ def _normalize_version(raw_version: object | None) -> int | str | None:
     return cast(int | str | None, raw_version)
 
 
+def _infer_version_from_schema(raw_schema: object | None) -> int | None:
+    if not isinstance(raw_schema, str):
+        return None
+
+    if raw_schema.endswith("changelog-v1"):
+        return 1
+    if raw_schema.endswith("changelog-v2"):
+        return 2
+
+    return None
+
+
 def _contains_nonempty_value(raw_value: object | None) -> bool:
     if raw_value is None:
         return False
@@ -747,6 +839,77 @@ def _validate_v2_file_sections(
     raw_change_log: Mapping[str, Any],
     issues: list[ValidationIssue],
 ) -> None:
+    for section_name in ("structured_files", "files"):
+        if section_name not in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="missing_required_section",
+                    message=(
+                        f"Version 2 changelogs must include the {section_name} section."
+                    ),
+                    path=section_name,
+                )
+            )
+
+    seen_structured_files: set[str] = set()
+    for structured_file_index, raw_structured_file in enumerate(
+        _parse_sequence(raw_change_log.get("structured_files")),
+        start=1,
+    ):
+        if isinstance(raw_structured_file, Mapping):
+            issues.append(
+                ValidationIssue(
+                    code="structured_file_entry_invalid",
+                    message=(
+                        "Structured file entries must be plain repository paths "
+                        "without nested metadata."
+                    ),
+                    path=None,
+                )
+            )
+            continue
+
+        structured_file_path = str(raw_structured_file).strip()
+        if structured_file_path == "":
+            issues.append(
+                ValidationIssue(
+                    code="structured_file_entry_missing_path",
+                    message=(
+                        f"Structured file {structured_file_index} must include a path."
+                    ),
+                    path=None,
+                )
+            )
+            continue
+
+        if not _is_structured_document_path(structured_file_path):
+            issues.append(
+                ValidationIssue(
+                    code="structured_file_entry_not_structured_document",
+                    message=(
+                        f"Structured file {structured_file_index} points to "
+                        f"{structured_file_path!r}, which is not a structured "
+                        "YAML document path."
+                    ),
+                    path=structured_file_path,
+                )
+            )
+
+        if structured_file_path in seen_structured_files:
+            issues.append(
+                ValidationIssue(
+                    code="duplicate_structured_file_entry",
+                    message=(
+                        f"Structured file {structured_file_path!r} is listed more "
+                        "than once."
+                    ),
+                    path=structured_file_path,
+                )
+            )
+            continue
+
+        seen_structured_files.add(structured_file_path)
+
     for file_change_index, raw_file_change in enumerate(
         _parse_sequence(raw_change_log.get("files")),
         start=1,
@@ -768,6 +931,19 @@ def _validate_v2_file_sections(
                 )
             )
 
+        if file_path is not None and _is_structured_document_path(file_path):
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_structured_path_not_allowed",
+                    message=(
+                        f"File change {file_change_index} points to a "
+                        "structured YAML document path. Move it to structured_files "
+                        "and remove its span metadata."
+                    ),
+                    path=file_path,
+                )
+            )
+
         if "related" in file_data and not _contains_nonempty_value(
             file_data.get("related")
         ):
@@ -784,6 +960,72 @@ def _validate_v2_file_sections(
             )
 
 
+def _validate_v2_structured_file_contents(
+    *,
+    issues: list[ValidationIssue],
+    repo_root: Path,
+    structured_file_path: str,
+) -> None:
+    structured_file = repo_root / structured_file_path
+    if not structured_file.exists():
+        issues.append(
+            ValidationIssue(
+                code="structured_file_missing",
+                message=(
+                    f"Structured file {structured_file_path} does not exist in the "
+                    "repository."
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    try:
+        raw_structured_content = yaml.safe_load(
+            structured_file.read_text(encoding="utf-8")
+        )
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            ValidationIssue(
+                code="structured_file_invalid_yaml",
+                message=(
+                    f"Structured file {structured_file_path} could not be parsed "
+                    f"as YAML: {exc}"
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    if not isinstance(raw_structured_content, Mapping):
+        issues.append(
+            ValidationIssue(
+                code="structured_file_invalid_yaml",
+                message=(
+                    f"Structured file {structured_file_path} must decode to a YAML "
+                    "mapping."
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    schema_value = raw_structured_content.get("schema")
+    if not isinstance(schema_value, str) or not schema_value.startswith(
+        "https://powdrr.io/schemas"
+    ):
+        issues.append(
+            ValidationIssue(
+                code="structured_file_invalid_schema",
+                message=(
+                    f"Structured file {structured_file_path} must define a schema "
+                    "value that starts with https://powdrr.io/schemas."
+                ),
+                path=structured_file_path,
+            )
+        )
+
+
 def _validate_v2_file_change(
     *,
     issues: list[ValidationIssue],
@@ -797,6 +1039,20 @@ def _validate_v2_file_change(
                 code="file_entry_missing_path",
                 message=f"File change {file_change_index} must include a path.",
                 path=None,
+            )
+        )
+        return
+
+    if _is_structured_document_path(file_change.path):
+        issues.append(
+            ValidationIssue(
+                code="file_entry_structured_path_not_allowed",
+                message=(
+                    f"File change {file_change_index} points to a structured "
+                    "YAML document path. Move it to structured_files and remove its "
+                    "span metadata."
+                ),
+                path=file_change.path,
             )
         )
         return

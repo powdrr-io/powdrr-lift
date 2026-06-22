@@ -1,0 +1,181 @@
+schema: https://powdrr.io/schemas/implementation-specification-v1
+title: "Agent platform expansion implementation"
+architecture_id: "2026-05-22-skill-distribution-architecture"
+entities:
+  - id: specify-system
+    action: added
+    rationale: Expand the system specification workflow into current-state, diff, and issues document families.
+  - id: specify-architecture
+    action: added
+    rationale: Keep the architecture specification workflow as the canonical source for the platform entity graph.
+  - id: specify-implementation
+    action: added
+    rationale: Use the implementation specification workflow to coordinate architecture-aligned platform expansion.
+  - id: specify-prs
+    action: added
+    rationale: Preserve a structured proposed-PR workflow for implementation planning and traceability.
+  - id: prepare-pr-changelog
+    action: added
+    rationale: Keep the PR changelog workflow available while the platform grows beyond the current skill set.
+  - id: review-pr-changelog
+    action: added
+    rationale: Retain changelog review as the first review surface for PR-linked intent and context.
+  - id: synchronize-code-and-state
+    action: added
+    rationale: Preserve the codebase-state workflow as the source for state synthesis and context lookups.
+  - id: powdrr-lift-cli
+    action: added
+    rationale: Provide the authoring and validation command surface for all specification families.
+  - id: powdrr-lift-mcp
+    action: added
+    rationale: Provide the agent-native command surface for all specification families.
+  - id: skill-core-module
+    action: added
+    rationale: Keep the CLI and MCP surfaces backed by the same validation and rendering logic.
+  - id: skill-template-file
+    action: added
+    rationale: Keep template generation and document rendering in a shared canonical source.
+  - id: skill-metadata-file
+    action: added
+    rationale: Keep agent-specific metadata declarative so the platform can be packaged once.
+  - id: skill-package
+    action: added
+    rationale: Package the skill set and the adjoining CLI and MCP as one installable artifact.
+  - id: homebrew
+    action: added
+    rationale: Preserve the single-command macOS install path.
+  - id: claude-code
+    action: added
+    rationale: Preserve support for the current Claude Code adapter target.
+  - id: codex
+    action: added
+    rationale: Preserve support for the current Codex adapter target.
+  - id: aider
+    action: added
+    rationale: Preserve support for the current Aider adapter target.
+  - id: cursor
+    action: added
+    rationale: Preserve support for the current Cursor adapter target.
+  - id: antigravity
+    action: added
+    rationale: Preserve support for the current Antigravity adapter target.
+  - id: opencode
+    action: added
+    rationale: Preserve support for the current OpenCode adapter target.
+  - id: macos
+    action: added
+    rationale: Preserve the macOS install target.
+  - id: windows
+    action: added
+    rationale: Preserve the Windows install target.
+  - id: linux
+    action: added
+    rationale: Preserve the Linux install target.
+entity_relationships:
+  - id: cli-delegates-core
+    action: added
+    rationale: The CLI must continue to delegate rendering and validation to shared core logic.
+  - id: mcp-delegates-core
+    action: added
+    rationale: The MCP server must continue to delegate rendering and validation to shared core logic.
+  - id: cli-mcp-mirror
+    action: added
+    rationale: The CLI and MCP must continue to expose the same behavior.
+  - id: core-renders-template
+    action: added
+    rationale: Template rendering must remain centralized in the shared core module.
+  - id: core-validates-metadata
+    action: added
+    rationale: Metadata validation must remain centralized in the shared core module.
+  - id: core-generates-package
+    action: added
+    rationale: Package generation must remain centralized in the shared core module.
+  - id: skill-package-contains-specify-system
+    action: added
+    rationale: The package must keep shipping the specify-system skill.
+  - id: skill-package-contains-specify-architecture
+    action: added
+    rationale: The package must keep shipping the specify-architecture skill.
+  - id: skill-package-contains-specify-implementation
+    action: added
+    rationale: The package must keep shipping the specify-implementation skill.
+  - id: skill-package-contains-specify-prs
+    action: added
+    rationale: The package must keep shipping the specify-prs skill.
+  - id: skill-package-contains-prepare-pr-changelog
+    action: added
+    rationale: The package must keep shipping the current PR changelog skill.
+  - id: homebrew-installs-skill-package
+    action: added
+    rationale: The Homebrew path must continue to install the skill package.
+  - id: skill-package-contains-powdrr-lift-cli
+    action: added
+    rationale: The package must keep shipping the CLI entry point.
+  - id: skill-package-contains-powdrr-lift-mcp
+    action: added
+    rationale: The package must keep shipping the MCP entry point.
+features:
+  - id: feature-document-families
+    action: added
+    description: Add current-state, diff, and issues document families for system, architecture, implementation, and proposed-PR specs so the platform can represent the same state model across `specify-system`, `specify-architecture`, `specify-implementation`, `specify-prs`, `synthesize-system`, `synthesize-architecture`, `synthesize-implementation`, and review workflows.
+    functional_requirements:
+      - The platform must render a current-state document that represents a complete coherent snapshot.
+      - The platform must render a diff document that can be applied to a parent current state.
+      - The platform must render an issues document that explicitly records known incoherence.
+      - The platform must validate each document family with the appropriate CLI and MCP surface.
+  - id: feature-specified-template-workflows
+    action: added
+    description: Give each specify skill and `create-pr-changelog` a template-generation and validation workflow.
+    functional_requirements:
+      - Each specify skill must expose a template generator endpoint.
+      - Each specify skill must expose a validation endpoint for the filled template.
+      - The template instructions must tell the agent how to fill the document before validation.
+      - The workflow must fail closed until the filled document validates.
+  - id: feature-synthesis-workflows
+    action: added
+    description: Add synthesis workflows that derive start state, new state, and diff from a parent branch and a PR for `synthesize-system`, `synthesize-architecture`, and `synthesize-implementation`.
+    functional_requirements:
+      - Each synthesize skill must expose a parent-branch current-state endpoint.
+      - Each synthesize skill must expose a PR current-state endpoint.
+      - Each synthesize skill must expose a diff endpoint.
+      - The synthesized diff must be applicable to the parent current state to produce the updated current state.
+  - id: feature-review-workflows
+    action: added
+    description: Add review workflows that produce diffs and inspect multiple layers of the system for inconsistencies across `review-system`, `review-architecture`, `review-implementation`, `review-pr`, and `review-pr-changelog`.
+    functional_requirements:
+      - Each review skill must produce a diff that describes the review target.
+      - Each review skill must surface inconsistencies, weaknesses, and missing links.
+      - Review output must inspect the surrounding specification layers, not only the changed file.
+      - Review output must remain explainable enough for an agent to fix the underlying issue.
+  - id: feature-context-graph
+    action: added
+    description: Add context endpoints that answer code-relationship questions using the indexed graph of code and specs so agents can ask about code used together, updated together, and linked to features, decisions, requirements, entities, and lines.
+    functional_requirements:
+      - The platform must answer what code is used together and updated together.
+      - The platform must answer what code is related to a feature, decision, requirement, or entity.
+      - The platform must answer intent and rationale questions for a file, range, or line of code.
+      - The platform must source answers from the changelog and specification graph, not just the source tree.
+  - id: feature-unified-packaging
+    action: added
+    description: Keep the CLI, MCP, skill set, and install story aligned across macOS, Windows, and Linux.
+    functional_requirements:
+      - The platform must install with a single command on each supported platform.
+      - The platform must preserve a Homebrew install path on macOS.
+      - The same package content must serve Claude Code, Codex, Aider, Cursor, Antigravity, and OpenCode.
+      - The CLI and MCP must remain behaviorally aligned through shared core logic.
+decisions:
+  - id: decision-single-core
+    action: added
+    description: Keep rendering, validation, synthesis, and graph query logic in a shared core module.
+  - id: decision-first-class-diffs
+    action: added
+    description: Treat diff documents as first-class artifacts rather than opaque implementation details.
+  - id: decision-explicit-incoherence
+    action: added
+    description: Record intentional incoherence in issues documents instead of hiding it behind partial validation.
+  - id: decision-shared-surface
+    action: added
+    description: Keep the CLI and MCP surfaces mirrored so agents and operators can use either one.
+  - id: decision-platform-install
+    action: added
+    description: Keep the package install story single-command and cross-platform, with Homebrew for macOS.

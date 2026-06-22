@@ -12,6 +12,13 @@ System. `powdrr-lift` is an opinionated coding agent memory system that:
 `powdrr-lift` is designed for individuals and teams focused on increasing code quality,
 increasing code understandability, decreasing token costs, and decreasing time wasted.
 
+## Design
+
+The next-stage platform design is captured in
+[`docs/design/agent-platform-expansion.md`](docs/design/agent-platform-expansion.md).
+It describes the specification families, synthesis workflows, review flows,
+and context endpoints that will extend the current skill platform.
+
 ## How It Works
 
 1. Install `powdrrlift` skills to your favorite coding agent

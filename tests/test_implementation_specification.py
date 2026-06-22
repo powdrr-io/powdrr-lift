@@ -71,11 +71,11 @@ def test_create_implementation_specification_template_writes_default_file(
     assert "# - Alpha" in template_text
     assert "# - rel-1" in template_text
     assert 'architecture_id: "2026-06-19"' in template_text
+    assert "    action: null" in template_text
+    assert "    supercedes: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
-    assert rendered_template["version"] == 1
     assert [section for section in rendered_template] == [
-        "version",
         "title",
         "architecture_id",
         "entities",
@@ -95,26 +95,37 @@ def test_validate_implementation_specification_reports_errors(
 
     entities:
       - id: Alpha
+        action: added
       - id: Ghost
+        action: maybe
+        supercedes: []
 
     entity_relationships:
       - id: rel-1
+        action: removed
       - id: rel-missing
+        action: added
 
     features:
       - id: feature-a
+        action: added
         description: Implement the first feature.
+        supercedes: []
         functional_requirements:
           - Must be implemented.
       - id: feature-a
+        action: removed
         description: Duplicate feature id.
         functional_requirements:
           - Must also be implemented.
 
     decisions:
       - id: decision-a
+        action: added
         description: Choose the main approach.
+        supercedes: []
       - id: feature-a
+        action: removed
         description: Duplicate across sections.
     """
 
@@ -129,7 +140,8 @@ def test_validate_implementation_specification_reports_errors(
     assert report.available_relationship_ids == ["rel-1"]
     assert {issue.code for issue in report.issues} == {
         "architecture_id_mismatch",
-        "unknown_architecture_entity",
+        "invalid_action",
+        "supercedes_empty",
         "unknown_architecture_relationship",
         "duplicate_specification_id",
     }
@@ -145,19 +157,24 @@ def test_validate_implementation_specification_reports_success_for_valid_spec(
 
     entities:
       - id: Alpha
+        action: added
       - id: Beta
+        action: removed
 
     entity_relationships:
       - id: rel-1
+        action: added
 
     features:
       - id: feature-a
+        action: added
         description: Implement the first feature.
         functional_requirements:
           - Must be implemented.
 
     decisions:
       - id: decision-a
+        action: removed
         description: Choose the main approach.
     """
 
@@ -182,18 +199,22 @@ def test_cli_validate_implementation_specification_reports_yaml(
 
         entities:
           - id: Alpha
+            action: added
 
         entity_relationships:
           - id: rel-1
+            action: added
 
         features:
           - id: feature-a
+            action: added
             description: Implement the first feature.
             functional_requirements:
               - Must be implemented.
 
         decisions:
           - id: decision-a
+            action: removed
             description: Choose the main approach.
         """,
         encoding="utf-8",

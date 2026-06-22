@@ -1,0 +1,1970 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 35
+title: Document the agent platform expansion
+intent:
+  problem: The repo needed a formal design note and implementation-spec artifact for
+    the next-stage agent platform.
+  goal: Capture the platform expansion so the specification families, synthesis workflows,
+    review flows, and context endpoints are documented in-repo.
+decisions:
+- id: decision-agent-platform-expansion
+  summary: Capture the next-stage platform design in a dedicated design doc and implementation
+    spec.
+structured_files:
+- docs/architecture/architecture-specification.yaml
+- docs/implementation/implementation-specification.yaml
+- docs/system/system-specification.yaml
+files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 15
+    end_line: 21
+  summary: Add the agent platform design section and link it from the README.
+  rationale: Document the new platform expansion alongside the project overview.
+- path: README.md
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Tidy the README wording around the semantic graph planning note.
+  rationale: Keep the closing planning statement aligned with the updated copy.
+- path: docs/design/agent-platform-expansion.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 119
+  summary: Add the agent platform design note.
+  rationale: Capture the platform expansion alongside the implementation spec.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 104
+  summary: Add structured file tracking to the parsed change log model.
+  rationale: Keep version 2 changelogs aware of document-format file paths.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 127
+  summary: Update the version 2 parser guidance to include structured files.
+  rationale: Keep the parser error text aligned with the expanded changelog format.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 130
+  summary: Parse top-level structured files into the change log model.
+  rationale: Preserve document-format paths alongside file-level change entries.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 133
+    end_line: 134
+  summary: Add a helper for parsing plain path lists in structured files.
+  rationale: Keep structured file parsing separate from entity-id parsing.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 172
+  summary: Expand the version 2 parser error message to mention structured files.
+  rationale: Keep parser guidance aligned with the expanded changelog format.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 181
+    end_line: 181
+  summary: Parse top-level structured files into the change log model.
+  rationale: Preserve document-format paths alongside file-level change entries.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 401
+  summary: Add a helper for parsing plain path lists in structured files.
+  rationale: Keep structured file parsing separate from entity-id parsing.
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 462
+    end_line: 473
+  summary: Infer changelog version from the schema header.
+  rationale: Support schema-only changelogs after removing explicit version fields.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 91
+  summary: Split structured documents from span-based file entries in the template.
+  rationale: Put document-format files in structured_files and keep spans for code
+    files.
+  related:
+    entities:
+    - changelog-template
+    - powdrr-lift-cli
+    - ChangeLogTemplate
+    - ChangelogIndex
+    - CLI
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Add the changelog schema header to generated templates.
+  rationale: Make the generated changelog self-describing for structured YAML validation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 110
+    end_line: 113
+  summary: Update the template instructions for structured files and regular files.
+  rationale: Tell authors which paths belong in structured_files versus files.
+  related:
+    entities:
+    - changelog-template
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 122
+  summary: Emit a structured_files section in the generated changelog template.
+  rationale: Preserve document-format paths without line spans.
+  related:
+    entities:
+    - changelog-template
+    - powdrr-lift-cli
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 124
+  summary: Render only non-structured entries in the files section.
+  rationale: Keep file spans reserved for code and other non-structured changes.
+  related:
+    entities:
+    - changelog-template
+    - powdrr-lift-cli
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 427
+    end_line: 427
+  summary: Update the generated header guidance to mention the changelog schema.
+  rationale: Keep the template header aligned with the new structured YAML requirement.
+  related:
+    entities:
+    - changelog-template
+    - powdrr-lift-cli
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 624
+    end_line: 631
+  summary: Add a structured-document path classifier for changelog generation.
+  rationale: Distinguish document-format files from span-based file entries.
+  related:
+    entities:
+    - changelog-template
+    - powdrr-lift-cli
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Import the structured-document path classifier into changelog validation.
+  rationale: Reuse the same document-format split in validation and template generation.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 147
+  summary: Update the version 2 top-level section guidance for structured files.
+  rationale: Keep the validator error text aligned with the new changelog format.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 157
+  summary: Include structured files when reporting proposed change paths.
+  rationale: Keep the validation report aware of both document and code changes.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 210
+  summary: Track structured file paths separately from span-based file entries.
+  rationale: Keep document-format files out of the span comparison path.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 271
+    end_line: 272
+  summary: Exclude structured documents from the expected file-entry map.
+  rationale: Compare code hunks separately from document-format paths.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 284
+  summary: Collect file changes in a single pass before splitting them by format.
+  rationale: Preserve the original file-entry ordering for validation.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 288
+    end_line: 290
+  summary: Keep the file-entry map keyed by path for later span checks.
+  rationale: Retain the diff comparison data needed for regular file entries.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 294
+  summary: Split structured file entries from regular file entries during validation.
+  rationale: Validate document-format paths without requiring line spans.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 368
+  summary: Validate only the regular file entries against diff spans.
+  rationale: Keep span validation focused on non-structured file changes.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 370
+    end_line: 370
+  summary: Check that structured files are present in the diff and not duplicated.
+  rationale: Ensure document-format paths are listed exactly once in structured_files.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 508
+    end_line: 539
+  summary: Keep unexpected-change reporting aligned after splitting structured files.
+  rationale: Preserve the regular file diff diagnostics after the format split.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 600
+    end_line: 608
+  summary: Compare only non-structured files against diff span counts.
+  rationale: Exclude document-format paths from span-level validation.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 664
+    end_line: 665
+  summary: Keep the unexpected-change check scoped to regular file entries.
+  rationale: Prevent structured files from being revalidated as diff hunks.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 810
+    end_line: 821
+  summary: Validate structured_files as plain paths and reject structured paths in
+    files.
+  rationale: Enforce the split between document-format paths and span-based file entries.
+  related:
+    entities:
+    - ChangeLogValidator
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 842
+    end_line: 912
+  summary: Reject structured document paths in file-entry validation.
+  rationale: Keep document-format paths out of the files section.
+  related:
+    entities:
+    - ChangeLogValidator
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 934
+    end_line: 946
+  summary: Reject structured document paths in file-entry validation.
+  rationale: Keep document-format paths out of the files section.
+  related:
+    entities:
+    - ChangeLogValidator
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 963
+    end_line: 1028
+  summary: Validate structured YAML file contents and schema headers.
+  rationale: Ensure structured documents remain valid YAML with allowed schema prefixes.
+  related:
+    entities:
+    - ChangeLogValidator
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1046
+    end_line: 1059
+  summary: Reject structured document paths in span-based file entries.
+  rationale: Keep document-format files in structured_files and out of files.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Remove version from generated architecture templates.
+  rationale: Let the schema identify the template version instead.
+  related:
+    entities:
+    - architecture-specification
+    - evaluate-architecture-specification
+    - create_architecture_specification
+    - validate_architecture_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Add the allowed implementation item action set.
+  rationale: Keep the implementation validator anchored to the current item-state
+    vocabulary.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 56
+  summary: Add the shared implementation section item record.
+  rationale: Keep entity and relationship validation on the same item shape.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 105
+  summary: Update template instructions for action, supercedes, and relationship shape.
+  rationale: Tell authors how to fill implementation entities and relationships before
+    validation.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 97
+    end_line: 97
+  summary: Extend implementation template instructions to cover feature and decision
+    actions.
+  rationale: Tell authors how to fill feature and decision state fields before validation.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Add action scaffolding to implementation entities.
+  rationale: Prompt authors to supply the required entity action field.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Add action scaffolding to implementation relationships.
+  rationale: Prompt authors to supply the required relationship action field.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 129
+  summary: Add action and supercedes scaffolding to implementation features and decisions.
+  rationale: Prompt authors to supply the required feature and decision state fields.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 131
+  summary: Route entity validation through the shared section-item collector.
+  rationale: Validate entities with the new action and supercedes rules.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 136
+    end_line: 136
+  summary: Validate entity section items and same-section supersedence.
+  rationale: Keep entity state transitions internally coherent.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 138
+  summary: Keep entity validation tied to collected item ids.
+  rationale: Ensure entity supersedence only targets current entity ids.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 264
+  summary: Route relationship validation through the shared section-item collector.
+  rationale: Validate relationships with the same action and supercedes rules as entities.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 272
+    end_line: 272
+  summary: Validate relationship section items and same-section supersedence.
+  rationale: Keep relationship state transitions internally coherent.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 281
+  summary: Keep relationship validation tied to collected item ids.
+  rationale: Ensure relationship supersedence only targets current relationship ids.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 292
+  summary: Validate feature and decision sections using the new action and supercedes
+    rules.
+  rationale: Keep feature and decision state transitions internally coherent.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 302
+    end_line: 309
+  summary: Skip non-mapping architecture ids while collecting available ids.
+  rationale: Keep the architecture summary builder resilient to malformed items.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 311
+    end_line: 311
+  summary: Replace the entity-specific collector with a shared section collector.
+  rationale: Reuse one validator path for both entities and relationships.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 314
+    end_line: 314
+  summary: Accept the shared available-id set in the section collector.
+  rationale: Compare both section types against their architecture-defined ids.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 324
+    end_line: 329
+  summary: Parse shared item ids, actions, and supercedes lists.
+  rationale: Capture the fields that the implementation schema now requires.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 339
+    end_line: 339
+  summary: Handle malformed section entries consistently.
+  rationale: Keep invalid implementation items from passing through the validator.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 350
+    end_line: 355
+  summary: Skip malformed section entries before deduplication.
+  rationale: Avoid cascading validation noise from broken mappings.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 459
+    end_line: 460
+  summary: Require ids, actions, and non-empty supercedes lists when present.
+  rationale: Enforce the implementation spec item rules for both sections.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 462
+    end_line: 462
+  summary: Reject duplicate specification ids while collecting section items.
+  rationale: Keep each implementation item unique within the document.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 464
+    end_line: 472
+  summary: Register collected item ids for later supersedence checks.
+  rationale: Retain the set of current ids for same-section references.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 474
+    end_line: 475
+  summary: Record the raw section item for later optional-field validation.
+  rationale: Preserve the original mapping for empty-supercedes checks.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 477
+    end_line: 477
+  summary: Continue duplicate and membership checks before accepting a section item.
+  rationale: Preserve the collector's deduplication and architecture membership flow.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 480
+    end_line: 494
+  summary: Reject implementation items that are not in the architecture spec.
+  rationale: Keep the implementation document aligned to the architecture graph.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 428
+    end_line: 429
+  summary: Keep architecture item messages type-aware.
+  rationale: Make validation output clearer for entities versus relationships.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 497
+    end_line: 507
+  summary: Keep unknown item messages aligned to the selected architecture spec.
+  rationale: Explain why an item id was rejected.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 510
+    end_line: 510
+  summary: Preserve the current item path when emitting validation issues.
+  rationale: Point validation feedback at the exact item field.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 513
+    end_line: 515
+  summary: Continue collecting section items after reporting unknown architecture
+    ids.
+  rationale: Keep the shared collector moving past rejected ids.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 525
+  summary: Build section item records for later supersedence validation.
+  rationale: Reuse the collected item data in a second validation pass.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 528
+  summary: Return both the current ids and the collected section records.
+  rationale: Support later same-section validation over the collected items.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 530
+    end_line: 531
+  summary: Replace the relationship-specific collector with shared supersedence validation.
+  rationale: Use one validation path for both implementation sections.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 533
+    end_line: 533
+  summary: Evaluate supersedence against the ids collected from the same section.
+  rationale: Keep same-section supersedence coherent.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 538
+    end_line: 547
+  summary: Skip items that omit supercedes during the second validation pass.
+  rationale: Treat optional supercedes as omitted when the field is absent.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 549
+    end_line: 549
+  summary: Keep empty optional supercedes values from short-circuiting validation.
+  rationale: Report empty optional values explicitly instead of ignoring them.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 552
+    end_line: 553
+  summary: Validate same-section supercedes references against the collected ids.
+  rationale: Ensure supersedence stays within entities or within relationships.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 555
+    end_line: 555
+  summary: Add required-action validation and the allowed implementation action set.
+  rationale: Enforce the allowed item-state vocabulary.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 557
+    end_line: 560
+  summary: Add coercion for optional supercedes lists.
+  rationale: Preserve same-section ids only when the list is populated.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 562
+  summary: Add empty optional value detection for supercedes fields.
+  rationale: Flag optional supercedes values that are present but empty.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 565
+    end_line: 575
+  summary: Add action and supercedes support to implementation features.
+  rationale: Enforce the feature item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 577
+    end_line: 600
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 602
+    end_line: 603
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 605
+    end_line: 621
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 623
+    end_line: 624
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 626
+    end_line: 637
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 639
+    end_line: 647
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 654
+    end_line: 654
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 656
+    end_line: 656
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 675
+    end_line: 679
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 687
+    end_line: 701
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 711
+    end_line: 711
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 758
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 760
+    end_line: 760
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 768
+    end_line: 768
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 771
+    end_line: 771
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    - create_implementation_specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 790
+    end_line: 794
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - create_implementation_specification
+    - evaluate-implementation-specification
+    - implementation-specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 802
+    end_line: 816
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - create_implementation_specification
+    - evaluate-implementation-specification
+    - implementation-specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 819
+    end_line: 820
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - create_implementation_specification
+    - evaluate-implementation-specification
+    - implementation-specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 836
+    end_line: 844
+  summary: Add action and supercedes support to implementation decisions.
+  rationale: Enforce the decision item rules for the implementation spec.
+  related:
+    entities:
+    - create_implementation_specification
+    - evaluate-implementation-specification
+    - implementation-specification
+    - validate_implementation_specification
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 846
+    end_line: 846
+  summary: Remove version from generated implementation templates.
+  rationale: Let the schema identify the template version instead.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Remove version from generated PR templates.
+  rationale: Let the schema identify the template version instead.
+  related:
+    entities:
+    - pr-specification-core
+    invariants: []
+    guidance: []
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 69
+    end_line: 69
+  summary: Remove version from generated system templates.
+  rationale: Let the schema identify the template version instead.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Stop asserting a version field in architecture template rendering.
+  rationale: Architecture templates no longer emit an explicit version key.
+  related:
+    entities:
+    - architecture-specification
+    - evaluate-architecture-specification
+    invariants: []
+    guidance: []
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 123
+  summary: Remove version from the expected architecture template keys.
+  rationale: Keep the architecture template assertions aligned with the schema-only format.
+  related:
+    entities:
+    - architecture-specification
+    - evaluate-architecture-specification
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Assert that the generated template includes the changelog schema header.
+  rationale: Verify the generated changelog advertises the v2 schema.
+  related:
+    entities:
+    - template-regression-tests
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Assert that the generated template includes a structured_files section.
+  rationale: Verify the new changelog format exposes document-format paths separately.
+  related:
+    entities:
+    - ChangeLogTemplate
+    - CLI
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Assert that parsed templates keep structured_files empty when no document
+    changes exist.
+  rationale: Keep the template parser aligned with the new section.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 153
+  summary: Add a README modification to the template-generation fixture.
+  rationale: Exercise the structured_files path on a document-format change.
+  related:
+    entities:
+    - template-regression-tests
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Add the README fixture file to the commit for the template test.
+  rationale: Keep the structured-file template fixture in the branch diff.
+  related:
+    entities:
+    - template-regression-tests
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 173
+  summary: Assert that the rendered template includes structured_files.
+  rationale: Verify the new top-level section appears in generated output.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 176
+    end_line: 176
+  summary: Assert that parsed templates keep structured_files empty when no document
+    changes exist.
+  rationale: Keep the template parser aligned with the new section.
+  related:
+    entities:
+    - template-regression-tests
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Assert that the README file remains in the parsed file changes.
+  rationale: Confirm that README stays a regular file change rather than a structured
+    entry.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 184
+  summary: Assert that parsed file types remain added in the template fixture.
+  rationale: Confirm that the parsed file metadata preserves the added file types.
+  related:
+    entities:
+    - template-regression-tests
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 99
+  summary: Add a README change, a Markdown design note, and a structured implementation
+    spec to the version 2 success fixture.
+  rationale: Exercise the new split between structured_files and files.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 115
+  summary: Add the structured_files section to the version 2 success fixture.
+  rationale: Keep the validation fixture aligned with the new format.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 130
+  summary: Add the README file entry to the version 2 success fixture.
+  rationale: Keep README in the regular file section rather than structured_files.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 227
+  summary: Update the validation report expectations for structured files.
+  rationale: Confirm the report includes both structured and regular changed paths.
+  related:
+    entities:
+    - ChangeLogValidator
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 243
+  summary: Add structured_files to the invalid feature/pr state fixture.
+  rationale: Keep the version 2 fixture in the new changelog format.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 308
+    end_line: 308
+  summary: Add structured_files to the duplicate-id fixture.
+  rationale: Keep the duplicate-id test aligned with the new format.
+  related:
+    entities:
+    - ChangeLogValidator
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 379
+    end_line: 379
+  summary: Add structured_files to the top-level entities fixture.
+  rationale: Keep the entity-acceptance fixture in the new changelog format.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 444
+    end_line: 444
+  summary: Add structured_files to the file-entities-on-file-entry fixture.
+  rationale: Keep the file-entry validation fixture in the new changelog format.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 493
+  summary: Add structured_files to the empty-related-block fixture.
+  rationale: Keep the empty-related-block validation aligned with the new format.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 530
+    end_line: 717
+  summary: Add a rejection test for structured document paths in the files section.
+  rationale: Ensure structured document paths are moved into structured_files.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 731
+    end_line: 732
+  summary: Add structured_files and files sections to the version 2 top-level changes
+    rejection fixture.
+  rationale: Keep the top-level changes test isolated to the intended error.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1350
+    end_line: 1350
+  summary: Add structured_files to the unknown-added-entity-types fixture.
+  rationale: Keep the entity taxonomy fixture aligned with the current format.
+  related:
+    entities:
+    - ChangeLogValidator
+    - EntityGraph
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 74
+    end_line: 75
+  summary: Update implementation specification tests for the new action and supercedes
+    rules.
+  rationale: Keep validation coverage in sync with the implementation spec schema
+    changes.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Add an invalid action case to the implementation validation test.
+  rationale: Ensure the validator rejects unsupported item states.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 78
+  summary: Add an empty supercedes case to the implementation validation test.
+  rationale: Ensure optional supercedes values are omitted when empty.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 98
+  summary: Add the relationship action field to the failing implementation spec fixture.
+  rationale: Keep the invalid fixture aligned with the new schema shape.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 101
+  summary: Add the second relationship action field to the failing implementation
+    spec fixture.
+  rationale: Keep duplicate-id coverage under the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 105
+    end_line: 105
+  summary: Add feature and decision action and supercedes cases to the failure fixture.
+  rationale: Ensure the validator rejects unsupported or empty optional feature and
+    decision state fields.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 107
+  summary: Update the validation expectations for the new implementation spec errors.
+  rationale: Match the new action and supercedes validation behavior.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 111
+  summary: Add entity action metadata to the valid implementation spec fixture.
+  rationale: Keep the success fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 113
+  summary: Add the second entity action metadata entry to the valid implementation
+    spec fixture.
+  rationale: Keep the success fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 117
+  summary: Add relationship action metadata to the valid implementation spec fixture.
+  rationale: Keep the success fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 124
+  summary: Update the validation expectations for the new implementation spec errors.
+  rationale: Match the new action and supercedes validation behavior.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 126
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 128
+  summary: Add relationship action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 144
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 160
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 166
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 177
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 202
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 206
+  summary: Add entity action metadata to the CLI validation fixture.
+  rationale: Keep the CLI fixture aligned with the new schema.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 210
+  summary: Update the implementation spec fixture to use the new action field.
+  rationale: Keep the example implementation spec aligned with the updated item shape.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 217
+  summary: Update the implementation spec fixture to include decision action data.
+  rationale: Keep the example implementation spec aligned with the updated decision shape.
+  related:
+    entities:
+    - implementation-specification
+    - evaluate-implementation-specification
+    invariants: []
+    guidance: []
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Add the changelog schema header to the version 1 parse fixture.
+  rationale: Verify the parser accepts the new schema header on legacy changelogs.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Add the changelog schema header to the version 2 parse fixture.
+  rationale: Verify the parser accepts the schema header on version 2 changelogs.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 78
+  summary: Add structured_files to the version 2 parser fixture.
+  rationale: Verify the parser maps document-format paths into the change log model.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 147
+  summary: Assert the parsed structured_files list in the version 2 parser test.
+  rationale: Confirm structured document paths are preserved by parsing.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 81
+  summary: Stop asserting a version field in PR template rendering.
+  rationale: PR templates no longer emit an explicit version key.
+  related:
+    entities:
+    - pr-specification-core
+    - pr-specification
+    - evaluate-pr-specification
+    invariants: []
+    guidance: []
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Remove version from the expected PR template keys.
+  rationale: Keep the PR template assertions aligned with the schema-only format.
+  related:
+    entities:
+    - pr-specification-core
+    - pr-specification
+    - evaluate-pr-specification
+    invariants: []
+    guidance: []
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Stop asserting a version field in system template rendering.
+  rationale: System templates no longer emit an explicit version key.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Remove version from the expected system template keys.
+  rationale: Keep the system template assertions aligned with the schema-only format.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

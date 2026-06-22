@@ -1,4 +1,4 @@
-version: 2
+schema: https://powdrr.io/schema/changelog-v2
 change_id: 29
 title: Add specify-implementation skill and endpoints
 intent:

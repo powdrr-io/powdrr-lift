@@ -1,4 +1,4 @@
-version: 1
+schema: https://powdrr.io/schemas/changelog-v1
 change_id: 6
 title: Add review PR changelog skill
 intent:

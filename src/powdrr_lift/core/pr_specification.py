@@ -73,7 +73,6 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
             )
             for entry in feature_catalog
         ],
-        "version: 1",
         "id: null",
         "feature_ids:",
         "  - null",

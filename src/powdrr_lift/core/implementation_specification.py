@@ -16,6 +16,7 @@ _DEFAULT_OUTPUT_PATH = (
 _DEFAULT_ARCHITECTURE_SPECIFICATION_PATH = (
     Path("docs") / "architecture" / "architecture-specification.yaml"
 )
+_ALLOWED_ACTIONS = {"added", "removed"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,15 @@ class _ArchitectureSpecificationSummary:
     title: str | None
     entity_ids: list[str]
     relationship_ids: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class _ImplementationSpecificationSectionItem:
+    id: str
+    action: str
+    supercedes: list[str]
+    path: str
+    raw: Mapping[str, Any]
 
 
 def implementation_specification_default_output_path(
@@ -82,7 +92,17 @@ def render_implementation_specification_template(
         "# - Keep `architecture_id` aligned with the architecture specification.",
         "# - Copy entity ids and relationship ids only from the architecture",
         "#   specification listed below.",
-        "# - Give each feature a unique id, a description, and functional",
+        "# - Give every entity and entity relationship an `action` of `added`",
+        "#   or `removed`.",
+        "# - Include `supercedes` only when it lists one or more ids; omit the",
+        "#   field when it would be empty.",
+        "# - Treat entity relationships with the same item shape as entities:",
+        "#   `id`, `action`, `rationale`, and optional `supercedes`.",
+        "# - Give each feature and decision an `action` of `added` or",
+        "#   `removed`.",
+        "# - Include `supercedes` only when it lists one or more ids; omit the",
+        "#   field when it would be empty.",
+        "# - Give each feature a unique id, description, and functional",
         "#   requirements.",
         "# - Give each decision a unique id and description.",
         "#",
@@ -94,23 +114,28 @@ def render_implementation_specification_template(
             f"# - {relationship_id}"
             for relationship_id in architecture_summary.relationship_ids
         ],
-        "version: 1",
         "title: null",
         f"architecture_id: {json.dumps(architecture_id)}",
         "entities:",
         "  - id: null",
+        "    action: null",
         "    rationale: null",
         "entity_relationships:",
         "  - id: null",
+        "    action: null",
         "    rationale: null",
         "features:",
         "  - id: null",
+        "    action: null",
         "    description: null",
+        "    supercedes: null",
         "    functional_requirements:",
         "      - null",
         "decisions:",
         "  - id: null",
+        "    action: null",
         "    description: null",
+        "    supercedes: null",
         "",
     ]
 
@@ -236,7 +261,7 @@ def build_implementation_specification_validation_report(
             )
         )
 
-    entity_ids = _collect_entity_references(
+    entity_ids, entity_items = _collect_section_items(
         _coerce_sequence(
             raw_spec.get("entities"),
             path="entities",
@@ -244,8 +269,16 @@ def build_implementation_specification_validation_report(
             issue_code="invalid_entities_section",
             issue_message="entities must be a list of entity mappings.",
         ),
-        available_entity_ids=set(architecture_summary.entity_ids),
+        available_ids=set(architecture_summary.entity_ids),
         issues=issues,
+        section_name="entities",
+        item_label="entity",
+    )
+    _validate_supercedes(
+        entity_items,
+        available_ids=entity_ids,
+        issues=issues,
+        item_label="entity",
     )
     if not entity_ids:
         issues.append(
@@ -256,7 +289,7 @@ def build_implementation_specification_validation_report(
             )
         )
 
-    _collect_relationship_references(
+    relationship_ids, relationship_items = _collect_section_items(
         _coerce_sequence(
             raw_spec.get("entity_relationships"),
             path="entity_relationships",
@@ -266,11 +299,19 @@ def build_implementation_specification_validation_report(
                 "entity_relationships must be a list of relationship mappings."
             ),
         ),
-        available_relationship_ids=set(architecture_summary.relationship_ids),
+        available_ids=set(architecture_summary.relationship_ids),
         issues=issues,
+        section_name="entity_relationships",
+        item_label="entity relationship",
+    )
+    _validate_supercedes(
+        relationship_items,
+        available_ids=relationship_ids,
+        issues=issues,
+        item_label="entity relationship",
     )
 
-    feature_ids = _collect_features(
+    feature_ids, feature_items = _collect_features(
         _coerce_sequence(
             raw_spec.get("features"),
             path="features",
@@ -279,6 +320,12 @@ def build_implementation_specification_validation_report(
             issue_message="features must be a list of feature mappings.",
         ),
         issues=issues,
+    )
+    _validate_supercedes(
+        feature_items,
+        available_ids=feature_ids,
+        issues=issues,
+        item_label="feature",
     )
     if not feature_ids:
         issues.append(
@@ -289,7 +336,7 @@ def build_implementation_specification_validation_report(
             )
         )
 
-    decision_ids = _collect_decisions(
+    decision_ids, decision_items = _collect_decisions(
         _coerce_sequence(
             raw_spec.get("decisions"),
             path="decisions",
@@ -299,6 +346,12 @@ def build_implementation_specification_validation_report(
         ),
         issues=issues,
         used_ids=feature_ids,
+    )
+    _validate_supercedes(
+        decision_items,
+        available_ids=decision_ids,
+        issues=issues,
+        item_label="decision",
     )
     if not decision_ids:
         issues.append(
@@ -403,127 +456,204 @@ def _collect_architecture_ids(
     return ids
 
 
-def _collect_entity_references(
-    raw_entities: Sequence[object],
+def _collect_section_items(
+    raw_items: Sequence[object],
     *,
-    available_entity_ids: set[str],
+    available_ids: set[str],
     issues: list[ImplementationSpecificationValidationIssue],
-) -> set[str]:
-    entity_ids: set[str] = set()
-    for index, raw_entity in enumerate(raw_entities):
-        entity = _coerce_mapping(
-            raw_entity,
-            path=f"entities[{index}]",
+    section_name: str,
+    item_label: str,
+) -> tuple[set[str], list[_ImplementationSpecificationSectionItem]]:
+    item_ids: set[str] = set()
+    items: list[_ImplementationSpecificationSectionItem] = []
+    for index, raw_item in enumerate(raw_items):
+        item = _coerce_mapping(
+            raw_item,
+            path=f"{section_name}[{index}]",
             issues=issues,
-            issue_code="invalid_entity_entry",
-            issue_message="Each entity entry must be a mapping.",
+            issue_code="invalid_specification_entry",
+            issue_message="Each specification entry must be a mapping.",
         )
-        if entity is None:
+        if item is None:
             continue
 
-        entity_id = _required_string(
-            entity.get("id"),
-            path=f"entities[{index}].id",
+        item_id = _required_string(
+            item.get("id"),
+            path=f"{section_name}[{index}].id",
             issues=issues,
-            issue_code="entity_id_missing",
-            issue_message="Each entity must include an id.",
+            issue_code="specification_id_missing",
+            issue_message="Each item must include an id.",
         )
-        if entity_id is None:
-            continue
-
-        if entity_id in entity_ids:
+        action = _required_action(
+            item.get("action"),
+            path=f"{section_name}[{index}].action",
+            issues=issues,
+        )
+        supercedes = _coerce_string_list(
+            item.get("supercedes"),
+            path=f"{section_name}[{index}].supercedes",
+            issues=issues,
+        )
+        if "supercedes" in item and _is_empty_optional_value(item.get("supercedes")):
             issues.append(
                 ImplementationSpecificationValidationIssue(
-                    code="duplicate_entity_id",
-                    message=f"Entity id {entity_id!r} appears more than once.",
-                    path=f"entities[{index}].id",
-                )
-            )
-            continue
-
-        if entity_id not in available_entity_ids:
-            issues.append(
-                ImplementationSpecificationValidationIssue(
-                    code="unknown_architecture_entity",
+                    code="supercedes_empty",
                     message=(
-                        f"Entity {entity_id!r} is not listed in the selected "
-                        "architecture specification."
+                        f"Each {item_label} must omit supercedes when it has no ids."
                     ),
-                    path=f"entities[{index}].id",
+                    path=f"{section_name}[{index}].supercedes",
+                )
+            )
+        if item_id is None or action is None:
+            continue
+
+        if item_id in item_ids:
+            issues.append(
+                ImplementationSpecificationValidationIssue(
+                    code="duplicate_specification_id",
+                    message=(f"Specification id {item_id!r} appears more than once."),
+                    path=f"{section_name}[{index}].id",
                 )
             )
             continue
 
-        entity_ids.add(entity_id)
+        if item_id not in available_ids:
+            issue_code = (
+                "unknown_architecture_entity"
+                if item_label == "entity"
+                else "unknown_architecture_relationship"
+            )
+            issues.append(
+                ImplementationSpecificationValidationIssue(
+                    code=issue_code,
+                    message=(
+                        f"{item_label.title()} {item_id!r} is not listed in the "
+                        "selected architecture specification."
+                    ),
+                    path=f"{section_name}[{index}].id",
+                )
+            )
+            continue
 
-    return entity_ids
+        item_ids.add(item_id)
+        items.append(
+            _ImplementationSpecificationSectionItem(
+                id=item_id,
+                action=action,
+                supercedes=supercedes,
+                path=f"{section_name}[{index}]",
+                raw=item,
+            )
+        )
+
+    return item_ids, items
 
 
-def _collect_relationship_references(
-    raw_relationships: Sequence[object],
+def _validate_supercedes(
+    items: Sequence[_ImplementationSpecificationSectionItem],
     *,
-    available_relationship_ids: set[str],
+    available_ids: set[str],
     issues: list[ImplementationSpecificationValidationIssue],
-) -> set[str]:
-    relationship_ids: set[str] = set()
-    for index, raw_relationship in enumerate(raw_relationships):
-        relationship = _coerce_mapping(
-            raw_relationship,
-            path=f"entity_relationships[{index}]",
-            issues=issues,
-            issue_code="invalid_relationship_entry",
-            issue_message="Each entity relationship entry must be a mapping.",
-        )
-        if relationship is None:
+    item_label: str,
+) -> None:
+    for item in items:
+        if "supercedes" not in item.raw:
+            continue
+        if _is_empty_optional_value(item.raw.get("supercedes")):
             continue
 
-        relationship_id = _required_string(
-            relationship.get("id"),
-            path=f"entity_relationships[{index}].id",
-            issues=issues,
-            issue_code="relationship_id_missing",
-            issue_message="Each entity relationship must include an id.",
-        )
-        if relationship_id is None:
-            continue
-
-        if relationship_id in relationship_ids:
-            issues.append(
-                ImplementationSpecificationValidationIssue(
-                    code="duplicate_relationship_id",
-                    message=(
-                        f"Entity relationship id {relationship_id!r} appears more "
-                        "than once."
-                    ),
-                    path=f"entity_relationships[{index}].id",
+        for superceded_id in item.supercedes:
+            if superceded_id not in available_ids:
+                issues.append(
+                    ImplementationSpecificationValidationIssue(
+                        code="unknown_supercedes_id",
+                        message=(
+                            f"{item_label.title()} {item.id!r} supercedes unknown "
+                            f"{item_label} id {superceded_id!r}."
+                        ),
+                        path=f"{item.path}.supercedes",
+                    )
                 )
+
+
+def _required_action(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[ImplementationSpecificationValidationIssue],
+) -> str | None:
+    value = _required_string(
+        raw_value,
+        path=path,
+        issues=issues,
+        issue_code="action_missing",
+        issue_message="Each item must include an action.",
+    )
+    if value is None:
+        return None
+
+    if value not in _ALLOWED_ACTIONS:
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code="invalid_action",
+                message="Each item action must be one of 'added' or 'removed'.",
+                path=path,
             )
-            continue
+        )
+        return None
 
-        if relationship_id not in available_relationship_ids:
-            issues.append(
-                ImplementationSpecificationValidationIssue(
-                    code="unknown_architecture_relationship",
-                    message=(
-                        f"Entity relationship {relationship_id!r} is not listed in "
-                        "the selected architecture specification."
-                    ),
-                    path=f"entity_relationships[{index}].id",
-                )
+    return value
+
+
+def _coerce_string_list(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[ImplementationSpecificationValidationIssue],
+) -> list[str]:
+    if raw_value is None:
+        return []
+    if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes)):
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code="invalid_supercedes_section",
+                message="supercedes must be a list of ids.",
+                path=path,
             )
-            continue
+        )
+        return []
 
-        relationship_ids.add(relationship_id)
+    values: list[str] = []
+    for index, raw_item in enumerate(raw_value):
+        value = _required_string(
+            raw_item,
+            path=f"{path}[{index}]",
+            issues=issues,
+            issue_code="supercedes_id_missing",
+            issue_message="supercedes values must be ids.",
+        )
+        if value is not None:
+            values.append(value)
+    return values
 
-    return relationship_ids
+
+def _is_empty_optional_value(raw_value: object) -> bool:
+    if raw_value is None:
+        return True
+    if isinstance(raw_value, str):
+        return raw_value.strip() == ""
+    if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes)):
+        return len(raw_value) == 0
+    return False
 
 
 def _collect_features(
     raw_features: Sequence[object],
     *,
     issues: list[ImplementationSpecificationValidationIssue],
-) -> set[str]:
+) -> tuple[set[str], list[_ImplementationSpecificationSectionItem]]:
     feature_ids: set[str] = set()
+    items: list[_ImplementationSpecificationSectionItem] = []
     for index, raw_feature in enumerate(raw_features):
         feature = _coerce_mapping(
             raw_feature,
@@ -542,6 +672,11 @@ def _collect_features(
             issue_code="feature_id_missing",
             issue_message="Each feature must include an id.",
         )
+        action = _required_action(
+            feature.get("action"),
+            path=f"features[{index}].action",
+            issues=issues,
+        )
         description = _required_string(
             feature.get("description"),
             path=f"features[{index}].description",
@@ -549,6 +684,21 @@ def _collect_features(
             issue_code="feature_description_missing",
             issue_message="Each feature must include a description.",
         )
+        supercedes = _coerce_string_list(
+            feature.get("supercedes"),
+            path=f"features[{index}].supercedes",
+            issues=issues,
+        )
+        if "supercedes" in feature and _is_empty_optional_value(
+            feature.get("supercedes")
+        ):
+            issues.append(
+                ImplementationSpecificationValidationIssue(
+                    code="supercedes_empty",
+                    message="Each feature must omit supercedes when it has no ids.",
+                    path=f"features[{index}].supercedes",
+                )
+            )
         requirements = _coerce_sequence(
             feature.get("functional_requirements"),
             path=f"features[{index}].functional_requirements",
@@ -558,7 +708,7 @@ def _collect_features(
                 "functional_requirements must be a list of requirement strings."
             ),
         )
-        if feature_id is None or description is None:
+        if feature_id is None or action is None or description is None:
             continue
 
         if feature_id in feature_ids:
@@ -597,8 +747,17 @@ def _collect_features(
             )
 
         feature_ids.add(feature_id)
+        items.append(
+            _ImplementationSpecificationSectionItem(
+                id=feature_id,
+                action=action,
+                supercedes=supercedes,
+                path=f"features[{index}]",
+                raw=feature,
+            )
+        )
 
-    return feature_ids
+    return feature_ids, items
 
 
 def _collect_decisions(
@@ -606,9 +765,10 @@ def _collect_decisions(
     *,
     issues: list[ImplementationSpecificationValidationIssue],
     used_ids: set[str],
-) -> set[str]:
+) -> tuple[set[str], list[_ImplementationSpecificationSectionItem]]:
     decision_ids: set[str] = set()
     seen_ids: set[str] = set(used_ids)
+    items: list[_ImplementationSpecificationSectionItem] = []
     for index, raw_decision in enumerate(raw_decisions):
         decision = _coerce_mapping(
             raw_decision,
@@ -627,6 +787,11 @@ def _collect_decisions(
             issue_code="decision_id_missing",
             issue_message="Each decision must include an id.",
         )
+        action = _required_action(
+            decision.get("action"),
+            path=f"decisions[{index}].action",
+            issues=issues,
+        )
         _required_string(
             decision.get("description"),
             path=f"decisions[{index}].description",
@@ -634,7 +799,24 @@ def _collect_decisions(
             issue_code="decision_description_missing",
             issue_message="Each decision must include a description.",
         )
+        supercedes = _coerce_string_list(
+            decision.get("supercedes"),
+            path=f"decisions[{index}].supercedes",
+            issues=issues,
+        )
+        if "supercedes" in decision and _is_empty_optional_value(
+            decision.get("supercedes")
+        ):
+            issues.append(
+                ImplementationSpecificationValidationIssue(
+                    code="supercedes_empty",
+                    message="Each decision must omit supercedes when it has no ids.",
+                    path=f"decisions[{index}].supercedes",
+                )
+            )
         if decision_id is None:
+            continue
+        if action is None:
             continue
 
         if decision_id in seen_ids:
@@ -651,8 +833,17 @@ def _collect_decisions(
 
         seen_ids.add(decision_id)
         decision_ids.add(decision_id)
+        items.append(
+            _ImplementationSpecificationSectionItem(
+                id=decision_id,
+                action=action,
+                supercedes=supercedes,
+                path=f"decisions[{index}]",
+                raw=decision,
+            )
+        )
 
-    return decision_ids
+    return decision_ids, items
 
 
 def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:

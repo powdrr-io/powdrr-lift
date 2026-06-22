@@ -1,4 +1,4 @@
-version: 1
+schema: https://powdrr.io/schemas/changelog-v1
 change_id: 14
 title: Add entity context lookups
 intent:

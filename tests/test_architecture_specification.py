@@ -118,9 +118,7 @@ def test_create_architecture_specification_template_writes_default_file(
     assert "# - Skill" in template_text
 
     rendered_template = yaml.safe_load(template_text)
-    assert rendered_template["version"] == 1
     assert [section for section in rendered_template] == [
-        "version",
         "id",
         "title",
         "entities",

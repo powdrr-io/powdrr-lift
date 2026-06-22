@@ -1,4 +1,4 @@
-version: 1
+schema: https://powdrr.io/schemas/changelog-v1
 change_id: 9
 title: "Add edit-context skill and index-backed code edit reporting"
 intent:

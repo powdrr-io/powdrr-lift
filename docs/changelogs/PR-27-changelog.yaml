@@ -1,4 +1,4 @@
-version: 2
+schema: https://powdrr.io/schema/changelog-v2
 change_id: 27
 title: Track coedited files in review context
 intent:

@@ -1,4 +1,4 @@
-version: 2
+schema: https://powdrr.io/schema/changelog-v2
 change_id: 25
 title: Add synchronize-code-and-state skill
 intent:

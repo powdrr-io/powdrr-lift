@@ -4,7 +4,7 @@ from powdrr_lift.change_log_parser import parse_change_log
 def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
     change_log = parse_change_log(
         """
-        version: 1
+        schema: https://powdrr.io/schemas/changelog-v1
         change_id: CHG-2026-001
         title: Introduce JWT refresh token flow
 
@@ -61,7 +61,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
 def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> None:
     change_log = parse_change_log(
         """
-        version: 2
+        schema: https://powdrr.io/schema/changelog-v2
         change_id: CHG-2026-002
         title: Expand review workflow metadata
 
@@ -72,6 +72,9 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
         decisions:
           - id: ADR-200
             summary: Keep version 1 support while introducing version 2.
+
+        structured_files:
+          - docs/system/system-specification.yaml
 
         files:
           - path: src/review/workflow.py
@@ -141,6 +144,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert change_log.change_id == "CHG-2026-002"
     assert change_log.title == "Expand review workflow metadata"
     assert (change_log.decisions or [])[0].id == "ADR-200"
+    assert change_log.structured_files == ["docs/system/system-specification.yaml"]
     assert [entity.id for entity in (change_log.entity_changes or [])] == [
         "ReviewSkill",
         "LegacyReviewNote",

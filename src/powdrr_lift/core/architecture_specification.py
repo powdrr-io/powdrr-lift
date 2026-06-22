@@ -69,7 +69,6 @@ def render_architecture_specification_template(
         "#",
         "# Allowed entity types:",
         *[f"# - {entity_type}" for entity_type in normalized_entity_types],
-        "version: 1",
         "id: null",
         "title: null",
         "entities:",

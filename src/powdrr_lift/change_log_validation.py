@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.index import (
     _file_change_entity_ids,
     _normalize_entity_id,
+    build_changelog_index,
     build_changelog_index_at_ref,
 )
 
@@ -168,16 +170,6 @@ def build_validation_report(
                     ),
                 )
             )
-        _validate_v2_file_sections(raw_change_log, issues)
-        if issues:
-            return ValidationReport(
-                validation_successful=False,
-                branch_name=branch_name,
-                default_branch_name=default_branch_name,
-                expected_change_files=expected_change_files,
-                proposed_change_files=proposed_change_files,
-                issues=issues,
-            )
 
     try:
         change_log = parse_change_log(proposed_change_log_yaml)
@@ -221,6 +213,62 @@ def build_validation_report(
         for entity in proposed_entities
         if (entity_id := _normalize_entity_id(entity.id)) is not None
     }
+    available_changelog_ids = _collect_changelog_defined_ids(change_log)
+    available_proposed_pr_detail_ids = _load_available_proposed_pr_detail_ids(
+        repo_root_path
+    )
+    available_rationale_ids = (
+        _load_available_rationale_ids(repo_root_path)
+        | available_changelog_ids
+        | available_proposed_pr_detail_ids
+    )
+
+    if version == 2:
+        _validate_v2_file_sections(
+            raw_change_log,
+            issues,
+            available_files={
+                file_change.path
+                for file_change in change_log.file_changes
+                if file_change.path is not None and file_change.path != ""
+            },
+            available_entity_ids={
+                entity_id
+                for entity_id in (
+                    _normalize_entity_id(entity.id)
+                    for entity in (change_log.entity_changes or [])
+                )
+                if entity_id is not None
+            },
+            available_invariant_ids={
+                invariant_id
+                for invariant_id in (
+                    _normalize_entity_id(invariant.id)
+                    for invariant in (change_log.invariant_changes or [])
+                )
+                if invariant_id is not None
+            },
+            available_guidance_ids={
+                guidance_id
+                for guidance_id in (
+                    _normalize_entity_id(guidance.id)
+                    for guidance in (change_log.guidance_changes or [])
+                )
+                if guidance_id is not None
+            },
+            available_proposed_pr_detail_ids=available_proposed_pr_detail_ids,
+            available_rationale_ids=available_rationale_ids,
+        )
+        if issues:
+            return ValidationReport(
+                validation_successful=False,
+                branch_name=branch_name,
+                default_branch_name=default_branch_name,
+                expected_change_files=expected_change_files,
+                proposed_change_files=proposed_change_files,
+                issues=issues,
+            )
+
     _validate_unique_changelog_ids(change_log, issues)
     added_entities = [
         entity for entity in proposed_entities if entity.action == "added"
@@ -398,6 +446,7 @@ def build_validation_report(
                 item_kind="invariant",
                 item_id=invariant_change.id,
                 description=invariant_change.description,
+                rationale=None,
                 action=invariant_change.action,
                 related=invariant_change.related,
                 available_files={
@@ -406,20 +455,22 @@ def build_validation_report(
                     if file_change.path is not None and file_change.path != ""
                 },
                 available_entities={
-                    _normalize_entity_id(entity.id)
+                    entity_id
                     for entity in (change_log.entity_changes or [])
-                    if _normalize_entity_id(entity.id) is not None
+                    if (entity_id := _normalize_entity_id(entity.id)) is not None
                 },
                 available_invariants={
-                    _normalize_entity_id(invariant.id)
+                    invariant_id
                     for invariant in (change_log.invariant_changes or [])
-                    if _normalize_entity_id(invariant.id) is not None
+                    if (invariant_id := _normalize_entity_id(invariant.id)) is not None
                 },
                 available_guidance={
-                    _normalize_entity_id(guidance.id)
+                    guidance_id
                     for guidance in (change_log.guidance_changes or [])
-                    if _normalize_entity_id(guidance.id) is not None
+                    if (guidance_id := _normalize_entity_id(guidance.id)) is not None
                 },
+                available_proposed_pr_detail_ids=available_proposed_pr_detail_ids,
+                available_rationale_ids=available_rationale_ids,
                 path=None,
             )
 
@@ -434,6 +485,7 @@ def build_validation_report(
                 item_kind="guidance",
                 item_id=guidance_change.id,
                 description=guidance_change.description,
+                rationale=None,
                 action=guidance_change.action,
                 related=guidance_change.related,
                 available_files={
@@ -442,20 +494,22 @@ def build_validation_report(
                     if file_change.path is not None and file_change.path != ""
                 },
                 available_entities={
-                    _normalize_entity_id(entity.id)
+                    entity_id
                     for entity in (change_log.entity_changes or [])
-                    if _normalize_entity_id(entity.id) is not None
+                    if (entity_id := _normalize_entity_id(entity.id)) is not None
                 },
                 available_invariants={
-                    _normalize_entity_id(invariant.id)
+                    invariant_id
                     for invariant in (change_log.invariant_changes or [])
-                    if _normalize_entity_id(invariant.id) is not None
+                    if (invariant_id := _normalize_entity_id(invariant.id)) is not None
                 },
                 available_guidance={
-                    _normalize_entity_id(guidance.id)
+                    guidance_id
                     for guidance in (change_log.guidance_changes or [])
-                    if _normalize_entity_id(guidance.id) is not None
+                    if (guidance_id := _normalize_entity_id(guidance.id)) is not None
                 },
+                available_proposed_pr_detail_ids=available_proposed_pr_detail_ids,
+                available_rationale_ids=available_rationale_ids,
                 path=None,
             )
 
@@ -566,6 +620,14 @@ def build_validation_report(
                         ),
                     )
                 )
+            _validate_quoted_rationale_ids(
+                rationale=relationship_change.rationale,
+                available_ids=available_rationale_ids,
+                issues=issues,
+                code="relationship_unknown_rationale_id",
+                path=None,
+                subject_label=f"Relationship {relationship_change.id or 'unknown'}",
+            )
     else:
         for relationship_change in change_log.entity_relationship_changes or []:
             source = _normalize_entity_id(relationship_change.source)
@@ -596,6 +658,14 @@ def build_validation_report(
                         ),
                     )
                 )
+            _validate_quoted_rationale_ids(
+                rationale=relationship_change.rationale,
+                available_ids=available_rationale_ids,
+                issues=issues,
+                code="relationship_unknown_rationale_id",
+                path=None,
+                subject_label=f"Relationship {relationship_change.id or 'unknown'}",
+            )
 
     expected_regular_change_entries_by_file = expected_change_entries_by_file
     proposed_regular_change_entries_by_file = {
@@ -819,25 +889,16 @@ def _infer_version_from_schema(raw_schema: object | None) -> int | None:
     return None
 
 
-def _contains_nonempty_value(raw_value: object | None) -> bool:
-    if raw_value is None:
-        return False
-
-    if isinstance(raw_value, str):
-        return raw_value.strip() != ""
-
-    if isinstance(raw_value, Mapping):
-        return any(_contains_nonempty_value(value) for value in raw_value.values())
-
-    if isinstance(raw_value, Sequence):
-        return any(_contains_nonempty_value(value) for value in raw_value)
-
-    return True
-
-
 def _validate_v2_file_sections(
     raw_change_log: Mapping[str, Any],
     issues: list[ValidationIssue],
+    *,
+    available_files: set[str],
+    available_entity_ids: set[str],
+    available_invariant_ids: set[str],
+    available_guidance_ids: set[str],
+    available_proposed_pr_detail_ids: set[str],
+    available_rationale_ids: set[str],
 ) -> None:
     for section_name in ("structured_files", "files"):
         if section_name not in raw_change_log:
@@ -944,16 +1005,111 @@ def _validate_v2_file_sections(
                 )
             )
 
-        if "related" in file_data and not _contains_nonempty_value(
-            file_data.get("related")
+        if file_path is None:
+            continue
+
+        raw_rationale = file_data.get("rationale")
+        if raw_rationale is None:
+            file_rationale = None
+        else:
+            file_rationale = str(raw_rationale).strip() or None
+        _validate_quoted_rationale_ids(
+            rationale=file_rationale,
+            available_ids=available_rationale_ids,
+            issues=issues,
+            code="file_entry_unknown_rationale_id",
+            path=file_path,
+            subject_label=f"File change {file_change_index}",
+        )
+
+        related = file_data.get("related")
+        if "related" not in file_data or not isinstance(related, Mapping):
+            continue
+
+        has_nonempty_related_value = False
+        for related_key, available_ids in (
+            ("files", available_files),
+            ("entities", available_entity_ids),
+            ("invariants", available_invariant_ids),
+            ("guidance", available_guidance_ids),
+            ("acceptance_criteria", available_proposed_pr_detail_ids),
+            ("expected_tests", available_proposed_pr_detail_ids),
+            ("expected_outcomes", available_proposed_pr_detail_ids),
+            ("non_goals", available_proposed_pr_detail_ids),
+            ("risks", available_proposed_pr_detail_ids),
         ):
+            if related_key not in related:
+                continue
+
+            raw_related_values = related.get(related_key)
+            if raw_related_values is None:
+                continue
+
+            if not isinstance(raw_related_values, Sequence) or isinstance(
+                raw_related_values, (str, bytes)
+            ):
+                issues.append(
+                    ValidationIssue(
+                        code="file_entry_invalid_related_section",
+                        message=(
+                            f"File change {file_change_index} related.{related_key} "
+                            "must be a list of ids."
+                        ),
+                        path=f"{file_path}.related.{related_key}",
+                    )
+                )
+                continue
+
+            if len(raw_related_values) == 0:
+                issues.append(
+                    ValidationIssue(
+                        code="file_entry_empty_related_list",
+                        message=(
+                            f"File change {file_change_index} related.{related_key} "
+                            "is empty. Remove it unless it points at a current id."
+                        ),
+                        path=f"{file_path}.related.{related_key}",
+                    )
+                )
+                continue
+
+            has_nonempty_related_value = True
+            for related_index, raw_related_value in enumerate(raw_related_values):
+                related_id = _normalize_related_reference_value(raw_related_value)
+                if related_id is None:
+                    issues.append(
+                        ValidationIssue(
+                            code="file_entry_related_missing_id",
+                            message=(
+                                f"File change {file_change_index} related."
+                                f"{related_key}[{related_index}] must include an id."
+                            ),
+                            path=f"{file_path}.related.{related_key}[{related_index}]",
+                        )
+                    )
+                    continue
+
+                if related_id not in available_ids:
+                    issues.append(
+                        ValidationIssue(
+                            code="unknown_related_reference",
+                            message=(
+                                f"File change {file_change_index} related."
+                                f"{related_key} references id {related_id!r}, but "
+                                "that id is not current."
+                            ),
+                            path=f"{file_path}.related.{related_key}[{related_index}]",
+                        )
+                    )
+
+        if "related" in file_data and not has_nonempty_related_value:
             issues.append(
                 ValidationIssue(
                     code="file_entry_empty_related",
                     message=(
                         f"File change {file_change_index} has an empty related "
                         "block. Remove related unless it includes at least one "
-                        "file, entity, invariant, or guidance reference."
+                        "current reference."
                     ),
                     path=file_path,
                 )
@@ -1256,6 +1412,226 @@ def _validate_unique_changelog_ids(
     for index, guidance in enumerate(change_log.guidance_changes or [], start=1):
         _register(guidance.id, "guidance", index)
 
+    _register(change_log.change_id, "change", 0)
+
+    for index, feature in enumerate(change_log.feature_changes or [], start=1):
+        _register(feature.id, "feature", index)
+
+    for index, proposed_pr in enumerate(change_log.pr_changes or [], start=1):
+        _register(proposed_pr.id, "proposed PR", index)
+
+
+def _collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
+    defined_ids: set[str] = set()
+    change_id = _normalize_entity_id(change_log.change_id)
+    if change_id is not None:
+        defined_ids.add(change_id)
+    for section in (
+        change_log.decisions,
+        change_log.entity_changes,
+        change_log.entity_relationship_changes,
+        change_log.invariant_changes,
+        change_log.guidance_changes,
+        change_log.feature_changes,
+        change_log.pr_changes,
+    ):
+        for item in section:
+            normalized_id = _normalize_entity_id(getattr(item, "id", None))
+            if normalized_id is not None:
+                defined_ids.add(normalized_id)
+    return defined_ids
+
+
+def _load_available_proposed_pr_detail_ids(repo_root: Path) -> set[str]:
+    proposal_dir = repo_root / "docs" / "proposals"
+    if not proposal_dir.exists():
+        return set()
+
+    detail_ids: set[str] = set()
+    for proposal_path in proposal_dir.glob("PR-*-proposed-pr-specification.yaml"):
+        try:
+            raw_spec = _load_yaml_mapping(proposal_path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+
+        proposed_pr_id = _normalize_entity_id(
+            None if raw_spec.get("id") is None else str(raw_spec.get("id"))
+        )
+        if proposed_pr_id is not None:
+            detail_ids.add(proposed_pr_id)
+
+        for section_name in (
+            "acceptance_criteria",
+            "expected_tests",
+            "expected_outcomes",
+            "non_goals",
+            "risks",
+        ):
+            for raw_item in _parse_sequence(raw_spec.get(section_name)):
+                item_data = _parse_mapping(raw_item)
+                item_id = _normalize_entity_id(
+                    None if item_data.get("id") is None else str(item_data.get("id"))
+                )
+                if item_id is not None:
+                    detail_ids.add(item_id)
+
+    return detail_ids
+
+
+def _load_available_rationale_ids(repo_root: Path) -> set[str]:
+    rationale_ids: set[str] = set()
+
+    try:
+        state_report = build_codebase_state_report(repo_root=repo_root)
+    except Exception:  # noqa: BLE001
+        state_report = None
+
+    if state_report is not None:
+        for entity in state_report.entities:
+            normalized_id = _normalize_entity_id(entity.id)
+            if normalized_id is not None:
+                rationale_ids.add(normalized_id)
+        for invariant in state_report.invariants:
+            normalized_id = _normalize_entity_id(invariant.id)
+            if normalized_id is not None:
+                rationale_ids.add(normalized_id)
+        for guidance in state_report.guidance:
+            normalized_id = _normalize_entity_id(guidance.id)
+            if normalized_id is not None:
+                rationale_ids.add(normalized_id)
+        for decision in state_report.decisions:
+            normalized_key = _normalize_entity_id(decision.key)
+            if normalized_key is not None:
+                rationale_ids.add(normalized_key)
+            normalized_id = _normalize_entity_id(decision.decision_id)
+            if normalized_id is not None:
+                rationale_ids.add(normalized_id)
+
+    try:
+        changelog_index = build_changelog_index(repo_root=repo_root)
+    except Exception:  # noqa: BLE001
+        changelog_index = None
+
+    if changelog_index is not None:
+        for document in changelog_index.documents:
+            rationale_ids.update(_collect_changelog_defined_ids(document.changelog))
+
+    rationale_ids.update(_load_available_proposed_pr_detail_ids(repo_root))
+    return rationale_ids
+
+
+def _extract_quoted_ids(text: str | None) -> list[str]:
+    if text is None:
+        return []
+
+    return [
+        quoted_id
+        for quoted_id in re.findall(r'"([^"]+)"', text)
+        if _normalize_entity_id(quoted_id) is not None
+    ]
+
+
+def _validate_quoted_rationale_ids(
+    *,
+    rationale: str | None,
+    available_ids: set[str],
+    issues: list[ValidationIssue],
+    code: str,
+    path: str | None,
+    subject_label: str,
+) -> None:
+    for quoted_id in _extract_quoted_ids(rationale):
+        if quoted_id not in available_ids:
+            issues.append(
+                ValidationIssue(
+                    code=code,
+                    message=(
+                        f"{subject_label} rationale references unknown id "
+                        f"{quoted_id!r}."
+                    ),
+                    path=path,
+                )
+            )
+
+
+def _normalize_related_reference_value(raw_value: object) -> str | None:
+    if isinstance(raw_value, Mapping):
+        raw_value = raw_value.get("id")
+    if raw_value is None:
+        return None
+    return _normalize_entity_id(str(raw_value))
+
+
+def _validate_related_reference_list(
+    *,
+    related: Mapping[str, Any],
+    related_key: str,
+    available_ids: set[str],
+    issues: list[ValidationIssue],
+    item_label: str,
+    path: str | None,
+) -> None:
+    if related_key not in related:
+        return
+
+    raw_values = related.get(related_key)
+    if raw_values is None:
+        issues.append(
+            ValidationIssue(
+                code="related_reference_missing",
+                message=(f"{item_label} related.{related_key} must be a list of ids."),
+                path=path,
+            )
+        )
+        return
+
+    if not isinstance(raw_values, Sequence) or isinstance(raw_values, (str, bytes)):
+        issues.append(
+            ValidationIssue(
+                code="related_reference_invalid",
+                message=(f"{item_label} related.{related_key} must be a list of ids."),
+                path=path,
+            )
+        )
+        return
+
+    if len(raw_values) == 0:
+        issues.append(
+            ValidationIssue(
+                code="related_reference_empty",
+                message=(
+                    f"{item_label} related.{related_key} is empty. Remove it "
+                    "unless it points at a real current id."
+                ),
+                path=path,
+            )
+        )
+        return
+
+    for raw_value in raw_values:
+        related_id = _normalize_related_reference_value(raw_value)
+        if related_id is None:
+            issues.append(
+                ValidationIssue(
+                    code="related_reference_missing_id",
+                    message=(f"{item_label} related.{related_key} must contain ids."),
+                    path=path,
+                )
+            )
+            continue
+
+        if related_id not in available_ids:
+            issues.append(
+                ValidationIssue(
+                    code="unknown_related_reference",
+                    message=(
+                        f"{item_label} related.{related_key} references id "
+                        f"{related_id!r}, but that id is not current."
+                    ),
+                    path=path,
+                )
+            )
+
 
 def _validate_v2_lifecycle_item(
     *,
@@ -1265,12 +1641,15 @@ def _validate_v2_lifecycle_item(
     item_kind: str,
     item_id: str | None,
     description: str | None,
+    rationale: str | None,
     action: str | None,
     related: RelatedSection | None,
     available_files: set[str],
-    available_entities: set[str | None],
-    available_invariants: set[str | None],
-    available_guidance: set[str | None],
+    available_entities: set[str],
+    available_invariants: set[str],
+    available_guidance: set[str],
+    available_proposed_pr_detail_ids: set[str],
+    available_rationale_ids: set[str],
     path: str | None,
 ) -> None:
     normalized_item_id = _normalize_entity_id(item_id)
@@ -1309,6 +1688,15 @@ def _validate_v2_lifecycle_item(
                 path=path,
             )
         )
+
+    _validate_quoted_rationale_ids(
+        rationale=rationale,
+        available_ids=available_rationale_ids,
+        issues=issues,
+        code=f"{item_kind}_unknown_rationale_id",
+        path=path,
+        subject_label=f"{item_kind.capitalize()} {normalized_item_id or item_index}",
+    )
 
     if related is None:
         return

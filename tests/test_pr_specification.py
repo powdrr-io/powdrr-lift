@@ -110,7 +110,7 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
       - id: ac-1
         description: Acceptance criteria one.
     expected_tests:
-      - id: test-1
+      - id: ac-1
         description: Expected test one.
     expected_outcomes:
       - id: outcome-1
@@ -136,6 +136,7 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
         "duplicate_proposed_pr_id",
         "duplicate_feature_id",
         "unknown_feature_id",
+        "duplicate_detail_id",
     }
 
 

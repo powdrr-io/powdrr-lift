@@ -32,6 +32,11 @@ class RelatedSection:
     entities: list[str] = field(default_factory=list)
     invariants: list[str] = field(default_factory=list)
     guidance: list[str] = field(default_factory=list)
+    acceptance_criteria: list[str] = field(default_factory=list)
+    expected_tests: list[str] = field(default_factory=list)
+    expected_outcomes: list[str] = field(default_factory=list)
+    non_goals: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,6 +379,11 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
         entities=_parse_id_sequence(data.get("entities")),
         invariants=_parse_id_sequence(data.get("invariants")),
         guidance=_parse_id_sequence(data.get("guidance")),
+        acceptance_criteria=_parse_id_sequence(data.get("acceptance_criteria")),
+        expected_tests=_parse_id_sequence(data.get("expected_tests")),
+        expected_outcomes=_parse_id_sequence(data.get("expected_outcomes")),
+        non_goals=_parse_id_sequence(data.get("non_goals")),
+        risks=_parse_id_sequence(data.get("risks")),
     )
 
 

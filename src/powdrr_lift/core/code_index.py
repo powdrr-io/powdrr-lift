@@ -2251,6 +2251,16 @@ def _append_related_item(
         related.invariants.append(related_id)
     elif related_kind == "guidance":
         related.guidance.append(related_id)
+    elif related_kind == "acceptance_criteria":
+        related.acceptance_criteria.append(related_id)
+    elif related_kind == "expected_tests":
+        related.expected_tests.append(related_id)
+    elif related_kind == "expected_outcomes":
+        related.expected_outcomes.append(related_id)
+    elif related_kind == "non_goals":
+        related.non_goals.append(related_id)
+    elif related_kind == "risks":
+        related.risks.append(related_id)
 
 
 def _write_related_section_rows(
@@ -2344,6 +2354,96 @@ def _write_related_section_rows(
                     related_id,
                 ),
             )
+        for related_index, related_id in enumerate(related.acceptance_criteria):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "acceptance_criteria",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_tests):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_outcomes):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "expected_outcomes",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.non_goals):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "non_goals",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.risks):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "risks",
+                    related_id,
+                ),
+            )
         return
 
     if scope in {"document", "change"}:
@@ -2423,6 +2523,101 @@ def _write_related_section_rows(
                     entity_index,
                     related_index,
                     "guidance",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.acceptance_criteria):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "acceptance_criteria",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_tests):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_outcomes):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "expected_outcomes",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.non_goals):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "non_goals",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.risks):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "risks",
                     related_id,
                 ),
             )
@@ -2507,6 +2702,96 @@ def _write_related_section_rows(
                     item_index,
                     related_index,
                     "guidance",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.acceptance_criteria):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "acceptance_criteria",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_tests):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_outcomes):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "expected_outcomes",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.non_goals):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "non_goals",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.risks):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "risks",
                     related_id,
                 ),
             )

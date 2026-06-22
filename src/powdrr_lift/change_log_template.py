@@ -22,6 +22,11 @@ class RelatedSectionPreview:
     entities: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
     guidance: tuple[str, ...] = ()
+    acceptance_criteria: tuple[str, ...] = ()
+    expected_tests: tuple[str, ...] = ()
+    expected_outcomes: tuple[str, ...] = ()
+    non_goals: tuple[str, ...] = ()
+    risks: tuple[str, ...] = ()
 
 
 def create_change_log_template(
@@ -111,6 +116,8 @@ def _render_template_body(
         "# Structured YAML files must include a `schema` key that starts with",
         "# `https://powdrr.io/schemas`.",
         "# Use `files` for code, Markdown, and other non-structured file entries.",
+        "# Related references are optional. Include only the populated lists, and",
+        "# remove the whole related block if it would otherwise be empty.",
     ]
 
     if structured_file_paths:
@@ -142,42 +149,20 @@ def _render_template_body(
                     "    # missing ones, remove stale ones, and use the final",
                     "    # list to decide what belongs in entities, entity",
                     "    # relationships, invariants, and guidance.",
-                    "    # Related ids for this file entry.",
-                    "    # Remove this block entirely if it does not point",
-                    "    # to anything.",
-                    "    related:",
                     *(
-                        ["      entities: []"]
-                        if not related_section.entities
-                        else [
-                            "      entities:",
-                            *(
-                                f"        - {related_entity}"
-                                for related_entity in related_section.entities
-                            ),
+                        [
+                            "    # Related ids for this file entry.",
+                            "    # Remove any empty related lists rather than leaving",
+                            "    # them in place.",
+                            "    related:",
                         ]
+                        if _has_related_values(related_section)
+                        else []
                     ),
                     *(
-                        ["      invariants: []"]
-                        if not related_section.invariants
-                        else [
-                            "      invariants:",
-                            *(
-                                f"        - {related_invariant}"
-                                for related_invariant in related_section.invariants
-                            ),
-                        ]
-                    ),
-                    *(
-                        ["      guidance: []"]
-                        if not related_section.guidance
-                        else [
-                            "      guidance:",
-                            *(
-                                f"        - {related_guidance}"
-                                for related_guidance in related_section.guidance
-                            ),
-                        ]
+                        _render_related_section(related_section)
+                        if _has_related_values(related_section)
+                        else []
                     ),
                 ]
             )
@@ -256,6 +241,42 @@ def _collect_related_sections_by_entry(
         )
 
     return related_sections_by_entry
+
+
+def _has_related_values(related_section: RelatedSectionPreview) -> bool:
+    return any(
+        (
+            related_section.entities,
+            related_section.invariants,
+            related_section.guidance,
+            related_section.acceptance_criteria,
+            related_section.expected_tests,
+            related_section.expected_outcomes,
+            related_section.non_goals,
+            related_section.risks,
+        )
+    )
+
+
+def _render_related_section(related_section: RelatedSectionPreview) -> list[str]:
+    lines: list[str] = []
+    for key, values in (
+        ("entities", related_section.entities),
+        ("invariants", related_section.invariants),
+        ("guidance", related_section.guidance),
+        ("acceptance_criteria", related_section.acceptance_criteria),
+        ("expected_tests", related_section.expected_tests),
+        ("expected_outcomes", related_section.expected_outcomes),
+        ("non_goals", related_section.non_goals),
+        ("risks", related_section.risks),
+    ):
+        if not values:
+            continue
+
+        lines.append(f"      {key}:")
+        lines.extend(f"        - {value}" for value in values)
+
+    return lines
 
 
 def _collect_related_entities_for_span(
@@ -432,11 +453,20 @@ def _render_header(
         "#   missing ones, and remove stale ones.\n"
         "# - Use the final related lists to help fill out `entities`,\n"
         "#   `entity_relationships`, `invariants`, and `guidance`.\n"
+        "# - Related references are optional. Remove empty related lists instead\n"
+        "#   of leaving them in place, and remove `related` entirely if nothing\n"
+        "#   needs to point at anything else.\n"
         "# - Put file-related entity ids under `related.entities`.\n"
         "# - Use `related.entities`, `related.invariants`, and `related.guidance`\n"
         "#   when this file change needs to point at supporting code areas or at\n"
         "#   the invariant or guidance entries it drives.\n"
-        "# - Remove `related` entirely if it would otherwise stay empty.\n"
+        "# - Use `related.acceptance_criteria`, `related.expected_tests`,\n"
+        "#   `related.expected_outcomes`, `related.non_goals`, and `related.risks`\n"
+        "#   when the change relates to a proposed-PR detail item. These\n"
+        "#   references are optional.\n"
+        "# - In any rationale, put current ids you want to reference in quotes;\n"
+        "#   the validator accepts quoted ids from the current codebase state,\n"
+        "#   existing changelogs, and proposal specs.\n"
         "# - Put entity lifecycle changes in `entities` with `action: added`,\n"
         "#   `action: deleted`, or `action: modified`.\n"
         "# - Put relationship changes in `entity_relationships`.\n"

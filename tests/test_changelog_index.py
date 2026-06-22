@@ -347,6 +347,16 @@ def test_build_changelog_index_normalizes_version_two_changes(
                 - INV-001
               guidance:
                 - GUID-001
+              acceptance_criteria:
+                - AC-001
+              expected_tests:
+                - TEST-001
+              expected_outcomes:
+                - OUT-001
+              non_goals:
+                - NG-001
+              risks:
+                - RISK-001
           - path: tests/test_app.py
             type: modified
             entities:
@@ -424,6 +434,17 @@ def test_build_changelog_index_normalizes_version_two_changes(
         "INV-001"
     ]
     assert index.documents[0].changelog.file_changes[0].related.guidance == ["GUID-001"]
+    assert index.documents[0].changelog.file_changes[0].related.acceptance_criteria == [
+        "AC-001"
+    ]
+    assert index.documents[0].changelog.file_changes[0].related.expected_tests == [
+        "TEST-001"
+    ]
+    assert index.documents[0].changelog.file_changes[0].related.expected_outcomes == [
+        "OUT-001"
+    ]
+    assert index.documents[0].changelog.file_changes[0].related.non_goals == ["NG-001"]
+    assert index.documents[0].changelog.file_changes[0].related.risks == ["RISK-001"]
     assert index.entity_graph.entities["ReviewSkill"][0].action == "added"
     assert index.provenance_for("src/app.py", 1).affects == ("ReviewSkill",)
 
@@ -485,6 +506,11 @@ def test_build_changelog_index_normalizes_version_two_changes(
         (0, 0, "entity", "ReviewSkill"),
         (0, 0, "invariant", "INV-001"),
         (0, 0, "guidance", "GUID-001"),
+        (0, 0, "acceptance_criteria", "AC-001"),
+        (0, 0, "expected_tests", "TEST-001"),
+        (0, 0, "expected_outcomes", "OUT-001"),
+        (0, 0, "non_goals", "NG-001"),
+        (0, 0, "risks", "RISK-001"),
         (1, 0, "entity", "ReviewSkill"),
         (1, 0, "invariant", "INV-001"),
         (1, 0, "guidance", "GUID-001"),

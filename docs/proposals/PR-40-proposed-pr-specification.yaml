@@ -6,3 +6,22 @@ intent:
   goal: Add the document families and authoring workflows that make system, architecture, implementation, and proposed-PR specs first-class current-state and diff artifacts.
   reasoning: This PR establishes the schema and template-validation foundation for specify-system, specify-architecture, specify-implementation, specify-prs, create-pr-changelog, and implement-pr so later synthesis and review workflows can build on coherent documents instead of ad hoc YAML.
 files: []
+acceptance_criteria:
+  - id: ac-doc-families
+    description: The platform has current-state, diff, and issues document families for system, architecture, implementation, and proposed-PR specs.
+  - id: ac-template-workflows
+    description: The specify skills and create-pr-changelog can generate templates and validate them before commit.
+expected_tests:
+  - id: test-template-generation
+    description: Add or update tests that verify each template generator writes the expected schema and sections.
+  - id: test-template-validation
+    description: Add or update tests that reject malformed templates and confirm boilerplate removal is enforced.
+expected_outcomes:
+  - id: outcome-spec-hygiene
+    description: Authors can produce coherent specs without inventing schema shapes or bypassing validation.
+non_goals:
+  - id: ng-synthesis
+    description: Do not add synthesis or review behavior in this PR.
+risks:
+  - id: risk-schema-churn
+    description: Adding several document families at once may require follow-up validator fixes if one family drifts from the shared shape.

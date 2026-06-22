@@ -65,6 +65,9 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - List only repository-relative file paths in `files` when updates are",
         "#   needed.",
         "# - Delete these instructions when you are done.",
+        "# - Add acceptance criteria, expected tests, expected outcomes,",
+        "#   non-goals, and risks as concrete lists with `id` and",
+        "#   `description`.",
         "#",
         "# Current feature ids:",
         *[
@@ -81,6 +84,21 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "  goal: null",
         "  reasoning: null",
         "files: []",
+        "acceptance_criteria:",
+        "  - id: null",
+        "    description: null",
+        "expected_tests:",
+        "  - id: null",
+        "    description: null",
+        "expected_outcomes:",
+        "  - id: null",
+        "    description: null",
+        "non_goals:",
+        "  - id: null",
+        "    description: null",
+        "risks:",
+        "  - id: null",
+        "    description: null",
         "",
     ]
     return "\n".join(lines)
@@ -147,7 +165,16 @@ def build_pr_specification_validation_report(
         issues=issues,
     )
 
-    for section_name in ("id", "feature_ids", "intent"):
+    for section_name in (
+        "id",
+        "feature_ids",
+        "intent",
+        "acceptance_criteria",
+        "expected_tests",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+    ):
         if section_name not in raw_spec:
             issues.append(
                 PRSpecificationValidationIssue(
@@ -214,6 +241,25 @@ def build_pr_specification_validation_report(
             issues=issues,
             issue_code="intent_reasoning_missing",
             issue_message="The intent.reasoning field is required.",
+        )
+
+    for section_name in (
+        "acceptance_criteria",
+        "expected_tests",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+    ):
+        _collect_detail_items(
+            _coerce_sequence(
+                raw_spec.get(section_name),
+                path=section_name,
+                issues=issues,
+                issue_code=f"invalid_{section_name}_section",
+                issue_message=(f"{section_name} must be a list of detail items."),
+            ),
+            section_name=section_name,
+            issues=issues,
         )
 
     _collect_file_paths(
@@ -346,6 +392,75 @@ def _validate_template_boilerplate_removed(
                 )
             )
             return
+
+
+def _collect_detail_items(
+    raw_items: Sequence[object],
+    *,
+    section_name: str,
+    issues: list[PRSpecificationValidationIssue],
+) -> set[str]:
+    item_ids: set[str] = set()
+    for index, raw_item in enumerate(raw_items):
+        item = _coerce_mapping(
+            raw_item,
+            path=f"{section_name}[{index}]",
+            issues=issues,
+            issue_code=f"invalid_{section_name}_item",
+            issue_message=(
+                f"Each {section_name.replace('_', ' ')} item must be a mapping."
+            ),
+        )
+        if item is None:
+            continue
+
+        item_id = _required_string(
+            item.get("id"),
+            path=f"{section_name}[{index}].id",
+            issues=issues,
+            issue_code=f"{section_name}_id_missing",
+            issue_message=(
+                f"Each {section_name.replace('_', ' ')} item must include an id."
+            ),
+        )
+        _required_string(
+            item.get("description"),
+            path=f"{section_name}[{index}].description",
+            issues=issues,
+            issue_code=f"{section_name}_description_missing",
+            issue_message=(
+                f"Each {section_name.replace('_', ' ')} item must include a "
+                "description."
+            ),
+        )
+        if item_id is None:
+            continue
+
+        if item_id in item_ids:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code=f"duplicate_{section_name}_id",
+                    message=(
+                        f"{section_name.replace('_', ' ').capitalize()} id "
+                        f"{item_id!r} appears more than once."
+                    ),
+                    path=f"{section_name}[{index}].id",
+                )
+            )
+            continue
+
+        item_ids.add(item_id)
+
+    if not item_ids:
+        issues.append(
+            PRSpecificationValidationIssue(
+                code=f"no_{section_name}_defined",
+                message=(f"Add at least one {section_name.replace('_', ' ')} item."),
+                path=section_name,
+            )
+        )
+
+    return item_ids
 
 
 def _collect_feature_ids(

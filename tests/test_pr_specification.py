@@ -84,6 +84,11 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         "feature_ids",
         "intent",
         "files",
+        "acceptance_criteria",
+        "expected_tests",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
     ]
 
 
@@ -105,6 +110,21 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
 
     files:
       - src/missing.py
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: Risk one.
     """
 
     report = build_pr_specification_validation_report(
@@ -141,6 +161,21 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
       reasoning: Keep the repo aligned.
 
     files: []
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: Risk one.
     """
 
     report = build_pr_specification_validation_report(
@@ -168,6 +203,9 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     # - List only repository-relative file paths in `files` when updates are
     #   needed.
     # - Delete these instructions when you are done.
+    # - Add acceptance criteria, expected tests, expected outcomes,
+    #   non-goals, and risks as concrete lists with `id` and
+    #   `description`.
     #
     # Current feature ids:
     # - feature-a (feature, docs/implementation/implementation-specification.yaml)
@@ -180,6 +218,21 @@ def test_validate_pr_specification_rejects_template_boilerplate(
       reasoning: Keep the repo aligned.
 
     files: []
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: Risk one.
     """
 
     report = build_pr_specification_validation_report(
@@ -190,6 +243,50 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     assert report.validation_successful is False
     assert {issue.code for issue in report.issues} == {
         "template_boilerplate_not_removed",
+    }
+
+
+def test_validate_pr_specification_rejects_missing_detail_description(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: pr-790
+
+    feature_ids:
+      - feature-a
+
+    intent:
+      goal: Add a new capability.
+      reasoning: Keep the repo aligned.
+
+    files: []
+    acceptance_criteria:
+      - id: ac-1
+        description: Acceptance criteria one.
+    expected_tests:
+      - id: test-1
+        description: Expected test one.
+    expected_outcomes:
+      - id: outcome-1
+        description: Expected outcome one.
+    non_goals:
+      - id: ng-1
+        description: Non-goal one.
+    risks:
+      - id: risk-1
+        description: ""
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "risks_description_missing",
     }
 
 
@@ -209,6 +306,21 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
           reasoning: Keep the repo aligned.
 
         files: []
+        acceptance_criteria:
+          - id: ac-1
+            description: Acceptance criteria one.
+        expected_tests:
+          - id: test-1
+            description: Expected test one.
+        expected_outcomes:
+          - id: outcome-1
+            description: Expected outcome one.
+        non_goals:
+          - id: ng-1
+            description: Non-goal one.
+        risks:
+          - id: risk-1
+            description: Risk one.
         """,
         encoding="utf-8",
     )

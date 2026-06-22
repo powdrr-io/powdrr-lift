@@ -12,6 +12,26 @@ System. `powdrr-lift` is an opinionated coding agent memory system that:
 `powdrr-lift` is designed for individuals and teams focused on increasing code quality,
 increasing code understandability, decreasing token costs, and decreasing time wasted.
 
+## Why Powdrr-Lift?
+
+AI coding assistants are powerful, but they are hard to trust when the only source of
+truth is chat history and a pile of markdown notes. `powdrr-lift` adds a structured
+change layer so humans and agents can agree on what changed before, during, and after
+the code lands.
+
+* Agree on the change hierarchy before implementation - capture intent, decisions,
+  file changes, entities, relationships, invariants, and guidance as structured data.
+* Validate at a finer granularity - the more structure the system has, the more
+  confidently both agents and humans can check coherency and catch drift early.
+* Surface the right context - targeted edit, blame, and entity views keep the current
+  change connected to its related code areas and prior decisions.
+* Keep the workflow opinionated - the repo has strong guardrails on purpose, because
+  opinionated systems make it easier to stay aligned and easier to encode your own
+  point of view when the work demands it.
+
+In practice, that means less ambiguity, less wasted work, and more confidence that the
+next change is still pointing in the right direction.
+
 ## Design
 
 The next-stage platform design is captured in

@@ -1,0 +1,2154 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: '41'
+title: Unify specifications under docs/specs
+intent:
+  problem: The repository has multiple specification families and helper workflows that need a single
+    location and validation path.
+  goal: Move architecture, system, implementation, and proposed-PR specs under docs/specs/<work-item-name>,
+    unify them on specification-v1, add the implement-pr workflow, and enforce immutability for merged
+    structured files.
+decisions:
+- id: unified-spec-layout
+  summary: Store the core specifications under docs/specs/<work-item-name> using specification-v1.
+- id: immutable-structured-files
+  summary: Treat merged structured files as immutable and reject post-merge edits.
+- id: implement-pr-workflow
+  summary: Add implement-pr discovery, validation, and execution support across CLI and MCP.
+structured_files:
+- docs/specs/PR-40/proposed-pr-specification.yaml
+- docs/specs/PR-41/proposed-pr-specification.yaml
+- docs/specs/PR-42/proposed-pr-specification.yaml
+- docs/specs/PR-43/proposed-pr-specification.yaml
+- docs/specs/powdrr-lift/architecture-specification.yaml
+- docs/specs/powdrr-lift/implementation-specification.yaml
+- docs/specs/powdrr-lift/system-specification.yaml
+files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 65
+    end_line: 67
+  summary: Document the unified specification workflow and the installable skill platform.
+  rationale: Document the new repo shape so the platform overview matches the code and spec layout.
+- path: docs/design/agent-platform-expansion.md
+  type: modified
+  span:
+    start_line: 29
+    end_line: 31
+  summary: Capture the platform expansion design and the new specification families.
+  rationale: Keep the design note aligned with the platform changes in this branch.
+- path: docs/design/agent-platform-expansion.md
+  type: modified
+  span:
+    start_line: 119
+    end_line: 119
+  summary: Capture the platform expansion design and the new specification families.
+  rationale: Keep the design note aligned with the platform changes in this branch.
+- path: skills/implement-pr/SKILL.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 41
+  summary: Add the implement-pr skill for proposed-PR discovery, validation, and implementation.
+  rationale: Provide the implementation workflow needed to act on a validated proposed PR.
+- path: skills/implement-pr/agents/openai.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 4
+  summary: Add the OpenAI agent metadata for the implement-pr skill.
+  rationale: Keep the agent wrapper for implement-pr aligned with the new skill.
+- path: skills/specify-architecture/SKILL.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update the architecture skill for the unified specification workflow.
+  rationale: Keep the architecture skill instructions aligned with the new spec flow.
+- path: skills/specify-architecture/SKILL.md
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Update the architecture skill for the unified specification workflow.
+  rationale: Keep the architecture skill instructions aligned with the new spec flow.
+- path: skills/specify-architecture/SKILL.md
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Update the architecture skill for the unified specification workflow.
+  rationale: Keep the architecture skill instructions aligned with the new spec flow.
+- path: skills/specify-architecture/SKILL.md
+  type: modified
+  span:
+    start_line: 20
+    end_line: 21
+  summary: Update the architecture skill for the unified specification workflow.
+  rationale: Keep the architecture skill instructions aligned with the new spec flow.
+- path: skills/specify-architecture/SKILL.md
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Update the architecture skill for the unified specification workflow.
+  rationale: Keep the architecture skill instructions aligned with the new spec flow.
+- path: skills/specify-architecture/SKILL.md
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Update the architecture skill for the unified specification workflow.
+  rationale: Keep the architecture skill instructions aligned with the new spec flow.
+- path: skills/specify-implementation/SKILL.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update the implementation skill for the unified specification workflow.
+  rationale: Keep the implementation skill instructions aligned with the new spec flow.
+- path: skills/specify-implementation/SKILL.md
+  type: modified
+  span:
+    start_line: 18
+    end_line: 19
+  summary: Update the implementation skill for the unified specification workflow.
+  rationale: Keep the implementation skill instructions aligned with the new spec flow.
+- path: skills/specify-implementation/SKILL.md
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Update the implementation skill for the unified specification workflow.
+  rationale: Keep the implementation skill instructions aligned with the new spec flow.
+- path: skills/specify-implementation/SKILL.md
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Update the implementation skill for the unified specification workflow.
+  rationale: Keep the implementation skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/SKILL.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update the proposed-PR skill for the new template and validation flow.
+  rationale: Keep the proposed-PR skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/SKILL.md
+  type: modified
+  span:
+    start_line: 15
+    end_line: 16
+  summary: Update the proposed-PR skill for the new template and validation flow.
+  rationale: Keep the proposed-PR skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/SKILL.md
+  type: modified
+  span:
+    start_line: 18
+    end_line: 19
+  summary: Update the proposed-PR skill for the new template and validation flow.
+  rationale: Keep the proposed-PR skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/SKILL.md
+  type: modified
+  span:
+    start_line: 24
+    end_line: 26
+  summary: Update the proposed-PR skill for the new template and validation flow.
+  rationale: Keep the proposed-PR skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/SKILL.md
+  type: modified
+  span:
+    start_line: 28
+    end_line: 29
+  summary: Update the proposed-PR skill for the new template and validation flow.
+  rationale: Keep the proposed-PR skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/SKILL.md
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Update the proposed-PR skill for the new template and validation flow.
+  rationale: Keep the proposed-PR skill instructions aligned with the new spec flow.
+- path: skills/specify-prs/agents/openai.yaml
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Update the OpenAI metadata for the proposed-PR skill.
+  rationale: Keep the agent wrapper for specify-prs aligned with the new skill.
+- path: skills/specify-system/SKILL.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update the system skill for the shared specification and review model.
+  rationale: Keep the system skill instructions aligned with the current-state and diff model.
+- path: skills/specify-system/SKILL.md
+  type: modified
+  span:
+    start_line: 15
+    end_line: 18
+  summary: Update the system skill for the shared specification and review model.
+  rationale: Keep the system skill instructions aligned with the current-state and diff model.
+- path: skills/specify-system/SKILL.md
+  type: modified
+  span:
+    start_line: 27
+    end_line: 28
+  summary: Update the system skill for the shared specification and review model.
+  rationale: Keep the system skill instructions aligned with the current-state and diff model.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 55
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 60
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 118
+    end_line: 118
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 125
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 148
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 153
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 166
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 172
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 193
+    end_line: 194
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 200
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 204
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 236
+    end_line: 237
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 250
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 283
+    end_line: 283
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 293
+  summary: Update src/powdrr_lift/__init__.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Teach the changelog template about structured files and the new optional related sections.
+  rationale: Update the generated template so authors can write valid changelogs for the new structure.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 120
+  summary: Teach the changelog template about structured files and the new optional related sections.
+  rationale: Update the generated template so authors can write valid changelogs for the new structure.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 658
+    end_line: 658
+  summary: Teach the changelog template about structured files and the new optional related sections.
+  rationale: Update the generated template so authors can write valid changelogs for the new structure.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 395
+    end_line: 398
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 581
+    end_line: 593
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1188
+    end_line: 1188
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1194
+    end_line: 1194
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1462
+    end_line: 1462
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1468
+    end_line: 1474
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1519
+    end_line: 1519
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1488
+    end_line: 1646
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1930
+    end_line: 1937
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1939
+    end_line: 1945
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1947
+    end_line: 1947
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1829
+    end_line: 1831
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1950
+    end_line: 1955
+  summary: Enforce the unified specification layout, immutable structured files, and richer cross-reference
+    validation.
+  rationale: Validate the new changelog shape and reject stale merged structured-file edits.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 41
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 316
+    end_line: 323
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 336
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 362
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 368
+    end_line: 368
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 376
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 404
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 410
+    end_line: 410
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 429
+    end_line: 436
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 442
+    end_line: 442
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 452
+    end_line: 489
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 495
+    end_line: 502
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 535
+    end_line: 542
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 548
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 573
+    end_line: 580
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 603
+    end_line: 610
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 817
+    end_line: 817
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 823
+    end_line: 826
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 837
+    end_line: 837
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 844
+    end_line: 847
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 858
+    end_line: 858
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 864
+    end_line: 867
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 878
+    end_line: 878
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 883
+    end_line: 886
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 894
+    end_line: 918
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 921
+    end_line: 924
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 929
+    end_line: 929
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 935
+    end_line: 935
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 947
+    end_line: 948
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 953
+    end_line: 953
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 959
+    end_line: 959
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 971
+    end_line: 974
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 978
+    end_line: 978
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 983
+    end_line: 983
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 994
+    end_line: 997
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1001
+    end_line: 1001
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1003
+    end_line: 1003
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1007
+    end_line: 1007
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1009
+    end_line: 1009
+  summary: Expose the new specification, proposed-PR, and context commands on the CLI.
+  rationale: Expose the new workflows to users through the command line interface.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Re-export the updated specification and index APIs from the core package.
+  rationale: Keep the public core API consistent after the specification migration.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 137
+  summary: Re-export the updated specification and index APIs from the core package.
+  rationale: Keep the public core API consistent after the specification migration.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 139
+  summary: Re-export the updated specification and index APIs from the core package.
+  rationale: Keep the public core API consistent after the specification migration.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 150
+  summary: Re-export the updated specification and index APIs from the core package.
+  rationale: Keep the public core API consistent after the specification migration.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 269
+  summary: Re-export the updated specification and index APIs from the core package.
+  rationale: Keep the public core API consistent after the specification migration.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 154
+  summary: Re-export the updated specification and index APIs from the core package.
+  rationale: Keep the public core API consistent after the specification migration.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 17
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 56
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 79
+    end_line: 79
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 122
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 132
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 139
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 149
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 165
+    end_line: 165
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 187
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 383
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 484
+    end_line: 485
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 683
+    end_line: 683
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 686
+    end_line: 686
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 692
+    end_line: 692
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 695
+    end_line: 695
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 707
+    end_line: 707
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 709
+    end_line: 709
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 726
+    end_line: 726
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 728
+    end_line: 728
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 736
+    end_line: 739
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 860
+    end_line: 865
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 867
+    end_line: 867
+  summary: Update the architecture specification helpers and templates for the unified spec flow.
+  rationale: Keep the architecture spec render and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 14
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 17
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 59
+    end_line: 59
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 68
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 96
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 156
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 167
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 171
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 184
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 190
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 200
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 209
+    end_line: 209
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 394
+    end_line: 394
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 400
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 958
+    end_line: 963
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 965
+    end_line: 965
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 981
+    end_line: 982
+  summary: Update the implementation specification helpers for the unified spec flow.
+  rationale: Keep the implementation spec helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 14
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 62
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 71
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 82
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 88
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 100
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 137
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 146
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 152
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 161
+    end_line: 161
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 163
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 167
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 169
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 177
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 179
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 186
+    end_line: 194
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 329
+    end_line: 342
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 381
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 384
+    end_line: 486
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 303
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 489
+    end_line: 492
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 529
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 538
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 556
+    end_line: 626
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 863
+    end_line: 898
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 900
+    end_line: 900
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 925
+    end_line: 946
+  summary: Add proposed-PR discovery, inspection, and validation helpers.
+  rationale: Keep the proposed-PR discovery and validation helpers in sync with the new layout.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 76
+  summary: Centralize specification path handling under docs/specs.
+  rationale: Centralize spec path resolution so the new docs/specs layout stays consistent.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 16
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 55
+    end_line: 63
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 68
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 80
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 104
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 110
+    end_line: 114
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 120
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 129
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 736
+    end_line: 741
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 743
+    end_line: 743
+  summary: Update the system specification helpers for the current-state and diff model.
+  rationale: Keep the system spec helpers in sync with the current-state and diff model.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 8
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 39
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 219
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 227
+    end_line: 227
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 232
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 243
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 251
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 254
+    end_line: 257
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 275
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 280
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 291
+    end_line: 291
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 297
+    end_line: 297
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 299
+    end_line: 302
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 310
+    end_line: 339
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 344
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 351
+    end_line: 351
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 358
+    end_line: 358
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 365
+    end_line: 365
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 373
+    end_line: 373
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 379
+    end_line: 379
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 386
+    end_line: 386
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 392
+    end_line: 392
+  summary: Expose the new specification and proposed-PR commands over MCP.
+  rationale: Expose the new workflows over MCP so agents can use them without shell mediation.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 83
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 94
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 102
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 116
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 190
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 250
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 304
+    end_line: 304
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 364
+    end_line: 364
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 379
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 429
+    end_line: 430
+  summary: Cover the updated architecture specification workflow.
+  rationale: Verify the architecture spec helpers and validation paths after the migration.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 81
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 95
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 100
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 122
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 234
+    end_line: 234
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 599
+    end_line: 599
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 601
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 605
+    end_line: 605
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 743
+    end_line: 743
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 745
+    end_line: 749
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 753
+    end_line: 753
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 764
+    end_line: 764
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 778
+    end_line: 778
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 866
+    end_line: 866
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 868
+    end_line: 872
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 887
+    end_line: 887
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 899
+    end_line: 899
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1642
+    end_line: 1676
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1678
+    end_line: 1678
+  summary: Cover the new changelog validation rules for structured files and references.
+  rationale: Verify the changelog validator against the new schema and immutability rules.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 20
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 57
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 65
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 80
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 142
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 192
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 210
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 245
+  summary: Cover the updated implementation specification workflow.
+  rationale: Verify the implementation spec helpers and validation paths after the migration.
+- path: tests/test_mcp_server.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 36
+  summary: Update tests/test_mcp_server.py for the unified specification workflow.
+  rationale: Keep the branch changes aligned with the unified specification workflow.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Cover the updated changelog parser for structured files and proposed-PR sections.
+  rationale: Verify the parser keeps the structured-file and proposed-PR sections intact.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 157
+    end_line: 159
+  summary: Cover the updated changelog parser for structured files and proposed-PR sections.
+  rationale: Verify the parser keeps the structured-file and proposed-PR sections intact.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 15
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 24
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 49
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 66
+    end_line: 111
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 122
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 136
+    end_line: 136
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 195
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 136
+    end_line: 136
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 238
+    end_line: 238
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 293
+    end_line: 293
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 337
+    end_line: 337
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 349
+    end_line: 352
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 355
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 390
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 402
+    end_line: 494
+  summary: Cover the proposed-PR specification discovery and validation workflow.
+  rationale: Verify proposed-PR discovery, inspection, and validation after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 25
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 84
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 119
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 148
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 177
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 208
+    end_line: 211
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 238
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 249
+    end_line: 252
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 279
+  summary: Cover the updated system specification workflow.
+  rationale: Verify the system spec helpers and validation paths after the migration.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

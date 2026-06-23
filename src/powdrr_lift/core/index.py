@@ -1011,13 +1011,16 @@ def _backfill_line_state_from_blame(
         if all(provenance is not None for provenance in file_lines):
             continue
 
-        blame_output = _git_output(
-            repo_root,
-            "blame",
-            "--line-porcelain",
-            "--",
-            file_path,
-        )
+        try:
+            blame_output = _git_output(
+                repo_root,
+                "blame",
+                "--line-porcelain",
+                "--",
+                file_path,
+            )
+        except subprocess.CalledProcessError:
+            continue
         if blame_output == "":
             continue
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, cast
 
@@ -36,6 +37,35 @@ class _FeatureCatalogEntry:
     feature_id: str
     source_path: str
     entity_type: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedPRSearchResult:
+    pr_number: int
+    proposed_pr_id: str | None
+    path: Path
+    score: float
+    matched_fields: tuple[str, ...] = field(default_factory=tuple)
+    feature_ids: tuple[str, ...] = field(default_factory=tuple)
+    intent_goal: str | None = None
+    intent_reasoning: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedPRSearchReport:
+    query: str
+    results: list[ProposedPRSearchResult] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class _ProposedPRDocument:
+    pr_number: int
+    path: Path
+    data: Mapping[str, Any]
+    proposed_pr_id: str | None
+    feature_ids: tuple[str, ...]
+    intent_goal: str | None
+    intent_reasoning: str | None
 
 
 def pr_specification_default_output_path(repo_root: str | Path | None = None) -> Path:
@@ -115,6 +145,64 @@ def create_pr_specification_template(
         encoding="utf-8",
     )
     return resolved_output_path
+
+
+def proposed_pr_specification_path(
+    pr_number: int,
+    *,
+    repo_root: str | Path | None = None,
+) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    return (
+        repo_root_path
+        / "docs"
+        / "proposals"
+        / f"PR-{pr_number}-proposed-pr-specification.yaml"
+    )
+
+
+def show_proposed_pr_specification(
+    pr_number: int,
+    *,
+    repo_root: str | Path | None = None,
+) -> str:
+    specification_path = proposed_pr_specification_path(pr_number, repo_root=repo_root)
+    if not specification_path.exists():
+        raise FileNotFoundError(
+            f"Proposed PR specification not found: {specification_path}"
+        )
+    return specification_path.read_text(encoding="utf-8")
+
+
+def search_proposed_pr_specifications(
+    query: str,
+    *,
+    repo_root: str | Path | None = None,
+    limit: int = 10,
+) -> ProposedPRSearchReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    normalized_query = query.strip()
+    if normalized_query == "":
+        raise ValueError("Query must not be empty.")
+
+    documents = _load_proposed_pr_documents(repo_root_path)
+    results = sorted(
+        (
+            _score_proposed_pr_document(normalized_query, document)
+            for document in documents
+        ),
+        key=lambda result: (-result.score, result.pr_number, result.path.name),
+    )
+    filtered_results = [result for result in results if result.score > 0.0][:limit]
+    return ProposedPRSearchReport(query=normalized_query, results=filtered_results)
+
+
+def render_proposed_pr_search_report(report: ProposedPRSearchReport) -> str:
+    return yaml.safe_dump(
+        _proposed_pr_search_report_to_data(report),
+        sort_keys=False,
+        allow_unicode=False,
+    )
 
 
 def validate_pr_specification_yaml(
@@ -358,6 +446,181 @@ def _load_existing_pr_ids(repo_root: Path) -> list[str]:
         pr_ids.append(proposed_pr_id)
 
     return pr_ids
+
+
+def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
+    proposal_dir = repo_root / "docs" / "proposals"
+    if not proposal_dir.exists():
+        return []
+
+    documents: list[_ProposedPRDocument] = []
+    for specification_path in sorted(
+        proposal_dir.glob("PR-*-proposed-pr-specification.yaml")
+    ):
+        pr_number = _parse_proposed_pr_number(specification_path.name)
+        if pr_number is None:
+            continue
+
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        proposed_pr_id = _optional_string(raw_spec.get("id"))
+        feature_ids = tuple(
+            feature_id
+            for feature_id in (
+                _optional_string(raw_feature_id)
+                for raw_feature_id in _coerce_sequence(
+                    raw_spec.get("feature_ids"),
+                    path=f"{specification_path}#feature_ids",
+                    issues=[],
+                    issue_code="invalid_feature_ids_section",
+                    issue_message="",
+                )
+            )
+            if feature_id is not None
+        )
+        intent = _coerce_mapping(
+            raw_spec.get("intent"),
+            path=f"{specification_path}#intent",
+            issues=[],
+            issue_code="invalid_intent_section",
+            issue_message="",
+        )
+        intent_goal = _optional_string(intent.get("goal")) if intent else None
+        intent_reasoning = _optional_string(intent.get("reasoning")) if intent else None
+        documents.append(
+            _ProposedPRDocument(
+                pr_number=pr_number,
+                path=specification_path,
+                data=raw_spec,
+                proposed_pr_id=proposed_pr_id,
+                feature_ids=feature_ids,
+                intent_goal=intent_goal,
+                intent_reasoning=intent_reasoning,
+            )
+        )
+
+    return documents
+
+
+def _parse_proposed_pr_number(filename: str) -> int | None:
+    if not filename.startswith("PR-") or not filename.endswith(
+        "-proposed-pr-specification.yaml"
+    ):
+        return None
+
+    number_text = filename.removeprefix("PR-").removesuffix(
+        "-proposed-pr-specification.yaml"
+    )
+    if not number_text.isdigit():
+        return None
+    return int(number_text)
+
+
+def _score_proposed_pr_document(
+    query: str,
+    document: _ProposedPRDocument,
+) -> ProposedPRSearchResult:
+    field_texts = {
+        "id": document.proposed_pr_id or "",
+        "feature_ids": " ".join(document.feature_ids),
+        "intent.goal": document.intent_goal or "",
+        "intent.reasoning": document.intent_reasoning or "",
+        "acceptance_criteria": _collect_detail_text(
+            document.data.get("acceptance_criteria")
+        ),
+        "expected_tests": _collect_detail_text(document.data.get("expected_tests")),
+        "expected_outcomes": _collect_detail_text(
+            document.data.get("expected_outcomes")
+        ),
+        "non_goals": _collect_detail_text(document.data.get("non_goals")),
+        "risks": _collect_detail_text(document.data.get("risks")),
+    }
+
+    matched_fields: list[str] = []
+    best_score = 0.0
+    for field_name, field_text in field_texts.items():
+        score = _score_text(query, field_text)
+        if score > best_score:
+            best_score = score
+        if score > 0.25:
+            matched_fields.append(field_name)
+
+    if document.proposed_pr_id and document.proposed_pr_id == query:
+        best_score = 1.0
+        if "id" not in matched_fields:
+            matched_fields.append("id")
+
+    return ProposedPRSearchResult(
+        pr_number=document.pr_number,
+        proposed_pr_id=document.proposed_pr_id,
+        path=document.path,
+        score=round(best_score, 4),
+        matched_fields=tuple(dict.fromkeys(matched_fields)),
+        feature_ids=document.feature_ids,
+        intent_goal=document.intent_goal,
+        intent_reasoning=document.intent_reasoning,
+    )
+
+
+def _collect_detail_text(raw_value: object | None) -> str:
+    if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes)):
+        return ""
+
+    collected: list[str] = []
+    for item in raw_value:
+        if not isinstance(item, Mapping):
+            continue
+        item_id = _optional_string(item.get("id"))
+        description = _optional_string(item.get("description"))
+        if item_id is not None:
+            collected.append(item_id)
+        if description is not None:
+            collected.append(description)
+    return " ".join(collected)
+
+
+def _score_text(query: str, text: str) -> float:
+    normalized_text = text.strip().lower()
+    if normalized_text == "":
+        return 0.0
+
+    normalized_query = query.strip().lower()
+    if normalized_query == "":
+        return 0.0
+
+    if normalized_query in normalized_text:
+        return 1.0
+
+    query_tokens = [token for token in _tokenize(normalized_query) if len(token) > 1]
+    if query_tokens:
+        overlap = sum(1 for token in query_tokens if token in normalized_text)
+        token_score = overlap / len(query_tokens)
+    else:
+        token_score = 0.0
+
+    return max(
+        SequenceMatcher(None, normalized_query, normalized_text).ratio(), token_score
+    )
+
+
+def _tokenize(text: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for character in text:
+        if character.isalnum():
+            current.append(character)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
 
 
 def _validate_template_boilerplate_removed(
@@ -621,5 +884,26 @@ def _report_to_data(
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues
+        ],
+    }
+
+
+def _proposed_pr_search_report_to_data(
+    report: ProposedPRSearchReport,
+) -> Mapping[str, Any]:
+    return {
+        "query": report.query,
+        "results": [
+            {
+                "pr_number": result.pr_number,
+                "proposed_pr_id": result.proposed_pr_id,
+                "path": str(result.path),
+                "score": result.score,
+                "matched_fields": list(result.matched_fields),
+                "feature_ids": list(result.feature_ids),
+                "intent_goal": result.intent_goal,
+                "intent_reasoning": result.intent_reasoning,
+            }
+            for result in report.results
         ],
     }

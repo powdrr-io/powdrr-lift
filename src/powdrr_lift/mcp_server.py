@@ -31,7 +31,10 @@ from powdrr_lift.core import (
     render_entity_reference_report,
     render_entity_relationship_report,
     render_invariants_report,
+    render_proposed_pr_search_report,
     resolve_repo_root,
+    search_proposed_pr_specifications,
+    show_proposed_pr_specification,
     system_specification_default_output_path,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
@@ -281,6 +284,28 @@ def build_server() -> Any:
             repo_root=repo_root_path,
         )
         return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def search_proposed_prs(
+        query: str,
+        limit: int = 10,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        report = search_proposed_pr_specifications(
+            query,
+            repo_root=repo_root_path,
+            limit=limit,
+        )
+        return render_proposed_pr_search_report(report)
+
+    @server.tool()
+    def show_proposed_pr(
+        pr_number: int,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        return show_proposed_pr_specification(pr_number, repo_root=repo_root_path)
 
     @server.tool()
     def validate_architecture_specification(

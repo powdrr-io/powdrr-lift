@@ -35,7 +35,10 @@ from powdrr_lift.core import (
     render_entity_reference_report,
     render_entity_relationship_report,
     render_invariants_report,
+    render_proposed_pr_search_report,
     resolve_repo_root,
+    search_proposed_pr_specifications,
+    show_proposed_pr_specification,
     system_specification_default_output_path,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
@@ -414,6 +417,45 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pr_specification_parser.set_defaults(func=_run_pr_specification)
 
+    search_proposed_prs_parser = subparsers.add_parser(
+        "search-proposed-prs",
+        aliases=["search_proposed_prs"],
+        help="Fuzzy-search proposed PR specifications.",
+    )
+    search_proposed_prs_parser.add_argument(
+        "query",
+        help="Search query to match against proposed PR ids, features, and intent.",
+    )
+    search_proposed_prs_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum number of results to return.",
+    )
+    search_proposed_prs_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    search_proposed_prs_parser.set_defaults(func=_run_search_proposed_prs)
+
+    show_proposed_pr_parser = subparsers.add_parser(
+        "show-proposed-pr",
+        aliases=["show_proposed_pr"],
+        help="Print a proposed PR specification by PR number.",
+    )
+    show_proposed_pr_parser.add_argument(
+        "pr_number",
+        type=int,
+        help="Proposed PR number to print.",
+    )
+    show_proposed_pr_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    show_proposed_pr_parser.set_defaults(func=_run_show_proposed_pr)
+
     evaluate_architecture_specification_parser = subparsers.add_parser(
         "evaluate-architecture-specification",
         aliases=["evaluate_architecture_specification"],
@@ -767,6 +809,32 @@ def _run_pr_specification(args: argparse.Namespace) -> int:
     else:
         print(f"Wrote PR specification template to {output_path}")
 
+    return 0
+
+
+def _run_search_proposed_prs(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    report = search_proposed_pr_specifications(
+        args.query,
+        repo_root=repo_root,
+        limit=args.limit,
+    )
+    rendered_report = render_proposed_pr_search_report(report)
+    sys.stdout.write(rendered_report)
+    if not rendered_report.endswith("\n"):
+        sys.stdout.write("\n")
+    return 0
+
+
+def _run_show_proposed_pr(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    proposed_pr_specification = show_proposed_pr_specification(
+        args.pr_number,
+        repo_root=repo_root,
+    )
+    sys.stdout.write(proposed_pr_specification)
+    if not proposed_pr_specification.endswith("\n"):
+        sys.stdout.write("\n")
     return 0
 
 

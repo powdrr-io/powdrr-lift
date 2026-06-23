@@ -8,7 +8,11 @@ import yaml
 
 from powdrr_lift import build_pr_specification_validation_report
 from powdrr_lift.cli import main
-from powdrr_lift.core import pr_specification_default_output_path
+from powdrr_lift.core import (
+    pr_specification_default_output_path,
+    search_proposed_pr_specifications,
+    show_proposed_pr_specification,
+)
 
 
 def _write_implementation_specification(repo_root: Path) -> Path:
@@ -51,6 +55,52 @@ def _write_existing_pr_specification(repo_root: Path) -> Path:
         encoding="utf-8",
     )
     return pr_specification_path
+
+
+def _write_proposed_pr_specification(
+    repo_root: Path,
+    pr_number: int,
+    *,
+    proposed_pr_id: str,
+    feature_id: str,
+    goal: str,
+    reasoning: str,
+) -> Path:
+    proposal_path = (
+        repo_root
+        / "docs"
+        / "proposals"
+        / f"PR-{pr_number}-proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True, exist_ok=True)
+    proposal_path.write_text(
+        f"""
+        schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+        id: {proposed_pr_id}
+        feature_ids:
+          - {feature_id}
+        intent:
+          goal: {goal}
+          reasoning: {reasoning}
+        acceptance_criteria:
+          - id: ac-{pr_number}
+            description: Acceptance criteria {pr_number}.
+        expected_tests:
+          - id: test-{pr_number}
+            description: Expected tests {pr_number}.
+        expected_outcomes:
+          - id: outcome-{pr_number}
+            description: Expected outcome {pr_number}.
+        non_goals:
+          - id: ng-{pr_number}
+            description: Non-goal {pr_number}.
+        risks:
+          - id: risk-{pr_number}
+            description: Risk {pr_number}.
+        """,
+        encoding="utf-8",
+    )
+    return proposal_path
 
 
 def test_create_pr_specification_template_writes_default_file(tmp_path: Path) -> None:
@@ -331,3 +381,96 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
     report = yaml.safe_load(stdout.getvalue())
     assert report["validation_successful"] is True
     assert report["proposed_pr_id"] == "pr-456"
+
+
+def test_search_proposed_pr_specifications_ranks_matching_results(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    first_path = _write_proposed_pr_specification(
+        tmp_path,
+        40,
+        proposed_pr_id="pr-40",
+        feature_id="feature-a",
+        goal="Introduce current-state and diff document families.",
+        reasoning="This supports the document family proposal.",
+    )
+    _write_proposed_pr_specification(
+        tmp_path,
+        41,
+        proposed_pr_id="pr-41",
+        feature_id="feature-b",
+        goal="Add synthesis workflows.",
+        reasoning="This supports the synthesis proposal.",
+    )
+
+    report = search_proposed_pr_specifications(
+        "document families",
+        repo_root=tmp_path,
+    )
+
+    assert report.query == "document families"
+    assert [result.pr_number for result in report.results][:1] == [40]
+    assert report.results[0].path == first_path
+    assert "intent.goal" in report.results[0].matched_fields
+
+
+def test_show_proposed_pr_specification_returns_file_contents(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposal_path = _write_proposed_pr_specification(
+        tmp_path,
+        42,
+        proposed_pr_id="pr-42",
+        feature_id="feature-a",
+        goal="Add review workflows.",
+        reasoning="This supports the review proposal.",
+    )
+
+    assert show_proposed_pr_specification(42, repo_root=tmp_path) == (
+        proposal_path.read_text(encoding="utf-8")
+    )
+
+
+def test_cli_search_and_show_proposed_pr_specification(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    _write_proposed_pr_specification(
+        tmp_path,
+        43,
+        proposed_pr_id="pr-43",
+        feature_id="feature-a",
+        goal="Package the platform.",
+        reasoning="This supports the packaging proposal.",
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "search-proposed-prs",
+                "packaging",
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+
+    assert exit_code == 0
+    search_report = yaml.safe_load(stdout.getvalue())
+    assert search_report["results"][0]["pr_number"] == 43
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "show-proposed-pr",
+                "43",
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+
+    assert exit_code == 0
+    assert "pr-43" in stdout.getvalue()

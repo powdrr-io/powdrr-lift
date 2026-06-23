@@ -14,6 +14,9 @@ entities:
   - id: specify-prs
     action: added
     rationale: Preserve a structured proposed-PR workflow for implementation planning and traceability.
+  - id: implement-pr
+    action: added
+    rationale: Add a workflow that searches, validates, and executes a proposed PR before changelog generation.
   - id: prepare-pr-changelog
     action: added
     rationale: Keep the PR changelog workflow available while the platform grows beyond the current skill set.
@@ -102,6 +105,9 @@ entity_relationships:
   - id: skill-package-contains-specify-prs
     action: added
     rationale: The package must keep shipping the specify-prs skill.
+  - id: skill-package-contains-implement-pr
+    action: added
+    rationale: The package must keep shipping the implement-pr skill.
   - id: skill-package-contains-prepare-pr-changelog
     action: added
     rationale: The package must keep shipping the current PR changelog skill.
@@ -131,6 +137,14 @@ features:
       - Each specify skill must expose a validation endpoint for the filled template.
       - The template instructions must tell the agent how to fill the document before validation.
       - The workflow must fail closed until the filled document validates.
+  - id: feature-proposed-pr-discovery
+    action: added
+    description: Add fuzzy search and direct inspection endpoints for proposed PR specifications so the implement-pr workflow can identify, inspect, and validate the right proposal before coding.
+    functional_requirements:
+      - The platform must fuzzy-match proposed PR ids, feature ids, and intent text.
+      - The platform must expose a direct inspection endpoint for a proposed PR id or number.
+      - The platform must validate the selected proposed PR before implementation begins.
+      - The implement-pr workflow must inspect every section of the proposed PR before and after the code changes.
   - id: feature-synthesis-workflows
     action: added
     description: Add synthesis workflows that derive start state, new state, and diff from a parent branch and a PR for `synthesize-system`, `synthesize-architecture`, and `synthesize-implementation`.

@@ -20,7 +20,10 @@ Use this skill to draft a PR specification that ties a proposed PR to current fe
    - Set `id` to a globally unique proposed PR id.
    - Reference one or more current feature ids from the current codebase state.
    - Put the PR goal and reasoning in `intent.goal` and `intent.reasoning`.
-   - List only repository-relative paths in `files`, and only when they need to change.
+   - Fill in `acceptance_criteria`, `expected_tests`, `expected_outcomes`,
+     `non_goals`, and `risks` with concrete `id` and `description` pairs.
+   - Keep the proposed PR self-contained; use the section lists to describe
+     what changes, not a file list.
 3. Validate the specification.
    - Run `powdrr-lift evaluate-pr-specification`.
    - If using MCP, call `validate_pr_specification`.

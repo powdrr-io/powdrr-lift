@@ -28,3969 +28,4155 @@ files:
   span:
     start_line: 65
     end_line: 67
-  summary: Update README.md for the implement-pr workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: docs/design/agent-platform-expansion.md
   type: modified
   span:
     start_line: 29
     end_line: 31
-  summary: Update docs/design/agent-platform-expansion.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: docs/design/agent-platform-expansion.md
   type: modified
   span:
     start_line: 119
     end_line: 119
-  summary: Update docs/design/agent-platform-expansion.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/implement-pr/SKILL.md
   type: added
   span:
     start_line: 1
     end_line: 41
-  summary: Update skills/implement-pr/SKILL.md for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/implement-pr/agents/openai.yaml
   type: added
   span:
     start_line: 1
     end_line: 6
-  summary: Update skills/implement-pr/agents/openai.yaml for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-architecture/SKILL.md
   type: modified
   span:
     start_line: 3
     end_line: 3
-  summary: Update skills/specify-architecture/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-architecture/SKILL.md
   type: modified
   span:
     start_line: 15
     end_line: 15
-  summary: Update skills/specify-architecture/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-architecture/SKILL.md
   type: modified
   span:
     start_line: 17
     end_line: 17
-  summary: Update skills/specify-architecture/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-architecture/SKILL.md
   type: modified
   span:
     start_line: 20
     end_line: 21
-  summary: Update skills/specify-architecture/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-architecture/SKILL.md
   type: modified
   span:
     start_line: 28
     end_line: 28
-  summary: Update skills/specify-architecture/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-architecture/SKILL.md
   type: modified
   span:
     start_line: 30
     end_line: 30
-  summary: Update skills/specify-architecture/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-implementation/SKILL.md
   type: modified
   span:
     start_line: 3
     end_line: 3
-  summary: Update skills/specify-implementation/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-implementation/SKILL.md
   type: modified
   span:
     start_line: 18
     end_line: 19
-  summary: Update skills/specify-implementation/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-implementation/SKILL.md
   type: modified
   span:
     start_line: 21
     end_line: 22
-  summary: Update skills/specify-implementation/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-implementation/SKILL.md
   type: modified
   span:
     start_line: 29
     end_line: 30
-  summary: Update skills/specify-implementation/SKILL.md for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-prs/SKILL.md
   type: modified
   span:
     start_line: 18
     end_line: 18
-  summary: Update skills/specify-prs/SKILL.md for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-prs/SKILL.md
   type: modified
   span:
     start_line: 23
     end_line: 27
-  summary: Update skills/specify-prs/SKILL.md for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-prs/SKILL.md
   type: modified
   span:
     start_line: 29
     end_line: 29
-  summary: Update skills/specify-prs/SKILL.md for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-prs/agents/openai.yaml
   type: modified
   span:
     start_line: 4
     end_line: 4
-  summary: Update skills/specify-prs/agents/openai.yaml for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-system/SKILL.md
   type: modified
   span:
     start_line: 3
     end_line: 3
-  summary: Update skills/specify-system/SKILL.md for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-system/SKILL.md
   type: modified
   span:
     start_line: 15
     end_line: 18
-  summary: Update skills/specify-system/SKILL.md for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: skills/specify-system/SKILL.md
   type: modified
   span:
     start_line: 27
     end_line: 28
-  summary: Update skills/specify-system/SKILL.md for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 54
     end_line: 55
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 60
     end_line: 60
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 118
     end_line: 118
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 124
     end_line: 125
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 147
     end_line: 148
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 153
     end_line: 153
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 166
     end_line: 166
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 171
     end_line: 172
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 193
     end_line: 194
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 200
     end_line: 200
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 202
     end_line: 204
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 236
     end_line: 237
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 250
     end_line: 250
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 283
     end_line: 283
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/__init__.py
   type: modified
   span:
     start_line: 292
     end_line: 293
-  summary: Update src/powdrr_lift/__init__.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
-- path: src/powdrr_lift/change_log_template.py
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
   type: modified
   span:
-    start_line: 11
-    end_line: 12
-  summary: Update src/powdrr_lift/change_log_template.py for the implement-pr workflow
-    and specification migration.
-  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
-    layout, and the proposed PR basis documents.
-- path: src/powdrr_lift/change_log_template.py
-  type: modified
-  span:
-    start_line: 117
-    end_line: 120
-  summary: Update src/powdrr_lift/change_log_template.py for the implement-pr workflow
-    and specification migration.
+    start_line: 35
+    end_line: 35
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
-- path: src/powdrr_lift/change_log_template.py
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
   type: modified
   span:
-    start_line: 658
-    end_line: 658
-  summary: Update src/powdrr_lift/change_log_template.py for the implement-pr workflow
-    and specification migration.
+    start_line: 383
+    end_line: 386
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 119
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 126
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 258
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 274
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 295
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 673
+    end_line: 676
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
     start_line: 4
     end_line: 4
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
     start_line: 26
     end_line: 26
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
     start_line: 34
     end_line: 34
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 395
-    end_line: 398
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 221
+    end_line: 221
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 581
-    end_line: 593
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 261
+    end_line: 261
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1188
-    end_line: 1188
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 397
+    end_line: 400
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1194
-    end_line: 1194
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 583
+    end_line: 595
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1462
-    end_line: 1462
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 920
+    end_line: 920
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1468
-    end_line: 1474
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 1056
+    end_line: 1056
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1100
+    end_line: 1150
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1243
+    end_line: 1243
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1249
+    end_line: 1249
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1517
+    end_line: 1517
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1523
+    end_line: 1529
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
     start_line: 1519
     end_line: 1519
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
-  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
-    layout, and the proposed PR basis documents.
-- path: src/powdrr_lift/change_log_validation.py
-  type: modified
-  span:
-    start_line: 1488
-    end_line: 1646
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1930
-    end_line: 1937
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 1543
+    end_line: 1701
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1939
-    end_line: 1945
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 1985
+    end_line: 1992
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1947
-    end_line: 1947
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 1994
+    end_line: 2002
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1829
-    end_line: 1831
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 2006
+    end_line: 2010
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1950
-    end_line: 1955
-  summary: Update src/powdrr_lift/change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 1823
+    end_line: 1827
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 2013
+    end_line: 2022
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 2024
+    end_line: 2024
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 38
     end_line: 38
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 40
     end_line: 41
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 316
     end_line: 320
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 333
     end_line: 333
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 352
     end_line: 356
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 362
     end_line: 362
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 370
     end_line: 370
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 391
     end_line: 395
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 401
     end_line: 401
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 420
     end_line: 424
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 430
     end_line: 430
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 440
     end_line: 478
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 484
     end_line: 488
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 501
     end_line: 501
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 521
     end_line: 525
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 531
     end_line: 531
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 539
     end_line: 539
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 556
     end_line: 560
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 566
     end_line: 566
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 583
     end_line: 587
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 794
     end_line: 794
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 800
     end_line: 803
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 815
     end_line: 815
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 821
     end_line: 824
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 835
     end_line: 835
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 841
     end_line: 844
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 855
     end_line: 855
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 860
     end_line: 863
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 871
     end_line: 896
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 899
     end_line: 902
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 907
     end_line: 907
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 913
     end_line: 913
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 925
     end_line: 925
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 931
     end_line: 931
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 937
     end_line: 937
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 948
     end_line: 951
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 955
     end_line: 955
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 960
     end_line: 960
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 971
     end_line: 974
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 978
     end_line: 978
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 983
     end_line: 983
-  summary: Update src/powdrr_lift/cli.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 97
     end_line: 98
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 104
     end_line: 104
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 106
     end_line: 108
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 156
     end_line: 157
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 191
     end_line: 191
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 242
     end_line: 242
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/__init__.py
   type: modified
   span:
     start_line: 254
     end_line: 255
-  summary: Update src/powdrr_lift/core/__init__.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 13
     end_line: 17
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 14
     end_line: 15
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 38
     end_line: 38
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 42
     end_line: 42
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 48
     end_line: 48
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 54
     end_line: 56
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 62
     end_line: 62
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 79
     end_line: 79
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 122
     end_line: 122
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 128
     end_line: 132
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 135
     end_line: 139
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 149
     end_line: 149
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 155
     end_line: 155
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 165
     end_line: 165
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 187
     end_line: 187
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 383
     end_line: 383
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 484
     end_line: 485
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 683
     end_line: 683
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 686
     end_line: 686
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 692
     end_line: 692
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 695
     end_line: 695
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 707
     end_line: 707
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 709
     end_line: 709
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 726
     end_line: 726
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 728
     end_line: 728
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 736
     end_line: 739
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 860
     end_line: 865
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/architecture_specification.py
   type: modified
   span:
     start_line: 867
     end_line: 867
-  summary: Update src/powdrr_lift/core/architecture_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1311
+    end_line: 1314
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1389
+    end_line: 1390
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1392
+    end_line: 1395
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1423
+    end_line: 1427
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 12
     end_line: 14
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 16
     end_line: 17
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 19
     end_line: 19
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 59
     end_line: 59
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 63
     end_line: 63
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 68
     end_line: 68
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 77
     end_line: 77
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 96
     end_line: 96
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 114
     end_line: 114
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 156
     end_line: 156
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 163
     end_line: 167
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 171
     end_line: 171
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 184
     end_line: 184
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 190
     end_line: 190
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 200
     end_line: 200
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 209
     end_line: 209
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 394
     end_line: 394
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 400
     end_line: 400
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 958
     end_line: 963
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 965
     end_line: 965
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/implementation_specification.py
   type: modified
   span:
     start_line: 981
     end_line: 982
-  summary: Update src/powdrr_lift/core/implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/index.py
   type: modified
   span:
     start_line: 1014
     end_line: 1023
-  summary: Update src/powdrr_lift/core/index.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 5
     end_line: 5
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 14
     end_line: 15
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 41
     end_line: 73
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 75
     end_line: 80
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 93
     end_line: 100
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 117
     end_line: 118
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 147
     end_line: 147
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 152
     end_line: 156
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 165
     end_line: 227
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 231
     end_line: 231
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 236
     end_line: 236
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 245
     end_line: 245
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 250
     end_line: 250
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 254
     end_line: 257
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 309
     end_line: 311
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 422
     end_line: 424
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 457
     end_line: 461
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 464
     end_line: 469
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 478
     end_line: 485
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 488
     end_line: 491
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 497
     end_line: 704
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 730
     end_line: 737
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 949
     end_line: 953
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 955
     end_line: 955
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 980
     end_line: 1000
-  summary: Update src/powdrr_lift/core/pr_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/spec_paths.py
   type: added
   span:
     start_line: 1
     end_line: 76
-  summary: Update src/powdrr_lift/core/spec_paths.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 13
     end_line: 16
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 14
     end_line: 14
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 48
     end_line: 48
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 52
     end_line: 52
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 55
     end_line: 63
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 68
     end_line: 68
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 80
     end_line: 80
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 104
     end_line: 104
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 110
     end_line: 114
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 117
     end_line: 120
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 129
     end_line: 129
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 134
     end_line: 134
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 143
     end_line: 143
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 736
     end_line: 741
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/core/system_specification.py
   type: modified
   span:
     start_line: 743
     end_line: 743
-  summary: Update src/powdrr_lift/core/system_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 34
     end_line: 34
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 36
     end_line: 37
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 217
     end_line: 217
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 225
     end_line: 225
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 227
     end_line: 230
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 241
     end_line: 241
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 250
     end_line: 250
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 252
     end_line: 255
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 266
     end_line: 266
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 273
     end_line: 273
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 275
     end_line: 278
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 289
     end_line: 289
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 295
     end_line: 295
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 297
     end_line: 300
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 308
     end_line: 329
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 334
     end_line: 334
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 341
     end_line: 341
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 348
     end_line: 348
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 356
     end_line: 356
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 363
     end_line: 363
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 369
     end_line: 369
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 376
     end_line: 376
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: src/powdrr_lift/mcp_server.py
   type: modified
   span:
     start_line: 382
     end_line: 382
-  summary: Update src/powdrr_lift/mcp_server.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 81
     end_line: 83
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 91
     end_line: 94
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 101
     end_line: 102
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 116
     end_line: 116
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 130
     end_line: 130
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 190
     end_line: 190
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 250
     end_line: 250
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 304
     end_line: 304
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 364
     end_line: 364
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 376
     end_line: 379
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_architecture_specification.py
   type: modified
   span:
     start_line: 429
     end_line: 430
-  summary: Update tests/test_architecture_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 75
     end_line: 75
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 77
     end_line: 81
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 85
     end_line: 85
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 91
     end_line: 95
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 100
     end_line: 100
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 122
     end_line: 122
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 225
     end_line: 225
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 234
     end_line: 234
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 599
-    end_line: 599
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 561
+    end_line: 561
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 601
-    end_line: 601
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 600
+    end_line: 600
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 605
-    end_line: 605
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 602
+    end_line: 602
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 743
-    end_line: 743
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 606
+    end_line: 606
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 745
-    end_line: 749
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 663
+    end_line: 665
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 753
-    end_line: 753
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
-  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
-    layout, and the proposed PR basis documents.
-  related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
-- path: tests/test_change_log_validation.py
-  type: modified
-  span:
-    start_line: 764
-    end_line: 764
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
-  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
-    layout, and the proposed PR basis documents.
-  related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
-- path: tests/test_change_log_validation.py
-  type: modified
-  span:
-    start_line: 778
+    start_line: 696
     end_line: 778
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 866
-    end_line: 866
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 830
+    end_line: 830
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 868
-    end_line: 872
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 832
+    end_line: 836
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 887
-    end_line: 887
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 840
+    end_line: 840
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 899
-    end_line: 899
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 851
+    end_line: 851
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 1642
-    end_line: 1676
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 865
+    end_line: 865
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 1678
-    end_line: 1678
-  summary: Update tests/test_change_log_validation.py for the implement-pr workflow
-    and specification migration.
+    start_line: 953
+    end_line: 953
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 955
+    end_line: 959
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 974
+    end_line: 974
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 986
+    end_line: 986
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1729
+    end_line: 1763
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1765
+    end_line: 1765
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_code_index.py
   type: modified
   span:
     start_line: 627
     end_line: 669
-  summary: Update tests/test_code_index.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 19
     end_line: 20
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 25
     end_line: 25
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 54
     end_line: 57
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 64
     end_line: 65
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 80
     end_line: 80
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 86
     end_line: 86
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 142
     end_line: 142
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 192
     end_line: 192
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 204
     end_line: 210
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_implementation_specification.py
   type: modified
   span:
     start_line: 244
     end_line: 245
-  summary: Update tests/test_implementation_specification.py for the implement-pr
-    workflow and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_mcp_server.py
   type: modified
   span:
     start_line: 35
     end_line: 36
-  summary: Update tests/test_mcp_server.py for the implement-pr workflow and specification
+  summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_parse_change_log.py
   type: modified
   span:
     start_line: 77
     end_line: 77
-  summary: Update tests/test_parse_change_log.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_parse_change_log.py
   type: modified
   span:
-    start_line: 157
-    end_line: 159
-  summary: Update tests/test_parse_change_log.py for the implement-pr workflow and
-    specification migration.
+    start_line: 80
+    end_line: 103
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 162
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 183
+    end_line: 186
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 11
     end_line: 15
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 20
     end_line: 24
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 29
     end_line: 29
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 47
     end_line: 49
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 53
     end_line: 53
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 66
     end_line: 111
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 114
     end_line: 114
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 121
     end_line: 122
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 136
     end_line: 136
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 141
     end_line: 141
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 188
     end_line: 188
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 195
     end_line: 195
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 136
     end_line: 136
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 238
     end_line: 238
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 265
     end_line: 265
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 293
     end_line: 293
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 337
     end_line: 337
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 349
     end_line: 352
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 355
     end_line: 355
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 389
     end_line: 390
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 402
     end_line: 494
-  summary: Update tests/test_pr_specification.py for the implement-pr workflow and
-    specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
   related:
-    prs:
-    - id: 40
-      state: completed
-    - id: 41
-      state: completed
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 17
     end_line: 17
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 24
     end_line: 25
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 45
     end_line: 45
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 52
     end_line: 52
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 81
     end_line: 84
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 116
     end_line: 119
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 145
     end_line: 148
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 174
     end_line: 177
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 208
     end_line: 211
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 235
     end_line: 238
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 249
     end_line: 252
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 - path: tests/test_system_specification.py
   type: modified
   span:
     start_line: 278
     end_line: 279
-  summary: Update tests/test_system_specification.py for the implement-pr workflow
-    and specification migration.
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
     layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
 entities: []
 entity_relationships: []
 invariants: []
 guidance: []
 features: []
-prs: []
+proposed_prs:
+- id: 40
+  state: completed
+- id: 41
+  state: completed

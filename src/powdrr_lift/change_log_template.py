@@ -22,7 +22,7 @@ class RelatedSectionPreview:
     entities: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
     guidance: tuple[str, ...] = ()
-    prs: tuple[tuple[str, str], ...] = ()
+    proposed_prs: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     expected_tests: tuple[str, ...] = ()
     expected_outcomes: tuple[str, ...] = ()
@@ -121,7 +121,9 @@ def _render_template_body(
         "# Related references are optional. Include only the populated lists, and",
         "# remove the whole related block if it would otherwise be empty.",
         "# If this change was based on earlier proposed PRs, record those PR ids",
-        "# under `related.prs` with `id` and `state` values.",
+        "# under `related.proposed_prs`.",
+        "# Use the top-level `proposed_prs` section to track proposed PR status",
+        "# with `id` and `state` values.",
         "# Use `state: completed` for basis PRs that are already merged and",
         "# `state: in_progress` for basis PRs that are still underway.",
     ]
@@ -185,7 +187,7 @@ def _render_template_body(
             "# Use `in_progress` when work is underway and `completed` when",
             "# it is done.",
             "features: []",
-            "prs: []",
+            "proposed_prs: []",
         ]
     )
 
@@ -255,7 +257,7 @@ def _has_related_values(related_section: RelatedSectionPreview) -> bool:
             related_section.entities,
             related_section.invariants,
             related_section.guidance,
-            related_section.prs,
+            related_section.proposed_prs,
             related_section.acceptance_criteria,
             related_section.expected_tests,
             related_section.expected_outcomes,
@@ -271,7 +273,7 @@ def _render_related_section(related_section: RelatedSectionPreview) -> list[str]
         ("entities", related_section.entities),
         ("invariants", related_section.invariants),
         ("guidance", related_section.guidance),
-        ("prs", related_section.prs),
+        ("proposed_prs", related_section.proposed_prs),
         ("acceptance_criteria", related_section.acceptance_criteria),
         ("expected_tests", related_section.expected_tests),
         ("expected_outcomes", related_section.expected_outcomes),
@@ -282,17 +284,7 @@ def _render_related_section(related_section: RelatedSectionPreview) -> list[str]
             continue
 
         lines.append(f"      {key}:")
-        if key == "prs":
-            for value in values:
-                lines.extend(
-                    [
-                        "        -",
-                        f"          id: {value[0]}",
-                        f"          state: {value[1]}",
-                    ]
-                )
-        else:
-            lines.extend(f"        - {value}" for value in values)
+        lines.extend(f"        - {value}" for value in values)
 
     return lines
 

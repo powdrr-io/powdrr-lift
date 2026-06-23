@@ -157,7 +157,17 @@ def build_validation_report(
                     message=(
                         "Version 2 changelogs must use top-level structured_files, "
                         "files, entities, entity_relationships, invariants, "
-                        "guidance, features, and prs sections."
+                        "guidance, features, and proposed_prs sections."
+                    ),
+                )
+            )
+        if "prs" in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="top_level_prs_not_allowed",
+                    message=(
+                        "Version 2 changelogs must use top-level proposed_prs "
+                        "instead of prs."
                     ),
                 )
             )
@@ -546,11 +556,11 @@ def build_validation_report(
             )
 
         for pr_change_index, pr_change in enumerate(
-            change_log.pr_changes or [], start=1
+            change_log.proposed_prs or [], start=1
         ):
             _validate_v2_state_change(
                 issues=issues,
-                section_name="prs",
+                section_name="proposed_prs",
                 item_index=pr_change_index,
                 item_id=pr_change.id,
                 state=pr_change.state,
@@ -1047,13 +1057,25 @@ def _validate_v2_file_sections(
         if "related" not in file_data or not isinstance(related, Mapping):
             continue
 
+        if "prs" in related:
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_legacy_related_prs_not_allowed",
+                    message=(
+                        f"File change {file_change_index} must use "
+                        "related.proposed_prs instead of related.prs."
+                    ),
+                    path=file_path,
+                )
+            )
+
         has_nonempty_related_value = False
         for related_key, available_ids in (
             ("files", available_files),
             ("entities", available_entity_ids),
             ("invariants", available_invariant_ids),
             ("guidance", available_guidance_ids),
-            ("prs", available_proposed_pr_ids),
+            ("proposed_prs", available_proposed_pr_ids),
             ("acceptance_criteria", available_proposed_pr_detail_ids),
             ("expected_tests", available_proposed_pr_detail_ids),
             ("expected_outcomes", available_proposed_pr_detail_ids),
@@ -1097,55 +1119,22 @@ def _validate_v2_file_sections(
 
             has_nonempty_related_value = True
             for related_index, raw_related_value in enumerate(raw_related_values):
-                if related_key == "prs":
-                    related_id, related_state = _parse_related_pr_reference(
-                        raw_related_value
+                if related_key == "proposed_prs" and isinstance(
+                    raw_related_value, Mapping
+                ):
+                    issues.append(
+                        ValidationIssue(
+                            code="file_entry_related_invalid_reference_shape",
+                            message=(
+                                f"File change {file_change_index} related."
+                                f"{related_key}[{related_index}] must be a plain "
+                                "list of ids."
+                            ),
+                            path=(
+                                f"{file_path}.related.{related_key}[{related_index}]"
+                            ),
+                        )
                     )
-                    if related_id is None:
-                        issues.append(
-                            ValidationIssue(
-                                code="file_entry_related_missing_id",
-                                message=(
-                                    f"File change {file_change_index} related."
-                                    f"{related_key}[{related_index}] must include "
-                                    "an id."
-                                ),
-                                path=(
-                                    f"{file_path}.related.{related_key}[{related_index}]"
-                                ),
-                            )
-                        )
-                        continue
-
-                    if related_id not in available_ids:
-                        issues.append(
-                            ValidationIssue(
-                                code="unknown_related_reference",
-                                message=(
-                                    f"File change {file_change_index} related."
-                                    f"{related_key} references id {related_id!r}, but "
-                                    "that id is not current."
-                                ),
-                                path=(
-                                    f"{file_path}.related.{related_key}[{related_index}]"
-                                ),
-                            )
-                        )
-
-                    if related_state not in {"in_progress", "completed"}:
-                        issues.append(
-                            ValidationIssue(
-                                code="file_entry_related_invalid_state",
-                                message=(
-                                    f"File change {file_change_index} related."
-                                    f"{related_key}[{related_index}] must use state "
-                                    "in_progress or completed."
-                                ),
-                                path=(
-                                    f"{file_path}.related.{related_key}[{related_index}].state"
-                                ),
-                            )
-                        )
                     continue
 
                 related_id = _normalize_related_reference_value(raw_related_value)
@@ -1488,7 +1477,7 @@ def _validate_unique_changelog_ids(
     for index, feature in enumerate(change_log.feature_changes or [], start=1):
         _register(feature.id, "feature", index)
 
-    for index, proposed_pr in enumerate(change_log.pr_changes or [], start=1):
+    for index, proposed_pr in enumerate(change_log.proposed_prs or [], start=1):
         _register(proposed_pr.id, "proposed PR", index)
 
 
@@ -1504,7 +1493,7 @@ def _collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
         change_log.invariant_changes,
         change_log.guidance_changes,
         change_log.feature_changes,
-        change_log.pr_changes,
+        change_log.proposed_prs,
     ):
         for item in section:
             normalized_id = _normalize_entity_id(getattr(item, "id", None))
@@ -1931,6 +1920,21 @@ def _validate_v2_lifecycle_item(
                         f"{item_kind.capitalize()} {normalized_item_id or item_index} "
                         f"references guidance {guidance_id}, but that guidance is "
                         "not listed in the change guidance section."
+                    ),
+                    path=path,
+                )
+            )
+
+    for proposed_pr_id in related.proposed_prs:
+        if proposed_pr_id not in available_proposed_pr_detail_ids:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_proposed_pr",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references proposed PR {proposed_pr_id}, but that "
+                        "proposed PR is not listed in the current proposed PR "
+                        "specs."
                     ),
                     path=path,
                 )

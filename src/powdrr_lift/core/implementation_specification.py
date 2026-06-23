@@ -9,13 +9,14 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.spec_paths import (
+    SPECIFICATION_SCHEMA_URL,
+    implementation_specification_path,
+)
+from powdrr_lift.core.spec_paths import (
+    architecture_specification_path as _architecture_specification_path,
+)
 
-_DEFAULT_OUTPUT_PATH = (
-    Path("docs") / "implementation" / "implementation-specification.yaml"
-)
-_DEFAULT_ARCHITECTURE_SPECIFICATION_PATH = (
-    Path("docs") / "architecture" / "architecture-specification.yaml"
-)
 _ALLOWED_ACTIONS = {"added", "removed"}
 
 
@@ -55,14 +56,16 @@ class _ImplementationSpecificationSectionItem:
 
 
 def implementation_specification_default_output_path(
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / _DEFAULT_OUTPUT_PATH
+    return implementation_specification_path(repo_root_path, work_item_name)
 
 
 def render_implementation_specification_template(
     *,
+    work_item_name: str,
     architecture_specification_path: str | Path | None = None,
     title: str | None = None,
     repo_root: str | Path | None = None,
@@ -71,6 +74,7 @@ def render_implementation_specification_template(
     architecture_summary = _load_architecture_specification_summary(
         repo_root_path,
         architecture_specification_path=architecture_specification_path,
+        work_item_name=work_item_name,
         issues=None,
     )
     if architecture_summary is None:
@@ -89,6 +93,7 @@ def render_implementation_specification_template(
         "# Implementation specification template.",
         "#",
         "# Instructions:",
+        f"# - Use the work item folder `docs/specs/{work_item_name.strip()}`.",
         "# - Keep `architecture_id` aligned with the architecture specification.",
         "# - Copy entity ids and relationship ids only from the architecture",
         "#   specification listed below.",
@@ -106,6 +111,7 @@ def render_implementation_specification_template(
         "#   requirements.",
         "# - Give each decision a unique id and description.",
         "#",
+        f"schema: {SPECIFICATION_SCHEMA_URL}",
         f"# Architecture id: {architecture_id}",
         "# Available entities:",
         *[f"# - {entity_id}" for entity_id in architecture_summary.entity_ids],
@@ -147,16 +153,22 @@ def render_implementation_specification_template(
 
 def create_implementation_specification_template(
     *,
+    work_item_name: str,
     architecture_specification_path: str | Path | None = None,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
     title: str | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path = _resolve_output_path(
+        repo_root_path,
+        work_item_name=work_item_name,
+        output_path=output_path,
+    )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_path.write_text(
         render_implementation_specification_template(
+            work_item_name=work_item_name,
             architecture_specification_path=architecture_specification_path,
             title=title,
             repo_root=repo_root_path,
@@ -169,11 +181,13 @@ def create_implementation_specification_template(
 def validate_implementation_specification_yaml(
     proposed_implementation_specification_yaml: str,
     *,
+    work_item_name: str,
     architecture_specification_path: str | Path | None = None,
     repo_root: str | Path | None = None,
 ) -> str:
     report = build_implementation_specification_validation_report(
         proposed_implementation_specification_yaml,
+        work_item_name=work_item_name,
         architecture_specification_path=architecture_specification_path,
         repo_root=repo_root,
     )
@@ -183,6 +197,7 @@ def validate_implementation_specification_yaml(
 def build_implementation_specification_validation_report(
     proposed_implementation_specification_yaml: str,
     *,
+    work_item_name: str,
     architecture_specification_path: str | Path | None = None,
     repo_root: str | Path | None = None,
 ) -> ImplementationSpecificationValidationReport:
@@ -191,6 +206,7 @@ def build_implementation_specification_validation_report(
     architecture_summary = _load_architecture_specification_summary(
         repo_root_path,
         architecture_specification_path=architecture_specification_path,
+        work_item_name=work_item_name,
         issues=issues,
     )
     if architecture_summary is None:
@@ -375,12 +391,13 @@ def _load_architecture_specification_summary(
     repo_root: Path,
     *,
     architecture_specification_path: str | Path | None,
+    work_item_name: str,
     issues: list[ImplementationSpecificationValidationIssue] | None,
 ) -> _ArchitectureSpecificationSummary | None:
     resolved_path = _resolve_input_path(
         repo_root,
         architecture_specification_path,
-        default_path=_DEFAULT_ARCHITECTURE_SPECIFICATION_PATH,
+        default_path=_architecture_specification_path(repo_root, work_item_name),
     )
     try:
         raw_yaml = resolved_path.read_text(encoding="utf-8")
@@ -938,9 +955,14 @@ def _optional_string(raw_value: object) -> str | None:
     return value or None
 
 
-def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+def _resolve_output_path(
+    repo_root: Path,
+    *,
+    work_item_name: str,
+    output_path: str | Path | None,
+) -> Path:
     if output_path is None:
-        return repo_root / _DEFAULT_OUTPUT_PATH
+        return implementation_specification_path(repo_root, work_item_name)
 
     resolved_output_path = Path(output_path)
     if not resolved_output_path.is_absolute():
@@ -956,6 +978,8 @@ def _resolve_input_path(
     default_path: Path,
 ) -> Path:
     if input_path is None:
+        if default_path.is_absolute():
+            return default_path
         return repo_root / default_path
 
     resolved_input_path = Path(input_path)

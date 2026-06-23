@@ -1,0 +1,4 @@
+model: gpt-5
+instructions: |
+  Use the implement-pr workflow in SKILL.md. Search proposed PRs first, then
+  inspect and validate the selected proposal before editing code.

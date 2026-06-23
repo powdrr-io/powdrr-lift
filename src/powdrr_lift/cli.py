@@ -36,6 +36,8 @@ from powdrr_lift.core import (
     render_entity_relationship_report,
     render_invariants_report,
     resolve_repo_root,
+    search_proposed_pr_specifications,
+    show_proposed_pr_specification,
     system_specification_default_output_path,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
@@ -311,6 +313,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate an architecture specification template.",
     )
     architecture_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used for "
+            "docs/specs/<work-item-name>/architecture-specification.yaml."
+        ),
+    )
+    architecture_specification_parser.add_argument(
         "--entity-type",
         dest="entity_types",
         action="append",
@@ -322,7 +332,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/architecture/architecture-specification.yaml."
+            "docs/specs/<work-item-name>/architecture-specification.yaml."
         ),
     )
     architecture_specification_parser.add_argument(
@@ -342,11 +352,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate an implementation specification template.",
     )
     implementation_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used for "
+            "docs/specs/<work-item-name>/implementation-specification.yaml."
+        ),
+    )
+    implementation_specification_parser.add_argument(
         "--architecture-specification",
         type=Path,
         help=(
             "Read the source architecture specification from this path instead "
-            "of docs/architecture/architecture-specification.yaml."
+            "of docs/specs/<work-item-name>/architecture-specification.yaml."
         ),
     )
     implementation_specification_parser.add_argument(
@@ -354,7 +372,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/implementation/implementation-specification.yaml."
+            "docs/specs/<work-item-name>/implementation-specification.yaml."
         ),
     )
     implementation_specification_parser.add_argument(
@@ -376,11 +394,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate a system specification template.",
     )
     system_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used for "
+            "docs/specs/<work-item-name>/system-specification.yaml."
+        ),
+    )
+    system_specification_parser.add_argument(
         "--output",
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/system/system-specification.yaml."
+            "docs/specs/<work-item-name>/system-specification.yaml."
         ),
     )
     system_specification_parser.add_argument(
@@ -400,11 +426,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate a proposed PR specification template.",
     )
     pr_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used for "
+            "docs/specs/<work-item-name>/proposed-pr-specification.yaml."
+        ),
+    )
+    pr_specification_parser.add_argument(
         "--output",
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/prs/proposed-pr-specification.yaml."
+            "docs/specs/<work-item-name>/proposed-pr-specification.yaml."
         ),
     )
     pr_specification_parser.add_argument(
@@ -414,10 +448,56 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pr_specification_parser.set_defaults(func=_run_pr_specification)
 
+    search_proposed_prs_parser = subparsers.add_parser(
+        "search-proposed-prs",
+        aliases=["search_proposed_prs"],
+        help="Fuzzy-search the indexed proposed PR specifications.",
+    )
+    search_proposed_prs_parser.add_argument(
+        "query",
+        help="Search string to match against indexed proposed PR specifications.",
+    )
+    search_proposed_prs_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when searching.",
+    )
+    search_proposed_prs_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Maximum number of search results to return.",
+    )
+    search_proposed_prs_parser.set_defaults(func=_run_search_proposed_prs)
+
+    show_proposed_pr_parser = subparsers.add_parser(
+        "show-proposed-pr",
+        aliases=["show_proposed_pr"],
+        help="Show a proposed PR specification by id.",
+    )
+    show_proposed_pr_parser.add_argument(
+        "proposed_pr_id",
+        help="Proposed PR id to display.",
+    )
+    show_proposed_pr_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when searching.",
+    )
+    show_proposed_pr_parser.set_defaults(func=_run_show_proposed_pr)
+
     evaluate_architecture_specification_parser = subparsers.add_parser(
         "evaluate-architecture-specification",
         aliases=["evaluate_architecture_specification"],
         help="Validate an architecture specification against allowed entity types.",
+    )
+    evaluate_architecture_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used to locate "
+            "docs/specs/<work-item-name>/architecture-specification.yaml."
+        ),
     )
     evaluate_architecture_specification_parser.add_argument(
         "--entity-type",
@@ -452,11 +532,19 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     evaluate_implementation_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used to locate "
+            "docs/specs/<work-item-name>/implementation-specification.yaml."
+        ),
+    )
+    evaluate_implementation_specification_parser.add_argument(
         "--architecture-specification",
         type=Path,
         help=(
             "Read the source architecture specification from this path instead "
-            "of docs/architecture/architecture-specification.yaml."
+            "of docs/specs/<work-item-name>/architecture-specification.yaml."
         ),
     )
     evaluate_implementation_specification_parser.add_argument(
@@ -482,6 +570,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate a proposed system specification.",
     )
     evaluate_system_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used to locate "
+            "docs/specs/<work-item-name>/system-specification.yaml."
+        ),
+    )
+    evaluate_system_specification_parser.add_argument(
         "--input",
         type=Path,
         help=(
@@ -502,6 +598,14 @@ def build_parser() -> argparse.ArgumentParser:
         "evaluate-pr-specification",
         aliases=["evaluate_pr_specification"],
         help="Validate a proposed PR specification against current features.",
+    )
+    evaluate_pr_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help=(
+            "Work item name used to locate "
+            "docs/specs/<work-item-name>/proposed-pr-specification.yaml."
+        ),
     )
     evaluate_pr_specification_parser.add_argument(
         "--input",
@@ -709,12 +813,16 @@ def _run_architecture_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     output_path = create_architecture_specification_template(
         args.entity_types,
+        work_item_name=args.work_item_name,
         output_path=args.output,
         repo_root=repo_root,
         title=args.title,
     )
     if args.output is None:
-        default_output = architecture_specification_default_output_path(repo_root)
+        default_output = architecture_specification_default_output_path(
+            args.work_item_name,
+            repo_root,
+        )
         print(f"Wrote architecture specification template to {default_output}")
     else:
         print(f"Wrote architecture specification template to {output_path}")
@@ -725,13 +833,17 @@ def _run_architecture_specification(args: argparse.Namespace) -> int:
 def _run_implementation_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     output_path = create_implementation_specification_template(
+        work_item_name=args.work_item_name,
         architecture_specification_path=args.architecture_specification,
         output_path=args.output,
         repo_root=repo_root,
         title=args.title,
     )
     if args.output is None:
-        default_output = implementation_specification_default_output_path(repo_root)
+        default_output = implementation_specification_default_output_path(
+            args.work_item_name,
+            repo_root,
+        )
         print(f"Wrote implementation specification template to {default_output}")
     else:
         print(f"Wrote implementation specification template to {output_path}")
@@ -742,12 +854,16 @@ def _run_implementation_specification(args: argparse.Namespace) -> int:
 def _run_system_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     output_path = create_system_specification_template(
+        work_item_name=args.work_item_name,
         output_path=args.output,
         repo_root=repo_root,
         title=args.title,
     )
     if args.output is None:
-        default_output = system_specification_default_output_path(repo_root)
+        default_output = system_specification_default_output_path(
+            args.work_item_name,
+            repo_root,
+        )
         print(f"Wrote system specification template to {default_output}")
     else:
         print(f"Wrote system specification template to {output_path}")
@@ -758,11 +874,15 @@ def _run_system_specification(args: argparse.Namespace) -> int:
 def _run_pr_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     output_path = create_pr_specification_template(
+        work_item_name=args.work_item_name,
         output_path=args.output,
         repo_root=repo_root,
     )
     if args.output is None:
-        default_output = pr_specification_default_output_path(repo_root)
+        default_output = pr_specification_default_output_path(
+            args.work_item_name,
+            repo_root,
+        )
         print(f"Wrote PR specification template to {default_output}")
     else:
         print(f"Wrote PR specification template to {output_path}")
@@ -770,18 +890,51 @@ def _run_pr_specification(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_search_proposed_prs(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    report = search_proposed_pr_specifications(
+        args.query,
+        repo_root=repo_root,
+        limit=args.limit,
+    )
+    for result in report.results:
+        title = f" - {result.title}" if result.title else ""
+        print(
+            f"{result.proposed_pr_id}{title} [{result.work_item_name}] "
+            f"{result.source_path}"
+        )
+
+    return 0
+
+
+def _run_show_proposed_pr(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    print(
+        show_proposed_pr_specification(
+            args.proposed_pr_id,
+            repo_root=repo_root,
+        )
+    )
+    return 0
+
+
 def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    input_path = args.input or architecture_specification_default_output_path(repo_root)
+    input_path = args.input or architecture_specification_default_output_path(
+        args.work_item_name,
+        repo_root,
+    )
     proposed_yaml = _read_input(input_path)
     report = build_architecture_specification_validation_report(
         proposed_yaml,
         entity_types=args.entity_types,
+        work_item_name=args.work_item_name,
         repo_root=repo_root,
     )
     report_yaml = validate_architecture_specification_yaml(
         proposed_yaml,
         entity_types=args.entity_types,
+        work_item_name=args.work_item_name,
         repo_root=repo_root,
     )
     sys.stdout.write(report_yaml)
@@ -793,16 +946,19 @@ def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
 def _run_evaluate_implementation_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     input_path = args.input or implementation_specification_default_output_path(
-        repo_root
+        args.work_item_name,
+        repo_root,
     )
     proposed_yaml = _read_input(input_path)
     report = build_implementation_specification_validation_report(
         proposed_yaml,
+        work_item_name=args.work_item_name,
         architecture_specification_path=args.architecture_specification,
         repo_root=repo_root,
     )
     report_yaml = validate_implementation_specification_yaml(
         proposed_yaml,
+        work_item_name=args.work_item_name,
         architecture_specification_path=args.architecture_specification,
         repo_root=repo_root,
     )
@@ -814,14 +970,19 @@ def _run_evaluate_implementation_specification(args: argparse.Namespace) -> int:
 
 def _run_evaluate_system_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    input_path = args.input or system_specification_default_output_path(repo_root)
+    input_path = args.input or system_specification_default_output_path(
+        args.work_item_name,
+        repo_root,
+    )
     proposed_yaml = _read_input(input_path)
     report = build_system_specification_validation_report(
         proposed_yaml,
+        work_item_name=args.work_item_name,
         repo_root=repo_root,
     )
     report_yaml = validate_system_specification_yaml(
         proposed_yaml,
+        work_item_name=args.work_item_name,
         repo_root=repo_root,
     )
     sys.stdout.write(report_yaml)
@@ -832,15 +993,22 @@ def _run_evaluate_system_specification(args: argparse.Namespace) -> int:
 
 def _run_evaluate_pr_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    input_path = args.input or pr_specification_default_output_path(repo_root)
+    input_path = args.input or pr_specification_default_output_path(
+        args.work_item_name,
+        repo_root,
+    )
     proposed_yaml = _read_input(input_path)
     report = build_pr_specification_validation_report(
         proposed_yaml,
+        work_item_name=args.work_item_name,
         repo_root=repo_root,
+        specification_path=input_path,
     )
     report_yaml = validate_pr_specification_yaml(
         proposed_yaml,
+        work_item_name=args.work_item_name,
         repo_root=repo_root,
+        specification_path=input_path,
     )
     sys.stdout.write(report_yaml)
     if not report_yaml.endswith("\n"):

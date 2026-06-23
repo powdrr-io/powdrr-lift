@@ -10,9 +10,12 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.spec_paths import (
+    SPECIFICATION_SCHEMA_URL,
+    architecture_specification_path,
+    system_specification_path,
+)
 
-_DEFAULT_OUTPUT_PATH = Path("docs") / "architecture" / "architecture-specification.yaml"
-_SYSTEM_SPECIFICATION_PATH = Path("docs") / "system" / "system-specification.yaml"
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
 
 
@@ -32,25 +35,31 @@ class ArchitectureSpecificationValidationReport:
 
 
 def architecture_specification_default_output_path(
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / _DEFAULT_OUTPUT_PATH
+    return architecture_specification_path(repo_root_path, work_item_name)
 
 
 def render_architecture_specification_template(
     entity_types: Sequence[str],
     *,
+    work_item_name: str,
     title: str | None = None,
 ) -> str:
     normalized_entity_types = _normalize_entity_types(entity_types)
     if not normalized_entity_types:
         raise ValueError("At least one entity type must be provided.")
+    normalized_work_item_name = work_item_name.strip()
+    if not normalized_work_item_name:
+        raise ValueError("work_item_name must not be empty.")
 
     lines = [
         "# Architecture specification template.",
         "#",
         "# Instructions:",
+        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
         "# - Fill in the sections below with the intended architecture.",
         "# - Set `id` to a date-based identifier, for example 2026-06-19.",
         "# - Choose each entity type from the allowed entity types listed here.",
@@ -67,6 +76,7 @@ def render_architecture_specification_template(
         "# - Keep every entity mentioned in a relationship, invariant, or",
         "#   guidance item present in the `entities` section.",
         "#",
+        f"schema: {SPECIFICATION_SCHEMA_URL}",
         "# Allowed entity types:",
         *[f"# - {entity_type}" for entity_type in normalized_entity_types],
         "id: null",
@@ -109,15 +119,24 @@ def render_architecture_specification_template(
 def create_architecture_specification_template(
     entity_types: Sequence[str],
     *,
+    work_item_name: str,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
     title: str | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path = _resolve_output_path(
+        repo_root_path,
+        work_item_name=work_item_name,
+        output_path=output_path,
+    )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_path.write_text(
-        render_architecture_specification_template(entity_types, title=title),
+        render_architecture_specification_template(
+            entity_types,
+            work_item_name=work_item_name,
+            title=title,
+        ),
         encoding="utf-8",
     )
     return resolved_output_path
@@ -127,11 +146,13 @@ def validate_architecture_specification_yaml(
     proposed_architecture_specification_yaml: str,
     *,
     entity_types: Sequence[str],
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> str:
     report = build_architecture_specification_validation_report(
         proposed_architecture_specification_yaml=proposed_architecture_specification_yaml,
         entity_types=entity_types,
+        work_item_name=work_item_name,
         repo_root=repo_root,
     )
     return yaml.safe_dump(_report_to_data(report), sort_keys=False)
@@ -141,6 +162,7 @@ def build_architecture_specification_validation_report(
     proposed_architecture_specification_yaml: str,
     *,
     entity_types: Sequence[str],
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> ArchitectureSpecificationValidationReport:
     allowed_entity_types = _normalize_entity_types(entity_types)
@@ -162,6 +184,7 @@ def build_architecture_specification_validation_report(
     repo_root_path = _resolve_repo_root(repo_root)
     system_reference_ids = _load_current_system_reference_ids(
         repo_root_path,
+        work_item_name=work_item_name,
         issues=issues,
     )
     if not system_reference_ids:
@@ -357,7 +380,7 @@ def _collect_entity_ids(
             unknown_reference_code="unknown_entity_rationale_reference",
             unknown_reference_message=(
                 "Entity rationale references must point to current requirement "
-                "or approach ids from docs/system/system-specification.yaml."
+                "or approach ids from the work item system specification."
             ),
         )
         entity_ids.add(entity_id)
@@ -458,8 +481,8 @@ def _collect_relationship_ids(
             unknown_reference_code="unknown_relationship_rationale_reference",
             unknown_reference_message=(
                 "Entity relationship rationale references must point to current "
-                "requirement or approach ids from "
-                "docs/system/system-specification.yaml."
+                "requirement or approach ids from the work item system "
+                "specification."
             ),
         )
         relationship_ids.add(relationship_id)
@@ -657,18 +680,19 @@ def _validate_rationale_references(
 def _load_current_system_reference_ids(
     repo_root: Path,
     *,
+    work_item_name: str,
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
-    system_spec_path = repo_root / _SYSTEM_SPECIFICATION_PATH
+    system_spec_path = system_specification_path(repo_root, work_item_name)
     if not system_spec_path.exists():
         issues.append(
             ArchitectureSpecificationValidationIssue(
                 code="missing_system_specification",
                 message=(
-                    "docs/system/system-specification.yaml is required to "
+                    f"{system_spec_path.relative_to(repo_root)} is required to "
                     "validate architecture rationale references."
                 ),
-                path=str(_SYSTEM_SPECIFICATION_PATH),
+                path=str(system_spec_path.relative_to(repo_root)),
             )
         )
         return set()
@@ -680,9 +704,9 @@ def _load_current_system_reference_ids(
             ArchitectureSpecificationValidationIssue(
                 code="invalid_system_specification",
                 message=(
-                    f"Could not parse docs/system/system-specification.yaml: {exc}"
+                    f"Could not parse {system_spec_path.relative_to(repo_root)}: {exc}"
                 ),
-                path=str(_SYSTEM_SPECIFICATION_PATH),
+                path=str(system_spec_path.relative_to(repo_root)),
             )
         )
         return set()
@@ -699,9 +723,9 @@ def _load_current_system_reference_ids(
                     code="invalid_system_specification",
                     message=(
                         f"{section_name} must be a list in "
-                        "docs/system/system-specification.yaml."
+                        f"{system_spec_path.relative_to(repo_root)}."
                     ),
-                    path=f"{_SYSTEM_SPECIFICATION_PATH}.{section_name}",
+                    path=f"{system_spec_path.relative_to(repo_root)}.{section_name}",
                 )
             )
             continue
@@ -709,7 +733,10 @@ def _load_current_system_reference_ids(
         for item_index, raw_item in enumerate(raw_section):
             item = _coerce_mapping(
                 raw_item,
-                path=f"{_SYSTEM_SPECIFICATION_PATH}.{section_name}[{item_index}]",
+                path=(
+                    f"{system_spec_path.relative_to(repo_root)}."
+                    f"{section_name}[{item_index}]"
+                ),
                 issues=issues,
                 issue_code="invalid_system_specification",
                 issue_message="System specification sections must contain mappings.",
@@ -830,9 +857,14 @@ def _normalize_entity_types(entity_types: Sequence[str]) -> list[str]:
     return normalized_entity_types
 
 
-def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+def _resolve_output_path(
+    repo_root: Path,
+    *,
+    work_item_name: str,
+    output_path: str | Path | None,
+) -> Path:
     if output_path is None:
-        return repo_root / _DEFAULT_OUTPUT_PATH
+        return architecture_specification_path(repo_root, work_item_name)
 
     resolved_output_path = Path(output_path)
     if not resolved_output_path.is_absolute():

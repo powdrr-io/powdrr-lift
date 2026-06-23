@@ -8,11 +8,10 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
-from powdrr_lift.core.codebase_state import build_codebase_state_report
-
-_DEFAULT_OUTPUT_PATH = Path("docs") / "prs" / "proposed-pr-specification.yaml"
-_IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "implementation"
-_PR_SPECIFICATION_DIR = Path("docs") / "prs"
+from powdrr_lift.core.spec_paths import (
+    SPECIFICATION_SCHEMA_URL,
+    proposed_pr_specification_path,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,12 +37,35 @@ class _FeatureCatalogEntry:
     entity_type: str | None
 
 
-def pr_specification_default_output_path(repo_root: str | Path | None = None) -> Path:
+@dataclass(frozen=True, slots=True)
+class ProposedPRSearchResult:
+    proposed_pr_id: str
+    work_item_name: str
+    title: str | None
+    feature_ids: tuple[str, ...]
+    source_path: str
+    score: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedPRSearchReport:
+    query: str
+    results: list[ProposedPRSearchResult] = field(default_factory=list)
+
+
+def pr_specification_default_output_path(
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / _DEFAULT_OUTPUT_PATH
+    return proposed_pr_specification_path(repo_root_path, work_item_name)
 
 
-def render_pr_specification_template(*, repo_root: str | Path | None = None) -> str:
+def render_pr_specification_template(
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> str:
     repo_root_path = _resolve_repo_root(repo_root)
     feature_catalog = _load_feature_catalog(repo_root_path)
     if not feature_catalog:
@@ -52,11 +74,15 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
             "Generate the codebase state first and ensure it contains current "
             "entities before generating a PR specification."
         )
+    normalized_work_item_name = work_item_name.strip()
+    if not normalized_work_item_name:
+        raise ValueError("work_item_name must not be empty.")
 
     lines = [
         "# PR specification template.",
         "#",
         "# Instructions:",
+        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
         "# - Create one template per proposed PR.",
         "# - Set `id` to a globally unique proposed PR id.",
         "# - Reference one or more current feature ids from the codebase state",
@@ -68,6 +94,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "#   `description`.",
         "# - Keep every detail id globally unique across those five sections.",
         "#",
+        f"schema: {SPECIFICATION_SCHEMA_URL}",
         "# Current feature ids:",
         *[
             (
@@ -104,14 +131,22 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
 
 def create_pr_specification_template(
     *,
+    work_item_name: str,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path = _resolve_output_path(
+        repo_root_path,
+        work_item_name=work_item_name,
+        output_path=output_path,
+    )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_path.write_text(
-        render_pr_specification_template(repo_root=repo_root_path),
+        render_pr_specification_template(
+            work_item_name=work_item_name,
+            repo_root=repo_root_path,
+        ),
         encoding="utf-8",
     )
     return resolved_output_path
@@ -120,11 +155,15 @@ def create_pr_specification_template(
 def validate_pr_specification_yaml(
     proposed_pr_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
+    specification_path: str | Path | None = None,
 ) -> str:
     report = build_pr_specification_validation_report(
         proposed_pr_specification_yaml,
+        work_item_name=work_item_name,
         repo_root=repo_root,
+        specification_path=specification_path,
     )
     return yaml.safe_dump(_report_to_data(report), sort_keys=False)
 
@@ -132,14 +171,24 @@ def validate_pr_specification_yaml(
 def build_pr_specification_validation_report(
     proposed_pr_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
+    specification_path: str | Path | None = None,
 ) -> PRSpecificationValidationReport:
     repo_root_path = _resolve_repo_root(repo_root)
     issues: list[PRSpecificationValidationIssue] = []
 
     feature_catalog = _load_feature_catalog(repo_root_path)
     available_feature_ids = [entry.feature_id for entry in feature_catalog]
-    known_pr_ids = _load_existing_pr_ids(repo_root_path)
+    current_specification_path = (
+        Path(specification_path)
+        if specification_path is not None
+        else pr_specification_default_output_path(work_item_name, repo_root_path)
+    )
+    known_pr_ids = _load_existing_pr_ids(
+        repo_root_path,
+        exclude_paths={current_specification_path.resolve()},
+    )
 
     try:
         raw_spec = _load_yaml_mapping(proposed_pr_specification_yaml)
@@ -274,35 +323,96 @@ def build_pr_specification_validation_report(
     )
 
 
-def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
-    try:
-        codebase_state_report = build_codebase_state_report(repo_root=repo_root)
-    except Exception:  # noqa: BLE001
-        codebase_state_report = None
+def show_proposed_pr_specification(
+    proposed_pr_id: str,
+    *,
+    repo_root: str | Path | None = None,
+) -> str:
+    repo_root_path = _resolve_repo_root(repo_root)
+    specification_path = _find_proposed_pr_specification_path(
+        repo_root_path,
+        proposed_pr_id,
+    )
+    if specification_path is None:
+        raise FileNotFoundError(
+            f"Could not find a proposed PR specification for id {proposed_pr_id!r}."
+        )
 
-    catalog: list[_FeatureCatalogEntry] = []
-    seen_feature_ids: set[str] = set()
-    if codebase_state_report is not None and codebase_state_report.entities:
-        for entity in codebase_state_report.entities:
-            if entity.id in seen_feature_ids:
-                continue
-            seen_feature_ids.add(entity.id)
-            source_path = entity.source.changelog_path or "current codebase state"
-            catalog.append(
-                _FeatureCatalogEntry(
-                    feature_id=entity.id,
-                    source_path=source_path,
-                    entity_type=entity.type,
+    return specification_path.read_text(encoding="utf-8")
+
+
+def search_proposed_pr_specifications(
+    query: str,
+    *,
+    repo_root: str | Path | None = None,
+    limit: int = 5,
+) -> ProposedPRSearchReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    normalized_query = query.strip().lower()
+    if not normalized_query:
+        raise ValueError("query must not be empty.")
+
+    results: list[ProposedPRSearchResult] = []
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root_path):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        proposed_pr_id = _optional_string(raw_spec.get("id"))
+        if proposed_pr_id is None:
+            continue
+
+        title = _optional_string(raw_spec.get("title"))
+        feature_ids = tuple(
+            feature_id
+            for feature_id in (
+                _optional_string(raw_feature_id)
+                for raw_feature_id in _coerce_sequence(
+                    raw_spec.get("feature_ids"),
+                    path="feature_ids",
+                    issues=[],
+                    issue_code="invalid_feature_ids_section",
+                    issue_message="",
                 )
             )
-        if catalog:
-            return catalog
+            if feature_id is not None
+        )
+        haystack = " ".join(
+            [
+                proposed_pr_id,
+                title or "",
+                " ".join(feature_ids),
+                specification_path.stem,
+                specification_path.parent.name,
+                specification_path.as_posix(),
+            ]
+        ).lower()
+        if normalized_query not in haystack:
+            continue
 
-    implementation_dir = repo_root / _IMPLEMENTATION_SPECIFICATION_DIR
-    if not implementation_dir.exists():
-        return catalog
+        score = haystack.count(normalized_query)
+        results.append(
+            ProposedPRSearchResult(
+                proposed_pr_id=proposed_pr_id,
+                work_item_name=specification_path.parent.name,
+                title=title,
+                feature_ids=feature_ids,
+                source_path=str(specification_path.relative_to(repo_root_path)),
+                score=score,
+            )
+        )
 
-    for specification_path in sorted(implementation_dir.rglob("*.yaml")):
+    results.sort(key=lambda result: (-result.score, result.proposed_pr_id))
+    return ProposedPRSearchReport(query=query, results=results[:limit])
+
+
+def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
+    catalog: list[_FeatureCatalogEntry] = []
+    seen_feature_ids: set[str] = set()
+    for specification_path in _iter_implementation_specification_paths(repo_root):
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -335,14 +445,20 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
     return catalog
 
 
-def _load_existing_pr_ids(repo_root: Path) -> list[str]:
-    pr_dir = repo_root / _PR_SPECIFICATION_DIR
-    if not pr_dir.exists():
-        return []
-
+def _load_existing_pr_ids(
+    repo_root: Path,
+    *,
+    exclude_paths: set[Path] | None = None,
+) -> list[str]:
     pr_ids: list[str] = []
     seen_ids: set[str] = set()
-    for specification_path in sorted(pr_dir.rglob("*.yaml")):
+    normalized_exclude_paths = {
+        path.resolve() for path in (exclude_paths or set()) if path is not None
+    }
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
+        if specification_path.resolve() in normalized_exclude_paths:
+            continue
+
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -358,6 +474,77 @@ def _load_existing_pr_ids(repo_root: Path) -> list[str]:
         pr_ids.append(proposed_pr_id)
 
     return pr_ids
+
+
+def _iter_implementation_specification_paths(repo_root: Path) -> list[Path]:
+    spec_root = repo_root / "docs" / "specs"
+    if not spec_root.exists():
+        return []
+
+    return sorted(
+        specification_path
+        for specification_path in spec_root.rglob("implementation-specification.yaml")
+        if specification_path.is_file()
+    )
+
+
+def _iter_proposed_pr_specification_paths(repo_root: Path) -> list[Path]:
+    spec_root = repo_root / "docs" / "specs"
+    if not spec_root.exists():
+        return []
+
+    candidate_paths = list(
+        sorted(
+            specification_path
+            for specification_path in spec_root.rglob("proposed-pr-specification.yaml")
+            if specification_path.is_file()
+        )
+    )
+    proposal_root = repo_root / "docs" / "proposals"
+    if proposal_root.exists():
+        candidate_paths.extend(
+            sorted(
+                specification_path
+                for specification_path in proposal_root.glob(
+                    "PR-*-proposed-pr-specification.yaml"
+                )
+                if specification_path.is_file()
+            )
+        )
+
+    seen_paths: set[Path] = set()
+    ordered_paths: list[Path] = []
+    for specification_path in candidate_paths:
+        if specification_path in seen_paths:
+            continue
+
+        seen_paths.add(specification_path)
+        ordered_paths.append(specification_path)
+
+    return ordered_paths
+
+
+def _find_proposed_pr_specification_path(
+    repo_root: Path,
+    proposed_pr_id: str,
+) -> Path | None:
+    normalized_proposed_pr_id = _optional_string(proposed_pr_id)
+    if normalized_proposed_pr_id is None:
+        return None
+
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        current_id = _optional_string(raw_spec.get("id"))
+        if current_id == normalized_proposed_pr_id:
+            return specification_path
+
+    return None
 
 
 def _validate_template_boilerplate_removed(
@@ -596,9 +783,14 @@ def _optional_string(raw_value: object) -> str | None:
     return value or None
 
 
-def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+def _resolve_output_path(
+    repo_root: Path,
+    *,
+    work_item_name: str,
+    output_path: str | Path | None,
+) -> Path:
     if output_path is None:
-        return repo_root / _DEFAULT_OUTPUT_PATH
+        return proposed_pr_specification_path(repo_root, work_item_name)
 
     resolved_output_path = Path(output_path)
     if not resolved_output_path.is_absolute():

@@ -16,12 +16,13 @@ from powdrr_lift.core import (
 
 def _write_architecture_specification(repo_root: Path) -> Path:
     architecture_specification_path = architecture_specification_default_output_path(
-        repo_root
+        "powdrr-lift",
+        repo_root,
     )
     architecture_specification_path.parent.mkdir(parents=True, exist_ok=True)
     architecture_specification_path.write_text(
         """
-        version: 1
+        schema: https://powdrr.io/schemas/specification-v1
         id: 2026-06-19
         title: Demo architecture
 
@@ -50,13 +51,18 @@ def test_create_implementation_specification_template_writes_default_file(
     tmp_path: Path,
 ) -> None:
     _write_architecture_specification(tmp_path)
-    output_path = implementation_specification_default_output_path(tmp_path)
+    output_path = implementation_specification_default_output_path(
+        "powdrr-lift",
+        tmp_path,
+    )
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
         exit_code = main(
             [
                 "implementation-specification",
+                "--work-item-name",
+                "powdrr-lift",
                 "--repo-root",
                 str(tmp_path),
             ]
@@ -71,11 +77,13 @@ def test_create_implementation_specification_template_writes_default_file(
     assert "# - Alpha" in template_text
     assert "# - rel-1" in template_text
     assert 'architecture_id: "2026-06-19"' in template_text
+    assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
     assert "    action: null" in template_text
     assert "    supercedes: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
+        "schema",
         "title",
         "architecture_id",
         "entities",
@@ -131,6 +139,7 @@ def test_validate_implementation_specification_reports_errors(
 
     report = build_implementation_specification_validation_report(
         proposed_spec,
+        work_item_name="powdrr-lift",
         repo_root=tmp_path,
     )
 
@@ -180,6 +189,7 @@ def test_validate_implementation_specification_reports_success_for_valid_spec(
 
     report = build_implementation_specification_validation_report(
         proposed_spec,
+        work_item_name="powdrr-lift",
         repo_root=tmp_path,
     )
 
@@ -191,7 +201,13 @@ def test_cli_validate_implementation_specification_reports_yaml(
     tmp_path: Path,
 ) -> None:
     _write_architecture_specification(tmp_path)
-    spec_path = tmp_path / "implementation-specification.yaml"
+    spec_path = (
+        tmp_path
+        / "docs"
+        / "specs"
+        / "powdrr-lift"
+        / "implementation-specification.yaml"
+    )
     spec_path.write_text(
         """
         version: 1
@@ -225,6 +241,8 @@ def test_cli_validate_implementation_specification_reports_yaml(
         exit_code = main(
             [
                 "evaluate-implementation-specification",
+                "--work-item-name",
+                "powdrr-lift",
                 "--repo-root",
                 str(tmp_path),
                 "--input",

@@ -1,4 +1,4 @@
-schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+schema: https://powdrr.io/schemas/specification-v1
 id: 42
 feature_ids:
   - feature-review-workflows

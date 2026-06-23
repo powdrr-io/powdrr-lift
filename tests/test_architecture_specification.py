@@ -78,7 +78,9 @@ approach:
 
 
 def _write_system_specification(tmp_path: Path) -> None:
-    system_spec_path = tmp_path / "docs" / "system" / "system-specification.yaml"
+    system_spec_path = (
+        tmp_path / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+    )
     system_spec_path.parent.mkdir(parents=True, exist_ok=True)
     system_spec_path.write_text(_SYSTEM_SPECIFICATION_YAML, encoding="utf-8")
 
@@ -86,13 +88,18 @@ def _write_system_specification(tmp_path: Path) -> None:
 def test_create_architecture_specification_template_writes_default_file(
     tmp_path: Path,
 ) -> None:
-    output_path = architecture_specification_default_output_path(tmp_path)
+    output_path = architecture_specification_default_output_path(
+        "powdrr-lift",
+        tmp_path,
+    )
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
         exit_code = main(
             [
                 "architecture-specification",
+                "--work-item-name",
+                "powdrr-lift",
                 "--entity-type",
                 "Service",
                 "--entity-type",
@@ -106,6 +113,7 @@ def test_create_architecture_specification_template_writes_default_file(
     assert output_path.exists()
     assert str(output_path) in stdout.getvalue()
     template_text = output_path.read_text(encoding="utf-8")
+    assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
     assert "# Allowed entity types:" in template_text
     assert "# - Set `id` to a date-based identifier" in template_text
     assert "# - Write each rationale in English" in template_text
@@ -119,6 +127,7 @@ def test_create_architecture_specification_template_writes_default_file(
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
+        "schema",
         "id",
         "title",
         "entities",
@@ -178,6 +187,7 @@ def test_validate_architecture_specification_reports_invalid_types_and_links(
     report = build_architecture_specification_validation_report(
         proposed_spec,
         entity_types=["Service", "Skill"],
+        work_item_name="powdrr-lift",
         repo_root=tmp_path,
     )
 
@@ -237,6 +247,7 @@ def test_validate_architecture_specification_requires_quoted_rationale_ids(
     report = build_architecture_specification_validation_report(
         proposed_spec,
         entity_types=["Service", "Skill"],
+        work_item_name="powdrr-lift",
         repo_root=tmp_path,
     )
 
@@ -290,6 +301,7 @@ def test_validate_architecture_specification_requires_related_references(
     report = build_architecture_specification_validation_report(
         proposed_spec,
         entity_types=["Service", "Skill"],
+        work_item_name="powdrr-lift",
         repo_root=tmp_path,
     )
 
@@ -349,6 +361,7 @@ def test_validate_architecture_specification_reports_success_for_valid_spec(
     report = build_architecture_specification_validation_report(
         proposed_spec,
         entity_types=["Service", "Skill"],
+        work_item_name="powdrr-lift",
         repo_root=tmp_path,
     )
 
@@ -360,7 +373,10 @@ def test_cli_validate_architecture_specification_reports_yaml(
     tmp_path: Path,
 ) -> None:
     _write_system_specification(tmp_path)
-    spec_path = tmp_path / "architecture-specification.yaml"
+    spec_path = (
+        tmp_path / "docs" / "specs" / "powdrr-lift" / "architecture-specification.yaml"
+    )
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(
         """
         version: 1
@@ -410,6 +426,8 @@ def test_cli_validate_architecture_specification_reports_yaml(
         exit_code = main(
             [
                 "evaluate-architecture-specification",
+                "--work-item-name",
+                "powdrr-lift",
                 "--entity-type",
                 "Service",
                 "--entity-type",

@@ -38,4 +38,5 @@ Use this skill when the task is to carry out a proposed PR from its specificatio
 - Do not start coding until the relevant proposed PR is identified and validated.
 - Do not assume the first search result is the right one if the query is broad.
 - Do not skip the second review pass after implementation.
-- Prefer to fix the code or the proposal when they disagree; do not force either side to fit stale context.
+- Prefer to fix the code if it disagrees with the proposal; treat the proposal as read-only.
+- Always make any design changes explicit by adding new specification files to the PR as necessary.

@@ -14,6 +14,24 @@ decisions:
   - id: proposed-pr-search-endpoints
     summary: Expose fuzzy proposed-PR search and direct inspection through the CLI and MCP
       surfaces.
+entities:
+  - id: implement-pr
+    type: Skill
+    action: added
+    related:
+      files:
+        - skills/implement-pr/SKILL.md
+        - skills/implement-pr/agents/openai.yaml
+  - id: feature-proposed-pr-discovery
+    type: Feature
+    action: added
+    related:
+      files:
+        - src/powdrr_lift/core/pr_specification.py
+        - src/powdrr_lift/cli.py
+        - src/powdrr_lift/mcp_server.py
+        - tests/test_pr_specification.py
+        - tests/test_mcp_server.py
 structured_files:
   - docs/architecture/architecture-specification.yaml
   - docs/implementation/implementation-specification.yaml

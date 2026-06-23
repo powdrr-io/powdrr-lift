@@ -392,7 +392,9 @@ def search_proposed_pr_specifications(
             filter(
                 None,
                 [
-                    _optional_string(intent.get("goal")) if intent is not None else None,
+                    _optional_string(intent.get("goal"))
+                    if intent is not None
+                    else None,
                     _optional_string(intent.get("reasoning"))
                     if intent is not None
                     else None,

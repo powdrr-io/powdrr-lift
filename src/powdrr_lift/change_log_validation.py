@@ -157,7 +157,17 @@ def build_validation_report(
                     message=(
                         "Version 2 changelogs must use top-level structured_files, "
                         "files, entities, entity_relationships, invariants, "
-                        "guidance, features, and prs sections."
+                        "guidance, features, and proposed_prs sections."
+                    ),
+                )
+            )
+        if "prs" in raw_change_log:
+            issues.append(
+                ValidationIssue(
+                    code="top_level_prs_not_allowed",
+                    message=(
+                        "Version 2 changelogs must use top-level proposed_prs "
+                        "instead of prs."
                     ),
                 )
             )
@@ -218,6 +228,7 @@ def build_validation_report(
     available_proposed_pr_detail_ids = _load_available_proposed_pr_detail_ids(
         repo_root_path
     )
+    available_proposed_pr_ids = _load_known_proposed_pr_ids(repo_root_path)
     available_rationale_ids = (
         _load_available_rationale_ids(repo_root_path)
         | available_changelog_ids
@@ -257,6 +268,7 @@ def build_validation_report(
                 )
                 if guidance_id is not None
             },
+            available_proposed_pr_ids=available_proposed_pr_ids,
             available_proposed_pr_detail_ids=available_proposed_pr_detail_ids,
             available_rationale_ids=available_rationale_ids,
         )
@@ -392,6 +404,11 @@ def build_validation_report(
             )
         )
         proposed_structured_file_set = set(proposed_structured_files)
+        branch_changed_paths = _load_branch_changed_paths(
+            repo_root_path,
+            default_branch_name=default_branch_name,
+            branch_name=branch_name,
+        )
         merged_structured_file_paths = _load_merged_structured_file_paths(
             repo_root_path,
             default_branch_name=default_branch_name,
@@ -544,11 +561,11 @@ def build_validation_report(
             )
 
         for pr_change_index, pr_change in enumerate(
-            change_log.pr_changes or [], start=1
+            change_log.proposed_prs or [], start=1
         ):
             _validate_v2_state_change(
                 issues=issues,
-                section_name="prs",
+                section_name="proposed_prs",
                 item_index=pr_change_index,
                 item_id=pr_change.id,
                 state=pr_change.state,
@@ -577,36 +594,39 @@ def build_validation_report(
                 )
 
         for structured_file_path in proposed_structured_files:
-            if structured_file_path in expected_structured_file_paths:
-                if structured_file_path in merged_structured_file_paths:
-                    issues.append(
-                        ValidationIssue(
-                            code="structured_file_edited_after_merge",
-                            message=(
-                                f"Structured file {structured_file_path} was already "
-                                "merged into main. Do not edit merged structured "
-                                "files; create a new work item folder under "
-                                "`docs/specs/` instead."
-                            ),
-                            path=structured_file_path,
-                        )
+            if structured_file_path not in branch_changed_paths:
+                issues.append(
+                    ValidationIssue(
+                        code="structured_file_not_in_branch_diff",
+                        message=(
+                            "Structured file entry for "
+                            f"{structured_file_path} does not appear in the branch "
+                            "diff"
+                        ),
+                        path=structured_file_path,
                     )
-                _validate_v2_structured_file_contents(
-                    issues=issues,
-                    repo_root=repo_root_path,
-                    structured_file_path=structured_file_path,
                 )
                 continue
 
-            issues.append(
-                ValidationIssue(
-                    code="unexpected_structured_change",
-                    message=(
-                        "Structured file entry for "
-                        f"{structured_file_path} does not appear in the branch diff"
-                    ),
-                    path=structured_file_path,
+            if structured_file_path in merged_structured_file_paths:
+                issues.append(
+                    ValidationIssue(
+                        code="structured_file_edited_after_merge",
+                        message=(
+                            f"Structured file {structured_file_path} was already "
+                            "merged into main. Do not edit merged structured "
+                            "files; create a new work item folder under "
+                            "`docs/specs/` instead."
+                        ),
+                        path=structured_file_path,
+                    )
                 )
+                continue
+
+            _validate_v2_structured_file_contents(
+                issues=issues,
+                repo_root=repo_root_path,
+                structured_file_path=structured_file_path,
             )
 
         for relationship_change in change_log.entity_relationship_changes or []:
@@ -915,6 +935,7 @@ def _validate_v2_file_sections(
     available_entity_ids: set[str],
     available_invariant_ids: set[str],
     available_guidance_ids: set[str],
+    available_proposed_pr_ids: set[str],
     available_proposed_pr_detail_ids: set[str],
     available_rationale_ids: set[str],
 ) -> None:
@@ -1044,12 +1065,25 @@ def _validate_v2_file_sections(
         if "related" not in file_data or not isinstance(related, Mapping):
             continue
 
+        if "prs" in related:
+            issues.append(
+                ValidationIssue(
+                    code="file_entry_legacy_related_prs_not_allowed",
+                    message=(
+                        f"File change {file_change_index} must use "
+                        "related.proposed_prs instead of related.prs."
+                    ),
+                    path=file_path,
+                )
+            )
+
         has_nonempty_related_value = False
         for related_key, available_ids in (
             ("files", available_files),
             ("entities", available_entity_ids),
             ("invariants", available_invariant_ids),
             ("guidance", available_guidance_ids),
+            ("proposed_prs", available_proposed_pr_ids),
             ("acceptance_criteria", available_proposed_pr_detail_ids),
             ("expected_tests", available_proposed_pr_detail_ids),
             ("expected_outcomes", available_proposed_pr_detail_ids),
@@ -1093,6 +1127,24 @@ def _validate_v2_file_sections(
 
             has_nonempty_related_value = True
             for related_index, raw_related_value in enumerate(raw_related_values):
+                if related_key == "proposed_prs" and isinstance(
+                    raw_related_value, Mapping
+                ):
+                    issues.append(
+                        ValidationIssue(
+                            code="file_entry_related_invalid_reference_shape",
+                            message=(
+                                f"File change {file_change_index} related."
+                                f"{related_key}[{related_index}] must be a plain "
+                                "list of ids."
+                            ),
+                            path=(
+                                f"{file_path}.related.{related_key}[{related_index}]"
+                            ),
+                        )
+                    )
+                    continue
+
                 related_id = _normalize_related_reference_value(raw_related_value)
                 if related_id is None:
                     issues.append(
@@ -1433,7 +1485,7 @@ def _validate_unique_changelog_ids(
     for index, feature in enumerate(change_log.feature_changes or [], start=1):
         _register(feature.id, "feature", index)
 
-    for index, proposed_pr in enumerate(change_log.pr_changes or [], start=1):
+    for index, proposed_pr in enumerate(change_log.proposed_prs or [], start=1):
         _register(proposed_pr.id, "proposed PR", index)
 
 
@@ -1449,7 +1501,7 @@ def _collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
         change_log.invariant_changes,
         change_log.guidance_changes,
         change_log.feature_changes,
-        change_log.pr_changes,
+        change_log.proposed_prs,
     ):
         for item in section:
             normalized_id = _normalize_entity_id(getattr(item, "id", None))
@@ -1641,6 +1693,37 @@ def _load_merged_structured_file_paths(
         path
         for path in (line.strip() for line in output.splitlines())
         if path and _is_structured_document_path(path)
+    }
+
+
+def _load_branch_changed_paths(
+    repo_root: Path,
+    *,
+    default_branch_name: str,
+    branch_name: str,
+) -> set[str]:
+    try:
+        output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "diff",
+                "--name-only",
+                "--diff-filter=ACMR",
+                f"{default_branch_name}...{branch_name}",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except Exception:  # noqa: BLE001
+        return set()
+
+    return {
+        path
+        for path in (line.strip() for line in output.splitlines())
+        if path and not _is_changelog_artifact_path(path)
     }
 
 
@@ -1881,6 +1964,21 @@ def _validate_v2_lifecycle_item(
                 )
             )
 
+    for proposed_pr_id in related.proposed_prs:
+        if proposed_pr_id not in available_proposed_pr_detail_ids:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_proposed_pr",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references proposed PR {proposed_pr_id}, but that "
+                        "proposed PR is not listed in the current proposed PR "
+                        "specs."
+                    ),
+                    path=path,
+                )
+            )
+
 
 def _validate_v2_state_change(
     *,
@@ -1953,3 +2051,17 @@ def _load_known_proposed_pr_ids(repo_root: Path) -> set[str]:
         for proposed_pr_id in _load_specification_ids(repo_root, "proposed_pr")
         if proposed_pr_id is not None
     }
+
+
+def _parse_related_pr_reference(raw_value: object) -> tuple[str | None, str | None]:
+    if isinstance(raw_value, Mapping):
+        related_id = _normalize_related_reference_value(raw_value.get("id"))
+        related_state_raw = raw_value.get("state")
+        related_state = (
+            None
+            if related_state_raw is None
+            else str(related_state_raw).strip() or None
+        )
+        return related_id, related_state
+
+    return _normalize_related_reference_value(raw_value), None

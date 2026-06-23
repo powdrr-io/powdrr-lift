@@ -32,6 +32,7 @@ class RelatedSection:
     entities: list[str] = field(default_factory=list)
     invariants: list[str] = field(default_factory=list)
     guidance: list[str] = field(default_factory=list)
+    proposed_prs: list[str] = field(default_factory=list)
     acceptance_criteria: list[str] = field(default_factory=list)
     expected_tests: list[str] = field(default_factory=list)
     expected_outcomes: list[str] = field(default_factory=list)
@@ -115,7 +116,7 @@ class ChangeLog:
     invariant_changes: list[ChangeInvariant] = field(default_factory=list)
     guidance_changes: list[ChangeGuidance] = field(default_factory=list)
     feature_changes: list[ChangeFeatureState] = field(default_factory=list)
-    pr_changes: list[ChangeProposedPRState] = field(default_factory=list)
+    proposed_prs: list[ChangeProposedPRState] = field(default_factory=list)
 
 
 def parse_change_log(yaml_content: str) -> ChangeLog:
@@ -165,7 +166,7 @@ def _parse_change_log_v1(data: Mapping[str, Any]) -> ChangeLog:
             )
         ],
         feature_changes=[],
-        pr_changes=[],
+        proposed_prs=[],
     )
 
 
@@ -174,7 +175,7 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         raise ValueError(
             "Version 2 changelogs must use top-level structured_files, files, "
             "entities, entity_relationships, invariants, guidance, features, "
-            "and prs sections."
+            "and proposed_prs sections."
         )
 
     return ChangeLog(
@@ -190,7 +191,7 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         invariant_changes=_parse_change_invariants(data),
         guidance_changes=_parse_change_guidance(data),
         feature_changes=_parse_change_features(data),
-        pr_changes=_parse_change_prs(data),
+        proposed_prs=_parse_change_proposed_prs(data),
     )
 
 
@@ -326,10 +327,12 @@ def _parse_change_features(data: Mapping[str, Any]) -> list[ChangeFeatureState]:
     ]
 
 
-def _parse_change_prs(data: Mapping[str, Any]) -> list[ChangeProposedPRState]:
+def _parse_change_proposed_prs(
+    data: Mapping[str, Any],
+) -> list[ChangeProposedPRState]:
     return [
         _parse_proposed_pr_state(pr_data)
-        for pr_data in _ensure_sequence(data.get("prs"))
+        for pr_data in _ensure_sequence(data.get("proposed_prs", data.get("prs")))
     ]
 
 
@@ -379,6 +382,7 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
         entities=_parse_id_sequence(data.get("entities")),
         invariants=_parse_id_sequence(data.get("invariants")),
         guidance=_parse_id_sequence(data.get("guidance")),
+        proposed_prs=_parse_id_sequence(data.get("proposed_prs", data.get("prs"))),
         acceptance_criteria=_parse_id_sequence(data.get("acceptance_criteria")),
         expected_tests=_parse_id_sequence(data.get("expected_tests")),
         expected_outcomes=_parse_id_sequence(data.get("expected_outcomes")),

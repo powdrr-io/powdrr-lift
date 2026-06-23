@@ -77,27 +77,29 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
           - docs/specs/powdrr-lift/system-specification.yaml
 
         files:
-          - path: src/review/workflow.py
-            type: modified
-            span:
-              start_line: 1
-              end_line: 3
-            summary: Update the review workflow file.
-            rationale: Capture the file-level context.
-            related:
-              entities:
-                - ReviewSkill
-                - ChangelogValidation
-              acceptance_criteria:
-                - AC-001
-              expected_tests:
-                - TEST-001
-              expected_outcomes:
-                - OUT-001
-              non_goals:
-                - NG-001
-              risks:
-                - RISK-001
+            - path: src/review/workflow.py
+              type: modified
+              span:
+                start_line: 1
+                end_line: 3
+              summary: Update the review workflow file.
+              rationale: Capture the file-level context.
+              related:
+                entities:
+                  - ReviewSkill
+                  - ChangelogValidation
+                proposed_prs:
+                  - 40
+                acceptance_criteria:
+                  - AC-001
+                expected_tests:
+                  - TEST-001
+                expected_outcomes:
+                  - OUT-001
+                non_goals:
+                  - NG-001
+                risks:
+                  - RISK-001
 
         entities:
           - id: ReviewSkill
@@ -144,7 +146,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
         features:
           - id: ReviewSkill
             state: in_progress
-        prs:
+        proposed_prs:
           - id: 42
             state: completed
                 """
@@ -177,6 +179,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
         "ReviewSkill",
         "ChangelogValidation",
     ]
+    assert (change_log.file_changes or [])[0].related.proposed_prs == ["40"]
     assert (change_log.file_changes or [])[0].related.acceptance_criteria == ["AC-001"]
     assert (change_log.file_changes or [])[0].related.expected_tests == ["TEST-001"]
     assert (change_log.file_changes or [])[0].related.expected_outcomes == ["OUT-001"]
@@ -202,8 +205,8 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert [feature.state for feature in (change_log.feature_changes or [])] == [
         "in_progress"
     ]
-    assert [pr.id for pr in (change_log.pr_changes or [])] == ["42"]
-    assert [pr.state for pr in (change_log.pr_changes or [])] == ["completed"]
+    assert [pr.id for pr in (change_log.proposed_prs or [])] == ["42"]
+    assert [pr.state for pr in (change_log.proposed_prs or [])] == ["completed"]
 
 
 def test_empty_yaml_returns_empty_changelog() -> None:

@@ -50,7 +50,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "invariants:" in template_text
     assert "guidance:" in template_text
     assert "features:" in template_text
-    assert "prs:" in template_text
+    assert "proposed_prs:" in template_text
     assert "    related:" not in template_text
     assert "A src/app.py" in template_text
     assert "A tests/test_app.py" in template_text
@@ -75,7 +75,7 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert change_log.structured_files == []
     assert change_log.entity_changes == []
     assert change_log.feature_changes == []
-    assert change_log.pr_changes == []
+    assert change_log.proposed_prs == []
     assert change_log.decisions == [Decision()]
 
 
@@ -193,7 +193,7 @@ def test_create_change_log_template_populates_full_related_sections(
     assert change_log.file_changes[0].related.non_goals == []
     assert change_log.file_changes[0].related.risks == []
     assert change_log.feature_changes == []
-    assert change_log.pr_changes == []
+    assert change_log.proposed_prs == []
 
 
 def test_create_change_log_template_handles_empty_diff(tmp_path: Path) -> None:

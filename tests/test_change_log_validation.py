@@ -1183,6 +1183,52 @@ def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(
     }
 
 
+def test_validate_change_log_yaml_rejects_incorrect_regular_file_span(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    decisions:
+      - id: ADR-200
+        summary: Keep the change entry aligned to the exact diff hunk.
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    files:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        affects:
+          - AppService
+        rationale: Keep the first hunk focused on the skill metadata.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    issue_codes = {issue.code for issue in report.issues}
+    assert issue_codes & {"missing_change", "unexpected_change"}
+
+
 def test_validate_change_log_yaml_rejects_version_two_changes(
     tmp_path: Path,
 ) -> None:

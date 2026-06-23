@@ -404,6 +404,11 @@ def build_validation_report(
             )
         )
         proposed_structured_file_set = set(proposed_structured_files)
+        branch_changed_paths = _load_branch_changed_paths(
+            repo_root_path,
+            default_branch_name=default_branch_name,
+            branch_name=branch_name,
+        )
         merged_structured_file_paths = _load_merged_structured_file_paths(
             repo_root_path,
             default_branch_name=default_branch_name,
@@ -589,36 +594,39 @@ def build_validation_report(
                 )
 
         for structured_file_path in proposed_structured_files:
-            if structured_file_path in expected_structured_file_paths:
-                if structured_file_path in merged_structured_file_paths:
-                    issues.append(
-                        ValidationIssue(
-                            code="structured_file_edited_after_merge",
-                            message=(
-                                f"Structured file {structured_file_path} was already "
-                                "merged into main. Do not edit merged structured "
-                                "files; create a new work item folder under "
-                                "`docs/specs/` instead."
-                            ),
-                            path=structured_file_path,
-                        )
+            if structured_file_path not in branch_changed_paths:
+                issues.append(
+                    ValidationIssue(
+                        code="structured_file_not_in_branch_diff",
+                        message=(
+                            "Structured file entry for "
+                            f"{structured_file_path} does not appear in the branch "
+                            "diff"
+                        ),
+                        path=structured_file_path,
                     )
-                _validate_v2_structured_file_contents(
-                    issues=issues,
-                    repo_root=repo_root_path,
-                    structured_file_path=structured_file_path,
                 )
                 continue
 
-            issues.append(
-                ValidationIssue(
-                    code="structured_file_not_in_branch_diff",
-                    message=(
-                        "Structured file entry for "
-                        f"{structured_file_path} does not appear in the branch diff"
-                    ),
-                    path=structured_file_path,
+            if structured_file_path in merged_structured_file_paths:
+                issues.append(
+                    ValidationIssue(
+                        code="structured_file_edited_after_merge",
+                        message=(
+                            f"Structured file {structured_file_path} was already "
+                            "merged into main. Do not edit merged structured "
+                            "files; create a new work item folder under "
+                            "`docs/specs/` instead."
+                        ),
+                        path=structured_file_path,
+                    )
                 )
+                continue
+
+            _validate_v2_structured_file_contents(
+                issues=issues,
+                repo_root=repo_root_path,
+                structured_file_path=structured_file_path,
             )
 
         for relationship_change in change_log.entity_relationship_changes or []:
@@ -1685,6 +1693,37 @@ def _load_merged_structured_file_paths(
         path
         for path in (line.strip() for line in output.splitlines())
         if path and _is_structured_document_path(path)
+    }
+
+
+def _load_branch_changed_paths(
+    repo_root: Path,
+    *,
+    default_branch_name: str,
+    branch_name: str,
+) -> set[str]:
+    try:
+        output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "diff",
+                "--name-only",
+                "--diff-filter=ACMR",
+                f"{default_branch_name}...{branch_name}",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except Exception:  # noqa: BLE001
+        return set()
+
+    return {
+        path
+        for path in (line.strip() for line in output.splitlines())
+        if path and not _is_changelog_artifact_path(path)
     }
 
 

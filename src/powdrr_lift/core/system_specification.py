@@ -10,8 +10,11 @@ import yaml
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.spec_paths import (
+    SPECIFICATION_SCHEMA_URL,
+    system_specification_path,
+)
 
-_DEFAULT_OUTPUT_PATH = Path("docs") / "system" / "system-specification.yaml"
 _ALLOWED_STATES = {"added", "removed", "supercedes"}
 
 
@@ -42,17 +45,27 @@ class _SystemSectionItem:
 
 
 def system_specification_default_output_path(
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / _DEFAULT_OUTPUT_PATH
+    return system_specification_path(repo_root_path, work_item_name)
 
 
-def render_system_specification_template(*, title: str | None = None) -> str:
+def render_system_specification_template(
+    *,
+    work_item_name: str,
+    title: str | None = None,
+) -> str:
+    normalized_work_item_name = work_item_name.strip()
+    if not normalized_work_item_name:
+        raise ValueError("work_item_name must not be empty.")
+
     lines = [
         "# System specification template.",
         "#",
         "# Instructions:",
+        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
         "# - Fill in the requirements and approach sections.",
         "# - Remove the boilerplate placeholder entries once the document is",
         "#   complete.",
@@ -64,6 +77,7 @@ def render_system_specification_template(*, title: str | None = None) -> str:
         "# - Keep ids unique across both sections.",
         "# - Reference only same-section ids in `supercedes`.",
         "#",
+        f"schema: {SPECIFICATION_SCHEMA_URL}",
         "# Optional title:",
         "# - Set `title` if a human-readable summary is helpful.",
         "id: null",
@@ -87,15 +101,23 @@ def render_system_specification_template(*, title: str | None = None) -> str:
 
 def create_system_specification_template(
     *,
+    work_item_name: str,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
     title: str | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path = _resolve_output_path(
+        repo_root_path,
+        work_item_name=work_item_name,
+        output_path=output_path,
+    )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_path.write_text(
-        render_system_specification_template(title=title),
+        render_system_specification_template(
+            work_item_name=work_item_name,
+            title=title,
+        ),
         encoding="utf-8",
     )
     return resolved_output_path
@@ -104,10 +126,12 @@ def create_system_specification_template(
 def validate_system_specification_yaml(
     proposed_system_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> str:
     report = build_system_specification_validation_report(
         proposed_system_specification_yaml,
+        work_item_name=work_item_name,
         repo_root=repo_root,
     )
     return yaml.safe_dump(_report_to_data(report), sort_keys=False)
@@ -116,6 +140,7 @@ def validate_system_specification_yaml(
 def build_system_specification_validation_report(
     proposed_system_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> SystemSpecificationValidationReport:
     _ = _resolve_repo_root(repo_root)
@@ -708,9 +733,14 @@ def _section_label(section_name: str) -> str:
     return section_name.rstrip("s")
 
 
-def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+def _resolve_output_path(
+    repo_root: Path,
+    *,
+    work_item_name: str,
+    output_path: str | Path | None,
+) -> Path:
     if output_path is None:
-        return repo_root / _DEFAULT_OUTPUT_PATH
+        return system_specification_path(repo_root, work_item_name)
     resolved_output_path = Path(output_path)
     if not resolved_output_path.is_absolute():
         return repo_root / resolved_output_path

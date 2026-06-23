@@ -214,6 +214,7 @@ def build_server() -> Any:
     @server.tool()
     def create_architecture_specification(
         entity_types: list[str],
+        work_item_name: str,
         output_path: str | None = None,
         title: str | None = None,
         repo_root: str | None = None,
@@ -221,8 +222,12 @@ def build_server() -> Any:
         repo_root_path = resolve_repo_root(repo_root)
         rendered_output_path = create_architecture_specification_template(
             entity_types,
+            work_item_name=work_item_name,
             output_path=(
-                architecture_specification_default_output_path(repo_root_path)
+                architecture_specification_default_output_path(
+                    work_item_name,
+                    repo_root_path,
+                )
                 if output_path is None
                 else Path(output_path)
             ),
@@ -233,6 +238,7 @@ def build_server() -> Any:
 
     @server.tool()
     def create_implementation_specification(
+        work_item_name: str,
         architecture_specification_path: str | None = None,
         output_path: str | None = None,
         title: str | None = None,
@@ -241,8 +247,12 @@ def build_server() -> Any:
         repo_root_path = resolve_repo_root(repo_root)
         rendered_output_path = create_implementation_specification_template(
             architecture_specification_path=architecture_specification_path,
+            work_item_name=work_item_name,
             output_path=(
-                implementation_specification_default_output_path(repo_root_path)
+                implementation_specification_default_output_path(
+                    work_item_name,
+                    repo_root_path,
+                )
                 if output_path is None
                 else Path(output_path)
             ),
@@ -253,14 +263,19 @@ def build_server() -> Any:
 
     @server.tool()
     def create_system_specification(
+        work_item_name: str,
         output_path: str | None = None,
         title: str | None = None,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
         rendered_output_path = create_system_specification_template(
+            work_item_name=work_item_name,
             output_path=(
-                system_specification_default_output_path(repo_root_path)
+                system_specification_default_output_path(
+                    work_item_name,
+                    repo_root_path,
+                )
                 if output_path is None
                 else Path(output_path)
             ),
@@ -271,13 +286,18 @@ def build_server() -> Any:
 
     @server.tool()
     def create_pr_specification(
+        work_item_name: str,
         output_path: str | None = None,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
         rendered_output_path = create_pr_specification_template(
+            work_item_name=work_item_name,
             output_path=(
-                pr_specification_default_output_path(repo_root_path)
+                pr_specification_default_output_path(
+                    work_item_name,
+                    repo_root_path,
+                )
                 if output_path is None
                 else Path(output_path)
             ),
@@ -311,18 +331,21 @@ def build_server() -> Any:
     def validate_architecture_specification(
         architecture_specification_yaml: str,
         entity_types: list[str],
+        work_item_name: str,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
         return validate_architecture_specification_yaml(
             architecture_specification_yaml,
             entity_types=entity_types,
+            work_item_name=work_item_name,
             repo_root=repo_root_path,
         )
 
     @server.tool()
     def validate_implementation_specification(
         implementation_specification_yaml: str,
+        work_item_name: str,
         architecture_specification_path: str | None = None,
         repo_root: str | None = None,
     ) -> str:
@@ -330,28 +353,33 @@ def build_server() -> Any:
         return validate_implementation_specification_yaml(
             implementation_specification_yaml,
             architecture_specification_path=architecture_specification_path,
+            work_item_name=work_item_name,
             repo_root=repo_root_path,
         )
 
     @server.tool()
     def validate_system_specification(
         system_specification_yaml: str,
+        work_item_name: str,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
         return validate_system_specification_yaml(
             system_specification_yaml,
+            work_item_name=work_item_name,
             repo_root=repo_root_path,
         )
 
     @server.tool()
     def validate_pr_specification(
         pr_specification_yaml: str,
+        work_item_name: str,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
         return validate_pr_specification_yaml(
             pr_specification_yaml,
+            work_item_name=work_item_name,
             repo_root=repo_root_path,
         )
 

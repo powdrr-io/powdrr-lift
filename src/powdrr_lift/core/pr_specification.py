@@ -11,9 +11,8 @@ import yaml
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.codebase_state import build_codebase_state_report
 
-_DEFAULT_OUTPUT_PATH = Path("docs") / "prs" / "proposed-pr-specification.yaml"
-_IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "implementation"
-_PR_SPECIFICATION_DIR = Path("docs") / "prs"
+_DEFAULT_OUTPUT_PATH = Path("docs") / "specs"
+_IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "specs"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +67,17 @@ class _ProposedPRDocument:
     intent_reasoning: str | None
 
 
-def pr_specification_default_output_path(repo_root: str | Path | None = None) -> Path:
+def pr_specification_default_output_path(
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / _DEFAULT_OUTPUT_PATH
+    return (
+        repo_root_path
+        / _DEFAULT_OUTPUT_PATH
+        / work_item_name
+        / "proposed-pr-specification.yaml"
+    )
 
 
 def render_pr_specification_template(*, repo_root: str | Path | None = None) -> str:
@@ -82,6 +89,14 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
             "Generate the codebase state first and ensure it contains current "
             "entities before generating a PR specification."
         )
+
+    feature_lines = [
+        (
+            f"# - {entry.feature_id} "
+            f"({entry.entity_type or 'entity'}, {entry.source_path})"
+        )
+        for entry in feature_catalog
+    ]
 
     lines = [
         "# PR specification template.",
@@ -99,13 +114,8 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Keep every detail id globally unique across those five sections.",
         "#",
         "# Current feature ids:",
-        *[
-            (
-                f"# - {entry.feature_id} "
-                f"({entry.entity_type or 'entity'}, {entry.source_path})"
-            )
-            for entry in feature_catalog
-        ],
+        *feature_lines,
+        "schema: https://powdrr.io/schemas/specification-v1",
         "id: null",
         "feature_ids:",
         "  - null",
@@ -134,11 +144,16 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
 
 def create_pr_specification_template(
     *,
+    work_item_name: str,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path = _resolve_output_path(
+        repo_root_path,
+        work_item_name,
+        output_path,
+    )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_path.write_text(
         render_pr_specification_template(repo_root=repo_root_path),
@@ -153,11 +168,16 @@ def proposed_pr_specification_path(
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root_path):
+        if _parse_proposed_pr_number(specification_path) == pr_number:
+            return specification_path
+
     return (
         repo_root_path
         / "docs"
-        / "proposals"
-        / f"PR-{pr_number}-proposed-pr-specification.yaml"
+        / "specs"
+        / f"PR-{pr_number}"
+        / "proposed-pr-specification.yaml"
     )
 
 
@@ -208,10 +228,12 @@ def render_proposed_pr_search_report(report: ProposedPRSearchReport) -> str:
 def validate_pr_specification_yaml(
     proposed_pr_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> str:
     report = build_pr_specification_validation_report(
         proposed_pr_specification_yaml,
+        work_item_name=work_item_name,
         repo_root=repo_root,
     )
     return yaml.safe_dump(_report_to_data(report), sort_keys=False)
@@ -220,14 +242,19 @@ def validate_pr_specification_yaml(
 def build_pr_specification_validation_report(
     proposed_pr_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
 ) -> PRSpecificationValidationReport:
     repo_root_path = _resolve_repo_root(repo_root)
     issues: list[PRSpecificationValidationIssue] = []
+    current_proposed_pr_id = _normalize_identifier(work_item_name)
 
     feature_catalog = _load_feature_catalog(repo_root_path)
     available_feature_ids = [entry.feature_id for entry in feature_catalog]
-    known_pr_ids = _load_existing_pr_ids(repo_root_path)
+    known_pr_ids = _load_existing_pr_ids(
+        repo_root_path,
+        excluded_proposed_pr_id=current_proposed_pr_id,
+    )
 
     try:
         raw_spec = _load_yaml_mapping(proposed_pr_specification_yaml)
@@ -279,7 +306,9 @@ def build_pr_specification_validation_report(
         issue_code="proposed_pr_id_missing",
         issue_message="The id field is required.",
     )
-    if proposed_pr_id is not None and proposed_pr_id in known_pr_ids:
+    if proposed_pr_id is not None and _normalize_identifier(
+        proposed_pr_id
+    ) in _normalize_identifier_set(known_pr_ids):
         issues.append(
             PRSpecificationValidationIssue(
                 code="duplicate_proposed_pr_id",
@@ -390,7 +419,9 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
     if not implementation_dir.exists():
         return catalog
 
-    for specification_path in sorted(implementation_dir.rglob("*.yaml")):
+    for specification_path in sorted(
+        implementation_dir.rglob("implementation-specification.yaml")
+    ):
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -423,14 +454,19 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
     return catalog
 
 
-def _load_existing_pr_ids(repo_root: Path) -> list[str]:
-    pr_dir = repo_root / _PR_SPECIFICATION_DIR
-    if not pr_dir.exists():
-        return []
-
+def _load_existing_pr_ids(
+    repo_root: Path,
+    *,
+    excluded_proposed_pr_id: str | None = None,
+) -> list[str]:
     pr_ids: list[str] = []
     seen_ids: set[str] = set()
-    for specification_path in sorted(pr_dir.rglob("*.yaml")):
+    excluded_identifier = (
+        _normalize_identifier(excluded_proposed_pr_id)
+        if excluded_proposed_pr_id is not None
+        else None
+    )
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -439,25 +475,29 @@ def _load_existing_pr_ids(repo_root: Path) -> list[str]:
             continue
 
         proposed_pr_id = _optional_string(raw_spec.get("id"))
-        if proposed_pr_id is None or proposed_pr_id in seen_ids:
+        if proposed_pr_id is None:
             continue
 
-        seen_ids.add(proposed_pr_id)
+        normalized_proposed_pr_id = _normalize_identifier(proposed_pr_id)
+        if (
+            excluded_identifier is not None
+            and normalized_proposed_pr_id == excluded_identifier
+        ):
+            continue
+
+        if normalized_proposed_pr_id in seen_ids:
+            continue
+
+        seen_ids.add(normalized_proposed_pr_id)
         pr_ids.append(proposed_pr_id)
 
     return pr_ids
 
 
 def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
-    proposal_dir = repo_root / "docs" / "proposals"
-    if not proposal_dir.exists():
-        return []
-
     documents: list[_ProposedPRDocument] = []
-    for specification_path in sorted(
-        proposal_dir.glob("PR-*-proposed-pr-specification.yaml")
-    ):
-        pr_number = _parse_proposed_pr_number(specification_path.name)
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
+        pr_number = _parse_proposed_pr_number(specification_path)
         if pr_number is None:
             continue
 
@@ -507,18 +547,57 @@ def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
     return documents
 
 
-def _parse_proposed_pr_number(filename: str) -> int | None:
-    if not filename.startswith("PR-") or not filename.endswith(
+def _iter_proposed_pr_specification_paths(repo_root: Path) -> list[Path]:
+    spec_root = repo_root / "docs" / "specs"
+    if not spec_root.exists():
+        specification_paths = []
+    else:
+        specification_paths = [
+            specification_path
+            for specification_path in spec_root.rglob("proposed-pr-specification.yaml")
+            if specification_path.is_file()
+        ]
+
+    proposal_root = repo_root / "docs" / "proposals"
+    if proposal_root.exists():
+        specification_paths.extend(
+            specification_path
+            for specification_path in proposal_root.glob(
+                "PR-*-proposed-pr-specification.yaml"
+            )
+            if specification_path.is_file()
+        )
+
+    seen_paths: set[Path] = set()
+    ordered_paths: list[Path] = []
+    for specification_path in sorted(specification_paths):
+        if specification_path in seen_paths:
+            continue
+
+        seen_paths.add(specification_path)
+        ordered_paths.append(specification_path)
+
+    return ordered_paths
+
+
+def _parse_proposed_pr_number(specification_path: Path) -> int | None:
+    parent_name = specification_path.parent.name
+    if parent_name.startswith("PR-"):
+        number_text = parent_name.removeprefix("PR-")
+        if number_text.isdigit():
+            return int(number_text)
+
+    filename = specification_path.name
+    if filename.startswith("PR-") and filename.endswith(
         "-proposed-pr-specification.yaml"
     ):
-        return None
+        number_text = filename.removeprefix("PR-").removesuffix(
+            "-proposed-pr-specification.yaml"
+        )
+        if number_text.isdigit():
+            return int(number_text)
 
-    number_text = filename.removeprefix("PR-").removesuffix(
-        "-proposed-pr-specification.yaml"
-    )
-    if not number_text.isdigit():
-        return None
-    return int(number_text)
+    return None
 
 
 def _score_proposed_pr_document(
@@ -646,6 +725,14 @@ def _validate_template_boilerplate_removed(
                 )
             )
             return
+
+
+def _normalize_identifier(value: str) -> str:
+    return value.strip().casefold()
+
+
+def _normalize_identifier_set(values: Sequence[str]) -> set[str]:
+    return {_normalize_identifier(value) for value in values}
 
 
 def _collect_detail_items(
@@ -859,9 +946,13 @@ def _optional_string(raw_value: object) -> str | None:
     return value or None
 
 
-def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+def _resolve_output_path(
+    repo_root: Path,
+    work_item_name: str,
+    output_path: str | Path | None,
+) -> Path:
     if output_path is None:
-        return repo_root / _DEFAULT_OUTPUT_PATH
+        return pr_specification_default_output_path(work_item_name, repo_root)
 
     resolved_output_path = Path(output_path)
     if not resolved_output_path.is_absolute():

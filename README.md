@@ -62,6 +62,9 @@ The next-stage platform design is captured in
 It describes the specification families, synthesis workflows, review flows,
 and context endpoints that will extend the current skill platform.
 
+The current specification documents live under `docs/specs/<work-item-name>/`
+and share the `https://powdrr.io/schemas/specification-v1` schema.
+
 ## How It Works
 
 1. Install `powdrrlift` skills to your favorite coding agent

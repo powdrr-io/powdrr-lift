@@ -19,7 +19,7 @@ Use this skill when the task is to carry out a proposed PR from its specificatio
    - If using MCP, call `show_proposed_pr`.
    - Read every section of the proposal before making changes.
 3. Validate the proposal.
-   - Run `powdrr-lift evaluate-pr-specification --input docs/proposals/PR-<num>-proposed-pr-specification.yaml`.
+   - Run `powdrr-lift evaluate-pr-specification --input docs/specs/PR-<num>/proposed-pr-specification.yaml`.
    - If using MCP, call `validate_pr_specification`.
    - Treat validation failure as a blocker until the proposal or the repo state is corrected.
 4. Implement the requested changes.

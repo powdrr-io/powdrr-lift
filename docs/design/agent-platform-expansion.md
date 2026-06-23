@@ -26,6 +26,9 @@ The platform should support these specification families:
 - `implementation`
 - `proposed-pr`
 
+All of those specifications live under `docs/specs/<work-item-name>/` and use
+the shared `https://powdrr.io/schemas/specification-v1` schema.
+
 Each of these document types needs two representations:
 
 - `current state`: a complete and coherent version of the document
@@ -116,4 +119,3 @@ The intended flow is:
   review output?
 - How much architecture churn should be introduced now versus deferred to the
   next pass?
-

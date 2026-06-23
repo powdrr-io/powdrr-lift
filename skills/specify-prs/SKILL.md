@@ -15,17 +15,18 @@ Use this skill to draft a PR specification that ties a proposed PR to current fe
    - Run `powdrr-lift pr-specification`.
    - If using MCP, call `create_pr_specification`.
    - Create one template per proposed PR.
-   - Use the default file at `docs/prs/proposed-pr-specification.yaml` unless the task calls for a different path.
+   - Use the default file at `docs/specs/<work-item-name>/proposed-pr-specification.yaml` unless the task calls for a different path.
 2. Fill out the template.
    - Set `id` to a globally unique proposed PR id.
    - Reference one or more current feature ids from the current codebase state.
    - Put the PR goal and reasoning in `intent.goal` and `intent.reasoning`.
    - Fill in `acceptance_criteria`, `expected_tests`, `expected_outcomes`,
-     `non_goals`, and `risks` with concrete `id` and `description` pairs.
+     `non_goals`, and `risks` with concrete `id` and `description` pairs when
+     they add useful detail.
    - Keep the proposed PR self-contained; use the section lists to describe
      what changes, not a file list.
 3. Validate the specification.
-   - Run `powdrr-lift evaluate-pr-specification`.
+   - Run `powdrr-lift evaluate-pr-specification --input docs/specs/<work-item-name>/proposed-pr-specification.yaml`.
    - If using MCP, call `validate_pr_specification`.
    - Treat any validation failure as a cue to fix the template and rerun.
 4. Iterate until clean.

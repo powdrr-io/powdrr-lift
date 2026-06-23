@@ -13,8 +13,10 @@ from powdrr_lift.core.code_index import (
     _current_branch,
 )
 from powdrr_lift.core.index import ChangelogDocument, SourceIndex
+from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
 
 _DEFAULT_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "codebase-state.yaml"
+_CURRENT_STATE_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "current-state.yaml"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,20 @@ class CodebaseStateDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class CodebaseStateFeature:
+    id: str
+    state: str | None
+    sources: list[CodebaseStateSource] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class CodebaseStateProposedPR:
+    id: str
+    state: str | None
+    sources: list[CodebaseStateSource] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
 class CodebaseStateIntent:
     problem: str | None
     goal: str | None
@@ -83,6 +99,8 @@ class CodebaseStateReport:
     invariants: list[CodebaseStateLifecycleItem] = field(default_factory=list)
     guidance: list[CodebaseStateLifecycleItem] = field(default_factory=list)
     decisions: list[CodebaseStateDecision] = field(default_factory=list)
+    features: list[CodebaseStateFeature] = field(default_factory=list)
+    proposed_prs: list[CodebaseStateProposedPR] = field(default_factory=list)
     intents: list[CodebaseStateIntent] = field(default_factory=list)
 
 
@@ -227,6 +245,118 @@ def create_codebase_state(
     return resolved_output_path
 
 
+def build_current_state_specification_report(
+    branch_name: str | None = None,
+    *,
+    parent_branch: str | None = None,
+    repo_root: str | Path | None = None,
+) -> dict[str, Any]:
+    repo_root_path = _resolve_repo_root(repo_root)
+    resolved_branch = branch_name or _current_branch(repo_root_path)
+    resolved_parent_branch = parent_branch or _resolve_default_branch(repo_root_path)
+
+    state = _load_codebase_state_state(
+        repo_root_path=repo_root_path,
+        branch_name=resolved_branch,
+        parent_branch=resolved_parent_branch,
+    )
+    requirements, approach = _collect_current_specification_sections(
+        state.source_index.specification_documents,
+    )
+    entities = _collect_current_specification_entities(
+        state.source_index.specification_documents,
+    )
+    relationships = _collect_current_specification_relationships(
+        state.source_index.specification_documents,
+    )
+    features = _collect_current_specification_features(
+        state.source_index.specification_documents,
+    )
+    decisions = _collect_current_specification_decisions(
+        state.source_index.specification_documents,
+    )
+    codebase_state_report = _build_codebase_state_report(state)
+
+    return {
+        "schema": SPECIFICATION_SCHEMA_URL,
+        "id": _current_state_report_id(resolved_branch),
+        "title": f"Current state synthesized for {resolved_branch}",
+        "requirements": requirements,
+        "approach": approach,
+        "entities": entities,
+        "entity_relationships": relationships,
+        "invariants": [
+            {
+                "id": item.id,
+                "description": item.description,
+                "action": "added",
+            }
+            for item in codebase_state_report.invariants
+        ],
+        "guidance": [
+            {
+                "id": item.id,
+                "description": item.description,
+                "action": "added",
+            }
+            for item in codebase_state_report.guidance
+        ],
+        "features": [feature for feature in features],
+        "decisions": decisions,
+        "proposed_prs": [
+            {
+                "id": proposed_pr.id,
+                "state": proposed_pr.state,
+            }
+            for proposed_pr in codebase_state_report.proposed_prs
+            if proposed_pr.state != "completed"
+        ],
+        "intents": [
+            {
+                "problem": intent.problem,
+                "goal": intent.goal,
+            }
+            for intent in codebase_state_report.intents
+        ],
+    }
+
+
+def render_current_state_specification_report(report: dict[str, Any]) -> str:
+    return yaml.safe_dump(report, sort_keys=False)
+
+
+def create_current_state_specification(
+    branch_name: str | None = None,
+    *,
+    output_path: str | Path | None = None,
+    parent_branch: str | None = None,
+    repo_root: str | Path | None = None,
+) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    report = build_current_state_specification_report(
+        branch_name=branch_name,
+        parent_branch=parent_branch,
+        repo_root=repo_root_path,
+    )
+    resolved_output_path = _resolve_current_state_output_path(
+        repo_root_path,
+        output_path,
+    )
+    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_output_path.write_text(
+        render_current_state_specification_report(report),
+        encoding="utf-8",
+    )
+    return resolved_output_path
+
+
+def current_state_specification_default_output_path(
+    repo_root: str | Path | None = None,
+) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    return repo_root_path / _CURRENT_STATE_OUTPUT_PATH
+
+
 def codebase_state_default_output_path(repo_root: str | Path | None = None) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
     return repo_root_path / _DEFAULT_OUTPUT_PATH
@@ -249,6 +379,8 @@ def _build_codebase_state_report(
         documents,
         kind="guidance",
     )
+    features = _collect_current_feature_states(documents)
+    proposed_prs = _collect_current_proposed_pr_states(documents)
     decisions = _collect_decisions(documents)
     intents = _collect_intents(documents)
 
@@ -264,6 +396,8 @@ def _build_codebase_state_report(
         invariants=invariants,
         guidance=guidance,
         decisions=decisions,
+        features=features,
+        proposed_prs=proposed_prs,
         intents=intents,
     )
 
@@ -381,6 +515,349 @@ def _collect_current_lifecycle_items(
             )
 
     return [items_by_id[item_id] for item_id in sorted(items_by_id)]
+
+
+def _collect_current_feature_states(
+    documents: list[ChangelogDocument],
+) -> list[CodebaseStateFeature]:
+    items_by_id: dict[str, CodebaseStateFeature] = {}
+    for document in documents:
+        source = _document_source(document)
+        for raw_item in document.changelog.feature_changes or []:
+            item_id = _normalize_text(raw_item.id)
+            if item_id is None:
+                continue
+
+            state = _normalize_text(raw_item.state)
+            if state == "removed":
+                items_by_id.pop(item_id, None)
+                continue
+
+            existing = items_by_id.get(item_id)
+            if state is None and existing is not None:
+                state = existing.state
+
+            sources = [] if existing is None else list(existing.sources)
+            if source not in sources:
+                sources.append(source)
+
+            items_by_id[item_id] = CodebaseStateFeature(
+                id=item_id,
+                state=state,
+                sources=sources,
+            )
+
+    return [items_by_id[item_id] for item_id in sorted(items_by_id)]
+
+
+def _collect_current_proposed_pr_states(
+    documents: list[ChangelogDocument],
+) -> list[CodebaseStateProposedPR]:
+    items_by_id: dict[str, CodebaseStateProposedPR] = {}
+    for document in documents:
+        source = _document_source(document)
+        for raw_item in document.changelog.pr_changes or []:
+            item_id = _normalize_text(raw_item.id)
+            if item_id is None:
+                continue
+
+            state = _normalize_text(raw_item.state)
+            if state == "removed":
+                items_by_id.pop(item_id, None)
+                continue
+
+            existing = items_by_id.get(item_id)
+            if state is None and existing is not None:
+                state = existing.state
+
+            sources = [] if existing is None else list(existing.sources)
+            if source not in sources:
+                sources.append(source)
+
+            items_by_id[item_id] = CodebaseStateProposedPR(
+                id=item_id,
+                state=state,
+                sources=sources,
+            )
+
+    return [items_by_id[item_id] for item_id in sorted(items_by_id)]
+
+
+def _collect_current_specification_sections(
+    specification_documents: list[Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    requirements_by_id: dict[str, dict[str, Any]] = {}
+    approach_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if (
+            _normalize_text(getattr(specification_document, "specification_type", None))
+            != "system"
+        ):
+            continue
+
+        raw_content = getattr(specification_document, "content", {})
+        requirements_by_id = _collect_current_system_section_items(
+            raw_content.get("requirements"),
+            requirements_by_id,
+        )
+        approach_by_id = _collect_current_system_section_items(
+            raw_content.get("approach"),
+            approach_by_id,
+        )
+
+    return (
+        [requirements_by_id[item_id] for item_id in sorted(requirements_by_id)],
+        [approach_by_id[item_id] for item_id in sorted(approach_by_id)],
+    )
+
+
+def _collect_current_specification_entities(
+    specification_documents: list[Any],
+) -> list[dict[str, Any]]:
+    entities_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if _normalize_text(
+            getattr(specification_document, "specification_type", None)
+        ) not in {"architecture", "implementation"}:
+            continue
+
+        raw_content = getattr(specification_document, "content", {})
+        for raw_item in _ensure_sequence(raw_content.get("entities")):
+            item = _ensure_mapping(raw_item)
+            item_id = _normalize_text(item.get("id"))
+            if item_id is None:
+                continue
+
+            action = _normalize_text(item.get("action"))
+            if action == "removed":
+                entities_by_id.pop(item_id, None)
+                continue
+
+            entity_data: dict[str, Any] = {
+                "id": item_id,
+                "type": _normalize_text(item.get("type")),
+                "summary": _normalize_text(item.get("summary")),
+                "rationale": _normalize_text(item.get("rationale")),
+                "action": "added",
+            }
+            entities_by_id[item_id] = entity_data
+
+    return [entities_by_id[item_id] for item_id in sorted(entities_by_id)]
+
+
+def _collect_current_specification_relationships(
+    specification_documents: list[Any],
+) -> list[dict[str, Any]]:
+    relationships_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if _normalize_text(
+            getattr(specification_document, "specification_type", None)
+        ) not in {"architecture", "implementation"}:
+            continue
+
+        raw_content = getattr(specification_document, "content", {})
+        for raw_item in _ensure_sequence(raw_content.get("entity_relationships")):
+            item = _ensure_mapping(raw_item)
+            item_id = _normalize_text(item.get("id"))
+            if item_id is None:
+                continue
+
+            action = _normalize_text(item.get("action"))
+            if action == "removed":
+                relationships_by_id.pop(item_id, None)
+                continue
+
+            relationship_data: dict[str, Any] = {
+                "id": item_id,
+                "source": _normalize_text(item.get("source")),
+                "target": _normalize_text(item.get("target")),
+                "relationship": _normalize_text(item.get("relationship")),
+                "description": _normalize_text(item.get("description")),
+                "rationale": _normalize_text(item.get("rationale")),
+                "action": "added",
+            }
+            relationships_by_id[item_id] = relationship_data
+
+    return [relationships_by_id[item_id] for item_id in sorted(relationships_by_id)]
+
+
+def _collect_current_specification_features(
+    specification_documents: list[Any],
+) -> list[dict[str, Any]]:
+    features_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if (
+            _normalize_text(getattr(specification_document, "specification_type", None))
+            != "implementation"
+        ):
+            continue
+
+        raw_content = getattr(specification_document, "content", {})
+        for raw_item in _ensure_sequence(raw_content.get("features")):
+            item = _ensure_mapping(raw_item)
+            item_id = _normalize_text(item.get("id"))
+            if item_id is None:
+                continue
+
+            action = _normalize_text(item.get("action"))
+            if action == "removed":
+                features_by_id.pop(item_id, None)
+                continue
+
+            feature_data: dict[str, Any] = {
+                "id": item_id,
+                "description": _normalize_text(item.get("description")),
+                "functional_requirements": [
+                    requirement
+                    for requirement in _normalize_text_sequence(
+                        item.get("functional_requirements")
+                    )
+                ],
+                "action": "added",
+            }
+            features_by_id[item_id] = feature_data
+
+    return [features_by_id[item_id] for item_id in sorted(features_by_id)]
+
+
+def _collect_current_specification_decisions(
+    specification_documents: list[Any],
+) -> list[dict[str, Any]]:
+    decisions_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if (
+            _normalize_text(getattr(specification_document, "specification_type", None))
+            != "implementation"
+        ):
+            continue
+
+        raw_content = getattr(specification_document, "content", {})
+        for raw_item in _ensure_sequence(raw_content.get("decisions")):
+            item = _ensure_mapping(raw_item)
+            item_id = _normalize_text(item.get("id"))
+            if item_id is None:
+                continue
+
+            action = _normalize_text(item.get("action"))
+            if action == "removed":
+                decisions_by_id.pop(item_id, None)
+                continue
+
+            decision_data: dict[str, Any] = {
+                "id": item_id,
+                "description": _normalize_text(item.get("description")),
+                "action": "added",
+            }
+            supercedes = _normalize_text_sequence(item.get("supercedes"))
+            if supercedes:
+                decision_data["supercedes"] = supercedes
+
+            decisions_by_id[item_id] = decision_data
+
+    return [decisions_by_id[item_id] for item_id in sorted(decisions_by_id)]
+
+
+def _collect_current_system_section_items(
+    raw_items: object | None,
+    items_by_id: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    for raw_item in _ensure_sequence(raw_items):
+        item = _ensure_mapping(raw_item)
+        item_id = _normalize_text(item.get("id"))
+        if item_id is None:
+            continue
+
+        state = _normalize_text(item.get("state"))
+        if state == "removed":
+            items_by_id.pop(item_id, None)
+            continue
+
+        item_data: dict[str, Any] = {
+            "id": item_id,
+            "description": _normalize_text(item.get("description")),
+            "state": "added",
+        }
+        supercedes = _normalize_text_sequence(item.get("supercedes"))
+        if supercedes:
+            item_data["supercedes"] = supercedes
+
+        items_by_id[item_id] = item_data
+
+    return items_by_id
+
+
+def _normalize_text_sequence(raw_values: object | None) -> list[str]:
+    values: list[str] = []
+    for raw_value in _ensure_sequence(raw_values):
+        normalized_value = _normalize_text(raw_value)
+        if normalized_value is not None:
+            values.append(normalized_value)
+
+    return values
+
+
+def _specification_document_sort_key(document: Any) -> tuple[str, str]:
+    return (
+        _normalize_text(getattr(document, "work_item_name", "")) or "",
+        _normalize_text(getattr(document, "specification_type", "")) or "",
+    )
+
+
+def _current_state_report_id(branch_name: str) -> str:
+    normalized_branch = branch_name.strip().replace("/", "-")
+    return f"current-state-{normalized_branch}"
+
+
+def _resolve_current_state_output_path(
+    repo_root: Path,
+    output_path: str | Path | None,
+) -> Path:
+    if output_path is None:
+        return repo_root / _CURRENT_STATE_OUTPUT_PATH
+
+    resolved_output = Path(output_path)
+    if not resolved_output.is_absolute():
+        resolved_output = repo_root / resolved_output
+
+    return resolved_output
+
+
+def _ensure_mapping(raw_data: object | None) -> dict[str, Any]:
+    if raw_data is None:
+        return {}
+
+    if not isinstance(raw_data, dict):
+        return {}
+
+    return raw_data
+
+
+def _ensure_sequence(raw_data: object | None) -> list[object]:
+    if raw_data is None:
+        return []
+
+    if isinstance(raw_data, (str, bytes)):
+        return []
+
+    if not isinstance(raw_data, list):
+        return []
+
+    return raw_data
 
 
 def _collect_decisions(
@@ -536,6 +1013,22 @@ def _codebase_state_report_to_data(report: CodebaseStateReport) -> dict[str, Any
                 "sources": [_source_to_data(source) for source in decision.sources],
             }
             for decision in report.decisions
+        ],
+        "features": [
+            {
+                "id": feature.id,
+                "state": feature.state,
+                "sources": [_source_to_data(source) for source in feature.sources],
+            }
+            for feature in report.features
+        ],
+        "proposed_prs": [
+            {
+                "id": proposed_pr.id,
+                "state": proposed_pr.state,
+                "sources": [_source_to_data(source) for source in proposed_pr.sources],
+            }
+            for proposed_pr in report.proposed_prs
         ],
         "intents": [
             {

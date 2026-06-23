@@ -9,10 +9,12 @@ from pathlib import Path
 from powdrr_lift.change_log_parser import (
     ChangeEntity,
     ChangeEntityRelationship,
+    ChangeFeatureState,
     ChangeFile,
     ChangeGuidance,
     ChangeInvariant,
     ChangeLog,
+    ChangeProposedPRState,
     Decision,
     Intent,
     RelatedSection,
@@ -40,9 +42,10 @@ from powdrr_lift.core.index import (
     _normalize_entity_id,
     _normalize_line_state,
     _parse_commit_log_output,
+    load_specification_documents,
 )
 
-INDEX_CACHE_VERSION = 13
+INDEX_CACHE_VERSION = 14
 
 
 @dataclass(frozen=True, slots=True)
@@ -861,6 +864,24 @@ class CodeIndexStore:
                     related_index, related_kind, related_id
                   )
                 );
+
+                CREATE TABLE IF NOT EXISTS change_feature_record (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  feature_index INTEGER NOT NULL,
+                  feature_id TEXT,
+                  state TEXT,
+                  PRIMARY KEY (branch_name, pr_number, feature_index)
+                );
+
+                CREATE TABLE IF NOT EXISTS change_pr_record (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  proposed_pr_index INTEGER NOT NULL,
+                  proposed_pr_id TEXT,
+                  state TEXT,
+                  PRIMARY KEY (branch_name, pr_number, proposed_pr_index)
+                );
                 """
             )
             branch_state_info = connection.execute(
@@ -997,6 +1018,7 @@ class CodeIndexStore:
             ).fetchone()
             if branch_row is None:
                 raise RuntimeError(f"Missing branch state for {branch_name!r}.")
+            specification_documents = load_specification_documents(self.repo_root)
 
             document_rows = connection.execute(
                 """
@@ -1154,6 +1176,24 @@ class CodeIndexStore:
                 """,
                 (branch_name,),
             ).fetchall()
+            feature_rows = connection.execute(
+                """
+                SELECT pr_number, feature_index, feature_id, state
+                FROM change_feature_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, feature_index, feature_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            proposed_pr_rows = connection.execute(
+                """
+                SELECT pr_number, proposed_pr_index, proposed_pr_id, state
+                FROM change_pr_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, proposed_pr_index, proposed_pr_id
+                """,
+                (branch_name,),
+            ).fetchall()
             affects_by_provenance_id = self._load_provenance_affects(
                 connection,
                 branch_name,
@@ -1234,6 +1274,12 @@ class CodeIndexStore:
             change_guidance_related_rows_by_pr.setdefault(row["pr_number"], []).append(
                 row
             )
+        feature_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in feature_rows:
+            feature_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        proposed_pr_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in proposed_pr_rows:
+            proposed_pr_rows_by_pr.setdefault(row["pr_number"], []).append(row)
 
         documents = [
             _load_changelog_document_from_cache_row(
@@ -1269,6 +1315,8 @@ class CodeIndexStore:
                 change_guidance_related_rows=change_guidance_related_rows_by_pr.get(
                     row["pr_number"], ()
                 ),
+                feature_rows=feature_rows_by_pr.get(row["pr_number"], ()),
+                proposed_pr_rows=proposed_pr_rows_by_pr.get(row["pr_number"], ()),
                 provenance_rows=provenance_by_pr.get(row["pr_number"], ()),
             )
             for row in document_rows
@@ -1278,6 +1326,7 @@ class CodeIndexStore:
             repo_root=self.repo_root,
             default_branch_name=branch_row["parent_branch"],
             documents=documents,
+            specification_documents=specification_documents,
             entity_graph=EntityGraph(
                 entities={
                     entity_id: tuple(occurrences)
@@ -1361,6 +1410,14 @@ class CodeIndexStore:
                 (branch_name,),
             )
             connection.execute(
+                "DELETE FROM change_feature_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_pr_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
                 "DELETE FROM provenance_affect WHERE branch_name = ?",
                 (branch_name,),
             )
@@ -1425,6 +1482,43 @@ class CodeIndexStore:
                             decision_state.decision_summary,
                             decision_state.decision_status,
                             decision_state.replaces_decision_id,
+                        ),
+                    )
+
+                for feature_index, feature in enumerate(
+                    document.changelog.feature_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_feature_record (
+                          branch_name, pr_number, feature_index, feature_id, state
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            feature_index,
+                            feature.id,
+                            feature.state,
+                        ),
+                    )
+
+                for proposed_pr_index, proposed_pr in enumerate(
+                    document.changelog.pr_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_pr_record (
+                          branch_name, pr_number, proposed_pr_index,
+                          proposed_pr_id, state
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            proposed_pr_index,
+                            proposed_pr.id,
+                            proposed_pr.state,
                         ),
                     )
 
@@ -1754,6 +1848,7 @@ def _build_branch_index(
         repo_root=repo_root,
         default_branch_name=parent_branch,
         documents=documents,
+        specification_documents=load_specification_documents(repo_root),
         entity_graph=_build_entity_graph(documents),
         changes=changes,
         file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
@@ -1807,6 +1902,7 @@ def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
         repo_root=repo_root,
         default_branch_name=ref,
         documents=documents,
+        specification_documents=[],
         entity_graph=_build_entity_graph(documents),
         changes=changes,
         file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
@@ -2091,6 +2187,8 @@ def _load_changelog_document_from_cache_row(
     change_invariant_related_rows: Sequence[sqlite3.Row],
     change_guidance_rows: Sequence[sqlite3.Row],
     change_guidance_related_rows: Sequence[sqlite3.Row],
+    feature_rows: Sequence[sqlite3.Row],
+    proposed_pr_rows: Sequence[sqlite3.Row],
     provenance_rows: Sequence[sqlite3.Row],
 ) -> ChangelogDocument:
     changelog_path = Path(row["changelog_path"])
@@ -2201,6 +2299,22 @@ def _load_changelog_document_from_cache_row(
         for guidance_row in change_guidance_rows
     ]
 
+    feature_changes = [
+        ChangeFeatureState(
+            id=feature_row["feature_id"],
+            state=feature_row["state"],
+        )
+        for feature_row in feature_rows
+    ]
+
+    proposed_pr_changes = [
+        ChangeProposedPRState(
+            id=proposed_pr_row["proposed_pr_id"],
+            state=proposed_pr_row["state"],
+        )
+        for proposed_pr_row in proposed_pr_rows
+    ]
+
     entity_relationship_changes = [
         ChangeEntityRelationship(
             action=relationship_row["action"],
@@ -2226,6 +2340,8 @@ def _load_changelog_document_from_cache_row(
         entity_relationship_changes=entity_relationship_changes,
         invariant_changes=invariant_changes,
         guidance_changes=guidance_changes,
+        feature_changes=feature_changes,
+        pr_changes=proposed_pr_changes,
     )
 
     return ChangelogDocument(

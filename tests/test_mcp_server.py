@@ -24,6 +24,7 @@ def test_build_server_registers_codebase_state_tool(
 
     assert server is not None
     assert "get_codebase_state" in registered_tools
+    assert "synthesize_current_state" in registered_tools
     assert "create_architecture_specification" in registered_tools
     assert "validate_architecture_specification" in registered_tools
     assert "create_implementation_specification" in registered_tools

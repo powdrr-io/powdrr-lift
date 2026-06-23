@@ -16,9 +16,11 @@ from powdrr_lift.core import (
     create_architecture_specification_template,
     create_change_log_template,
     create_codebase_state,
+    create_current_state_specification,
     create_implementation_specification_template,
     create_pr_specification_template,
     create_system_specification_template,
+    current_state_specification_default_output_path,
     implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
@@ -205,6 +207,26 @@ def build_server() -> Any:
             branch_name=branch_name,
             output_path=(
                 codebase_state_default_output_path(repo_root_path)
+                if output_path is None
+                else Path(output_path)
+            ),
+            parent_branch=parent_branch,
+            repo_root=repo_root_path,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def synthesize_current_state(
+        branch_name: str | None = None,
+        parent_branch: str | None = None,
+        output_path: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_current_state_specification(
+            branch_name=branch_name,
+            output_path=(
+                current_state_specification_default_output_path(repo_root_path)
                 if output_path is None
                 else Path(output_path)
             ),

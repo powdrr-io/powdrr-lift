@@ -18,9 +18,11 @@ from powdrr_lift.core import (
     create_architecture_specification_template,
     create_change_log_template,
     create_codebase_state,
+    create_current_state_specification,
     create_implementation_specification_template,
     create_pr_specification_template,
     create_system_specification_template,
+    current_state_specification_default_output_path,
     implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
@@ -307,6 +309,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to use when running git commands.",
     )
     codebase_state_parser.set_defaults(func=_run_codebase_state)
+
+    current_state_parser = subparsers.add_parser(
+        "synthesize-current-state",
+        aliases=["synthesize_current_state"],
+        help="Synthesize the current specification state from indexed files.",
+    )
+    current_state_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to inspect. Defaults to the current branch.",
+    )
+    current_state_parser.add_argument(
+        "--parent-branch",
+        help="Reference parent branch used to build the index.",
+    )
+    current_state_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the synthesized state to this path instead of "
+            ".powdrr-lift/state/current-state.yaml."
+        ),
+    )
+    current_state_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    current_state_parser.set_defaults(func=_run_current_state)
 
     architecture_specification_parser = subparsers.add_parser(
         "architecture-specification",
@@ -806,6 +837,23 @@ def _run_codebase_state(args: argparse.Namespace) -> int:
         print(f"Wrote codebase state to {default_output}")
     else:
         print(f"Wrote codebase state to {output_path}")
+
+    return 0
+
+
+def _run_current_state(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_current_state_specification(
+        branch_name=args.branch_name,
+        output_path=args.output,
+        parent_branch=args.parent_branch,
+        repo_root=repo_root,
+    )
+    if args.output is None:
+        default_output = current_state_specification_default_output_path(repo_root)
+        print(f"Wrote current state report to {default_output}")
+    else:
+        print(f"Wrote current state report to {output_path}")
 
     return 0
 

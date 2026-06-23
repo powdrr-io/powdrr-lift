@@ -88,6 +88,7 @@ __all__ = [
     "Span",
     "create_change_log_template",
     "build_codebase_state_report",
+    "build_current_state_specification_report",
     "build_invariants_report",
     "build_changelog_index",
     "build_changelog_index_at_ref",
@@ -95,7 +96,9 @@ __all__ = [
     "build_blame_view_state",
     "build_repo_tree",
     "codebase_state_default_output_path",
+    "current_state_specification_default_output_path",
     "create_codebase_state",
+    "create_current_state_specification",
     "refresh_code_index",
     "parse_change_log",
     "parse_line_range",
@@ -107,6 +110,7 @@ __all__ = [
     "parse_validation_report",
     "render_edit_context_report",
     "render_codebase_state_report",
+    "render_current_state_specification_report",
     "render_current_decisions_report",
     "render_entity_decision_report",
     "render_entity_reference_report",
@@ -311,13 +315,17 @@ def __getattr__(name: str) -> Any:
         "CodebaseStateRelationship",
         "CodebaseStateReport",
         "CodebaseStateSource",
+        "build_current_state_specification_report",
         "build_current_decisions_report",
         "build_codebase_state_report",
         "build_invariants_report",
         "codebase_state_default_output_path",
+        "current_state_specification_default_output_path",
         "create_codebase_state",
+        "create_current_state_specification",
         "render_current_decisions_report",
         "render_codebase_state_report",
+        "render_current_state_specification_report",
         "render_invariants_report",
     }:
         from powdrr_lift.core.codebase_state import (
@@ -330,11 +338,15 @@ def __getattr__(name: str) -> Any:
             CodebaseStateSource,
             build_codebase_state_report,
             build_current_decisions_report,
+            build_current_state_specification_report,
             build_invariants_report,
             codebase_state_default_output_path,
             create_codebase_state,
+            create_current_state_specification,
+            current_state_specification_default_output_path,
             render_codebase_state_report,
             render_current_decisions_report,
+            render_current_state_specification_report,
             render_invariants_report,
         )
 
@@ -346,13 +358,23 @@ def __getattr__(name: str) -> Any:
             "CodebaseStateRelationship": CodebaseStateRelationship,
             "CodebaseStateReport": CodebaseStateReport,
             "CodebaseStateSource": CodebaseStateSource,
+            "build_current_state_specification_report": (
+                build_current_state_specification_report
+            ),
             "build_current_decisions_report": build_current_decisions_report,
             "build_codebase_state_report": build_codebase_state_report,
             "build_invariants_report": build_invariants_report,
             "codebase_state_default_output_path": codebase_state_default_output_path,
+            "current_state_specification_default_output_path": (
+                current_state_specification_default_output_path
+            ),
             "create_codebase_state": create_codebase_state,
+            "create_current_state_specification": create_current_state_specification,
             "render_current_decisions_report": render_current_decisions_report,
             "render_codebase_state_report": render_codebase_state_report,
+            "render_current_state_specification_report": (
+                render_current_state_specification_report
+            ),
             "render_invariants_report": render_invariants_report,
         }[name]
 

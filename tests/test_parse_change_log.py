@@ -77,27 +77,30 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
           - docs/specs/powdrr-lift/system-specification.yaml
 
         files:
-          - path: src/review/workflow.py
-            type: modified
-            span:
-              start_line: 1
-              end_line: 3
-            summary: Update the review workflow file.
-            rationale: Capture the file-level context.
-            related:
-              entities:
-                - ReviewSkill
-                - ChangelogValidation
-              acceptance_criteria:
-                - AC-001
-              expected_tests:
-                - TEST-001
-              expected_outcomes:
-                - OUT-001
-              non_goals:
-                - NG-001
-              risks:
-                - RISK-001
+            - path: src/review/workflow.py
+              type: modified
+              span:
+                start_line: 1
+                end_line: 3
+              summary: Update the review workflow file.
+              rationale: Capture the file-level context.
+              related:
+                entities:
+                  - ReviewSkill
+                  - ChangelogValidation
+                prs:
+                  - id: 40
+                    state: completed
+                acceptance_criteria:
+                  - AC-001
+                expected_tests:
+                  - TEST-001
+                expected_outcomes:
+                  - OUT-001
+                non_goals:
+                  - NG-001
+                risks:
+                  - RISK-001
 
         entities:
           - id: ReviewSkill
@@ -176,6 +179,10 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert (change_log.file_changes or [])[0].related.entities == [
         "ReviewSkill",
         "ChangelogValidation",
+    ]
+    assert [pr.id for pr in (change_log.file_changes or [])[0].related.prs] == ["40"]
+    assert [pr.state for pr in (change_log.file_changes or [])[0].related.prs] == [
+        "completed"
     ]
     assert (change_log.file_changes or [])[0].related.acceptance_criteria == ["AC-001"]
     assert (change_log.file_changes or [])[0].related.expected_tests == ["TEST-001"]

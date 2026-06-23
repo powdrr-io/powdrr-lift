@@ -32,6 +32,7 @@ class RelatedSection:
     entities: list[str] = field(default_factory=list)
     invariants: list[str] = field(default_factory=list)
     guidance: list[str] = field(default_factory=list)
+    prs: list[ChangeProposedPRState] = field(default_factory=list)
     acceptance_criteria: list[str] = field(default_factory=list)
     expected_tests: list[str] = field(default_factory=list)
     expected_outcomes: list[str] = field(default_factory=list)
@@ -379,6 +380,10 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
         entities=_parse_id_sequence(data.get("entities")),
         invariants=_parse_id_sequence(data.get("invariants")),
         guidance=_parse_id_sequence(data.get("guidance")),
+        prs=[
+            _parse_proposed_pr_state(raw_pr)
+            for raw_pr in _ensure_sequence(data.get("prs"))
+        ],
         acceptance_criteria=_parse_id_sequence(data.get("acceptance_criteria")),
         expected_tests=_parse_id_sequence(data.get("expected_tests")),
         expected_outcomes=_parse_id_sequence(data.get("expected_outcomes")),

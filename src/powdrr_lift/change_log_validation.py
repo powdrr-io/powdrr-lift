@@ -218,6 +218,7 @@ def build_validation_report(
     available_proposed_pr_detail_ids = _load_available_proposed_pr_detail_ids(
         repo_root_path
     )
+    available_proposed_pr_ids = _load_known_proposed_pr_ids(repo_root_path)
     available_rationale_ids = (
         _load_available_rationale_ids(repo_root_path)
         | available_changelog_ids
@@ -257,6 +258,7 @@ def build_validation_report(
                 )
                 if guidance_id is not None
             },
+            available_proposed_pr_ids=available_proposed_pr_ids,
             available_proposed_pr_detail_ids=available_proposed_pr_detail_ids,
             available_rationale_ids=available_rationale_ids,
         )
@@ -915,6 +917,7 @@ def _validate_v2_file_sections(
     available_entity_ids: set[str],
     available_invariant_ids: set[str],
     available_guidance_ids: set[str],
+    available_proposed_pr_ids: set[str],
     available_proposed_pr_detail_ids: set[str],
     available_rationale_ids: set[str],
 ) -> None:
@@ -1050,6 +1053,7 @@ def _validate_v2_file_sections(
             ("entities", available_entity_ids),
             ("invariants", available_invariant_ids),
             ("guidance", available_guidance_ids),
+            ("prs", available_proposed_pr_ids),
             ("acceptance_criteria", available_proposed_pr_detail_ids),
             ("expected_tests", available_proposed_pr_detail_ids),
             ("expected_outcomes", available_proposed_pr_detail_ids),
@@ -1093,6 +1097,57 @@ def _validate_v2_file_sections(
 
             has_nonempty_related_value = True
             for related_index, raw_related_value in enumerate(raw_related_values):
+                if related_key == "prs":
+                    related_id, related_state = _parse_related_pr_reference(
+                        raw_related_value
+                    )
+                    if related_id is None:
+                        issues.append(
+                            ValidationIssue(
+                                code="file_entry_related_missing_id",
+                                message=(
+                                    f"File change {file_change_index} related."
+                                    f"{related_key}[{related_index}] must include "
+                                    "an id."
+                                ),
+                                path=(
+                                    f"{file_path}.related.{related_key}[{related_index}]"
+                                ),
+                            )
+                        )
+                        continue
+
+                    if related_id not in available_ids:
+                        issues.append(
+                            ValidationIssue(
+                                code="unknown_related_reference",
+                                message=(
+                                    f"File change {file_change_index} related."
+                                    f"{related_key} references id {related_id!r}, but "
+                                    "that id is not current."
+                                ),
+                                path=(
+                                    f"{file_path}.related.{related_key}[{related_index}]"
+                                ),
+                            )
+                        )
+
+                    if related_state not in {"in_progress", "completed"}:
+                        issues.append(
+                            ValidationIssue(
+                                code="file_entry_related_invalid_state",
+                                message=(
+                                    f"File change {file_change_index} related."
+                                    f"{related_key}[{related_index}] must use state "
+                                    "in_progress or completed."
+                                ),
+                                path=(
+                                    f"{file_path}.related.{related_key}[{related_index}].state"
+                                ),
+                            )
+                        )
+                    continue
+
                 related_id = _normalize_related_reference_value(raw_related_value)
                 if related_id is None:
                     issues.append(
@@ -1953,3 +2008,17 @@ def _load_known_proposed_pr_ids(repo_root: Path) -> set[str]:
         for proposed_pr_id in _load_specification_ids(repo_root, "proposed_pr")
         if proposed_pr_id is not None
     }
+
+
+def _parse_related_pr_reference(raw_value: object) -> tuple[str | None, str | None]:
+    if isinstance(raw_value, Mapping):
+        related_id = _normalize_related_reference_value(raw_value.get("id"))
+        related_state_raw = raw_value.get("state")
+        related_state = (
+            None
+            if related_state_raw is None
+            else str(related_state_raw).strip() or None
+        )
+        return related_id, related_state
+
+    return _normalize_related_reference_value(raw_value), None

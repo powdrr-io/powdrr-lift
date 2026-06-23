@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.spec_paths import is_specification_path
-
 
 @dataclass(frozen=True, slots=True)
 class BranchDiffEntry:
@@ -24,6 +22,7 @@ class RelatedSectionPreview:
     entities: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
     guidance: tuple[str, ...] = ()
+    prs: tuple[tuple[str, str], ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     expected_tests: tuple[str, ...] = ()
     expected_outcomes: tuple[str, ...] = ()
@@ -121,6 +120,10 @@ def _render_template_body(
         "# Use `files` for code, Markdown, and other non-structured file entries.",
         "# Related references are optional. Include only the populated lists, and",
         "# remove the whole related block if it would otherwise be empty.",
+        "# If this change was based on earlier proposed PRs, record those PR ids",
+        "# under `related.prs` with `id` and `state` values.",
+        "# Use `state: completed` for basis PRs that are already merged and",
+        "# `state: in_progress` for basis PRs that are still underway.",
     ]
 
     if structured_file_paths:
@@ -252,6 +255,7 @@ def _has_related_values(related_section: RelatedSectionPreview) -> bool:
             related_section.entities,
             related_section.invariants,
             related_section.guidance,
+            related_section.prs,
             related_section.acceptance_criteria,
             related_section.expected_tests,
             related_section.expected_outcomes,
@@ -267,6 +271,7 @@ def _render_related_section(related_section: RelatedSectionPreview) -> list[str]
         ("entities", related_section.entities),
         ("invariants", related_section.invariants),
         ("guidance", related_section.guidance),
+        ("prs", related_section.prs),
         ("acceptance_criteria", related_section.acceptance_criteria),
         ("expected_tests", related_section.expected_tests),
         ("expected_outcomes", related_section.expected_outcomes),
@@ -277,7 +282,17 @@ def _render_related_section(related_section: RelatedSectionPreview) -> list[str]
             continue
 
         lines.append(f"      {key}:")
-        lines.extend(f"        - {value}" for value in values)
+        if key == "prs":
+            for value in values:
+                lines.extend(
+                    [
+                        "        -",
+                        f"          id: {value[0]}",
+                        f"          state: {value[1]}",
+                    ]
+                )
+        else:
+            lines.extend(f"        - {value}" for value in values)
 
     return lines
 
@@ -655,7 +670,10 @@ def _is_changelog_artifact_path(path: str) -> bool:
 
 
 def _is_structured_document_path(path: str) -> bool:
-    return is_specification_path(path.strip())
+    normalized_path = path.strip().replace("\\", "/")
+    return normalized_path.startswith("docs/specs/") and normalized_path.endswith(
+        ".yaml"
+    )
 
 
 def _normalize_change_type(status: str) -> str:

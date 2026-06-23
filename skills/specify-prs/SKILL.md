@@ -22,6 +22,8 @@ Use this skill to draft a PR specification that ties a proposed PR to current fe
    - Reference one or more current feature ids from the current codebase state.
    - Put the PR goal and reasoning in `intent.goal` and `intent.reasoning`.
    - Add the optional detail lists when they help clarify the work.
+   - Use the five detail lists to describe the work itself, not a file list.
+   - Keep the proposed PR self-contained and scoped to the named work item.
 3. Validate the specification.
    - Run `powdrr-lift evaluate-pr-specification --work-item-name <work-item-name>`.
    - If using MCP, call `validate_pr_specification` with the work item name.

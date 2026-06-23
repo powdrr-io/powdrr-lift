@@ -409,6 +409,14 @@ def search_proposed_pr_specifications(
     return ProposedPRSearchReport(query=query, results=results[:limit])
 
 
+def render_proposed_pr_search_report(report: ProposedPRSearchReport) -> str:
+    return yaml.safe_dump(
+        _proposed_pr_search_report_to_data(report),
+        sort_keys=False,
+        allow_unicode=False,
+    )
+
+
 def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
     catalog: list[_FeatureCatalogEntry] = []
     seen_feature_ids: set[str] = set()
@@ -813,5 +821,24 @@ def _report_to_data(
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues
+        ],
+    }
+
+
+def _proposed_pr_search_report_to_data(
+    report: ProposedPRSearchReport,
+) -> Mapping[str, Any]:
+    return {
+        "query": report.query,
+        "results": [
+            {
+                "proposed_pr_id": result.proposed_pr_id,
+                "work_item_name": result.work_item_name,
+                "title": result.title,
+                "feature_ids": list(result.feature_ids),
+                "source_path": result.source_path,
+                "score": result.score,
+            }
+            for result in report.results
         ],
     }

@@ -41,10 +41,12 @@ class _FeatureCatalogEntry:
 class ProposedPRSearchResult:
     proposed_pr_id: str
     pr_number: int | None
+    path: Path
     work_item_name: str
     title: str | None
     feature_ids: tuple[str, ...]
     source_path: str
+    matched_fields: tuple[str, ...]
     score: int
 
 
@@ -388,51 +390,61 @@ def search_proposed_pr_specifications(
             issue_code="invalid_intent_section",
             issue_message="",
         )
-        intent_text = " ".join(
-            filter(
-                None,
-                [
-                    _optional_string(intent.get("goal"))
-                    if intent is not None
-                    else None,
-                    _optional_string(intent.get("reasoning"))
-                    if intent is not None
-                    else None,
-                ],
-            )
+        intent_goal = _optional_string(intent.get("goal")) if intent is not None else None
+        intent_reasoning = (
+            _optional_string(intent.get("reasoning")) if intent is not None else None
         )
-        detail_text = " ".join(
-            filter(
-                None,
-                [
-                    _optional_string(item.get("description"))
-                    for section_name in (
-                        "acceptance_criteria",
-                        "expected_tests",
-                        "expected_outcomes",
-                        "non_goals",
-                        "risks",
-                    )
-                    for item in (
-                        raw_value
-                        for raw_value in _coerce_sequence(
-                            raw_spec.get(section_name),
-                            path=section_name,
-                            issues=[],
-                            issue_code=f"invalid_{section_name}_section",
-                            issue_message="",
-                        )
-                        if isinstance(raw_value, Mapping)
-                    )
-                ],
-            )
-        )
+        detail_text_parts: list[str] = []
+        matched_fields: list[str] = []
+        if normalized_query in proposed_pr_id.lower():
+            matched_fields.append("id")
+        if title is not None and normalized_query in title.lower():
+            matched_fields.append("title")
+        if any(normalized_query in feature_id.lower() for feature_id in feature_ids):
+            matched_fields.append("feature_ids")
+        if intent_goal is not None and normalized_query in intent_goal.lower():
+            matched_fields.append("intent.goal")
+        if intent_reasoning is not None and normalized_query in intent_reasoning.lower():
+            matched_fields.append("intent.reasoning")
+        for section_name in (
+            "acceptance_criteria",
+            "expected_tests",
+            "expected_outcomes",
+            "non_goals",
+            "risks",
+        ):
+            section_text_parts: list[str] = []
+            for raw_value in _coerce_sequence(
+                raw_spec.get(section_name),
+                path=section_name,
+                issues=[],
+                issue_code=f"invalid_{section_name}_section",
+                issue_message="",
+            ):
+                if not isinstance(raw_value, Mapping):
+                    continue
+                description = _optional_string(raw_value.get("description"))
+                if description is not None:
+                    section_text_parts.append(description)
+            section_text = " ".join(section_text_parts)
+            if section_text:
+                detail_text_parts.append(section_text)
+            if section_text and normalized_query in section_text.lower():
+                matched_fields.append(section_name)
+        if normalized_query in specification_path.stem.lower():
+            matched_fields.append("path.stem")
+        if normalized_query in specification_path.parent.name.lower():
+            matched_fields.append("work_item_name")
+        if normalized_query in specification_path.as_posix().lower():
+            matched_fields.append("path")
+        detail_text = " ".join(detail_text_parts)
         haystack = " ".join(
             [
                 proposed_pr_id,
                 title or "",
                 " ".join(feature_ids),
-                intent_text,
+                intent_goal or "",
+                intent_reasoning or "",
                 detail_text,
                 specification_path.stem,
                 specification_path.parent.name,
@@ -447,10 +459,12 @@ def search_proposed_pr_specifications(
             ProposedPRSearchResult(
                 proposed_pr_id=proposed_pr_id,
                 pr_number=_parse_proposed_pr_number(proposed_pr_id),
+                path=specification_path,
                 work_item_name=specification_path.parent.name,
                 title=title,
                 feature_ids=feature_ids,
                 source_path=str(specification_path.relative_to(repo_root_path)),
+                matched_fields=tuple(dict.fromkeys(matched_fields)),
                 score=score,
             )
         )
@@ -913,10 +927,13 @@ def _proposed_pr_search_report_to_data(
         "results": [
             {
                 "proposed_pr_id": result.proposed_pr_id,
+                "pr_number": result.pr_number,
+                "path": str(result.path),
                 "work_item_name": result.work_item_name,
                 "title": result.title,
                 "feature_ids": list(result.feature_ids),
                 "source_path": result.source_path,
+                "matched_fields": list(result.matched_fields),
                 "score": result.score,
             }
             for result in report.results

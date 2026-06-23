@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -23,7 +24,6 @@ from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,
 )
-from powdrr_lift.core.codebase_state import build_codebase_state_report
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.index import (
     _file_change_entity_ids,
@@ -31,6 +31,7 @@ from powdrr_lift.core.index import (
     build_changelog_index,
     build_changelog_index_at_ref,
 )
+from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,6 +392,10 @@ def build_validation_report(
             )
         )
         proposed_structured_file_set = set(proposed_structured_files)
+        merged_structured_file_paths = _load_merged_structured_file_paths(
+            repo_root_path,
+            default_branch_name=default_branch_name,
+        )
         proposed_structured_file_changes = [
             file_change
             for file_change in change_log.file_changes
@@ -573,6 +578,19 @@ def build_validation_report(
 
         for structured_file_path in proposed_structured_files:
             if structured_file_path in expected_structured_file_paths:
+                if structured_file_path in merged_structured_file_paths:
+                    issues.append(
+                        ValidationIssue(
+                            code="structured_file_edited_after_merge",
+                            message=(
+                                f"Structured file {structured_file_path} was already "
+                                "merged into main. Do not edit merged structured "
+                                "files; create a new work item folder under "
+                                "`docs/specs/` instead."
+                            ),
+                            path=structured_file_path,
+                        )
+                    )
                 _validate_v2_structured_file_contents(
                     issues=issues,
                     repo_root=repo_root_path,
@@ -1167,15 +1185,13 @@ def _validate_v2_structured_file_contents(
         return
 
     schema_value = raw_structured_content.get("schema")
-    if not isinstance(schema_value, str) or not schema_value.startswith(
-        "https://powdrr.io/schemas"
-    ):
+    if not isinstance(schema_value, str) or schema_value != SPECIFICATION_SCHEMA_URL:
         issues.append(
             ValidationIssue(
                 code="structured_file_invalid_schema",
                 message=(
                     f"Structured file {structured_file_path} must define a schema "
-                    "value that starts with https://powdrr.io/schemas."
+                    "value of https://powdrr.io/schemas/specification-v1."
                 ),
                 path=structured_file_path,
             )
@@ -1443,69 +1459,19 @@ def _collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
 
 
 def _load_available_proposed_pr_detail_ids(repo_root: Path) -> set[str]:
-    proposal_dir = repo_root / "docs" / "proposals"
-    if not proposal_dir.exists():
-        return set()
-
-    detail_ids: set[str] = set()
-    for proposal_path in proposal_dir.glob("PR-*-proposed-pr-specification.yaml"):
-        try:
-            raw_spec = _load_yaml_mapping(proposal_path.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            continue
-
-        proposed_pr_id = _normalize_entity_id(
-            None if raw_spec.get("id") is None else str(raw_spec.get("id"))
-        )
-        if proposed_pr_id is not None:
-            detail_ids.add(proposed_pr_id)
-
-        for section_name in (
-            "acceptance_criteria",
-            "expected_tests",
-            "expected_outcomes",
-            "non_goals",
-            "risks",
-        ):
-            for raw_item in _parse_sequence(raw_spec.get(section_name)):
-                item_data = _parse_mapping(raw_item)
-                item_id = _normalize_entity_id(
-                    None if item_data.get("id") is None else str(item_data.get("id"))
-                )
-                if item_id is not None:
-                    detail_ids.add(item_id)
-
-    return detail_ids
+    return _load_specification_ids(repo_root, "proposed_pr")
 
 
 def _load_available_rationale_ids(repo_root: Path) -> set[str]:
     rationale_ids: set[str] = set()
 
-    try:
-        state_report = build_codebase_state_report(repo_root=repo_root)
-    except Exception:  # noqa: BLE001
-        state_report = None
-
-    if state_report is not None:
-        for entity in state_report.entities:
-            normalized_id = _normalize_entity_id(entity.id)
-            if normalized_id is not None:
-                rationale_ids.add(normalized_id)
-        for invariant in state_report.invariants:
-            normalized_id = _normalize_entity_id(invariant.id)
-            if normalized_id is not None:
-                rationale_ids.add(normalized_id)
-        for guidance in state_report.guidance:
-            normalized_id = _normalize_entity_id(guidance.id)
-            if normalized_id is not None:
-                rationale_ids.add(normalized_id)
-        for decision in state_report.decisions:
-            normalized_key = _normalize_entity_id(decision.key)
-            if normalized_key is not None:
-                rationale_ids.add(normalized_key)
-            normalized_id = _normalize_entity_id(decision.decision_id)
-            if normalized_id is not None:
-                rationale_ids.add(normalized_id)
+    for specification_kind in (
+        "architecture",
+        "system",
+        "implementation",
+        "proposed_pr",
+    ):
+        rationale_ids.update(_load_specification_ids(repo_root, specification_kind))
 
     try:
         changelog_index = build_changelog_index(repo_root=repo_root)
@@ -1516,8 +1482,166 @@ def _load_available_rationale_ids(repo_root: Path) -> set[str]:
         for document in changelog_index.documents:
             rationale_ids.update(_collect_changelog_defined_ids(document.changelog))
 
-    rationale_ids.update(_load_available_proposed_pr_detail_ids(repo_root))
     return rationale_ids
+
+
+def _load_specification_ids(repo_root: Path, specification_kind: str) -> set[str]:
+    specification_ids: set[str] = set()
+    for specification_path in _iter_specification_paths(repo_root, specification_kind):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        if specification_kind == "architecture":
+            specification_ids.update(
+                _collect_section_ids(raw_spec, "entities", "id")
+                | _collect_section_ids(raw_spec, "entity_relationships", "id")
+                | _collect_section_ids(raw_spec, "invariants", "id")
+                | _collect_section_ids(raw_spec, "guidance", "id")
+            )
+            normalized_id = _normalize_entity_id(
+                None if raw_spec.get("id") is None else str(raw_spec.get("id"))
+            )
+            if normalized_id is not None:
+                specification_ids.add(normalized_id)
+        elif specification_kind == "system":
+            specification_ids.update(
+                _collect_section_ids(raw_spec, "requirements", "id")
+                | _collect_section_ids(raw_spec, "approach", "id")
+            )
+            normalized_id = _normalize_entity_id(
+                None if raw_spec.get("id") is None else str(raw_spec.get("id"))
+            )
+            if normalized_id is not None:
+                specification_ids.add(normalized_id)
+        elif specification_kind == "implementation":
+            specification_ids.update(
+                _collect_section_ids(raw_spec, "entities", "id")
+                | _collect_section_ids(raw_spec, "entity_relationships", "id")
+                | _collect_section_ids(raw_spec, "features", "id")
+                | _collect_section_ids(raw_spec, "decisions", "id")
+            )
+            architecture_id = _normalize_entity_id(
+                None
+                if raw_spec.get("architecture_id") is None
+                else str(raw_spec.get("architecture_id"))
+            )
+            if architecture_id is not None:
+                specification_ids.add(architecture_id)
+        else:
+            specification_ids.update(
+                _collect_section_ids(raw_spec, "acceptance_criteria", "id")
+                | _collect_section_ids(raw_spec, "expected_tests", "id")
+                | _collect_section_ids(raw_spec, "expected_outcomes", "id")
+                | _collect_section_ids(raw_spec, "non_goals", "id")
+                | _collect_section_ids(raw_spec, "risks", "id")
+            )
+            normalized_id = _normalize_entity_id(
+                None if raw_spec.get("id") is None else str(raw_spec.get("id"))
+            )
+            if normalized_id is not None:
+                specification_ids.add(normalized_id)
+
+            for feature_id in _parse_sequence(raw_spec.get("feature_ids")):
+                normalized_feature_id = _normalize_entity_id(str(feature_id))
+                if normalized_feature_id is not None:
+                    specification_ids.add(normalized_feature_id)
+
+    return specification_ids
+
+
+def _iter_specification_paths(repo_root: Path, specification_kind: str) -> list[Path]:
+    spec_root = repo_root / "docs" / "specs"
+    if not spec_root.exists():
+        return []
+
+    filename_by_kind = {
+        "architecture": "architecture-specification.yaml",
+        "system": "system-specification.yaml",
+        "implementation": "implementation-specification.yaml",
+        "proposed_pr": "proposed-pr-specification.yaml",
+    }
+    filename = filename_by_kind.get(specification_kind)
+    if filename is None:
+        return []
+
+    specification_paths = [
+        specification_path
+        for specification_path in spec_root.rglob(filename)
+        if specification_path.is_file()
+    ]
+
+    if specification_kind == "proposed_pr":
+        proposal_root = repo_root / "docs" / "proposals"
+        if proposal_root.exists():
+            specification_paths.extend(
+                specification_path
+                for specification_path in proposal_root.glob(
+                    "PR-*-proposed-pr-specification.yaml"
+                )
+                if specification_path.is_file()
+            )
+
+    seen_paths: set[Path] = set()
+    ordered_paths: list[Path] = []
+    for specification_path in sorted(specification_paths):
+        if specification_path in seen_paths:
+            continue
+
+        seen_paths.add(specification_path)
+        ordered_paths.append(specification_path)
+
+    return ordered_paths
+
+
+def _collect_section_ids(
+    raw_spec: Mapping[str, Any],
+    section_name: str,
+    item_id_key: str,
+) -> set[str]:
+    ids: set[str] = set()
+    for raw_item in _parse_sequence(raw_spec.get(section_name)):
+        item = _parse_mapping(raw_item)
+        item_id = _normalize_entity_id(
+            None if item.get(item_id_key) is None else str(item.get(item_id_key))
+        )
+        if item_id is not None:
+            ids.add(item_id)
+    return ids
+
+
+def _load_merged_structured_file_paths(
+    repo_root: Path,
+    *,
+    default_branch_name: str,
+) -> set[str]:
+    try:
+        output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "ls-tree",
+                "-r",
+                "--name-only",
+                default_branch_name,
+                "docs/specs",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except Exception:  # noqa: BLE001
+        return set()
+
+    return {
+        path
+        for path in (line.strip() for line in output.splitlines())
+        if path and _is_structured_document_path(path)
+    }
 
 
 def _extract_quoted_ids(text: str | None) -> list[str]:
@@ -1803,31 +1927,29 @@ def _validate_v2_state_change(
 
 
 def _load_available_feature_ids(repo_root: Path) -> set[str]:
-    try:
-        report = build_codebase_state_report(repo_root=repo_root)
-    except Exception:  # noqa: BLE001
-        return set()
+    feature_ids: set[str] = set()
+    for specification_path in _iter_specification_paths(repo_root, "implementation"):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
 
-    return {
-        entity.id
-        for entity in report.entities
-        if _normalize_entity_id(entity.id) is not None
-    }
+        for raw_feature in _parse_sequence(raw_spec.get("features")):
+            feature = _parse_mapping(raw_feature)
+            feature_id = _normalize_entity_id(
+                None if feature.get("id") is None else str(feature.get("id"))
+            )
+            if feature_id is not None:
+                feature_ids.add(feature_id)
+
+    return feature_ids
 
 
 def _load_known_proposed_pr_ids(repo_root: Path) -> set[str]:
-    pr_dir = repo_root / "docs" / "changelogs"
-    if not pr_dir.exists():
-        return set()
-
-    known_pr_ids: set[str] = set()
-    for changelog_path in pr_dir.glob("PR-*-changelog.yaml"):
-        name = changelog_path.name
-        if not name.startswith("PR-") or not name.endswith("-changelog.yaml"):
-            continue
-
-        pr_id = name.removeprefix("PR-").removesuffix("-changelog.yaml")
-        if pr_id:
-            known_pr_ids.add(pr_id)
-
-    return known_pr_ids
+    return {
+        proposed_pr_id
+        for proposed_pr_id in _load_specification_ids(repo_root, "proposed_pr")
+        if proposed_pr_id is not None
+    }

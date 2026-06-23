@@ -14,13 +14,15 @@ from powdrr_lift.core import system_specification_default_output_path
 def test_create_system_specification_template_writes_default_file(
     tmp_path: Path,
 ) -> None:
-    output_path = system_specification_default_output_path(tmp_path)
+    output_path = system_specification_default_output_path("powdrr-lift", tmp_path)
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
         exit_code = main(
             [
                 "system-specification",
+                "--work-item-name",
+                "powdrr-lift",
                 "--repo-root",
                 str(tmp_path),
             ]
@@ -40,12 +42,14 @@ def test_create_system_specification_template_writes_default_file(
         "# - `supercedes` is optional; omit it unless the item replaces ids."
         in template_text
     )
+    assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
     assert "requirements:" in template_text
     assert "approach:" in template_text
     assert "supercedes: []" not in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
+        "schema",
         "id",
         "title",
         "requirements",
@@ -74,7 +78,10 @@ def test_validate_system_specification_reports_errors() -> None:
         state: supercedes
     """
 
-    report = build_system_specification_validation_report(proposed_spec)
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
 
     assert report.validation_successful is False
     assert report.system_id == "sys-1"
@@ -106,7 +113,10 @@ def test_validate_system_specification_flags_boilerplate() -> None:
         supercedes: []
     """
 
-    report = build_system_specification_validation_report(proposed_spec)
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
 
     assert report.validation_successful is False
     assert {issue.code for issue in report.issues} == {
@@ -132,7 +142,10 @@ def test_validate_system_specification_reports_duplicate_keys() -> None:
         state: added
     """
 
-    report = build_system_specification_validation_report(proposed_spec)
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
 
     assert report.validation_successful is False
     assert {issue.code for issue in report.issues} == {
@@ -158,7 +171,10 @@ def test_validate_system_specification_flags_empty_optional_values() -> None:
         supercedes: []
     """
 
-    report = build_system_specification_validation_report(proposed_spec)
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
 
     assert report.validation_successful is False
     assert {issue.code for issue in report.issues} == {
@@ -189,7 +205,10 @@ def test_validate_system_specification_reports_success_for_valid_spec() -> None:
         state: removed
     """
 
-    report = build_system_specification_validation_report(proposed_spec)
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
 
     assert report.validation_successful is True
     assert report.issues == []
@@ -213,7 +232,10 @@ def test_validate_system_specification_reports_duplicate_ids_across_sections() -
         supercedes: []
     """
 
-    report = build_system_specification_validation_report(proposed_spec)
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
 
     assert report.validation_successful is False
     assert {issue.code for issue in report.issues} == {
@@ -224,7 +246,10 @@ def test_validate_system_specification_reports_duplicate_ids_across_sections() -
 def test_cli_validate_system_specification_reports_yaml(
     tmp_path: Path,
 ) -> None:
-    spec_path = tmp_path / "system-specification.yaml"
+    spec_path = (
+        tmp_path / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+    )
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(
         """
         version: 1
@@ -250,6 +275,8 @@ def test_cli_validate_system_specification_reports_yaml(
         exit_code = main(
             [
                 "evaluate-system-specification",
+                "--work-item-name",
+                "powdrr-lift",
                 "--repo-root",
                 str(tmp_path),
                 "--input",

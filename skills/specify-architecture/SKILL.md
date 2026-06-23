@@ -1,6 +1,6 @@
 ---
 name: specify-architecture
-description: Create, fill, and validate architecture specification templates with the repository's architecture-specification CLI or MCP endpoints. Use when Codex needs to define an architecture spec from a provided set of entity types, ensure entity types are allowed, and verify that relationship, invariant, and guidance references point to listed entities.
+description: Create, fill, and validate architecture specification templates with the repository's architecture-specification CLI or MCP endpoints. Use when Codex needs to define an architecture spec from a provided set of entity types, scoped to a work item name, ensure entity types are allowed, and verify that relationship, invariant, and guidance references point to listed entities.
 ---
 
 # Specify Architecture
@@ -12,21 +12,22 @@ Use this skill to produce an architecture specification that stays consistent wi
 ## Workflow
 
 1. Create the template.
-   - Run `powdrr-lift architecture-specification --entity-type <type> ...`.
+   - Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...`.
    - If using MCP, call `create_architecture_specification` with the same
-     allowed entity type list.
+     allowed entity type list and work item name.
    - Provide the full allowed entity type set every time you generate the template.
    - Set `id` to a date-based identifier, for example `2026-06-19`.
-   - Use the default file at `docs/architecture/architecture-specification.yaml` unless the task calls for a different path.
+   - Use the default file at `docs/specs/<work-item-name>/architecture-specification.yaml` unless the task calls for a different path.
+   - Keep the work item name stable for the architecture, system, and implementation specs that belong to the same effort.
 2. Fill out the template.
    - Keep each entity's `type` within the provided entity type set.
    - Put entity-to-entity links in `entity_relationships`.
    - Use `related.entities` and `related.entity_relationships` in `invariants` and `guidance` whenever those items refer to specific entities or relationships.
    - Keep every entity mentioned anywhere in the spec listed in `entities`.
 3. Validate the specification.
-   - Run `powdrr-lift evaluate-architecture-specification --entity-type <type> ...`.
+   - Run `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...`.
    - If using MCP, call `validate_architecture_specification` with the same
-     allowed entity type list.
+     allowed entity type list and work item name.
    - Use the same allowed entity type set you used when creating the template.
    - Treat any validation failure as a cue to fix the spec and rerun the validator.
 4. Iterate until clean.

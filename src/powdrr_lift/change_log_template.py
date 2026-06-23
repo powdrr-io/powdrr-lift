@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.core.spec_paths import is_specification_path
+
 
 @dataclass(frozen=True, slots=True)
 class BranchDiffEntry:
@@ -112,9 +114,10 @@ def _render_template_body(
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Structured YAML files go in `structured_files` as paths only.",
-        "# Structured YAML files must include a `schema` key that starts with",
-        "# `https://powdrr.io/schemas`.",
+        "# Structured YAML files under `docs/specs/` go in `structured_files` as",
+        "# paths only.",
+        "# Structured YAML files must include a `schema` key of",
+        "# `https://powdrr.io/schemas/specification-v1`.",
         "# Use `files` for code, Markdown, and other non-structured file entries.",
         "# Related references are optional. Include only the populated lists, and",
         "# remove the whole related block if it would otherwise be empty.",
@@ -652,11 +655,7 @@ def _is_changelog_artifact_path(path: str) -> bool:
 
 
 def _is_structured_document_path(path: str) -> bool:
-    normalized_path = path.strip()
-    if not normalized_path.startswith("docs/"):
-        return False
-
-    return normalized_path.endswith((".yaml", ".yml"))
+    return is_specification_path(path.strip())
 
 
 def _normalize_change_type(status: str) -> str:

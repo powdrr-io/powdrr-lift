@@ -624,6 +624,49 @@ def test_backfill_line_state_from_blame_fills_missing_lines(
     assert line_state["src/app.py"][2] == provenance
 
 
+def test_backfill_line_state_from_blame_skips_missing_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    line_state: dict[str, list[core_index.ProvenanceRecord | None]] = {
+        "docs/system/system-specification.yaml": [None]
+    }
+
+    def _fake_git_output(repo_root_arg: Path, *args: str) -> str:
+        assert repo_root_arg == repo_root
+        assert args == (
+            "blame",
+            "--line-porcelain",
+            "--",
+            "docs/system/system-specification.yaml",
+        )
+        raise subprocess.CalledProcessError(
+            returncode=128,
+            cmd=(
+                "git",
+                "-C",
+                str(repo_root),
+                "blame",
+                "--line-porcelain",
+                "--",
+                "docs/system/system-specification.yaml",
+            ),
+        )
+
+    monkeypatch.setattr(core_index, "_git_output", _fake_git_output)
+
+    core_index._backfill_line_state_from_blame(  # noqa: SLF001
+        repo_root,
+        line_state,
+        {},
+    )
+
+    assert line_state["docs/system/system-specification.yaml"] == [None]
+
+
 def test_refresh_code_index_rebuilds_when_parent_snapshot_changes(
     tmp_path: Path,
 ) -> None:

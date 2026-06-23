@@ -17,12 +17,16 @@ from powdrr_lift.core import (
 
 def _write_implementation_specification(repo_root: Path) -> Path:
     implementation_specification_path = (
-        repo_root / "docs" / "implementation" / "implementation-specification.yaml"
+        repo_root
+        / "docs"
+        / "specs"
+        / "powdrr-lift"
+        / "implementation-specification.yaml"
     )
     implementation_specification_path.parent.mkdir(parents=True, exist_ok=True)
     implementation_specification_path.write_text(
         """
-        version: 1
+        schema: https://powdrr.io/schemas/specification-v1
         architecture_id: 2026-06-19
         features:
           - id: feature-a
@@ -40,11 +44,13 @@ def _write_implementation_specification(repo_root: Path) -> Path:
 
 
 def _write_existing_pr_specification(repo_root: Path) -> Path:
-    pr_specification_path = repo_root / "docs" / "prs" / "PR-123-specification.yaml"
+    pr_specification_path = (
+        repo_root / "docs" / "specs" / "PR-123" / "proposed-pr-specification.yaml"
+    )
     pr_specification_path.parent.mkdir(parents=True, exist_ok=True)
     pr_specification_path.write_text(
         """
-        version: 1
+        schema: https://powdrr.io/schemas/specification-v1
         id: pr-123
         feature_ids:
           - feature-a
@@ -105,13 +111,15 @@ def _write_proposed_pr_specification(
 
 def test_create_pr_specification_template_writes_default_file(tmp_path: Path) -> None:
     _write_implementation_specification(tmp_path)
-    output_path = pr_specification_default_output_path(tmp_path)
+    output_path = pr_specification_default_output_path("PR-456", tmp_path)
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
         exit_code = main(
             [
                 "pr-specification",
+                "--work-item-name",
+                "PR-456",
                 "--repo-root",
                 str(tmp_path),
             ]
@@ -125,10 +133,12 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert "# - feature-a" in template_text
     assert "# - feature-b" in template_text
     assert "Delete these instructions when you are done." in template_text
+    assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
     assert "id: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
+        "schema",
         "id",
         "feature_ids",
         "intent",
@@ -175,15 +185,15 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
 
     report = build_pr_specification_validation_report(
         proposed_spec,
+        work_item_name="PR-123",
         repo_root=tmp_path,
     )
 
     assert report.validation_successful is False
     assert report.proposed_pr_id == "pr-123"
     assert report.available_feature_ids == ["feature-a", "feature-b"]
-    assert report.known_pr_ids == ["pr-123"]
+    assert report.known_pr_ids == []
     assert {issue.code for issue in report.issues} == {
-        "duplicate_proposed_pr_id",
         "duplicate_feature_id",
         "unknown_feature_id",
         "duplicate_detail_id",
@@ -225,6 +235,7 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
 
     report = build_pr_specification_validation_report(
         proposed_spec,
+        work_item_name="PR-456",
         repo_root=tmp_path,
     )
 
@@ -251,7 +262,7 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     #   `description`.
     #
     # Current feature ids:
-    # - feature-a (feature, docs/implementation/implementation-specification.yaml)
+    # - feature-a (feature, docs/specs/powdrr-lift/implementation-specification.yaml)
     id: pr-789
     feature_ids:
       - feature-a
@@ -279,6 +290,7 @@ def test_validate_pr_specification_rejects_template_boilerplate(
 
     report = build_pr_specification_validation_report(
         proposed_spec,
+        work_item_name="PR-456",
         repo_root=tmp_path,
     )
 
@@ -322,6 +334,7 @@ def test_validate_pr_specification_rejects_missing_detail_description(
 
     report = build_pr_specification_validation_report(
         proposed_spec,
+        work_item_name="PR-456",
         repo_root=tmp_path,
     )
 
@@ -333,10 +346,13 @@ def test_validate_pr_specification_rejects_missing_detail_description(
 
 def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
     _write_implementation_specification(tmp_path)
-    spec_path = tmp_path / "pr-specification.yaml"
+    spec_path = (
+        tmp_path / "docs" / "specs" / "PR-456" / "proposed-pr-specification.yaml"
+    )
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(
         """
-        version: 1
+        schema: https://powdrr.io/schemas/specification-v1
         id: pr-456
 
         feature_ids:
@@ -370,6 +386,8 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
         exit_code = main(
             [
                 "evaluate-pr-specification",
+                "--work-item-name",
+                "PR-456",
                 "--repo-root",
                 str(tmp_path),
                 "--input",

@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, cast
 
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
-from powdrr_lift.core.codebase_state import build_codebase_state_report
-
-_DEFAULT_OUTPUT_PATH = Path("docs") / "prs" / "proposed-pr-specification.yaml"
-_IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "implementation"
-_PR_SPECIFICATION_DIR = Path("docs") / "prs"
+from powdrr_lift.core.spec_paths import (
+    SPECIFICATION_SCHEMA_URL,
+    proposed_pr_specification_path,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,14 +39,15 @@ class _FeatureCatalogEntry:
 
 @dataclass(frozen=True, slots=True)
 class ProposedPRSearchResult:
-    pr_number: int
-    proposed_pr_id: str | None
+    proposed_pr_id: str
+    pr_number: int | None
     path: Path
-    score: float
-    matched_fields: tuple[str, ...] = field(default_factory=tuple)
-    feature_ids: tuple[str, ...] = field(default_factory=tuple)
-    intent_goal: str | None = None
-    intent_reasoning: str | None = None
+    work_item_name: str
+    title: str | None
+    feature_ids: tuple[str, ...]
+    source_path: str
+    matched_fields: tuple[str, ...]
+    score: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,23 +56,19 @@ class ProposedPRSearchReport:
     results: list[ProposedPRSearchResult] = field(default_factory=list)
 
 
-@dataclass(frozen=True, slots=True)
-class _ProposedPRDocument:
-    pr_number: int
-    path: Path
-    data: Mapping[str, Any]
-    proposed_pr_id: str | None
-    feature_ids: tuple[str, ...]
-    intent_goal: str | None
-    intent_reasoning: str | None
-
-
-def pr_specification_default_output_path(repo_root: str | Path | None = None) -> Path:
+def pr_specification_default_output_path(
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / _DEFAULT_OUTPUT_PATH
+    return proposed_pr_specification_path(repo_root_path, work_item_name)
 
 
-def render_pr_specification_template(*, repo_root: str | Path | None = None) -> str:
+def render_pr_specification_template(
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> str:
     repo_root_path = _resolve_repo_root(repo_root)
     feature_catalog = _load_feature_catalog(repo_root_path)
     if not feature_catalog:
@@ -82,11 +77,15 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
             "Generate the codebase state first and ensure it contains current "
             "entities before generating a PR specification."
         )
+    normalized_work_item_name = work_item_name.strip()
+    if not normalized_work_item_name:
+        raise ValueError("work_item_name must not be empty.")
 
     lines = [
         "# PR specification template.",
         "#",
         "# Instructions:",
+        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
         "# - Create one template per proposed PR.",
         "# - Set `id` to a globally unique proposed PR id.",
         "# - Reference one or more current feature ids from the codebase state",
@@ -98,6 +97,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "#   `description`.",
         "# - Keep every detail id globally unique across those five sections.",
         "#",
+        f"schema: {SPECIFICATION_SCHEMA_URL}",
         "# Current feature ids:",
         *[
             (
@@ -134,85 +134,39 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
 
 def create_pr_specification_template(
     *,
+    work_item_name: str,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    resolved_output_path = _resolve_output_path(repo_root_path, output_path)
+    resolved_output_path = _resolve_output_path(
+        repo_root_path,
+        work_item_name=work_item_name,
+        output_path=output_path,
+    )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_path.write_text(
-        render_pr_specification_template(repo_root=repo_root_path),
+        render_pr_specification_template(
+            work_item_name=work_item_name,
+            repo_root=repo_root_path,
+        ),
         encoding="utf-8",
     )
     return resolved_output_path
 
 
-def proposed_pr_specification_path(
-    pr_number: int,
-    *,
-    repo_root: str | Path | None = None,
-) -> Path:
-    repo_root_path = _resolve_repo_root(repo_root)
-    return (
-        repo_root_path
-        / "docs"
-        / "proposals"
-        / f"PR-{pr_number}-proposed-pr-specification.yaml"
-    )
-
-
-def show_proposed_pr_specification(
-    pr_number: int,
-    *,
-    repo_root: str | Path | None = None,
-) -> str:
-    specification_path = proposed_pr_specification_path(pr_number, repo_root=repo_root)
-    if not specification_path.exists():
-        raise FileNotFoundError(
-            f"Proposed PR specification not found: {specification_path}"
-        )
-    return specification_path.read_text(encoding="utf-8")
-
-
-def search_proposed_pr_specifications(
-    query: str,
-    *,
-    repo_root: str | Path | None = None,
-    limit: int = 10,
-) -> ProposedPRSearchReport:
-    repo_root_path = _resolve_repo_root(repo_root)
-    normalized_query = query.strip()
-    if normalized_query == "":
-        raise ValueError("Query must not be empty.")
-
-    documents = _load_proposed_pr_documents(repo_root_path)
-    results = sorted(
-        (
-            _score_proposed_pr_document(normalized_query, document)
-            for document in documents
-        ),
-        key=lambda result: (-result.score, result.pr_number, result.path.name),
-    )
-    filtered_results = [result for result in results if result.score > 0.0][:limit]
-    return ProposedPRSearchReport(query=normalized_query, results=filtered_results)
-
-
-def render_proposed_pr_search_report(report: ProposedPRSearchReport) -> str:
-    return yaml.safe_dump(
-        _proposed_pr_search_report_to_data(report),
-        sort_keys=False,
-        allow_unicode=False,
-    )
-
-
 def validate_pr_specification_yaml(
     proposed_pr_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
+    specification_path: str | Path | None = None,
 ) -> str:
     report = build_pr_specification_validation_report(
         proposed_pr_specification_yaml,
+        work_item_name=work_item_name,
         repo_root=repo_root,
+        specification_path=specification_path,
     )
     return yaml.safe_dump(_report_to_data(report), sort_keys=False)
 
@@ -220,14 +174,24 @@ def validate_pr_specification_yaml(
 def build_pr_specification_validation_report(
     proposed_pr_specification_yaml: str,
     *,
+    work_item_name: str,
     repo_root: str | Path | None = None,
+    specification_path: str | Path | None = None,
 ) -> PRSpecificationValidationReport:
     repo_root_path = _resolve_repo_root(repo_root)
     issues: list[PRSpecificationValidationIssue] = []
 
     feature_catalog = _load_feature_catalog(repo_root_path)
     available_feature_ids = [entry.feature_id for entry in feature_catalog]
-    known_pr_ids = _load_existing_pr_ids(repo_root_path)
+    current_specification_path = (
+        Path(specification_path)
+        if specification_path is not None
+        else pr_specification_default_output_path(work_item_name, repo_root_path)
+    )
+    known_pr_ids = _load_existing_pr_ids(
+        repo_root_path,
+        exclude_paths={current_specification_path.resolve()},
+    )
 
     try:
         raw_spec = _load_yaml_mapping(proposed_pr_specification_yaml)
@@ -362,35 +326,170 @@ def build_pr_specification_validation_report(
     )
 
 
-def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
-    try:
-        codebase_state_report = build_codebase_state_report(repo_root=repo_root)
-    except Exception:  # noqa: BLE001
-        codebase_state_report = None
+def show_proposed_pr_specification(
+    proposed_pr_id: str | int,
+    *,
+    repo_root: str | Path | None = None,
+) -> str:
+    repo_root_path = _resolve_repo_root(repo_root)
+    specification_path = _find_proposed_pr_specification_path(
+        repo_root_path,
+        proposed_pr_id,
+    )
+    if specification_path is None:
+        raise FileNotFoundError(
+            f"Could not find a proposed PR specification for id {proposed_pr_id!r}."
+        )
 
-    catalog: list[_FeatureCatalogEntry] = []
-    seen_feature_ids: set[str] = set()
-    if codebase_state_report is not None and codebase_state_report.entities:
-        for entity in codebase_state_report.entities:
-            if entity.id in seen_feature_ids:
-                continue
-            seen_feature_ids.add(entity.id)
-            source_path = entity.source.changelog_path or "current codebase state"
-            catalog.append(
-                _FeatureCatalogEntry(
-                    feature_id=entity.id,
-                    source_path=source_path,
-                    entity_type=entity.type,
+    return specification_path.read_text(encoding="utf-8")
+
+
+def search_proposed_pr_specifications(
+    query: str,
+    *,
+    repo_root: str | Path | None = None,
+    limit: int = 5,
+) -> ProposedPRSearchReport:
+    repo_root_path = _resolve_repo_root(repo_root)
+    normalized_query = query.strip().lower()
+    if not normalized_query:
+        raise ValueError("query must not be empty.")
+
+    results: list[ProposedPRSearchResult] = []
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root_path):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+
+        proposed_pr_id = _optional_string(raw_spec.get("id"))
+        if proposed_pr_id is None:
+            continue
+
+        title = _optional_string(raw_spec.get("title"))
+        feature_ids = tuple(
+            feature_id
+            for feature_id in (
+                _optional_string(raw_feature_id)
+                for raw_feature_id in _coerce_sequence(
+                    raw_spec.get("feature_ids"),
+                    path="feature_ids",
+                    issues=[],
+                    issue_code="invalid_feature_ids_section",
+                    issue_message="",
                 )
             )
-        if catalog:
-            return catalog
+            if feature_id is not None
+        )
+        intent = _coerce_mapping(
+            raw_spec.get("intent"),
+            path="intent",
+            issues=[],
+            issue_code="invalid_intent_section",
+            issue_message="",
+        )
+        intent_goal = (
+            _optional_string(intent.get("goal")) if intent is not None else None
+        )
+        intent_reasoning = (
+            _optional_string(intent.get("reasoning")) if intent is not None else None
+        )
+        detail_text_parts: list[str] = []
+        matched_fields: list[str] = []
+        if normalized_query in proposed_pr_id.lower():
+            matched_fields.append("id")
+        if title is not None and normalized_query in title.lower():
+            matched_fields.append("title")
+        if any(normalized_query in feature_id.lower() for feature_id in feature_ids):
+            matched_fields.append("feature_ids")
+        if intent_goal is not None and normalized_query in intent_goal.lower():
+            matched_fields.append("intent.goal")
+        if (
+            intent_reasoning is not None
+            and normalized_query in intent_reasoning.lower()
+        ):
+            matched_fields.append("intent.reasoning")
+        for section_name in (
+            "acceptance_criteria",
+            "expected_tests",
+            "expected_outcomes",
+            "non_goals",
+            "risks",
+        ):
+            section_text_parts: list[str] = []
+            for raw_value in _coerce_sequence(
+                raw_spec.get(section_name),
+                path=section_name,
+                issues=[],
+                issue_code=f"invalid_{section_name}_section",
+                issue_message="",
+            ):
+                if not isinstance(raw_value, Mapping):
+                    continue
+                description = _optional_string(raw_value.get("description"))
+                if description is not None:
+                    section_text_parts.append(description)
+            section_text = " ".join(section_text_parts)
+            if section_text:
+                detail_text_parts.append(section_text)
+            if section_text and normalized_query in section_text.lower():
+                matched_fields.append(section_name)
+        if normalized_query in specification_path.stem.lower():
+            matched_fields.append("path.stem")
+        if normalized_query in specification_path.parent.name.lower():
+            matched_fields.append("work_item_name")
+        if normalized_query in specification_path.as_posix().lower():
+            matched_fields.append("path")
+        detail_text = " ".join(detail_text_parts)
+        haystack = " ".join(
+            [
+                proposed_pr_id,
+                title or "",
+                " ".join(feature_ids),
+                intent_goal or "",
+                intent_reasoning or "",
+                detail_text,
+                specification_path.stem,
+                specification_path.parent.name,
+                specification_path.as_posix(),
+            ]
+        ).lower()
+        if normalized_query not in haystack:
+            continue
 
-    implementation_dir = repo_root / _IMPLEMENTATION_SPECIFICATION_DIR
-    if not implementation_dir.exists():
-        return catalog
+        score = haystack.count(normalized_query)
+        results.append(
+            ProposedPRSearchResult(
+                proposed_pr_id=proposed_pr_id,
+                pr_number=_parse_proposed_pr_number(proposed_pr_id),
+                path=specification_path,
+                work_item_name=specification_path.parent.name,
+                title=title,
+                feature_ids=feature_ids,
+                source_path=str(specification_path.relative_to(repo_root_path)),
+                matched_fields=tuple(dict.fromkeys(matched_fields)),
+                score=score,
+            )
+        )
 
-    for specification_path in sorted(implementation_dir.rglob("*.yaml")):
+    results.sort(key=lambda result: (-result.score, result.proposed_pr_id))
+    return ProposedPRSearchReport(query=query, results=results[:limit])
+
+
+def render_proposed_pr_search_report(report: ProposedPRSearchReport) -> str:
+    return yaml.safe_dump(
+        _proposed_pr_search_report_to_data(report),
+        sort_keys=False,
+        allow_unicode=False,
+    )
+
+
+def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
+    catalog: list[_FeatureCatalogEntry] = []
+    seen_feature_ids: set[str] = set()
+    for specification_path in _iter_implementation_specification_paths(repo_root):
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -423,14 +522,20 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
     return catalog
 
 
-def _load_existing_pr_ids(repo_root: Path) -> list[str]:
-    pr_dir = repo_root / _PR_SPECIFICATION_DIR
-    if not pr_dir.exists():
-        return []
-
+def _load_existing_pr_ids(
+    repo_root: Path,
+    *,
+    exclude_paths: set[Path] | None = None,
+) -> list[str]:
     pr_ids: list[str] = []
     seen_ids: set[str] = set()
-    for specification_path in sorted(pr_dir.rglob("*.yaml")):
+    normalized_exclude_paths = {
+        path.resolve() for path in (exclude_paths or set()) if path is not None
+    }
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
+        if specification_path.resolve() in normalized_exclude_paths:
+            continue
+
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -448,19 +553,63 @@ def _load_existing_pr_ids(repo_root: Path) -> list[str]:
     return pr_ids
 
 
-def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
-    proposal_dir = repo_root / "docs" / "proposals"
-    if not proposal_dir.exists():
+def _iter_implementation_specification_paths(repo_root: Path) -> list[Path]:
+    spec_root = repo_root / "docs" / "specs"
+    if not spec_root.exists():
         return []
 
-    documents: list[_ProposedPRDocument] = []
-    for specification_path in sorted(
-        proposal_dir.glob("PR-*-proposed-pr-specification.yaml")
-    ):
-        pr_number = _parse_proposed_pr_number(specification_path.name)
-        if pr_number is None:
+    return sorted(
+        specification_path
+        for specification_path in spec_root.rglob("implementation-specification.yaml")
+        if specification_path.is_file()
+    )
+
+
+def _iter_proposed_pr_specification_paths(repo_root: Path) -> list[Path]:
+    spec_root = repo_root / "docs" / "specs"
+    if not spec_root.exists():
+        return []
+
+    candidate_paths = list(
+        sorted(
+            specification_path
+            for specification_path in spec_root.rglob("proposed-pr-specification.yaml")
+            if specification_path.is_file()
+        )
+    )
+    proposal_root = repo_root / "docs" / "proposals"
+    if proposal_root.exists():
+        candidate_paths.extend(
+            sorted(
+                specification_path
+                for specification_path in proposal_root.glob(
+                    "PR-*-proposed-pr-specification.yaml"
+                )
+                if specification_path.is_file()
+            )
+        )
+
+    seen_paths: set[Path] = set()
+    ordered_paths: list[Path] = []
+    for specification_path in candidate_paths:
+        if specification_path in seen_paths:
             continue
 
+        seen_paths.add(specification_path)
+        ordered_paths.append(specification_path)
+
+    return ordered_paths
+
+
+def _find_proposed_pr_specification_path(
+    repo_root: Path,
+    proposed_pr_id: str | int,
+) -> Path | None:
+    normalized_proposed_pr_id = _normalize_proposed_pr_id(proposed_pr_id)
+    if normalized_proposed_pr_id is None:
+        return None
+
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -468,159 +617,11 @@ def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
         except Exception:  # noqa: BLE001
             continue
 
-        proposed_pr_id = _optional_string(raw_spec.get("id"))
-        feature_ids = tuple(
-            feature_id
-            for feature_id in (
-                _optional_string(raw_feature_id)
-                for raw_feature_id in _coerce_sequence(
-                    raw_spec.get("feature_ids"),
-                    path=f"{specification_path}#feature_ids",
-                    issues=[],
-                    issue_code="invalid_feature_ids_section",
-                    issue_message="",
-                )
-            )
-            if feature_id is not None
-        )
-        intent = _coerce_mapping(
-            raw_spec.get("intent"),
-            path=f"{specification_path}#intent",
-            issues=[],
-            issue_code="invalid_intent_section",
-            issue_message="",
-        )
-        intent_goal = _optional_string(intent.get("goal")) if intent else None
-        intent_reasoning = _optional_string(intent.get("reasoning")) if intent else None
-        documents.append(
-            _ProposedPRDocument(
-                pr_number=pr_number,
-                path=specification_path,
-                data=raw_spec,
-                proposed_pr_id=proposed_pr_id,
-                feature_ids=feature_ids,
-                intent_goal=intent_goal,
-                intent_reasoning=intent_reasoning,
-            )
-        )
+        current_id = _optional_string(raw_spec.get("id"))
+        if current_id == normalized_proposed_pr_id:
+            return specification_path
 
-    return documents
-
-
-def _parse_proposed_pr_number(filename: str) -> int | None:
-    if not filename.startswith("PR-") or not filename.endswith(
-        "-proposed-pr-specification.yaml"
-    ):
-        return None
-
-    number_text = filename.removeprefix("PR-").removesuffix(
-        "-proposed-pr-specification.yaml"
-    )
-    if not number_text.isdigit():
-        return None
-    return int(number_text)
-
-
-def _score_proposed_pr_document(
-    query: str,
-    document: _ProposedPRDocument,
-) -> ProposedPRSearchResult:
-    field_texts = {
-        "id": document.proposed_pr_id or "",
-        "feature_ids": " ".join(document.feature_ids),
-        "intent.goal": document.intent_goal or "",
-        "intent.reasoning": document.intent_reasoning or "",
-        "acceptance_criteria": _collect_detail_text(
-            document.data.get("acceptance_criteria")
-        ),
-        "expected_tests": _collect_detail_text(document.data.get("expected_tests")),
-        "expected_outcomes": _collect_detail_text(
-            document.data.get("expected_outcomes")
-        ),
-        "non_goals": _collect_detail_text(document.data.get("non_goals")),
-        "risks": _collect_detail_text(document.data.get("risks")),
-    }
-
-    matched_fields: list[str] = []
-    best_score = 0.0
-    for field_name, field_text in field_texts.items():
-        score = _score_text(query, field_text)
-        if score > best_score:
-            best_score = score
-        if score > 0.25:
-            matched_fields.append(field_name)
-
-    if document.proposed_pr_id and document.proposed_pr_id == query:
-        best_score = 1.0
-        if "id" not in matched_fields:
-            matched_fields.append("id")
-
-    return ProposedPRSearchResult(
-        pr_number=document.pr_number,
-        proposed_pr_id=document.proposed_pr_id,
-        path=document.path,
-        score=round(best_score, 4),
-        matched_fields=tuple(dict.fromkeys(matched_fields)),
-        feature_ids=document.feature_ids,
-        intent_goal=document.intent_goal,
-        intent_reasoning=document.intent_reasoning,
-    )
-
-
-def _collect_detail_text(raw_value: object | None) -> str:
-    if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes)):
-        return ""
-
-    collected: list[str] = []
-    for item in raw_value:
-        if not isinstance(item, Mapping):
-            continue
-        item_id = _optional_string(item.get("id"))
-        description = _optional_string(item.get("description"))
-        if item_id is not None:
-            collected.append(item_id)
-        if description is not None:
-            collected.append(description)
-    return " ".join(collected)
-
-
-def _score_text(query: str, text: str) -> float:
-    normalized_text = text.strip().lower()
-    if normalized_text == "":
-        return 0.0
-
-    normalized_query = query.strip().lower()
-    if normalized_query == "":
-        return 0.0
-
-    if normalized_query in normalized_text:
-        return 1.0
-
-    query_tokens = [token for token in _tokenize(normalized_query) if len(token) > 1]
-    if query_tokens:
-        overlap = sum(1 for token in query_tokens if token in normalized_text)
-        token_score = overlap / len(query_tokens)
-    else:
-        token_score = 0.0
-
-    return max(
-        SequenceMatcher(None, normalized_query, normalized_text).ratio(), token_score
-    )
-
-
-def _tokenize(text: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for character in text:
-        if character.isalnum():
-            current.append(character)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
+    return None
 
 
 def _validate_template_boilerplate_removed(
@@ -859,9 +860,44 @@ def _optional_string(raw_value: object) -> str | None:
     return value or None
 
 
-def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Path:
+def _normalize_proposed_pr_id(proposed_pr_id: str | int) -> str | None:
+    if isinstance(proposed_pr_id, int):
+        if proposed_pr_id <= 0:
+            return None
+        return f"pr-{proposed_pr_id}"
+
+    value = _optional_string(proposed_pr_id)
+    if value is None:
+        return None
+    if value.isdigit():
+        return f"pr-{int(value)}"
+    if value.lower().startswith("pr-") and value[3:].isdigit():
+        return f"pr-{int(value[3:])}"
+    return value
+
+
+def _parse_proposed_pr_number(proposed_pr_id: str) -> int | None:
+    normalized = _normalize_proposed_pr_id(proposed_pr_id)
+    if normalized is None:
+        return None
+    if not normalized.startswith("pr-"):
+        return None
+
+    suffix = normalized[3:]
+    if not suffix.isdigit():
+        return None
+
+    return int(suffix)
+
+
+def _resolve_output_path(
+    repo_root: Path,
+    *,
+    work_item_name: str,
+    output_path: str | Path | None,
+) -> Path:
     if output_path is None:
-        return repo_root / _DEFAULT_OUTPUT_PATH
+        return proposed_pr_specification_path(repo_root, work_item_name)
 
     resolved_output_path = Path(output_path)
     if not resolved_output_path.is_absolute():
@@ -895,14 +931,15 @@ def _proposed_pr_search_report_to_data(
         "query": report.query,
         "results": [
             {
-                "pr_number": result.pr_number,
                 "proposed_pr_id": result.proposed_pr_id,
+                "pr_number": result.pr_number,
                 "path": str(result.path),
-                "score": result.score,
-                "matched_fields": list(result.matched_fields),
+                "work_item_name": result.work_item_name,
+                "title": result.title,
                 "feature_ids": list(result.feature_ids),
-                "intent_goal": result.intent_goal,
-                "intent_reasoning": result.intent_reasoning,
+                "source_path": result.source_path,
+                "matched_fields": list(result.matched_fields),
+                "score": result.score,
             }
             for result in report.results
         ],

@@ -1,6 +1,4 @@
-interface:
-  display_name: Implement PR
-  short_description: Locate and implement a proposed PR from its spec.
-  default_prompt: Use $implement-pr when a proposed PR needs to be found, validated, inspected, implemented, and re-checked. Start with the fuzzy search endpoint, then inspect the full proposal, validate it, make the code changes, review the proposal again, and only then move on to changelog preparation or ask the user for more feedback. In this repo, the changelog workflow is prepare-pr-changelog.
-policy:
-  allow_implicit_invocation: true
+model: gpt-5
+instructions: |
+  Use the implement-pr workflow in SKILL.md. Search proposed PRs first, then
+  inspect and validate the selected proposal before editing code.

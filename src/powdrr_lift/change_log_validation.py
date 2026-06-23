@@ -612,7 +612,7 @@ def build_validation_report(
 
             issues.append(
                 ValidationIssue(
-                    code="unexpected_structured_change",
+                    code="structured_file_not_in_branch_diff",
                     message=(
                         "Structured file entry for "
                         f"{structured_file_path} does not appear in the branch diff"

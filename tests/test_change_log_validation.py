@@ -1103,6 +1103,86 @@ def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
     assert "structured_file_invalid_schema" in {issue.code for issue in report.issues}
 
 
+def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    implementation_spec_path = (
+        repo_root
+        / "docs"
+        / "specs"
+        / "powdrr-lift"
+        / "implementation-specification.yaml"
+    )
+    implementation_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        version: 1
+        title: "Agent platform expansion implementation"
+        architecture_id: "2026-05-22-skill-distribution-architecture"
+        entities: []
+        entity_relationships: []
+        features: []
+        decisions: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/specs/powdrr-lift/implementation-specification.yaml")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    _git(repo_root, "add", "src/app.py")
+    _git(repo_root, "commit", "-m", "Add app code")
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files:
+      - docs/specs/powdrr-lift/implementation-specification.yaml
+
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    proposed_prs: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "structured_file_not_in_branch_diff" in {
+        issue.code for issue in report.issues
+    }
+
+
 def test_validate_change_log_yaml_rejects_version_two_changes(
     tmp_path: Path,
 ) -> None:

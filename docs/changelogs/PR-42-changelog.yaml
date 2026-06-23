@@ -520,8 +520,86 @@ files:
 - path: src/powdrr_lift/change_log_parser/parse_change_log.py
   type: modified
   span:
-    start_line: 383
-    end_line: 386
+    start_line: 119
+    end_line: 119
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 169
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 194
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 330
+    end_line: 332
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 335
+    end_line: 335
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 385
+    end_line: 385
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -560,7 +638,7 @@ files:
   type: modified
   span:
     start_line: 123
-    end_line: 126
+    end_line: 128
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -572,8 +650,8 @@ files:
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 258
-    end_line: 258
+    start_line: 190
+    end_line: 190
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -585,8 +663,8 @@ files:
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 274
-    end_line: 274
+    start_line: 260
+    end_line: 260
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -598,8 +676,8 @@ files:
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 285
-    end_line: 295
+    start_line: 276
+    end_line: 276
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -611,8 +689,8 @@ files:
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 673
-    end_line: 676
+    start_line: 665
+    end_line: 668
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -663,8 +741,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 221
-    end_line: 221
+    start_line: 160
+    end_line: 170
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -676,8 +754,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 261
-    end_line: 261
+    start_line: 231
+    end_line: 231
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -689,8 +767,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 397
-    end_line: 400
+    start_line: 271
+    end_line: 271
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -702,8 +780,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 583
-    end_line: 595
+    start_line: 407
+    end_line: 410
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -715,8 +793,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 920
-    end_line: 920
+    start_line: 559
+    end_line: 559
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -728,8 +806,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1056
-    end_line: 1056
+    start_line: 563
+    end_line: 563
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -741,8 +819,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1100
-    end_line: 1150
+    start_line: 593
+    end_line: 605
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -754,8 +832,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1243
-    end_line: 1243
+    start_line: 930
+    end_line: 930
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -767,8 +845,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1249
-    end_line: 1249
+    start_line: 1060
+    end_line: 1071
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -780,8 +858,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1517
-    end_line: 1517
+    start_line: 1078
+    end_line: 1078
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -793,8 +871,86 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1523
-    end_line: 1529
+    start_line: 1122
+    end_line: 1139
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1232
+    end_line: 1232
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1238
+    end_line: 1238
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1480
+    end_line: 1480
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1496
+    end_line: 1496
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1506
+    end_line: 1506
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1512
+    end_line: 1518
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -819,8 +975,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1543
-    end_line: 1701
+    start_line: 1532
+    end_line: 1690
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -832,8 +988,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1985
-    end_line: 1992
+    start_line: 1928
+    end_line: 1942
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -845,8 +1001,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 1994
-    end_line: 2002
+    start_line: 1989
+    end_line: 1996
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -858,8 +1014,21 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 2006
-    end_line: 2010
+    start_line: 1998
+    end_line: 2006
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 2010
+    end_line: 2014
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -884,8 +1053,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 2013
-    end_line: 2022
+    start_line: 2017
+    end_line: 2026
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -897,8 +1066,8 @@ files:
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 2024
-    end_line: 2024
+    start_line: 2028
+    end_line: 2028
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3208,6 +3377,33 @@ files:
     proposed_prs:
     - 40
     - 41
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Update tests/test_change_log_template.py for the implement-pr workflow
+    and specification migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 78
+  summary: Update tests/test_change_log_template.py for the implement-pr workflow
+    and specification migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 196
+    end_line: 196
+  summary: Update tests/test_change_log_template.py for the implement-pr workflow
+    and specification migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
 - path: tests/test_change_log_validation.py
   type: modified
   span:
@@ -3289,6 +3485,19 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
+    start_line: 207
+    end_line: 207
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
     start_line: 225
     end_line: 225
   summary: Update the branch change set for the implement-pr workflow and specification
@@ -3304,6 +3513,32 @@ files:
   span:
     start_line: 234
     end_line: 234
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 277
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 410
+    end_line: 410
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3368,7 +3603,7 @@ files:
   type: modified
   span:
     start_line: 663
-    end_line: 665
+    end_line: 664
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3380,8 +3615,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 696
-    end_line: 778
+    start_line: 695
+    end_line: 862
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3393,8 +3628,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 830
-    end_line: 830
+    start_line: 914
+    end_line: 914
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3406,8 +3641,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 832
-    end_line: 836
+    start_line: 916
+    end_line: 920
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3419,8 +3654,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 840
-    end_line: 840
+    start_line: 924
+    end_line: 924
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3432,8 +3667,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 851
-    end_line: 851
+    start_line: 935
+    end_line: 935
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3445,8 +3680,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 865
-    end_line: 865
+    start_line: 949
+    end_line: 949
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3458,8 +3693,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 953
-    end_line: 953
+    start_line: 1037
+    end_line: 1037
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3471,8 +3706,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 955
-    end_line: 959
+    start_line: 1039
+    end_line: 1043
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3484,8 +3719,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 974
-    end_line: 974
+    start_line: 1058
+    end_line: 1058
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3497,8 +3732,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 986
-    end_line: 986
+    start_line: 1070
+    end_line: 1070
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3510,8 +3745,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 1729
-    end_line: 1763
+    start_line: 1813
+    end_line: 1847
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3523,8 +3758,8 @@ files:
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 1765
-    end_line: 1765
+    start_line: 1849
+    end_line: 1849
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3706,7 +3941,7 @@ files:
   type: modified
   span:
     start_line: 80
-    end_line: 103
+    end_line: 102
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3718,8 +3953,8 @@ files:
 - path: tests/test_parse_change_log.py
   type: modified
   span:
-    start_line: 160
-    end_line: 162
+    start_line: 149
+    end_line: 149
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification
@@ -3731,8 +3966,34 @@ files:
 - path: tests/test_parse_change_log.py
   type: modified
   span:
-    start_line: 183
-    end_line: 186
+    start_line: 159
+    end_line: 161
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 182
+    end_line: 182
+  summary: Update the branch change set for the implement-pr workflow and specification
+    migration.
+  rationale: Keep this file aligned with the implement-pr workflow, the unified specification
+    layout, and the proposed PR basis documents.
+  related:
+    proposed_prs:
+    - 40
+    - 41
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 208
+    end_line: 209
   summary: Update the branch change set for the implement-pr workflow and specification
     migration.
   rationale: Keep this file aligned with the implement-pr workflow, the unified specification

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
     blame_view_state_to_data,
@@ -30,6 +32,7 @@ from powdrr_lift.core import (
     render_entity_decision_report,
     render_entity_reference_report,
     render_entity_relationship_report,
+    render_proposed_pr_search_report,
     render_invariants_report,
     resolve_repo_root,
     search_proposed_pr_specifications,
@@ -317,20 +320,7 @@ def build_server() -> Any:
             limit=limit,
         )
         return json.dumps(
-            {
-                "query": report.query,
-                "results": [
-                    {
-                        "proposed_pr_id": result.proposed_pr_id,
-                        "work_item_name": result.work_item_name,
-                        "title": result.title,
-                        "feature_ids": list(result.feature_ids),
-                        "source_path": result.source_path,
-                        "score": result.score,
-                    }
-                    for result in report.results
-                ],
-            },
+            yaml.safe_load(render_proposed_pr_search_report(report)),
             indent=2,
             sort_keys=False,
             ensure_ascii=False,

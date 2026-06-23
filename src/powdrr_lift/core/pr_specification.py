@@ -40,6 +40,7 @@ class _FeatureCatalogEntry:
 @dataclass(frozen=True, slots=True)
 class ProposedPRSearchResult:
     proposed_pr_id: str
+    pr_number: int | None
     work_item_name: str
     title: str | None
     feature_ids: tuple[str, ...]
@@ -324,7 +325,7 @@ def build_pr_specification_validation_report(
 
 
 def show_proposed_pr_specification(
-    proposed_pr_id: str,
+    proposed_pr_id: str | int,
     *,
     repo_root: str | Path | None = None,
 ) -> str:
@@ -380,11 +381,57 @@ def search_proposed_pr_specifications(
             )
             if feature_id is not None
         )
+        intent = _coerce_mapping(
+            raw_spec.get("intent"),
+            path="intent",
+            issues=[],
+            issue_code="invalid_intent_section",
+            issue_message="",
+        )
+        intent_text = " ".join(
+            filter(
+                None,
+                [
+                    _optional_string(intent.get("goal")) if intent is not None else None,
+                    _optional_string(intent.get("reasoning"))
+                    if intent is not None
+                    else None,
+                ],
+            )
+        )
+        detail_text = " ".join(
+            filter(
+                None,
+                [
+                    _optional_string(item.get("description"))
+                    for section_name in (
+                        "acceptance_criteria",
+                        "expected_tests",
+                        "expected_outcomes",
+                        "non_goals",
+                        "risks",
+                    )
+                    for item in (
+                        raw_value
+                        for raw_value in _coerce_sequence(
+                            raw_spec.get(section_name),
+                            path=section_name,
+                            issues=[],
+                            issue_code=f"invalid_{section_name}_section",
+                            issue_message="",
+                        )
+                        if isinstance(raw_value, Mapping)
+                    )
+                ],
+            )
+        )
         haystack = " ".join(
             [
                 proposed_pr_id,
                 title or "",
                 " ".join(feature_ids),
+                intent_text,
+                detail_text,
                 specification_path.stem,
                 specification_path.parent.name,
                 specification_path.as_posix(),
@@ -397,6 +444,7 @@ def search_proposed_pr_specifications(
         results.append(
             ProposedPRSearchResult(
                 proposed_pr_id=proposed_pr_id,
+                pr_number=_parse_proposed_pr_number(proposed_pr_id),
                 work_item_name=specification_path.parent.name,
                 title=title,
                 feature_ids=feature_ids,
@@ -534,9 +582,9 @@ def _iter_proposed_pr_specification_paths(repo_root: Path) -> list[Path]:
 
 def _find_proposed_pr_specification_path(
     repo_root: Path,
-    proposed_pr_id: str,
+    proposed_pr_id: str | int,
 ) -> Path | None:
-    normalized_proposed_pr_id = _optional_string(proposed_pr_id)
+    normalized_proposed_pr_id = _normalize_proposed_pr_id(proposed_pr_id)
     if normalized_proposed_pr_id is None:
         return None
 
@@ -789,6 +837,36 @@ def _optional_string(raw_value: object) -> str | None:
 
     value = str(raw_value).strip()
     return value or None
+
+
+def _normalize_proposed_pr_id(proposed_pr_id: str | int) -> str | None:
+    if isinstance(proposed_pr_id, int):
+        if proposed_pr_id <= 0:
+            return None
+        return f"pr-{proposed_pr_id}"
+
+    value = _optional_string(proposed_pr_id)
+    if value is None:
+        return None
+    if value.isdigit():
+        return f"pr-{int(value)}"
+    if value.lower().startswith("pr-") and value[3:].isdigit():
+        return f"pr-{int(value[3:])}"
+    return value
+
+
+def _parse_proposed_pr_number(proposed_pr_id: str) -> int | None:
+    normalized = _normalize_proposed_pr_id(proposed_pr_id)
+    if normalized is None:
+        return None
+    if not normalized.startswith("pr-"):
+        return None
+
+    suffix = normalized[3:]
+    if not suffix.isdigit():
+        return None
+
+    return int(suffix)
 
 
 def _resolve_output_path(

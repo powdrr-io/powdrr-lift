@@ -34,6 +34,7 @@ from powdrr_lift.core import (
     render_entity_decision_report,
     render_entity_reference_report,
     render_entity_relationship_report,
+    render_proposed_pr_search_report,
     render_invariants_report,
     resolve_repo_root,
     search_proposed_pr_specifications,
@@ -897,13 +898,10 @@ def _run_search_proposed_prs(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         limit=args.limit,
     )
-    for result in report.results:
-        title = f" - {result.title}" if result.title else ""
-        print(
-            f"{result.proposed_pr_id}{title} [{result.work_item_name}] "
-            f"{result.source_path}"
-        )
-
+    rendered_report = render_proposed_pr_search_report(report)
+    sys.stdout.write(rendered_report)
+    if not rendered_report.endswith("\n"):
+        sys.stdout.write("\n")
     return 0
 
 

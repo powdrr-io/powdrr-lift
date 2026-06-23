@@ -390,7 +390,9 @@ def search_proposed_pr_specifications(
             issue_code="invalid_intent_section",
             issue_message="",
         )
-        intent_goal = _optional_string(intent.get("goal")) if intent is not None else None
+        intent_goal = (
+            _optional_string(intent.get("goal")) if intent is not None else None
+        )
         intent_reasoning = (
             _optional_string(intent.get("reasoning")) if intent is not None else None
         )
@@ -404,7 +406,10 @@ def search_proposed_pr_specifications(
             matched_fields.append("feature_ids")
         if intent_goal is not None and normalized_query in intent_goal.lower():
             matched_fields.append("intent.goal")
-        if intent_reasoning is not None and normalized_query in intent_reasoning.lower():
+        if (
+            intent_reasoning is not None
+            and normalized_query in intent_reasoning.lower()
+        ):
             matched_fields.append("intent.reasoning")
         for section_name in (
             "acceptance_criteria",

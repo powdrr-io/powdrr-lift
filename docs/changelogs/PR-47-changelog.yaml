@@ -1,0 +1,408 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: '47'
+title: Add required test case evidence
+intent:
+  problem: Proposed PRs did not have a dedicated way to declare required test cases,
+    and changelog evidence could not explicitly point back to those cases.
+  goal: Add required test case evidence to proposed PR specs and enforce that changelog
+    related sections can cite those test cases from real changed source hunks.
+decisions:
+- id: required-test-case-evidence
+  summary: Treat required test cases as first-class proposed-PR evidence.
+structured_files:
+- docs/specs/required-test-cases/feature-pr-specification.yaml
+- docs/specs/required-test-cases/system-map-specification.yaml
+files:
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Preserve required test case references while parsing changelog YAML.
+  rationale: The parser must round-trip required test case evidence.
+  related:
+    required_test_cases: &id001
+    - rtc-roundtrip-preserves
+- path: src/powdrr_lift/change_log_parser/parse_change_log.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 389
+  summary: Preserve required test case references while parsing changelog YAML.
+  rationale: The parser must round-trip required test case evidence.
+  related:
+    required_test_cases: *id001
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Render and preserve required test case evidence in generated changelog
+    templates.
+  rationale: The template generator must surface required test cases and keep them
+    during regeneration.
+  related:
+    required_test_cases: &id002
+    - rtc-changelog-linking
+    - rtc-roundtrip-preserves
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 249
+    end_line: 252
+  summary: Render and preserve required test case evidence in generated changelog
+    templates.
+  rationale: The template generator must surface required test cases and keep them
+    during regeneration.
+  related:
+    required_test_cases: *id002
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Render and preserve required test case evidence in generated changelog
+    templates.
+  rationale: The template generator must surface required test cases and keep them
+    during regeneration.
+  related:
+    required_test_cases: *id002
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Render and preserve required test case evidence in generated changelog
+    templates.
+  rationale: The template generator must surface required test cases and keep them
+    during regeneration.
+  related:
+    required_test_cases: *id002
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 411
+    end_line: 450
+  summary: Render and preserve required test case evidence in generated changelog
+    templates.
+  rationale: The template generator must surface required test cases and keep them
+    during regeneration.
+  related:
+    required_test_cases: *id002
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 521
+    end_line: 522
+  summary: Render and preserve required test case evidence in generated changelog
+    templates.
+  rationale: The template generator must surface required test cases and keep them
+    during regeneration.
+  related:
+    required_test_cases: *id002
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: &id003
+    - rtc-validation-rejects-stale
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 238
+    end_line: 244
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: *id003
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 640
+    end_line: 654
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: *id003
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1112
+    end_line: 1112
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: *id003
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1541
+    end_line: 1587
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: *id003
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1661
+    end_line: 1661
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: *id003
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 2054
+    end_line: 2068
+  summary: Validate required test case references against the proposal and changed
+    source.
+  rationale: Validation must reject stale or unanchored evidence.
+  related:
+    required_test_cases: *id003
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2389
+    end_line: 2390
+  summary: Round-trip required test case references through the code index.
+  rationale: The index must not drop evidence links when regenerating related sections.
+  related:
+    required_test_cases: &id004
+    - rtc-roundtrip-preserves
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2526
+    end_line: 2543
+  summary: Round-trip required test case references through the code index.
+  rationale: The index must not drop evidence links when regenerating related sections.
+  related:
+    required_test_cases: *id004
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2718
+    end_line: 2736
+  summary: Round-trip required test case references through the code index.
+  rationale: The index must not drop evidence links when regenerating related sections.
+  related:
+    required_test_cases: *id004
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2914
+    end_line: 2931
+  summary: Round-trip required test case references through the code index.
+  rationale: The index must not drop evidence links when regenerating related sections.
+  related:
+    required_test_cases: *id004
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 112
+    end_line: 112
+  summary: Add required test case evidence to proposed PR specifications.
+  rationale: The proposed PR template must declare the evidence that changelogs will
+    cite.
+  related:
+    required_test_cases: &id005
+    - rtc-pr-template
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Add required test case evidence to proposed PR specifications.
+  rationale: The proposed PR template must declare the evidence that changelogs will
+    cite.
+  related:
+    required_test_cases: *id005
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 133
+  summary: Add required test case evidence to proposed PR specifications.
+  rationale: The proposed PR template must declare the evidence that changelogs will
+    cite.
+  related:
+    required_test_cases: *id005
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 290
+  summary: Add required test case evidence to proposed PR specifications.
+  rationale: The proposed PR template must declare the evidence that changelogs will
+    cite.
+  related:
+    required_test_cases: *id005
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 372
+  summary: Add required test case evidence to proposed PR specifications.
+  rationale: The proposed PR template must declare the evidence that changelogs will
+    cite.
+  related:
+    required_test_cases: *id005
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 621
+    end_line: 623
+  summary: Add required test case evidence to proposed PR specifications.
+  rationale: The proposed PR template must declare the evidence that changelogs will
+    cite.
+  related:
+    required_test_cases: *id005
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 192
+  summary: Cover template rendering of required test case evidence.
+  rationale: Tests must prove the generator preserves the new related field.
+  related:
+    required_test_cases:
+    - rtc-changelog-linking
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 157
+  summary: Cover validation of required test case evidence.
+  rationale: Tests must prove the validator rejects missing or stale references.
+  related:
+    required_test_cases: &id006
+    - rtc-validation-rejects-stale
+    - rtc-changelog-linking
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 339
+  summary: Cover validation of required test case evidence.
+  rationale: Tests must prove the validator rejects missing or stale references.
+  related:
+    required_test_cases: *id006
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 2061
+    end_line: 2063
+  summary: Cover validation of required test case evidence.
+  rationale: Tests must prove the validator rejects missing or stale references.
+  related:
+    required_test_cases: *id006
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 97
+    end_line: 98
+  summary: Cover parser round-tripping of required test case evidence.
+  rationale: Tests must prove required_test_cases survive YAML parsing.
+  related:
+    required_test_cases: &id007
+    - rtc-roundtrip-preserves
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 187
+  summary: Cover parser round-tripping of required test case evidence.
+  rationale: Tests must prove required_test_cases survive YAML parsing.
+  related:
+    required_test_cases: *id007
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 97
+    end_line: 99
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: &id008
+    - rtc-pr-template
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 181
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 232
+    end_line: 234
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 271
+    end_line: 271
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 292
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 337
+    end_line: 339
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 387
+    end_line: 389
+  summary: Cover proposed PR specs with required test cases.
+  rationale: Tests must prove the new template section renders and validates.
+  related:
+    required_test_cases: *id008
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

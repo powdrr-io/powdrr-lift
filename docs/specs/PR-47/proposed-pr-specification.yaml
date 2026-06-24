@@ -1,0 +1,37 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: 47
+feature_ids:
+  - feature-specified-template-workflows
+  - feature-review-workflows
+  - feature-context-graph
+intent:
+  goal: Strengthen proposed PR evidence so changelogs can point at required test cases that prove the code changes landed.
+  reasoning: The branch needs explicit required test case evidence so the changelog can link changed source hunks back to the tests that validate them.
+acceptance_criteria:
+  - id: ac-required-test-cases
+    description: Proposed PR specs include a required_test_cases section with concrete ids and descriptions.
+  - id: ac-changelog-links
+    description: Changelog related sections can reference required test case ids for changed source hunks.
+expected_tests:
+  - id: test-pr-spec-required-test-cases
+    description: Verify the PR specification template renders required_test_cases entries.
+  - id: test-changelog-required-test-cases
+    description: Verify changelog templates preserve related.required_test_cases when evidence exists.
+required_test_cases:
+  - id: rtc-pr-template
+    description: Verify a proposed PR template can declare required test cases and still validate.
+  - id: rtc-changelog-linking
+    description: Verify a changelog file can point at required test cases for a changed source hunk.
+  - id: rtc-validation-rejects-stale
+    description: Verify validation rejects required test case references that do not resolve to real ids or real source locations.
+  - id: rtc-roundtrip-preserves
+    description: Verify parser, template generation, and code indexing preserve required test case references.
+expected_outcomes:
+  - id: outcome-stronger-evidence
+    description: Proposed PRs and changelogs carry a stronger explicit evidence trail for each code change.
+non_goals:
+  - id: ng-no-plan-rewrite
+    description: Do not rewrite the feature plan or changelog to hide a mismatch between plan and code.
+risks:
+  - id: risk-regeneration
+    description: Existing changelogs may need regeneration before they satisfy the new required test case evidence rules.

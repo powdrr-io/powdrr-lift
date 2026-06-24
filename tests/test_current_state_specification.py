@@ -50,6 +50,8 @@ def test_build_current_state_specification_report_synthesizes_indexed_specs(
     assert [item["id"] for item in report["proposed_prs"]] == ["pr-101"]
     assert report["proposed_prs"][0]["state"] == "in_progress"
     assert len(report["intents"]) == 1
+    assert all(item["id"] != "feature-3" for item in report["features"])
+    assert all(item["id"] != "pr-103" for item in report["proposed_prs"])
 
     codebase_state = build_codebase_state_report(
         branch_name="feature/current-state",
@@ -65,6 +67,10 @@ def test_build_current_state_specification_report_synthesizes_indexed_specs(
         "pr-102",
     ]
     assert codebase_state.proposed_prs[1].state == "completed"
+    assert all(feature.id != "feature-3" for feature in codebase_state.features)
+    assert all(
+        proposed_pr.id != "pr-103" for proposed_pr in codebase_state.proposed_prs
+    )
 
 
 def test_cli_synthesize_current_state_writes_default_file(tmp_path: Path) -> None:
@@ -137,12 +143,16 @@ def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:
             state: in_progress
           - id: feature-2
             state: completed
+          - id: feature-3
+            state: removed
 
         prs:
           - id: pr-101
             state: in_progress
           - id: pr-102
             state: completed
+          - id: pr-103
+            state: removed
         """,
         encoding="utf-8",
     )

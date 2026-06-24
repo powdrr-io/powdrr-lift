@@ -35,6 +35,7 @@ class RelatedSection:
     proposed_prs: list[str] = field(default_factory=list)
     acceptance_criteria: list[str] = field(default_factory=list)
     expected_tests: list[str] = field(default_factory=list)
+    required_test_cases: list[str] = field(default_factory=list)
     expected_outcomes: list[str] = field(default_factory=list)
     non_goals: list[str] = field(default_factory=list)
     risks: list[str] = field(default_factory=list)
@@ -385,6 +386,7 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
         proposed_prs=_parse_id_sequence(data.get("proposed_prs", data.get("prs"))),
         acceptance_criteria=_parse_id_sequence(data.get("acceptance_criteria")),
         expected_tests=_parse_id_sequence(data.get("expected_tests")),
+        required_test_cases=_parse_id_sequence(data.get("required_test_cases")),
         expected_outcomes=_parse_id_sequence(data.get("expected_outcomes")),
         non_goals=_parse_id_sequence(data.get("non_goals")),
         risks=_parse_id_sequence(data.get("risks")),

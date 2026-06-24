@@ -109,9 +109,9 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Fill in `intent.goal` and `intent.reasoning`.",
         "# - Delete these instructions when you are done.",
         "# - Add acceptance criteria, expected tests, expected outcomes,",
-        "#   non-goals, and risks as concrete lists with `id` and",
+        "#   required test cases, non-goals, and risks as concrete lists with `id` and",
         "#   `description`.",
-        "# - Keep every detail id globally unique across those five sections.",
+        "# - Keep every detail id globally unique across those six sections.",
         "#",
         "# Current feature ids:",
         *feature_lines,
@@ -126,6 +126,9 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "  - id: null",
         "    description: null",
         "expected_tests:",
+        "  - id: null",
+        "    description: null",
+        "required_test_cases:",
         "  - id: null",
         "    description: null",
         "expected_outcomes:",
@@ -284,6 +287,7 @@ def build_pr_specification_validation_report(
         "intent",
         "acceptance_criteria",
         "expected_tests",
+        "required_test_cases",
         "expected_outcomes",
         "non_goals",
         "risks",
@@ -365,6 +369,7 @@ def build_pr_specification_validation_report(
     for section_name in (
         "acceptance_criteria",
         "expected_tests",
+        "required_test_cases",
         "expected_outcomes",
         "non_goals",
         "risks",
@@ -613,6 +618,9 @@ def _score_proposed_pr_document(
             document.data.get("acceptance_criteria")
         ),
         "expected_tests": _collect_detail_text(document.data.get("expected_tests")),
+        "required_test_cases": _collect_detail_text(
+            document.data.get("required_test_cases")
+        ),
         "expected_outcomes": _collect_detail_text(
             document.data.get("expected_outcomes")
         ),

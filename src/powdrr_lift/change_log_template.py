@@ -25,6 +25,7 @@ class RelatedSectionPreview:
     proposed_prs: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     expected_tests: tuple[str, ...] = ()
+    required_test_cases: tuple[str, ...] = ()
     expected_outcomes: tuple[str, ...] = ()
     non_goals: tuple[str, ...] = ()
     risks: tuple[str, ...] = ()
@@ -245,6 +246,10 @@ def _collect_related_sections_by_entry(
                     current_file_path=diff_entry.path,
                     related_entity_names=related_entities,
                 ),
+                required_test_cases=_collect_related_test_case_ids(
+                    source_index.documents,
+                    current_file_path=diff_entry.path,
+                ),
             )
         )
 
@@ -260,6 +265,7 @@ def _has_related_values(related_section: RelatedSectionPreview) -> bool:
             related_section.proposed_prs,
             related_section.acceptance_criteria,
             related_section.expected_tests,
+            related_section.required_test_cases,
             related_section.expected_outcomes,
             related_section.non_goals,
             related_section.risks,
@@ -276,6 +282,7 @@ def _render_related_section(related_section: RelatedSectionPreview) -> list[str]
         ("proposed_prs", related_section.proposed_prs),
         ("acceptance_criteria", related_section.acceptance_criteria),
         ("expected_tests", related_section.expected_tests),
+        ("required_test_cases", related_section.required_test_cases),
         ("expected_outcomes", related_section.expected_outcomes),
         ("non_goals", related_section.non_goals),
         ("risks", related_section.risks),
@@ -401,6 +408,46 @@ def _collect_related_lifecycle_ids(
     return tuple(related_ids)
 
 
+def _collect_related_test_case_ids(
+    documents: Sequence[object],
+    *,
+    current_file_path: str,
+) -> tuple[str, ...]:
+    related_ids: list[str] = []
+    seen_ids: set[str] = set()
+
+    for document in documents:
+        changelog = getattr(document, "changelog", None)
+        if changelog is None:
+            continue
+
+        for file_change in getattr(changelog, "file_changes", ()):
+            file_id = getattr(file_change, "path", None)
+            if file_id != current_file_path:
+                continue
+
+            file_span = getattr(file_change, "span", None)
+            file_start = getattr(file_span, "start_line", None)
+            file_end = getattr(file_span, "end_line", None)
+            if file_start is None or file_end is None:
+                continue
+            if file_start > file_end:
+                continue
+
+            related = getattr(file_change, "related", None)
+            if related is None:
+                continue
+
+            for related_id in getattr(related, "required_test_cases", ()):
+                if related_id in seen_ids:
+                    continue
+
+                seen_ids.add(str(related_id))
+                related_ids.append(str(related_id))
+
+    return tuple(related_ids)
+
+
 def _related_section_matches(
     related: object,
     *,
@@ -471,7 +518,8 @@ def _render_header(
         "#   when this file change needs to point at supporting code areas or at\n"
         "#   the invariant or guidance entries it drives.\n"
         "# - Use `related.acceptance_criteria`, `related.expected_tests`,\n"
-        "#   `related.expected_outcomes`, `related.non_goals`, and `related.risks`\n"
+        "#   `related.required_test_cases`, `related.expected_outcomes`,\n"
+        "#   `related.non_goals`, and `related.risks`\n"
         "#   when the change relates to a proposed-PR detail item. These\n"
         "#   references are optional.\n"
         "# - In any rationale, put current ids you want to reference in quotes;\n"

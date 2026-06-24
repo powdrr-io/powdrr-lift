@@ -189,6 +189,7 @@ def test_create_change_log_template_populates_full_related_sections(
     assert change_log.file_changes[0].related.guidance == []
     assert change_log.file_changes[0].related.acceptance_criteria == []
     assert change_log.file_changes[0].related.expected_tests == []
+    assert change_log.file_changes[0].related.required_test_cases == []
     assert change_log.file_changes[0].related.expected_outcomes == []
     assert change_log.file_changes[0].related.non_goals == []
     assert change_log.file_changes[0].related.risks == []

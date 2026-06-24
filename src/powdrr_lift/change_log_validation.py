@@ -31,6 +31,7 @@ from powdrr_lift.core.index import (
     build_changelog_index,
     build_changelog_index_at_ref,
 )
+from powdrr_lift.core.pr_specification import proposed_pr_specification_path
 from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
 
 
@@ -233,6 +234,13 @@ def build_validation_report(
         _load_available_rationale_ids(repo_root_path)
         | available_changelog_ids
         | available_proposed_pr_detail_ids
+    )
+    required_test_case_ids = _load_required_test_case_ids_for_change_id(
+        repo_root_path,
+        change_log.change_id,
+    )
+    referenced_required_test_case_ids = _collect_required_test_case_reference_ids(
+        change_log
     )
 
     if version == 2:
@@ -627,6 +635,21 @@ def build_validation_report(
                 issues=issues,
                 repo_root=repo_root_path,
                 structured_file_path=structured_file_path,
+            )
+
+        for required_test_case_id in sorted(required_test_case_ids):
+            if required_test_case_id in referenced_required_test_case_ids:
+                continue
+
+            issues.append(
+                ValidationIssue(
+                    code="missing_required_test_case_reference",
+                    message=(
+                        f"Required test case {required_test_case_id} is declared "
+                        "in the proposed PR specification but is not referenced "
+                        "by any changed source hunk in the changelog."
+                    ),
+                )
             )
 
         for relationship_change in change_log.entity_relationship_changes or []:
@@ -1086,6 +1109,7 @@ def _validate_v2_file_sections(
             ("proposed_prs", available_proposed_pr_ids),
             ("acceptance_criteria", available_proposed_pr_detail_ids),
             ("expected_tests", available_proposed_pr_detail_ids),
+            ("required_test_cases", available_proposed_pr_detail_ids),
             ("expected_outcomes", available_proposed_pr_detail_ids),
             ("non_goals", available_proposed_pr_detail_ids),
             ("risks", available_proposed_pr_detail_ids),
@@ -1514,6 +1538,53 @@ def _load_available_proposed_pr_detail_ids(repo_root: Path) -> set[str]:
     return _load_specification_ids(repo_root, "proposed_pr")
 
 
+def _load_required_test_case_ids_for_change_id(
+    repo_root: Path,
+    change_id: str | None,
+) -> set[str]:
+    pr_number = _parse_optional_pr_number(change_id)
+    if pr_number is None:
+        return set()
+
+    specification_path = proposed_pr_specification_path(pr_number, repo_root=repo_root)
+    if not specification_path.exists():
+        return set()
+
+    try:
+        raw_spec = _load_yaml_mapping(specification_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return set()
+
+    return _collect_section_ids(raw_spec, "required_test_cases", "id")
+
+
+def _collect_required_test_case_reference_ids(change_log: ChangeLog) -> set[str]:
+    required_test_case_ids: set[str] = set()
+    for file_change in change_log.file_changes:
+        related = file_change.related
+        for required_test_case_id in related.required_test_cases:
+            normalized_required_test_case_id = _normalize_entity_id(
+                required_test_case_id
+            )
+            if normalized_required_test_case_id is None:
+                continue
+
+            required_test_case_ids.add(normalized_required_test_case_id)
+
+    return required_test_case_ids
+
+
+def _parse_optional_pr_number(raw_change_id: str | None) -> int | None:
+    if raw_change_id is None:
+        return None
+
+    normalized_change_id = str(raw_change_id).strip()
+    if not normalized_change_id.isdigit():
+        return None
+
+    return int(normalized_change_id)
+
+
 def _load_available_rationale_ids(repo_root: Path) -> set[str]:
     rationale_ids: set[str] = set()
 
@@ -1587,6 +1658,7 @@ def _load_specification_ids(repo_root: Path, specification_kind: str) -> set[str
             specification_ids.update(
                 _collect_section_ids(raw_spec, "acceptance_criteria", "id")
                 | _collect_section_ids(raw_spec, "expected_tests", "id")
+                | _collect_section_ids(raw_spec, "required_test_cases", "id")
                 | _collect_section_ids(raw_spec, "expected_outcomes", "id")
                 | _collect_section_ids(raw_spec, "non_goals", "id")
                 | _collect_section_ids(raw_spec, "risks", "id")
@@ -1973,6 +2045,21 @@ def _validate_v2_lifecycle_item(
                         f"{item_kind.capitalize()} {normalized_item_id or item_index} "
                         f"references proposed PR {proposed_pr_id}, but that "
                         "proposed PR is not listed in the current proposed PR "
+                        "specs."
+                    ),
+                    path=path,
+                )
+            )
+
+    for required_test_case_id in related.required_test_cases:
+        if required_test_case_id not in available_proposed_pr_detail_ids:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_required_test_case",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references required test case {required_test_case_id}, but "
+                        "that test case is not listed in the current proposed PR "
                         "specs."
                     ),
                     path=path,

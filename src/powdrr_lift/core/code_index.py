@@ -2386,6 +2386,8 @@ def _append_related_item(
         related.acceptance_criteria.append(related_id)
     elif related_kind == "expected_tests":
         related.expected_tests.append(related_id)
+    elif related_kind == "required_test_cases":
+        related.required_test_cases.append(related_id)
     elif related_kind == "expected_outcomes":
         related.expected_outcomes.append(related_id)
     elif related_kind == "non_goals":
@@ -2518,6 +2520,24 @@ def _write_related_section_rows(
                     file_index,
                     related_index,
                     "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.required_test_cases):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "required_test_cases",
                     related_id,
                 ),
             )
@@ -2695,6 +2715,25 @@ def _write_related_section_rows(
                     related_id,
                 ),
             )
+        for related_index, related_id in enumerate(related.required_test_cases):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "required_test_cases",
+                    related_id,
+                ),
+            )
         for related_index, related_id in enumerate(related.expected_outcomes):
             connection.execute(
                 """
@@ -2869,6 +2908,24 @@ def _write_related_section_rows(
                     item_index,
                     related_index,
                     "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.required_test_cases):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "required_test_cases",
                     related_id,
                 ),
             )

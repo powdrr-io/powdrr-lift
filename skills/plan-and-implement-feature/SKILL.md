@@ -25,15 +25,25 @@ description: Plan a feature from the codebase, generate the system-map and featu
    - Run `powdrr-lift init --pr-number <num>`.
    - If using MCP, use the changelog template endpoint available in this repo.
    - Fill out the changelog from the implemented code changes.
-5. Compare and validate.
+5. Generate the plan diff.
+   - Run `powdrr-lift plan-diff --feature-plan-specification <path> --changelog <path>`.
+   - If using MCP, call `create_plan_diff_specification`.
+   - Compare the filled feature plan specification against the changelog files.
+   - Treat each difference as a single actionable item and work through them one at a time.
+6. Examine the plan diff and make code-only changes.
+   - Use the plan diff as the source of truth for closing the gaps between the plan and the implemented change.
+   - Make changes only to code. Do not revise the plan, the feature template, or the changelog to hide a mismatch.
+   - When there are gaps, delete the old changelog and the diff file, regenerate the changelog template, follow its instructions, regenerate the plan diff, and repeat until the diff has no entries.
+7. Compare and validate.
    - Compare the changelog against the feature plan template and ensure every required change, validation condition, and outcome is reflected.
    - Run `powdrr-lift evaluate-pr-against-changelog --pr-number <num>`.
-   - Repeat the comparison and validation until the changelog is clean.
-6. Finish only when the feature, changelog, and validation all agree.
+8. Finish only when the feature, changelog, and validation all agree.
 
 ## Guardrails
 
 - Do not skip the system map step.
 - Do not skip the feature+PR template step.
+- Do not skip the plan diff step.
 - Do not mark the work done until the changelog validates.
+- Do not mark the work done until the plan diff is empty.
 - Prefer the smallest change set that fully satisfies the requested feature.

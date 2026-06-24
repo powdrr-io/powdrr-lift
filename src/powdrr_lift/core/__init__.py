@@ -102,6 +102,12 @@ from powdrr_lift.core.index import (
     build_changelog_index,
     build_changelog_index_at_ref,
 )
+from powdrr_lift.core.plan_diff_specification import (
+    build_plan_diff_report,
+    create_plan_diff_specification,
+    plan_diff_specification_default_output_path,
+    render_plan_diff_specification,
+)
 from powdrr_lift.core.pr_analysis import (
     BranchDiffEntry,
     collect_branch_diff_entries,

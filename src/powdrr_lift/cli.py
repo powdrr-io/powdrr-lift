@@ -21,6 +21,7 @@ from powdrr_lift.core import (
     create_current_state_specification,
     create_feature_pr_specification_template,
     create_implementation_specification_template,
+    create_plan_diff_specification,
     create_pr_specification_template,
     create_system_map_specification_template,
     create_system_specification_template,
@@ -33,6 +34,7 @@ from powdrr_lift.core import (
     lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
+    plan_diff_specification_default_output_path,
     pr_specification_default_output_path,
     render_current_decisions_report,
     render_edit_context_report,
@@ -504,6 +506,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional title to embed in the template.",
     )
     feature_pr_specification_parser.set_defaults(func=_run_feature_pr_specification)
+
+    plan_diff_specification_parser = subparsers.add_parser(
+        "plan-diff",
+        aliases=["plan_diff"],
+        help="Generate a plan diff specification from a feature plan and changelogs.",
+    )
+    plan_diff_specification_parser.add_argument(
+        "--feature-plan-specification",
+        type=Path,
+        required=True,
+        help=(
+            "Read the feature plan specification from this path and derive the "
+            "default output location from its work-item folder."
+        ),
+    )
+    plan_diff_specification_parser.add_argument(
+        "--changelog",
+        dest="changelog_paths",
+        type=Path,
+        action="append",
+        required=True,
+        help="ChangeLog file to compare against the feature plan. May be repeated.",
+    )
+    plan_diff_specification_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the diff to this path instead of "
+            "docs/plan-diffs/<work-item-name>/plan-diff.yaml."
+        ),
+    )
+    plan_diff_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when resolving relative paths.",
+    )
+    plan_diff_specification_parser.set_defaults(func=_run_plan_diff_specification)
 
     pr_specification_parser = subparsers.add_parser(
         "pr-specification",
@@ -995,6 +1034,26 @@ def _run_feature_pr_specification(args: argparse.Namespace) -> int:
         print(f"Wrote feature and PR specification template to {default_output}")
     else:
         print(f"Wrote feature and PR specification template to {output_path}")
+
+    return 0
+
+
+def _run_plan_diff_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_plan_diff_specification(
+        feature_plan_specification_path=args.feature_plan_specification,
+        changelog_paths=args.changelog_paths,
+        output_path=args.output,
+        repo_root=repo_root,
+    )
+    if args.output is None:
+        default_output = plan_diff_specification_default_output_path(
+            args.feature_plan_specification,
+            repo_root,
+        )
+        print(f"Wrote plan diff specification to {default_output}")
+    else:
+        print(f"Wrote plan diff specification to {output_path}")
 
     return 0
 

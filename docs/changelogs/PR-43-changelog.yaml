@@ -1,0 +1,479 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: '43'
+title: Add current state synthesis endpoint
+intent:
+  problem: The repository needed a way to synthesize a complete current-state specification
+    from indexed structured specs and changelog-derived lifecycle data.
+  goal: Add a CLI and MCP endpoint that derive a specification-v1 current-state report
+    from the index, prune removed items, and omit completed proposed PRs.
+decisions:
+- id: current-state-synthesis
+  summary: Capture the current-state synthesis workflow.
+structured_files: []
+files:
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 91
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 101
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 113
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 318
+    end_line: 318
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 323
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 325
+    end_line: 325
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 328
+    end_line: 328
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 341
+    end_line: 341
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 345
+    end_line: 346
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 349
+    end_line: 349
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 361
+    end_line: 363
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 368
+    end_line: 370
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 372
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 377
+  summary: Export the current-state synthesis helpers and public API.
+  rationale: Keep the public API aligned with the current-state synthesis endpoint.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Wire the current-state synthesis command into the CLI.
+  rationale: Keep the CLI aligned with the current-state synthesis workflow.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Wire the current-state synthesis command into the CLI.
+  rationale: Keep the CLI aligned with the current-state synthesis workflow.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 341
+  summary: Wire the current-state synthesis command into the CLI.
+  rationale: Keep the CLI aligned with the current-state synthesis workflow.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 844
+    end_line: 860
+  summary: Wire the current-state synthesis command into the CLI.
+  rationale: Keep the CLI aligned with the current-state synthesis workflow.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Re-export the current-state synthesis helpers from the core package.
+  rationale: Keep the core exports aligned with the new synthesis helpers.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 94
+  summary: Re-export the current-state synthesis helpers from the core package.
+  rationale: Keep the core exports aligned with the new synthesis helpers.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Re-export the current-state synthesis helpers from the core package.
+  rationale: Keep the core exports aligned with the new synthesis helpers.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 118
+    end_line: 118
+  summary: Re-export the current-state synthesis helpers from the core package.
+  rationale: Keep the core exports aligned with the new synthesis helpers.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 867
+    end_line: 884
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1021
+    end_line: 1021
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1179
+    end_line: 1196
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1277
+    end_line: 1282
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1318
+    end_line: 1319
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1329
+    end_line: 1329
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1412
+    end_line: 1419
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1488
+    end_line: 1524
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1851
+    end_line: 1851
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1905
+    end_line: 1905
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2190
+    end_line: 2191
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2302
+    end_line: 2317
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2343
+    end_line: 2344
+  summary: Persist structured spec documents and lifecycle data in the cache.
+  rationale: Keep the index cache aligned with structured spec ingestion and lifecycle
+    tracking.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 81
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 103
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 359
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 382
+    end_line: 383
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 399
+    end_line: 400
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 862
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1017
+    end_line: 1032
+  summary: Build and render the current-state specification report.
+  rationale: Keep the current-state report derived from indexed structured specs and
+    lifecycle data.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 54
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 110
+    end_line: 110
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 176
+    end_line: 176
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 203
+    end_line: 203
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 330
+    end_line: 330
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 337
+    end_line: 388
+  summary: Load structured specification documents into the source index.
+  rationale: Keep structured spec ingestion available to the code index.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Expose the current-state synthesis tool through MCP.
+  rationale: Keep the MCP surface aligned with the current-state synthesis workflow.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Expose the current-state synthesis tool through MCP.
+  rationale: Keep the MCP surface aligned with the current-state synthesis workflow.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 237
+  summary: Expose the current-state synthesis tool through MCP.
+  rationale: Keep the MCP surface aligned with the current-state synthesis workflow.
+- path: tests/test_current_state_specification.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 249
+  summary: Cover current-state synthesis report generation and CLI output.
+  rationale: Keep regression coverage on the current-state synthesis behavior.
+- path: tests/test_mcp_server.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Register the current-state synthesis MCP tool.
+  rationale: Keep MCP registration coverage aligned with the new tool.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

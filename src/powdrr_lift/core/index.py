@@ -21,6 +21,7 @@ from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,
 )
+from powdrr_lift.core.spec_paths import is_specification_path
 
 _PR_FILE_NAME_RE = re.compile(r"^PR-(\d+)-changelog\.yaml$")
 _PR_SUBJECT_RE = re.compile(r"\(#(?P<pr_number>\d+)\)")
@@ -38,6 +39,17 @@ class ChangelogDocument:
     commit_sha: str | None
     commit_timestamp: int | None
     commit_subject: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SpecificationDocument:
+    path: Path
+    work_item_name: str
+    specification_type: str
+    schema: str | None
+    spec_id: str | None
+    title: str | None
+    content: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +107,7 @@ class SourceIndex:
     repo_root: Path
     default_branch_name: str
     documents: list[ChangelogDocument] = field(default_factory=list)
+    specification_documents: list[SpecificationDocument] = field(default_factory=list)
     entity_graph: EntityGraph = field(default_factory=EntityGraph)
     changes: list[ProvenanceRecord] = field(default_factory=list)
     file_lines: dict[str, tuple[ProvenanceRecord | None, ...]] = field(
@@ -160,6 +173,7 @@ def build_changelog_index(
         default_branch_name=default_branch_name,
         commits=commits,
         documents=list(document_by_pr.values()),
+        specification_documents=load_specification_documents(repo_root_path),
     )
 
 
@@ -186,6 +200,7 @@ def build_changelog_index_at_ref(
         default_branch_name=resolved_ref,
         commits=commits,
         documents=list(document_by_pr.values()),
+        specification_documents=[],
     )
 
 
@@ -267,6 +282,7 @@ def _build_source_index(
     default_branch_name: str,
     commits: Sequence[_CommitRecord],
     documents: list[ChangelogDocument],
+    specification_documents: list[SpecificationDocument] | None = None,
 ) -> SourceIndex:
     changes: list[ProvenanceRecord] = []
     line_state: dict[str, list[ProvenanceRecord | None]] = {}
@@ -311,10 +327,63 @@ def _build_source_index(
         repo_root=repo_root_path,
         default_branch_name=default_branch_name,
         documents=documents,
+        specification_documents=list(specification_documents or []),
         entity_graph=entity_graph,
         changes=changes,
         file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
     )
+
+
+def load_specification_documents(repo_root: Path) -> list[SpecificationDocument]:
+    output = _git_output(repo_root, "ls-files", "docs/specs")
+    specification_documents: list[SpecificationDocument] = []
+    for path_text in sorted(output.splitlines()):
+        if not path_text or not is_specification_path(path_text):
+            continue
+
+        file_path = repo_root / path_text
+        if not file_path.exists():
+            continue
+
+        try:
+            raw_spec = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+
+        if not isinstance(raw_spec, dict):
+            continue
+
+        path_parts = Path(path_text).parts
+        if len(path_parts) < 4:
+            continue
+
+        work_item_name = path_parts[2]
+        specification_type = file_path.stem.removesuffix("-specification")
+        specification_documents.append(
+            SpecificationDocument(
+                path=file_path,
+                work_item_name=work_item_name,
+                specification_type=specification_type,
+                schema=(
+                    None
+                    if raw_spec.get("schema") is None
+                    else str(raw_spec.get("schema")).strip() or None
+                ),
+                spec_id=(
+                    None
+                    if raw_spec.get("id") is None
+                    else str(raw_spec.get("id")).strip() or None
+                ),
+                title=(
+                    None
+                    if raw_spec.get("title") is None
+                    else str(raw_spec.get("title")).strip() or None
+                ),
+                content=raw_spec,
+            )
+        )
+
+    return specification_documents
 
 
 def _load_mainline_commits(

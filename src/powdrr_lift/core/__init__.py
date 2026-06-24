@@ -75,6 +75,14 @@ from powdrr_lift.core.entity_context import (
     render_entity_reference_report,
     render_entity_relationship_report,
 )
+from powdrr_lift.core.feature_planning_specification import (
+    create_feature_pr_specification_template,
+    create_system_map_specification_template,
+    feature_pr_specification_default_output_path,
+    render_feature_pr_specification_template,
+    render_system_map_specification_template,
+    system_map_specification_default_output_path,
+)
 from powdrr_lift.core.implementation_specification import (
     ImplementationSpecificationValidationIssue,
     ImplementationSpecificationValidationReport,
@@ -150,6 +158,7 @@ _CODEBASE_STATE = "powdrr_lift.core.codebase_state"
 _CODE_INDEX = "powdrr_lift.core.code_index"
 _EDIT_CONTEXT = "powdrr_lift.core.edit_context"
 _ENTITY_CONTEXT = "powdrr_lift.core.entity_context"
+_FEATURE_PLANNING = "powdrr_lift.core.feature_planning_specification"
 _IMPLEMENTATION = "powdrr_lift.core.implementation_specification"
 _INDEX = "powdrr_lift.core.index"
 _PR_ANALYSIS = "powdrr_lift.core.pr_analysis"
@@ -237,9 +246,11 @@ _EXPORTS: dict[str, str] = {
     "create_architecture_specification_template": _ARCHITECTURE,
     "create_change_log_template": _TEMPLATE,
     "create_codebase_state": _CODEBASE_STATE,
+    "create_feature_pr_specification_template": _FEATURE_PLANNING,
     "create_current_state_specification": _CODEBASE_STATE,
     "create_implementation_specification_template": _IMPLEMENTATION,
     "create_pr_specification_template": _PR_SPECIFICATION,
+    "create_system_map_specification_template": _FEATURE_PLANNING,
     "create_system_specification_template": _SYSTEM,
     "implementation_specification_default_output_path": _IMPLEMENTATION,
     "lookup_code_provenance": _CODE_INDEX,
@@ -259,6 +270,7 @@ _EXPORTS: dict[str, str] = {
     "render_current_state_specification_report": _CODEBASE_STATE,
     "render_current_decisions_report": _CODEBASE_STATE,
     "render_edit_context_report": _EDIT_CONTEXT,
+    "render_feature_pr_specification_template": _FEATURE_PLANNING,
     "render_entity_decision_report": _ENTITY_CONTEXT,
     "render_entity_reference_report": _ENTITY_CONTEXT,
     "render_entity_relationship_report": _ENTITY_CONTEXT,
@@ -266,6 +278,7 @@ _EXPORTS: dict[str, str] = {
     "render_invariants_report": _CODEBASE_STATE,
     "render_pr_specification_template": _PR_SPECIFICATION,
     "render_proposed_pr_search_report": _PR_SPECIFICATION,
+    "render_system_map_specification_template": _FEATURE_PLANNING,
     "render_system_specification_template": _SYSTEM,
     "render_change_log_template": _TEMPLATE,
     "resolve_default_branch": _PR_ANALYSIS,
@@ -273,6 +286,7 @@ _EXPORTS: dict[str, str] = {
     "search_proposed_pr_specifications": _PR_SPECIFICATION,
     "show_proposed_pr_specification": _PR_SPECIFICATION,
     "system_specification_default_output_path": _SYSTEM,
+    "system_map_specification_default_output_path": _FEATURE_PLANNING,
     "validate_architecture_specification_yaml": _ARCHITECTURE,
     "build_validation_report": _VALIDATE,
     "validate_change_log_yaml": _VALIDATE,

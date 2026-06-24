@@ -56,6 +56,8 @@ __all__ = [
     "architecture_specification_default_output_path",
     "implementation_specification_default_output_path",
     "system_specification_default_output_path",
+    "system_map_specification_default_output_path",
+    "feature_pr_specification_default_output_path",
     "pr_specification_default_output_path",
     "proposed_pr_specification_path",
     "build_architecture_specification_validation_report",
@@ -65,6 +67,8 @@ __all__ = [
     "create_architecture_specification_template",
     "create_implementation_specification_template",
     "create_system_specification_template",
+    "create_system_map_specification_template",
+    "create_feature_pr_specification_template",
     "create_pr_specification_template",
     "build_current_decisions_report",
     "EditContextLine",
@@ -118,6 +122,8 @@ __all__ = [
     "render_architecture_specification_template",
     "render_implementation_specification_template",
     "render_system_specification_template",
+    "render_system_map_specification_template",
+    "render_feature_pr_specification_template",
     "render_pr_specification_template",
     "render_proposed_pr_search_report",
     "render_invariants_report",
@@ -153,6 +159,8 @@ def __getattr__(name: str) -> Any:
         "architecture_specification_default_output_path",
         "implementation_specification_default_output_path",
         "system_specification_default_output_path",
+        "system_map_specification_default_output_path",
+        "feature_pr_specification_default_output_path",
         "pr_specification_default_output_path",
         "proposed_pr_specification_path",
         "build_architecture_specification_validation_report",
@@ -162,10 +170,14 @@ def __getattr__(name: str) -> Any:
         "create_architecture_specification_template",
         "create_implementation_specification_template",
         "create_system_specification_template",
+        "create_system_map_specification_template",
+        "create_feature_pr_specification_template",
         "create_pr_specification_template",
         "render_architecture_specification_template",
         "render_implementation_specification_template",
         "render_system_specification_template",
+        "render_system_map_specification_template",
+        "render_feature_pr_specification_template",
         "render_pr_specification_template",
         "render_proposed_pr_search_report",
         "validate_architecture_specification_yaml",
@@ -183,6 +195,14 @@ def __getattr__(name: str) -> Any:
             create_architecture_specification_template,
             render_architecture_specification_template,
             validate_architecture_specification_yaml,
+        )
+        from powdrr_lift.core.feature_planning_specification import (
+            create_feature_pr_specification_template,
+            create_system_map_specification_template,
+            feature_pr_specification_default_output_path,
+            render_feature_pr_specification_template,
+            render_system_map_specification_template,
+            system_map_specification_default_output_path,
         )
         from powdrr_lift.core.implementation_specification import (
             ImplementationSpecificationValidationIssue,
@@ -248,6 +268,12 @@ def __getattr__(name: str) -> Any:
             "system_specification_default_output_path": (
                 system_specification_default_output_path
             ),
+            "system_map_specification_default_output_path": (
+                system_map_specification_default_output_path
+            ),
+            "feature_pr_specification_default_output_path": (
+                feature_pr_specification_default_output_path
+            ),
             "pr_specification_default_output_path": (
                 pr_specification_default_output_path
             ),
@@ -273,6 +299,12 @@ def __getattr__(name: str) -> Any:
             "create_system_specification_template": (
                 create_system_specification_template
             ),
+            "create_system_map_specification_template": (
+                create_system_map_specification_template
+            ),
+            "create_feature_pr_specification_template": (
+                create_feature_pr_specification_template
+            ),
             "create_pr_specification_template": create_pr_specification_template,
             "render_architecture_specification_template": (
                 render_architecture_specification_template
@@ -282,6 +314,12 @@ def __getattr__(name: str) -> Any:
             ),
             "render_system_specification_template": (
                 render_system_specification_template
+            ),
+            "render_system_map_specification_template": (
+                render_system_map_specification_template
+            ),
+            "render_feature_pr_specification_template": (
+                render_feature_pr_specification_template
             ),
             "render_pr_specification_template": render_pr_specification_template,
             "render_proposed_pr_search_report": render_proposed_pr_search_report,

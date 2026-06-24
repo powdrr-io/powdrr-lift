@@ -9,6 +9,8 @@ ARCHITECTURE_SPECIFICATION_FILENAME = "architecture-specification.yaml"
 SYSTEM_SPECIFICATION_FILENAME = "system-specification.yaml"
 IMPLEMENTATION_SPECIFICATION_FILENAME = "implementation-specification.yaml"
 PROPOSED_PR_SPECIFICATION_FILENAME = "proposed-pr-specification.yaml"
+SYSTEM_MAP_SPECIFICATION_FILENAME = "system-map-specification.yaml"
+FEATURE_PR_SPECIFICATION_FILENAME = "feature-pr-specification.yaml"
 
 
 def normalize_work_item_name(work_item_name: str) -> str:
@@ -66,6 +68,24 @@ def proposed_pr_specification_path(
 ) -> Path:
     return work_item_specification_root(repo_root, work_item_name) / (
         PROPOSED_PR_SPECIFICATION_FILENAME
+    )
+
+
+def system_map_specification_path(
+    repo_root: str | Path,
+    work_item_name: str,
+) -> Path:
+    return work_item_specification_root(repo_root, work_item_name) / (
+        SYSTEM_MAP_SPECIFICATION_FILENAME
+    )
+
+
+def feature_pr_specification_path(
+    repo_root: str | Path,
+    work_item_name: str,
+) -> Path:
+    return work_item_specification_root(repo_root, work_item_name) / (
+        FEATURE_PR_SPECIFICATION_FILENAME
     )
 
 

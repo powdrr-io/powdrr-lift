@@ -19,10 +19,13 @@ from powdrr_lift.core import (
     create_change_log_template,
     create_codebase_state,
     create_current_state_specification,
+    create_feature_pr_specification_template,
     create_implementation_specification_template,
     create_pr_specification_template,
+    create_system_map_specification_template,
     create_system_specification_template,
     current_state_specification_default_output_path,
+    feature_pr_specification_default_output_path,
     implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
@@ -41,6 +44,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
     search_proposed_pr_specifications,
     show_proposed_pr_specification,
+    system_map_specification_default_output_path,
     system_specification_default_output_path,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
@@ -442,6 +446,64 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional title to embed in the template.",
     )
     system_specification_parser.set_defaults(func=_run_system_specification)
+
+    system_map_specification_parser = subparsers.add_parser(
+        "system-map-specification",
+        aliases=["system_map_specification"],
+        help="Generate a system map specification template.",
+    )
+    system_map_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help="Work item name used as the docs/specs subfolder for the spec.",
+    )
+    system_map_specification_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the template to this path instead of "
+            "docs/specs/<work-item-name>/system-map-specification.yaml."
+        ),
+    )
+    system_map_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    system_map_specification_parser.add_argument(
+        "--title",
+        help="Optional title to embed in the template.",
+    )
+    system_map_specification_parser.set_defaults(func=_run_system_map_specification)
+
+    feature_pr_specification_parser = subparsers.add_parser(
+        "feature-pr-specification",
+        aliases=["feature_pr_specification"],
+        help="Generate a feature and PR specification template.",
+    )
+    feature_pr_specification_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help="Work item name used as the docs/specs subfolder for the spec.",
+    )
+    feature_pr_specification_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the template to this path instead of "
+            "docs/specs/<work-item-name>/feature-pr-specification.yaml."
+        ),
+    )
+    feature_pr_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    feature_pr_specification_parser.add_argument(
+        "--title",
+        help="Optional title to embed in the template.",
+    )
+    feature_pr_specification_parser.set_defaults(func=_run_feature_pr_specification)
 
     pr_specification_parser = subparsers.add_parser(
         "pr-specification",
@@ -893,6 +955,46 @@ def _run_system_specification(args: argparse.Namespace) -> int:
         print(f"Wrote system specification template to {default_output}")
     else:
         print(f"Wrote system specification template to {output_path}")
+
+    return 0
+
+
+def _run_system_map_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_system_map_specification_template(
+        work_item_name=args.work_item_name,
+        output_path=args.output,
+        repo_root=repo_root,
+        title=args.title,
+    )
+    if args.output is None:
+        default_output = system_map_specification_default_output_path(
+            args.work_item_name,
+            repo_root,
+        )
+        print(f"Wrote system map specification template to {default_output}")
+    else:
+        print(f"Wrote system map specification template to {output_path}")
+
+    return 0
+
+
+def _run_feature_pr_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_feature_pr_specification_template(
+        work_item_name=args.work_item_name,
+        output_path=args.output,
+        repo_root=repo_root,
+        title=args.title,
+    )
+    if args.output is None:
+        default_output = feature_pr_specification_default_output_path(
+            args.work_item_name,
+            repo_root,
+        )
+        print(f"Wrote feature and PR specification template to {default_output}")
+    else:
+        print(f"Wrote feature and PR specification template to {output_path}")
 
     return 0
 

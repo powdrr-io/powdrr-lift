@@ -15,10 +15,13 @@ from powdrr_lift.core import (
     create_change_log_template,
     create_codebase_state,
     create_current_state_specification,
+    create_feature_pr_specification_template,
     create_implementation_specification_template,
     create_pr_specification_template,
+    create_system_map_specification_template,
     create_system_specification_template,
     current_state_specification_default_output_path,
+    feature_pr_specification_default_output_path,
     implementation_specification_default_output_path,
     lookup_edit_context,
     lookup_entity_decisions,
@@ -37,6 +40,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
     search_proposed_pr_specifications,
     show_proposed_pr_specification,
+    system_map_specification_default_output_path,
     system_specification_default_output_path,
     validate_architecture_specification_yaml,
     validate_change_log_yaml,
@@ -295,6 +299,52 @@ def build_server() -> Any:
             work_item_name=work_item_name,
             output_path=(
                 system_specification_default_output_path(
+                    work_item_name,
+                    repo_root_path,
+                )
+                if output_path is None
+                else Path(output_path)
+            ),
+            repo_root=repo_root_path,
+            title=title,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def create_system_map_specification(
+        work_item_name: str,
+        output_path: str | None = None,
+        title: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_system_map_specification_template(
+            work_item_name=work_item_name,
+            output_path=(
+                system_map_specification_default_output_path(
+                    work_item_name,
+                    repo_root_path,
+                )
+                if output_path is None
+                else Path(output_path)
+            ),
+            repo_root=repo_root_path,
+            title=title,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def create_feature_pr_specification(
+        work_item_name: str,
+        output_path: str | None = None,
+        title: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_feature_pr_specification_template(
+            work_item_name=work_item_name,
+            output_path=(
+                feature_pr_specification_default_output_path(
                     work_item_name,
                     repo_root_path,
                 )

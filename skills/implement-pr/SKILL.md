@@ -1,42 +1,41 @@
 ---
 name: implement-pr
-description: Locate a proposed PR with fuzzy search, validate the proposal, inspect every section, implement the requested changes, and re-check the proposal before optionally preparing the PR changelog.
+description: Find a proposed PR by fuzzy search, inspect the full proposal, validate it against the current indexed specs and changelogs, implement the requested changes, review the proposal again, and then optionally generate the matching PR changelog. Use when Codex needs to carry out a proposed PR from its specification document.
 ---
 
 # Implement PR
 
-Use this skill when the task is to carry out a proposed PR from its specification.
+## Overview
+
+Use this skill to turn a proposed PR specification into code changes that still line up with the repo's current indexed state.
 
 ## Workflow
 
 1. Find the proposed PR.
-   - Run `powdrr-lift search-proposed-prs "<query>"`.
+   - Run `powdrr-lift search-proposed-prs <query>`.
    - If using MCP, call `search_proposed_prs`.
-   - Use the search results to identify the best proposed PR.
-   - If the match is ambiguous, inspect the top candidates before proceeding.
-2. Load the full proposal.
-   - Run `powdrr-lift show-proposed-pr <pr-number>`.
+   - Review the fuzzy matches and pick the intended proposed PR id.
+2. Inspect the proposal.
+   - Run `powdrr-lift show-proposed-pr <proposed-pr-id>`.
    - If using MCP, call `show_proposed_pr`.
-   - Read every section of the proposal before making changes.
+   - Read every section: `feature_ids`, `intent`, `acceptance_criteria`, `expected_tests`, `expected_outcomes`, `non_goals`, and `risks`.
 3. Validate the proposal.
-   - Run `powdrr-lift evaluate-pr-specification --input docs/specs/PR-<num>/proposed-pr-specification.yaml`.
+   - Run `powdrr-lift evaluate-pr-specification --work-item-name <work-item-name>`.
    - If using MCP, call `validate_pr_specification`.
-   - Treat validation failure as a blocker until the proposal or the repo state is corrected.
+   - Fix any validation problems before continuing.
 4. Implement the requested changes.
-   - Make the smallest code and doc changes that satisfy the proposal.
-   - Keep the proposal, implementation, and current repo state aligned.
+   - Make the smallest code changes that satisfy the proposal.
+   - Keep the proposal's intent, acceptance criteria, and risks in view while editing.
 5. Review the proposal again.
-   - Re-read every section after the code changes.
-   - Confirm the implementation still covers the proposal intent, acceptance criteria, tests, outcomes, non-goals, and risks.
-6. Decide whether to continue or stop.
-   - If more user feedback is needed, ask for it.
-   - Otherwise continue with the repository's PR changelog workflow
-     (`prepare-pr-changelog` in this repo).
+   - Re-read every section after the implementation to confirm the code matches the proposal.
+   - If the code diverges from the proposal, reconcile it before moving on.
+6. Decide whether to continue.
+   - If more feedback is needed, ask the user.
+   - Otherwise, generate or refresh the PR changelog for the branch.
 
 ## Guardrails
 
-- Do not start coding until the relevant proposed PR is identified and validated.
-- Do not assume the first search result is the right one if the query is broad.
-- Do not skip the second review pass after implementation.
-- Prefer to fix the code if it disagrees with the proposal; treat the proposal as read-only.
-- Always make any design changes explicit by adding new specification files to the PR as necessary.
+- Use the proposal as the source of intent, not as a license to widen scope.
+- Prefer current indexed feature ids only.
+- Keep the implementation aligned with the proposal's acceptance criteria and expected tests.
+- If the proposal is stale, update the proposal or the source specs first, then revalidate.

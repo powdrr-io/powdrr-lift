@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: 43
+feature_ids:
+  - feature-unified-packaging
+intent:
+  goal: Package the skill set, CLI, and MCP into a single installable distribution that works across macOS, Windows, and Linux and covers the supported coding agents.
+  reasoning: The platform only becomes reusable when the same authoritative payload can be installed cleanly with one command per platform and used consistently by Claude Code, Codex, Aider, Cursor, Antigravity, and OpenCode.
+acceptance_criteria:
+  - id: ac-install-path
+    description: The package installs with a single command on macOS, Windows, and Linux.
+  - id: ac-agent-coverage
+    description: The package supports Claude Code, Codex, Aider, Cursor, Antigravity, and OpenCode.
+expected_tests:
+  - id: test-platform-install
+    description: Add or update tests that verify the packaging and install flow stay cross-platform.
+  - id: test-adapter-metadata
+    description: Add or update tests that ensure the installer can ship the metadata needed by each supported agent.
+expected_outcomes:
+  - id: outcome-single-bundle
+    description: Users can install one authoritative bundle and use it across the supported agent surfaces.
+non_goals:
+  - id: ng-feature-parity
+    description: Do not attempt to add every future document family before the core platform is stable.
+risks:
+  - id: risk-platform-friction
+    description: Cross-platform packaging may expose platform-specific install or path issues that need follow-up fixes.

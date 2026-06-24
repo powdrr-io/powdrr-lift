@@ -17,25 +17,27 @@ description: Plan a feature from the codebase, generate the system-map and featu
    - If using MCP, call `create_feature_pr_specification`.
    - Use the completed system map and the requested feature to fill each section with the required changes, validation conditions, and outcomes.
    - Double-check that nothing needed to implement the feature is missing.
-3. Generate the plan diff.
+3. Plan and execute the code changes.
+   - Use the feature+PR template as the source of truth for the implementation plan.
+   - Make the smallest coherent code changes that satisfy the plan.
+   - Run the relevant tests and fix any failures before moving on.
+4. Prepare the PR changelog.
+   - Run `powdrr-lift init --pr-number <num>`.
+   - If using MCP, use the changelog template endpoint available in this repo.
+   - Fill out the changelog from the implemented code changes.
+5. Generate the plan diff.
    - Run `powdrr-lift plan-diff --feature-plan-specification <path> --changelog <path>`.
    - If using MCP, call `create_plan_diff_specification`.
    - Compare the filled feature plan specification against the changelog files.
    - Treat each difference as a single actionable item and work through them one at a time.
-4. Plan and execute the code changes.
-   - Use the feature+PR template as the source of truth for the implementation plan.
+6. Examine the plan diff and make code-only changes.
    - Use the plan diff as the source of truth for closing the gaps between the plan and the implemented change.
-   - Make the smallest coherent code changes that satisfy the plan.
-   - Run the relevant tests and fix any failures before moving on.
-5. Prepare the PR changelog.
-   - Run `powdrr-lift init --pr-number <num>`.
-   - If using MCP, use the changelog template endpoint available in this repo.
-   - Fill out the changelog from the implemented code changes.
-6. Compare and validate.
+   - Make changes only to code. Do not revise the plan, the feature template, or the changelog to hide a mismatch.
+   - When there are gaps, delete the old changelog and the diff file, regenerate the changelog template, follow its instructions, regenerate the plan diff, and repeat until the diff has no entries.
+7. Compare and validate.
    - Compare the changelog against the feature plan template and ensure every required change, validation condition, and outcome is reflected.
    - Run `powdrr-lift evaluate-pr-against-changelog --pr-number <num>`.
-   - If there are gaps, delete the old changelog and the diff file, regenerate the changelog template, follow its instructions, regenerate the plan diff, and repeat until the diff has no entries.
-7. Finish only when the feature, changelog, and validation all agree.
+8. Finish only when the feature, changelog, and validation all agree.
 
 ## Guardrails
 

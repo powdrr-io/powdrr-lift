@@ -17,23 +17,31 @@ description: Plan a feature from the codebase, generate the system-map and featu
    - If using MCP, call `create_feature_pr_specification`.
    - Use the completed system map and the requested feature to fill each section with the required changes, validation conditions, and outcomes.
    - Double-check that nothing needed to implement the feature is missing.
-3. Plan and execute the code changes.
+3. Generate the plan diff.
+   - Run `powdrr-lift plan-diff --feature-plan-specification <path> --changelog <path>`.
+   - If using MCP, call `create_plan_diff_specification`.
+   - Compare the filled feature plan specification against the changelog files.
+   - Treat each difference as a single actionable item and work through them one at a time.
+4. Plan and execute the code changes.
    - Use the feature+PR template as the source of truth for the implementation plan.
+   - Use the plan diff as the source of truth for closing the gaps between the plan and the implemented change.
    - Make the smallest coherent code changes that satisfy the plan.
    - Run the relevant tests and fix any failures before moving on.
-4. Prepare the PR changelog.
+5. Prepare the PR changelog.
    - Run `powdrr-lift init --pr-number <num>`.
    - If using MCP, use the changelog template endpoint available in this repo.
    - Fill out the changelog from the implemented code changes.
-5. Compare and validate.
+6. Compare and validate.
    - Compare the changelog against the feature plan template and ensure every required change, validation condition, and outcome is reflected.
    - Run `powdrr-lift evaluate-pr-against-changelog --pr-number <num>`.
-   - Repeat the comparison and validation until the changelog is clean.
-6. Finish only when the feature, changelog, and validation all agree.
+   - If there are gaps, delete the old changelog and the diff file, regenerate the changelog template, follow its instructions, regenerate the plan diff, and repeat until the diff has no entries.
+7. Finish only when the feature, changelog, and validation all agree.
 
 ## Guardrails
 
 - Do not skip the system map step.
 - Do not skip the feature+PR template step.
+- Do not skip the plan diff step.
 - Do not mark the work done until the changelog validates.
+- Do not mark the work done until the plan diff is empty.
 - Prefer the smallest change set that fully satisfies the requested feature.

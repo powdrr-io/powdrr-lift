@@ -58,17 +58,20 @@ __all__ = [
     "system_specification_default_output_path",
     "system_map_specification_default_output_path",
     "feature_pr_specification_default_output_path",
+    "plan_diff_specification_default_output_path",
     "pr_specification_default_output_path",
     "proposed_pr_specification_path",
     "build_architecture_specification_validation_report",
     "build_implementation_specification_validation_report",
     "build_system_specification_validation_report",
     "build_pr_specification_validation_report",
+    "build_plan_diff_report",
     "create_architecture_specification_template",
     "create_implementation_specification_template",
     "create_system_specification_template",
     "create_system_map_specification_template",
     "create_feature_pr_specification_template",
+    "create_plan_diff_specification",
     "create_pr_specification_template",
     "build_current_decisions_report",
     "EditContextLine",
@@ -124,6 +127,7 @@ __all__ = [
     "render_system_specification_template",
     "render_system_map_specification_template",
     "render_feature_pr_specification_template",
+    "render_plan_diff_specification",
     "render_pr_specification_template",
     "render_proposed_pr_search_report",
     "render_invariants_report",
@@ -161,23 +165,27 @@ def __getattr__(name: str) -> Any:
         "system_specification_default_output_path",
         "system_map_specification_default_output_path",
         "feature_pr_specification_default_output_path",
+        "plan_diff_specification_default_output_path",
         "pr_specification_default_output_path",
         "proposed_pr_specification_path",
         "build_architecture_specification_validation_report",
         "build_implementation_specification_validation_report",
         "build_system_specification_validation_report",
         "build_pr_specification_validation_report",
+        "build_plan_diff_report",
         "create_architecture_specification_template",
         "create_implementation_specification_template",
         "create_system_specification_template",
         "create_system_map_specification_template",
         "create_feature_pr_specification_template",
+        "create_plan_diff_specification",
         "create_pr_specification_template",
         "render_architecture_specification_template",
         "render_implementation_specification_template",
         "render_system_specification_template",
         "render_system_map_specification_template",
         "render_feature_pr_specification_template",
+        "render_plan_diff_specification",
         "render_pr_specification_template",
         "render_proposed_pr_search_report",
         "validate_architecture_specification_yaml",
@@ -212,6 +220,12 @@ def __getattr__(name: str) -> Any:
             implementation_specification_default_output_path,
             render_implementation_specification_template,
             validate_implementation_specification_yaml,
+        )
+        from powdrr_lift.core.plan_diff_specification import (
+            build_plan_diff_report,
+            create_plan_diff_specification,
+            plan_diff_specification_default_output_path,
+            render_plan_diff_specification,
         )
         from powdrr_lift.core.pr_specification import (
             ProposedPRSearchReport,
@@ -274,6 +288,9 @@ def __getattr__(name: str) -> Any:
             "feature_pr_specification_default_output_path": (
                 feature_pr_specification_default_output_path
             ),
+            "plan_diff_specification_default_output_path": (
+                plan_diff_specification_default_output_path
+            ),
             "pr_specification_default_output_path": (
                 pr_specification_default_output_path
             ),
@@ -290,6 +307,7 @@ def __getattr__(name: str) -> Any:
             "build_pr_specification_validation_report": (
                 build_pr_specification_validation_report
             ),
+            "build_plan_diff_report": build_plan_diff_report,
             "create_architecture_specification_template": (
                 create_architecture_specification_template
             ),
@@ -305,6 +323,7 @@ def __getattr__(name: str) -> Any:
             "create_feature_pr_specification_template": (
                 create_feature_pr_specification_template
             ),
+            "create_plan_diff_specification": create_plan_diff_specification,
             "create_pr_specification_template": create_pr_specification_template,
             "render_architecture_specification_template": (
                 render_architecture_specification_template
@@ -321,6 +340,7 @@ def __getattr__(name: str) -> Any:
             "render_feature_pr_specification_template": (
                 render_feature_pr_specification_template
             ),
+            "render_plan_diff_specification": render_plan_diff_specification,
             "render_pr_specification_template": render_pr_specification_template,
             "render_proposed_pr_search_report": render_proposed_pr_search_report,
             "validate_architecture_specification_yaml": (

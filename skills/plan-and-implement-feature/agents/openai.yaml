@@ -1,7 +1,7 @@
 interface:
   display_name: "Plan And Implement Feature"
   short_description: "Plan, implement, and validate features"
-  default_prompt: "Use $plan-and-implement-feature to generate the system map, generate the feature+PR template, implement the requested change, and validate the changelog before saying it is done."
+  default_prompt: "Use $plan-and-implement-feature to generate the system map, generate the feature+PR template, generate and close the plan diff against the changelog, implement the requested change, and validate the changelog before saying it is done."
 
 policy:
   allow_implicit_invocation: true

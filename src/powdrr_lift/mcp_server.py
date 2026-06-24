@@ -29,6 +29,7 @@ from powdrr_lift.core import (
     lookup_entity_relationships,
     parse_line_ranges,
     parse_validation_report,
+    plan_diff_specification_default_output_path,
     pr_specification_default_output_path,
     render_current_decisions_report,
     render_edit_context_report,
@@ -47,6 +48,9 @@ from powdrr_lift.core import (
     validate_implementation_specification_yaml,
     validate_pr_specification_yaml,
     validate_system_specification_yaml,
+)
+from powdrr_lift.core import (
+    create_plan_diff_specification as _create_plan_diff_specification,
 )
 
 
@@ -368,6 +372,29 @@ def build_server() -> Any:
             output_path=(
                 pr_specification_default_output_path(
                     work_item_name,
+                    repo_root_path,
+                )
+                if output_path is None
+                else Path(output_path)
+            ),
+            repo_root=repo_root_path,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def create_plan_diff_specification(
+        feature_plan_specification_path: str,
+        changelog_paths: list[str],
+        output_path: str | None = None,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = _create_plan_diff_specification(
+            feature_plan_specification_path=feature_plan_specification_path,
+            changelog_paths=changelog_paths,
+            output_path=(
+                plan_diff_specification_default_output_path(
+                    feature_plan_specification_path,
                     repo_root_path,
                 )
                 if output_path is None

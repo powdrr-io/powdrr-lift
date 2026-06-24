@@ -33,6 +33,7 @@ def test_build_server_registers_codebase_state_tool(
     assert "create_system_map_specification" in registered_tools
     assert "validate_system_specification" in registered_tools
     assert "create_feature_pr_specification" in registered_tools
+    assert "create_plan_diff_specification" in registered_tools
     assert "create_pr_specification" in registered_tools
     assert "validate_pr_specification" in registered_tools
     assert "search_proposed_prs" in registered_tools

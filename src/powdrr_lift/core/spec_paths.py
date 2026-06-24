@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 SPECIFICATION_SCHEMA_URL = "https://powdrr.io/schemas/specification-v1"
+PLAN_DIFF_SCHEMA_URL = "https://powdrr.io/schema/plan-diff-v1"
 SPECIFICATIONS_ROOT = Path("docs") / "specs"
+PLAN_DIFFS_ROOT = Path("docs") / "plan-diffs"
 
 ARCHITECTURE_SPECIFICATION_FILENAME = "architecture-specification.yaml"
 SYSTEM_SPECIFICATION_FILENAME = "system-specification.yaml"
@@ -11,6 +13,7 @@ IMPLEMENTATION_SPECIFICATION_FILENAME = "implementation-specification.yaml"
 PROPOSED_PR_SPECIFICATION_FILENAME = "proposed-pr-specification.yaml"
 SYSTEM_MAP_SPECIFICATION_FILENAME = "system-map-specification.yaml"
 FEATURE_PR_SPECIFICATION_FILENAME = "feature-pr-specification.yaml"
+PLAN_DIFF_SPECIFICATION_FILENAME = "plan-diff.yaml"
 
 
 def normalize_work_item_name(work_item_name: str) -> str:
@@ -86,6 +89,18 @@ def feature_pr_specification_path(
 ) -> Path:
     return work_item_specification_root(repo_root, work_item_name) / (
         FEATURE_PR_SPECIFICATION_FILENAME
+    )
+
+
+def plan_diff_specification_path(
+    repo_root: str | Path,
+    work_item_name: str,
+) -> Path:
+    return (
+        Path(repo_root)
+        / PLAN_DIFFS_ROOT
+        / normalize_work_item_name(work_item_name)
+        / PLAN_DIFF_SPECIFICATION_FILENAME
     )
 
 

@@ -81,9 +81,67 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 
 ## Get Started
 
-(Coming Soon)
-Mac
-```brew install powdrr-lift```
+### For OpenCode
+
+1. **Clone this repository**
+   ```bash
+   git clone <repository-url>
+   cd powdrr-lift
+   ```
+
+2. **Install the skills**
+   ```bash
+   ./scripts/install-skills.sh
+   ```
+
+3. **OpenCode will automatically load the skills**
+   - Skills are installed to `~/.config/opencode/skills/`
+   - Configuration is installed to `~/.config/opencode/opencode.json`
+   - Skills are enabled for default agents
+
+4. **Start using the skills**
+   - Run `opencode` in your project
+   - The skills will be available automatically
+   - Use the `skill` tool to invoke specific skills
+
+### For Mac
+```bash
+brew install powdrr-lift
+```
+
+### Available Skills
+
+This repository includes 10 installable skills for OpenCode:
+
+1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated system specification document from the analysis and commit it.
+
+2. **code-edit-context** - Use when you are about to edit code and need index-backed context for a file and line ranges.
+
+3. **implement-pr** - Find a proposed PR by fuzzy search, inspect the full proposal, validate it against the current indexed specs and changelogs, implement the requested changes, review the proposal again, and then optionally generate the matching PR changelog.
+
+4. **prepare-pr-changelog** - Use when preparing a pull request or getting a PR ready. Guides the agent through the PR changelog workflow with powdrr-lift.
+
+5. **review-pr-changelog** - Use during code review when the change includes a changelog. This skill complements general code-review skills; do not replace normal review. Check for the changelog first, validate it, then review each change against the PR intent and report the feedback.
+
+6. **specify-architecture** - Create, fill, and validate architecture specification templates with the repository's architecture-specification CLI or MCP endpoints.
+
+7. **specify-implementation** - Create, fill, and validate implementation specification templates with the repository's implementation-specification CLI or MCP endpoints.
+
+8. **specify-prs** - Create, fill, and validate proposed PR specification templates with the repository's pr-specification CLI or MCP endpoints.
+
+9. **specify-system** - Create, fill, and validate system specification templates with the repository's system-specification CLI or MCP endpoints.
+
+10. **synchronize-code-and-state** - Generate the current codebase-state snapshot, compare it to the source tree and changelog index, and reconcile mismatches by changing code and/or the changelog while preserving the repo's intent.
+
+**Usage:**
+```bash
+# In OpenCode, you can invoke skills manually:
+skill({ name: "prepare-pr-changelog" })
+skill({ name: "review-pr-changelog" })
+skill({ name: "specify-system" })
+```
+
+OpenCode will automatically load skills and display them in the available skills list.
 
 
 ## Background

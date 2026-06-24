@@ -556,7 +556,7 @@ def _collect_current_proposed_pr_states(
     items_by_id: dict[str, CodebaseStateProposedPR] = {}
     for document in documents:
         source = _document_source(document)
-        for raw_item in document.changelog.pr_changes or []:
+        for raw_item in document.changelog.proposed_prs or []:
             item_id = _normalize_text(raw_item.id)
             if item_id is None:
                 continue

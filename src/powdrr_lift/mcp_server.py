@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
     blame_view_state_to_data,
@@ -270,8 +268,8 @@ def build_server() -> Any:
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
         rendered_output_path = create_implementation_specification_template(
-            work_item_name=work_item_name,
             architecture_specification_path=architecture_specification_path,
+            work_item_name=work_item_name,
             output_path=(
                 implementation_specification_default_output_path(
                     work_item_name,
@@ -332,7 +330,7 @@ def build_server() -> Any:
     @server.tool()
     def search_proposed_prs(
         query: str,
-        limit: int = 5,
+        limit: int = 10,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
@@ -341,23 +339,15 @@ def build_server() -> Any:
             repo_root=repo_root_path,
             limit=limit,
         )
-        return json.dumps(
-            yaml.safe_load(render_proposed_pr_search_report(report)),
-            indent=2,
-            sort_keys=False,
-            ensure_ascii=False,
-        )
+        return render_proposed_pr_search_report(report)
 
     @server.tool()
     def show_proposed_pr(
-        proposed_pr_id: str,
+        pr_number: int,
         repo_root: str | None = None,
     ) -> str:
         repo_root_path = resolve_repo_root(repo_root)
-        return show_proposed_pr_specification(
-            proposed_pr_id,
-            repo_root=repo_root_path,
-        )
+        return show_proposed_pr_specification(pr_number, repo_root=repo_root_path)
 
     @server.tool()
     def validate_architecture_specification(
@@ -384,8 +374,8 @@ def build_server() -> Any:
         repo_root_path = resolve_repo_root(repo_root)
         return validate_implementation_specification_yaml(
             implementation_specification_yaml,
-            work_item_name=work_item_name,
             architecture_specification_path=architecture_specification_path,
+            work_item_name=work_item_name,
             repo_root=repo_root_path,
         )
 

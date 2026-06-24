@@ -204,7 +204,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
       - id: AppService
         state: completed
 
-    prs:
+    proposed_prs:
       - id: 1
         state: completed
     """
@@ -274,7 +274,7 @@ def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
       - id: MissingFeature
         state: pending
 
-    prs:
+    proposed_prs:
       - id: 99
         state: queued
     """
@@ -407,7 +407,7 @@ def test_validate_change_log_yaml_rejects_change_id_colliding_with_feature_id(
       - id: feature-a
         state: completed
 
-    prs: []
+    proposed_prs: []
     """
 
     report = parse_validation_report(
@@ -558,6 +558,7 @@ def test_validate_change_log_yaml_rejects_version_two_empty_related_block(
           entities: []
           invariants: []
           guidance: []
+          proposed_prs: []
           acceptance_criteria: []
           expected_tests: []
           expected_outcomes: []
@@ -659,6 +660,8 @@ def test_validate_change_log_yaml_accepts_proposal_detail_related_ids(
             - ng-1
           risks:
             - risk-1
+          proposed_prs:
+            - 1
       - path: tests/test_app.py
         type: modified
         span:
@@ -687,6 +690,174 @@ def test_validate_change_log_yaml_accepts_proposal_detail_related_ids(
 
     assert report.validation_successful is True
     assert report.issues == []
+
+
+def test_validate_change_log_yaml_rejects_related_proposed_prs_objects(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "docs" / "specs" / "PR-1").mkdir(parents=True, exist_ok=True)
+    proposal_path = (
+        repo_root / "docs" / "specs" / "PR-1" / "proposed-pr-specification.yaml"
+    )
+    proposal_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        id: 1
+        feature_ids:
+          - AppService
+
+        intent:
+          goal: Add the application feature.
+          reasoning: Keep the proposal focused.
+
+        acceptance_criteria:
+          - id: ac-1
+            description: Acceptance criteria one.
+        expected_tests:
+          - id: test-1
+            description: Expected test one.
+        expected_outcomes:
+          - id: outcome-1
+            description: Expected outcome one.
+        non_goals:
+          - id: ng-1
+            description: Non-goal one.
+        risks:
+          - id: risk-1
+            description: Risk one.
+        """,
+        encoding="utf-8",
+    )
+
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Depends on "AppService".
+        related:
+          proposed_prs:
+            - id: 1
+              state: completed
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    proposed_prs: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "file_entry_related_invalid_reference_shape" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_validate_change_log_yaml_rejects_top_level_proposed_pr_state_invalid(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "docs" / "specs" / "PR-1").mkdir(parents=True, exist_ok=True)
+    proposal_path = (
+        repo_root / "docs" / "specs" / "PR-1" / "proposed-pr-specification.yaml"
+    )
+    proposal_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        id: 1
+        feature_ids:
+          - AppService
+
+        intent:
+          goal: Add the application feature.
+          reasoning: Keep the proposal focused.
+
+        acceptance_criteria:
+          - id: ac-1
+            description: Acceptance criteria one.
+        expected_tests:
+          - id: test-1
+            description: Expected test one.
+        expected_outcomes:
+          - id: outcome-1
+            description: Expected outcome one.
+        non_goals:
+          - id: ng-1
+            description: Non-goal one.
+        risks:
+          - id: risk-1
+            description: Risk one.
+        """,
+        encoding="utf-8",
+    )
+
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code.
+        rationale: Depends on "AppService".
+    proposed_prs:
+      - id: 1
+        state: pending
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "invalid_pr_state" in {issue.code for issue in report.issues}
 
 
 def test_validate_change_log_yaml_rejects_unknown_quoted_rationale_ids(
@@ -930,6 +1101,132 @@ def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
 
     assert report.validation_successful is False
     assert "structured_file_invalid_schema" in {issue.code for issue in report.issues}
+
+
+def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    implementation_spec_path = (
+        repo_root
+        / "docs"
+        / "specs"
+        / "powdrr-lift"
+        / "implementation-specification.yaml"
+    )
+    implementation_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        version: 1
+        title: "Agent platform expansion implementation"
+        architecture_id: "2026-05-22-skill-distribution-architecture"
+        entities: []
+        entity_relationships: []
+        features: []
+        decisions: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/specs/powdrr-lift/implementation-specification.yaml")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    _git(repo_root, "add", "src/app.py")
+    _git(repo_root, "commit", "-m", "Add app code")
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files:
+      - docs/specs/powdrr-lift/implementation-specification.yaml
+
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    proposed_prs: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert "structured_file_not_in_branch_diff" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_validate_change_log_yaml_rejects_incorrect_regular_file_span(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_multi_hunk_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    decisions:
+      - id: ADR-200
+        summary: Keep the change entry aligned to the exact diff hunk.
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    files:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        affects:
+          - AppService
+        rationale: Keep the first hunk focused on the skill metadata.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    issue_codes = {issue.code for issue in report.issues}
+    assert issue_codes & {"missing_change", "unexpected_change"}
 
 
 def test_validate_change_log_yaml_rejects_version_two_changes(

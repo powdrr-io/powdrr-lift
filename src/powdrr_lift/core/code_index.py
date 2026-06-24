@@ -1358,6 +1358,10 @@ class CodeIndexStore:
                 (branch_name,),
             )
             connection.execute(
+                "DELETE FROM branch_decision WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
                 "DELETE FROM provenance_record WHERE branch_name = ?",
                 (branch_name,),
             )
@@ -1439,7 +1443,13 @@ class CodeIndexStore:
                 ),
             )
 
+            seen_branch_document_pr_numbers: set[int] = set()
+            seen_branch_decision_keys: set[tuple[int, int]] = set()
             for document in index.documents:
+                if document.pr_number in seen_branch_document_pr_numbers:
+                    continue
+
+                seen_branch_document_pr_numbers.add(document.pr_number)
                 connection.execute(
                     """
                     INSERT INTO branch_document (
@@ -1467,6 +1477,11 @@ class CodeIndexStore:
                 for decision_state in _collect_decision_states(
                     document.changelog.decisions or []
                 ):
+                    decision_key = (document.pr_number, decision_state.decision_index)
+                    if decision_key in seen_branch_decision_keys:
+                        continue
+
+                    seen_branch_decision_keys.add(decision_key)
                     connection.execute(
                         """
                         INSERT INTO branch_decision (
@@ -1504,7 +1519,7 @@ class CodeIndexStore:
                     )
 
                 for proposed_pr_index, proposed_pr in enumerate(
-                    document.changelog.pr_changes or []
+                    document.changelog.proposed_prs or []
                 ):
                     connection.execute(
                         """
@@ -2341,7 +2356,7 @@ def _load_changelog_document_from_cache_row(
         invariant_changes=invariant_changes,
         guidance_changes=guidance_changes,
         feature_changes=feature_changes,
-        pr_changes=proposed_pr_changes,
+        proposed_prs=proposed_pr_changes,
     )
 
     return ChangelogDocument(

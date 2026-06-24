@@ -1,7 +1,148 @@
-from __future__ import annotations
+"""Core package exports."""
 
-from importlib import import_module
+# ruff: noqa: F401
+
 from typing import Any
+
+from powdrr_lift.core.architecture_specification import (
+    ArchitectureSpecificationValidationIssue,
+    ArchitectureSpecificationValidationReport,
+    architecture_specification_default_output_path,
+    build_architecture_specification_validation_report,
+    create_architecture_specification_template,
+    render_architecture_specification_template,
+    validate_architecture_specification_yaml,
+)
+from powdrr_lift.core.blame_view import (
+    BlameChunk,
+    BlameFileView,
+    BlameLine,
+    BlameProvenance,
+    BlameViewState,
+    RepoTreeNode,
+    blame_file_view_to_data,
+    blame_tree_node_to_data,
+    blame_view_state_to_data,
+    build_blame_file_view,
+    build_blame_view_state,
+    build_repo_tree,
+)
+from powdrr_lift.core.code_index import (
+    BranchState,
+    code_index_db_path,
+    lookup_code_provenance,
+    lookup_code_provenance_span,
+    refresh_code_index,
+)
+from powdrr_lift.core.codebase_state import (
+    CodebaseStateDecision,
+    CodebaseStateEntity,
+    CodebaseStateIntent,
+    CodebaseStateLifecycleItem,
+    CodebaseStateRelationship,
+    CodebaseStateReport,
+    CodebaseStateSource,
+    build_codebase_state_report,
+    build_current_decisions_report,
+    build_invariants_report,
+    codebase_state_default_output_path,
+    create_codebase_state,
+    create_current_state_specification,
+    current_state_specification_default_output_path,
+    render_codebase_state_report,
+    render_current_decisions_report,
+    render_current_state_specification_report,
+    render_invariants_report,
+)
+from powdrr_lift.core.edit_context import (
+    EditContextLine,
+    EditContextRange,
+    EditContextReport,
+    lookup_edit_context,
+    parse_line_range,
+    parse_line_ranges,
+    render_edit_context_report,
+)
+from powdrr_lift.core.entity_context import (
+    EntityDecisionOccurrence,
+    EntityDecisionReport,
+    EntityReferenceReport,
+    EntityRelationshipReport,
+    lookup_entity_decisions,
+    lookup_entity_references,
+    lookup_entity_relationships,
+    render_entity_decision_report,
+    render_entity_reference_report,
+    render_entity_relationship_report,
+)
+from powdrr_lift.core.implementation_specification import (
+    ImplementationSpecificationValidationIssue,
+    ImplementationSpecificationValidationReport,
+    build_implementation_specification_validation_report,
+    create_implementation_specification_template,
+    implementation_specification_default_output_path,
+    render_implementation_specification_template,
+    validate_implementation_specification_yaml,
+)
+from powdrr_lift.core.index import (
+    ChangelogDocument,
+    EntityGraph,
+    EntityOccurrence,
+    ProvenanceRecord,
+    RelationshipOccurrence,
+    SourceIndex,
+    build_changelog_index,
+    build_changelog_index_at_ref,
+)
+from powdrr_lift.core.pr_analysis import (
+    BranchDiffEntry,
+    collect_branch_diff_entries,
+    resolve_default_branch,
+    resolve_repo_root,
+)
+from powdrr_lift.core.pr_specification import (
+    ProposedPRSearchReport,
+    ProposedPRSearchResult,
+    PRSpecificationValidationIssue,
+    PRSpecificationValidationReport,
+    build_pr_specification_validation_report,
+    create_pr_specification_template,
+    pr_specification_default_output_path,
+    proposed_pr_specification_path,
+    render_pr_specification_template,
+    render_proposed_pr_search_report,
+    search_proposed_pr_specifications,
+    show_proposed_pr_specification,
+    validate_pr_specification_yaml,
+)
+from powdrr_lift.core.schemas import (
+    ChangeEntity,
+    ChangeEntityRelationship,
+    ChangeFeatureState,
+    ChangeFile,
+    ChangeGuidance,
+    ChangeInvariant,
+    ChangeLog,
+    ChangeProposedPRState,
+    Decision,
+    Intent,
+    RelatedSection,
+    Span,
+    parse_change_log,
+)
+from powdrr_lift.core.system_specification import (
+    SystemSpecificationValidationIssue,
+    SystemSpecificationValidationReport,
+    build_system_specification_validation_report,
+    create_system_specification_template,
+    render_system_specification_template,
+    system_specification_default_output_path,
+    validate_system_specification_yaml,
+)
+from powdrr_lift.core.template import (
+    create_change_log_template,
+    render_change_log_template,
+)
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
 _BLAME_VIEW = "powdrr_lift.core.blame_view"
@@ -144,15 +285,27 @@ __all__ = sorted(_EXPORTS)
 
 
 def __getattr__(name: str) -> Any:
-    module_name = _EXPORTS.get(name)
-    if module_name is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if name in {
+        "ValidationIssue",
+        "ValidationReport",
+        "build_validation_report",
+        "parse_validation_report",
+        "validate_change_log_yaml",
+    }:
+        from powdrr_lift.core.validate import (
+            ValidationIssue,
+            ValidationReport,
+            build_validation_report,
+            parse_validation_report,
+            validate_change_log_yaml,
+        )
 
-    module = import_module(module_name)
-    value = getattr(module, name)
-    globals()[name] = value
-    return value
+        return {
+            "ValidationIssue": ValidationIssue,
+            "ValidationReport": ValidationReport,
+            "build_validation_report": build_validation_report,
+            "parse_validation_report": parse_validation_report,
+            "validate_change_log_yaml": validate_change_log_yaml,
+        }[name]
 
-
-def __dir__() -> list[str]:
-    return sorted(set(globals()) | set(__all__))
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

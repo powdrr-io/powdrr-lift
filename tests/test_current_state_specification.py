@@ -30,27 +30,34 @@ def test_build_current_state_specification_report_synthesizes_indexed_specs(
     assert [item["id"] for item in report["requirements"]] == ["req-1"]
     assert report["requirements"][0]["state"] == "added"
     assert [item["id"] for item in report["approach"]] == ["app-1"]
+    assert all(item["id"] != "req-2" for item in report["requirements"])
+    assert all(item["id"] != "app-2" for item in report["approach"])
     assert [item["id"] for item in report["entities"]] == [
         "Alpha",
         "Beta",
         "Gamma",
     ]
+    assert all(item["id"] != "Delta" for item in report["entities"])
     assert [item["id"] for item in report["entity_relationships"]] == [
         "rel-1",
         "rel-2",
     ]
+    assert all(item["id"] != "rel-3" for item in report["entity_relationships"])
     assert [item["id"] for item in report["features"]] == [
         "feature-1",
         "feature-2",
     ]
     assert report["features"][0]["action"] == "added"
+    assert all(item["id"] != "feature-3" for item in report["features"])
     assert [item["id"] for item in report["decisions"]] == ["decision-1"]
+    assert all(item["id"] != "decision-2" for item in report["decisions"])
     assert [item["id"] for item in report["invariants"]] == ["inv-1"]
+    assert all(item["id"] != "inv-2" for item in report["invariants"])
     assert [item["id"] for item in report["guidance"]] == ["guide-1"]
+    assert all(item["id"] != "guide-2" for item in report["guidance"])
     assert [item["id"] for item in report["proposed_prs"]] == ["pr-101"]
     assert report["proposed_prs"][0]["state"] == "in_progress"
-    assert len(report["intents"]) == 1
-    assert all(item["id"] != "feature-3" for item in report["features"])
+    assert "intents" not in report
     assert all(item["id"] != "pr-103" for item in report["proposed_prs"])
 
     codebase_state = build_codebase_state_report(
@@ -71,6 +78,9 @@ def test_build_current_state_specification_report_synthesizes_indexed_specs(
     assert all(
         proposed_pr.id != "pr-103" for proposed_pr in codebase_state.proposed_prs
     )
+    assert all(item.id != "inv-2" for item in codebase_state.invariants)
+    assert all(item.id != "guide-2" for item in codebase_state.guidance)
+    assert all(item.id != "decision-2" for item in codebase_state.decisions)
 
 
 def test_cli_synthesize_current_state_writes_default_file(tmp_path: Path) -> None:
@@ -175,10 +185,16 @@ def _write_structured_specs(repo_root: Path) -> None:
           - id: req-1
             description: Keep the current state report coherent.
             state: added
+          - id: req-2
+            description: Old requirement removed from the current state.
+            state: removed
         approach:
           - id: app-1
             description: Build the current state report from indexed docs.
             state: added
+          - id: app-2
+            description: Old approach removed from the current state.
+            state: removed
         """,
         encoding="utf-8",
     )
@@ -198,6 +214,11 @@ def _write_structured_specs(repo_root: Path) -> None:
             type: Skill
             summary: The beta skill.
             rationale: "req-1"
+          - id: Delta
+            type: Skill
+            summary: Removed skill.
+            rationale: "req-1"
+            action: removed
         entity_relationships:
           - id: rel-1
             source: Alpha
@@ -205,6 +226,13 @@ def _write_structured_specs(repo_root: Path) -> None:
             relationship: depends_on
             description: Alpha depends on Beta.
             rationale: "req-1"
+          - id: rel-3
+            source: Delta
+            target: Beta
+            relationship: depends_on
+            description: Delta depends on Beta.
+            rationale: "req-1"
+            action: removed
         """,
         encoding="utf-8",
     )
@@ -230,6 +258,12 @@ def _write_structured_specs(repo_root: Path) -> None:
             target: Alpha
             relationship: depends_on
             rationale: "req-1"
+          - id: rel-4
+            action: removed
+            source: Gamma
+            target: Beta
+            relationship: depends_on
+            rationale: "req-1"
         features:
           - id: feature-1
             action: added
@@ -241,10 +275,18 @@ def _write_structured_specs(repo_root: Path) -> None:
             description: Hide completed proposed PRs from the report.
             functional_requirements:
               - Completed proposed PRs must be omitted.
+          - id: feature-3
+            action: removed
+            description: Removed feature.
+            functional_requirements:
+              - No longer surface this feature.
         decisions:
           - id: decision-1
             action: added
             description: Build the current state report from indexed docs.
+          - id: decision-2
+            action: removed
+            description: Old decision removed from the current state.
         """,
         encoding="utf-8",
     )

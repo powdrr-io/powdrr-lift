@@ -311,13 +311,6 @@ def build_current_state_specification_report(
             for proposed_pr in codebase_state_report.proposed_prs
             if proposed_pr.state != "completed"
         ],
-        "intents": [
-            {
-                "problem": intent.problem,
-                "goal": intent.goal,
-            }
-            for intent in codebase_state_report.intents
-        ],
     }
 
 

@@ -46,6 +46,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
     search_proposed_pr_specifications,
     show_proposed_pr_specification,
+    start_planning_feature,
     system_map_specification_default_output_path,
     system_specification_default_output_path,
     validate_architecture_specification_yaml,
@@ -506,6 +507,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional title to embed in the template.",
     )
     feature_pr_specification_parser.set_defaults(func=_run_feature_pr_specification)
+
+    start_planning_feature_parser = subparsers.add_parser(
+        "start-planning-feature",
+        aliases=["start_planning_feature"],
+        help="Generate the instructions for starting feature planning.",
+    )
+    start_planning_feature_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help="Work item name used to fill the skill instructions.",
+    )
+    start_planning_feature_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when reading the planning skill.",
+    )
+    start_planning_feature_parser.set_defaults(func=_run_start_planning_feature)
 
     plan_diff_specification_parser = subparsers.add_parser(
         "plan-diff",
@@ -1035,6 +1053,18 @@ def _run_feature_pr_specification(args: argparse.Namespace) -> int:
     else:
         print(f"Wrote feature and PR specification template to {output_path}")
 
+    return 0
+
+
+def _run_start_planning_feature(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    instructions = start_planning_feature(
+        work_item_name=args.work_item_name,
+        repo_root=repo_root,
+    )
+    sys.stdout.write(instructions)
+    if not instructions.endswith("\n"):
+        sys.stdout.write("\n")
     return 0
 
 

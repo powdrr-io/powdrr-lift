@@ -53,6 +53,9 @@ from powdrr_lift.core import (
 from powdrr_lift.core import (
     create_plan_diff_specification as _create_plan_diff_specification,
 )
+from powdrr_lift.core import (
+    start_planning_feature as _start_planning_feature,
+)
 
 
 def _load_fastmcp() -> Any:
@@ -378,6 +381,17 @@ def build_server() -> Any:
             title=title,
         )
         return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def start_planning_feature(
+        work_item_name: str,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        return _start_planning_feature(
+            work_item_name=work_item_name,
+            repo_root=repo_root_path,
+        )
 
     @server.tool()
     def create_pr_specification(

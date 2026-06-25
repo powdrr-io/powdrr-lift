@@ -81,6 +81,7 @@ from powdrr_lift.core.feature_planning_specification import (
     feature_pr_specification_default_output_path,
     render_feature_pr_specification_template,
     render_system_map_specification_template,
+    start_planning_feature,
     system_map_specification_default_output_path,
 )
 from powdrr_lift.core.implementation_specification import (
@@ -260,6 +261,7 @@ _EXPORTS: dict[str, str] = {
     "create_pr_specification_template": _PR_SPECIFICATION,
     "create_system_map_specification_template": _FEATURE_PLANNING,
     "create_system_specification_template": _SYSTEM,
+    "start_planning_feature": _FEATURE_PLANNING,
     "implementation_specification_default_output_path": _IMPLEMENTATION,
     "lookup_code_provenance": _CODE_INDEX,
     "lookup_code_provenance_span": _CODE_INDEX,

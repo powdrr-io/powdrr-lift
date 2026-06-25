@@ -261,3 +261,23 @@ def create_feature_pr_specification_template(
         encoding="utf-8",
     )
     return resolved_output_path
+
+
+def start_planning_feature(
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> str:
+    repo_root_path = _resolve_repo_root(repo_root)
+    normalized_work_item_name = work_item_name.strip()
+    if not normalized_work_item_name:
+        raise ValueError("work_item_name must not be empty.")
+
+    skill_path = repo_root_path / "skills" / "plan-and-implement-feature" / "SKILL.md"
+    if not skill_path.is_file():
+        raise FileNotFoundError(
+            f"Could not find plan-and-implement-feature skill at {skill_path}"
+        )
+
+    skill_text = skill_path.read_text(encoding="utf-8")
+    return skill_text.replace("<work-item-name>", normalized_work_item_name)

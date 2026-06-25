@@ -58,6 +58,7 @@ __all__ = [
     "system_specification_default_output_path",
     "system_map_specification_default_output_path",
     "feature_pr_specification_default_output_path",
+    "start_planning_feature",
     "plan_diff_specification_default_output_path",
     "pr_specification_default_output_path",
     "proposed_pr_specification_path",
@@ -173,6 +174,7 @@ def __getattr__(name: str) -> Any:
         "system_specification_default_output_path",
         "system_map_specification_default_output_path",
         "feature_pr_specification_default_output_path",
+        "start_planning_feature",
         "plan_diff_specification_default_output_path",
         "pr_specification_default_output_path",
         "proposed_pr_specification_path",
@@ -218,6 +220,7 @@ def __getattr__(name: str) -> Any:
             feature_pr_specification_default_output_path,
             render_feature_pr_specification_template,
             render_system_map_specification_template,
+            start_planning_feature,
             system_map_specification_default_output_path,
         )
         from powdrr_lift.core.implementation_specification import (
@@ -331,6 +334,7 @@ def __getattr__(name: str) -> Any:
             "create_feature_pr_specification_template": (
                 create_feature_pr_specification_template
             ),
+            "start_planning_feature": start_planning_feature,
             "create_plan_diff_specification": create_plan_diff_specification,
             "create_pr_specification_template": create_pr_specification_template,
             "render_architecture_specification_template": (

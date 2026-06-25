@@ -95,6 +95,7 @@ __all__ = [
     "RepoTreeNode",
     "Span",
     "create_change_log_template",
+    "create_change_log_template_from_plan_diff",
     "build_codebase_state_report",
     "build_current_state_specification_report",
     "build_invariants_report",
@@ -149,6 +150,13 @@ def __getattr__(name: str) -> Any:
         from powdrr_lift.change_log_template import create_change_log_template
 
         return create_change_log_template
+
+    if name == "create_change_log_template_from_plan_diff":
+        from powdrr_lift.change_log_template import (
+            create_change_log_template_from_plan_diff,
+        )
+
+        return create_change_log_template_from_plan_diff
 
     if name in {
         "ArchitectureSpecificationValidationIssue",

@@ -156,6 +156,7 @@ from powdrr_lift.core.system_specification import (
 )
 from powdrr_lift.core.template import (
     create_change_log_template,
+    create_change_log_template_from_plan_diff,
     render_change_log_template,
 )
 
@@ -252,6 +253,7 @@ _EXPORTS: dict[str, str] = {
     "collect_branch_diff_entries": _PR_ANALYSIS,
     "create_architecture_specification_template": _ARCHITECTURE,
     "create_change_log_template": _TEMPLATE,
+    "create_change_log_template_from_plan_diff": _TEMPLATE,
     "create_codebase_state": _CODEBASE_STATE,
     "create_feature_pr_specification_template": _FEATURE_PLANNING,
     "create_current_state_specification": _CODEBASE_STATE,

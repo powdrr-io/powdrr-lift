@@ -34,6 +34,7 @@ def test_build_server_registers_codebase_state_tool(
     assert "validate_system_specification" in registered_tools
     assert "create_feature_pr_specification" in registered_tools
     assert "start_planning_feature" in registered_tools
+    assert "init_change_log_template_from_plan_diff" in registered_tools
     assert "create_plan_diff_specification" in registered_tools
     assert "create_pr_specification" in registered_tools
     assert "validate_pr_specification" in registered_tools

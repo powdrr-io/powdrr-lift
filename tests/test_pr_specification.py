@@ -55,6 +55,7 @@ def _write_existing_pr_specification(repo_root: Path) -> Path:
         feature_ids:
           - feature-a
         intent:
+          problem: Existing PR spec.
           goal: Existing PR spec.
           reasoning: Make sure ids are unique.
         """,
@@ -86,6 +87,7 @@ def _write_proposed_pr_specification(
         feature_ids:
           - {feature_id}
         intent:
+          problem: {goal}
           goal: {goal}
           reasoning: {reasoning}
         acceptance_criteria:
@@ -94,6 +96,9 @@ def _write_proposed_pr_specification(
         expected_tests:
           - id: test-{pr_number}
             description: Expected tests {pr_number}.
+        required_test_cases:
+          - id: rtc-{pr_number}
+            description: Required test case {pr_number}.
         expected_outcomes:
           - id: outcome-{pr_number}
             description: Expected outcome {pr_number}.
@@ -135,6 +140,9 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert "Delete these instructions when you are done." in template_text
     assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
     assert "id: null" in template_text
+    assert "Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`." in (
+        template_text
+    )
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
@@ -144,6 +152,7 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         "intent",
         "acceptance_criteria",
         "expected_tests",
+        "required_test_cases",
         "expected_outcomes",
         "non_goals",
         "risks",
@@ -163,6 +172,7 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
       - feature-missing
 
     intent:
+      problem: Add a new capability.
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
@@ -172,6 +182,9 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
     expected_tests:
       - id: ac-1
         description: Expected test one.
+    required_test_cases:
+      - id: rtc-1
+        description: Required test case one.
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -213,6 +226,7 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
       - feature-b
 
     intent:
+      problem: Add a new capability.
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
@@ -222,6 +236,9 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
     expected_tests:
       - id: test-1
         description: Expected test one.
+    required_test_cases:
+      - id: rtc-1
+        description: Required test case one.
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -255,10 +272,10 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     # - Set `id` to a globally unique proposed PR id.
     # - Reference one or more current feature ids from the codebase state
     #   listed below.
-    # - Fill in `intent.goal` and `intent.reasoning`.
+    # - Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`.
     # - Delete these instructions when you are done.
     # - Add acceptance criteria, expected tests, expected outcomes,
-    #   non-goals, and risks as concrete lists with `id` and
+    #   required test cases, non-goals, and risks as concrete lists with `id` and
     #   `description`.
     #
     # Current feature ids:
@@ -268,6 +285,7 @@ def test_validate_pr_specification_rejects_template_boilerplate(
       - feature-a
 
     intent:
+      problem: Add a new capability.
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
@@ -277,6 +295,9 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     expected_tests:
       - id: test-1
         description: Expected test one.
+    required_test_cases:
+      - id: rtc-1
+        description: Required test case one.
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -312,6 +333,7 @@ def test_validate_pr_specification_rejects_missing_detail_description(
       - feature-a
 
     intent:
+      problem: Add a new capability.
       goal: Add a new capability.
       reasoning: Keep the repo aligned.
 
@@ -321,6 +343,9 @@ def test_validate_pr_specification_rejects_missing_detail_description(
     expected_tests:
       - id: test-1
         description: Expected test one.
+    required_test_cases:
+      - id: rtc-1
+        description: Required test case one.
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -359,6 +384,7 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
           - feature-a
 
         intent:
+          problem: Add a new capability.
           goal: Add a new capability.
           reasoning: Keep the repo aligned.
 
@@ -368,6 +394,9 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
         expected_tests:
           - id: test-1
             description: Expected test one.
+        required_test_cases:
+          - id: rtc-1
+            description: Required test case one.
         expected_outcomes:
           - id: outcome-1
             description: Expected outcome one.

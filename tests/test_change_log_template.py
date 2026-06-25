@@ -3,7 +3,12 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from powdrr_lift import Decision, create_change_log_template, parse_change_log
+from powdrr_lift import (
+    Decision,
+    create_change_log_template,
+    create_change_log_template_from_plan_diff,
+    parse_change_log,
+)
 
 
 def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
@@ -50,6 +55,15 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "invariants:" in template_text
     assert "guidance:" in template_text
     assert "features:" in template_text
+    assert "Use `features` to record feature ids whose state changed in this PR." in (
+        template_text
+    )
+    assert "Use `entities` for every concrete entity lifecycle change." in (
+        template_text
+    )
+    assert "Use `entity_relationships` for every relationship that changes." in (
+        template_text
+    )
     assert "proposed_prs:" in template_text
     assert "    related:" not in template_text
     assert "A src/app.py" in template_text
@@ -77,6 +91,74 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert change_log.feature_changes == []
     assert change_log.proposed_prs == []
     assert change_log.decisions == [Decision()]
+
+
+def test_create_change_log_template_from_plan_diff_prefills_related_sections(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (repo_root / "tests").mkdir()
+    (repo_root / "tests" / "test_app.py").write_text(
+        "def test_app():\n    assert True\n",
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "src/app.py", "tests/test_app.py")
+    _git(repo_root, "commit", "-m", "Add application files")
+
+    plan_diff_path = repo_root / "docs" / "plan-diffs" / "feature" / "plan-diff.yaml"
+    plan_diff_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_diff_path.write_text(
+        """
+        schema: https://powdrr.io/schema/plan-diff-v1
+        feature_plan_path: docs/specs/feature/feature-pr-specification.yaml
+        changelog_paths:
+          - docs/changelogs/PR-1-changelog.yaml
+        differences:
+          - id: required-test-case-missing
+            kind: missing_from_changelog
+            section: required_test_cases
+            description: Missing required test case evidence.
+            plan_value: rtc-1
+            changelog_value: null
+            source_paths:
+              - docs/changelogs/PR-1-changelog.yaml
+            source_spans:
+              - path: tests/test_app.py
+                start_line: 1
+                end_line: 2
+        """,
+        encoding="utf-8",
+    )
+
+    output_path = create_change_log_template_from_plan_diff(
+        branch_name="feature/change-log",
+        plan_diff_path=plan_diff_path,
+        output_path=tmp_path / "change-log.template.yaml",
+        repo_root=repo_root,
+        default_branch="main",
+    )
+
+    template_text = output_path.read_text(encoding="utf-8")
+    change_log = parse_change_log(template_text)
+    test_file = next(
+        file_change
+        for file_change in change_log.file_changes
+        if file_change.path == "tests/test_app.py"
+    )
+    assert test_file.related.required_test_cases == ["rtc-1"]
 
 
 def test_create_change_log_template_populates_full_related_sections(
@@ -189,6 +271,7 @@ def test_create_change_log_template_populates_full_related_sections(
     assert change_log.file_changes[0].related.guidance == []
     assert change_log.file_changes[0].related.acceptance_criteria == []
     assert change_log.file_changes[0].related.expected_tests == []
+    assert change_log.file_changes[0].related.required_test_cases == []
     assert change_log.file_changes[0].related.expected_outcomes == []
     assert change_log.file_changes[0].related.non_goals == []
     assert change_log.file_changes[0].related.risks == []

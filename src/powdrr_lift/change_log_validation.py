@@ -1086,6 +1086,7 @@ def _validate_v2_file_sections(
             ("proposed_prs", available_proposed_pr_ids),
             ("acceptance_criteria", available_proposed_pr_detail_ids),
             ("expected_tests", available_proposed_pr_detail_ids),
+            ("required_test_cases", available_proposed_pr_detail_ids),
             ("expected_outcomes", available_proposed_pr_detail_ids),
             ("non_goals", available_proposed_pr_detail_ids),
             ("risks", available_proposed_pr_detail_ids),
@@ -1511,7 +1512,9 @@ def _collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
 
 
 def _load_available_proposed_pr_detail_ids(repo_root: Path) -> set[str]:
-    return _load_specification_ids(repo_root, "proposed_pr")
+    return _load_specification_ids(repo_root, "proposed_pr") | _load_specification_ids(
+        repo_root, "feature_pr"
+    )
 
 
 def _load_available_rationale_ids(repo_root: Path) -> set[str]:
@@ -1587,6 +1590,7 @@ def _load_specification_ids(repo_root: Path, specification_kind: str) -> set[str
             specification_ids.update(
                 _collect_section_ids(raw_spec, "acceptance_criteria", "id")
                 | _collect_section_ids(raw_spec, "expected_tests", "id")
+                | _collect_section_ids(raw_spec, "required_test_cases", "id")
                 | _collect_section_ids(raw_spec, "expected_outcomes", "id")
                 | _collect_section_ids(raw_spec, "non_goals", "id")
                 | _collect_section_ids(raw_spec, "risks", "id")
@@ -1612,6 +1616,7 @@ def _iter_specification_paths(repo_root: Path, specification_kind: str) -> list[
 
     filename_by_kind = {
         "architecture": "architecture-specification.yaml",
+        "feature_pr": "feature-pr-specification.yaml",
         "system": "system-specification.yaml",
         "implementation": "implementation-specification.yaml",
         "proposed_pr": "proposed-pr-specification.yaml",
@@ -1979,6 +1984,21 @@ def _validate_v2_lifecycle_item(
                 )
             )
 
+    for required_test_case_id in related.required_test_cases:
+        if required_test_case_id not in available_proposed_pr_detail_ids:
+            issues.append(
+                ValidationIssue(
+                    code=f"{item_kind}_related_unknown_required_test_case",
+                    message=(
+                        f"{item_kind.capitalize()} {normalized_item_id or item_index} "
+                        f"references required test case {required_test_case_id}, but "
+                        "that test case is not listed in the current proposed PR "
+                        "specs."
+                    ),
+                    path=path,
+                )
+            )
+
 
 def _validate_v2_state_change(
     *,
@@ -2026,21 +2046,24 @@ def _validate_v2_state_change(
 
 def _load_available_feature_ids(repo_root: Path) -> set[str]:
     feature_ids: set[str] = set()
-    for specification_path in _iter_specification_paths(repo_root, "implementation"):
-        try:
-            raw_spec = _load_yaml_mapping(
-                specification_path.read_text(encoding="utf-8")
-            )
-        except Exception:  # noqa: BLE001
-            continue
+    for specification_kind in ("implementation", "feature_pr"):
+        for specification_path in _iter_specification_paths(
+            repo_root, specification_kind
+        ):
+            try:
+                raw_spec = _load_yaml_mapping(
+                    specification_path.read_text(encoding="utf-8")
+                )
+            except Exception:  # noqa: BLE001
+                continue
 
-        for raw_feature in _parse_sequence(raw_spec.get("features")):
-            feature = _parse_mapping(raw_feature)
-            feature_id = _normalize_entity_id(
-                None if feature.get("id") is None else str(feature.get("id"))
-            )
-            if feature_id is not None:
-                feature_ids.add(feature_id)
+            for raw_feature in _parse_sequence(raw_spec.get("features")):
+                feature = _parse_mapping(raw_feature)
+                feature_id = _normalize_entity_id(
+                    None if feature.get("id") is None else str(feature.get("id"))
+                )
+                if feature_id is not None:
+                    feature_ids.add(feature_id)
 
     return feature_ids
 

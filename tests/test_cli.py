@@ -60,6 +60,41 @@ def test_cli_init_uses_pr_changelog_path(tmp_path: Path) -> None:
     assert "docs/changelogs/PR-123-changelog.yaml" in stdout.getvalue()
 
 
+def test_cli_init_from_plan_diff_writes_template(tmp_path: Path) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    plan_diff_path = repo_root / "docs" / "plan-diffs" / "feature" / "plan-diff.yaml"
+    plan_diff_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_diff_path.write_text(
+        """
+        schema: https://powdrr.io/schema/plan-diff-v1
+        feature_plan_path: docs/specs/feature/feature-pr-specification.yaml
+        changelog_paths:
+          - docs/changelogs/PR-1-changelog.yaml
+        differences: []
+        """,
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "change-log.template.yaml"
+
+    with redirect_stdout(io.StringIO()) as stdout:
+        exit_code = main(
+            [
+                "init-from-plan-diff",
+                "feature/change-log",
+                "--repo-root",
+                str(repo_root),
+                "--plan-diff",
+                str(plan_diff_path),
+                "--output",
+                str(output_path),
+            ]
+        )
+
+    assert exit_code == 0
+    assert output_path.exists()
+    assert str(output_path) in stdout.getvalue()
+
+
 def test_cli_evaluate_reports_validation_failure(tmp_path: Path) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
     proposed_yaml = tmp_path / "proposed-change-log.yaml"

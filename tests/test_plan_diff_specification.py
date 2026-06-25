@@ -41,6 +41,8 @@ def test_build_plan_diff_report_detects_missing_feature_ids(tmp_path: Path) -> N
     ]
     assert report.differences[0].section == "features"
     assert report.differences[0].plan_value == "feature-b"
+    assert report.differences[0].source_spans
+    assert report.differences[0].source_spans[0].path == "src/powdrr_lift/example.py"
 
 
 def test_create_plan_diff_specification_writes_default_file(tmp_path: Path) -> None:
@@ -148,6 +150,10 @@ def _write_changelog(
                 "files": [
                     {
                         "path": "src/powdrr_lift/example.py",
+                        "span": {
+                            "start_line": 1,
+                            "end_line": 1,
+                        },
                         "entities": [],
                         "related": {
                             "acceptance_criteria": ["ac-1"],

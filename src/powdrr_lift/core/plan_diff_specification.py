@@ -25,6 +25,14 @@ class PlanDiffEntry:
     plan_value: str | None = None
     changelog_value: str | None = None
     source_paths: tuple[str, ...] = ()
+    source_spans: tuple[PlanDiffSourceSpan, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PlanDiffSourceSpan:
+    path: str
+    start_line: int
+    end_line: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +106,7 @@ def build_plan_diff_report(
     ]
     changelog_sections = _collect_changelog_sections(changelog_docs)
     related_sections = _collect_changelog_related_sections(changelog_docs)
+    source_spans_by_section = _collect_changelog_source_spans_by_section(changelog_docs)
 
     differences = _collect_differences(
         plan_intent=plan_intent,
@@ -105,6 +114,7 @@ def build_plan_diff_report(
         changelog_docs=changelog_docs,
         changelog_sections=changelog_sections,
         related_sections=related_sections,
+        source_spans_by_section=source_spans_by_section,
         repo_root=repo_root_path,
     )
 
@@ -125,8 +135,15 @@ def render_plan_diff_specification(report: PlanDiffReport) -> str:
         "# Instructions:",
         "# - Compare the feature plan specification to each changelog file.",
         "# - Examine one difference at a time.",
+        "# - Use `source_spans` to point at the file hunks that should carry",
+        "#   the missing changelog evidence whenever such spans exist.",
+        "# - If a difference already has source spans, update those spans in the",
+        "#   changelog first and then make the code change that the span implies.",
+        "# - If a difference has no source spans, make the code change that",
+        "#   would create one before editing the changelog.",
         "# - Make the code changes needed to remove that difference.",
-        "# - Update the changelog after each change set.",
+        "# - Update the changelog after each change set so the changelog and",
+        "#   the plan stay aligned.",
         "# - When all differences are resolved, delete the old changelog and",
         "#   this diff file.",
         "# - Regenerate the changelog template with `powdrr-lift init` and",
@@ -148,6 +165,7 @@ def _collect_differences(
     changelog_docs: Sequence[tuple[Path, Any]],
     changelog_sections: Mapping[str, set[str]],
     related_sections: Mapping[str, set[str]],
+    source_spans_by_section: Mapping[str, tuple[PlanDiffSourceSpan, ...]],
     repo_root: Path,
 ) -> list[PlanDiffEntry]:
     differences: list[PlanDiffEntry] = []
@@ -174,6 +192,10 @@ def _collect_differences(
                     source_paths=(
                         _render_repo_relative_path(changelog_path, repo_root),
                     ),
+                    source_spans=(
+                        source_spans_by_section.get("intent")
+                        or source_spans_by_section.get("all", ())
+                    ),
                 )
             )
 
@@ -195,6 +217,10 @@ def _collect_differences(
                     _render_repo_relative_path(path, repo_root)
                     for path, _ in changelog_docs
                 ),
+                source_spans=(
+                    source_spans_by_section.get(section_name)
+                    or source_spans_by_section.get("all", ())
+                ),
             )
         )
 
@@ -214,6 +240,10 @@ def _collect_differences(
                     _render_repo_relative_path(path, repo_root)
                     for path, _ in changelog_docs
                 ),
+                source_spans=(
+                    source_spans_by_section.get(section_name)
+                    or source_spans_by_section.get("all", ())
+                ),
             )
         )
 
@@ -226,6 +256,7 @@ def _collect_section_differences(
     plan_ids: set[str],
     changelog_ids: set[str],
     source_paths: tuple[str, ...],
+    source_spans: tuple[PlanDiffSourceSpan, ...],
 ) -> list[PlanDiffEntry]:
     differences: list[PlanDiffEntry] = []
 
@@ -241,6 +272,7 @@ def _collect_section_differences(
                 plan_value=item_id,
                 changelog_value=None,
                 source_paths=source_paths,
+                source_spans=source_spans,
             )
         )
 
@@ -256,6 +288,7 @@ def _collect_section_differences(
                 plan_value=None,
                 changelog_value=item_id,
                 source_paths=source_paths,
+                source_spans=source_spans,
             )
         )
 
@@ -351,6 +384,132 @@ def _collect_changelog_related_sections(
                 )
 
     return related_sections
+
+
+def _collect_changelog_source_spans_by_section(
+    changelog_docs: Sequence[tuple[Path, Any]],
+) -> dict[str, tuple[PlanDiffSourceSpan, ...]]:
+    source_spans_by_section: dict[str, list[PlanDiffSourceSpan]] = {
+        "all": [],
+        "intent": [],
+        "features": [],
+        "decisions": [],
+        "entities": [],
+        "entity_relationships": [],
+        "invariants": [],
+        "guidance": [],
+        "acceptance_criteria": [],
+        "expected_tests": [],
+        "required_test_cases": [],
+        "expected_outcomes": [],
+        "non_goals": [],
+        "risks": [],
+    }
+    seen_spans_by_section: dict[str, set[tuple[str, int, int]]] = {
+        section_name: set() for section_name in source_spans_by_section
+    }
+    for _changelog_path, changelog in changelog_docs:
+        for file_change in getattr(changelog, "file_changes", ()):
+            path = getattr(file_change, "path", None)
+            span = getattr(file_change, "span", None)
+            start_line = getattr(span, "start_line", None)
+            end_line = getattr(span, "end_line", None)
+            if (
+                path is None
+                or start_line is None
+                or end_line is None
+                or not isinstance(start_line, int)
+                or not isinstance(end_line, int)
+            ):
+                continue
+
+            key = (str(path), start_line, end_line)
+            span_preview = PlanDiffSourceSpan(
+                path=str(path),
+                start_line=start_line,
+                end_line=end_line,
+            )
+            if key not in seen_spans_by_section["all"]:
+                seen_spans_by_section["all"].add(key)
+                source_spans_by_section["all"].append(span_preview)
+
+            for section_name in _infer_source_span_sections(
+                path=str(path),
+                file_change=file_change,
+            ):
+                if key in seen_spans_by_section[section_name]:
+                    continue
+
+                seen_spans_by_section[section_name].add(key)
+                source_spans_by_section[section_name].append(span_preview)
+
+    return {
+        section_name: tuple(source_spans)
+        for section_name, source_spans in source_spans_by_section.items()
+    }
+
+
+def _infer_source_span_sections(
+    *,
+    path: str,
+    file_change: Any,
+) -> tuple[str, ...]:
+    related = getattr(file_change, "related", None)
+    related_entities = tuple(getattr(related, "entities", ()) if related else ())
+    related_invariants = tuple(getattr(related, "invariants", ()) if related else ())
+    related_guidance = tuple(getattr(related, "guidance", ()) if related else ())
+    related_required_test_cases = tuple(
+        getattr(related, "required_test_cases", ()) if related else ()
+    )
+    related_acceptance_criteria = tuple(
+        getattr(related, "acceptance_criteria", ()) if related else ()
+    )
+    related_expected_tests = tuple(
+        getattr(related, "expected_tests", ()) if related else ()
+    )
+    related_expected_outcomes = tuple(
+        getattr(related, "expected_outcomes", ()) if related else ()
+    )
+    related_non_goals = tuple(getattr(related, "non_goals", ()) if related else ())
+    related_risks = tuple(getattr(related, "risks", ()) if related else ())
+    path_lower = path.lower()
+    sections: list[str] = []
+
+    if "test" in path_lower or related_required_test_cases:
+        sections.append("required_test_cases")
+        sections.append("expected_tests")
+        sections.append("acceptance_criteria")
+        sections.append("expected_outcomes")
+
+    if related_entities:
+        sections.extend(("entities", "entity_relationships"))
+    if related_invariants:
+        sections.append("invariants")
+    if related_guidance:
+        sections.append("guidance")
+    if related_acceptance_criteria:
+        sections.append("acceptance_criteria")
+    if related_expected_tests:
+        sections.append("expected_tests")
+    if related_expected_outcomes:
+        sections.append("expected_outcomes")
+    if related_non_goals:
+        sections.append("non_goals")
+    if related_risks:
+        sections.append("risks")
+    if not sections and path.startswith("docs/"):
+        sections.append("guidance")
+
+    ordered_sections: list[str] = []
+    seen_sections: set[str] = set()
+    for section_name in sections:
+        if section_name in seen_sections:
+            continue
+
+        seen_sections.add(section_name)
+        ordered_sections.append(section_name)
+
+    return tuple(ordered_sections)
 
 
 def _collect_plan_id_set(raw_plan: Mapping[str, Any], section_name: str) -> set[str]:
@@ -452,6 +611,14 @@ def _report_to_data(report: PlanDiffReport) -> dict[str, Any]:
                 "plan_value": difference.plan_value,
                 "changelog_value": difference.changelog_value,
                 "source_paths": list(difference.source_paths),
+                "source_spans": [
+                    {
+                        "path": span.path,
+                        "start_line": span.start_line,
+                        "end_line": span.end_line,
+                    }
+                    for span in difference.source_spans
+                ],
             }
             for difference in report.differences
         ],

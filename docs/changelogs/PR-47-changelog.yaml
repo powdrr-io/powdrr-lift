@@ -1,14 +1,21 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: '47'
-title: Add required test case evidence
+version: 2
+change_id: 47
+title: Add required test case evidence to proposed PR changelogs
 intent:
-  problem: Proposed PRs did not have a dedicated way to declare required test cases,
-    and changelog evidence could not explicitly point back to those cases.
-  goal: Add required test case evidence to proposed PR specs and enforce that changelog
-    related sections can cite those test cases from real changed source hunks.
+  problem: null
+  goal: Strengthen proposed PRs and changelogs so each change includes explicit required
+    test cases and validation proves the evidence points to real changed code.
 decisions:
-- id: required-test-case-evidence
-  summary: Treat required test cases as first-class proposed-PR evidence.
+- id: decision-required-test-cases-are-plan-evidence
+  summary: Treat required test cases as explicit proposed-PR evidence rather than
+    as a free-form note in the changelog.
+- id: decision-validation-is-fail-closed
+  summary: Make changelog validation fail closed when a required test case reference
+    is missing, stale, or disconnected from source.
+- id: decision-preserve-workflow-order
+  summary: Keep the plan, implementation, changelog, and diff workflow order intact
+    and use the diff only to drive code changes.
 structured_files:
 - docs/specs/PR-47/proposed-pr-specification.yaml
 - docs/specs/required-test-cases/feature-pr-specification.yaml
@@ -19,391 +26,2054 @@ files:
   span:
     start_line: 38
     end_line: 38
-  summary: Preserve required test case references while parsing changelog YAML.
-  rationale: The parser must round-trip required test case evidence.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id001
-    - rtc-roundtrip-preserves
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_parser/parse_change_log.py
   type: modified
   span:
     start_line: 389
     end_line: 389
-  summary: Preserve required test case references while parsing changelog YAML.
-  rationale: The parser must round-trip required test case evidence.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id001
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
     start_line: 28
     end_line: 28
-  summary: Render and preserve required test case evidence in generated changelog
-    templates.
-  rationale: The template generator must surface required test cases and keep them
-    during regeneration.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id002
-    - rtc-changelog-linking
-    - rtc-roundtrip-preserves
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 249
-    end_line: 252
-  summary: Render and preserve required test case evidence in generated changelog
-    templates.
-  rationale: The template generator must surface required test cases and keep them
-    during regeneration.
+    start_line: 126
+    end_line: 129
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id002
+    entities:
+    - changelog-template
+    - changelog-code-index
+    - changelog-parser
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 268
-    end_line: 268
-  summary: Render and preserve required test case evidence in generated changelog
-    templates.
-  rationale: The template generator must surface required test cases and keep them
-    during regeneration.
+    start_line: 253
+    end_line: 256
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id002
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 285
-    end_line: 285
-  summary: Render and preserve required test case evidence in generated changelog
-    templates.
-  rationale: The template generator must surface required test cases and keep them
-    during regeneration.
+    start_line: 272
+    end_line: 272
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id002
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 411
-    end_line: 450
-  summary: Render and preserve required test case evidence in generated changelog
-    templates.
-  rationale: The template generator must surface required test cases and keep them
-    during regeneration.
+    start_line: 289
+    end_line: 289
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id002
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_template.py
   type: modified
   span:
-    start_line: 521
-    end_line: 522
-  summary: Render and preserve required test case evidence in generated changelog
-    templates.
-  rationale: The template generator must surface required test cases and keep them
-    during regeneration.
+    start_line: 415
+    end_line: 454
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id002
+    entities:
+    - changelog-template
+    - changelog-code-index
+    - changelog-parser
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 526
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 34
-    end_line: 34
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
+    start_line: 1089
+    end_line: 1089
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id003
-    - rtc-validation-rejects-stale
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 238
-    end_line: 244
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
+    start_line: 1591
+    end_line: 1591
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id003
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/change_log_validation.py
   type: modified
   span:
-    start_line: 640
-    end_line: 654
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
+    start_line: 1984
+    end_line: 1998
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id003
-- path: src/powdrr_lift/change_log_validation.py
-  type: modified
-  span:
-    start_line: 1112
-    end_line: 1112
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
-  related:
-    required_test_cases: *id003
-- path: src/powdrr_lift/change_log_validation.py
-  type: modified
-  span:
-    start_line: 1541
-    end_line: 1587
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
-  related:
-    required_test_cases: *id003
-- path: src/powdrr_lift/change_log_validation.py
-  type: modified
-  span:
-    start_line: 1661
-    end_line: 1661
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
-  related:
-    required_test_cases: *id003
-- path: src/powdrr_lift/change_log_validation.py
-  type: modified
-  span:
-    start_line: 2054
-    end_line: 2068
-  summary: Validate required test case references against the proposal and changed
-    source.
-  rationale: Validation must reject stale or unanchored evidence.
-  related:
-    required_test_cases: *id003
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/code_index.py
   type: modified
   span:
     start_line: 2389
     end_line: 2390
-  summary: Round-trip required test case references through the code index.
-  rationale: The index must not drop evidence links when regenerating related sections.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id004
-    - rtc-roundtrip-preserves
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/code_index.py
   type: modified
   span:
     start_line: 2526
     end_line: 2543
-  summary: Round-trip required test case references through the code index.
-  rationale: The index must not drop evidence links when regenerating related sections.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id004
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/code_index.py
   type: modified
   span:
     start_line: 2718
     end_line: 2736
-  summary: Round-trip required test case references through the code index.
-  rationale: The index must not drop evidence links when regenerating related sections.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id004
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/code_index.py
   type: modified
   span:
     start_line: 2914
     end_line: 2931
-  summary: Round-trip required test case references through the code index.
-  rationale: The index must not drop evidence links when regenerating related sections.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id004
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 112
     end_line: 112
-  summary: Add required test case evidence to proposed PR specifications.
-  rationale: The proposed PR template must declare the evidence that changelogs will
-    cite.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id005
-    - rtc-pr-template
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 114
     end_line: 114
-  summary: Add required test case evidence to proposed PR specifications.
-  rationale: The proposed PR template must declare the evidence that changelogs will
-    cite.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id005
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 131
     end_line: 133
-  summary: Add required test case evidence to proposed PR specifications.
-  rationale: The proposed PR template must declare the evidence that changelogs will
-    cite.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id005
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
     start_line: 290
     end_line: 290
-  summary: Add required test case evidence to proposed PR specifications.
-  rationale: The proposed PR template must declare the evidence that changelogs will
-    cite.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id005
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
-    start_line: 372
-    end_line: 372
-  summary: Add required test case evidence to proposed PR specifications.
-  rationale: The proposed PR template must declare the evidence that changelogs will
-    cite.
+    start_line: 351
+    end_line: 351
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id005
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
 - path: src/powdrr_lift/core/pr_specification.py
   type: modified
   span:
-    start_line: 621
-    end_line: 623
-  summary: Add required test case evidence to proposed PR specifications.
-  rationale: The proposed PR template must declare the evidence that changelogs will
-    cite.
+    start_line: 354
+    end_line: 360
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id005
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 379
+    end_line: 379
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 628
+    end_line: 630
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    non_goals:
+    - ng-no-new-artifact-type
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-legacy-changelogs
+    entities:
+    - pr-specification-validator
+    - proposed-pr-specification
 - path: tests/test_change_log_template.py
   type: modified
   span:
-    start_line: 192
-    end_line: 192
-  summary: Cover template rendering of required test case evidence.
-  rationale: Tests must prove the generator preserves the new related field.
+    start_line: 53
+    end_line: 55
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
     required_test_cases:
+    - rtc-pr-specification
     - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 195
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 156
     end_line: 157
-  summary: Cover validation of required test case evidence.
-  rationale: Tests must prove the validator rejects missing or stale references.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id006
-    - rtc-validation-rejects-stale
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
     - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_change_log_validation.py
   type: modified
   span:
     start_line: 240
-    end_line: 339
-  summary: Cover validation of required test case evidence.
-  rationale: Tests must prove the validator rejects missing or stale references.
+    end_line: 293
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id006
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_change_log_validation.py
   type: modified
   span:
-    start_line: 2061
-    end_line: 2063
-  summary: Cover validation of required test case evidence.
-  rationale: Tests must prove the validator rejects missing or stale references.
+    start_line: 668
+    end_line: 668
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id006
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 768
+    end_line: 768
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 855
+    end_line: 856
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 2009
+    end_line: 2009
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 2019
+    end_line: 2021
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_parse_change_log.py
   type: modified
   span:
     start_line: 97
     end_line: 98
-  summary: Cover parser round-tripping of required test case evidence.
-  rationale: Tests must prove required_test_cases survive YAML parsing.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id007
-    - rtc-roundtrip-preserves
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_parse_change_log.py
   type: modified
   span:
     start_line: 187
     end_line: 187
-  summary: Cover parser round-tripping of required test case evidence.
-  rationale: Tests must prove required_test_cases survive YAML parsing.
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id007
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 97
-    end_line: 99
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 58
+    end_line: 58
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: &id008
-    - rtc-pr-template
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 150
-    end_line: 150
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 90
+    end_line: 90
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 179
-    end_line: 181
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 99
+    end_line: 101
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 232
-    end_line: 234
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 143
+    end_line: 145
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 271
-    end_line: 271
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 155
+    end_line: 155
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 290
-    end_line: 292
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 175
+    end_line: 175
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
-    start_line: 337
-    end_line: 339
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    start_line: 185
+    end_line: 187
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 239
+    end_line: 241
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 275
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 278
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 288
+    end_line: 288
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 300
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 336
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 348
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
 - path: tests/test_pr_specification.py
   type: modified
   span:
     start_line: 387
-    end_line: 389
-  summary: Cover proposed PR specs with required test cases.
-  rationale: Tests must prove the new template section renders and validates.
+    end_line: 387
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
   related:
-    required_test_cases: *id008
-entities: []
-entity_relationships: []
-invariants: []
-guidance: []
-features: []
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 399
+  summary: Update the changelog evidence for required test cases.
+  rationale: Keep the changelog aligned with the required test case evidence workflow and the current codebase state.
+  related:
+    entities:
+    - changelog-code-index
+    - changelog-parser
+    - changelog-template
+    - changelog-validator
+    - pr-specification-validator
+    - proposed-pr-specification
+    invariants:
+    - inv-changelog-required-test-case-reference-valid
+    - inv-evidence-matches-changed-source
+    - inv-required-test-cases-exist-in-pr-spec
+    - inv-roundtrip-preserves-required-test-cases
+    guidance:
+    - guide-only-code-fixes
+    - guide-test-the-evidence-path
+    - guide-use-new-section-first
+    acceptance_criteria:
+    - ac-required-test-cases
+    - ac-changelog-links
+    - ac-validation-rejects-stale-evidence
+    - ac-roundtrip-preserves-evidence
+    expected_tests:
+    - test-pr-specification-required-test-cases
+    - test-changelog-required-test-cases
+    - test-validator-required-test-cases
+    required_test_cases:
+    - rtc-pr-specification
+    - rtc-changelog-linking
+    - rtc-validator-rejects-unknown
+    - rtc-validator-rejects-stale-span
+    expected_outcomes:
+    - outcome-stronger-evidence
+    - outcome-validation-proof
+    non_goals:
+    - ng-no-plan-rewrite
+    - ng-no-new-artifact-type
+    risks:
+    - risk-legacy-changelogs
+    - risk-overstrict-linking
+entities:
+- id: proposed-pr-specification
+  type: Template file
+  action: added
+  description: Proposed PR template that now includes required test cases as an evidence
+    section.
+  rationale: This is the source of truth for what evidence the changelog must cite.
+- id: changelog-template
+  type: Template file
+  action: modified
+  description: Generated changelog template with related sections for changed files.
+  rationale: This template is where evidence links from changed hunks are recorded.
+- id: changelog-validator
+  type: Module
+  action: added
+  description: Validation engine for changelog YAML.
+  rationale: It must enforce the new required test case linkage rules.
+- id: changelog-parser
+  type: Module
+  action: added
+  description: Parser that loads changelog YAML into typed structures.
+  rationale: It must preserve required test case ids so validation and indexing can
+    use them.
+- id: changelog-code-index
+  type: Module
+  action: added
+  description: Code index and round-trip helper for changelog metadata.
+  rationale: It must not drop required test case ids when it rewrites related sections.
+- id: pr-specification-validator
+  type: Module
+  action: added
+  description: Validator for proposed PR templates.
+  rationale: It must accept and validate the new required_test_cases section.
+entity_relationships:
+- id: pr-specification-feeds-changelog-evidence
+  source: proposed-pr-specification
+  target: changelog-template
+  relationship: feeds
+  description: The proposed PR document tells the changelog generator which required
+    tests should exist.
+  rationale: Evidence links in the changelog must trace back to the planned test cases.
+  action: added
+- id: changelog-parser-feeds-validator
+  source: changelog-parser
+  target: changelog-validator
+  relationship: feeds
+  description: Parsed required test case ids are handed to validation.
+  rationale: Validation cannot check references if the parser drops them.
+  action: added
+- id: changelog-code-index-preserves-related-evidence
+  source: changelog-code-index
+  target: changelog-template
+  relationship: supports
+  description: The code index carries required test case evidence through regeneration.
+  rationale: Regeneration should keep the evidence links already discovered in the
+    branch.
+  action: added
+- id: pr-validator-exposes-required-test-cases
+  source: pr-specification-validator
+  target: proposed-pr-specification
+  relationship: validates
+  description: The PR validator must require and validate required_test_cases entries.
+  rationale: The planned evidence should be checked before implementation starts.
+  action: added
+- id: changelog-validator-checks-source-locations
+  source: changelog-validator
+  target: changelog-template
+  relationship: validates
+  description: The changelog validator must verify that required test case references
+    map to real changed source locations.
+  rationale: A required test case reference without a real source span is not usable
+    evidence.
+  action: added
+invariants:
+- id: inv-required-test-cases-exist-in-pr-spec
+  description: Every required_test_cases entry in a proposed PR specification must
+    have both an id and a description.
+  action: added
+  related:
+    entities:
+    - proposed-pr-specification
+    - pr-specification-validator
+  rationale: The changelog can only cite evidence that is explicitly described in
+    the plan.
+- id: inv-changelog-required-test-case-reference-valid
+  description: Every changelog related.required_test_cases entry must resolve to a
+    required_test_cases id in the current proposed PR specifications.
+  action: added
+  related:
+    entities:
+    - changelog-validator
+    - proposed-pr-specification
+  rationale: The validator should reject stale or invented evidence references.
+- id: inv-evidence-matches-changed-source
+  description: Every required test case reference in a changelog must be tied to a
+    changed source file span that exists in the branch diff.
+  action: added
+  related:
+    entities:
+    - changelog-template
+    - changelog-validator
+  rationale: Evidence needs to point at the actual code that changed.
+- id: inv-roundtrip-preserves-required-test-cases
+  description: Required test case ids must survive parser, template, and index round-trips
+    unchanged.
+  action: added
+  related:
+    entities:
+    - changelog-parser
+    - changelog-code-index
+  rationale: Dropping evidence references would make regenerated changelogs incomplete.
+guidance:
+- id: guide-use-new-section-first
+  description: Add the required_test_cases section to the proposed PR spec before
+    wiring changelog validation against it.
+  action: added
+  related:
+    entities:
+    - proposed-pr-specification
+    - changelog-validator
+  rationale: The validator needs a source of truth before the changelog can cite it.
+- id: guide-only-code-fixes
+  description: If the plan diff shows a mismatch, change the implementation code instead
+    of rewriting the plan or changelog to make the mismatch disappear.
+  action: added
+  related:
+    entities:
+    - changelog-validator
+    - changelog-code-index
+  rationale: The workflow should close real gaps, not hide them.
+- id: guide-test-the-evidence-path
+  description: Add tests that fail when required test case ids are missing, malformed,
+    or disconnected from changed source hunks.
+  action: added
+  related:
+    entities:
+    - pr-specification-validator
+    - changelog-parser
+  rationale: The new evidence path is only trustworthy if validation covers the failure
+    modes.
+features:
+- id: feature-required-test-cases
+  state: completed
+- id: feature-required-test-case-validation
+  state: completed
+- id: feature-roundtrip-evidence-preservation
+  state: completed
 proposed_prs: []

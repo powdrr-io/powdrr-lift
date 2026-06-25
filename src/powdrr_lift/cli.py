@@ -17,6 +17,7 @@ from powdrr_lift.core import (
     codebase_state_default_output_path,
     create_architecture_specification_template,
     create_change_log_template,
+    create_change_log_template_from_plan_diff,
     create_codebase_state,
     create_current_state_specification,
     create_feature_pr_specification_template,
@@ -92,6 +93,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the default branch name.",
     )
     init_parser.set_defaults(func=_run_init)
+
+    init_from_plan_diff_parser = subparsers.add_parser(
+        "init-from-plan-diff",
+        aliases=["init_from_plan_diff"],
+        help="Generate a ChangeLog template from a plan diff specification.",
+    )
+    init_from_plan_diff_parser.add_argument(
+        "branch_name",
+        nargs="?",
+        help="Branch name to compare against the default branch.",
+    )
+    init_from_plan_diff_parser.add_argument(
+        "--plan-diff",
+        type=Path,
+        required=True,
+        help="Plan diff specification to use when pre-filling related sections.",
+    )
+    init_from_plan_diff_parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write the template to this path instead of the default file.",
+    )
+    init_from_plan_diff_parser.add_argument(
+        "--pr-number",
+        type=int,
+        help=(
+            "Write the template to docs/changelogs/PR-<num>-changelog.yaml and "
+            "print the next workflow step."
+        ),
+    )
+    init_from_plan_diff_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running git commands.",
+    )
+    init_from_plan_diff_parser.add_argument(
+        "--default-branch",
+        help="Override the default branch name.",
+    )
+    init_from_plan_diff_parser.set_defaults(func=_run_init_from_plan_diff)
 
     evaluate_parser = subparsers.add_parser(
         "evaluate-pr-against-changelog",
@@ -789,6 +830,31 @@ def _run_init(args: argparse.Namespace) -> int:
     output_path = _resolve_template_output_path(repo_root, args.output, args.pr_number)
     output_path = create_change_log_template(
         branch_name=branch_name,
+        output_path=output_path,
+        repo_root=repo_root,
+        default_branch=args.default_branch,
+    )
+    print(output_path)
+    if args.pr_number is not None:
+        print("Next: fill out the template according to the instructions in the file.")
+        print(
+            "Then validate it with: "
+            f"powdrr-lift evaluate-pr-against-changelog --pr-number {args.pr_number}"
+        )
+        print(
+            "When it passes, include it in the PR as "
+            f"docs/changelogs/PR-{args.pr_number}-changelog.yaml"
+        )
+    return 0
+
+
+def _run_init_from_plan_diff(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    branch_name = args.branch_name or _current_branch(repo_root)
+    output_path = _resolve_template_output_path(repo_root, args.output, args.pr_number)
+    output_path = create_change_log_template_from_plan_diff(
+        branch_name=branch_name,
+        plan_diff_path=args.plan_diff,
         output_path=output_path,
         repo_root=repo_root,
         default_branch=args.default_branch,

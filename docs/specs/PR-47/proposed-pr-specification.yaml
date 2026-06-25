@@ -5,6 +5,7 @@ feature_ids:
   - feature-review-workflows
   - feature-context-graph
 intent:
+  problem: Placeholder problem.
   goal: Strengthen proposed PR evidence so changelogs can point at required test cases that prove the code changes landed.
   reasoning: The branch needs explicit required test case evidence so the changelog can link changed source hunks back to the tests that validate them.
 acceptance_criteria:

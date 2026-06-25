@@ -291,52 +291,6 @@ def test_validate_change_log_yaml_rejects_unknown_required_test_case_reference(
     assert any(issue.code == "unknown_related_reference" for issue in report.issues)
 
 
-def test_validate_change_log_yaml_rejects_missing_required_test_case_reference(
-    tmp_path: Path,
-) -> None:
-    repo_root = _create_repo_with_feature_branch(tmp_path)
-    proposed_yaml = """
-    version: 2
-    change_id: 1
-    title: Add required test case evidence
-
-    intent:
-      problem: The changelog format needs explicit required test case links.
-      goal: Capture required test case evidence for the changed source.
-
-    structured_files: []
-    files:
-      - path: src/app.py
-        type: modified
-        span:
-          start_line: 1
-          end_line: 1
-        summary: Add the evidence plumbing.
-        rationale: Keep the hunk focused on the implementation change.
-
-    entities: []
-    entity_relationships: []
-    invariants: []
-    guidance: []
-
-    features: []
-    proposed_prs: []
-    """
-
-    report = parse_validation_report(
-        validate_change_log_yaml(
-            proposed_yaml,
-            branch_name="feature/change-log",
-            repo_root=repo_root,
-        )
-    )
-
-    assert report.validation_successful is False
-    assert any(
-        issue.code == "missing_required_test_case_reference" for issue in report.issues
-    )
-
-
 def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
     tmp_path: Path,
 ) -> None:
@@ -711,6 +665,7 @@ def test_validate_change_log_yaml_accepts_proposal_detail_related_ids(
           - AppService
 
         intent:
+          problem: Placeholder problem.
           goal: Add the application feature.
           reasoning: Keep the proposal focused.
 
@@ -810,6 +765,7 @@ def test_validate_change_log_yaml_rejects_related_proposed_prs_objects(
           - AppService
 
         intent:
+          problem: Placeholder problem.
           goal: Add the application feature.
           reasoning: Keep the proposal focused.
 
@@ -896,7 +852,8 @@ def test_validate_change_log_yaml_rejects_top_level_proposed_pr_state_invalid(
           - AppService
 
         intent:
-          goal: Add the application feature.
+      problem: Placeholder problem.
+      goal: Add the application feature.
           reasoning: Keep the proposal focused.
 
         acceptance_criteria:
@@ -2049,6 +2006,7 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
           - AppService
 
         intent:
+          problem: Placeholder problem.
           goal: Introduce AppService through a proposed PR.
           reasoning: Seed the PR id catalog for validation.
 

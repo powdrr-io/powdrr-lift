@@ -10,6 +10,7 @@ decisions:
 - id: required-test-case-evidence
   summary: Treat required test cases as first-class proposed-PR evidence.
 structured_files:
+- docs/specs/PR-47/proposed-pr-specification.yaml
 - docs/specs/required-test-cases/feature-pr-specification.yaml
 - docs/specs/required-test-cases/system-map-specification.yaml
 files:

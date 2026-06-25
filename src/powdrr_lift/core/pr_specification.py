@@ -106,7 +106,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Set `id` to a globally unique proposed PR id.",
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
-        "# - Fill in `intent.goal` and `intent.reasoning`.",
+        "# - Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`.",
         "# - Delete these instructions when you are done.",
         "# - Add acceptance criteria, expected tests, expected outcomes,",
         "#   required test cases, non-goals, and risks as concrete lists with `id` and",
@@ -348,9 +348,16 @@ def build_pr_specification_validation_report(
         path="intent",
         issues=issues,
         issue_code="invalid_intent_section",
-        issue_message="intent must be a mapping with goal and reasoning.",
+        issue_message="intent must be a mapping with problem, goal, and reasoning.",
     )
     if intent is not None:
+        _required_string(
+            intent.get("problem"),
+            path="intent.problem",
+            issues=issues,
+            issue_code="intent_problem_missing",
+            issue_message="The intent.problem field is required.",
+        )
         _required_string(
             intent.get("goal"),
             path="intent.goal",

@@ -50,6 +50,9 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "invariants:" in template_text
     assert "guidance:" in template_text
     assert "features:" in template_text
+    assert "Use `features` to record feature ids whose state changed in this PR." in (
+        template_text
+    )
     assert "proposed_prs:" in template_text
     assert "    related:" not in template_text
     assert "A src/app.py" in template_text

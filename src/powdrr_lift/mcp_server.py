@@ -13,6 +13,7 @@ from powdrr_lift.core import (
     codebase_state_default_output_path,
     create_architecture_specification_template,
     create_change_log_template,
+    create_change_log_template_from_plan_diff,
     create_codebase_state,
     create_current_state_specification,
     create_feature_pr_specification_template,
@@ -52,6 +53,9 @@ from powdrr_lift.core import (
 from powdrr_lift.core import (
     create_plan_diff_specification as _create_plan_diff_specification,
 )
+from powdrr_lift.core import (
+    start_planning_feature as _start_planning_feature,
+)
 
 
 def _load_fastmcp() -> Any:
@@ -84,6 +88,24 @@ def build_server() -> Any:
         repo_root_path = resolve_repo_root(repo_root)
         rendered_output_path = create_change_log_template(
             branch_name=branch_name,
+            output_path=None if output_path is None else Path(output_path),
+            repo_root=repo_root_path,
+            default_branch=default_branch,
+        )
+        return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def init_change_log_template_from_plan_diff(
+        branch_name: str,
+        plan_diff_path: str,
+        output_path: str | None = None,
+        repo_root: str | None = None,
+        default_branch: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        rendered_output_path = create_change_log_template_from_plan_diff(
+            branch_name=branch_name,
+            plan_diff_path=Path(plan_diff_path),
             output_path=None if output_path is None else Path(output_path),
             repo_root=repo_root_path,
             default_branch=default_branch,
@@ -359,6 +381,17 @@ def build_server() -> Any:
             title=title,
         )
         return rendered_output_path.read_text(encoding="utf-8")
+
+    @server.tool()
+    def start_planning_feature(
+        work_item_name: str,
+        repo_root: str | None = None,
+    ) -> str:
+        repo_root_path = resolve_repo_root(repo_root)
+        return _start_planning_feature(
+            work_item_name=work_item_name,
+            repo_root=repo_root_path,
+        )
 
     @server.tool()
     def create_pr_specification(

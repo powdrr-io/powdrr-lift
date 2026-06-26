@@ -81,6 +81,7 @@ from powdrr_lift.core.feature_planning_specification import (
     feature_pr_specification_default_output_path,
     render_feature_pr_specification_template,
     render_system_map_specification_template,
+    start_planning_feature,
     system_map_specification_default_output_path,
 )
 from powdrr_lift.core.implementation_specification import (
@@ -155,6 +156,7 @@ from powdrr_lift.core.system_specification import (
 )
 from powdrr_lift.core.template import (
     create_change_log_template,
+    create_change_log_template_from_plan_diff,
     render_change_log_template,
 )
 
@@ -251,6 +253,7 @@ _EXPORTS: dict[str, str] = {
     "collect_branch_diff_entries": _PR_ANALYSIS,
     "create_architecture_specification_template": _ARCHITECTURE,
     "create_change_log_template": _TEMPLATE,
+    "create_change_log_template_from_plan_diff": _TEMPLATE,
     "create_codebase_state": _CODEBASE_STATE,
     "create_feature_pr_specification_template": _FEATURE_PLANNING,
     "create_current_state_specification": _CODEBASE_STATE,
@@ -258,6 +261,7 @@ _EXPORTS: dict[str, str] = {
     "create_pr_specification_template": _PR_SPECIFICATION,
     "create_system_map_specification_template": _FEATURE_PLANNING,
     "create_system_specification_template": _SYSTEM,
+    "start_planning_feature": _FEATURE_PLANNING,
     "implementation_specification_default_output_path": _IMPLEMENTATION,
     "lookup_code_provenance": _CODE_INDEX,
     "lookup_code_provenance_span": _CODE_INDEX,

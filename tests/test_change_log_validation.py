@@ -206,6 +206,8 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         related:
           entities:
             - TestSuite
+          required_test_cases:
+            - rtc-1
 
     entities:
       - id: AppServiceEntity
@@ -286,6 +288,60 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         "tests/test_app.py",
         "docs/specs/powdrr-lift/implementation-specification.yaml",
     ]
+
+
+def test_validate_change_log_yaml_rejects_unknown_required_test_case_reference(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files: []
+    files:
+      - path: src/app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add the review skill wiring.
+        rationale: Keep the first hunk focused on the skill metadata.
+      - path: tests/test_app.py
+        type: modified
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add the review workflow test.
+        rationale: Keep the second hunk focused on the test harness.
+        related:
+          required_test_cases:
+            - rtc-999
+
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+
+    features: []
+    proposed_prs: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "unknown_related_reference" for issue in report.issues)
 
 
 def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
@@ -662,6 +718,7 @@ def test_validate_change_log_yaml_accepts_proposal_detail_related_ids(
           - AppService
 
         intent:
+          problem: Placeholder problem.
           goal: Add the application feature.
           reasoning: Keep the proposal focused.
 
@@ -761,6 +818,7 @@ def test_validate_change_log_yaml_rejects_related_proposed_prs_objects(
           - AppService
 
         intent:
+          problem: Placeholder problem.
           goal: Add the application feature.
           reasoning: Keep the proposal focused.
 
@@ -847,7 +905,8 @@ def test_validate_change_log_yaml_rejects_top_level_proposed_pr_state_invalid(
           - AppService
 
         intent:
-          goal: Add the application feature.
+      problem: Placeholder problem.
+      goal: Add the application feature.
           reasoning: Keep the proposal focused.
 
         acceptance_criteria:
@@ -2000,6 +2059,7 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
           - AppService
 
         intent:
+          problem: Placeholder problem.
           goal: Introduce AppService through a proposed PR.
           reasoning: Seed the PR id catalog for validation.
 
@@ -2009,6 +2069,9 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
         expected_tests:
           - id: test-1
             description: The new service is covered by a test.
+        required_test_cases:
+          - id: rtc-1
+            description: The test case is linked from the changelog.
         expected_outcomes:
           - id: outcome-1
             description: The repo has a current proposed PR id.

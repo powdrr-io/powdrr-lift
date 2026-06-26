@@ -9,10 +9,12 @@ Subagent (general-purpose):
   prompt: |
     You are reviewing the feature plan diff and reconciling it with the changelog.
     Your job is to make the plan diff clean using only code changes or changelog changes.
+    If you are assigned an invariant, your job is also to verify that all changes still satisfy that one invariant.
 
     ## What Was Requested
     Read the feature plan specification and the current changelog artifacts.
     Global constraints that bind this run: [GLOBAL_CONSTRAINTS]
+    Invariant under review, if any: [INVARIANT_ID_AND_TEXT]
 
     ## Required Workflow
     1. Generate a fresh changelog with the CLI:
@@ -20,9 +22,10 @@ Subagent (general-purpose):
     2. Generate the plan diff with the CLI:
        `powdrr-lift plan-diff --feature-plan-specification <path> --changelog <path>`
     3. Inspect the diff and identify any mismatches.
-    4. Fix only code or changelog content.
-    5. Regenerate the changelog and plan diff.
-    6. Repeat until the diff is clean.
+    4. If an invariant is assigned, review all changes against that invariant and call out any violation.
+    5. Fix only code or changelog content.
+    6. Regenerate the changelog and plan diff.
+    7. Repeat until the diff is clean and the invariant still holds.
 
     ## Hard Rules
     - Never change the specification at this stage.

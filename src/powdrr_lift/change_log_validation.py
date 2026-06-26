@@ -20,6 +20,7 @@ from powdrr_lift.change_log_parser import (
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
     _collect_branch_diff_entries,
+    _current_branch,
     _is_structured_document_path,
     _resolve_default_branch,
     _resolve_repo_root,
@@ -53,7 +54,7 @@ class ValidationReport:
 
 def validate_change_log_yaml(
     proposed_change_log_yaml: str,
-    branch_name: str,
+    branch_name: str | None = None,
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> str:
@@ -68,12 +69,16 @@ def validate_change_log_yaml(
 
 def build_validation_report(
     proposed_change_log_yaml: str,
-    branch_name: str,
+    branch_name: str | None = None,
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> ValidationReport:
     repo_root_path = _resolve_repo_root(repo_root)
-    default_branch_name = default_branch or _resolve_default_branch(repo_root_path)
+    branch_name = branch_name or _current_branch(repo_root_path)
+    default_branch_name = default_branch or _resolve_default_branch(
+        repo_root_path,
+        branch_name=branch_name,
+    )
     diff_entries = _collect_branch_diff_entries(
         repo_root_path,
         default_branch_name,

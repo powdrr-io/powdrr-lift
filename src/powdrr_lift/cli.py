@@ -844,10 +844,9 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run_init(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    branch_name = args.branch_name or _current_branch(repo_root)
     output_path = _resolve_template_output_path(repo_root, args.output, args.pr_number)
     output_path = create_change_log_template(
-        branch_name=branch_name,
+        branch_name=args.branch_name,
         output_path=output_path,
         repo_root=repo_root,
         default_branch=args.default_branch,
@@ -893,12 +892,11 @@ def _run_init_from_plan_diff(args: argparse.Namespace) -> int:
 
 def _run_evaluate(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    branch_name = args.branch_name or _current_branch(repo_root)
     input_path = _resolve_template_input_path(repo_root, args.input, args.pr_number)
     proposed_yaml = _read_input(input_path)
     report_yaml = validate_change_log_yaml(
         proposed_yaml,
-        branch_name=branch_name,
+        branch_name=args.branch_name,
         repo_root=repo_root,
         default_branch=args.default_branch,
     )

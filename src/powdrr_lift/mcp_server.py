@@ -80,7 +80,7 @@ def build_server() -> Any:
 
     @server.tool()
     def init_change_log_template(
-        branch_name: str,
+        branch_name: str | None = None,
         output_path: str | None = None,
         repo_root: str | None = None,
         default_branch: str | None = None,
@@ -115,7 +115,7 @@ def build_server() -> Any:
     @server.tool()
     def evaluate_pr_against_changelog(
         proposed_change_log_yaml: str,
-        branch_name: str,
+        branch_name: str | None = None,
         repo_root: str | None = None,
         default_branch: str | None = None,
     ) -> str:

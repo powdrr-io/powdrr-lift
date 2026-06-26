@@ -61,6 +61,59 @@ def test_validate_change_log_yaml_reports_success_when_changes_match(
     assert report.proposed_change_files == ["src/app.py", "tests/test_app.py"]
 
 
+def test_validate_change_log_yaml_autodetects_current_branch(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    proposed_yaml = """
+    version: 1
+    change_id: 7
+    title: Add application files
+
+    intent:
+      problem: Missing files
+      goal: Ship the new files
+
+    decisions:
+      - id: ADR-100
+        summary: Add files directly
+
+    entities:
+      - id: AppService
+        type: Service
+        action: added
+
+    changes:
+      - file: src/app.py
+        span:
+          start_line: 1
+          end_line: 1
+        summary: Add app code
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+      - file: tests/test_app.py
+        span:
+          start_line: 1
+          end_line: 2
+        summary: Add app test
+        affects:
+          - AppService
+        rationale: Needed for the feature.
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.expected_change_files == ["src/app.py", "tests/test_app.py"]
+    assert report.proposed_change_files == ["src/app.py", "tests/test_app.py"]
+
+
 def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     tmp_path: Path,
 ) -> None:

@@ -31,27 +31,31 @@ class RelatedSectionPreview:
 
 
 def create_change_log_template(
-    branch_name: str,
+    branch_name: str | None = None,
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
+    resolved_branch_name = branch_name or _current_branch(repo_root_path)
     output_path = _resolve_output_path(repo_root_path, output_path)
-    default_branch_name = default_branch or _resolve_default_branch(repo_root_path)
+    default_branch_name = default_branch or _resolve_default_branch(
+        repo_root_path,
+        branch_name=resolved_branch_name,
+    )
     diff_entries = _collect_branch_diff_entries(
         repo_root_path,
         default_branch_name,
-        branch_name,
+        resolved_branch_name,
     )
     related_sections_by_entry = _collect_related_sections_by_entry(
         repo_root_path,
-        branch_name,
+        resolved_branch_name,
         default_branch_name,
         diff_entries,
     )
     template = render_change_log_template(
-        branch_name=branch_name,
+        branch_name=resolved_branch_name,
         default_branch_name=default_branch_name,
         diff_entries=diff_entries,
         related_sections_by_entry=related_sections_by_entry,
@@ -621,7 +625,10 @@ def _resolve_output_path(repo_root: Path, output_path: str | Path | None) -> Pat
     return resolved_output
 
 
-def _resolve_default_branch(repo_root: Path) -> str:
+def _resolve_default_branch(
+    repo_root: Path,
+    branch_name: str | None = None,
+) -> str:
     try:
         head_reference = _git_output(
             repo_root,
@@ -638,48 +645,97 @@ def _resolve_default_branch(repo_root: Path) -> str:
     try:
         remote_output = _git_output(repo_root, "remote", "show", "origin")
     except subprocess.CalledProcessError:
-        local_branch = _resolve_local_default_branch(repo_root)
-        return local_branch or "main"
+        resolved_branch = branch_name or _current_branch(repo_root)
+        local_branch = _resolve_local_base_branch(repo_root, resolved_branch)
+        return local_branch or resolved_branch
 
     for line in remote_output.splitlines():
         if line.startswith("  HEAD branch: "):
             return line.partition(": ")[2].strip()
 
-    local_branch = _resolve_local_default_branch(repo_root)
-    return local_branch or "main"
+    resolved_branch = branch_name or _current_branch(repo_root)
+    local_branch = _resolve_local_base_branch(repo_root, resolved_branch)
+    return local_branch or resolved_branch
 
 
-def _resolve_local_default_branch(repo_root: Path) -> str | None:
+def _resolve_local_base_branch(
+    repo_root: Path,
+    branch_name: str,
+) -> str | None:
     try:
-        local_branches = {
+        local_branches = [
             line.strip()
             for line in _git_output(
                 repo_root,
                 "for-each-ref",
+                "--sort=-committerdate",
                 "--format=%(refname:short)",
                 "refs/heads",
             ).splitlines()
             if line.strip()
-        }
+        ]
     except subprocess.CalledProcessError:
-        local_branches = set()
+        local_branches = []
 
-    for candidate in ("master", "main", "trunk", "develop"):
-        if candidate in local_branches:
-            return candidate
+    for candidate in local_branches:
+        if not candidate or candidate == branch_name:
+            continue
+        if not _is_conventional_base_branch_name(candidate):
+            continue
 
-    try:
-        current_branch = _git_output(
-            repo_root,
-            "symbolic-ref",
-            "--quiet",
-            "--short",
-            "HEAD",
-        ).strip()
-    except subprocess.CalledProcessError:
-        return None
+        try:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "merge-base",
+                    "--is-ancestor",
+                    candidate,
+                    branch_name,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            continue
 
-    return current_branch or None
+        return candidate
+
+    for candidate in local_branches:
+        if not candidate or candidate == branch_name:
+            continue
+
+        try:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "merge-base",
+                    "--is-ancestor",
+                    candidate,
+                    branch_name,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            continue
+
+        return candidate
+
+    return None
+
+
+def _is_conventional_base_branch_name(branch_name: str) -> bool:
+    return branch_name in {"main", "master", "trunk", "develop"}
+
+
+def _current_branch(repo_root: Path) -> str:
+    return _git_output(repo_root, "branch", "--show-current").strip()
 
 
 def _git_output(repo_root: Path, *args: str) -> str:
@@ -741,10 +797,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     print(output_path)
     return 0
-
-
-def _current_branch(repo_root: Path) -> str:
-    return _git_output(repo_root, "branch", "--show-current").strip()
 
 
 if __name__ == "__main__":

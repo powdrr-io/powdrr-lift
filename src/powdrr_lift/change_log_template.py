@@ -638,13 +638,48 @@ def _resolve_default_branch(repo_root: Path) -> str:
     try:
         remote_output = _git_output(repo_root, "remote", "show", "origin")
     except subprocess.CalledProcessError:
-        return "main"
+        local_branch = _resolve_local_default_branch(repo_root)
+        return local_branch or "main"
 
     for line in remote_output.splitlines():
         if line.startswith("  HEAD branch: "):
             return line.partition(": ")[2].strip()
 
-    return "main"
+    local_branch = _resolve_local_default_branch(repo_root)
+    return local_branch or "main"
+
+
+def _resolve_local_default_branch(repo_root: Path) -> str | None:
+    try:
+        local_branches = {
+            line.strip()
+            for line in _git_output(
+                repo_root,
+                "for-each-ref",
+                "--format=%(refname:short)",
+                "refs/heads",
+            ).splitlines()
+            if line.strip()
+        }
+    except subprocess.CalledProcessError:
+        local_branches = set()
+
+    for candidate in ("master", "main", "trunk", "develop"):
+        if candidate in local_branches:
+            return candidate
+
+    try:
+        current_branch = _git_output(
+            repo_root,
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "HEAD",
+        ).strip()
+    except subprocess.CalledProcessError:
+        return None
+
+    return current_branch or None
 
 
 def _git_output(repo_root: Path, *args: str) -> str:

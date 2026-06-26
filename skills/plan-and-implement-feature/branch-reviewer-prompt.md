@@ -10,7 +10,7 @@ Subagent (general-purpose):
     You are reviewing the full branch after all task-level work is complete.
 
     ## What Was Requested
-    Read the feature contract, system map, plan diff, and changelog artifacts that define the run.
+    Read the feature contract, system map, changelog, and plan diff artifacts that define the run.
     Global constraints that bind the branch: [GLOBAL_CONSTRAINTS]
 
     ## Diff Under Review
@@ -24,7 +24,8 @@ Subagent (general-purpose):
 
     ## Review Rules
     - Judge the branch as a whole, not one task at a time.
-    - Look for integration gaps, duplicated logic, missing coverage, and mismatches between the completed artifacts.
+    - Look for integration gaps, duplicated logic, missing coverage, and mismatches between the feature contract, changelog, and plan diff.
+    - Verify that the changelog build step, plan-diff reconciliation step, and code-only fix loop all converge on the same final branch state.
     - Cite file:line for every finding.
     - This is the final gate before wrap-up.
 

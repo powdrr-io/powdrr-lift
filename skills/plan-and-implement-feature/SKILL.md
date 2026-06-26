@@ -36,7 +36,10 @@ Use this skill when you need to take a feature from discovery through implementa
 2. Build the system map.
    - Dispatch a fresh subagent to own this phase.
    - Run `powdrr-lift system-map-specification --work-item-name <work-item-name>`.
-   - If using MCP, call `create_system_map_specification`.
+   - If using MCP, call `create_system_map_specification`, which should look through the current index and prepopulate all sections from what exists on the current branch.
+   - Check recent branches to see whether most of them already include a changelog or are very simple (<100 lines of source changed).
+   - If so, have the produced file say, "This file is already complete, delete this line and then move on to the next step".
+   - Otherwise keep the normal system-map instructions.
    - Fill the sections one at a time, verify each section, and remove instructions when done.
 3. Build the feature and PR template.
    - Dispatch a fresh subagent to own this phase.

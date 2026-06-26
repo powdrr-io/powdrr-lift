@@ -68,6 +68,7 @@ Use this skill when you need to take a feature from discovery through implementa
    - If using MCP, call `create_plan_diff_specification`.
    - Compare the filled feature plan specification against the changelog files.
    - Dispatch a fresh feature reviewer subagent using `feature-reviewer-prompt.md` and have that subagent drive the diff cleanup loop.
+   - For every invariant in the feature specification, dispatch a separate invariant-review subagent using `feature-reviewer-prompt.md` to review all changes against that one invariant.
    - Treat each difference as a code-only or changelog-only task and run it through the same implementer/reviewer loop.
    - Never change the specification at this point.
    - Keep iterating until the plan diff is clean.

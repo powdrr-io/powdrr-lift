@@ -59,9 +59,7 @@ Use this skill when you need to take a feature from discovery through implementa
 5. Prepare the PR changelog.
    - Run `powdrr-lift init --pr-number <num>`.
    - If the plan diff already exists, use it to guide the changelog fill instead of starting over from memory.
-   - If using MCP, call the changelog template endpoint that looks through the current index and prepopulates every section from what exists on the current branch.
-   - If the branch already looks complete or is a small source-only change, have that endpoint emit the compact instruction-only template that says, "This file is already complete, delete this line and then move on to the next step."
-   - Otherwise keep the normal changelog instructions.
+   - If using MCP, call the changelog template endpoint available in this repo.
    - Fill the changelog from the implemented code changes.
 6. Generate the plan diff.
    - Run `powdrr-lift plan-diff --feature-plan-specification <path> --changelog <path>`.

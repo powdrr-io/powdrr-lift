@@ -1,7 +1,7 @@
 interface:
   display_name: "Plan And Implement Feature"
-  short_description: "Plan, implement, and validate features"
-  default_prompt: "Use $plan-and-implement-feature to generate the system map, generate the feature+PR template, implement the requested change, generate the changelog, generate the plan diff, make code-only fixes until the diff is empty, and validate the changelog before saying it is done."
+  short_description: "Plan and implement features with subagents"
+  default_prompt: "Use $plan-and-implement-feature to plan the system map and feature+PR template, keep a durable run ledger, dispatch a fresh implementer subagent per task, review each task with a fresh reviewer subagent, reconcile plan-diff gaps as code-only tasks, run a final branch-wide reviewer subagent, and validate the changelog before saying it is done."
 
 policy:
   allow_implicit_invocation: true

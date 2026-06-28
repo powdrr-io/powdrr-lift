@@ -22,6 +22,7 @@ class BranchDiffEntry:
 @dataclass(frozen=True, slots=True)
 class RelatedSectionPreview:
     entities: tuple[str, ...] = ()
+    decisions: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
     guidance: tuple[str, ...] = ()
     proposed_prs: tuple[str, ...] = ()
@@ -171,8 +172,10 @@ def _render_template_body(
         "  problem: null",
         "  # Describe the intended outcome.",
         "  goal: null",
+        "# Put ALL CREATIVE AND DESIGN DECISIONS MADE BY THE HUMAN OPERATOR",
+        "# in `human-decisions`.",
         "# List each decision or ADR used by this change.",
-        "decisions:",
+        "human-decisions:",
         "  -",
         "    # Decision identifier, such as an ADR number.",
         "    id: null",
@@ -192,6 +195,9 @@ def _render_template_body(
         "# entity ids in `related.entities` or the explicit relationship entry",
         "# in `entity_relationships`, whichever most directly describes the",
         "# change.",
+        "# When a file change depends on a human decision, put that decision id",
+        "# in `related.decisions` and make sure any input decisions are",
+        "# explicitly referenced in that block.",
         "# If this change was based on earlier proposed PRs, record those PR ids",
         "# under `related.proposed_prs`.",
         "# Use `features` to record feature ids whose state changed in this PR.",
@@ -317,6 +323,7 @@ def _collect_related_sections_by_entry(
         related_sections_by_entry.append(
             RelatedSectionPreview(
                 entities=tuple(related_entities),
+                decisions=(),
                 invariants=_collect_related_lifecycle_ids(
                     source_index.documents,
                     item_kind="invariant",
@@ -370,6 +377,7 @@ def _merge_related_sections_by_plan_diff(
     for difference in _parse_plan_diff_differences(plan_diff_report):
         if difference.section not in {
             "entities",
+            "decisions",
             "invariants",
             "guidance",
             "acceptance_criteria",
@@ -466,6 +474,37 @@ def _merge_related_section_preview(
     if section_name == "entities":
         return RelatedSectionPreview(
             entities=_dedupe_string_values([*related_section.entities, value]),
+            decisions=related_section.decisions,
+            invariants=related_section.invariants,
+            guidance=related_section.guidance,
+            proposed_prs=related_section.proposed_prs,
+            acceptance_criteria=related_section.acceptance_criteria,
+            expected_tests=related_section.expected_tests,
+            required_test_cases=related_section.required_test_cases,
+            expected_outcomes=related_section.expected_outcomes,
+            non_goals=related_section.non_goals,
+            risks=related_section.risks,
+        )
+
+    if section_name == "decisions":
+        return RelatedSectionPreview(
+            entities=related_section.entities,
+            decisions=_dedupe_string_values([*related_section.decisions, value]),
+            invariants=related_section.invariants,
+            guidance=related_section.guidance,
+            proposed_prs=related_section.proposed_prs,
+            acceptance_criteria=related_section.acceptance_criteria,
+            expected_tests=related_section.expected_tests,
+            required_test_cases=related_section.required_test_cases,
+            expected_outcomes=related_section.expected_outcomes,
+            non_goals=related_section.non_goals,
+            risks=related_section.risks,
+        )
+
+    if section_name == "decisions":
+        return RelatedSectionPreview(
+            entities=related_section.entities,
+            decisions=_dedupe_string_values([*related_section.decisions, value]),
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -480,6 +519,7 @@ def _merge_related_section_preview(
     if section_name == "invariants":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=_dedupe_string_values([*related_section.invariants, value]),
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -494,6 +534,7 @@ def _merge_related_section_preview(
     if section_name == "guidance":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=_dedupe_string_values([*related_section.guidance, value]),
             proposed_prs=related_section.proposed_prs,
@@ -508,6 +549,7 @@ def _merge_related_section_preview(
     if section_name == "proposed_prs":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=_dedupe_string_values([*related_section.proposed_prs, value]),
@@ -522,6 +564,7 @@ def _merge_related_section_preview(
     if section_name == "acceptance_criteria":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -538,6 +581,7 @@ def _merge_related_section_preview(
     if section_name == "expected_tests":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -554,6 +598,7 @@ def _merge_related_section_preview(
     if section_name == "required_test_cases":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -570,6 +615,7 @@ def _merge_related_section_preview(
     if section_name == "expected_outcomes":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -586,6 +632,7 @@ def _merge_related_section_preview(
     if section_name == "non_goals":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -600,6 +647,7 @@ def _merge_related_section_preview(
     if section_name == "risks":
         return RelatedSectionPreview(
             entities=related_section.entities,
+            decisions=related_section.decisions,
             invariants=related_section.invariants,
             guidance=related_section.guidance,
             proposed_prs=related_section.proposed_prs,
@@ -649,6 +697,7 @@ def _has_related_values(related_section: RelatedSectionPreview) -> bool:
     return any(
         (
             related_section.entities,
+            related_section.decisions,
             related_section.invariants,
             related_section.guidance,
             related_section.proposed_prs,
@@ -666,6 +715,7 @@ def _render_related_section(related_section: RelatedSectionPreview) -> list[str]
     lines: list[str] = []
     for key, values in (
         ("entities", related_section.entities),
+        ("decisions", related_section.decisions),
         ("invariants", related_section.invariants),
         ("guidance", related_section.guidance),
         ("proposed_prs", related_section.proposed_prs),
@@ -898,14 +948,19 @@ def _render_header(
         "#   of the changelog. Keep entries that are still relevant, add\n"
         "#   missing ones, and remove stale ones.\n"
         "# - Use the final related lists to help fill out `entities`,\n"
-        "#   `entity_relationships`, `invariants`, and `guidance`.\n"
+        "#   `human-decisions`, `entity_relationships`, `invariants`, and\n"
+        "#   `guidance`.\n"
         "# - Related references are optional. Remove empty related lists instead\n"
         "#   of leaving them in place, and remove `related` entirely if nothing\n"
         "#   needs to point at anything else.\n"
         "# - Put file-related entity ids under `related.entities`.\n"
-        "# - Use `related.entities`, `related.invariants`, and `related.guidance`\n"
-        "#   when this file change needs to point at supporting code areas or at\n"
-        "#   the invariant or guidance entries it drives.\n"
+        "# - Use `related.decisions` when this file change needs to point at the\n"
+        "#   human decision ids that informed the code block. Make sure any\n"
+        "#   input decisions are explicitly referenced in this block.\n"
+        "# - Use `related.entities`, `related.decisions`, `related.invariants`,\n"
+        "#   and `related.guidance` when this file change needs to point at\n"
+        "#   supporting code areas or at the decision, invariant, or guidance\n"
+        "#   entries it drives.\n"
         "# - Use `related.acceptance_criteria`, `related.expected_tests`,\n"
         "#   `related.required_test_cases`, `related.expected_outcomes`,\n"
         "#   `related.non_goals`, and `related.risks`\n"
@@ -919,6 +974,10 @@ def _render_header(
         "# - Put relationship changes in `entity_relationships`.\n"
         "# - Put invariant changes in `invariants` and guidance changes in\n"
         "#   `guidance`.\n"
+        "# - Put ALL CREATIVE AND DESIGN DECISIONS MADE BY THE HUMAN OPERATOR\n"
+        "#   in `human-decisions`.\n"
+        "# - Use `human-decisions` for the top-level decision records and\n"
+        "#   `related.decisions` to connect file entries back to them.\n"
         "# - Use `related` on entity, relationship, invariant, and guidance\n"
         "#   entries to point at the relevant entity, invariant, or guidance\n"
         "#   ids.\n"

@@ -162,7 +162,8 @@ def build_validation_report(
                     message=(
                         "Version 2 changelogs must use top-level structured_files, "
                         "files, entities, entity_relationships, invariants, "
-                        "guidance, features, and proposed_prs sections."
+                        "guidance, features, human-decisions, and proposed_prs "
+                        "sections."
                     ),
                 )
             )
@@ -256,6 +257,14 @@ def build_validation_report(
                     for entity in (change_log.entity_changes or [])
                 )
                 if entity_id is not None
+            },
+            available_decision_ids={
+                decision_id
+                for decision_id in (
+                    _normalize_entity_id(decision.id)
+                    for decision in (change_log.decisions or [])
+                )
+                if decision_id is not None
             },
             available_invariant_ids={
                 invariant_id
@@ -938,6 +947,7 @@ def _validate_v2_file_sections(
     *,
     available_files: set[str],
     available_entity_ids: set[str],
+    available_decision_ids: set[str],
     available_invariant_ids: set[str],
     available_guidance_ids: set[str],
     available_proposed_pr_ids: set[str],
@@ -1086,6 +1096,7 @@ def _validate_v2_file_sections(
         for related_key, available_ids in (
             ("files", available_files),
             ("entities", available_entity_ids),
+            ("decisions", available_decision_ids),
             ("invariants", available_invariant_ids),
             ("guidance", available_guidance_ids),
             ("proposed_prs", available_proposed_pr_ids),

@@ -12,7 +12,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
           problem: Access tokens expire too frequently
           goal: Maintain authenticated sessions
 
-        decisions:
+        human-decisions:
           - id: ADR-042
             summary: Store refresh tokens in Redis
 
@@ -53,6 +53,7 @@ def test_parse_change_log_maps_yaml_into_dataclasses() -> None:
         "AuthService",
         "UserSession",
     ]
+    assert (change_log.file_changes or [])[0].related.decisions == []
     assert (change_log.entity_relationship_changes or [])[0].relationship == (
         "stores_refresh_tokens"
     )
@@ -69,7 +70,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
           problem: The changelog format needs richer change-level structure.
           goal: Capture files, entities, invariants, and guidance per hunk.
 
-        decisions:
+        human-decisions:
           - id: ADR-200
             summary: Keep version 1 support while introducing version 2.
 
@@ -88,6 +89,8 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
                 entities:
                   - ReviewSkill
                   - ChangelogValidation
+                decisions:
+                  - ADR-200
                 proposed_prs:
                   - 40
                 acceptance_criteria:
@@ -181,6 +184,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
         "ReviewSkill",
         "ChangelogValidation",
     ]
+    assert (change_log.file_changes or [])[0].related.decisions == ["ADR-200"]
     assert (change_log.file_changes or [])[0].related.proposed_prs == ["40"]
     assert (change_log.file_changes or [])[0].related.acceptance_criteria == ["AC-001"]
     assert (change_log.file_changes or [])[0].related.expected_tests == ["TEST-001"]

@@ -30,6 +30,7 @@ class Span:
 class RelatedSection:
     files: list[str] = field(default_factory=list)
     entities: list[str] = field(default_factory=list)
+    decisions: list[str] = field(default_factory=list)
     invariants: list[str] = field(default_factory=list)
     guidance: list[str] = field(default_factory=list)
     proposed_prs: list[str] = field(default_factory=list)
@@ -176,7 +177,7 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         raise ValueError(
             "Version 2 changelogs must use top-level structured_files, files, "
             "entities, entity_relationships, invariants, guidance, features, "
-            "and proposed_prs sections."
+            "human-decisions, and proposed_prs sections."
         )
 
     return ChangeLog(
@@ -216,7 +217,9 @@ def _parse_decision(raw_decision: object | None) -> Decision:
 def _parse_decisions(data: Mapping[str, Any]) -> list[Decision]:
     decisions = [
         _parse_decision(decision_data)
-        for decision_data in _ensure_sequence(data.get("decisions"))
+        for decision_data in _ensure_sequence(
+            data.get("human-decisions", data.get("decisions"))
+        )
     ]
     if not decisions and data.get("decision") is not None:
         decisions.append(_parse_decision(data.get("decision")))
@@ -381,6 +384,7 @@ def _parse_related_section(raw_related: object | None) -> RelatedSection:
     return RelatedSection(
         files=_parse_id_sequence(data.get("files")),
         entities=_parse_id_sequence(data.get("entities")),
+        decisions=_parse_id_sequence(data.get("decisions")),
         invariants=_parse_id_sequence(data.get("invariants")),
         guidance=_parse_id_sequence(data.get("guidance")),
         proposed_prs=_parse_id_sequence(data.get("proposed_prs", data.get("prs"))),

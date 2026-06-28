@@ -303,6 +303,14 @@ def test_validate_change_log_yaml_rejects_unknown_required_test_case_reference(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    human-decisions:
+      - id: ADR-200
+        summary: Keep decision references explicit in file blocks.
+
+    human-decisions:
+      - id: ADR-200
+        summary: Keep decision references explicit in file blocks.
+
     structured_files: []
     files:
       - path: src/app.py
@@ -356,6 +364,10 @@ def test_validate_change_log_yaml_rejects_invalid_feature_and_pr_state_sections(
     intent:
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
+
+    human-decisions:
+      - id: ADR-200
+        summary: Keep decision references explicit in file blocks.
 
     structured_files: []
     files:
@@ -493,6 +505,10 @@ def test_validate_change_log_yaml_rejects_change_id_colliding_with_feature_id(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    human-decisions:
+      - id: ADR-200
+        summary: Keep decision references explicit in file blocks.
+
     structured_files: []
     files:
       - path: src/app.py
@@ -544,6 +560,10 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
       problem: The changelog format needs richer per-change structure.
       goal: Capture files, entities, invariants, and guidance per hunk.
 
+    human-decisions:
+      - id: ADR-200
+        summary: Keep decision references explicit in file blocks.
+
     structured_files: []
     files:
       - path: src/app.py
@@ -556,6 +576,8 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
         related:
           entities:
             - AppService
+          decisions:
+            - ADR-200
       - path: tests/test_app.py
         type: modified
         span:
@@ -566,11 +588,10 @@ def test_validate_change_log_yaml_accepts_version_two_top_level_entities(
         related:
           entities:
             - TestSuite
+          decisions:
+            - ADR-200
 
     entities:
-      - id: LegacyTopLevelEntity
-        type: Service
-        action: added
       - id: AppService
         type: Service
         action: added

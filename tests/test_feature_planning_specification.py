@@ -187,7 +187,11 @@ def test_create_feature_pr_specification_template_writes_default_file(
     assert "invariants:" in template_text
     assert "guidance:" in template_text
     assert "features:" in template_text
-    assert "decisions:" in template_text
+    assert "human-decisions:" in template_text
+    assert (
+        "# - Put ALL CREATIVE AND DESIGN DECISIONS MADE BY THE HUMAN OPERATOR"
+        in template_text
+    )
     assert "feature_ids:" in template_text
     assert "intent:" in template_text
     assert "acceptance_criteria:" in template_text
@@ -208,7 +212,7 @@ def test_create_feature_pr_specification_template_writes_default_file(
         "invariants",
         "guidance",
         "features",
-        "decisions",
+        "human-decisions",
         "feature_ids",
         "intent",
         "acceptance_criteria",

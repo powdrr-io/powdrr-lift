@@ -47,7 +47,15 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert "Compared against default branch `main`." in template_text
     assert "schema: https://powdrr.io/schema/changelog-v2" in template_text
     assert "change_id: null" in template_text
-    assert "decisions:" in template_text
+    assert "human-decisions:" in template_text
+    assert (
+        "# - Use `related.decisions` when this file change needs to point at the"
+        in template_text
+    )
+    assert (
+        "# - Put ALL CREATIVE AND DESIGN DECISIONS MADE BY THE HUMAN OPERATOR"
+        in template_text
+    )
     assert "files:" in template_text
     assert "structured_files:" in template_text
     assert "entities:" in template_text

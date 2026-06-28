@@ -259,6 +259,9 @@ def _system_map_instruction_lines(
         return [
             "# - This file is already complete, delete this line and then move "
             "on to the next step",
+            "# - Delete these instructions and replace with a comment saying that",
+            "#   this file is read-only and should never be editted by a tool or",
+            "#   agent.",
         ]
 
     return [

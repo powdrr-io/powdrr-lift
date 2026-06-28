@@ -138,6 +138,14 @@ def test_create_system_map_specification_template_uses_compact_instructions(
         "on to the next step" in template_text
     )
     assert (
+        "# - Delete these instructions and replace with a comment saying that"
+        in template_text
+    )
+    assert (
+        "#   this file is read-only and should never be editted by a tool or"
+        in template_text
+    )
+    assert (
         "# - Analyze the full codebase deeply before writing anything."
         not in template_text
     )

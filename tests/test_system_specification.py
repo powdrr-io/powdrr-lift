@@ -35,9 +35,14 @@ def test_create_system_specification_template_writes_default_file(
     assert "# System specification template." in template_text
     assert "# - Set `id` to a unique identifier" in template_text
     assert (
-        "# - Remove the boilerplate placeholder entries once the document is"
+        "# - Delete these instructions and replace with a comment saying that"
         in template_text
     )
+    assert (
+        "#   this file is read-only and should never be editted by a tool or"
+        in template_text
+    )
+    assert "#   agent." in template_text
     assert (
         "# - `supercedes` is optional; omit it unless the item replaces ids."
         in template_text

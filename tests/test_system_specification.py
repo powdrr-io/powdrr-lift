@@ -219,6 +219,21 @@ def test_validate_system_specification_reports_success_for_valid_spec() -> None:
     assert report.issues == []
 
 
+def test_validate_system_specification_allows_sparse_spec() -> None:
+    proposed_spec = """
+    version: 1
+    id: sys-1
+    """
+
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
 def test_validate_system_specification_reports_duplicate_ids_across_sections() -> None:
     proposed_spec = """
     version: 1

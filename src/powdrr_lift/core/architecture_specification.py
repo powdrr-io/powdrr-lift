@@ -222,21 +222,6 @@ def build_architecture_specification_validation_report(
         issue_message="The id field is required.",
     )
 
-    for section_name in (
-        "entities",
-        "entity_relationships",
-        "invariants",
-        "guidance",
-    ):
-        if section_name not in raw_spec:
-            issues.append(
-                ArchitectureSpecificationValidationIssue(
-                    code="missing_required_section",
-                    message=f"The {section_name} section is required.",
-                    path=section_name,
-                )
-            )
-
     entity_ids = _collect_entity_ids(
         _coerce_sequence(
             raw_spec.get("entities"),
@@ -249,14 +234,6 @@ def build_architecture_specification_validation_report(
         system_reference_ids=system_reference_ids,
         issues=issues,
     )
-    if not entity_ids:
-        issues.append(
-            ArchitectureSpecificationValidationIssue(
-                code="no_entities_defined",
-                message="Define at least one entity.",
-                path="entities",
-            )
-        )
     relationship_ids = _collect_relationship_ids(
         _coerce_sequence(
             raw_spec.get("entity_relationships"),

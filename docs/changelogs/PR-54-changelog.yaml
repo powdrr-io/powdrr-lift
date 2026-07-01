@@ -210,7 +210,7 @@ files:
     type: modified
     span:
       start_line: 107
-      end_line: 131
+      end_line: 132
     summary: Document how to start Codex through the local OpenAI recording proxy.
     rationale: Operators need a one-time setup guide that explains how to launch the proxy, point Codex at it, and inspect recorded exchanges.
     related:

@@ -206,6 +206,22 @@ files:
         - openai-proxy-service
       expected_outcomes:
         - outcome-transparent-setup
+  - path: README.md
+    type: modified
+    span:
+      start_line: 107
+      end_line: 131
+    summary: Document how to start Codex through the local OpenAI recording proxy.
+    rationale: Operators need a one-time setup guide that explains how to launch the proxy, point Codex at it, and inspect recorded exchanges.
+    related:
+      entities:
+        - openai-proxy-cli
+        - openai-proxy-service
+        - proxy-log-directory
+      guidance:
+        - guide-setup-env
+      expected_outcomes:
+        - outcome-transparent-setup
   - path: tests/test_openai_proxy.py
     type: added
     span:

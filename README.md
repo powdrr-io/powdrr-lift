@@ -104,6 +104,32 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
    - The skills will be available automatically
    - Use the `skill` tool to invoke specific skills
 
+### For Codex Proxy Recording
+
+Use the built-in proxy when you want Codex to send OpenAI requests through a local
+recording layer. The proxy forwards requests transparently and writes each request
+and response to disk.
+
+1. **Start the proxy**
+   ```bash
+   powdrr-lift openai-proxy --repo-root . --upstream-base-url https://api.openai.com
+   ```
+
+   - The proxy listens on `http://127.0.0.1:8787/v1` by default.
+   - Recorded exchanges are written to `.powdrr/openai-proxy/` by default.
+   - Use `--log-dir <path>` if you want to store recordings somewhere else.
+
+2. **Point Codex at the proxy**
+   - Set `OPENAI_BASE_URL=http://127.0.0.1:8787/v1` before launching Codex.
+   - Keep your normal `OPENAI_API_KEY` in place; the proxy forwards the auth
+     header to the upstream API.
+
+3. **Use Codex normally**
+   - After the one-time setup, Codex talks to the proxy as if it were the
+     OpenAI API.
+   - You can inspect the recorded request and response bodies later in the log
+     directory.
+
 ### For Mac
 ```bash
 brew install powdrr-lift

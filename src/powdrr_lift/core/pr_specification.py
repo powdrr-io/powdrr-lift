@@ -283,26 +283,6 @@ def build_pr_specification_validation_report(
         issues=issues,
     )
 
-    for section_name in (
-        "id",
-        "feature_ids",
-        "intent",
-        "acceptance_criteria",
-        "expected_tests",
-        "required_test_cases",
-        "expected_outcomes",
-        "non_goals",
-        "risks",
-    ):
-        if section_name not in raw_spec:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="missing_required_section",
-                    message=f"The {section_name} section is required.",
-                    path=section_name,
-                )
-            )
-
     seen_detail_ids: set[str] = set()
 
     proposed_pr_id = _required_string(
@@ -325,7 +305,7 @@ def build_pr_specification_validation_report(
     if proposed_pr_id is not None:
         seen_detail_ids.add(proposed_pr_id)
 
-    feature_ids = _collect_feature_ids(
+    _collect_feature_ids(
         _coerce_sequence(
             raw_spec.get("feature_ids"),
             path="feature_ids",
@@ -336,21 +316,19 @@ def build_pr_specification_validation_report(
         available_feature_ids=set(available_feature_ids),
         issues=issues,
     )
-    if not feature_ids:
-        issues.append(
-            PRSpecificationValidationIssue(
-                code="no_feature_ids_defined",
-                message="Reference at least one feature id.",
-                path="feature_ids",
-            )
+    raw_intent = raw_spec.get("intent")
+    intent = (
+        None
+        if raw_intent is None
+        else _coerce_mapping(
+            raw_intent,
+            path="intent",
+            issues=issues,
+            issue_code="invalid_intent_section",
+            issue_message=(
+                "intent must be a mapping with problem, goal, and reasoning."
+            ),
         )
-
-    intent = _coerce_mapping(
-        raw_spec.get("intent"),
-        path="intent",
-        issues=issues,
-        issue_code="invalid_intent_section",
-        issue_message="intent must be a mapping with problem, goal, and reasoning.",
     )
     if intent is not None:
         _required_string(
@@ -760,9 +738,7 @@ def _collect_detail_items(
     issues: list[PRSpecificationValidationIssue],
 ) -> set[str]:
     item_ids: set[str] = set()
-    saw_any_item = False
     for index, raw_item in enumerate(raw_items):
-        saw_any_item = True
         item = _coerce_mapping(
             raw_item,
             path=f"{section_name}[{index}]",
@@ -812,15 +788,6 @@ def _collect_detail_items(
 
         seen_ids.add(item_id)
         item_ids.add(item_id)
-
-    if not saw_any_item:
-        issues.append(
-            PRSpecificationValidationIssue(
-                code=f"no_{section_name}_defined",
-                message=(f"Add at least one {section_name.replace('_', ' ')} item."),
-                path=section_name,
-            )
-        )
 
     return item_ids
 

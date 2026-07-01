@@ -369,6 +369,28 @@ def test_validate_architecture_specification_reports_success_for_valid_spec(
     assert report.issues == []
 
 
+def test_validate_architecture_specification_allows_sparse_spec(
+    tmp_path: Path,
+) -> None:
+    _write_system_specification(tmp_path)
+
+    proposed_spec = """
+    version: 1
+    id: 2026-06-19
+    title: Demo architecture
+    """
+
+    report = build_architecture_specification_validation_report(
+        proposed_spec,
+        entity_types=["Service", "Skill"],
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
 def test_cli_validate_architecture_specification_reports_yaml(
     tmp_path: Path,
 ) -> None:

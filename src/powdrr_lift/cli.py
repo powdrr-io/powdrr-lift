@@ -56,6 +56,13 @@ from powdrr_lift.core import (
     validate_pr_specification_yaml,
     validate_system_specification_yaml,
 )
+from powdrr_lift.openai_proxy import (
+    OpenAIProxyConfig,
+    default_openai_proxy_log_dir,
+)
+from powdrr_lift.openai_proxy import (
+    serve as serve_openai_proxy,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -791,6 +798,49 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate_pr_specification_parser.set_defaults(func=_run_evaluate_pr_specification)
 
+    openai_proxy_parser = subparsers.add_parser(
+        "openai-proxy",
+        aliases=["openai_proxy"],
+        help="Start a local OpenAI reverse proxy that records exchanges.",
+    )
+    openai_proxy_parser.add_argument(
+        "--upstream-base-url",
+        default="https://api.openai.com",
+        help="Upstream OpenAI base URL to forward requests to.",
+    )
+    openai_proxy_parser.add_argument(
+        "--log-dir",
+        type=Path,
+        help="Directory to write recorded exchanges to.",
+    )
+    openai_proxy_parser.add_argument(
+        "--client-path-prefix",
+        default="/v1",
+        help="Incoming path prefix to strip before forwarding to the upstream.",
+    )
+    openai_proxy_parser.add_argument(
+        "--upstream-path-prefix",
+        default="/v1",
+        help="Upstream path prefix to add before forwarding the request.",
+    )
+    openai_proxy_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the proxy server to.",
+    )
+    openai_proxy_parser.add_argument(
+        "--port",
+        type=int,
+        default=8787,
+        help="Port to bind the proxy server to.",
+    )
+    openai_proxy_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used to resolve the default log directory.",
+    )
+    openai_proxy_parser.set_defaults(func=_run_openai_proxy)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -1290,6 +1340,26 @@ def _run_evaluate_pr_specification(args: argparse.Namespace) -> int:
     if not report_yaml.endswith("\n"):
         sys.stdout.write("\n")
     return 0 if report.validation_successful else 1
+
+
+def _run_openai_proxy(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    log_dir = (
+        args.log_dir
+        if args.log_dir is not None
+        else default_openai_proxy_log_dir(repo_root)
+    )
+    serve_openai_proxy(
+        OpenAIProxyConfig(
+            upstream_base_url=args.upstream_base_url,
+            log_dir=log_dir,
+            host=args.host,
+            port=args.port,
+            client_path_prefix=args.client_path_prefix,
+            upstream_path_prefix=args.upstream_path_prefix,
+        )
+    )
+    return 0
 
 
 def _run_entity_decisions(args: argparse.Namespace) -> int:

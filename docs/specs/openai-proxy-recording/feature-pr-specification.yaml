@@ -1,0 +1,218 @@
+# Feature and PR specification template.
+#
+# Instructions:
+# - Use the work item folder `docs/specs/openai-proxy-recording`.
+# - Start from the filled system map template and the requested feature.
+# - Fill out one section at a time in this order:
+#   requirements, approach, entities, entity_relationships,
+#   invariants, guidance, features, human-decisions, feature_ids, intent,
+#   acceptance_criteria, expected_tests, expected_outcomes,
+#   non_goals, risks.
+# - For each section, capture only the changes needed to implement the
+#   feature and the validation conditions that prove it is done.
+# - Double-check that nothing requested by the feature is missing.
+# - Put ALL CREATIVE AND DESIGN DECISIONS MADE BY THE HUMAN OPERATOR
+#   in the human-decisions section.
+# - Delete these instructions and replace with a comment saying that
+#   this file is read-only and should never be editted by a tool or
+#   agent.
+# - Use `state` for requirements and approach items.
+# - Use `action` for features and human-decisions.
+# - Keep ids unique across the whole document.
+#
+schema: https://powdrr.io/schemas/specification-v1
+id: openai-proxy-recording
+title: Transparent OpenAI API proxy with full exchange recording
+requirements:
+  - id: req-transparent-reverse-proxy
+    description: Forward OpenAI API traffic through a local reverse proxy without changing the user workflow after initial setup.
+    state: added
+  - id: req-record-exchanges
+    description: Record every request payload and response payload that passes through the proxy.
+    state: added
+  - id: req-preserve-streaming
+    description: Preserve streamed responses and response metadata so the proxy stays transparent to Codex and other OpenAI clients.
+    state: added
+  - id: req-configurable-log-storage
+    description: Allow the operator to choose where captured request and response records are written on disk.
+    state: added
+  - id: req-simple-setup
+    description: Make the initial setup a one-time configuration change that can be reused for subsequent sessions.
+    state: added
+approach:
+  - id: app-openai-proxy-server
+    description: Add a local CLI command that runs a reverse proxy in front of the OpenAI API and forwards requests to the upstream service.
+    state: added
+  - id: app-exchange-recording
+    description: Write one structured record per proxied exchange containing the request body, response body, and the metadata needed to inspect the conversation later.
+    state: added
+  - id: app-streaming-forwarding
+    description: Stream upstream response bytes to the client as they arrive while also buffering the body for recording.
+    state: added
+  - id: app-transparent-setup
+    description: Document the setup as a base-url override plus a local log directory so the proxy stays invisible after the first configuration step.
+    state: added
+  - id: app-proxy-tests
+    description: Test the proxy against a fake upstream OpenAI server so the recording and forwarding behavior is validated without real API calls.
+    state: added
+entities:
+  - id: openai-proxy-service
+    type: Service
+    summary: Local reverse proxy for OpenAI API traffic.
+    rationale: Support the transparent forwarding and recording workflow described by "req-transparent-reverse-proxy" and "req-record-exchanges".
+  - id: openai-upstream-api
+    type: External service
+    summary: The real OpenAI API endpoint that receives forwarded requests.
+    rationale: The proxy must preserve the upstream API contract instead of reimplementing it.
+  - id: openai-exchange-record
+    type: Artifact
+    summary: A structured on-disk record of one proxied request/response pair.
+    rationale: Capture all model input and output for later inspection and replay.
+  - id: proxy-log-directory
+    type: Artifact
+    summary: The filesystem location where exchange records are written.
+    rationale: Let the operator choose a durable place to keep the captured traffic.
+  - id: openai-proxy-cli
+    type: Command
+    summary: The CLI entry point that starts the proxy server.
+    rationale: Provide the one-time setup surface used by the operator to make the proxy transparent afterward.
+entity_relationships:
+  - id: rel-cli-starts-proxy
+    source: openai-proxy-cli
+    target: openai-proxy-service
+    relationship: starts
+    description: The CLI command launches the local proxy server.
+    rationale: The operator needs a simple setup path to start recording traffic.
+  - id: rel-proxy-forwards-upstream
+    source: openai-proxy-service
+    target: openai-upstream-api
+    relationship: forwards_to
+    description: The proxy forwards every OpenAI request to the configured upstream service.
+    rationale: Preserve the normal OpenAI API workflow while inserting the recording layer.
+  - id: rel-proxy-writes-records
+    source: openai-proxy-service
+    target: openai-exchange-record
+    relationship: writes
+    description: The proxy writes one exchange record for every request and response it handles.
+    rationale: Keep the complete input/output history on disk.
+  - id: rel-records-live-in-logdir
+    source: openai-exchange-record
+    target: proxy-log-directory
+    relationship: stored_in
+    description: Exchange records live in the configured log directory.
+    rationale: Make recording location configurable and durable.
+invariants:
+  - id: inv-forward-verbatim
+    description: The proxy must forward the OpenAI request path, method, and body without altering the payload semantics.
+    rationale: Any request mutation would break transparency and undermine the recorded trace.
+    related:
+      entities:
+        - openai-proxy-service
+        - openai-upstream-api
+      entity_relationships:
+        - rel-proxy-forwards-upstream
+  - id: inv-record-every-exchange
+    description: Every successful or failed proxied exchange must be recorded exactly once.
+    rationale: The proxy exists to preserve the full conversation history.
+    related:
+      entities:
+        - openai-proxy-service
+        - openai-exchange-record
+      entity_relationships:
+        - rel-proxy-writes-records
+  - id: inv-preserve-streaming
+    description: Streamed upstream responses must remain streamed to the client.
+    rationale: The proxy must not change the user-visible behavior after setup.
+    related:
+      entities:
+        - openai-proxy-service
+        - openai-upstream-api
+      entity_relationships:
+        - rel-proxy-forwards-upstream
+guidance:
+  - id: guide-setup-env
+    description: Configure the client to point at the proxy base URL once, then keep using the normal OpenAI or Codex workflow.
+    rationale: The proxy should be invisible after initial setup.
+    related:
+      entities:
+        - openai-proxy-service
+        - openai-proxy-cli
+      entity_relationships:
+        - rel-cli-starts-proxy
+  - id: guide-recording-format
+    description: Store each exchange as a structured record with the request and response bodies available for later inspection.
+    rationale: The logs should be usable for auditing, debugging, and replay.
+    related:
+      entities:
+        - openai-exchange-record
+        - proxy-log-directory
+      entity_relationships:
+        - rel-records-live-in-logdir
+features:
+  - id: feature-openai-proxy-recording
+    action: added
+    description: Transparent local OpenAI proxy that records all request and response payloads.
+    supercedes: null
+    functional_requirements:
+      - req-transparent-reverse-proxy
+      - req-record-exchanges
+      - req-preserve-streaming
+      - req-configurable-log-storage
+      - req-simple-setup
+human-decisions:
+  - id: decision-proxy-reverse-layer
+    action: added
+    description: Implement the feature as a local reverse proxy instead of modifying Codex or the OpenAI API client.
+    supercedes: null
+  - id: decision-record-raw-exchanges
+    action: added
+    description: Record the raw request and response bodies so the operator can inspect the exact model input and output later.
+    supercedes: null
+  - id: decision-stream-while-recording
+    action: added
+    description: Preserve streaming responses to the client while buffering the full response for the exchange record.
+    supercedes: null
+feature_ids:
+  - feature-openai-proxy-recording
+intent:
+  goal: Add a transparent proxy that sits between Codex and the OpenAI API and records all LLM input and output.
+  reasoning: Keep the normal user workflow intact after one initial configuration step while preserving a complete local audit trail of every proxied exchange.
+acceptance_criteria:
+  - id: ac-proxy-starts
+    description: The CLI can start the proxy with an upstream OpenAI base URL, a bind host and port, and a writable log directory.
+  - id: ac-request-forwarding
+    description: A request sent to the proxy reaches a fake upstream OpenAI server with the same method, path, headers needed for the API call, and body content.
+  - id: ac-response-forwarding
+    description: The proxy returns the upstream response status and body unchanged to the client.
+  - id: ac-exchange-recording
+    description: Each proxied exchange writes a structured record to disk that contains the request body and the response body.
+  - id: ac-streaming
+    description: Streamed upstream responses are relayed to the client without waiting for the full response to finish first.
+expected_tests:
+  - id: test-proxy-cli
+    description: Verify the CLI parser and runner expose the new proxy command and its setup flags.
+  - id: test-proxy-forwarding
+    description: Exercise the proxy against a fake upstream server and assert the request and response bodies are preserved.
+  - id: test-proxy-recording
+    description: Assert that the proxy writes a structured exchange record for each request.
+  - id: test-proxy-streaming
+    description: Verify that streamed responses are relayed to the client while still being captured for logging.
+expected_outcomes:
+  - id: outcome-transparent-setup
+    description: After the one-time proxy setup, the user can keep using Codex with the proxy base URL without any additional workflow changes.
+  - id: outcome-auditable-traffic
+    description: The operator can inspect the recorded exchange history on disk to see exactly what was sent to and received from the LLM.
+non_goals:
+  - id: ng-auth-management
+    description: The proxy does not manage OpenAI API keys beyond forwarding the client-supplied authorization header to the upstream service.
+  - id: ng-prompt-rewriting
+    description: The proxy does not alter prompts, completions, or tool call payloads.
+  - id: ng-multi-provider-routing
+    description: The proxy does not route traffic across multiple model providers or vendor endpoints.
+risks:
+  - id: risk-secret-spillage
+    description: Recorded request bodies may contain sensitive content, so the log directory must be treated as sensitive data.
+  - id: risk-streaming-complexity
+    description: Streaming proxying is more complex than buffering a single JSON response and could regress if chunk handling is wrong.
+  - id: risk-api-drift
+    description: The OpenAI API surface may evolve, so the proxy should avoid hard-coding assumptions that are easy to break.

@@ -126,6 +126,34 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     _git(repo_root, "add", "docs/design/agent-platform-expansion.md")
     _git(repo_root, "commit", "-m", "Add structured design doc")
     (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    system_spec_path = (
+        repo_root / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+    )
+    system_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        id: 2026-05-22-skill-distribution-system
+        title: "Agent platform expansion system"
+        requirements: []
+        approach: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/specs/powdrr-lift/system-specification.yaml")
+    _git(repo_root, "commit", "-m", "Add structured system spec")
+    architecture_spec_path = (
+        repo_root / "docs" / "specs" / "powdrr-lift" / "architecture-specification.yaml"
+    )
+    architecture_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        id: 2026-05-22-skill-distribution-architecture
+        title: "Agent platform expansion architecture"
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/specs/powdrr-lift/architecture-specification.yaml")
+    _git(repo_root, "commit", "-m", "Add structured architecture spec")
     implementation_spec_path = (
         repo_root
         / "docs"
@@ -143,6 +171,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         entity_relationships: []
         features:
           - id: AppService
+            action: added
             description: The shared application service.
             functional_requirements:
               - Keep the service available for the baseline graph.
@@ -172,6 +201,8 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         summary: Introduce version 2 of the changelog schema.
 
     structured_files:
+      - docs/specs/powdrr-lift/system-specification.yaml
+      - docs/specs/powdrr-lift/architecture-specification.yaml
       - docs/specs/powdrr-lift/implementation-specification.yaml
 
     files:
@@ -274,20 +305,24 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
 
     assert report.validation_successful is True
     assert report.issues == []
-    assert report.expected_change_files == [
+    assert set(report.expected_change_files) == {
         "README.md",
         "docs/design/agent-platform-expansion.md",
+        "docs/specs/powdrr-lift/architecture-specification.yaml",
         "docs/specs/powdrr-lift/implementation-specification.yaml",
+        "docs/specs/powdrr-lift/system-specification.yaml",
         "src/app.py",
         "tests/test_app.py",
-    ]
-    assert report.proposed_change_files == [
+    }
+    assert set(report.proposed_change_files) == {
         "README.md",
         "docs/design/agent-platform-expansion.md",
+        "docs/specs/powdrr-lift/architecture-specification.yaml",
+        "docs/specs/powdrr-lift/implementation-specification.yaml",
+        "docs/specs/powdrr-lift/system-specification.yaml",
         "src/app.py",
         "tests/test_app.py",
-        "docs/specs/powdrr-lift/implementation-specification.yaml",
-    ]
+    }
 
 
 def test_validate_change_log_yaml_rejects_unknown_required_test_case_reference(
@@ -1234,6 +1269,69 @@ def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
 
     assert report.validation_successful is False
     assert "structured_file_invalid_schema" in {issue.code for issue in report.issues}
+
+
+def test_validate_change_log_yaml_rejects_invalid_structured_specification_contents(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/change-log")
+    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    system_spec_path = (
+        repo_root / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+    )
+    system_spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        title: Missing the system id
+        requirements: []
+        approach: []
+        """,
+        encoding="utf-8",
+    )
+    _git(repo_root, "add", "docs/specs/powdrr-lift/system-specification.yaml")
+    _git(repo_root, "commit", "-m", "Add invalid system spec")
+
+    proposed_yaml = """
+    version: 2
+    change_id: 7
+    title: Add review workflow metadata
+
+    intent:
+      problem: The changelog format needs richer per-change structure.
+      goal: Capture files, entities, invariants, and guidance per hunk.
+
+    structured_files:
+      - docs/specs/powdrr-lift/system-specification.yaml
+
+    files: []
+    entities: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = parse_validation_report(
+        validate_change_log_yaml(
+            proposed_yaml,
+            branch_name="feature/change-log",
+            repo_root=repo_root,
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(
+        issue.code == "structured_file_system_specification_system_id_missing"
+        for issue in report.issues
+    )
 
 
 def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(

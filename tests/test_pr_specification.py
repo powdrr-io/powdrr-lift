@@ -263,6 +263,28 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
     assert report.issues == []
 
 
+def test_validate_pr_specification_allows_sparse_spec(tmp_path: Path) -> None:
+    _write_implementation_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: pr-789
+
+    intent:
+      problem: Add a new capability.
+      goal: Add a new capability.
+      reasoning: Keep the repo aligned.
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        work_item_name="PR-789",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
 def test_validate_pr_specification_rejects_template_boilerplate(
     tmp_path: Path,
 ) -> None:

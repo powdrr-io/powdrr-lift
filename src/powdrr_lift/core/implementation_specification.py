@@ -237,22 +237,6 @@ def build_implementation_specification_validation_report(
             issues=issues,
         )
 
-    for section_name in (
-        "architecture_id",
-        "entities",
-        "entity_relationships",
-        "features",
-        "decisions",
-    ):
-        if section_name not in raw_spec:
-            issues.append(
-                ImplementationSpecificationValidationIssue(
-                    code="missing_required_section",
-                    message=f"The {section_name} section is required.",
-                    path=section_name,
-                )
-            )
-
     proposed_architecture_id = _required_string(
         raw_spec.get("architecture_id"),
         path="architecture_id",
@@ -296,15 +280,6 @@ def build_implementation_specification_validation_report(
         issues=issues,
         item_label="entity",
     )
-    if not entity_ids:
-        issues.append(
-            ImplementationSpecificationValidationIssue(
-                code="no_entities_defined",
-                message="Define at least one entity.",
-                path="entities",
-            )
-        )
-
     relationship_ids, relationship_items = _collect_section_items(
         _coerce_sequence(
             raw_spec.get("entity_relationships"),
@@ -343,15 +318,6 @@ def build_implementation_specification_validation_report(
         issues=issues,
         item_label="feature",
     )
-    if not feature_ids:
-        issues.append(
-            ImplementationSpecificationValidationIssue(
-                code="no_features_defined",
-                message="Define at least one feature.",
-                path="features",
-            )
-        )
-
     decision_ids, decision_items = _collect_decisions(
         _coerce_sequence(
             raw_spec.get("decisions"),
@@ -369,15 +335,6 @@ def build_implementation_specification_validation_report(
         issues=issues,
         item_label="decision",
     )
-    if not decision_ids:
-        issues.append(
-            ImplementationSpecificationValidationIssue(
-                code="no_decisions_defined",
-                message="Define at least one decision.",
-                path="decisions",
-            )
-        )
-
     return ImplementationSpecificationValidationReport(
         validation_successful=not issues,
         architecture_id=architecture_summary.architecture_id,

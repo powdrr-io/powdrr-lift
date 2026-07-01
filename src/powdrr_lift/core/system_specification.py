@@ -184,16 +184,6 @@ def build_system_specification_validation_report(
             issues=issues,
         )
 
-    for section_name in ("id", "requirements", "approach"):
-        if section_name not in raw_spec:
-            issues.append(
-                SystemSpecificationValidationIssue(
-                    code="missing_required_section",
-                    message=f"The {section_name} section is required.",
-                    path=section_name,
-                )
-            )
-
     system_id = _required_string(
         raw_spec.get("id"),
         path="id",
@@ -620,6 +610,8 @@ def _coerce_sequence(
     issue_code: str,
     issue_message: str,
 ) -> list[object]:
+    if value is None:
+        return []
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         issues.append(
             SystemSpecificationValidationIssue(

@@ -25,14 +25,26 @@ from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,
 )
+from powdrr_lift.core.architecture_specification import (
+    build_architecture_specification_validation_report,
+)
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
+from powdrr_lift.core.implementation_specification import (
+    build_implementation_specification_validation_report,
+)
 from powdrr_lift.core.index import (
     _file_change_entity_ids,
     _normalize_entity_id,
     build_changelog_index,
     build_changelog_index_at_ref,
 )
+from powdrr_lift.core.pr_specification import (
+    build_pr_specification_validation_report,
+)
 from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
+from powdrr_lift.core.system_specification import (
+    build_system_specification_validation_report,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -641,6 +653,7 @@ def build_validation_report(
                 issues=issues,
                 repo_root=repo_root_path,
                 structured_file_path=structured_file_path,
+                allowed_entity_types=allowed_entity_types,
             )
 
         for relationship_change in change_log.entity_relationship_changes or []:
@@ -1208,6 +1221,7 @@ def _validate_v2_structured_file_contents(
     issues: list[ValidationIssue],
     repo_root: Path,
     structured_file_path: str,
+    allowed_entity_types: set[str] | None = None,
 ) -> None:
     structured_file = repo_root / structured_file_path
     if not structured_file.exists():
@@ -1261,6 +1275,135 @@ def _validate_v2_structured_file_contents(
                 message=(
                     f"Structured file {structured_file_path} must define a schema "
                     "value of https://powdrr.io/schemas/specification-v1."
+                ),
+                path=structured_file_path,
+            )
+        )
+        return
+
+    _validate_v2_structured_file_specification(
+        issues=issues,
+        repo_root=repo_root,
+        structured_file_path=structured_file_path,
+        allowed_entity_types=allowed_entity_types,
+    )
+
+
+def _validate_v2_structured_file_specification(
+    *,
+    issues: list[ValidationIssue],
+    repo_root: Path,
+    structured_file_path: str,
+    allowed_entity_types: set[str] | None,
+) -> None:
+    structured_file_name = Path(structured_file_path).name
+    work_item_name = Path(structured_file_path).parent.name
+    raw_yaml = (repo_root / structured_file_path).read_text(encoding="utf-8")
+
+    if structured_file_name == "system-specification.yaml":
+        system_report = build_system_specification_validation_report(
+            raw_yaml,
+            work_item_name=work_item_name,
+        )
+        _append_structured_file_validation_issues(
+            issues=issues,
+            structured_file_path=structured_file_path,
+            validator_name="system_specification",
+            report_issues=system_report.issues,
+        )
+        return
+
+    if structured_file_name == "architecture-specification.yaml":
+        effective_allowed_entity_types = allowed_entity_types
+        if effective_allowed_entity_types is None:
+            try:
+                effective_allowed_entity_types = set(
+                    load_entity_taxonomy(repo_root).entity_types
+                )
+            except FileNotFoundError:
+                issues.append(
+                    ValidationIssue(
+                        code="entity_taxonomy_missing",
+                        message=(
+                            "Architecture structured-file validation requires "
+                            "software_development_entity_taxonomy.md at the repo "
+                            "root."
+                        ),
+                    )
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                issues.append(
+                    ValidationIssue(
+                        code="entity_taxonomy_invalid",
+                        message=(
+                            "Could not parse software_development_entity_taxonomy."
+                            f"md: {exc}"
+                        ),
+                    )
+                )
+                return
+        architecture_report = build_architecture_specification_validation_report(
+            raw_yaml,
+            entity_types=sorted(effective_allowed_entity_types),
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+        )
+        _append_structured_file_validation_issues(
+            issues=issues,
+            structured_file_path=structured_file_path,
+            validator_name="architecture_specification",
+            report_issues=architecture_report.issues,
+        )
+        return
+
+    if structured_file_name == "implementation-specification.yaml":
+        implementation_report = build_implementation_specification_validation_report(
+            raw_yaml,
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+        )
+        _append_structured_file_validation_issues(
+            issues=issues,
+            structured_file_path=structured_file_path,
+            validator_name="implementation_specification",
+            report_issues=implementation_report.issues,
+        )
+        return
+
+    if structured_file_name == "proposed-pr-specification.yaml":
+        proposed_pr_report = build_pr_specification_validation_report(
+            raw_yaml,
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+        )
+        _append_structured_file_validation_issues(
+            issues=issues,
+            structured_file_path=structured_file_path,
+            validator_name="pr_specification",
+            report_issues=proposed_pr_report.issues,
+        )
+        return
+
+
+def _append_structured_file_validation_issues(
+    *,
+    issues: list[ValidationIssue],
+    structured_file_path: str,
+    validator_name: str,
+    report_issues: Sequence[Any],
+) -> None:
+    for report_issue in report_issues:
+        issue_code = getattr(report_issue, "code", "structured_file_validation_failed")
+        issue_message = getattr(
+            report_issue, "message", "Structured file validation failed."
+        )
+        issues.append(
+            ValidationIssue(
+                code=f"structured_file_{validator_name}_{issue_code}",
+                message=(
+                    f"Structured file {structured_file_path} failed "
+                    f"{validator_name} validation: {issue_message}"
                 ),
                 path=structured_file_path,
             )

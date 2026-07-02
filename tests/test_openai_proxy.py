@@ -96,7 +96,18 @@ def test_openai_proxy_forwards_and_records_exchange(
             assert upstream_captured["path"] == "/v1/responses?debug=true"
             assert upstream_captured["body"] == request_body
             upstream_headers = cast(dict[str, str], upstream_captured["headers"])
-            assert upstream_headers["Authorization"] == "Bearer test-token"
+            upstream_headers_lower = {
+                key.lower(): value for key, value in upstream_headers.items()
+            }
+            assert upstream_headers_lower["authorization"] == "Bearer test-token"
+            assert upstream_headers_lower["host"] == "chatgpt.com"
+            assert upstream_headers_lower["oai-product-sku"] == "codex"
+            assert upstream_headers_lower["originator"] == "codex-tui"
+            assert (
+                upstream_headers_lower["user-agent"]
+                == "codex-tui/0.142.3 (Mac OS 26.5.1; arm64) "
+                "Apple_Terminal/470.2 (codex-tui; 0.142.3)"
+            )
 
             records = _wait_for_exchange_dump_paths(tmp_path / "records")
             request_in = json.loads(records["request-in"].read_text(encoding="utf-8"))
@@ -278,6 +289,13 @@ def test_openai_proxy_tunnels_websocket_upgrade(tmp_path: Path) -> None:
 
             assert tunneled_response == b"pong"
             upstream_request = cast(str, upstream_captured["request"])
+            assert "Host: chatgpt.com" in upstream_request
+            assert "oai-product-sku: codex" in upstream_request
+            assert "originator: codex-tui" in upstream_request
+            assert (
+                "user-agent: codex-tui/0.142.3 (Mac OS 26.5.1; arm64) "
+                "Apple_Terminal/470.2 (codex-tui; 0.142.3)" in upstream_request
+            )
             assert "Connection: Upgrade" in upstream_request
             assert "Upgrade: websocket" in upstream_request
             assert "Authorization: Bearer websocket-token" in upstream_request

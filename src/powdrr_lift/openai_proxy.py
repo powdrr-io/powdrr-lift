@@ -16,6 +16,16 @@ from urllib.parse import SplitResult, urlsplit
 
 import httpx
 
+_UPSTREAM_REQUEST_HEADERS = {
+    "Host": "chatgpt.com",
+    "oai-product-sku": "codex",
+    "originator": "codex-tui",
+    "user-agent": (
+        "codex-tui/0.142.3 (Mac OS 26.5.1; arm64) "
+        "Apple_Terminal/470.2 (codex-tui; 0.142.3)"
+    ),
+}
+
 _HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -208,10 +218,8 @@ def build_server(config: OpenAIProxyConfig) -> ThreadingHTTPServer:
                     continue
                 if normalized_key == "accept-encoding":
                     continue
-                if normalized_key == "host":
-                    headers[key] = _upstream_host_header(upstream)
-                    continue
                 headers[key] = value
+            headers.update(_UPSTREAM_REQUEST_HEADERS)
             return headers
 
         def _auth_source(self) -> str:
@@ -309,7 +317,7 @@ def build_server(config: OpenAIProxyConfig) -> ThreadingHTTPServer:
                 upstream=upstream,
             )
             url = f"{upstream.scheme}://{_upstream_host_header(upstream)}{path}"
-            transport = httpx.HTTPTransport(http2=True, retries=0)
+            transport = httpx.HTTPTransport(http2=False, retries=0)
             with httpx.Client(transport=transport, timeout=120.0) as client:
                 request = client.build_request(
                     method=self.command,

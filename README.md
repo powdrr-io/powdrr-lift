@@ -112,17 +112,22 @@ and response to disk.
 
 1. **Start the proxy**
    ```bash
-   powdrr-lift openai-proxy --repo-root . --upstream-base-url https://api.openai.com
+   powdrr-lift openai-proxy --upstream-base-url https://api.openai.com
    ```
 
    - The proxy listens on `http://127.0.0.1:8787/v1` by default.
-   - Recorded exchanges are written to `.powdrr/openai-proxy/` by default.
-   - Use `--log-dir <path>` if you want to store recordings somewhere else.
+   - Recorded exchanges are written to `.powdrr/openai-proxy/` by default as
+     separate `*-request-in.json`, `*-request-out.json`, `*-response-in.json`,
+     and `*-response-out.json` dumps.
+   - Use `--log-root <path>` to change the base directory, or
+     `--log-dir <path>` to store recordings somewhere else directly.
+   - Websocket upgrade requests are forwarded as upgrade handshakes and then
+     tunneled so realtime OpenAI traffic keeps the native transport shape.
 
 2. **Point Codex at the proxy**
    - Set `OPENAI_BASE_URL=http://127.0.0.1:8787/v1` before launching Codex.
-   - Keep your normal `OPENAI_API_KEY` in place; the proxy forwards the auth
-     header to the upstream API.
+   - The proxy forwards the client auth header unchanged and never
+     substitutes credentials of its own.
 
 3. **Use Codex normally**
    - After the one-time setup, Codex talks to the proxy as if it were the

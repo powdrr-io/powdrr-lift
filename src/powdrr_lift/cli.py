@@ -814,6 +814,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory to write recorded exchanges to.",
     )
     openai_proxy_parser.add_argument(
+        "--log-root",
+        type=Path,
+        default=Path("."),
+        help="Base directory used to resolve the default log directory.",
+    )
+    openai_proxy_parser.add_argument(
         "--client-path-prefix",
         default="/v1",
         help="Incoming path prefix to strip before forwarding to the upstream.",
@@ -833,11 +839,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=8787,
         help="Port to bind the proxy server to.",
-    )
-    openai_proxy_parser.add_argument(
-        "--repo-root",
-        type=Path,
-        help="Repository root used to resolve the default log directory.",
     )
     openai_proxy_parser.set_defaults(func=_run_openai_proxy)
 
@@ -1343,11 +1344,10 @@ def _run_evaluate_pr_specification(args: argparse.Namespace) -> int:
 
 
 def _run_openai_proxy(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
     log_dir = (
         args.log_dir
         if args.log_dir is not None
-        else default_openai_proxy_log_dir(repo_root)
+        else default_openai_proxy_log_dir(args.log_root)
     )
     serve_openai_proxy(
         OpenAIProxyConfig(

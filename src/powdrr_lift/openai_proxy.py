@@ -282,8 +282,9 @@ def serve(config: OpenAIProxyConfig) -> None:
     print(f"Forwarding to {config.upstream_base_url}")
     print(f"Recording exchanges in {config.log_dir}")
     print(
-        "Set OPENAI_BASE_URL to the proxy base URL for your client, "
-        f"for example http://{config.host}:{config.port}{config.client_path_prefix}"
+        "Set Codex openai_base_url to the proxy base URL, for example "
+        f'codex -c openai_base_url="http://{config.host}:{config.port}'
+        f'{config.client_path_prefix}"'
     )
     server.serve_forever()
 

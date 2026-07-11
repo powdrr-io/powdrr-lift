@@ -120,9 +120,19 @@ and response to disk.
    - Use `--log-dir <path>` if you want to store recordings somewhere else.
 
 2. **Point Codex at the proxy**
-   - Set `OPENAI_BASE_URL=http://127.0.0.1:8787/v1` before launching Codex.
-   - Keep your normal `OPENAI_API_KEY` in place; the proxy forwards the auth
-     header to the upstream API.
+   - Codex reads its user config from `~/.codex/config.toml`.
+   - Add this setting to make Codex use the proxy for the Responses API:
+     ```toml
+     openai_base_url = "http://127.0.0.1:8787/v1"
+     ```
+   - For a one-off session, you can override the same setting on the command line:
+     ```bash
+     codex -c openai_base_url="http://127.0.0.1:8787/v1"
+     ```
+   - Keep your existing Codex auth setup in place. The proxy forwards the
+     Authorization header it receives to the upstream API.
+   - The proxy base URL must keep the `/v1` suffix so Codex continues to call
+     the Responses API endpoint through the proxy.
 
 3. **Use Codex normally**
    - After the one-time setup, Codex talks to the proxy as if it were the
@@ -167,7 +177,7 @@ skill({ name: "review-pr-changelog" })
 skill({ name: "specify-system" })
 ```
 
-OpenCode will automatically load skills and display them in the available skills list.
+OpenCode will automatically load the skills and display them in the available skills list.
 
 
 ## Background

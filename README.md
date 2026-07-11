@@ -120,19 +120,32 @@ and response to disk.
    - Use `--log-dir <path>` if you want to store recordings somewhere else.
 
 2. **Point Codex at the proxy**
-   - Codex reads its user config from `~/.codex/config.toml`.
-   - Add this setting to make Codex use the proxy for the Responses API:
+   - If your Codex build supports provider blocks, point a provider at the proxy
+     and tell Codex to speak the Responses API over that transport:
+     ```toml
+     model_provider = "minimax"
+
+     [model_providers.minimax]
+     name = "Powdrr Lift logging proxy"
+     base_url = "http://127.0.0.1:8787"
+     wire_api = "responses"
+     requires_openai_auth = false
+     ```
+   - That shape keeps Codex on the Responses API path while the proxy logs the
+     request and response bodies and forwards them unchanged to OpenAI.
+   - If your Codex config still uses the legacy `openai_base_url` setting, point
+     it at the proxy root with the `/v1` suffix:
      ```toml
      openai_base_url = "http://127.0.0.1:8787/v1"
      ```
-   - For a one-off session, you can override the same setting on the command line:
+   - For a one-off session with the legacy setting, override it on the command
+     line:
      ```bash
      codex -c openai_base_url="http://127.0.0.1:8787/v1"
      ```
-   - Keep your existing Codex auth setup in place. The proxy forwards the
-     Authorization header it receives to the upstream API.
-   - The proxy base URL must keep the `/v1` suffix so Codex continues to call
-     the Responses API endpoint through the proxy.
+   - Keep your existing Codex auth setup in place if Codex is the component
+     supplying credentials. The proxy forwards the Authorization header it
+     receives to the upstream API.
 
 3. **Use Codex normally**
    - After the one-time setup, Codex talks to the proxy as if it were the

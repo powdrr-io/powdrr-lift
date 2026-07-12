@@ -25,6 +25,7 @@ class WorkflowTaskValidationIssue:
 class WorkflowTaskValidationReport:
     validation_successful: bool
     task_ids: list[str] = field(default_factory=list)
+    task_paths: list[str] = field(default_factory=list)
     issues: list[WorkflowTaskValidationIssue] = field(default_factory=list)
 
 
@@ -47,88 +48,82 @@ class WorkflowTask:
             "description": self.description,
         }
 
+    def to_json(self) -> str:
+        return workflow_task_to_json(self)
+
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> WorkflowTask:
-        task_id = _required_string(data, "task_id")
-        description = _required_string(data, "description")
-        complexity = _required_complexity(data, "complexity")
-        upstream_task_ids = _required_string_sequence(data, "upstream_task_ids")
-        dependent_state = _required_string_sequence(data, "dependent_state")
-        if "input_state" not in data:
-            raise ValueError("Workflow task entries must include input_state.")
-
-        return cls(
-            task_id=task_id,
-            description=description,
-            complexity=complexity,
-            input_state=data["input_state"],
-            upstream_task_ids=upstream_task_ids,
-            dependent_state=dependent_state,
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowTaskDocument:
-    tasks: tuple[WorkflowTask, ...] = field(default_factory=tuple)
-
-    def to_data(self) -> dict[str, Any]:
-        return {"tasks": [task.to_data() for task in self.tasks]}
-
-    def to_json(self) -> str:
-        return workflow_task_document_to_json(self)
+        return workflow_task_from_data(data)
 
     @classmethod
-    def from_data(cls, data: Mapping[str, Any]) -> WorkflowTaskDocument:
-        return workflow_task_document_from_data(data)
+    def from_json(cls, json_content: str) -> WorkflowTask:
+        return workflow_task_from_json(json_content)
 
     @classmethod
-    def from_json(cls, json_content: str) -> WorkflowTaskDocument:
-        return workflow_task_document_from_json(json_content)
+    def from_file(cls, path: str | Path) -> WorkflowTask:
+        return load_workflow_task(path)
+
+    def save(self, path: str | Path) -> Path:
+        return save_workflow_task(self, path)
 
 
-def workflow_task_document_to_json(document: WorkflowTaskDocument) -> str:
-    return json.dumps(document.to_data(), indent=2, ensure_ascii=False) + "\n"
+WorkflowTaskDocument = WorkflowTask
 
 
-def workflow_task_document_from_json(json_content: str) -> WorkflowTaskDocument:
+def workflow_task_to_json(task: WorkflowTask) -> str:
+    return json.dumps(task.to_data(), indent=2, ensure_ascii=False) + "\n"
+
+
+def workflow_task_from_json(json_content: str) -> WorkflowTask:
     loaded_content = json.loads(json_content)
     if not isinstance(loaded_content, Mapping):
-        raise ValueError("Workflow task JSON must decode to a mapping.")
-    return workflow_task_document_from_data(cast("Mapping[str, Any]", loaded_content))
+        raise ValueError("Workflow task JSON must decode to an object.")
+    return workflow_task_from_data(cast("Mapping[str, Any]", loaded_content))
 
 
-def workflow_task_document_from_data(data: Mapping[str, Any]) -> WorkflowTaskDocument:
-    tasks = data.get("tasks")
-    if not isinstance(tasks, Sequence) or isinstance(tasks, (str, bytes, bytearray)):
-        raise ValueError("Workflow task documents must include a tasks array.")
+def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
+    task_id = _required_string(data, "task_id")
+    description = _required_string(data, "description")
+    complexity = _required_complexity(data, "complexity")
+    upstream_task_ids = _required_string_sequence(data, "upstream_task_ids")
+    dependent_state = _required_string_sequence(data, "dependent_state")
+    if "input_state" not in data:
+        raise ValueError("Workflow task entries must include input_state.")
 
-    return WorkflowTaskDocument(
-        tasks=tuple(
-            WorkflowTask.from_data(_require_mapping(task_data, path="tasks[]"))
-            for task_data in tasks
-        ),
+    return WorkflowTask(
+        task_id=task_id,
+        description=description,
+        complexity=complexity,
+        input_state=data["input_state"],
+        upstream_task_ids=upstream_task_ids,
+        dependent_state=dependent_state,
     )
 
 
-def load_workflow_task_document(path: str | Path) -> WorkflowTaskDocument:
-    return workflow_task_document_from_json(Path(path).read_text(encoding="utf-8"))
+def load_workflow_task(path: str | Path) -> WorkflowTask:
+    return workflow_task_from_json(Path(path).read_text(encoding="utf-8"))
 
 
-def save_workflow_task_document(
-    document: WorkflowTaskDocument,
-    path: str | Path,
-) -> Path:
+def save_workflow_task(task: WorkflowTask, path: str | Path) -> Path:
     resolved_path = Path(path)
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_path.write_text(
-        workflow_task_document_to_json(document),
-        encoding="utf-8",
-    )
+    resolved_path.write_text(workflow_task_to_json(task), encoding="utf-8")
     return resolved_path
+
+
+def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:
+    directory_path = Path(directory)
+    return tuple(
+        load_workflow_task(task_path)
+        for task_path in sorted(directory_path.glob("*.json"))
+        if task_path.is_file()
+    )
 
 
 def build_workflow_task_validation_report(
     json_content: str,
+    *,
+    source_path: str | Path | None = None,
 ) -> WorkflowTaskValidationReport:
     try:
         loaded_content = json.loads(json_content)
@@ -136,10 +131,12 @@ def build_workflow_task_validation_report(
         return WorkflowTaskValidationReport(
             validation_successful=False,
             task_ids=[],
+            task_paths=_task_paths_list(source_path),
             issues=[
                 WorkflowTaskValidationIssue(
                     code="invalid_json",
                     message=f"Could not parse workflow task JSON: {exc}",
+                    path=_format_path(source_path),
                 )
             ],
         )
@@ -148,281 +145,306 @@ def build_workflow_task_validation_report(
         return WorkflowTaskValidationReport(
             validation_successful=False,
             task_ids=[],
+            task_paths=_task_paths_list(source_path),
             issues=[
                 WorkflowTaskValidationIssue(
                     code="invalid_root_type",
                     message="Workflow task JSON must decode to an object.",
+                    path=_format_path(source_path),
                 )
             ],
         )
 
-    raw_document = cast("Mapping[str, Any]", loaded_content)
+    raw_task = cast("Mapping[str, Any]", loaded_content)
     issues: list[WorkflowTaskValidationIssue] = []
 
-    allowed_top_level_keys = {"tasks"}
     _validate_unknown_keys(
-        raw_document,
-        allowed_top_level_keys,
+        raw_task,
+        {
+            "task_id",
+            "upstream_task_ids",
+            "dependent_state",
+            "complexity",
+            "input_state",
+            "description",
+        },
         issues,
-        path="",
-        subject="workflow task document",
+        path=_format_path(source_path) or "",
+        subject="workflow task",
     )
 
-    raw_tasks = raw_document.get("tasks")
-    if not isinstance(raw_tasks, Sequence) or isinstance(
-        raw_tasks,
+    task_id = _optional_string(raw_task.get("task_id"))
+    if task_id is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_task_id",
+                message="Workflow task entries must include a non-empty task_id.",
+                path=_format_child_path(source_path, "task_id"),
+            )
+        )
+
+    description = _optional_string(raw_task.get("description"))
+    if description is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_description",
+                message="Workflow task entries must include a non-empty description.",
+                path=_format_child_path(source_path, "description"),
+            )
+        )
+
+    complexity = _optional_string(raw_task.get("complexity"))
+    if complexity is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_complexity",
+                message="Workflow task entries must include a non-empty complexity.",
+                path=_format_child_path(source_path, "complexity"),
+            )
+        )
+    elif complexity not in {member.value for member in TaskComplexity}:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_complexity",
+                message=(
+                    "Workflow task complexity must be one of low, medium, or high."
+                ),
+                path=_format_child_path(source_path, "complexity"),
+            )
+        )
+
+    if "input_state" not in raw_task:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_input_state",
+                message="Workflow task entries must include input_state.",
+                path=_format_child_path(source_path, "input_state"),
+            )
+        )
+    elif raw_task.get("input_state") is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="null_input_state",
+                message="Workflow task input_state must not be null.",
+                path=_format_child_path(source_path, "input_state"),
+            )
+        )
+
+    upstream_task_ids = raw_task.get("upstream_task_ids")
+    if not isinstance(upstream_task_ids, Sequence) or isinstance(
+        upstream_task_ids,
         (str, bytes, bytearray),
     ):
         issues.append(
             WorkflowTaskValidationIssue(
-                code="invalid_tasks_type",
-                message="Workflow task documents must include a tasks array.",
-                path="tasks",
+                code="invalid_upstream_task_ids_type",
+                message="Workflow task upstream_task_ids must be an array.",
+                path=_format_child_path(source_path, "upstream_task_ids"),
             )
         )
-        return WorkflowTaskValidationReport(
-            validation_successful=False,
-            task_ids=[],
-            issues=issues,
-        )
-
-    task_ids: list[str] = []
-    task_ids_by_index: list[str | None] = []
-    seen_task_ids: set[str] = set()
-    tasks_by_id: dict[str, int] = {}
-
-    for index, raw_task in enumerate(raw_tasks):
-        task_path = f"tasks[{index}]"
-        if not isinstance(raw_task, Mapping):
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="invalid_task_type",
-                    message="Workflow task entries must be objects.",
-                    path=task_path,
-                )
-            )
-            task_ids_by_index.append(None)
-            continue
-
-        raw_task_mapping = cast("Mapping[str, Any]", raw_task)
-        _validate_unknown_keys(
-            raw_task_mapping,
-            {
-                "task_id",
-                "upstream_task_ids",
-                "dependent_state",
-                "complexity",
-                "input_state",
-                "description",
-            },
-            issues,
-            path=task_path,
-            subject="workflow task",
-        )
-
-        task_id = _optional_string(raw_task_mapping.get("task_id"))
-        if task_id is None:
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="missing_task_id",
-                    message="Workflow task entries must include a non-empty task_id.",
-                    path=f"{task_path}.task_id",
-                )
-            )
-            task_ids_by_index.append(None)
-        else:
-            task_ids_by_index.append(task_id)
-            task_ids.append(task_id)
-            if task_id in seen_task_ids:
-                issues.append(
-                    WorkflowTaskValidationIssue(
-                        code="duplicate_task_id",
-                        message=f"Workflow task id {task_id!r} appears more than once.",
-                        path=f"{task_path}.task_id",
-                    )
-                )
-            else:
-                seen_task_ids.add(task_id)
-                tasks_by_id[task_id] = index
-
-        description = _optional_string(raw_task_mapping.get("description"))
-        if description is None:
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="missing_description",
-                    message=(
-                        "Workflow task entries must include a non-empty description."
-                    ),
-                    path=f"{task_path}.description",
-                )
-            )
-
-        complexity = _optional_string(raw_task_mapping.get("complexity"))
-        if complexity is None:
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="missing_complexity",
-                    message=(
-                        "Workflow task entries must include a non-empty complexity."
-                    ),
-                    path=f"{task_path}.complexity",
-                )
-            )
-        elif complexity not in {member.value for member in TaskComplexity}:
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="invalid_complexity",
-                    message=(
-                        "Workflow task complexity must be one of low, medium, or high."
-                    ),
-                    path=f"{task_path}.complexity",
-                )
-            )
-
-        if "input_state" not in raw_task_mapping:
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="missing_input_state",
-                    message="Workflow task entries must include input_state.",
-                    path=f"{task_path}.input_state",
-                )
-            )
-        elif raw_task_mapping.get("input_state") is None:
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="null_input_state",
-                    message="Workflow task input_state must not be null.",
-                    path=f"{task_path}.input_state",
-                )
-            )
-
-        upstream_task_ids = raw_task_mapping.get("upstream_task_ids")
-        if not isinstance(upstream_task_ids, Sequence) or isinstance(
-            upstream_task_ids,
-            (str, bytes, bytearray),
-        ):
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="invalid_upstream_task_ids_type",
-                    message="Workflow task upstream_task_ids must be an array.",
-                    path=f"{task_path}.upstream_task_ids",
-                )
-            )
-        else:
-            seen_upstream_ids: set[str] = set()
-            for upstream_index, upstream_id in enumerate(upstream_task_ids):
-                normalized_upstream_id = _optional_string(upstream_id)
-                if normalized_upstream_id is None:
-                    issues.append(
-                        WorkflowTaskValidationIssue(
-                            code="invalid_upstream_task_id",
-                            message=(
-                                "Workflow task upstream_task_ids must contain "
-                                "non-empty strings."
-                            ),
-                            path=f"{task_path}.upstream_task_ids[{upstream_index}]",
-                        )
-                    )
-                    continue
-                if normalized_upstream_id == task_id:
-                    issues.append(
-                        WorkflowTaskValidationIssue(
-                            code="self_dependency",
-                            message=(
-                                "A workflow task cannot list itself as an upstream "
-                                "task."
-                            ),
-                            path=f"{task_path}.upstream_task_ids[{upstream_index}]",
-                        )
-                    )
-                if normalized_upstream_id in seen_upstream_ids:
-                    issues.append(
-                        WorkflowTaskValidationIssue(
-                            code="duplicate_upstream_task_id",
-                            message=(
-                                "Workflow task upstream_task_ids must not contain "
-                                "duplicates."
-                            ),
-                            path=f"{task_path}.upstream_task_ids[{upstream_index}]",
-                        )
-                    )
-                    continue
-                seen_upstream_ids.add(normalized_upstream_id)
-
-        dependent_state = raw_task_mapping.get("dependent_state")
-        if not isinstance(dependent_state, Sequence) or isinstance(
-            dependent_state,
-            (str, bytes, bytearray),
-        ):
-            issues.append(
-                WorkflowTaskValidationIssue(
-                    code="invalid_dependent_state_type",
-                    message="Workflow task dependent_state must be an array.",
-                    path=f"{task_path}.dependent_state",
-                )
-            )
-        else:
-            seen_dependent_states: set[str] = set()
-            for state_index, state_value in enumerate(dependent_state):
-                normalized_state = _optional_string(state_value)
-                if normalized_state is None:
-                    issues.append(
-                        WorkflowTaskValidationIssue(
-                            code="invalid_dependent_state_item",
-                            message=(
-                                "Workflow task dependent_state must contain "
-                                "non-empty strings."
-                            ),
-                            path=f"{task_path}.dependent_state[{state_index}]",
-                        )
-                    )
-                    continue
-                if normalized_state in seen_dependent_states:
-                    issues.append(
-                        WorkflowTaskValidationIssue(
-                            code="duplicate_dependent_state",
-                            message=(
-                                "Workflow task dependent_state must not contain "
-                                "duplicates."
-                            ),
-                            path=f"{task_path}.dependent_state[{state_index}]",
-                        )
-                    )
-                    continue
-                seen_dependent_states.add(normalized_state)
-
-    for index, raw_task in enumerate(raw_tasks):
-        if not isinstance(raw_task, Mapping):
-            continue
-        raw_task_mapping = cast("Mapping[str, Any]", raw_task)
-        task_id = task_ids_by_index[index]
-        if task_id is None:
-            continue
-        upstream_task_ids = raw_task_mapping.get("upstream_task_ids")
-        if not isinstance(upstream_task_ids, Sequence) or isinstance(
-            upstream_task_ids,
-            (str, bytes, bytearray),
-        ):
-            continue
+    else:
+        seen_upstream_ids: set[str] = set()
         for upstream_index, upstream_id in enumerate(upstream_task_ids):
             normalized_upstream_id = _optional_string(upstream_id)
             if normalized_upstream_id is None:
+                issues.append(
+                    WorkflowTaskValidationIssue(
+                        code="invalid_upstream_task_id",
+                        message=(
+                            "Workflow task upstream_task_ids must contain "
+                            "non-empty strings."
+                        ),
+                        path=_format_sequence_path(
+                            source_path,
+                            "upstream_task_ids",
+                            upstream_index,
+                        ),
+                    )
+                )
                 continue
-            if normalized_upstream_id not in tasks_by_id:
+            if task_id is not None and normalized_upstream_id == task_id:
+                issues.append(
+                    WorkflowTaskValidationIssue(
+                        code="self_dependency",
+                        message=(
+                            "A workflow task cannot list itself as an upstream task."
+                        ),
+                        path=_format_sequence_path(
+                            source_path,
+                            "upstream_task_ids",
+                            upstream_index,
+                        ),
+                    )
+                )
+            if normalized_upstream_id in seen_upstream_ids:
+                issues.append(
+                    WorkflowTaskValidationIssue(
+                        code="duplicate_upstream_task_id",
+                        message=(
+                            "Workflow task upstream_task_ids must not contain "
+                            "duplicates."
+                        ),
+                        path=_format_sequence_path(
+                            source_path,
+                            "upstream_task_ids",
+                            upstream_index,
+                        ),
+                    )
+                )
+                continue
+            seen_upstream_ids.add(normalized_upstream_id)
+
+    dependent_state = raw_task.get("dependent_state")
+    if not isinstance(dependent_state, Sequence) or isinstance(
+        dependent_state,
+        (str, bytes, bytearray),
+    ):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_dependent_state_type",
+                message="Workflow task dependent_state must be an array.",
+                path=_format_child_path(source_path, "dependent_state"),
+            )
+        )
+    else:
+        seen_dependent_states: set[str] = set()
+        for state_index, state_value in enumerate(dependent_state):
+            normalized_state = _optional_string(state_value)
+            if normalized_state is None:
+                issues.append(
+                    WorkflowTaskValidationIssue(
+                        code="invalid_dependent_state_item",
+                        message=(
+                            "Workflow task dependent_state must contain "
+                            "non-empty strings."
+                        ),
+                        path=_format_sequence_path(
+                            source_path,
+                            "dependent_state",
+                            state_index,
+                        ),
+                    )
+                )
+                continue
+            if normalized_state in seen_dependent_states:
+                issues.append(
+                    WorkflowTaskValidationIssue(
+                        code="duplicate_dependent_state",
+                        message=(
+                            "Workflow task dependent_state must not contain duplicates."
+                        ),
+                        path=_format_sequence_path(
+                            source_path,
+                            "dependent_state",
+                            state_index,
+                        ),
+                    )
+                )
+                continue
+            seen_dependent_states.add(normalized_state)
+
+    if task_id is None or description is None or complexity is None:
+        return WorkflowTaskValidationReport(
+            validation_successful=False,
+            task_ids=[task_id] if task_id is not None else [],
+            task_paths=_task_paths_list(source_path),
+            issues=issues,
+        )
+
+    return WorkflowTaskValidationReport(
+        validation_successful=not issues,
+        task_ids=[task_id],
+        task_paths=_task_paths_list(source_path),
+        issues=issues,
+    )
+
+
+def build_workflow_task_directory_validation_report(
+    directory: str | Path,
+) -> WorkflowTaskValidationReport:
+    directory_path = Path(directory)
+    if not directory_path.exists():
+        return WorkflowTaskValidationReport(
+            validation_successful=False,
+            issues=[
+                WorkflowTaskValidationIssue(
+                    code="missing_directory",
+                    message=f"Workflow task directory does not exist: {directory_path}",
+                    path=str(directory_path),
+                )
+            ],
+        )
+    if not directory_path.is_dir():
+        return WorkflowTaskValidationReport(
+            validation_successful=False,
+            issues=[
+                WorkflowTaskValidationIssue(
+                    code="not_a_directory",
+                    message=f"Workflow task path is not a directory: {directory_path}",
+                    path=str(directory_path),
+                )
+            ],
+        )
+
+    issues: list[WorkflowTaskValidationIssue] = []
+    task_ids: list[str] = []
+    task_paths: list[str] = []
+    tasks_by_id: dict[str, Path] = {}
+    upstream_references: list[tuple[Path, WorkflowTask]] = []
+
+    for task_path in sorted(directory_path.glob("*.json")):
+        if not task_path.is_file():
+            continue
+        task_paths.append(str(task_path))
+        raw_content = task_path.read_text(encoding="utf-8")
+        file_report = build_workflow_task_validation_report(
+            raw_content,
+            source_path=task_path,
+        )
+        issues.extend(file_report.issues)
+        if not file_report.validation_successful or not file_report.task_ids:
+            continue
+
+        task = workflow_task_from_json(raw_content)
+        task_id = task.task_id
+        upstream_references.append((task_path, task))
+        if task_id in tasks_by_id:
+            issues.append(
+                WorkflowTaskValidationIssue(
+                    code="duplicate_task_id",
+                    message=(
+                        f"Workflow task id {task_id!r} appears in both "
+                        f"{tasks_by_id[task_id]} and {task_path}."
+                    ),
+                    path=str(task_path),
+                )
+            )
+        else:
+            tasks_by_id[task_id] = task_path
+            task_ids.append(task_id)
+
+    for task_path, task in upstream_references:
+        for upstream_index, upstream_task_id in enumerate(task.upstream_task_ids):
+            if upstream_task_id not in tasks_by_id:
                 issues.append(
                     WorkflowTaskValidationIssue(
                         code="missing_upstream_task",
                         message=(
-                            f"Workflow task {task_id!r} references unknown upstream "
-                            f"task {normalized_upstream_id!r}."
+                            f"Workflow task {task.task_id!r} references unknown "
+                            f"upstream task {upstream_task_id!r}."
                         ),
-                        path=f"tasks[{index}].upstream_task_ids[{upstream_index}]",
+                        path=_format_sequence_path(
+                            task_path,
+                            "upstream_task_ids",
+                            upstream_index,
+                        ),
                     )
                 )
 
     return WorkflowTaskValidationReport(
         validation_successful=not issues,
         task_ids=task_ids,
+        task_paths=task_paths,
         issues=issues,
     )
 
@@ -442,10 +464,31 @@ def validate_workflow_task_json_file(path: str | Path) -> str:
     return validate_workflow_task_json(Path(path).read_text(encoding="utf-8"))
 
 
+def validate_workflow_task_directory(directory: str | Path) -> str:
+    return (
+        json.dumps(
+            _report_to_data(build_workflow_task_directory_validation_report(directory)),
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
+
+
+workflow_task_document_to_json = workflow_task_to_json
+workflow_task_document_from_json = workflow_task_from_json
+workflow_task_document_from_data = workflow_task_from_data
+load_workflow_task_document = load_workflow_task
+save_workflow_task_document = save_workflow_task
+load_workflow_task_documents = load_workflow_tasks
+validate_workflow_task_directory_json = validate_workflow_task_directory
+
+
 def _report_to_data(report: WorkflowTaskValidationReport) -> dict[str, Any]:
     return {
         "validation_successful": report.validation_successful,
         "task_ids": report.task_ids,
+        "task_paths": report.task_paths,
         "issues": [
             {
                 "code": issue.code,
@@ -499,12 +542,6 @@ def _optional_string(value: object) -> str | None:
     return normalized if normalized else None
 
 
-def _require_mapping(value: object, *, path: str) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise ValueError(f"Expected a mapping at {path}.")
-    return cast("Mapping[str, Any]", value)
-
-
 def _validate_unknown_keys(
     data: Mapping[str, Any],
     allowed_keys: set[str],
@@ -523,3 +560,38 @@ def _validate_unknown_keys(
                 path=f"{path}.{key}" if path else key,
             )
         )
+
+
+def _format_source_path(source_path: str | Path | None) -> str | None:
+    if source_path is None:
+        return None
+    return str(Path(source_path))
+
+
+def _task_paths_list(source_path: str | Path | None) -> list[str]:
+    formatted_source_path = _format_source_path(source_path)
+    return [formatted_source_path] if formatted_source_path is not None else []
+
+
+def _format_path(source_path: str | Path | None) -> str | None:
+    if source_path is None:
+        return None
+    return str(Path(source_path))
+
+
+def _format_child_path(source_path: str | Path | None, key: str) -> str | None:
+    formatted_source_path = _format_path(source_path)
+    if formatted_source_path is None:
+        return key
+    return f"{formatted_source_path}.{key}"
+
+
+def _format_sequence_path(
+    source_path: str | Path | None,
+    key: str,
+    index: int,
+) -> str | None:
+    formatted_source_path = _format_path(source_path)
+    if formatted_source_path is None:
+        return f"{key}[{index}]"
+    return f"{formatted_source_path}.{key}[{index}]"

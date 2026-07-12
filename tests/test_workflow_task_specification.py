@@ -6,162 +6,177 @@ from pathlib import Path
 from powdrr_lift.core.workflow_task_specification import (
     TaskComplexity,
     WorkflowTask,
-    WorkflowTaskDocument,
+    build_workflow_task_directory_validation_report,
     build_workflow_task_validation_report,
-    load_workflow_task_document,
-    save_workflow_task_document,
-    validate_workflow_task_json,
-    workflow_task_document_from_json,
-    workflow_task_document_to_json,
+    load_workflow_task,
+    load_workflow_tasks,
+    save_workflow_task,
+    validate_workflow_task_directory,
+    workflow_task_from_json,
+    workflow_task_to_json,
 )
 
 
-def test_workflow_task_document_round_trips_through_json() -> None:
-    document = WorkflowTaskDocument(
-        tasks=(
-            WorkflowTask(
-                task_id="task-1",
-                upstream_task_ids=(),
-                dependent_state=("state-a", "state-b"),
-                complexity=TaskComplexity.MEDIUM,
-                input_state={"environment": "staging"},
-                description="Prepare the deployment environment.",
-            ),
-            WorkflowTask(
-                task_id="task-2",
-                upstream_task_ids=("task-1",),
-                dependent_state=("state-c",),
-                complexity=TaskComplexity.HIGH,
-                input_state=["artifact-a", "artifact-b"],
-                description="Promote the release artifacts.",
-            ),
-        ),
+def test_workflow_task_round_trips_through_json() -> None:
+    task = WorkflowTask(
+        task_id="task-1",
+        upstream_task_ids=("task-0",),
+        dependent_state=("state-a", "state-b"),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"environment": "staging"},
+        description="Prepare the deployment environment.",
     )
 
-    json_text = workflow_task_document_to_json(document)
-    parsed = workflow_task_document_from_json(json_text)
+    json_text = workflow_task_to_json(task)
+    parsed = workflow_task_from_json(json_text)
 
-    assert parsed == document
+    assert parsed == task
     assert json.loads(json_text) == {
-        "tasks": [
-            {
-                "task_id": "task-1",
-                "upstream_task_ids": [],
-                "dependent_state": ["state-a", "state-b"],
-                "complexity": "medium",
-                "input_state": {"environment": "staging"},
-                "description": "Prepare the deployment environment.",
-            },
-            {
-                "task_id": "task-2",
-                "upstream_task_ids": ["task-1"],
-                "dependent_state": ["state-c"],
-                "complexity": "high",
-                "input_state": ["artifact-a", "artifact-b"],
-                "description": "Promote the release artifacts.",
-            },
-        ]
+        "task_id": "task-1",
+        "upstream_task_ids": ["task-0"],
+        "dependent_state": ["state-a", "state-b"],
+        "complexity": "medium",
+        "input_state": {"environment": "staging"},
+        "description": "Prepare the deployment environment.",
     }
 
 
-def test_workflow_task_document_validation_accepts_known_dependencies() -> None:
-    json_text = """
-    {
-      "tasks": [
-        {
-          "task_id": "task-1",
-          "upstream_task_ids": [],
-          "dependent_state": ["state-a"],
-          "complexity": "low",
-          "input_state": {"ready": true},
-          "description": "First task."
-        },
-        {
-          "task_id": "task-2",
-          "upstream_task_ids": ["task-1"],
-          "dependent_state": ["state-b"],
-          "complexity": "medium",
-          "input_state": {"ready": false},
-          "description": "Second task."
-        }
-      ]
-    }
-    """
+def test_workflow_task_directory_loader_reads_all_json_files(
+    tmp_path: Path,
+) -> None:
+    task_a = WorkflowTask(
+        task_id="task-a",
+        upstream_task_ids=(),
+        dependent_state=("state-a",),
+        complexity=TaskComplexity.LOW,
+        input_state={"ready": True},
+        description="First task.",
+    )
+    task_b = WorkflowTask(
+        task_id="task-b",
+        upstream_task_ids=("task-a",),
+        dependent_state=("state-b",),
+        complexity=TaskComplexity.HIGH,
+        input_state={"ready": False},
+        description="Second task.",
+    )
 
-    report = build_workflow_task_validation_report(json_text)
+    save_workflow_task(task_b, tmp_path / "b.json")
+    save_workflow_task(task_a, tmp_path / "a.json")
+
+    assert load_workflow_tasks(tmp_path) == (task_a, task_b)
+
+
+def test_workflow_task_directory_validation_accepts_known_dependencies(
+    tmp_path: Path,
+) -> None:
+    save_workflow_task(
+        WorkflowTask(
+            task_id="task-1",
+            upstream_task_ids=(),
+            dependent_state=("state-a",),
+            complexity=TaskComplexity.LOW,
+            input_state={"ready": True},
+            description="First task.",
+        ),
+        tmp_path / "task-1.json",
+    )
+    save_workflow_task(
+        WorkflowTask(
+            task_id="task-2",
+            upstream_task_ids=("task-1",),
+            dependent_state=("state-b",),
+            complexity=TaskComplexity.MEDIUM,
+            input_state={"ready": False},
+            description="Second task.",
+        ),
+        tmp_path / "task-2.json",
+    )
+
+    report = build_workflow_task_directory_validation_report(tmp_path)
 
     assert report.validation_successful is True
     assert report.task_ids == ["task-1", "task-2"]
     assert report.issues == []
-    assert json.loads(validate_workflow_task_json(json_text)) == {
+    assert json.loads(validate_workflow_task_directory(tmp_path)) == {
         "validation_successful": True,
         "task_ids": ["task-1", "task-2"],
+        "task_paths": [
+            str(tmp_path / "task-1.json"),
+            str(tmp_path / "task-2.json"),
+        ],
         "issues": [],
     }
 
 
-def test_workflow_task_document_validation_rejects_missing_upstream_task() -> None:
-    json_text = """
-    {
-      "tasks": [
-        {
-          "task_id": "task-2",
-          "upstream_task_ids": ["missing-task"],
-          "dependent_state": ["state-b"],
-          "complexity": "high",
-          "input_state": {"ready": false},
-          "description": "Second task."
-        }
-      ]
-    }
-    """
+def test_workflow_task_directory_validation_rejects_missing_upstream_task(
+    tmp_path: Path,
+) -> None:
+    save_workflow_task(
+        WorkflowTask(
+            task_id="task-2",
+            upstream_task_ids=("missing-task",),
+            dependent_state=("state-b",),
+            complexity=TaskComplexity.HIGH,
+            input_state={"ready": False},
+            description="Second task.",
+        ),
+        tmp_path / "task-2.json",
+    )
 
-    report = build_workflow_task_validation_report(json_text)
+    report = build_workflow_task_directory_validation_report(tmp_path)
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["missing_upstream_task"]
     assert "missing-task" in report.issues[0].message
-    assert report.issues[0].path == "tasks[0].upstream_task_ids[0]"
+    assert report.issues[0].path == f"{tmp_path / 'task-2.json'}.upstream_task_ids[0]"
 
 
-def test_workflow_task_document_validation_rejects_malformed_tasks_array() -> None:
+def test_workflow_task_directory_validation_rejects_malformed_json(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "task-1.json").write_text(
+        "{ invalid json",
+        encoding="utf-8",
+    )
+
+    report = build_workflow_task_directory_validation_report(tmp_path)
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["invalid_json"]
+    assert report.issues[0].path == str(tmp_path / "task-1.json")
+
+
+def test_workflow_task_validation_reports_unknown_keys() -> None:
     report = build_workflow_task_validation_report(
         json.dumps(
             {
-                "tasks": [
-                    {
-                        "task_id": "task-1",
-                        "upstream_task_ids": [],
-                        "dependent_state": ["state-a"],
-                        "complexity": "low",
-                        "input_state": {"ready": True},
-                        "description": "Task one.",
-                        "unexpected": "field",
-                    }
-                ]
+                "task_id": "task-1",
+                "upstream_task_ids": [],
+                "dependent_state": ["state-a"],
+                "complexity": "low",
+                "input_state": {"ready": True},
+                "description": "Task one.",
+                "unexpected": "field",
             }
         )
     )
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["unknown_key"]
-    assert report.issues[0].path == "tasks[0].unexpected"
+    assert report.issues[0].path == "unexpected"
 
 
-def test_workflow_task_document_file_helpers_round_trip(tmp_path: Path) -> None:
-    document = WorkflowTaskDocument(
-        tasks=(
-            WorkflowTask(
-                task_id="task-1",
-                upstream_task_ids=(),
-                dependent_state=(),
-                complexity=TaskComplexity.LOW,
-                input_state={"ready": True},
-                description="Task one.",
-            ),
-        ),
+def test_workflow_task_file_helpers_round_trip(tmp_path: Path) -> None:
+    task = WorkflowTask(
+        task_id="task-1",
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.LOW,
+        input_state={"ready": True},
+        description="Task one.",
     )
 
-    output_path = save_workflow_task_document(document, tmp_path / "tasks.json")
+    output_path = save_workflow_task(task, tmp_path / "task-1.json")
     assert output_path.exists()
-    assert load_workflow_task_document(output_path) == document
+    assert load_workflow_task(output_path) == task

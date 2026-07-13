@@ -674,8 +674,6 @@ def __getattr__(name: str) -> Any:
         "save_workflow_task",
         "save_workflow_task_document",
         "select_ready_workflow_tasks",
-        "validate_workflow_template_json",
-        "validate_workflow_template_json_file",
         "validate_workflow_task_directory",
         "validate_workflow_task_directory_json",
         "validate_workflow_task_json",

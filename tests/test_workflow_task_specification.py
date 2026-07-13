@@ -12,6 +12,7 @@ from powdrr_lift.core.workflow_task_specification import (
     load_workflow_task,
     load_workflow_tasks,
     save_workflow_task,
+    select_ready_workflow_tasks,
     validate_workflow_task_directory,
     workflow_task_from_json,
     workflow_task_to_json,
@@ -210,3 +211,60 @@ def test_workflow_task_file_helpers_round_trip(tmp_path: Path) -> None:
     output_path = save_workflow_task(task, tmp_path / "task-1.json")
     assert output_path.exists()
     assert load_workflow_task(output_path) == task
+
+
+def test_select_ready_workflow_tasks_returns_ready_open_tasks() -> None:
+    task_a = WorkflowTask(
+        task_id="task-a",
+        status=TaskStatus.COMPLETED,
+        upstream_task_ids=(),
+        dependent_state=("state-a",),
+        complexity=TaskComplexity.LOW,
+        input_state={"ready": True},
+        description="Completed upstream.",
+    )
+    task_b = WorkflowTask(
+        task_id="task-b",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("task-a",),
+        dependent_state=("state-b",),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"ready": False},
+        description="Ready to run.",
+    )
+    task_c = WorkflowTask(
+        task_id="task-c",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("task-b",),
+        dependent_state=("state-c",),
+        complexity=TaskComplexity.HIGH,
+        input_state={"ready": False},
+        description="Blocked by open upstream.",
+    )
+    task_d = WorkflowTask(
+        task_id="task-d",
+        status=TaskStatus.LOCKED,
+        upstream_task_ids=("task-a",),
+        dependent_state=("state-d",),
+        complexity=TaskComplexity.LOW,
+        input_state={"ready": False},
+        description="Not open.",
+    )
+
+    ready_tasks = select_ready_workflow_tasks((task_a, task_b, task_c, task_d))
+
+    assert ready_tasks == (task_b,)
+
+
+def test_select_ready_workflow_tasks_excludes_missing_upstreams() -> None:
+    task = WorkflowTask(
+        task_id="task-a",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("missing-task",),
+        dependent_state=("state-a",),
+        complexity=TaskComplexity.LOW,
+        input_state={"ready": True},
+        description="Blocked by missing upstream.",
+    )
+
+    assert select_ready_workflow_tasks((task,)) == ()

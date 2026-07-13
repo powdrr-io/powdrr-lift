@@ -132,6 +132,22 @@ def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:
     )
 
 
+def select_ready_workflow_tasks(
+    tasks: Sequence[WorkflowTask],
+) -> tuple[WorkflowTask, ...]:
+    tasks_by_id = {task.task_id: task for task in tasks}
+    return tuple(
+        task
+        for task in tasks
+        if task.status is TaskStatus.OPEN
+        and all(
+            tasks_by_id.get(upstream_task_id) is not None
+            and tasks_by_id[upstream_task_id].status is TaskStatus.COMPLETED
+            for upstream_task_id in task.upstream_task_ids
+        )
+    )
+
+
 def build_workflow_task_validation_report(
     json_content: str,
     *,

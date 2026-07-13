@@ -5,6 +5,7 @@ from pathlib import Path
 
 from powdrr_lift.core.workflow_task_specification import (
     TaskComplexity,
+    TaskStatus,
     WorkflowTask,
     build_workflow_task_directory_validation_report,
     build_workflow_task_validation_report,
@@ -20,6 +21,7 @@ from powdrr_lift.core.workflow_task_specification import (
 def test_workflow_task_round_trips_through_json() -> None:
     task = WorkflowTask(
         task_id="task-1",
+        status=TaskStatus.OPEN,
         upstream_task_ids=("task-0",),
         dependent_state=("state-a", "state-b"),
         complexity=TaskComplexity.MEDIUM,
@@ -33,6 +35,7 @@ def test_workflow_task_round_trips_through_json() -> None:
     assert parsed == task
     assert json.loads(json_text) == {
         "task_id": "task-1",
+        "status": "open",
         "upstream_task_ids": ["task-0"],
         "dependent_state": ["state-a", "state-b"],
         "complexity": "medium",
@@ -46,6 +49,7 @@ def test_workflow_task_directory_loader_reads_all_json_files(
 ) -> None:
     task_a = WorkflowTask(
         task_id="task-a",
+        status=TaskStatus.OPEN,
         upstream_task_ids=(),
         dependent_state=("state-a",),
         complexity=TaskComplexity.LOW,
@@ -54,6 +58,7 @@ def test_workflow_task_directory_loader_reads_all_json_files(
     )
     task_b = WorkflowTask(
         task_id="task-b",
+        status=TaskStatus.LOCKED,
         upstream_task_ids=("task-a",),
         dependent_state=("state-b",),
         complexity=TaskComplexity.HIGH,
@@ -73,6 +78,7 @@ def test_workflow_task_directory_validation_accepts_known_dependencies(
     save_workflow_task(
         WorkflowTask(
             task_id="task-1",
+            status=TaskStatus.OPEN,
             upstream_task_ids=(),
             dependent_state=("state-a",),
             complexity=TaskComplexity.LOW,
@@ -84,6 +90,7 @@ def test_workflow_task_directory_validation_accepts_known_dependencies(
     save_workflow_task(
         WorkflowTask(
             task_id="task-2",
+            status=TaskStatus.OPEN,
             upstream_task_ids=("task-1",),
             dependent_state=("state-b",),
             complexity=TaskComplexity.MEDIUM,
@@ -115,6 +122,7 @@ def test_workflow_task_directory_validation_rejects_missing_upstream_task(
     save_workflow_task(
         WorkflowTask(
             task_id="task-2",
+            status=TaskStatus.ABANDONED,
             upstream_task_ids=("missing-task",),
             dependent_state=("state-b",),
             complexity=TaskComplexity.HIGH,
@@ -152,6 +160,7 @@ def test_workflow_task_validation_reports_unknown_keys() -> None:
         json.dumps(
             {
                 "task_id": "task-1",
+                "status": "completed",
                 "upstream_task_ids": [],
                 "dependent_state": ["state-a"],
                 "complexity": "low",
@@ -167,9 +176,30 @@ def test_workflow_task_validation_reports_unknown_keys() -> None:
     assert report.issues[0].path == "unexpected"
 
 
+def test_workflow_task_validation_rejects_invalid_status() -> None:
+    report = build_workflow_task_validation_report(
+        json.dumps(
+            {
+                "task_id": "task-1",
+                "status": "in-progress",
+                "upstream_task_ids": [],
+                "dependent_state": ["state-a"],
+                "complexity": "low",
+                "input_state": {"ready": True},
+                "description": "Task one.",
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["invalid_status"]
+    assert report.issues[0].path == "status"
+
+
 def test_workflow_task_file_helpers_round_trip(tmp_path: Path) -> None:
     task = WorkflowTask(
         task_id="task-1",
+        status=TaskStatus.COMPLETED,
         upstream_task_ids=(),
         dependent_state=(),
         complexity=TaskComplexity.LOW,

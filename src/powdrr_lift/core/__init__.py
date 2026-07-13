@@ -161,6 +161,7 @@ from powdrr_lift.core.template import (
 )
 from powdrr_lift.core.workflow_task_specification import (
     TaskComplexity,
+    TaskStatus,
     WorkflowTask,
     WorkflowTaskDocument,
     WorkflowTaskValidationIssue,
@@ -217,6 +218,7 @@ _EXPORTS: dict[str, str] = {
     "SystemSpecificationValidationIssue": _SYSTEM,
     "SystemSpecificationValidationReport": _SYSTEM,
     "TaskComplexity": _WORKFLOW_TASK_SPECIFICATION,
+    "TaskStatus": _WORKFLOW_TASK_SPECIFICATION,
     "PRSpecificationValidationIssue": _PR_SPECIFICATION,
     "PRSpecificationValidationReport": _PR_SPECIFICATION,
     "ProposedPRSearchReport": _PR_SPECIFICATION,

@@ -14,6 +14,14 @@ class TaskComplexity(StrEnum):
     HIGH = "high"
 
 
+class TaskStatus(StrEnum):
+    OPEN = "open"
+    COMPLETED = "completed"
+    SUPERCEDED = "superceded"
+    ABANDONED = "abandoned"
+    LOCKED = "locked"
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowTaskValidationIssue:
     code: str
@@ -32,6 +40,7 @@ class WorkflowTaskValidationReport:
 @dataclass(frozen=True, slots=True)
 class WorkflowTask:
     task_id: str
+    status: TaskStatus
     description: str
     complexity: TaskComplexity
     input_state: Any
@@ -41,6 +50,7 @@ class WorkflowTask:
     def to_data(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
+            "status": self.status.value,
             "upstream_task_ids": list(self.upstream_task_ids),
             "dependent_state": list(self.dependent_state),
             "complexity": self.complexity.value,
@@ -83,6 +93,7 @@ def workflow_task_from_json(json_content: str) -> WorkflowTask:
 
 def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     task_id = _required_string(data, "task_id")
+    status = _required_status(data, "status")
     description = _required_string(data, "description")
     complexity = _required_complexity(data, "complexity")
     upstream_task_ids = _required_string_sequence(data, "upstream_task_ids")
@@ -92,6 +103,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
 
     return WorkflowTask(
         task_id=task_id,
+        status=status,
         description=description,
         complexity=complexity,
         input_state=data["input_state"],
@@ -162,6 +174,7 @@ def build_workflow_task_validation_report(
         raw_task,
         {
             "task_id",
+            "status",
             "upstream_task_ids",
             "dependent_state",
             "complexity",
@@ -190,6 +203,27 @@ def build_workflow_task_validation_report(
                 code="missing_description",
                 message="Workflow task entries must include a non-empty description.",
                 path=_format_child_path(source_path, "description"),
+            )
+        )
+
+    status = _optional_string(raw_task.get("status"))
+    if status is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_status",
+                message="Workflow task entries must include a non-empty status.",
+                path=_format_child_path(source_path, "status"),
+            )
+        )
+    elif status not in {member.value for member in TaskStatus}:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_status",
+                message=(
+                    "Workflow task status must be one of open, completed, "
+                    "superceded, abandoned, or locked."
+                ),
+                path=_format_child_path(source_path, "status"),
             )
         )
 
@@ -343,7 +377,7 @@ def build_workflow_task_validation_report(
                 continue
             seen_dependent_states.add(normalized_state)
 
-    if task_id is None or description is None or complexity is None:
+    if task_id is None or status is None or description is None or complexity is None:
         return WorkflowTaskValidationReport(
             validation_successful=False,
             task_ids=[task_id] if task_id is not None else [],
@@ -514,6 +548,17 @@ def _required_complexity(data: Mapping[str, Any], key: str) -> TaskComplexity:
     except ValueError as exc:
         raise ValueError(
             "Workflow task complexity must be one of low, medium, or high."
+        ) from exc
+
+
+def _required_status(data: Mapping[str, Any], key: str) -> TaskStatus:
+    raw_status = _required_string(data, key)
+    try:
+        return TaskStatus(raw_status)
+    except ValueError as exc:
+        raise ValueError(
+            "Workflow task status must be one of open, completed, superceded, "
+            "abandoned, or locked."
         ) from exc
 
 

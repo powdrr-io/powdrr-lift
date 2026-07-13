@@ -50,6 +50,7 @@ __all__ = [
     "SystemSpecificationValidationIssue",
     "SystemSpecificationValidationReport",
     "TaskComplexity",
+    "TaskStatus",
     "PRSpecificationValidationIssue",
     "PRSpecificationValidationReport",
     "ProposedPRSearchReport",
@@ -644,6 +645,7 @@ def __getattr__(name: str) -> Any:
 
     if name in {
         "TaskComplexity",
+        "TaskStatus",
         "WorkflowTask",
         "WorkflowTaskDocument",
         "WorkflowTaskValidationIssue",
@@ -669,6 +671,7 @@ def __getattr__(name: str) -> Any:
     }:
         from powdrr_lift.core.workflow_task_specification import (
             TaskComplexity,
+            TaskStatus,
             WorkflowTask,
             WorkflowTaskDocument,
             WorkflowTaskValidationIssue,
@@ -695,6 +698,7 @@ def __getattr__(name: str) -> Any:
 
         return {
             "TaskComplexity": TaskComplexity,
+            "TaskStatus": TaskStatus,
             "WorkflowTask": WorkflowTask,
             "WorkflowTaskDocument": WorkflowTaskDocument,
             "WorkflowTaskValidationIssue": WorkflowTaskValidationIssue,

@@ -17,6 +17,7 @@ class TaskComplexity(StrEnum):
 class TaskStatus(StrEnum):
     OPEN = "open"
     COMPLETED = "completed"
+    CLOSED = "closed"
     SUPERCEDED = "superceded"
     ABANDONED = "abandoned"
     LOCKED = "locked"
@@ -236,7 +237,7 @@ def build_workflow_task_validation_report(
             WorkflowTaskValidationIssue(
                 code="invalid_status",
                 message=(
-                    "Workflow task status must be one of open, completed, "
+                    "Workflow task status must be one of open, completed, closed, "
                     "superceded, abandoned, or locked."
                 ),
                 path=_format_child_path(source_path, "status"),
@@ -439,7 +440,8 @@ def build_workflow_task_directory_validation_report(
     issues: list[WorkflowTaskValidationIssue] = []
     task_ids: list[str] = []
     task_paths: list[str] = []
-    tasks_by_id: dict[str, Path] = {}
+    tasks_by_id: dict[str, WorkflowTask] = {}
+    task_paths_by_id: dict[str, Path] = {}
     upstream_references: list[tuple[Path, WorkflowTask]] = []
 
     for task_path in sorted(directory_path.glob("*.json")):
@@ -464,13 +466,14 @@ def build_workflow_task_directory_validation_report(
                     code="duplicate_task_id",
                     message=(
                         f"Workflow task id {task_id!r} appears in both "
-                        f"{tasks_by_id[task_id]} and {task_path}."
+                        f"{task_paths_by_id[task_id]} and {task_path}."
                     ),
                     path=str(task_path),
                 )
             )
         else:
-            tasks_by_id[task_id] = task_path
+            tasks_by_id[task_id] = task
+            task_paths_by_id[task_id] = task_path
             task_ids.append(task_id)
 
     for task_path, task in upstream_references:
@@ -490,6 +493,33 @@ def build_workflow_task_directory_validation_report(
                         ),
                     )
                 )
+
+    downstream_task_ids: dict[str, list[str]] = {task_id: [] for task_id in tasks_by_id}
+    for _downstream_task_path, downstream_task in upstream_references:
+        for upstream_task_id in downstream_task.upstream_task_ids:
+            if upstream_task_id in downstream_task_ids:
+                downstream_task_ids[upstream_task_id].append(downstream_task.task_id)
+
+    for task_path, task in upstream_references:
+        if task.status is not TaskStatus.OPEN:
+            continue
+        for downstream_task_id in downstream_task_ids.get(task.task_id, []):
+            downstream_task_obj = tasks_by_id.get(downstream_task_id)
+            if (
+                downstream_task_obj is None
+                or downstream_task_obj.status is not TaskStatus.CLOSED
+            ):
+                continue
+            issues.append(
+                WorkflowTaskValidationIssue(
+                    code="open_task_has_closed_downstream_task",
+                    message=(
+                        f"Workflow task {task.task_id!r} is open while downstream "
+                        f"task {downstream_task_obj.task_id!r} is closed."
+                    ),
+                    path=_format_source_path(task_path),
+                )
+            )
 
     return WorkflowTaskValidationReport(
         validation_successful=not issues,

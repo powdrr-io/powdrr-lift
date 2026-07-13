@@ -197,6 +197,25 @@ def test_workflow_task_validation_rejects_invalid_status() -> None:
     assert report.issues[0].path == "status"
 
 
+def test_workflow_task_validation_accepts_closed_status() -> None:
+    report = build_workflow_task_validation_report(
+        json.dumps(
+            {
+                "task_id": "task-1",
+                "status": "closed",
+                "upstream_task_ids": [],
+                "dependent_state": ["state-a"],
+                "complexity": "low",
+                "input_state": {"ready": True},
+                "description": "Task one.",
+            }
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
 def test_workflow_task_file_helpers_round_trip(tmp_path: Path) -> None:
     task = WorkflowTask(
         task_id="task-1",
@@ -268,3 +287,43 @@ def test_select_ready_workflow_tasks_excludes_missing_upstreams() -> None:
     )
 
     assert select_ready_workflow_tasks((task,)) == ()
+
+
+def test_workflow_task_directory_validation_flags_open_task_with_closed_downstream(
+    tmp_path: Path,
+) -> None:
+    save_workflow_task(
+        WorkflowTask(
+            task_id="task-open",
+            status=TaskStatus.OPEN,
+            upstream_task_ids=(),
+            dependent_state=("state-open",),
+            complexity=TaskComplexity.LOW,
+            input_state={"ready": True},
+            description="Open upstream task.",
+        ),
+        tmp_path / "task-open.json",
+    )
+    save_workflow_task(
+        WorkflowTask(
+            task_id="task-closed",
+            status=TaskStatus.CLOSED,
+            upstream_task_ids=("task-open",),
+            dependent_state=("state-closed",),
+            complexity=TaskComplexity.MEDIUM,
+            input_state={"ready": False},
+            description="Closed downstream task.",
+        ),
+        tmp_path / "task-closed.json",
+    )
+
+    report = build_workflow_task_directory_validation_report(tmp_path)
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues].count(
+        "open_task_has_closed_downstream_task"
+    ) == 1
+    assert any("task-open" in issue.message for issue in report.issues)
+    assert any(
+        issue.path == str(tmp_path / "task-open.json") for issue in report.issues
+    )

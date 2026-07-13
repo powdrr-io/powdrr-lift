@@ -159,6 +159,32 @@ from powdrr_lift.core.template import (
     create_change_log_template_from_plan_diff,
     render_change_log_template,
 )
+from powdrr_lift.core.workflow_task_specification import (
+    TaskComplexity,
+    TaskStatus,
+    WorkflowTask,
+    WorkflowTaskDocument,
+    WorkflowTaskValidationIssue,
+    WorkflowTaskValidationReport,
+    build_workflow_task_directory_validation_report,
+    build_workflow_task_validation_report,
+    load_workflow_task_document,
+    load_workflow_task_documents,
+    load_workflow_tasks,
+    save_workflow_task,
+    save_workflow_task_document,
+    select_ready_workflow_tasks,
+    validate_workflow_task_directory,
+    validate_workflow_task_directory_json,
+    validate_workflow_task_json,
+    validate_workflow_task_json_file,
+    workflow_task_document_from_data,
+    workflow_task_document_from_json,
+    workflow_task_document_to_json,
+    workflow_task_from_data,
+    workflow_task_from_json,
+    workflow_task_to_json,
+)
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
 _BLAME_VIEW = "powdrr_lift.core.blame_view"
@@ -175,6 +201,7 @@ _SCHEMAS = "powdrr_lift.core.schemas"
 _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
+_WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
 
 _EXPORTS: dict[str, str] = {
     "BranchDiffEntry": _PR_ANALYSIS,
@@ -191,10 +218,16 @@ _EXPORTS: dict[str, str] = {
     "ImplementationSpecificationValidationReport": _IMPLEMENTATION,
     "SystemSpecificationValidationIssue": _SYSTEM,
     "SystemSpecificationValidationReport": _SYSTEM,
+    "TaskComplexity": _WORKFLOW_TASK_SPECIFICATION,
+    "TaskStatus": _WORKFLOW_TASK_SPECIFICATION,
     "PRSpecificationValidationIssue": _PR_SPECIFICATION,
     "PRSpecificationValidationReport": _PR_SPECIFICATION,
     "ProposedPRSearchReport": _PR_SPECIFICATION,
     "ProposedPRSearchResult": _PR_SPECIFICATION,
+    "WorkflowTask": _WORKFLOW_TASK_SPECIFICATION,
+    "WorkflowTaskDocument": _WORKFLOW_TASK_SPECIFICATION,
+    "WorkflowTaskValidationIssue": _WORKFLOW_TASK_SPECIFICATION,
+    "WorkflowTaskValidationReport": _WORKFLOW_TASK_SPECIFICATION,
     "proposed_pr_specification_path": _PR_SPECIFICATION,
     "CodebaseStateDecision": _CODEBASE_STATE,
     "CodebaseStateEntity": _CODEBASE_STATE,
@@ -244,6 +277,8 @@ _EXPORTS: dict[str, str] = {
     "build_implementation_specification_validation_report": _IMPLEMENTATION,
     "build_pr_specification_validation_report": _PR_SPECIFICATION,
     "build_system_specification_validation_report": _SYSTEM,
+    "build_workflow_task_directory_validation_report": _WORKFLOW_TASK_SPECIFICATION,
+    "build_workflow_task_validation_report": _WORKFLOW_TASK_SPECIFICATION,
     "build_changelog_index": _INDEX,
     "build_changelog_index_at_ref": _INDEX,
     "build_repo_tree": _BLAME_VIEW,
@@ -269,6 +304,9 @@ _EXPORTS: dict[str, str] = {
     "lookup_entity_decisions": _ENTITY_CONTEXT,
     "lookup_entity_references": _ENTITY_CONTEXT,
     "lookup_entity_relationships": _ENTITY_CONTEXT,
+    "load_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
+    "load_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
+    "load_workflow_task_documents": _WORKFLOW_TASK_SPECIFICATION,
     "parse_change_log": _SCHEMAS,
     "parse_line_range": _EDIT_CONTEXT,
     "parse_line_ranges": _EDIT_CONTEXT,
@@ -295,6 +333,9 @@ _EXPORTS: dict[str, str] = {
     "resolve_repo_root": _PR_ANALYSIS,
     "search_proposed_pr_specifications": _PR_SPECIFICATION,
     "show_proposed_pr_specification": _PR_SPECIFICATION,
+    "save_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
+    "save_workflow_task": _WORKFLOW_TASK_SPECIFICATION,
+    "select_ready_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
     "system_specification_default_output_path": _SYSTEM,
     "system_map_specification_default_output_path": _FEATURE_PLANNING,
     "validate_architecture_specification_yaml": _ARCHITECTURE,
@@ -303,6 +344,16 @@ _EXPORTS: dict[str, str] = {
     "validate_implementation_specification_yaml": _IMPLEMENTATION,
     "validate_pr_specification_yaml": _PR_SPECIFICATION,
     "validate_system_specification_yaml": _SYSTEM,
+    "validate_workflow_task_directory": _WORKFLOW_TASK_SPECIFICATION,
+    "validate_workflow_task_directory_json": _WORKFLOW_TASK_SPECIFICATION,
+    "validate_workflow_task_json": _WORKFLOW_TASK_SPECIFICATION,
+    "validate_workflow_task_json_file": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_task_from_data": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_task_from_json": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_task_to_json": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_task_document_from_data": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_task_document_from_json": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_task_document_to_json": _WORKFLOW_TASK_SPECIFICATION,
 }
 
 __all__ = sorted(_EXPORTS)

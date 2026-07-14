@@ -182,11 +182,7 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
 
 def test_specify_feature_workflow_template_file_is_checked_in() -> None:
     template_path = (
-        Path(__file__).resolve().parents[1]
-        / "docs"
-        / "specs"
-        / "specify-a-feature"
-        / "workflow-template.json"
+        Path(__file__).resolve().parents[1] / "templates" / "specify-a-feature.json"
     )
     template = load_workflow_template(template_path)
 

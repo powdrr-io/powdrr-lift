@@ -9,6 +9,7 @@ from powdrr_lift.core.workflow_template_specification import (
     WorkflowTaskTemplateGeneration,
     WorkflowTemplate,
     build_workflow_template_validation_report,
+    create_specify_feature_workflow_template,
     load_workflow_template,
     save_workflow_template,
     validate_workflow_template_json,
@@ -178,3 +179,37 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
     output_path = save_workflow_template(template, tmp_path / "workflow.json")
     assert output_path.exists()
     assert load_workflow_template(output_path) == template
+
+
+def test_create_specify_feature_workflow_template_has_expected_steps() -> None:
+    template = create_specify_feature_workflow_template()
+
+    assert template.when_to_use == (
+        "When a feature needs to move from an idea to implementation-ready work.",
+        "When the work should gather requirements, supporting context, intent, and "
+        "proposed PRs in a single workflow.",
+    )
+    assert template.how_to_fill_this_out == (
+        "Fill in the steps in order and keep each step focused on the named output.",
+        "Use the generation block to fan out follow-up tasks when one step needs "
+        "to produce several related tasks.",
+        "Keep dependencies explicit so later steps only rely on completed upstream "
+        "templates.",
+    )
+    assert [task.description for task in template.task_templates] == [
+        "Gather the requirements and approach.",
+        "Gather the entities, invariants, and guidance.",
+        "Gather the features and decisions.",
+        "Gather the intent and reasoning.",
+        "Specify proposed PRs.",
+    ]
+    assert template.task_templates[2].generation == WorkflowTaskTemplateGeneration(
+        for_each="each feature or decision that needs dedicated follow-up",
+        downstream_task_template_indexes=(3, 4),
+    )
+    assert (
+        build_workflow_template_validation_report(
+            template.to_json()
+        ).validation_successful
+        is True
+    )

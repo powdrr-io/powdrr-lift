@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -69,7 +70,7 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     templates_dir.mkdir()
     save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
 
-    responses = iter(
+    responses: Iterator[dict[str, object]] = iter(
         [
             {
                 "selected_template_path": str(templates_dir / "specify-a-feature.json"),

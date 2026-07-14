@@ -244,6 +244,86 @@ def test_run_workflow_chat_uses_anthropic_provider(
     assert (output_dir / "gather-requirements.json").exists()
 
 
+def test_run_workflow_chat_uses_zai_provider_for_glm_models(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
+                "selected_template_reason": "The request is to specify a feature.",
+                "next_question": None,
+                "ready_to_generate": True,
+            },
+            {
+                "tasks": [
+                    {
+                        "task_id": "gather-requirements",
+                        "status": "open",
+                        "description": "Gather the requirements and approach.",
+                        "complexity": "medium",
+                        "input_state": {
+                            "feature": "Add exports",
+                            "requirements": ["Expose package symbols"],
+                            "approach": ["Add re-exports"],
+                        },
+                        "output_state_type": "requirements-and-approach-state",
+                        "upstream_task_ids": [],
+                        "dependent_state": [
+                            "requirements-captured",
+                            "approach-defined",
+                        ],
+                    },
+                ]
+            },
+        ]
+    )
+
+    captured: dict[str, object] = {}
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            captured["model"] = model
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            captured["messages"] = messages
+            return next(responses)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setenv("ZAI_API_KEY", "zai-key")
+
+    output_dir = tmp_path / "generated"
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        WorkflowChatConfig(
+            templates_dir=templates_dir,
+            output_dir=output_dir,
+            model="glm-5.2",
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert captured["model"] == "glm-5.2"
+    assert captured["base_url"] == "https://api.z.ai/api/paas/v4/"
+    assert "Using zai credentials from ZAI_API_KEY" in stderr.getvalue()
+    assert (output_dir / "gather-requirements.json").exists()
+
+
 def test_resolve_api_key_prefers_env_over_codex_auth(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -291,6 +371,17 @@ def test_resolve_api_key_uses_anthropic_env_when_requested(
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
     assert _resolve_api_key("anthropic", None) == ("anth-key", "ANTHROPIC_API_KEY")
+
+
+def test_resolve_api_key_uses_zai_env_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ZAI_API_KEY", "zai-key")
+    monkeypatch.delenv("GLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CODEX_API_KEY", raising=False)
+
+    assert _resolve_api_key("zai", None) == ("zai-key", "ZAI_API_KEY")
 
 
 def test_anthropic_chat_client_sends_messages_api_request(

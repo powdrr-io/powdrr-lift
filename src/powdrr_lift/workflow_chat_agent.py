@@ -601,6 +601,12 @@ def _build_chat_client(
             api_key=credentials.api_key,
             base_url=credentials.base_url,
         )
+    if credentials.provider == "zai":
+        return OpenAIChatClient(
+            model=model,
+            api_key=credentials.api_key,
+            base_url=credentials.base_url,
+        )
     return OpenAIChatClient(
         model=model,
         api_key=credentials.api_key,
@@ -629,6 +635,8 @@ def _resolve_provider(provider_override: str, model: str) -> str:
         return provider_override
     if model.startswith("claude-"):
         return "anthropic"
+    if model.startswith("glm-"):
+        return "zai"
     if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY"):
         if not (
             os.environ.get("OPENAI_API_KEY")
@@ -636,6 +644,15 @@ def _resolve_provider(provider_override: str, model: str) -> str:
             or _resolve_codex_access_token() is not None
         ):
             return "anthropic"
+    if os.environ.get("ZAI_API_KEY") or os.environ.get("ZAI_BASE_URL"):
+        if not (
+            os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("CODEX_API_KEY")
+            or os.environ.get("ANTHROPIC_API_KEY")
+            or os.environ.get("CLAUDE_API_KEY")
+            or _resolve_codex_access_token() is not None
+        ):
+            return "zai"
     return "openai"
 
 
@@ -650,6 +667,15 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
         raise RuntimeError(
             "No Anthropic credentials found. Set ANTHROPIC_API_KEY or "
             "CLAUDE_API_KEY, or pass --api-key."
+        )
+    if provider == "zai":
+        for env_name in ("ZAI_API_KEY", "GLM_API_KEY"):
+            value = os.environ.get(env_name)
+            if value:
+                return value, env_name
+        raise RuntimeError(
+            "No z.ai credentials found. Set ZAI_API_KEY or GLM_API_KEY, or "
+            "pass --api-key."
         )
     for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
         value = os.environ.get(env_name)
@@ -673,6 +699,12 @@ def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
             if value:
                 return value, env_name
         return "https://api.anthropic.com", "default"
+    if provider == "zai":
+        for env_name in ("ZAI_BASE_URL",):
+            value = os.environ.get(env_name)
+            if value:
+                return value, env_name
+        return "https://api.z.ai/api/paas/v4/", "default"
     for env_name in ("OPENAI_BASE_URL", "CODEX_BASE_URL"):
         value = os.environ.get(env_name)
         if value:

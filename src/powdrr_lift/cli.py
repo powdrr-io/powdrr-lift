@@ -852,11 +852,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workflow_chat_parser.add_argument(
         "--provider",
-        choices=["auto", "openai", "anthropic"],
+        choices=["auto", "openai", "anthropic", "zai"],
         default="auto",
         help=(
             "LLM provider to use. Auto picks Anthropic when Claude models or "
-            "Anthropic credentials are provided."
+            "Anthropic credentials are provided, and z.ai when GLM models or "
+            "z.ai credentials are provided."
         ),
     )
     workflow_chat_parser.add_argument(
@@ -873,17 +874,20 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_chat_parser.add_argument(
         "--model",
         default="gpt-4.1-mini",
-        help="OpenAI model to use for template matching and task generation.",
+        help="Model to use for template matching and task generation.",
     )
     workflow_chat_parser.add_argument(
         "--api-key",
-        help="OpenAI API key. Defaults to OPENAI_API_KEY or CODEX_API_KEY.",
+        help=(
+            "API key. Defaults to the provider-specific environment variable "
+            "or Codex auth when supported."
+        ),
     )
     workflow_chat_parser.add_argument(
         "--base-url",
         help=(
-            "OpenAI base URL. Defaults to OPENAI_BASE_URL, CODEX_BASE_URL, or "
-            "the public API."
+            "Base URL. Defaults to the provider-specific environment variable "
+            "or the public API."
         ),
     )
     workflow_chat_parser.add_argument(

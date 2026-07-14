@@ -65,6 +65,14 @@ class WorkflowChatTaskBundle:
         return {"tasks": [task.to_data() for task in self.tasks]}
 
 
+@dataclass(frozen=True, slots=True)
+class WorkflowChatCredentials:
+    api_key: str
+    source: str
+    base_url: str
+    base_url_source: str
+
+
 class OpenAIChatClient:
     def __init__(
         self,
@@ -141,12 +149,17 @@ def run_workflow_chat(
         )
         return 1
 
-    api_key = _resolve_api_key(config.api_key)
-    base_url = _resolve_base_url(config.base_url)
+    credentials = _resolve_credentials(config.api_key, config.base_url)
+    print(
+        f"Using OpenAI credentials from {credentials.source} "
+        f"with base URL from {credentials.base_url_source}: "
+        f"{credentials.base_url}",
+        file=stderr,
+    )
     client = OpenAIChatClient(
         model=config.model,
-        api_key=api_key,
-        base_url=base_url,
+        api_key=credentials.api_key,
+        base_url=credentials.base_url,
     )
 
     user_request = _prompt_user(
@@ -498,39 +511,48 @@ def _prompt_user(
     return input_func().strip()
 
 
-def _resolve_api_key(override: str | None) -> str:
+def _resolve_credentials(
+    api_key_override: str | None,
+    base_url_override: str | None,
+) -> WorkflowChatCredentials:
+    api_key, source = _resolve_api_key(api_key_override)
+    base_url, base_url_source = _resolve_base_url(base_url_override)
+    return WorkflowChatCredentials(
+        api_key=api_key,
+        source=source,
+        base_url=base_url,
+        base_url_source=base_url_source,
+    )
+
+
+def _resolve_api_key(override: str | None) -> tuple[str, str]:
     if override:
-        return override
+        return override, "--api-key"
     for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
         value = os.environ.get(env_name)
         if value:
-            return value
+            return value, env_name
     codex_token = _resolve_codex_access_token()
     if codex_token is not None:
-        return codex_token
+        return codex_token, _codex_auth_path_description()
     raise RuntimeError(
         "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
         "sign in with Codex so ~/.codex/auth.json is available."
     )
 
 
-def _resolve_base_url(override: str | None) -> str:
+def _resolve_base_url(override: str | None) -> tuple[str, str]:
     if override:
-        return override
+        return override, "--base-url"
     for env_name in ("OPENAI_BASE_URL", "CODEX_BASE_URL"):
         value = os.environ.get(env_name)
         if value:
-            return value
-    return "https://api.openai.com/v1"
+            return value, env_name
+    return "https://api.openai.com/v1", "default"
 
 
 def _resolve_codex_access_token() -> str | None:
-    codex_home = os.environ.get("CODEX_HOME")
-    auth_path = (
-        Path(codex_home).expanduser() / "auth.json"
-        if codex_home is not None
-        else Path.home() / ".codex" / "auth.json"
-    )
+    auth_path = _resolve_codex_auth_path()
     if not auth_path.exists():
         return None
 
@@ -561,3 +583,15 @@ def _resolve_codex_access_token() -> str | None:
             return None
 
     return access_token
+
+
+def _resolve_codex_auth_path() -> Path:
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home is not None:
+        return Path(codex_home).expanduser() / "auth.json"
+
+    return Path.home() / ".codex" / "auth.json"
+
+
+def _codex_auth_path_description() -> str:
+    return str(_resolve_codex_auth_path())

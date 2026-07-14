@@ -155,7 +155,7 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     assert (output_dir / "specify-prs.json").exists()
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote workflow tasks to" in stdout.getvalue()
-    assert stderr.getvalue() == ""
+    assert "Using OpenAI credentials from --api-key" in stderr.getvalue()
 
 
 def test_resolve_api_key_prefers_env_over_codex_auth(
@@ -172,7 +172,7 @@ def test_resolve_api_key_prefers_env_over_codex_auth(
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     monkeypatch.setenv("OPENAI_API_KEY", "env-token")
 
-    assert _resolve_api_key(None) == "env-token"
+    assert _resolve_api_key(None) == ("env-token", "OPENAI_API_KEY")
 
 
 def test_resolve_api_key_uses_codex_auth_when_env_missing(
@@ -190,7 +190,10 @@ def test_resolve_api_key_uses_codex_auth_when_env_missing(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key(None) == "codex-token"
+    assert _resolve_api_key(None) == (
+        "codex-token",
+        str(codex_home / "auth.json"),
+    )
 
 
 def _build_template() -> WorkflowTemplate:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
+    _resolve_api_key,
     run_workflow_chat,
 )
 
@@ -154,6 +157,41 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     assert stderr.getvalue() == ""
 
 
+def test_resolve_api_key_prefers_env_over_codex_auth(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = tmp_path / ".codex"
+    codex_home.mkdir()
+    _write_codex_auth(
+        codex_home / "auth.json",
+        access_token="codex-token",
+        expiry=datetime.now(UTC) + timedelta(hours=1),
+    )
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.setenv("OPENAI_API_KEY", "env-token")
+
+    assert _resolve_api_key(None) == "env-token"
+
+
+def test_resolve_api_key_uses_codex_auth_when_env_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = tmp_path / ".codex"
+    codex_home.mkdir()
+    _write_codex_auth(
+        codex_home / "auth.json",
+        access_token="codex-token",
+        expiry=datetime.now(UTC) + timedelta(hours=1),
+    )
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CODEX_API_KEY", raising=False)
+
+    assert _resolve_api_key(None) == "codex-token"
+
+
 def _build_template() -> WorkflowTemplate:
     return WorkflowTemplate(
         when_to_use=(
@@ -180,4 +218,24 @@ def _build_template() -> WorkflowTemplate:
                 dependent_state=("proposed-prs-specified",),
             ),
         ),
+    )
+
+
+def _write_codex_auth(
+    auth_path: Path,
+    *,
+    access_token: str,
+    expiry: datetime,
+) -> None:
+    auth_path.write_text(
+        json.dumps(
+            {
+                "auth_mode": "chatgpt",
+                "tokens": {
+                    "access_token": access_token,
+                    "expiry": expiry.isoformat(),
+                },
+            }
+        ),
+        encoding="utf-8",
     )

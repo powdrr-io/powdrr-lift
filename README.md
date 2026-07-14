@@ -141,6 +141,8 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 ```
 
 - The command uses `OPENAI_API_KEY` by default and also accepts `CODEX_API_KEY`.
+- If those are unset, it falls back to the local Codex auth cache in
+  `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.
 - Set `OPENAI_BASE_URL` to point at the local proxy if you want to record the
   requests.
 - If you omit `--output-dir`, the generated task set is written to a temporary

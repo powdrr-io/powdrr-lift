@@ -6,6 +6,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TextIO, cast
 from urllib.error import HTTPError, URLError
@@ -504,8 +505,12 @@ def _resolve_api_key(override: str | None) -> str:
         value = os.environ.get(env_name)
         if value:
             return value
+    codex_token = _resolve_codex_access_token()
+    if codex_token is not None:
+        return codex_token
     raise RuntimeError(
-        "No OpenAI API key found. Set OPENAI_API_KEY (or CODEX_API_KEY) first."
+        "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
+        "sign in with Codex so ~/.codex/auth.json is available."
     )
 
 
@@ -517,3 +522,42 @@ def _resolve_base_url(override: str | None) -> str:
         if value:
             return value
     return "https://api.openai.com/v1"
+
+
+def _resolve_codex_access_token() -> str | None:
+    codex_home = os.environ.get("CODEX_HOME")
+    auth_path = (
+        Path(codex_home).expanduser() / "auth.json"
+        if codex_home is not None
+        else Path.home() / ".codex" / "auth.json"
+    )
+    if not auth_path.exists():
+        return None
+
+    try:
+        raw_auth = json.loads(auth_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(raw_auth, dict):
+        return None
+
+    tokens = raw_auth.get("tokens")
+    if not isinstance(tokens, dict):
+        return None
+
+    access_token = tokens.get("access_token")
+    if not isinstance(access_token, str) or not access_token:
+        return None
+
+    expiry = tokens.get("expiry")
+    if isinstance(expiry, str):
+        try:
+            expiry_dt = datetime.fromisoformat(expiry)
+        except ValueError:
+            return access_token
+        if expiry_dt.tzinfo is None:
+            expiry_dt = expiry_dt.replace(tzinfo=UTC)
+        if expiry_dt <= datetime.now(UTC):
+            return None
+
+    return access_token

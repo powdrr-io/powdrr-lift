@@ -41,6 +41,7 @@ def test_workflow_task_round_trips_through_json() -> None:
         "dependent_state": ["state-a", "state-b"],
         "complexity": "medium",
         "input_state": {"environment": "staging"},
+        "output_state_type": "state",
         "description": "Prepare the deployment environment.",
     }
 
@@ -166,6 +167,7 @@ def test_workflow_task_validation_reports_unknown_keys() -> None:
                 "dependent_state": ["state-a"],
                 "complexity": "low",
                 "input_state": {"ready": True},
+                "output_state_type": "state",
                 "description": "Task one.",
                 "unexpected": "field",
             }
@@ -187,6 +189,7 @@ def test_workflow_task_validation_rejects_invalid_status() -> None:
                 "dependent_state": ["state-a"],
                 "complexity": "low",
                 "input_state": {"ready": True},
+                "output_state_type": "state",
                 "description": "Task one.",
             }
         )
@@ -207,6 +210,7 @@ def test_workflow_task_validation_accepts_closed_status() -> None:
                 "dependent_state": ["state-a"],
                 "complexity": "low",
                 "input_state": {"ready": True},
+                "output_state_type": "state",
                 "description": "Task one.",
             }
         )

@@ -185,6 +185,22 @@ from powdrr_lift.core.workflow_task_specification import (
     workflow_task_from_json,
     workflow_task_to_json,
 )
+from powdrr_lift.core.workflow_template_specification import (
+    WorkflowTaskTemplate,
+    WorkflowTaskTemplateGeneration,
+    WorkflowTemplate,
+    WorkflowTemplateDocument,
+    WorkflowTemplateValidationIssue,
+    WorkflowTemplateValidationReport,
+    build_workflow_template_validation_report,
+    load_workflow_template,
+    save_workflow_template,
+    validate_workflow_template_json,
+    validate_workflow_template_json_file,
+    workflow_template_from_data,
+    workflow_template_from_json,
+    workflow_template_to_json,
+)
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
 _BLAME_VIEW = "powdrr_lift.core.blame_view"
@@ -202,6 +218,7 @@ _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
 _WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
+_WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.core.workflow_template_specification"
 
 _EXPORTS: dict[str, str] = {
     "BranchDiffEntry": _PR_ANALYSIS,
@@ -228,6 +245,12 @@ _EXPORTS: dict[str, str] = {
     "WorkflowTaskDocument": _WORKFLOW_TASK_SPECIFICATION,
     "WorkflowTaskValidationIssue": _WORKFLOW_TASK_SPECIFICATION,
     "WorkflowTaskValidationReport": _WORKFLOW_TASK_SPECIFICATION,
+    "WorkflowTaskTemplate": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "WorkflowTaskTemplateGeneration": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "WorkflowTemplate": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "WorkflowTemplateDocument": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "WorkflowTemplateValidationIssue": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "WorkflowTemplateValidationReport": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "proposed_pr_specification_path": _PR_SPECIFICATION,
     "CodebaseStateDecision": _CODEBASE_STATE,
     "CodebaseStateEntity": _CODEBASE_STATE,
@@ -336,6 +359,7 @@ _EXPORTS: dict[str, str] = {
     "save_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
     "save_workflow_task": _WORKFLOW_TASK_SPECIFICATION,
     "select_ready_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
+    "build_workflow_template_validation_report": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "system_specification_default_output_path": _SYSTEM,
     "system_map_specification_default_output_path": _FEATURE_PLANNING,
     "validate_architecture_specification_yaml": _ARCHITECTURE,
@@ -348,12 +372,17 @@ _EXPORTS: dict[str, str] = {
     "validate_workflow_task_directory_json": _WORKFLOW_TASK_SPECIFICATION,
     "validate_workflow_task_json": _WORKFLOW_TASK_SPECIFICATION,
     "validate_workflow_task_json_file": _WORKFLOW_TASK_SPECIFICATION,
+    "validate_workflow_template_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "validate_workflow_template_json_file": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_task_from_data": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_from_json": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_to_json": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_document_from_data": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_document_from_json": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_document_to_json": _WORKFLOW_TASK_SPECIFICATION,
+    "workflow_template_from_data": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "workflow_template_from_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "workflow_template_to_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
 }
 
 __all__ = sorted(_EXPORTS)

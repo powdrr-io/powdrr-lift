@@ -527,6 +527,31 @@ def test_resolve_template_path_accepts_missing_extension(
     )
 
 
+def test_resolve_template_path_accepts_trailing_dot(
+    tmp_path: Path,
+) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    template_path = templates_dir / "specify-a-feature.json"
+    save_workflow_template(_build_template(), template_path)
+    from powdrr_lift.workflow_chat_agent import WorkflowTemplateCatalogEntry
+
+    catalog = (
+        WorkflowTemplateCatalogEntry(
+            path=template_path,
+            template=_build_template(),
+        ),
+    )
+
+    assert (
+        _resolve_template_path(
+            f"{template_path.with_suffix('').as_posix()}.",
+            catalog,
+        )
+        == template_path
+    )
+
+
 def test_anthropic_chat_client_sends_messages_api_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

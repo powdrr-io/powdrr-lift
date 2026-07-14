@@ -531,16 +531,17 @@ def _resolve_template_path(
     catalog: Sequence[WorkflowTemplateCatalogEntry],
 ) -> Path:
     normalized_value = _normalize_template_path_value(template_path_value)
-    path_without_suffix = _path_without_suffix(template_path_value)
     for entry in catalog:
+        entry_value = str(entry.path)
+        entry_value_no_suffix = _path_without_suffix(entry_value)
         if (
-            template_path_value == str(entry.path)
+            template_path_value == entry_value
             or template_path_value == entry.path.name
             or template_path_value == entry.path.stem
-            or normalized_value == _normalize_template_path_value(str(entry.path))
+            or normalized_value == _normalize_template_path_value(entry_value)
             or normalized_value == _normalize_template_path_value(entry.path.name)
             or normalized_value == _normalize_template_path_value(entry.path.stem)
-            or path_without_suffix == _path_without_suffix(str(entry.path))
+            or _path_without_suffix(template_path_value) == entry_value_no_suffix
         ):
             return entry.path
     raise RuntimeError(
@@ -550,11 +551,11 @@ def _resolve_template_path(
 
 
 def _normalize_template_path_value(value: str) -> str:
-    return value.strip().rstrip("./").rstrip()
+    return value.strip().rstrip(".").rstrip()
 
 
 def _path_without_suffix(value: str) -> str:
-    return str(Path(value).with_suffix(""))
+    return str(Path(value.rstrip(".")).with_suffix(""))
 
 
 def _verbose_print(stderr: TextIO, verbose: bool, message: str) -> None:

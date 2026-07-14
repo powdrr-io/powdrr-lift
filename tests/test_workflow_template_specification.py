@@ -67,6 +67,7 @@ def test_workflow_template_round_trips_through_json() -> None:
                 "description": "Generate one task per changed file.",
                 "complexity": "medium",
                 "input_state": {"files": []},
+                "output_state_type": "state",
                 "upstream_task_template_indexes": [],
                 "dependent_state": ["files-discovered"],
                 "generation": {
@@ -78,6 +79,7 @@ def test_workflow_template_round_trips_through_json() -> None:
                 "description": "Validate the aggregated results.",
                 "complexity": "high",
                 "input_state": {"ready": True},
+                "output_state_type": "state",
                 "upstream_task_template_indexes": [0],
                 "dependent_state": ["validation-ready"],
             },
@@ -95,6 +97,7 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                     "description": "Generate one task per item.",
                     "complexity": "low",
                     "input_state": {"items": []},
+                    "output_state_type": "state",
                     "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
                     "generation": {
@@ -106,6 +109,7 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                     "description": "Aggregate generated results.",
                     "complexity": "high",
                     "input_state": {"ready": True},
+                    "output_state_type": "state",
                     "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
                 },
@@ -135,6 +139,7 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                     "description": "Generate one task per item.",
                     "complexity": "low",
                     "input_state": {"items": []},
+                    "output_state_type": "state",
                     "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
                     "generation": {
@@ -146,6 +151,7 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                     "description": "Aggregate generated results.",
                     "complexity": "high",
                     "input_state": {"ready": True},
+                    "output_state_type": "state",
                     "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
                 },
@@ -171,6 +177,7 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
                 description="Do the work.",
                 complexity=TaskComplexity.LOW,
                 input_state={"ready": True},
+                output_state_type="state",
             ),
         ),
     )
@@ -204,6 +211,13 @@ def test_specify_feature_workflow_template_file_is_checked_in() -> None:
         "Gather the features and decisions.",
         "Gather the intent and reasoning.",
         "Specify proposed PRs.",
+    ]
+    assert [task.output_state_type for task in template.task_templates] == [
+        "requirements-and-approach-state",
+        "entities-invariants-guidance-state",
+        "features-and-decisions-state",
+        "intent-and-reasoning-state",
+        "proposed-prs-state",
     ]
     assert template.task_templates[2].generation == WorkflowTaskTemplateGeneration(
         for_each="each feature or decision that needs dedicated follow-up",

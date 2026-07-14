@@ -42,6 +42,7 @@ class WorkflowTaskTemplate:
     description: str
     complexity: TaskComplexity
     input_state: Any
+    output_state_type: str = "state"
     upstream_task_template_indexes: tuple[int, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
@@ -51,6 +52,7 @@ class WorkflowTaskTemplate:
             "description": self.description,
             "complexity": self.complexity.value,
             "input_state": self.input_state,
+            "output_state_type": self.output_state_type,
             "upstream_task_template_indexes": list(self.upstream_task_template_indexes),
             "dependent_state": list(self.dependent_state),
         }
@@ -239,6 +241,7 @@ def build_workflow_template_validation_report(
                 "description",
                 "complexity",
                 "input_state",
+                "output_state_type",
                 "upstream_task_template_indexes",
                 "dependent_state",
                 "generation",
@@ -289,6 +292,21 @@ def build_workflow_template_validation_report(
                     code="missing_input_state",
                     message="Workflow task templates must include input_state.",
                     path=_child_path(task_template_path, "input_state"),
+                )
+            )
+
+        output_state_type = _optional_string(
+            raw_task_template_mapping.get("output_state_type")
+        )
+        if output_state_type is None:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="missing_output_state_type",
+                    message=(
+                        "Workflow task templates must include a non-empty "
+                        "output_state_type."
+                    ),
+                    path=_child_path(task_template_path, "output_state_type"),
                 )
             )
 
@@ -537,6 +555,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
     input_state = data.get("input_state", _MISSING)
     if input_state is _MISSING:
         raise ValueError("Workflow task templates must include input_state.")
+    output_state_type = _required_string(data, "output_state_type")
     upstream_task_template_indexes = _required_int_sequence(
         data,
         "upstream_task_template_indexes",
@@ -550,6 +569,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         description=description,
         complexity=complexity,
         input_state=input_state,
+        output_state_type=output_state_type,
         upstream_task_template_indexes=upstream_task_template_indexes,
         dependent_state=dependent_state,
         generation=parsed_generation,

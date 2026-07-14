@@ -17,6 +17,7 @@
         "requirements": [],
         "approach": []
       },
+      "output_state_type": "requirements-and-approach-state",
       "upstream_task_template_indexes": [],
       "dependent_state": [
         "requirements-captured",
@@ -31,6 +32,7 @@
         "invariants": [],
         "guidance": []
       },
+      "output_state_type": "entities-invariants-guidance-state",
       "upstream_task_template_indexes": [
         0
       ],
@@ -47,6 +49,7 @@
         "features": [],
         "decisions": []
       },
+      "output_state_type": "features-and-decisions-state",
       "upstream_task_template_indexes": [
         1
       ],
@@ -69,6 +72,7 @@
         "intent": null,
         "reasoning": null
       },
+      "output_state_type": "intent-and-reasoning-state",
       "upstream_task_template_indexes": [
         2
       ],
@@ -83,6 +87,7 @@
       "input_state": {
         "proposed_prs": []
       },
+      "output_state_type": "proposed-prs-state",
       "upstream_task_template_indexes": [
         3
       ],

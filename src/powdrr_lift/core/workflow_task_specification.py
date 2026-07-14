@@ -45,6 +45,7 @@ class WorkflowTask:
     description: str
     complexity: TaskComplexity
     input_state: Any
+    output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
 
@@ -56,6 +57,7 @@ class WorkflowTask:
             "dependent_state": list(self.dependent_state),
             "complexity": self.complexity.value,
             "input_state": self.input_state,
+            "output_state_type": self.output_state_type,
             "description": self.description,
         }
 
@@ -101,6 +103,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     dependent_state = _required_string_sequence(data, "dependent_state")
     if "input_state" not in data:
         raise ValueError("Workflow task entries must include input_state.")
+    output_state_type = _required_string(data, "output_state_type")
 
     return WorkflowTask(
         task_id=task_id,
@@ -108,6 +111,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         description=description,
         complexity=complexity,
         input_state=data["input_state"],
+        output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
     )
@@ -196,6 +200,7 @@ def build_workflow_task_validation_report(
             "dependent_state",
             "complexity",
             "input_state",
+            "output_state_type",
             "description",
         },
         issues,
@@ -278,6 +283,18 @@ def build_workflow_task_validation_report(
                 code="null_input_state",
                 message="Workflow task input_state must not be null.",
                 path=_format_child_path(source_path, "input_state"),
+            )
+        )
+
+    output_state_type = _optional_string(raw_task.get("output_state_type"))
+    if output_state_type is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_output_state_type",
+                message=(
+                    "Workflow task entries must include a non-empty output_state_type."
+                ),
+                path=_format_child_path(source_path, "output_state_type"),
             )
         )
 

@@ -1,0 +1,94 @@
+{
+  "when_to_use": [
+    "When a feature needs to move from an idea to implementation-ready work.",
+    "When the work should gather requirements, supporting context, intent, and proposed PRs in a single workflow."
+  ],
+  "how_to_fill_this_out": [
+    "Fill in the steps in order and keep each step focused on the named output.",
+    "Use the generation block to fan out follow-up tasks when one step needs to produce several related tasks.",
+    "Keep dependencies explicit so later steps only rely on completed upstream templates."
+  ],
+  "task_templates": [
+    {
+      "description": "Gather the requirements and approach.",
+      "complexity": "medium",
+      "input_state": {
+        "feature": null,
+        "requirements": [],
+        "approach": []
+      },
+      "upstream_task_template_indexes": [],
+      "dependent_state": [
+        "requirements-captured",
+        "approach-defined"
+      ]
+    },
+    {
+      "description": "Gather the entities, invariants, and guidance.",
+      "complexity": "medium",
+      "input_state": {
+        "entities": [],
+        "invariants": [],
+        "guidance": []
+      },
+      "upstream_task_template_indexes": [
+        0
+      ],
+      "dependent_state": [
+        "entities-captured",
+        "invariants-captured",
+        "guidance-captured"
+      ]
+    },
+    {
+      "description": "Gather the features and decisions.",
+      "complexity": "medium",
+      "input_state": {
+        "features": [],
+        "decisions": []
+      },
+      "upstream_task_template_indexes": [
+        1
+      ],
+      "dependent_state": [
+        "features-captured",
+        "decisions-captured"
+      ],
+      "generation": {
+        "for_each": "each feature or decision that needs dedicated follow-up",
+        "downstream_task_template_indexes": [
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "description": "Gather the intent and reasoning.",
+      "complexity": "medium",
+      "input_state": {
+        "intent": null,
+        "reasoning": null
+      },
+      "upstream_task_template_indexes": [
+        2
+      ],
+      "dependent_state": [
+        "intent-captured",
+        "reasoning-captured"
+      ]
+    },
+    {
+      "description": "Specify proposed PRs.",
+      "complexity": "high",
+      "input_state": {
+        "proposed_prs": []
+      },
+      "upstream_task_template_indexes": [
+        3
+      ],
+      "dependent_state": [
+        "proposed-prs-specified"
+      ]
+    }
+  ]
+}

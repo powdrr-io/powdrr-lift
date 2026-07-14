@@ -57,7 +57,6 @@ __all__ = [
     "WorkflowTemplateDocument",
     "WorkflowTemplateValidationIssue",
     "WorkflowTemplateValidationReport",
-    "create_specify_feature_workflow_template",
     "PRSpecificationValidationIssue",
     "PRSpecificationValidationReport",
     "ProposedPRSearchReport",
@@ -755,7 +754,6 @@ def __getattr__(name: str) -> Any:
         "WorkflowTemplateDocument",
         "WorkflowTemplateValidationIssue",
         "WorkflowTemplateValidationReport",
-        "create_specify_feature_workflow_template",
         "build_workflow_template_validation_report",
         "load_workflow_template",
         "save_workflow_template",
@@ -773,7 +771,6 @@ def __getattr__(name: str) -> Any:
             WorkflowTemplateValidationIssue,
             WorkflowTemplateValidationReport,
             build_workflow_template_validation_report,
-            create_specify_feature_workflow_template,
             load_workflow_template,
             save_workflow_template,
             validate_workflow_template_json,
@@ -790,9 +787,6 @@ def __getattr__(name: str) -> Any:
             "WorkflowTemplateDocument": WorkflowTemplateDocument,
             "WorkflowTemplateValidationIssue": WorkflowTemplateValidationIssue,
             "WorkflowTemplateValidationReport": WorkflowTemplateValidationReport,
-            "create_specify_feature_workflow_template": (
-                create_specify_feature_workflow_template
-            ),
             "build_workflow_template_validation_report": (
                 build_workflow_template_validation_report
             ),

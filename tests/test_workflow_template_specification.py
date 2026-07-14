@@ -9,7 +9,6 @@ from powdrr_lift.core.workflow_template_specification import (
     WorkflowTaskTemplateGeneration,
     WorkflowTemplate,
     build_workflow_template_validation_report,
-    create_specify_feature_workflow_template,
     load_workflow_template,
     save_workflow_template,
     validate_workflow_template_json,
@@ -181,8 +180,15 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
     assert load_workflow_template(output_path) == template
 
 
-def test_create_specify_feature_workflow_template_has_expected_steps() -> None:
-    template = create_specify_feature_workflow_template()
+def test_specify_feature_workflow_template_file_is_checked_in() -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "specs"
+        / "specify-a-feature"
+        / "workflow-template.json"
+    )
+    template = load_workflow_template(template_path)
 
     assert template.when_to_use == (
         "When a feature needs to move from an idea to implementation-ready work.",

@@ -851,6 +851,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Start an interactive workflow chat agent in the terminal.",
     )
     workflow_chat_parser.add_argument(
+        "--provider",
+        choices=["auto", "openai", "anthropic"],
+        default="auto",
+        help=(
+            "LLM provider to use. Auto picks Anthropic when Claude models or "
+            "Anthropic credentials are provided."
+        ),
+    )
+    workflow_chat_parser.add_argument(
         "--templates-dir",
         type=Path,
         default=Path("templates"),
@@ -1423,6 +1432,7 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
         WorkflowChatConfig(
             templates_dir=templates_dir,
             output_dir=output_dir,
+            provider=args.provider,
             model=args.model,
             api_key=args.api_key,
             base_url=args.base_url,

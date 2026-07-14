@@ -5,6 +5,8 @@ import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
+from urllib.request import Request
 
 import pytest
 
@@ -16,6 +18,7 @@ from powdrr_lift.core import (
     save_workflow_template,
 )
 from powdrr_lift.workflow_chat_agent import (
+    AnthropicChatClient,
     WorkflowChatConfig,
     _resolve_api_key,
     run_workflow_chat,
@@ -155,7 +158,90 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     assert (output_dir / "specify-prs.json").exists()
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote workflow tasks to" in stdout.getvalue()
-    assert "Using OpenAI credentials from --api-key" in stderr.getvalue()
+    assert "Using openai credentials from --api-key" in stderr.getvalue()
+
+
+def test_run_workflow_chat_uses_anthropic_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
+                "selected_template_reason": "The request is to specify a feature.",
+                "next_question": None,
+                "ready_to_generate": True,
+            },
+            {
+                "tasks": [
+                    {
+                        "task_id": "gather-requirements",
+                        "status": "open",
+                        "description": "Gather the requirements and approach.",
+                        "complexity": "medium",
+                        "input_state": {
+                            "feature": "Add exports",
+                            "requirements": ["Expose package symbols"],
+                            "approach": ["Add re-exports"],
+                        },
+                        "output_state_type": "requirements-and-approach-state",
+                        "upstream_task_ids": [],
+                        "dependent_state": [
+                            "requirements-captured",
+                            "approach-defined",
+                        ],
+                    },
+                ]
+            },
+        ]
+    )
+
+    captured: dict[str, object] = {}
+
+    class _FakeAnthropicClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            captured["model"] = model
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            captured["messages"] = messages
+            return next(responses)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.AnthropicChatClient",
+        _FakeAnthropicClient,
+    )
+
+    output_dir = tmp_path / "generated"
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        WorkflowChatConfig(
+            templates_dir=templates_dir,
+            output_dir=output_dir,
+            provider="anthropic",
+            api_key="anth-key",
+            base_url="https://api.anthropic.com",
+            model="claude-sonnet-4.5",
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert captured["model"] == "claude-sonnet-4.5"
+    assert captured["api_key"] == "anth-key"
+    assert captured["base_url"] == "https://api.anthropic.com"
+    assert "Using anthropic credentials from --api-key" in stderr.getvalue()
+    assert (output_dir / "gather-requirements.json").exists()
 
 
 def test_resolve_api_key_prefers_env_over_codex_auth(
@@ -172,7 +258,7 @@ def test_resolve_api_key_prefers_env_over_codex_auth(
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     monkeypatch.setenv("OPENAI_API_KEY", "env-token")
 
-    assert _resolve_api_key(None) == ("env-token", "OPENAI_API_KEY")
+    assert _resolve_api_key("openai", None) == ("env-token", "OPENAI_API_KEY")
 
 
 def test_resolve_api_key_uses_codex_auth_when_env_missing(
@@ -190,10 +276,92 @@ def test_resolve_api_key_uses_codex_auth_when_env_missing(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key(None) == (
+    assert _resolve_api_key("openai", None) == (
         "codex-token",
         str(codex_home / "auth.json"),
     )
+
+
+def test_resolve_api_key_uses_anthropic_env_when_requested(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anth-key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CODEX_API_KEY", raising=False)
+
+    assert _resolve_api_key("anthropic", None) == ("anth-key", "ANTHROPIC_API_KEY")
+
+
+def test_anthropic_chat_client_sends_messages_api_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeResponse:
+        def __enter__(self) -> _FakeResponse:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            tb: object,
+        ) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {
+                                    "selected_template_path": (
+                                        "templates/specify-a-feature.json"
+                                    )
+                                }
+                            ),
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def _fake_urlopen(request: Request, timeout: float) -> _FakeResponse:
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.header_items())
+        captured["body"] = json.loads(cast(bytes, request.data).decode("utf-8"))
+        captured["timeout"] = timeout
+        return _FakeResponse()
+
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+
+    client = AnthropicChatClient(
+        model="claude-sonnet-4.5",
+        api_key="anth-key",
+        base_url="https://api.anthropic.com",
+    )
+    response = client.complete_json(
+        [
+            {"role": "system", "content": "system prompt"},
+            {"role": "user", "content": "hello"},
+        ]
+    )
+
+    assert captured["url"] == "https://api.anthropic.com/v1/messages"
+    assert captured["body"] == {
+        "model": "claude-sonnet-4.5",
+        "max_tokens": 4096,
+        "system": "system prompt",
+        "messages": [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": "hello"}],
+            }
+        ],
+    }
+    assert response == {"selected_template_path": "templates/specify-a-feature.json"}
 
 
 def _build_template() -> WorkflowTemplate:

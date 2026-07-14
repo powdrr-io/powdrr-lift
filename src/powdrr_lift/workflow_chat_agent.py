@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TextIO, cast
+from typing import Any, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -36,6 +36,7 @@ class WorkflowTemplateCatalogEntry:
 class WorkflowChatConfig:
     templates_dir: Path
     output_dir: Path | None = None
+    provider: str = "auto"
     model: str = _DEFAULT_MODEL
     api_key: str | None = None
     base_url: str | None = None
@@ -67,6 +68,7 @@ class WorkflowChatTaskBundle:
 
 @dataclass(frozen=True, slots=True)
 class WorkflowChatCredentials:
+    provider: str
     api_key: str
     source: str
     base_url: str
@@ -134,6 +136,84 @@ class OpenAIChatClient:
         return cast("dict[str, Any]", parsed_content)
 
 
+class AnthropicChatClient:
+    def __init__(
+        self,
+        *,
+        model: str,
+        api_key: str,
+        base_url: str,
+        timeout: float = 120.0,
+        api_version: str = "2023-06-01",
+    ) -> None:
+        self._model = model
+        self._api_key = api_key
+        self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
+        self._api_version = api_version
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        system_prompt, conversation_messages = _split_system_message(messages)
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "max_tokens": 4096,
+            "messages": [
+                _anthropic_message(message) for message in conversation_messages
+            ],
+        }
+        if system_prompt is not None:
+            payload["system"] = system_prompt
+
+        request = Request(
+            f"{self._base_url}/v1/messages",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "x-api-key": self._api_key,
+                "anthropic-version": self._api_version,
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self._timeout) as response:
+                raw_response = response.read().decode("utf-8")
+        except HTTPError as exc:
+            raise RuntimeError(
+                "Anthropic request failed with HTTP "
+                f"{exc.code}: {exc.read().decode('utf-8', errors='replace')}"
+            ) from exc
+        except URLError as exc:
+            raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
+
+        loaded_response = json.loads(raw_response)
+        content = loaded_response.get("content")
+        if not isinstance(content, list) or not content:
+            raise RuntimeError("Anthropic response did not include any content.")
+
+        text_parts: list[str] = []
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") != "text":
+                continue
+            text = block.get("text")
+            if isinstance(text, str) and text.strip():
+                text_parts.append(text)
+
+        response_text = "".join(text_parts).strip()
+        if not response_text:
+            raise RuntimeError("Anthropic response content was empty.")
+
+        parsed_content = json.loads(response_text)
+        if not isinstance(parsed_content, dict):
+            raise RuntimeError("Anthropic response content must be a JSON object.")
+        return cast("dict[str, Any]", parsed_content)
+
+
+class WorkflowChatClient(Protocol):
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
+
+
 def run_workflow_chat(
     config: WorkflowChatConfig,
     *,
@@ -149,17 +229,16 @@ def run_workflow_chat(
         )
         return 1
 
-    credentials = _resolve_credentials(config.api_key, config.base_url)
+    provider = _resolve_provider(config.provider, config.model)
+    credentials = _resolve_credentials(provider, config.api_key, config.base_url)
     print(
-        f"Using OpenAI credentials from {credentials.source} "
-        f"with base URL from {credentials.base_url_source}: "
-        f"{credentials.base_url}",
+        f"Using {credentials.provider} credentials from {credentials.source} "
+        f"with base URL from {credentials.base_url_source}: {credentials.base_url}",
         file=stderr,
     )
-    client = OpenAIChatClient(
+    client = _build_chat_client(
+        credentials,
         model=config.model,
-        api_key=credentials.api_key,
-        base_url=credentials.base_url,
     )
 
     user_request = _prompt_user(
@@ -347,7 +426,7 @@ def _build_generation_messages(
 
 
 def _generate_workflow_tasks(
-    client: OpenAIChatClient,
+    client: WorkflowChatClient,
     template: WorkflowTemplateCatalogEntry,
     transcript: Sequence[dict[str, str]],
 ) -> WorkflowChatTaskBundle:
@@ -511,13 +590,33 @@ def _prompt_user(
     return input_func().strip()
 
 
+def _build_chat_client(
+    credentials: WorkflowChatCredentials,
+    *,
+    model: str,
+) -> OpenAIChatClient | AnthropicChatClient:
+    if credentials.provider == "anthropic":
+        return AnthropicChatClient(
+            model=model,
+            api_key=credentials.api_key,
+            base_url=credentials.base_url,
+        )
+    return OpenAIChatClient(
+        model=model,
+        api_key=credentials.api_key,
+        base_url=credentials.base_url,
+    )
+
+
 def _resolve_credentials(
+    provider: str,
     api_key_override: str | None,
     base_url_override: str | None,
 ) -> WorkflowChatCredentials:
-    api_key, source = _resolve_api_key(api_key_override)
-    base_url, base_url_source = _resolve_base_url(base_url_override)
+    api_key, source = _resolve_api_key(provider, api_key_override)
+    base_url, base_url_source = _resolve_base_url(provider, base_url_override)
     return WorkflowChatCredentials(
+        provider=provider,
         api_key=api_key,
         source=source,
         base_url=base_url,
@@ -525,9 +624,33 @@ def _resolve_credentials(
     )
 
 
-def _resolve_api_key(override: str | None) -> tuple[str, str]:
+def _resolve_provider(provider_override: str, model: str) -> str:
+    if provider_override != "auto":
+        return provider_override
+    if model.startswith("claude-"):
+        return "anthropic"
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY"):
+        if not (
+            os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("CODEX_API_KEY")
+            or _resolve_codex_access_token() is not None
+        ):
+            return "anthropic"
+    return "openai"
+
+
+def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--api-key"
+    if provider == "anthropic":
+        for env_name in ("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"):
+            value = os.environ.get(env_name)
+            if value:
+                return value, env_name
+        raise RuntimeError(
+            "No Anthropic credentials found. Set ANTHROPIC_API_KEY or "
+            "CLAUDE_API_KEY, or pass --api-key."
+        )
     for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
         value = os.environ.get(env_name)
         if value:
@@ -541,9 +664,15 @@ def _resolve_api_key(override: str | None) -> tuple[str, str]:
     )
 
 
-def _resolve_base_url(override: str | None) -> tuple[str, str]:
+def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--base-url"
+    if provider == "anthropic":
+        for env_name in ("ANTHROPIC_BASE_URL",):
+            value = os.environ.get(env_name)
+            if value:
+                return value, env_name
+        return "https://api.anthropic.com", "default"
     for env_name in ("OPENAI_BASE_URL", "CODEX_BASE_URL"):
         value = os.environ.get(env_name)
         if value:
@@ -595,3 +724,33 @@ def _resolve_codex_auth_path() -> Path:
 
 def _codex_auth_path_description() -> str:
     return str(_resolve_codex_auth_path())
+
+
+def _split_system_message(
+    messages: list[dict[str, str]],
+) -> tuple[str | None, list[dict[str, str]]]:
+    if not messages:
+        return None, []
+    first_message = messages[0]
+    if first_message.get("role") != "system":
+        return None, list(messages)
+    system_content = first_message.get("content")
+    if not isinstance(system_content, str):
+        return None, list(messages)
+    return system_content, list(messages[1:])
+
+
+def _anthropic_message(message: dict[str, str]) -> dict[str, Any]:
+    role = message.get("role")
+    content = message.get("content")
+    if role not in {"user", "assistant"}:
+        raise RuntimeError(
+            "Anthropic messages must use user or assistant roles after splitting "
+            "the system prompt."
+        )
+    if not isinstance(content, str):
+        raise RuntimeError("Anthropic message content must be a string.")
+    return {
+        "role": role,
+        "content": [{"type": "text", "text": content}],
+    }

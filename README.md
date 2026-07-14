@@ -130,6 +130,22 @@ and response to disk.
    - You can inspect the recorded request and response bodies later in the log
      directory.
 
+### Workflow chat
+
+Use the terminal workflow chat agent to match a request against the checked-in
+workflow templates, ask follow-up questions, and generate a validated task
+directory.
+
+```bash
+powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/specify-a-feature
+```
+
+- The command uses `OPENAI_API_KEY` by default and also accepts `CODEX_API_KEY`.
+- Set `OPENAI_BASE_URL` to point at the local proxy if you want to record the
+  requests.
+- If you omit `--output-dir`, the generated task set is written to a temporary
+  directory and summarized on stdout.
+
 ### For Mac
 ```bash
 brew install powdrr-lift

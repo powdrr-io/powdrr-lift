@@ -63,6 +63,10 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
+from powdrr_lift.workflow_chat_agent import (
+    WorkflowChatConfig,
+    run_workflow_chat,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -841,6 +845,51 @@ def build_parser() -> argparse.ArgumentParser:
     )
     openai_proxy_parser.set_defaults(func=_run_openai_proxy)
 
+    workflow_chat_parser = subparsers.add_parser(
+        "workflow-chat",
+        aliases=["workflow_chat"],
+        help="Start an interactive workflow chat agent in the terminal.",
+    )
+    workflow_chat_parser.add_argument(
+        "--templates-dir",
+        type=Path,
+        default=Path("templates"),
+        help="Directory containing workflow template JSON files.",
+    )
+    workflow_chat_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Directory to write generated workflow task JSON files to.",
+    )
+    workflow_chat_parser.add_argument(
+        "--model",
+        default="gpt-4.1-mini",
+        help="OpenAI model to use for template matching and task generation.",
+    )
+    workflow_chat_parser.add_argument(
+        "--api-key",
+        help="OpenAI API key. Defaults to OPENAI_API_KEY or CODEX_API_KEY.",
+    )
+    workflow_chat_parser.add_argument(
+        "--base-url",
+        help=(
+            "OpenAI base URL. Defaults to OPENAI_BASE_URL, CODEX_BASE_URL, or "
+            "the public API."
+        ),
+    )
+    workflow_chat_parser.add_argument(
+        "--max-turns",
+        type=int,
+        default=8,
+        help="Maximum number of follow-up turns before the chat agent stops.",
+    )
+    workflow_chat_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to resolve the default templates directory.",
+    )
+    workflow_chat_parser.set_defaults(func=_run_workflow_chat)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -1360,6 +1409,26 @@ def _run_openai_proxy(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _run_workflow_chat(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    templates_dir = args.templates_dir
+    if not templates_dir.is_absolute():
+        templates_dir = repo_root / templates_dir
+    output_dir = args.output_dir
+    if output_dir is not None and not output_dir.is_absolute():
+        output_dir = repo_root / output_dir
+    return run_workflow_chat(
+        WorkflowChatConfig(
+            templates_dir=templates_dir,
+            output_dir=output_dir,
+            model=args.model,
+            api_key=args.api_key,
+            base_url=args.base_url,
+            max_turns=args.max_turns,
+        ),
+    )
 
 
 def _run_entity_decisions(args: argparse.Namespace) -> int:

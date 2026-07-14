@@ -897,6 +897,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum number of follow-up turns before the chat agent stops.",
     )
     workflow_chat_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print additional progress details to stderr.",
+    )
+    workflow_chat_parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root to resolve the default templates directory.",
@@ -1441,6 +1446,7 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
             api_key=args.api_key,
             base_url=args.base_url,
             max_turns=args.max_turns,
+            verbose=args.verbose,
         ),
     )
 

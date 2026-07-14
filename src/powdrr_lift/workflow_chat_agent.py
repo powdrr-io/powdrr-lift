@@ -41,6 +41,7 @@ class WorkflowChatConfig:
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
+    verbose: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,6 +237,13 @@ def run_workflow_chat(
         f"with base URL from {credentials.base_url_source}: {credentials.base_url}",
         file=stderr,
     )
+    _verbose_print(
+        stderr,
+        config.verbose,
+        f"Loaded {len(catalog)} workflow template(s) from {config.templates_dir}",
+    )
+    _verbose_print(stderr, config.verbose, f"Selected provider: {provider}")
+    _verbose_print(stderr, config.verbose, f"Selected model: {config.model}")
     client = _build_chat_client(
         credentials,
         model=config.model,
@@ -247,12 +255,20 @@ def run_workflow_chat(
         stdout=stdout,
     )
     transcript: list[dict[str, str]] = [{"role": "user", "content": user_request}]
+    _verbose_print(stderr, config.verbose, f"Initial user request: {user_request}")
     selected_template: WorkflowTemplateCatalogEntry | None = None
     selection: WorkflowChatSelection | None = None
 
     for _turn in range(config.max_turns):
+        _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
         selection_payload = client.complete_json(
             _build_selection_messages(catalog, transcript)
+        )
+        _verbose_print(
+            stderr,
+            config.verbose,
+            "Selection payload: "
+            f"{json.dumps(selection_payload, indent=2, ensure_ascii=False)}",
         )
         selection = _parse_selection_response(selection_payload, catalog)
         selected_template = _find_catalog_entry(
@@ -272,6 +288,7 @@ def run_workflow_chat(
 
         print(selection.next_question, file=stdout)
         answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+        _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
         transcript.append({"role": "assistant", "content": selection.next_question})
         transcript.append({"role": "user", "content": answer})
     else:
@@ -291,14 +308,25 @@ def run_workflow_chat(
         selected_template,
         transcript,
     )
+    _verbose_print(
+        stderr,
+        config.verbose,
+        f"Generated {len(task_bundle.tasks)} workflow task(s)",
+    )
 
     output_dir = (
         config.output_dir
         if config.output_dir is not None
         else Path(tempfile.mkdtemp(prefix="powdrr-lift-workflow-chat-"))
     )
+    _verbose_print(stderr, config.verbose, f"Writing tasks to {output_dir}")
     task_paths = _write_task_bundle(task_bundle, output_dir)
     validation_report = _validate_task_directory(output_dir)
+    _verbose_print(
+        stderr,
+        config.verbose,
+        f"Validation successful: {validation_report.validation_successful}",
+    )
 
     if config.output_dir is None:
         print(
@@ -433,7 +461,7 @@ def _generate_workflow_tasks(
     payload = client.complete_json(_build_generation_messages(template, transcript))
     raw_tasks = payload.get("tasks")
     if not isinstance(raw_tasks, list):
-        raise RuntimeError("OpenAI task generation response did not include tasks.")
+        raise RuntimeError("Workflow task generation response did not include tasks.")
 
     tasks = tuple(
         WorkflowTask.from_data(task_data)
@@ -441,7 +469,7 @@ def _generate_workflow_tasks(
         if isinstance(task_data, dict)
     )
     if not tasks:
-        raise RuntimeError("OpenAI task generation response did not produce tasks.")
+        raise RuntimeError("Workflow task generation response did not produce tasks.")
     return WorkflowChatTaskBundle(tasks=tasks)
 
 
@@ -473,7 +501,7 @@ def _parse_selection_response(
         or not selected_template_path_value
     ):
         raise RuntimeError(
-            "OpenAI selection response must include selected_template_path."
+            "Workflow selection response must include selected_template_path."
         )
     selected_template_path = _resolve_template_path(
         selected_template_path_value,
@@ -482,11 +510,13 @@ def _parse_selection_response(
     selected_template_reason = payload.get("selected_template_reason")
     if not isinstance(selected_template_reason, str) or not selected_template_reason:
         raise RuntimeError(
-            "OpenAI selection response must include selected_template_reason."
+            "Workflow selection response must include selected_template_reason."
         )
     next_question = payload.get("next_question")
     if next_question is not None and not isinstance(next_question, str):
-        raise RuntimeError("OpenAI selection response next_question must be a string.")
+        raise RuntimeError(
+            "Workflow selection response next_question must be a string."
+        )
     ready_to_generate = bool(payload.get("ready_to_generate"))
     return WorkflowChatSelection(
         selected_template_path=selected_template_path,
@@ -500,16 +530,36 @@ def _resolve_template_path(
     template_path_value: str,
     catalog: Sequence[WorkflowTemplateCatalogEntry],
 ) -> Path:
+    normalized_value = _normalize_template_path_value(template_path_value)
+    path_without_suffix = _path_without_suffix(template_path_value)
     for entry in catalog:
         if (
             template_path_value == str(entry.path)
             or template_path_value == entry.path.name
+            or template_path_value == entry.path.stem
+            or normalized_value == _normalize_template_path_value(str(entry.path))
+            or normalized_value == _normalize_template_path_value(entry.path.name)
+            or normalized_value == _normalize_template_path_value(entry.path.stem)
+            or path_without_suffix == _path_without_suffix(str(entry.path))
         ):
             return entry.path
     raise RuntimeError(
-        "OpenAI selection response referenced unknown template "
+        "Workflow selection response referenced unknown template "
         f"{template_path_value!r}."
     )
+
+
+def _normalize_template_path_value(value: str) -> str:
+    return value.strip().rstrip("./").rstrip()
+
+
+def _path_without_suffix(value: str) -> str:
+    return str(Path(value).with_suffix(""))
+
+
+def _verbose_print(stderr: TextIO, verbose: bool, message: str) -> None:
+    if verbose:
+        print(f"[verbose] {message}", file=stderr)
 
 
 def _find_catalog_entry(

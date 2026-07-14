@@ -21,6 +21,7 @@ from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     WorkflowChatConfig,
     _resolve_api_key,
+    _resolve_template_path,
     run_workflow_chat,
 )
 
@@ -63,6 +64,42 @@ def test_cli_workflow_chat_wires_configuration(
     assert config.templates_dir == templates_dir
     assert config.output_dir == repo_root / "generated"
     assert config.model == "test-model"
+    assert config.verbose is False
+
+
+def test_cli_workflow_chat_wires_verbose_flag(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    templates_dir = repo_root / "templates"
+    templates_dir.mkdir()
+    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_workflow_chat(config: WorkflowChatConfig, **kwargs: object) -> int:
+        captured["config"] = config
+        return 0
+
+    monkeypatch.setattr("powdrr_lift.cli.run_workflow_chat", _fake_run_workflow_chat)
+
+    exit_code = main(
+        [
+            "workflow-chat",
+            "--repo-root",
+            str(repo_root),
+            "--templates-dir",
+            "templates",
+            "--verbose",
+        ]
+    )
+
+    assert exit_code == 0
+    config = captured["config"]
+    assert isinstance(config, WorkflowChatConfig)
+    assert config.verbose is True
 
 
 def test_run_workflow_chat_generates_and_validates_tasks(
@@ -159,6 +196,87 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote workflow tasks to" in stdout.getvalue()
     assert "Using openai credentials from --api-key" in stderr.getvalue()
+
+
+def test_run_workflow_chat_verbose_prints_progress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
+                "selected_template_reason": "The request is to specify a feature.",
+                "next_question": None,
+                "ready_to_generate": True,
+            },
+            {
+                "tasks": [
+                    {
+                        "task_id": "gather-requirements",
+                        "status": "open",
+                        "description": "Gather the requirements and approach.",
+                        "complexity": "medium",
+                        "input_state": {
+                            "feature": "Add exports",
+                            "requirements": ["Expose package symbols"],
+                            "approach": ["Add re-exports"],
+                        },
+                        "output_state_type": "requirements-and-approach-state",
+                        "upstream_task_ids": [],
+                        "dependent_state": [
+                            "requirements-captured",
+                            "approach-defined",
+                        ],
+                    },
+                ]
+            },
+        ]
+    )
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            self.model = model
+            self.api_key = api_key
+            self.base_url = base_url
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            return next(responses)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+
+    output_dir = tmp_path / "generated"
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        WorkflowChatConfig(
+            templates_dir=templates_dir,
+            output_dir=output_dir,
+            api_key="test-key",
+            model="test-model",
+            verbose=True,
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    stderr_value = stderr.getvalue()
+    assert "[verbose] Loaded 1 workflow template(s)" in stderr_value
+    assert "[verbose] Selected provider: openai" in stderr_value
+    assert "[verbose] Selected model: test-model" in stderr_value
+    assert "[verbose] Initial user request: Build exports" in stderr_value
+    assert "[verbose] Generated 1 workflow task(s)" in stderr_value
 
 
 def test_run_workflow_chat_uses_anthropic_provider(
@@ -382,6 +500,31 @@ def test_resolve_api_key_uses_zai_env_when_requested(
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
     assert _resolve_api_key("zai", None) == ("zai-key", "ZAI_API_KEY")
+
+
+def test_resolve_template_path_accepts_missing_extension(
+    tmp_path: Path,
+) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    template_path = templates_dir / "specify-a-feature.json"
+    save_workflow_template(_build_template(), template_path)
+    from powdrr_lift.workflow_chat_agent import WorkflowTemplateCatalogEntry
+
+    catalog = (
+        WorkflowTemplateCatalogEntry(
+            path=template_path,
+            template=_build_template(),
+        ),
+    )
+
+    assert (
+        _resolve_template_path(
+            str(template_path.with_suffix("")),
+            catalog,
+        )
+        == template_path
+    )
 
 
 def test_anthropic_chat_client_sends_messages_api_request(

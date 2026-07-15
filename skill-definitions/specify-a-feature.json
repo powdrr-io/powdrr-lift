@@ -1,0 +1,27 @@
+{
+  "name": "specify-a-feature",
+  "when_to_use": [
+    "When the user wants to work through a feature in the TUI and leave with a concrete, synchronous plan.",
+    "When the feature needs a guided sequence of clarifying questions instead of an async task bundle."
+  ],
+  "steps": [
+    {
+      "description": "Capture the feature goal and what success looks like."
+    },
+    {
+      "description": "Gather the relevant system context, entities, invariants, and guidance.",
+      "uses_skills": [
+        "specify-system"
+      ]
+    },
+    {
+      "description": "List the concrete feature decisions and the parts that need to change."
+    },
+    {
+      "description": "Record the intent and reasoning behind the chosen approach."
+    },
+    {
+      "description": "Summarize the result into a concise implementation-ready note."
+    }
+  ]
+}

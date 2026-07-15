@@ -157,9 +157,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
 
     assert skill.name == "specify-a-feature"
     assert skill.when_to_use == (
-        (
-            "When the user needs a concrete, actionable plan for a feature."
-        ),
+        ("When the user needs a concrete, actionable plan for a feature."),
         (
             "When the flow should gather context, review architecture, and drive "
             "implementation details synchronously."

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -83,6 +82,7 @@ WorkflowChatSelection = SkillChatSelection
 @dataclass(frozen=True, slots=True)
 class SkillChatAction:
     kind: str
+    tool: str | None = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
 
@@ -378,6 +378,11 @@ def run_workflow_chat(
             continue
 
         if action.kind == "invoke_tool":
+            if action.tool != "shell":
+                raise RuntimeError(
+                    "Unsupported workflow tool "
+                    f"{action.tool!r}; only shell is supported."
+                )
             tool_result = _execute_shell_tool(
                 action.parameters,
                 worktree_root=worktree_root,
@@ -750,11 +755,12 @@ def _action_system_prompt() -> str:
         "You are executing a checked-in skill in a terminal workflow.\n"
         "Return exactly one JSON object with one of these forms:\n"
         '{"kind":"prompt_user","text":"..."}\n'
-        '{"kind":"invoke_tool","parameters":{"command":"...","cwd":"...","env":{...}}}\n'
+        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}}}\n'
         '{"kind":"complete","text":"..."}\n'
         "Use prompt_user when you need more information from the user.\n"
-        "Use invoke_tool for shell commands, including any CLI command that a "
-        "skill step describes in backticks.\n"
+        "Use invoke_tool for shell commands.\n"
+        "When the selected skill includes tool_invocations, choose one of those "
+        "structured invocations and fill in its parameters.\n"
         "Use complete when the skill is finished.\n"
         "Do not output markdown."
     )
@@ -774,6 +780,9 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
         return SkillChatAction(kind=kind, text=text.strip())
 
     if kind == "invoke_tool":
+        tool = payload.get("tool")
+        if not isinstance(tool, str) or not tool.strip():
+            raise RuntimeError("Workflow invoke_tool action must include tool.")
         parameters = payload.get("parameters")
         if not isinstance(parameters, dict):
             raise RuntimeError("Workflow invoke_tool action must include parameters.")
@@ -788,6 +797,7 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
             normalized_parameters["command"] = normalized_command
             return SkillChatAction(
                 kind=kind,
+                tool=tool.strip(),
                 parameters=normalized_parameters,
             )
         if isinstance(command, Sequence) and not isinstance(
@@ -805,6 +815,7 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
             normalized_parameters["command"] = normalized_command_list
             return SkillChatAction(
                 kind=kind,
+                tool=tool.strip(),
                 parameters=normalized_parameters,
             )
         raise RuntimeError(
@@ -906,47 +917,16 @@ def _skill_step_to_data(step: Any) -> dict[str, Any]:
         "details": step.details,
         "uses_skills": list(step.uses_skills),
     }
-    tool_hints = _skill_step_tool_hints(step.description, step.details)
-    if tool_hints:
-        data["tool_hints"] = [
-            {
-                "tool": "shell",
-                "command": tool_hint,
-            }
-            for tool_hint in tool_hints
+    if step.tool_invocations:
+        data["tool_invocations"] = [
+            _tool_invocation_to_data(tool_invocation)
+            for tool_invocation in step.tool_invocations
         ]
     return data
 
 
-def _skill_step_tool_hints(description: str, details: str | None) -> tuple[str, ...]:
-    snippets: list[str] = []
-    snippets.extend(_extract_backticked_text(description))
-    if details is not None:
-        snippets.extend(_extract_backticked_text(details))
-
-    hints: list[str] = []
-    seen: set[str] = set()
-    for snippet in snippets:
-        normalized_snippet = snippet.strip()
-        if not normalized_snippet:
-            continue
-        if not _looks_like_shell_command(normalized_snippet):
-            continue
-        if normalized_snippet in seen:
-            continue
-        seen.add(normalized_snippet)
-        hints.append(normalized_snippet)
-    return tuple(hints)
-
-
-def _extract_backticked_text(text: str) -> list[str]:
-    return re.findall(r"`([^`]+)`", text)
-
-
-def _looks_like_shell_command(snippet: str) -> bool:
-    return snippet.startswith("powdrr-lift ") or snippet.startswith(
-        "uv run powdrr-lift "
-    )
+def _tool_invocation_to_data(tool_invocation: Any) -> dict[str, Any]:
+    return tool_invocation.to_data()
 
 
 def _required_shell_command_item(value: object) -> str:

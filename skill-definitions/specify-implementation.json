@@ -14,16 +14,40 @@
       ]
     },
     {
-      "description": "Run `powdrr-lift implementation-specification --work-item-name <work-item-name>` to generate the template.",
+      "description": "Generate the implementation specification template.",
       "details": "Use the generated implementation template as the canonical place to capture feature and decision detail."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "implementation-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
       "description": "Fill out the feature and decision sections so they stay aligned with the architecture id.",
       "details": "Keep the implementation spec aligned with the source architecture version and do not invent new ids."
     },
     {
-      "description": "Validate with `powdrr-lift evaluate-implementation-specification --work-item-name <work-item-name>` and fix issues until it passes.",
+      "description": "Validate the filled implementation template and fix issues until it passes.",
       "details": "Resolve architecture mismatches and duplicate ids before considering the document complete."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-implementation-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     }
   ]
 }

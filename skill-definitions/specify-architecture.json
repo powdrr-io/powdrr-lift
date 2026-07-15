@@ -13,16 +13,44 @@
       ]
     },
     {
-      "description": "Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` to generate the template.",
+      "description": "Generate the architecture specification template.",
       "details": "Generate the architecture template with the full allowed entity type set so validation can enforce the schema."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        }
+      ]
     },
     {
       "description": "Fill out entities, relationships, invariants, and guidance using only the allowed entity types.",
       "details": "Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships."
     },
     {
-      "description": "Validate with `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` and fix any validation errors.",
+      "description": "Validate the filled architecture template and fix any validation errors.",
       "details": "Re-run validation until there are no unknown types or broken references."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        }
+      ]
     }
   ]
 }

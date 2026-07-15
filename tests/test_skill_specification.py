@@ -6,6 +6,7 @@ from pathlib import Path
 from powdrr_lift.core import (
     Skill,
     SkillStep,
+    SkillToolInvocation,
     build_skill_directory_validation_report,
     load_skill,
     save_skill,
@@ -34,6 +35,17 @@ def test_skill_round_trips_through_json() -> None:
                 description="Pull in the system context.",
                 details="Use the system spec and related context.",
                 uses_skills=("specify-system",),
+                tool_invocations=(
+                    SkillToolInvocation(
+                        tool="shell",
+                        command=(
+                            "powdrr-lift",
+                            "system-specification",
+                            "--work-item-name",
+                            "<work-item-name>",
+                        ),
+                    ),
+                ),
             ),
             SkillStep(description="Summarize the result."),
         ),
@@ -61,6 +73,17 @@ def test_skill_round_trips_through_json() -> None:
                 "description": "Pull in the system context.",
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
+                "tool_invocations": [
+                    {
+                        "tool": "shell",
+                        "command": [
+                            "powdrr-lift",
+                            "system-specification",
+                            "--work-item-name",
+                            "<work-item-name>",
+                        ],
+                    }
+                ],
             },
             {"description": "Summarize the result."},
         ],
@@ -176,6 +199,18 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert skill.steps[2].details is not None
     assert skill.steps[1].uses_skills == ("review-system",)
     assert skill.steps[2].uses_skills == ("review-architecture",)
+    assert skill.steps[3].tool_invocations[0].command == (
+        "powdrr-lift",
+        "implementation-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
+    assert skill.steps[4].tool_invocations[0].command == (
+        "powdrr-lift",
+        "pr-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:

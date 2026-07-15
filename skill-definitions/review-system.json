@@ -13,8 +13,20 @@
       ]
     },
     {
-      "description": "Run `powdrr-lift evaluate-system-specification --work-item-name <work-item-name>` on the filled template.",
+      "description": "Validate the filled system template.",
       "details": "Treat any validation failure as a blocking issue before moving on to subjective review."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
       "description": "Check the requirements and approach for missing context, weak statements, or inconsistent supersedence.",

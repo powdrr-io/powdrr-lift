@@ -435,7 +435,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     assert (worktree_root / output_dir / "skill-execution.json").exists()
 
 
-def test_catalog_entry_to_data_extracts_shell_tool_hints() -> None:
+def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
     skill_path = (
         Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.json"
     )
@@ -444,15 +444,21 @@ def test_catalog_entry_to_data_extracts_shell_tool_hints() -> None:
         SkillCatalogEntry(path=skill_path, skill=skill),
     )
 
-    tool_hints = [hint for step in data["steps"] for hint in step.get("tool_hints", [])]
+    tool_invocations = [
+        tool_invocation
+        for step in data["steps"]
+        for tool_invocation in step.get("tool_invocations", [])
+    ]
 
-    assert tool_hints == [
+    assert tool_invocations == [
         {
             "tool": "shell",
-            "command": (
-                "powdrr-lift evaluate-system-specification "
-                "--work-item-name <work-item-name>"
-            ),
+            "command": [
+                "powdrr-lift",
+                "evaluate-system-specification",
+                "--work-item-name",
+                "<work-item-name>",
+            ],
         }
     ]
 
@@ -478,8 +484,14 @@ def test_run_workflow_chat_executes_shell_tool_actions(
             },
             {
                 "kind": "invoke_tool",
+                "tool": "shell",
                 "parameters": {
-                    "command": "powdrr-lift system-specification --work-item-name demo",
+                    "command": [
+                        "powdrr-lift",
+                        "system-specification",
+                        "--work-item-name",
+                        "demo",
+                    ],
                 },
             },
             {
@@ -545,8 +557,13 @@ def test_run_workflow_chat_executes_shell_tool_actions(
     assert summary_path.exists()
     run_args = cast(tuple[object, ...], captured["run_args"])
     run_kwargs = cast(dict[str, object], captured["run_kwargs"])
-    assert run_args[0] == "powdrr-lift system-specification --work-item-name demo"
-    assert run_kwargs["shell"] is True
+    assert run_args[0] == [
+        "powdrr-lift",
+        "system-specification",
+        "--work-item-name",
+        "demo",
+    ]
+    assert run_kwargs["shell"] is False
     assert "tool stdout" in stdout.getvalue()
     assert "tool stderr" in stderr.getvalue()
     summary = json.loads(summary_path.read_text(encoding="utf-8"))

@@ -23,10 +23,30 @@ class SkillValidationReport:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillToolInvocation:
+    tool: str
+    command: tuple[str, ...]
+    cwd: str | None = None
+    env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "tool": self.tool,
+            "command": list(self.command),
+        }
+        if self.cwd is not None:
+            data["cwd"] = self.cwd
+        if self.env:
+            data["env"] = {key: value for key, value in self.env}
+        return data
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
+    tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {"description": self.description}
@@ -34,6 +54,10 @@ class SkillStep:
             data["details"] = self.details
         if self.uses_skills:
             data["uses_skills"] = list(self.uses_skills)
+        if self.tool_invocations:
+            data["tool_invocations"] = [
+                tool_invocation.to_data() for tool_invocation in self.tool_invocations
+            ]
         return data
 
 
@@ -225,7 +249,7 @@ def build_skill_validation_report(
             step_mapping = cast("Mapping[str, Any]", step)
             _validate_unknown_keys(
                 step_mapping,
-                {"description", "details", "uses_skills"},
+                {"description", "details", "uses_skills", "tool_invocations"},
                 issues,
                 path=step_path or "",
                 subject="skill step",
@@ -253,7 +277,7 @@ def build_skill_validation_report(
 
             uses_skills = step_mapping.get("uses_skills")
             if uses_skills is None:
-                continue
+                uses_skills = ()
             if not isinstance(uses_skills, Sequence) or isinstance(
                 uses_skills,
                 (str, bytes, bytearray),
@@ -265,42 +289,187 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "uses_skills"),
                     )
                 )
-                continue
+            else:
+                seen_refs: set[str] = set()
+                for ref_index, ref_value in enumerate(uses_skills):
+                    normalized_ref = _optional_string(ref_value)
+                    if normalized_ref is None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_uses_skills_item",
+                                message=(
+                                    "Skill step uses_skills must contain non-empty "
+                                    "strings."
+                                ),
+                                path=_sequence_path(
+                                    step_path,
+                                    "uses_skills",
+                                    ref_index,
+                                ),
+                            )
+                        )
+                        continue
+                    if normalized_ref in seen_refs:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="duplicate_uses_skill",
+                                message=(
+                                    "Skill step uses_skills must not contain "
+                                    "duplicates."
+                                ),
+                                path=_sequence_path(
+                                    step_path,
+                                    "uses_skills",
+                                    ref_index,
+                                ),
+                            )
+                        )
+                        continue
+                    seen_refs.add(normalized_ref)
 
-            seen_refs: set[str] = set()
-            for ref_index, ref_value in enumerate(uses_skills):
-                normalized_ref = _optional_string(ref_value)
-                if normalized_ref is None:
+            tool_invocations = step_mapping.get("tool_invocations")
+            if tool_invocations is None:
+                continue
+            if not isinstance(tool_invocations, Sequence) or isinstance(
+                tool_invocations,
+                (str, bytes, bytearray),
+            ):
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_tool_invocations_type",
+                        message="Skill step tool_invocations must be an array.",
+                        path=_child_path(step_path, "tool_invocations"),
+                    )
+                )
+                continue
+            if len(tool_invocations) == 0:
+                issues.append(
+                    SkillValidationIssue(
+                        code="missing_tool_invocations",
+                        message=(
+                            "Skill steps with tool_invocations must include at "
+                            "least one tool invocation."
+                        ),
+                        path=_child_path(step_path, "tool_invocations"),
+                    )
+                )
+                continue
+            for tool_index, tool_invocation in enumerate(tool_invocations):
+                tool_path = _sequence_path(step_path, "tool_invocations", tool_index)
+                if not isinstance(tool_invocation, Mapping):
                     issues.append(
                         SkillValidationIssue(
-                            code="invalid_uses_skills_item",
-                            message=(
-                                "Skill step uses_skills must contain non-empty strings."
-                            ),
-                            path=_sequence_path(
-                                step_path,
-                                "uses_skills",
-                                ref_index,
-                            ),
+                            code="invalid_tool_invocation_type",
+                            message="Skill tool invocations must be objects.",
+                            path=tool_path,
                         )
                     )
                     continue
-                if normalized_ref in seen_refs:
+                tool_mapping = cast("Mapping[str, Any]", tool_invocation)
+                _validate_unknown_keys(
+                    tool_mapping,
+                    {"tool", "command", "cwd", "env"},
+                    issues,
+                    path=tool_path or "",
+                    subject="skill tool invocation",
+                )
+
+                tool = _optional_string(tool_mapping.get("tool"))
+                if tool is None:
                     issues.append(
                         SkillValidationIssue(
-                            code="duplicate_uses_skill",
-                            message=(
-                                "Skill step uses_skills must not contain duplicates."
-                            ),
-                            path=_sequence_path(
-                                step_path,
-                                "uses_skills",
-                                ref_index,
-                            ),
+                            code="missing_tool",
+                            message="Skill tool invocations must include a tool name.",
+                            path=_child_path(tool_path, "tool"),
                         )
                     )
-                    continue
-                seen_refs.add(normalized_ref)
+                elif tool != "shell":
+                    issues.append(
+                        SkillValidationIssue(
+                            code="unsupported_tool",
+                            message=(
+                                "Skill tool invocations currently only support shell."
+                            ),
+                            path=_child_path(tool_path, "tool"),
+                        )
+                    )
+
+                command = tool_mapping.get("command")
+                if not isinstance(command, Sequence) or isinstance(
+                    command,
+                    (str, bytes, bytearray),
+                ):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_tool_command_type",
+                            message="Skill tool invocation command must be an array.",
+                            path=_child_path(tool_path, "command"),
+                        )
+                    )
+                else:
+                    for arg_index, arg in enumerate(command):
+                        if _optional_string(arg) is None:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="invalid_tool_command_item",
+                                    message=(
+                                        "Skill tool invocation command items must be "
+                                        "non-empty strings."
+                                    ),
+                                    path=_sequence_path(
+                                        tool_path,
+                                        "command",
+                                        arg_index,
+                                    ),
+                                )
+                            )
+
+                cwd = tool_mapping.get("cwd")
+                if cwd is not None and _optional_string(cwd) is None:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_tool_cwd",
+                            message=(
+                                "Skill tool invocation cwd must be a non-empty string."
+                            ),
+                            path=_child_path(tool_path, "cwd"),
+                        )
+                    )
+
+                env = tool_mapping.get("env")
+                if env is not None:
+                    if not isinstance(env, Mapping):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_tool_env_type",
+                                message="Skill tool invocation env must be an object.",
+                                path=_child_path(tool_path, "env"),
+                            )
+                        )
+                    else:
+                        for env_key, env_value in env.items():
+                            if _optional_string(env_key) is None:
+                                issues.append(
+                                    SkillValidationIssue(
+                                        code="invalid_tool_env_key",
+                                        message=(
+                                            "Skill tool invocation env keys must be "
+                                            "non-empty strings."
+                                        ),
+                                        path=_child_path(tool_path, "env"),
+                                    )
+                                )
+                            if _optional_string(env_value) is None:
+                                issues.append(
+                                    SkillValidationIssue(
+                                        code="invalid_tool_env_value",
+                                        message=(
+                                            "Skill tool invocation env values must be "
+                                            "non-empty strings."
+                                        ),
+                                        path=_child_path(tool_path, "env"),
+                                    )
+                                )
 
     skill_names = [name] if name is not None else []
     return SkillValidationReport(
@@ -463,10 +632,14 @@ def _parse_step(raw_step: object) -> SkillStep:
     description = _required_string(raw_step_mapping, "description")
     details = _optional_string(raw_step_mapping.get("details"))
     uses_skills = _optional_string_sequence(raw_step_mapping.get("uses_skills"))
+    tool_invocations = _optional_tool_invocations(
+        raw_step_mapping.get("tool_invocations"),
+    )
     return SkillStep(
         description=description,
         details=details,
         uses_skills=uses_skills,
+        tool_invocations=tool_invocations,
     )
 
 
@@ -509,6 +682,45 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step uses_skills must be an array.")
     return tuple(_required_string({"value": item}, "value") for item in value)
+
+
+def _optional_tool_invocations(value: object) -> tuple[SkillToolInvocation, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("Skill step tool_invocations must be an array.")
+    return tuple(_parse_tool_invocation(item) for item in value)
+
+
+def _parse_tool_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
+    if not isinstance(raw_tool_invocation, Mapping):
+        raise ValueError("Skill tool invocations must be objects.")
+    raw_mapping = cast("Mapping[str, Any]", raw_tool_invocation)
+    tool = _required_string(raw_mapping, "tool")
+    command_value = raw_mapping.get("command")
+    if not isinstance(command_value, Sequence) or isinstance(
+        command_value,
+        (str, bytes, bytearray),
+    ):
+        raise ValueError("Skill tool invocation command must be an array.")
+    command = tuple(
+        _required_string({"command": item}, "command") for item in command_value
+    )
+    cwd = _optional_string(raw_mapping.get("cwd"))
+    env_value = raw_mapping.get("env")
+    if env_value is None:
+        env: tuple[tuple[str, str], ...] = ()
+    else:
+        if not isinstance(env_value, Mapping):
+            raise ValueError("Skill tool invocation env must be an object.")
+        env = tuple(
+            (
+                _required_string({"key": key}, "key"),
+                _required_string({"value": value}, "value"),
+            )
+            for key, value in env_value.items()
+        )
+    return SkillToolInvocation(tool=tool, command=command, cwd=cwd, env=env)
 
 
 def _optional_string(value: object) -> str | None:

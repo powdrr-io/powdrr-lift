@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
@@ -19,6 +20,7 @@ from powdrr_lift.core import (
     build_workflow_task_directory_validation_report,
     build_workflow_template_validation_report,
     load_workflow_template,
+    resolve_repo_root,
     save_workflow_task,
     validate_workflow_task_directory,
 )
@@ -35,6 +37,7 @@ class WorkflowTemplateCatalogEntry:
 @dataclass(frozen=True, slots=True)
 class WorkflowChatConfig:
     templates_dir: Path
+    repo_root: Path | None = None
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
@@ -222,10 +225,22 @@ def run_workflow_chat(
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
 ) -> int:
-    catalog = _load_workflow_template_catalog(config.templates_dir, stderr=stderr)
+    repo_root = _resolve_worktree_context(
+        config.repo_root,
+        stderr=stderr,
+        verbose=config.verbose,
+    )
+    templates_dir = config.templates_dir
+    if not templates_dir.is_absolute():
+        templates_dir = repo_root / templates_dir
+    output_dir = config.output_dir
+    if output_dir is not None and not output_dir.is_absolute():
+        output_dir = repo_root / output_dir
+
+    catalog = _load_workflow_template_catalog(templates_dir, stderr=stderr)
     if not catalog:
         print(
-            f"No workflow templates found in {config.templates_dir}.",
+            f"No workflow templates found in {templates_dir}.",
             file=stderr,
         )
         return 1
@@ -240,7 +255,7 @@ def run_workflow_chat(
     _verbose_print(
         stderr,
         config.verbose,
-        f"Loaded {len(catalog)} workflow template(s) from {config.templates_dir}",
+        f"Loaded {len(catalog)} workflow template(s) from {templates_dir}",
     )
     _verbose_print(stderr, config.verbose, f"Selected provider: {provider}")
     _verbose_print(stderr, config.verbose, f"Selected model: {config.model}")
@@ -315,8 +330,8 @@ def run_workflow_chat(
     )
 
     output_dir = (
-        config.output_dir
-        if config.output_dir is not None
+        output_dir
+        if output_dir is not None
         else Path(tempfile.mkdtemp(prefix="powdrr-lift-workflow-chat-"))
     )
     _verbose_print(stderr, config.verbose, f"Writing tasks to {output_dir}")
@@ -561,6 +576,57 @@ def _path_without_suffix(value: str) -> str:
 def _verbose_print(stderr: TextIO, verbose: bool, message: str) -> None:
     if verbose:
         print(f"[verbose] {message}", file=stderr)
+
+
+def _resolve_worktree_context(
+    repo_root: Path | None,
+    *,
+    stderr: TextIO,
+    verbose: bool,
+) -> Path:
+    resolved_repo_root = resolve_repo_root(repo_root)
+    if _is_dedicated_worktree(resolved_repo_root):
+        _verbose_print(
+            stderr,
+            verbose,
+            f"Using existing worktree context at {resolved_repo_root}",
+        )
+        return resolved_repo_root
+
+    branch_name = _generate_worktree_branch_name()
+    script_path = resolved_repo_root / "scripts" / "create-worktree.sh"
+    if not script_path.is_file():
+        raise RuntimeError(
+            f"Could not find the worktree creation script at {script_path}."
+        )
+
+    _verbose_print(
+        stderr,
+        verbose,
+        f"Creating dedicated worktree with branch {branch_name}",
+    )
+    process = subprocess.run(
+        ["bash", str(script_path), branch_name],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=resolved_repo_root,
+    )
+    worktree_path = Path(process.stdout.strip().splitlines()[-1]).expanduser().resolve()
+    if not worktree_path.exists():
+        raise RuntimeError(
+            f"Worktree creation script did not return an existing path: {worktree_path}"
+        )
+    _verbose_print(stderr, verbose, f"Using dedicated worktree at {worktree_path}")
+    return worktree_path
+
+
+def _is_dedicated_worktree(repo_root: Path) -> bool:
+    return ".worktrees" in repo_root.parts
+
+
+def _generate_worktree_branch_name() -> str:
+    return f"workflow-chat-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}"
 
 
 def _find_catalog_entry(

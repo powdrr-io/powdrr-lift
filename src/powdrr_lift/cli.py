@@ -1431,16 +1431,11 @@ def _run_openai_proxy(args: argparse.Namespace) -> int:
 
 def _run_workflow_chat(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    templates_dir = args.templates_dir
-    if not templates_dir.is_absolute():
-        templates_dir = repo_root / templates_dir
-    output_dir = args.output_dir
-    if output_dir is not None and not output_dir.is_absolute():
-        output_dir = repo_root / output_dir
     return run_workflow_chat(
         WorkflowChatConfig(
-            templates_dir=templates_dir,
-            output_dir=output_dir,
+            templates_dir=args.templates_dir,
+            repo_root=repo_root,
+            output_dir=args.output_dir,
             provider=args.provider,
             model=args.model,
             api_key=args.api_key,

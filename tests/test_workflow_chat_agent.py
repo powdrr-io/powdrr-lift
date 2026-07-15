@@ -143,7 +143,7 @@ def test_run_workflow_chat_generates_skill_summary(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
@@ -229,7 +229,7 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     for skill_path in sorted(source_skills_dir.glob("*.json")):
         save_skill(load_skill(skill_path), skills_dir / skill_path.name)
 
-    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     worktree_root.mkdir(parents=True)
 
     responses: Iterator[dict[str, object]] = iter(
@@ -352,7 +352,7 @@ def test_run_workflow_chat_verbose_prints_progress(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
@@ -425,7 +425,7 @@ def test_run_workflow_chat_uses_anthropic_provider(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
@@ -499,7 +499,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
@@ -598,7 +598,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
@@ -807,7 +807,7 @@ def test_resolve_skill_path_accepts_trailing_dot(
 def test_resolve_worktree_context_uses_existing_dedicated_worktree(
     tmp_path: Path,
 ) -> None:
-    worktree_root = tmp_path / "repo" / ".worktrees" / "codex" / "skill-chat"
+    worktree_root = tmp_path / "repo" / ".worktrees" / "skill-chat"
     worktree_root.mkdir(parents=True)
 
     stderr = io.StringIO()

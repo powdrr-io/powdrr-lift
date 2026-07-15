@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ast
 import io
 import json
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -232,6 +234,31 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     worktree_root.mkdir(parents=True)
 
+    implementation_spec_path = (
+        worktree_root
+        / "docs"
+        / "specs"
+        / "display-related-photos"
+        / "implementation-specification.yaml"
+    )
+    pr_spec_path = (
+        worktree_root
+        / "docs"
+        / "specs"
+        / "display-related-photos"
+        / "proposed-pr-specification.yaml"
+    )
+
+    def _write_python_command(target: Path, content: str) -> list[str]:
+        return [
+            "python3",
+            "-c",
+            (
+                "from pathlib import Path; "
+                f"Path({str(target)!r}).write_text({content!r}, encoding='utf-8')"
+            ),
+        ]
+
     responses: Iterator[dict[str, object]] = iter(
         [
             {
@@ -255,13 +282,103 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 },
             },
             {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": _write_python_command(
+                        implementation_spec_path,
+                        "\n".join(
+                            [
+                                "schema: https://powdrr.io/schemas/specification-v1",
+                                "architecture_id: arch-2026-07-15",
+                                "features:",
+                                "  - id: display-related-photos",
+                                "    action: added",
+                                "    description: Display related photos.",
+                                "    functional_requirements:",
+                                "      - Show related photos in the UI.",
+                                "decisions:",
+                                "  - id: display-related-photos-layout",
+                                "    action: added",
+                                "    description: Use a responsive photo grid.",
+                            ]
+                        ),
+                    ),
+                },
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "evaluate-implementation-specification",
+                        "--work-item-name",
+                        "display-related-photos",
+                    ],
+                },
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "pr-specification",
+                        "--work-item-name",
+                        "display-related-photos",
+                    ],
+                },
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": _write_python_command(
+                        pr_spec_path,
+                        "\n".join(
+                            [
+                                "schema: https://powdrr.io/schemas/specification-v1",
+                                "id: pr-display-related-photos",
+                                "feature_ids:",
+                                "  - display-related-photos",
+                                "intent:",
+                                "  problem: Users need related photos surfaced.",
+                                "  goal: Add related photos to the feature view.",
+                                "  reasoning: The implementation spec defines the",
+                                "    behavior and the PR spec captures the intended",
+                                "    scope for the async follow-up.",
+                                "acceptance_criteria:",
+                                "  - id: ac-1",
+                                "    description: Related photos are visible.",
+                                "expected_tests:",
+                                "  - id: test-1",
+                                "    description: The related photo list renders.",
+                                "required_test_cases:",
+                                "  - id: rtc-1",
+                                "    description: Verify empty and populated states.",
+                                "expected_outcomes:",
+                                "  - id: outcome-1",
+                                "    description: The workflow identifies scope.",
+                                "non_goals:",
+                                "  - id: ng-1",
+                                "    description: No image upload changes.",
+                                "risks:",
+                                "  - id: risk-1",
+                                "    description: The layout may need extra space.",
+                            ]
+                        ),
+                    ),
+                },
+            },
+            {
                 "kind": "complete",
                 "text": "Feature specification complete.",
             },
         ]
     )
 
-    captured: dict[str, object] = {"messages": []}
+    captured: dict[str, object] = {"messages": [], "run_history": []}
 
     class _FakeOpenAIClient:
         def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
@@ -274,15 +391,95 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             return next(responses)
 
     class _FakeProcess:
-        def __init__(self) -> None:
+        def __init__(self, *, stdout: str = "", stderr: str = "") -> None:
             self.returncode = 0
-            self.stdout = "generated implementation spec\n"
-            self.stderr = ""
+            self.stdout = stdout
+            self.stderr = stderr
 
     def _fake_run(*args: object, **kwargs: object) -> _FakeProcess:
-        captured["run_args"] = args
-        captured["run_kwargs"] = kwargs
-        return _FakeProcess()
+        command = cast(list[str] | str, args[0])
+        shell = bool(kwargs.get("shell"))
+        cwd = cast(Path, kwargs.get("cwd", worktree_root))
+        run_history = cast(list[dict[str, object]], captured["run_history"])
+        run_history.append({"command": command, "shell": shell, "cwd": cwd})
+
+        if command == [
+            "powdrr-lift",
+            "implementation-specification",
+            "--work-item-name",
+            "display-related-photos",
+        ]:
+            implementation_spec_path.parent.mkdir(parents=True, exist_ok=True)
+            implementation_spec_path.write_text(
+                "\n".join(
+                    [
+                        "# Implementation specification template.",
+                        "schema: https://powdrr.io/schemas/specification-v1",
+                        "architecture_id: arch-2026-07-15",
+                        "features: []",
+                        "decisions: []",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            return _FakeProcess(stdout=f"generated {implementation_spec_path}\n")
+
+        if command == [
+            "powdrr-lift",
+            "evaluate-implementation-specification",
+            "--work-item-name",
+            "display-related-photos",
+        ]:
+            return _FakeProcess(stdout="implementation specification valid\n")
+
+        if command == [
+            "powdrr-lift",
+            "pr-specification",
+            "--work-item-name",
+            "display-related-photos",
+        ]:
+            pr_spec_path.parent.mkdir(parents=True, exist_ok=True)
+            pr_spec_path.write_text(
+                "\n".join(
+                    [
+                        "# PR specification template.",
+                        "schema: https://powdrr.io/schemas/specification-v1",
+                        "id: pr-display-related-photos",
+                        "feature_ids: []",
+                        "intent:",
+                        "  problem: null",
+                        "  goal: null",
+                        "  reasoning: null",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            return _FakeProcess(stdout=f"generated {pr_spec_path}\n")
+
+        if (
+            isinstance(command, list)
+            and len(command) == 3
+            and command[0] == "python3"
+            and command[1] == "-c"
+        ):
+            script = command[2]
+            match = re.fullmatch(
+                (
+                    r"from pathlib import Path; Path\((?P<path>.+)\)"
+                    r"\.write_text\((?P<content>.+), encoding='utf-8'\)"
+                ),
+                script,
+                flags=re.DOTALL,
+            )
+            if match is None:
+                raise AssertionError(f"Unexpected python command: {script}")
+            target = Path(ast.literal_eval(match.group("path")))
+            content = ast.literal_eval(match.group("content"))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+            return _FakeProcess(stdout=f"wrote {target}\n")
+
+        raise AssertionError(f"Unexpected shell command: {command!r}")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
@@ -317,7 +514,7 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     assert summary_path.exists()
 
     messages = cast(list[list[dict[str, str]]], captured["messages"])
-    assert len(messages) == 3
+    assert len(messages) == 7
     action_prompt = json.loads(messages[1][1]["content"])
     assert action_prompt["skill"]["name"] == "specify-a-feature"
     assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["tool"] == "shell"
@@ -327,23 +524,101 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         "--work-item-name",
         "<work-item-name>",
     ]
-    complete_prompt = json.loads(messages[2][1]["content"])
-    assert complete_prompt["execution_events"][0]["kind"] == "invoke_tool"
+    assert action_prompt["skill"]["steps"][4]["tool_invocations"][0]["command"] == [
+        "powdrr-lift",
+        "pr-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    ]
 
-    run_args = cast(tuple[object, ...], captured["run_args"])
-    run_kwargs = cast(dict[str, object], captured["run_kwargs"])
-    assert run_args[0] == [
+    implementation_fill_prompt = json.loads(messages[2][1]["content"])
+    assert len(implementation_fill_prompt["execution_events"]) == 1
+    assert implementation_fill_prompt["execution_events"][0]["parameters"][
+        "command"
+    ] == [
         "powdrr-lift",
         "implementation-specification",
         "--work-item-name",
         "display-related-photos",
     ]
-    assert run_kwargs["shell"] is False
-    assert "generated implementation spec" in stdout.getvalue()
+
+    implementation_evaluation_prompt = json.loads(messages[3][1]["content"])
+    assert [
+        event["kind"] for event in implementation_evaluation_prompt["execution_events"]
+    ] == [
+        "invoke_tool",
+        "invoke_tool",
+    ]
+
+    pr_generation_prompt = json.loads(messages[4][1]["content"])
+    assert [event["kind"] for event in pr_generation_prompt["execution_events"]] == [
+        "invoke_tool",
+        "invoke_tool",
+        "invoke_tool",
+    ]
+
+    pr_fill_prompt = json.loads(messages[5][1]["content"])
+    assert [event["kind"] for event in pr_fill_prompt["execution_events"]] == [
+        "invoke_tool",
+        "invoke_tool",
+        "invoke_tool",
+        "invoke_tool",
+    ]
+
+    complete_prompt = json.loads(messages[6][1]["content"])
+    assert complete_prompt["execution_events"][-1]["kind"] == "invoke_tool"
+    assert complete_prompt["execution_events"][-1]["parameters"]["command"][0:2] == [
+        "python3",
+        "-c",
+    ]
+
+    run_history = cast(list[dict[str, object]], captured["run_history"])
+    assert len(run_history) == 5
+    assert run_history[0]["command"] == [
+        "powdrr-lift",
+        "implementation-specification",
+        "--work-item-name",
+        "display-related-photos",
+    ]
+    implementation_write_command = cast(list[str], run_history[1]["command"])
+    assert implementation_write_command[:2] == ["python3", "-c"]
+    assert "implementation-specification.yaml" in implementation_write_command[2]
+    assert "Show related photos in the UI." in implementation_write_command[2]
+    assert run_history[2]["command"] == [
+        "powdrr-lift",
+        "evaluate-implementation-specification",
+        "--work-item-name",
+        "display-related-photos",
+    ]
+    assert run_history[3]["command"] == [
+        "powdrr-lift",
+        "pr-specification",
+        "--work-item-name",
+        "display-related-photos",
+    ]
+    pr_write_command = cast(list[str], run_history[4]["command"])
+    assert pr_write_command[:2] == ["python3", "-c"]
+    assert "proposed-pr-specification.yaml" in pr_write_command[2]
+    assert "Related photos are visible." in pr_write_command[2]
+    assert implementation_spec_path.exists()
+    assert pr_spec_path.exists()
+    implementation_text = implementation_spec_path.read_text(encoding="utf-8")
+    assert "display-related-photos" in implementation_text
+    assert "Show related photos in the UI." in implementation_text
+    pr_text = pr_spec_path.read_text(encoding="utf-8")
+    assert "pr-display-related-photos" in pr_text
+    assert "Related photos are visible." in pr_text
+    assert "generated" in stdout.getvalue()
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["selected_skill_name"] == "specify-a-feature"
-    assert summary["execution_events"][0]["kind"] == "invoke_tool"
-    assert summary["execution_events"][1]["kind"] == "complete"
+    assert [event["kind"] for event in summary["execution_events"]] == [
+        "invoke_tool",
+        "invoke_tool",
+        "invoke_tool",
+        "invoke_tool",
+        "invoke_tool",
+        "complete",
+    ]
 
 
 def test_run_workflow_chat_verbose_prints_progress(

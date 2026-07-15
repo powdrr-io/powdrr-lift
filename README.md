@@ -130,6 +130,27 @@ and response to disk.
    - You can inspect the recorded request and response bodies later in the log
      directory.
 
+### Workflow chat
+
+Use the terminal workflow chat agent to match a request against the checked-in
+workflow templates, ask follow-up questions, and generate a validated task
+directory.
+
+```bash
+powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/specify-a-feature
+```
+
+- The command uses `OPENAI_API_KEY` by default and also accepts `CODEX_API_KEY`.
+- If those are unset, it falls back to the local Codex auth cache in
+  `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.
+- Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
+- Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
+- z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
+- Set `OPENAI_BASE_URL` to point at the local proxy if you want to record the
+  requests.
+- If you omit `--output-dir`, the generated task set is written to a temporary
+  directory and summarized on stdout.
+
 ### For Mac
 ```bash
 brew install powdrr-lift

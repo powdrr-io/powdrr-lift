@@ -22,6 +22,7 @@ from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
     _resolve_api_key,
     _resolve_template_path,
+    _resolve_worktree_context,
     run_workflow_chat,
 )
 
@@ -61,8 +62,9 @@ def test_cli_workflow_chat_wires_configuration(
     assert exit_code == 0
     config = captured["config"]
     assert isinstance(config, WorkflowChatConfig)
-    assert config.templates_dir == templates_dir
-    assert config.output_dir == repo_root / "generated"
+    assert config.repo_root == repo_root
+    assert config.templates_dir == Path("templates")
+    assert config.output_dir == Path("generated")
     assert config.model == "test-model"
     assert config.verbose is False
 
@@ -99,6 +101,7 @@ def test_cli_workflow_chat_wires_verbose_flag(
     assert exit_code == 0
     config = captured["config"]
     assert isinstance(config, WorkflowChatConfig)
+    assert config.repo_root == repo_root
     assert config.verbose is True
 
 
@@ -106,8 +109,11 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
+    templates_dir = worktree_root / "templates"
+    templates_dir.mkdir(parents=True)
     save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
@@ -172,8 +178,12 @@ def test_run_workflow_chat_generates_and_validates_tasks(
         "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
         _FakeOpenAIClient,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
 
-    output_dir = tmp_path / "generated"
+    output_dir = Path("generated")
     stdout = io.StringIO()
     stderr = io.StringIO()
     answers = iter(["Build exports", "Add API exports for the package"])
@@ -181,6 +191,7 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     exit_code = run_workflow_chat(
         WorkflowChatConfig(
             templates_dir=templates_dir,
+            repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",
             model="test-model",
@@ -191,8 +202,8 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     )
 
     assert exit_code == 0
-    assert (output_dir / "gather-requirements.json").exists()
-    assert (output_dir / "specify-prs.json").exists()
+    assert (worktree_root / output_dir / "gather-requirements.json").exists()
+    assert (worktree_root / output_dir / "specify-prs.json").exists()
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote workflow tasks to" in stdout.getvalue()
     assert "Using openai credentials from --api-key" in stderr.getvalue()
@@ -202,8 +213,11 @@ def test_run_workflow_chat_verbose_prints_progress(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
+    templates_dir = worktree_root / "templates"
+    templates_dir.mkdir(parents=True)
     save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
@@ -252,14 +266,19 @@ def test_run_workflow_chat_verbose_prints_progress(
         "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
         _FakeOpenAIClient,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
 
-    output_dir = tmp_path / "generated"
+    output_dir = Path("generated")
     stdout = io.StringIO()
     stderr = io.StringIO()
 
     exit_code = run_workflow_chat(
         WorkflowChatConfig(
             templates_dir=templates_dir,
+            repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",
             model="test-model",
@@ -277,14 +296,18 @@ def test_run_workflow_chat_verbose_prints_progress(
     assert "[verbose] Selected model: test-model" in stderr_value
     assert "[verbose] Initial user request: Build exports" in stderr_value
     assert "[verbose] Generated 1 workflow task(s)" in stderr_value
+    assert (worktree_root / output_dir / "gather-requirements.json").exists()
 
 
 def test_run_workflow_chat_uses_anthropic_provider(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
+    templates_dir = worktree_root / "templates"
+    templates_dir.mkdir(parents=True)
     save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
@@ -335,14 +358,19 @@ def test_run_workflow_chat_uses_anthropic_provider(
         "powdrr_lift.workflow_chat_agent.AnthropicChatClient",
         _FakeAnthropicClient,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
 
-    output_dir = tmp_path / "generated"
+    output_dir = Path("generated")
     stdout = io.StringIO()
     stderr = io.StringIO()
 
     exit_code = run_workflow_chat(
         WorkflowChatConfig(
             templates_dir=templates_dir,
+            repo_root=repo_root,
             output_dir=output_dir,
             provider="anthropic",
             api_key="anth-key",
@@ -359,15 +387,18 @@ def test_run_workflow_chat_uses_anthropic_provider(
     assert captured["api_key"] == "anth-key"
     assert captured["base_url"] == "https://api.anthropic.com"
     assert "Using anthropic credentials from --api-key" in stderr.getvalue()
-    assert (output_dir / "gather-requirements.json").exists()
+    assert (worktree_root / output_dir / "gather-requirements.json").exists()
 
 
 def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
+    templates_dir = worktree_root / "templates"
+    templates_dir.mkdir(parents=True)
     save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
@@ -419,14 +450,19 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
         _FakeOpenAIClient,
     )
     monkeypatch.setenv("ZAI_API_KEY", "zai-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
 
-    output_dir = tmp_path / "generated"
+    output_dir = Path("generated")
     stdout = io.StringIO()
     stderr = io.StringIO()
 
     exit_code = run_workflow_chat(
         WorkflowChatConfig(
             templates_dir=templates_dir,
+            repo_root=repo_root,
             output_dir=output_dir,
             model="glm-5.2",
         ),
@@ -439,7 +475,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     assert captured["model"] == "glm-5.2"
     assert captured["base_url"] == "https://api.z.ai/api/paas/v4/"
     assert "Using zai credentials from ZAI_API_KEY" in stderr.getvalue()
-    assert (output_dir / "gather-requirements.json").exists()
+    assert (worktree_root / output_dir / "gather-requirements.json").exists()
 
 
 def test_resolve_api_key_prefers_env_over_codex_auth(
@@ -550,6 +586,58 @@ def test_resolve_template_path_accepts_trailing_dot(
         )
         == template_path
     )
+
+
+def test_resolve_worktree_context_uses_existing_dedicated_worktree(
+    tmp_path: Path,
+) -> None:
+    worktree_root = tmp_path / "repo" / ".worktrees" / "codex" / "workflow-chat"
+    worktree_root.mkdir(parents=True)
+
+    stderr = io.StringIO()
+    resolved = _resolve_worktree_context(worktree_root, stderr=stderr, verbose=True)
+
+    assert resolved == worktree_root.resolve()
+    assert "Using existing worktree context" in stderr.getvalue()
+
+
+def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checkout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    script_path = repo_root / "scripts" / "create-worktree.sh"
+    script_path.parent.mkdir(parents=True)
+    script_path.touch()
+    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-20260714"
+    worktree_root.mkdir(parents=True)
+
+    captured: dict[str, object] = {}
+
+    def _fake_run(
+        cmd: list[str],
+        *,
+        check: bool,
+        capture_output: bool,
+        text: bool,
+        cwd: Path,
+    ) -> object:
+        captured["cmd"] = cmd
+        captured["cwd"] = cwd
+        return type("Result", (), {"stdout": f"{worktree_root}\n"})()
+
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
+
+    stderr = io.StringIO()
+    resolved = _resolve_worktree_context(repo_root, stderr=stderr, verbose=True)
+
+    assert resolved == worktree_root.resolve()
+    assert cast(list[str], captured["cmd"])[0] == "bash"
+    assert cast(list[str], captured["cmd"])[1] == str(script_path)
+    assert cast(list[str], captured["cmd"])[2].startswith("codex/workflow-chat-")
+    assert captured["cwd"] == repo_root.resolve()
+    assert "Creating dedicated worktree" in stderr.getvalue()
 
 
 def test_anthropic_chat_client_sends_messages_api_request(

@@ -138,7 +138,10 @@ class OpenAIChatClient:
         except URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
 
-        loaded_response = json.loads(raw_response)
+        loaded_response = _parse_json_object(
+            raw_response,
+            "OpenAI response",
+        )
         choices = loaded_response.get("choices")
         if not isinstance(choices, list) or not choices:
             raise RuntimeError("OpenAI response did not include any choices.")
@@ -152,10 +155,7 @@ class OpenAIChatClient:
         if not isinstance(content, str) or not content.strip():
             raise RuntimeError("OpenAI response message content was empty.")
 
-        parsed_content = json.loads(content)
-        if not isinstance(parsed_content, dict):
-            raise RuntimeError("OpenAI response content must be a JSON object.")
-        return cast("dict[str, Any]", parsed_content)
+        return _parse_json_object(content, "OpenAI response content")
 
 
 class AnthropicChatClient:
@@ -207,7 +207,10 @@ class AnthropicChatClient:
         except URLError as exc:
             raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
 
-        loaded_response = json.loads(raw_response)
+        loaded_response = _parse_json_object(
+            raw_response,
+            "Anthropic response",
+        )
         content = loaded_response.get("content")
         if not isinstance(content, list) or not content:
             raise RuntimeError("Anthropic response did not include any content.")
@@ -226,10 +229,7 @@ class AnthropicChatClient:
         if not response_text:
             raise RuntimeError("Anthropic response content was empty.")
 
-        parsed_content = json.loads(response_text)
-        if not isinstance(parsed_content, dict):
-            raise RuntimeError("Anthropic response content must be a JSON object.")
-        return cast("dict[str, Any]", parsed_content)
+        return _parse_json_object(response_text, "Anthropic response content")
 
 
 class WorkflowChatClient(Protocol):
@@ -292,9 +292,17 @@ def run_workflow_chat(
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
-        selection_payload = client.complete_json(
-            _build_selection_messages(catalog, transcript)
+        selection_payload = _complete_json_with_retry(
+            client,
+            _build_selection_messages(catalog, transcript),
+            context="skill selection",
+            config=config,
+            input_func=input_func,
+            stdout=stdout,
+            stderr=stderr,
         )
+        if selection_payload is None:
+            return 1
         _verbose_print(
             stderr,
             config.verbose,
@@ -342,7 +350,8 @@ def run_workflow_chat(
                 f"for step {step_index + 1}/{len(selected_skill.skill.steps)}"
             ),
         )
-        action_payload = client.complete_json(
+        action_payload = _complete_json_with_retry(
+            client,
             _build_step_execution_messages(
                 selected_skill=selected_skill,
                 current_step=current_step,
@@ -351,8 +360,18 @@ def run_workflow_chat(
                 execution_events=execution_events,
                 execution_context=execution_context,
                 worktree_root=worktree_root,
-            )
+            ),
+            context=(
+                f"workflow execution for step {step_index + 1}/"
+                f"{len(selected_skill.skill.steps)}"
+            ),
+            config=config,
+            input_func=input_func,
+            stdout=stdout,
+            stderr=stderr,
         )
+        if action_payload is None:
+            return 1
         _verbose_print(
             stderr,
             config.verbose,
@@ -1009,6 +1028,47 @@ def _optional_string(value: object) -> str | None:
         raise RuntimeError("Workflow action decisions_and_context must be a string.")
     normalized_value = value.strip()
     return normalized_value or None
+
+
+def _complete_json_with_retry(
+    client: WorkflowChatClient,
+    messages: list[dict[str, str]],
+    *,
+    context: str,
+    config: WorkflowChatConfig,
+    input_func: Callable[[], str],
+    stdout: TextIO,
+    stderr: TextIO,
+) -> dict[str, Any] | None:
+    while True:
+        try:
+            return client.complete_json(messages)
+        except RuntimeError as exc:
+            print(f"{context} failed: {exc}", file=stderr)
+            retry = _prompt_user(
+                "Type 'retry' to try again or 'abort' to stop: ",
+                input_func=input_func,
+                stdout=stdout,
+            )
+            _verbose_print(
+                stderr,
+                config.verbose,
+                f"User chose {retry!r} after {context} failure",
+            )
+            if retry.strip().lower() == "retry":
+                continue
+            print(f"Stopping after {context} failure.", file=stderr)
+            return None
+
+
+def _parse_json_object(content: str, context: str) -> dict[str, Any]:
+    try:
+        parsed_content = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{context} was not valid JSON: {exc.msg}") from exc
+    if not isinstance(parsed_content, dict):
+        raise RuntimeError(f"{context} must be a JSON object.")
+    return cast("dict[str, Any]", parsed_content)
 
 
 def _prompt_user(

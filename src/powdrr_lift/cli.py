@@ -875,7 +875,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workflow_chat_parser.add_argument(
         "--model",
-        default="gpt-4.1-mini",
+        default="glm-5.2",
         help="Model to use for template matching and task generation.",
     )
     workflow_chat_parser.add_argument(

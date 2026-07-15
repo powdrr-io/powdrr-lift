@@ -407,7 +407,9 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             assert len(execution_events) == expected_event_count
             if expected_last_event_kind is not None:
                 assert execution_events[-1]["kind"] == expected_last_event_kind
+            assert prompt["execution_mode"] == "execute_selected_skill"
             assert prompt["skill"]["name"] == "specify-a-feature"
+            assert prompt["selected_skill"]["name"] == "specify-a-feature"
             assert prompt["transcript"][0]["content"] == "Build exports"
             return prompt
 
@@ -598,7 +600,9 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     messages = cast(list[list[dict[str, str]]], captured["messages"])
     assert len(messages) == 7
     action_prompt = json.loads(messages[1][1]["content"])
+    assert action_prompt["execution_mode"] == "execute_selected_skill"
     assert action_prompt["skill"]["name"] == "specify-a-feature"
+    assert action_prompt["selected_skill"]["name"] == "specify-a-feature"
     assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["tool"] == "shell"
     assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["command"] == [
         "powdrr-lift",

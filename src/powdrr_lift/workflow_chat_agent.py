@@ -730,6 +730,7 @@ def _build_action_messages(
             "role": "user",
             "content": json.dumps(
                 {
+                    "execution_mode": "execute_selected_skill",
                     "available_tools": [
                         {
                             "name": "shell",
@@ -739,6 +740,7 @@ def _build_action_messages(
                         }
                     ],
                     "worktree_root": str(worktree_root),
+                    "selected_skill": _catalog_entry_to_data(selected_skill),
                     "skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
                     "execution_events": list(execution_events),
@@ -753,11 +755,17 @@ def _build_action_messages(
 def _action_system_prompt() -> str:
     return (
         "You are executing a checked-in skill in a terminal workflow.\n"
+        "A skill has already been selected.\n"
+        "Do not select a skill, do not re-rank skills, and do not ask the user "
+        "to pick a skill.\n"
+        "Use the selected skill's steps, tool invocations, transcript, and prior "
+        "execution events to determine the next action.\n"
         "Return exactly one JSON object with one of these forms:\n"
         '{"kind":"prompt_user","text":"..."}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}}}\n'
         '{"kind":"complete","text":"..."}\n'
-        "Use prompt_user when you need more information from the user.\n"
+        "Use prompt_user only when you need more information to continue "
+        "executing the selected skill.\n"
         "Use invoke_tool for shell commands.\n"
         "When the selected skill includes tool_invocations, choose one of those "
         "structured invocations and fill in its parameters.\n"

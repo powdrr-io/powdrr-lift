@@ -151,6 +151,19 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 - If you omit `--output-dir`, the generated task set is written to a temporary
   directory and summarized on stdout.
 
+### Skill flows
+
+Skills are synchronous TUI flows. They are checked in as JSON files under
+`skill-definitions/` and are intended to guide a user through a short sequence
+of plain-English steps.
+
+- Use `when_to_use` to describe the situations where the skill applies.
+- Use `steps` to list the ordered actions to follow.
+- A step can reference other skills with `uses_skills` when the flow should
+  compose existing skills instead of duplicating them.
+- The skill loader can validate a directory of skills and ensure every
+  referenced skill exists.
+
 ### For Mac
 ```bash
 brew install powdrr-lift

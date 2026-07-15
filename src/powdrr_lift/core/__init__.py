@@ -1,6 +1,6 @@
 """Core package exports."""
 
-# ruff: noqa: F401
+# ruff: noqa: F401, I001
 
 from typing import Any
 
@@ -130,6 +130,25 @@ from powdrr_lift.core.pr_specification import (
     show_proposed_pr_specification,
     validate_pr_specification_yaml,
 )
+from powdrr_lift.core.skill_specification import (
+    Skill,
+    SkillDocument,
+    SkillStep,
+    SkillValidationIssue,
+    SkillValidationReport,
+    build_skill_directory_validation_report,
+    build_skill_validation_report,
+    load_skill,
+    load_skills,
+    save_skill,
+    skill_from_data,
+    skill_from_json,
+    skill_to_json,
+    validate_skill_directory,
+    validate_skill_directory_json,
+    validate_skill_json,
+    validate_skill_json_file,
+)
 from powdrr_lift.core.schemas import (
     ChangeEntity,
     ChangeEntityRelationship,
@@ -217,6 +236,7 @@ _SCHEMAS = "powdrr_lift.core.schemas"
 _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
+_SKILL = "powdrr_lift.core.skill_specification"
 _WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
 _WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.core.workflow_template_specification"
 
@@ -235,6 +255,11 @@ _EXPORTS: dict[str, str] = {
     "ImplementationSpecificationValidationReport": _IMPLEMENTATION,
     "SystemSpecificationValidationIssue": _SYSTEM,
     "SystemSpecificationValidationReport": _SYSTEM,
+    "Skill": _SKILL,
+    "SkillDocument": _SKILL,
+    "SkillStep": _SKILL,
+    "SkillValidationIssue": _SKILL,
+    "SkillValidationReport": _SKILL,
     "TaskComplexity": _WORKFLOW_TASK_SPECIFICATION,
     "TaskStatus": _WORKFLOW_TASK_SPECIFICATION,
     "PRSpecificationValidationIssue": _PR_SPECIFICATION,
@@ -299,6 +324,8 @@ _EXPORTS: dict[str, str] = {
     "build_invariants_report": _CODEBASE_STATE,
     "build_implementation_specification_validation_report": _IMPLEMENTATION,
     "build_pr_specification_validation_report": _PR_SPECIFICATION,
+    "build_skill_directory_validation_report": _SKILL,
+    "build_skill_validation_report": _SKILL,
     "build_system_specification_validation_report": _SYSTEM,
     "build_workflow_task_directory_validation_report": _WORKFLOW_TASK_SPECIFICATION,
     "build_workflow_task_validation_report": _WORKFLOW_TASK_SPECIFICATION,
@@ -330,6 +357,8 @@ _EXPORTS: dict[str, str] = {
     "load_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
     "load_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
     "load_workflow_task_documents": _WORKFLOW_TASK_SPECIFICATION,
+    "load_skill": _SKILL,
+    "load_skills": _SKILL,
     "parse_change_log": _SCHEMAS,
     "parse_line_range": _EDIT_CONTEXT,
     "parse_line_ranges": _EDIT_CONTEXT,
@@ -357,6 +386,7 @@ _EXPORTS: dict[str, str] = {
     "search_proposed_pr_specifications": _PR_SPECIFICATION,
     "show_proposed_pr_specification": _PR_SPECIFICATION,
     "save_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
+    "save_skill": _SKILL,
     "save_workflow_task": _WORKFLOW_TASK_SPECIFICATION,
     "select_ready_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
     "build_workflow_template_validation_report": _WORKFLOW_TEMPLATE_SPECIFICATION,
@@ -367,6 +397,10 @@ _EXPORTS: dict[str, str] = {
     "validate_change_log_yaml": _VALIDATE,
     "validate_implementation_specification_yaml": _IMPLEMENTATION,
     "validate_pr_specification_yaml": _PR_SPECIFICATION,
+    "validate_skill_directory": _SKILL,
+    "validate_skill_directory_json": _SKILL,
+    "validate_skill_json": _SKILL,
+    "validate_skill_json_file": _SKILL,
     "validate_system_specification_yaml": _SYSTEM,
     "validate_workflow_task_directory": _WORKFLOW_TASK_SPECIFICATION,
     "validate_workflow_task_directory_json": _WORKFLOW_TASK_SPECIFICATION,
@@ -383,6 +417,9 @@ _EXPORTS: dict[str, str] = {
     "workflow_template_from_data": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_template_from_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_template_to_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "skill_from_data": _SKILL,
+    "skill_from_json": _SKILL,
+    "skill_to_json": _SKILL,
 }
 
 __all__ = sorted(_EXPORTS)

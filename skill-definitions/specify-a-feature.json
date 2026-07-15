@@ -1,0 +1,39 @@
+{
+  "name": "specify-a-feature",
+  "when_to_use": [
+    "When the user needs a concrete, actionable plan for a feature.",
+    "When the flow should gather context, review architecture, and drive implementation details synchronously."
+  ],
+  "steps": [
+    {
+      "description": "Capture the feature goal and what success looks like.",
+      "details": "Interview the user about outcomes, corner cases, test cases, and any constraints that change the shape of the plan."
+    },
+    {
+      "description": "Review the system context before deciding the feature shape.",
+      "details": "Use the system review flow to confirm the requirements, approach, and current constraints.",
+      "uses_skills": [
+        "review-system"
+      ]
+    },
+    {
+      "description": "Review the architecture context before choosing implementation details.",
+      "details": "Use the architecture review flow to confirm the entity model, relationships, invariants, and guidance that the feature must respect.",
+      "uses_skills": [
+        "review-architecture"
+      ]
+    },
+    {
+      "description": "Generate the implementation template and fill it out.",
+      "details": "Invoke the `specify-implementation` CLI endpoint, then complete the generated template with the feature decisions and reasoning."
+    },
+    {
+      "description": "Decide on proposed PRs and fill out each PR template.",
+      "details": "Choose an appropriate set of proposed PRs, invoke the `specify-pr` flow for each one, and fill out those templates with the relevant intent, acceptance criteria, tests, and risks."
+    },
+    {
+      "description": "Prompt the user to review the result.",
+      "details": "Show the draft plan back to the user and confirm that the scoped feature, implementation, and PR breakdown still match what they want."
+    }
+  ]
+}

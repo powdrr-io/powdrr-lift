@@ -11,17 +11,12 @@ from urllib.request import Request
 import pytest
 
 from powdrr_lift.cli import main
-from powdrr_lift.core import (
-    TaskComplexity,
-    WorkflowTaskTemplate,
-    WorkflowTemplate,
-    save_workflow_template,
-)
+from powdrr_lift.core import Skill, SkillStep, save_skill
 from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
-    WorkflowChatConfig,
+    SkillChatConfig,
     _resolve_api_key,
-    _resolve_template_path,
+    _resolve_skill_path,
     _resolve_worktree_context,
     run_workflow_chat,
 )
@@ -33,13 +28,13 @@ def test_cli_workflow_chat_wires_configuration(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    templates_dir = repo_root / "templates"
-    templates_dir.mkdir()
-    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
     captured: dict[str, object] = {}
 
-    def _fake_run_workflow_chat(config: WorkflowChatConfig, **kwargs: object) -> int:
+    def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
         captured["config"] = config
         return 0
 
@@ -50,8 +45,8 @@ def test_cli_workflow_chat_wires_configuration(
             "workflow-chat",
             "--repo-root",
             str(repo_root),
-            "--templates-dir",
-            "templates",
+            "--skills-dir",
+            "skill-definitions",
             "--output-dir",
             "generated",
             "--model",
@@ -61,9 +56,10 @@ def test_cli_workflow_chat_wires_configuration(
 
     assert exit_code == 0
     config = captured["config"]
-    assert isinstance(config, WorkflowChatConfig)
+    assert isinstance(config, SkillChatConfig)
     assert config.repo_root == repo_root
-    assert config.templates_dir == Path("templates")
+    assert config.skills_dir == Path("skill-definitions")
+    assert config.templates_dir == Path("skill-definitions")
     assert config.output_dir == Path("generated")
     assert config.model == "test-model"
     assert config.verbose is False
@@ -75,13 +71,13 @@ def test_cli_workflow_chat_wires_verbose_flag(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    templates_dir = repo_root / "templates"
-    templates_dir.mkdir()
-    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
     captured: dict[str, object] = {}
 
-    def _fake_run_workflow_chat(config: WorkflowChatConfig, **kwargs: object) -> int:
+    def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
         captured["config"] = config
         return 0
 
@@ -92,74 +88,43 @@ def test_cli_workflow_chat_wires_verbose_flag(
             "workflow-chat",
             "--repo-root",
             str(repo_root),
-            "--templates-dir",
-            "templates",
+            "--skills-dir",
+            "skill-definitions",
             "--verbose",
         ]
     )
 
     assert exit_code == 0
     config = captured["config"]
-    assert isinstance(config, WorkflowChatConfig)
+    assert isinstance(config, SkillChatConfig)
     assert config.repo_root == repo_root
     assert config.verbose is True
 
 
-def test_run_workflow_chat_generates_and_validates_tasks(
+def test_run_workflow_chat_generates_skill_summary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
-    templates_dir = worktree_root / "templates"
-    templates_dir.mkdir(parents=True)
-    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
         [
             {
-                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
-                "selected_template_reason": "The request is to specify a feature.",
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to specify a feature.",
                 "next_question": "What feature are you specifying?",
-                "ready_to_generate": False,
+                "ready_to_execute": False,
             },
             {
-                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
-                "selected_template_reason": "The request is to specify a feature.",
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to specify a feature.",
                 "next_question": None,
-                "ready_to_generate": True,
-            },
-            {
-                "tasks": [
-                    {
-                        "task_id": "gather-requirements",
-                        "status": "open",
-                        "description": "Gather the requirements and approach.",
-                        "complexity": "medium",
-                        "input_state": {
-                            "feature": "Add exports",
-                            "requirements": ["Expose package symbols"],
-                            "approach": ["Add re-exports"],
-                        },
-                        "output_state_type": "requirements-and-approach-state",
-                        "upstream_task_ids": [],
-                        "dependent_state": [
-                            "requirements-captured",
-                            "approach-defined",
-                        ],
-                    },
-                    {
-                        "task_id": "specify-prs",
-                        "status": "open",
-                        "description": "Specify proposed PRs.",
-                        "complexity": "high",
-                        "input_state": {"proposed_prs": ["Add exports"]},
-                        "output_state_type": "proposed-prs-state",
-                        "upstream_task_ids": ["gather-requirements"],
-                        "dependent_state": ["proposed-prs-specified"],
-                    },
-                ]
+                "ready_to_execute": True,
             },
         ]
     )
@@ -189,8 +154,8 @@ def test_run_workflow_chat_generates_and_validates_tasks(
     answers = iter(["Build exports", "Add API exports for the package"])
 
     exit_code = run_workflow_chat(
-        WorkflowChatConfig(
-            templates_dir=templates_dir,
+        SkillChatConfig(
+            skills_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",
@@ -201,11 +166,14 @@ def test_run_workflow_chat_generates_and_validates_tasks(
         stderr=stderr,
     )
 
+    summary_path = worktree_root / output_dir / "skill-execution.json"
     assert exit_code == 0
-    assert (worktree_root / output_dir / "gather-requirements.json").exists()
-    assert (worktree_root / output_dir / "specify-prs.json").exists()
+    assert summary_path.exists()
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["selected_skill_name"] == "specify-a-feature"
+    assert summary["skill"]["name"] == "specify-a-feature"
     assert "What feature are you specifying?" in stdout.getvalue()
-    assert "Wrote workflow tasks to" in stdout.getvalue()
+    assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Using openai credentials from --api-key" in stderr.getvalue()
 
 
@@ -215,39 +183,18 @@ def test_run_workflow_chat_verbose_prints_progress(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
-    templates_dir = worktree_root / "templates"
-    templates_dir.mkdir(parents=True)
-    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
         [
             {
-                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
-                "selected_template_reason": "The request is to specify a feature.",
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to specify a feature.",
                 "next_question": None,
-                "ready_to_generate": True,
-            },
-            {
-                "tasks": [
-                    {
-                        "task_id": "gather-requirements",
-                        "status": "open",
-                        "description": "Gather the requirements and approach.",
-                        "complexity": "medium",
-                        "input_state": {
-                            "feature": "Add exports",
-                            "requirements": ["Expose package symbols"],
-                            "approach": ["Add re-exports"],
-                        },
-                        "output_state_type": "requirements-and-approach-state",
-                        "upstream_task_ids": [],
-                        "dependent_state": [
-                            "requirements-captured",
-                            "approach-defined",
-                        ],
-                    },
-                ]
+                "ready_to_execute": True,
             },
         ]
     )
@@ -276,8 +223,8 @@ def test_run_workflow_chat_verbose_prints_progress(
     stderr = io.StringIO()
 
     exit_code = run_workflow_chat(
-        WorkflowChatConfig(
-            templates_dir=templates_dir,
+        SkillChatConfig(
+            skills_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",
@@ -291,12 +238,12 @@ def test_run_workflow_chat_verbose_prints_progress(
 
     assert exit_code == 0
     stderr_value = stderr.getvalue()
-    assert "[verbose] Loaded 1 workflow template(s)" in stderr_value
+    assert "[verbose] Loaded 1 skill(s)" in stderr_value
     assert "[verbose] Selected provider: openai" in stderr_value
     assert "[verbose] Selected model: test-model" in stderr_value
     assert "[verbose] Initial user request: Build exports" in stderr_value
-    assert "[verbose] Generated 1 workflow task(s)" in stderr_value
-    assert (worktree_root / output_dir / "gather-requirements.json").exists()
+    assert "[verbose] Prepared execution summary for specify-a-feature" in stderr_value
+    assert (worktree_root / output_dir / "skill-execution.json").exists()
 
 
 def test_run_workflow_chat_uses_anthropic_provider(
@@ -305,39 +252,18 @@ def test_run_workflow_chat_uses_anthropic_provider(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
-    templates_dir = worktree_root / "templates"
-    templates_dir.mkdir(parents=True)
-    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
         [
             {
-                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
-                "selected_template_reason": "The request is to specify a feature.",
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to specify a feature.",
                 "next_question": None,
-                "ready_to_generate": True,
-            },
-            {
-                "tasks": [
-                    {
-                        "task_id": "gather-requirements",
-                        "status": "open",
-                        "description": "Gather the requirements and approach.",
-                        "complexity": "medium",
-                        "input_state": {
-                            "feature": "Add exports",
-                            "requirements": ["Expose package symbols"],
-                            "approach": ["Add re-exports"],
-                        },
-                        "output_state_type": "requirements-and-approach-state",
-                        "upstream_task_ids": [],
-                        "dependent_state": [
-                            "requirements-captured",
-                            "approach-defined",
-                        ],
-                    },
-                ]
+                "ready_to_execute": True,
             },
         ]
     )
@@ -368,8 +294,8 @@ def test_run_workflow_chat_uses_anthropic_provider(
     stderr = io.StringIO()
 
     exit_code = run_workflow_chat(
-        WorkflowChatConfig(
-            templates_dir=templates_dir,
+        SkillChatConfig(
+            skills_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             provider="anthropic",
@@ -387,7 +313,7 @@ def test_run_workflow_chat_uses_anthropic_provider(
     assert captured["api_key"] == "anth-key"
     assert captured["base_url"] == "https://api.anthropic.com"
     assert "Using anthropic credentials from --api-key" in stderr.getvalue()
-    assert (worktree_root / output_dir / "gather-requirements.json").exists()
+    assert (worktree_root / output_dir / "skill-execution.json").exists()
 
 
 def test_run_workflow_chat_uses_zai_provider_for_glm_models(
@@ -396,39 +322,18 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-test"
-    templates_dir = worktree_root / "templates"
-    templates_dir.mkdir(parents=True)
-    save_workflow_template(_build_template(), templates_dir / "specify-a-feature.json")
+    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
     responses: Iterator[dict[str, object]] = iter(
         [
             {
-                "selected_template_path": str(templates_dir / "specify-a-feature.json"),
-                "selected_template_reason": "The request is to specify a feature.",
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to specify a feature.",
                 "next_question": None,
-                "ready_to_generate": True,
-            },
-            {
-                "tasks": [
-                    {
-                        "task_id": "gather-requirements",
-                        "status": "open",
-                        "description": "Gather the requirements and approach.",
-                        "complexity": "medium",
-                        "input_state": {
-                            "feature": "Add exports",
-                            "requirements": ["Expose package symbols"],
-                            "approach": ["Add re-exports"],
-                        },
-                        "output_state_type": "requirements-and-approach-state",
-                        "upstream_task_ids": [],
-                        "dependent_state": [
-                            "requirements-captured",
-                            "approach-defined",
-                        ],
-                    },
-                ]
+                "ready_to_execute": True,
             },
         ]
     )
@@ -460,8 +365,8 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     stderr = io.StringIO()
 
     exit_code = run_workflow_chat(
-        WorkflowChatConfig(
-            templates_dir=templates_dir,
+        SkillChatConfig(
+            skills_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             model="glm-5.2",
@@ -475,7 +380,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     assert captured["model"] == "glm-5.2"
     assert captured["base_url"] == "https://api.z.ai/api/paas/v4/"
     assert "Using zai credentials from ZAI_API_KEY" in stderr.getvalue()
-    assert (worktree_root / output_dir / "gather-requirements.json").exists()
+    assert (worktree_root / output_dir / "skill-execution.json").exists()
 
 
 def test_resolve_api_key_prefers_env_over_codex_auth(
@@ -538,60 +443,54 @@ def test_resolve_api_key_uses_zai_env_when_requested(
     assert _resolve_api_key("zai", None) == ("zai-key", "ZAI_API_KEY")
 
 
-def test_resolve_template_path_accepts_missing_extension(
+def test_resolve_skill_path_accepts_missing_extension(
     tmp_path: Path,
 ) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
-    template_path = templates_dir / "specify-a-feature.json"
-    save_workflow_template(_build_template(), template_path)
-    from powdrr_lift.workflow_chat_agent import WorkflowTemplateCatalogEntry
+    skills_dir = tmp_path / "skill-definitions"
+    skills_dir.mkdir()
+    skill_path = skills_dir / "specify-a-feature.json"
+    save_skill(_build_skill(), skill_path)
+    from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
 
     catalog = (
-        WorkflowTemplateCatalogEntry(
-            path=template_path,
-            template=_build_template(),
+        SkillCatalogEntry(
+            path=skill_path,
+            skill=_build_skill(),
+        ),
+    )
+
+    assert _resolve_skill_path(str(skill_path.with_suffix("")), catalog) == skill_path
+
+
+def test_resolve_skill_path_accepts_trailing_dot(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    skills_dir.mkdir()
+    skill_path = skills_dir / "specify-a-feature.json"
+    save_skill(_build_skill(), skill_path)
+    from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
+
+    catalog = (
+        SkillCatalogEntry(
+            path=skill_path,
+            skill=_build_skill(),
         ),
     )
 
     assert (
-        _resolve_template_path(
-            str(template_path.with_suffix("")),
+        _resolve_skill_path(
+            f"{skill_path.with_suffix('').as_posix()}.",
             catalog,
         )
-        == template_path
-    )
-
-
-def test_resolve_template_path_accepts_trailing_dot(
-    tmp_path: Path,
-) -> None:
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
-    template_path = templates_dir / "specify-a-feature.json"
-    save_workflow_template(_build_template(), template_path)
-    from powdrr_lift.workflow_chat_agent import WorkflowTemplateCatalogEntry
-
-    catalog = (
-        WorkflowTemplateCatalogEntry(
-            path=template_path,
-            template=_build_template(),
-        ),
-    )
-
-    assert (
-        _resolve_template_path(
-            f"{template_path.with_suffix('').as_posix()}.",
-            catalog,
-        )
-        == template_path
+        == skill_path
     )
 
 
 def test_resolve_worktree_context_uses_existing_dedicated_worktree(
     tmp_path: Path,
 ) -> None:
-    worktree_root = tmp_path / "repo" / ".worktrees" / "codex" / "workflow-chat"
+    worktree_root = tmp_path / "repo" / ".worktrees" / "codex" / "skill-chat"
     worktree_root.mkdir(parents=True)
 
     stderr = io.StringIO()
@@ -610,7 +509,7 @@ def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checko
     script_path = repo_root / "scripts" / "create-worktree.sh"
     script_path.parent.mkdir(parents=True)
     script_path.touch()
-    worktree_root = repo_root / ".worktrees" / "codex" / "workflow-chat-20260714"
+    worktree_root = repo_root / ".worktrees" / "workflow-chat-20260714"
     worktree_root.mkdir(parents=True)
 
     captured: dict[str, object] = {}
@@ -665,8 +564,8 @@ def test_anthropic_chat_client_sends_messages_api_request(
                             "type": "text",
                             "text": json.dumps(
                                 {
-                                    "selected_template_path": (
-                                        "templates/specify-a-feature.json"
+                                    "selected_skill_path": (
+                                        "skill-definitions/specify-a-feature.json"
                                     )
                                 }
                             ),
@@ -708,33 +607,26 @@ def test_anthropic_chat_client_sends_messages_api_request(
             }
         ],
     }
-    assert response == {"selected_template_path": "templates/specify-a-feature.json"}
+    assert response == {
+        "selected_skill_path": "skill-definitions/specify-a-feature.json"
+    }
 
 
-def _build_template() -> WorkflowTemplate:
-    return WorkflowTemplate(
+def _build_skill() -> Skill:
+    return Skill(
+        name="specify-a-feature",
         when_to_use=(
-            "When a feature needs to move from an idea to implementation-ready work.",
+            "When the user wants a guided synchronous flow for a new feature.",
+            "When the flow should match the user's intent to a checked-in skill.",
         ),
-        how_to_fill_this_out=("Fill the steps in order.",),
-        task_templates=(
-            WorkflowTaskTemplate(
-                description="Gather the requirements and approach.",
-                complexity=TaskComplexity.MEDIUM,
-                input_state={
-                    "feature": None,
-                    "requirements": [],
-                    "approach": [],
-                },
-                output_state_type="requirements-and-approach-state",
+        steps=(
+            SkillStep(
+                description="Capture the feature goal.",
+                details="Record the user-visible outcome first.",
             ),
-            WorkflowTaskTemplate(
-                description="Specify proposed PRs.",
-                complexity=TaskComplexity.HIGH,
-                input_state={"proposed_prs": []},
-                output_state_type="proposed-prs-state",
-                upstream_task_template_indexes=(0,),
-                dependent_state=("proposed-prs-specified",),
+            SkillStep(
+                description="Summarize the result.",
+                details="Leave the user with a concise handoff.",
             ),
         ),
     )

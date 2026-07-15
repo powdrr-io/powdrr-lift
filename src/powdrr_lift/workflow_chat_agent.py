@@ -14,29 +14,24 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from powdrr_lift.core import (
-    WorkflowTask,
-    WorkflowTaskValidationReport,
-    WorkflowTemplate,
-    build_workflow_task_directory_validation_report,
-    build_workflow_template_validation_report,
-    load_workflow_template,
+    Skill,
+    build_skill_directory_validation_report,
+    load_skills,
     resolve_repo_root,
-    save_workflow_task,
-    validate_workflow_task_directory,
 )
 
 _DEFAULT_MODEL = "gpt-4.1-mini"
 
 
 @dataclass(frozen=True, slots=True)
-class WorkflowTemplateCatalogEntry:
+class SkillCatalogEntry:
     path: Path
-    template: WorkflowTemplate
+    skill: Skill
 
 
 @dataclass(frozen=True, slots=True)
-class WorkflowChatConfig:
-    templates_dir: Path
+class SkillChatConfig:
+    skills_dir: Path
     repo_root: Path | None = None
     output_dir: Path | None = None
     provider: str = "auto"
@@ -46,28 +41,41 @@ class WorkflowChatConfig:
     max_turns: int = 8
     verbose: bool = False
 
-
-@dataclass(frozen=True, slots=True)
-class WorkflowChatResult:
-    selected_template_path: Path
-    task_paths: tuple[Path, ...]
-    validation_report: WorkflowTaskValidationReport
+    @property
+    def templates_dir(self) -> Path:
+        return self.skills_dir
 
 
 @dataclass(frozen=True, slots=True)
-class WorkflowChatSelection:
-    selected_template_path: Path
-    selected_template_reason: str
+class SkillChatResult:
+    selected_skill_path: Path
+    summary_path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class SkillChatSelection:
+    selected_skill_path: Path
+    selected_skill_reason: str
     next_question: str | None = None
-    ready_to_generate: bool = False
+    ready_to_execute: bool = False
+
+    @property
+    def selected_template_path(self) -> Path:
+        return self.selected_skill_path
+
+    @property
+    def selected_template_reason(self) -> str:
+        return self.selected_skill_reason
+
+    @property
+    def ready_to_generate(self) -> bool:
+        return self.ready_to_execute
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowChatTaskBundle:
-    tasks: tuple[WorkflowTask, ...]
-
-    def to_data(self) -> dict[str, Any]:
-        return {"tasks": [task.to_data() for task in self.tasks]}
+WorkflowTemplateCatalogEntry = SkillCatalogEntry
+WorkflowChatConfig = SkillChatConfig
+WorkflowChatResult = SkillChatResult
+WorkflowChatSelection = SkillChatSelection
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,19 +238,16 @@ def run_workflow_chat(
         stderr=stderr,
         verbose=config.verbose,
     )
-    templates_dir = config.templates_dir
-    if not templates_dir.is_absolute():
-        templates_dir = repo_root / templates_dir
+    skills_dir = config.skills_dir
+    if not skills_dir.is_absolute():
+        skills_dir = repo_root / skills_dir
     output_dir = config.output_dir
     if output_dir is not None and not output_dir.is_absolute():
         output_dir = repo_root / output_dir
 
-    catalog = _load_workflow_template_catalog(templates_dir, stderr=stderr)
+    catalog = _load_skill_catalog(skills_dir, stderr=stderr)
     if not catalog:
-        print(
-            f"No workflow templates found in {templates_dir}.",
-            file=stderr,
-        )
+        print(f"No skills found in {skills_dir}.", file=stderr)
         return 1
 
     provider = _resolve_provider(config.provider, config.model)
@@ -255,7 +260,7 @@ def run_workflow_chat(
     _verbose_print(
         stderr,
         config.verbose,
-        f"Loaded {len(catalog)} workflow template(s) from {templates_dir}",
+        f"Loaded {len(catalog)} skill(s) from {skills_dir}",
     )
     _verbose_print(stderr, config.verbose, f"Selected provider: {provider}")
     _verbose_print(stderr, config.verbose, f"Selected model: {config.model}")
@@ -271,8 +276,8 @@ def run_workflow_chat(
     )
     transcript: list[dict[str, str]] = [{"role": "user", "content": user_request}]
     _verbose_print(stderr, config.verbose, f"Initial user request: {user_request}")
-    selected_template: WorkflowTemplateCatalogEntry | None = None
-    selection: WorkflowChatSelection | None = None
+    selected_skill: SkillCatalogEntry | None = None
+    selection: SkillChatSelection | None = None
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
@@ -286,16 +291,10 @@ def run_workflow_chat(
             f"{json.dumps(selection_payload, indent=2, ensure_ascii=False)}",
         )
         selection = _parse_selection_response(selection_payload, catalog)
-        selected_template = _find_catalog_entry(
-            catalog,
-            selection.selected_template_path,
-        )
-        print(
-            f"Matched workflow template: {selected_template.path}",
-            file=stdout,
-        )
-        print(selection.selected_template_reason, file=stdout)
-        if selection.ready_to_generate and selection.next_question is None:
+        selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
+        print(f"Matched skill: {selected_skill.path}", file=stdout)
+        print(selection.selected_skill_reason, file=stdout)
+        if selection.ready_to_execute and selection.next_question is None:
             break
 
         if selection.next_question is None:
@@ -308,57 +307,42 @@ def run_workflow_chat(
         transcript.append({"role": "user", "content": answer})
     else:
         print(
-            "Reached the maximum number of workflow chat turns without "
-            "generating output.",
+            "Reached the maximum number of skill chat turns without selecting a skill.",
             file=stderr,
         )
         return 1
 
-    if selected_template is None or selection is None:
-        print("Could not select a workflow template.", file=stderr)
+    if selected_skill is None or selection is None:
+        print("Could not select a skill.", file=stderr)
         return 1
 
-    task_bundle = _generate_workflow_tasks(
-        client,
-        selected_template,
-        transcript,
-    )
+    summary = _build_skill_execution_summary(selected_skill, selection, transcript)
     _verbose_print(
         stderr,
         config.verbose,
-        f"Generated {len(task_bundle.tasks)} workflow task(s)",
+        f"Prepared execution summary for {selected_skill.skill.name}",
     )
 
     output_dir = (
         output_dir
         if output_dir is not None
-        else Path(tempfile.mkdtemp(prefix="powdrr-lift-workflow-chat-"))
+        else Path(tempfile.mkdtemp(prefix="powdrr-lift-skill-chat-"))
     )
-    _verbose_print(stderr, config.verbose, f"Writing tasks to {output_dir}")
-    task_paths = _write_task_bundle(task_bundle, output_dir)
-    validation_report = _validate_task_directory(output_dir)
+    _verbose_print(stderr, config.verbose, f"Writing skill summary to {output_dir}")
+    summary_path = _write_skill_summary(summary, output_dir)
     _verbose_print(
         stderr,
         config.verbose,
-        f"Validation successful: {validation_report.validation_successful}",
+        f"Summary written to {summary_path}",
     )
 
     if config.output_dir is None:
         print(
             json.dumps(
                 {
-                    "selected_template_file": str(selected_template.path),
-                    "task_directory": str(output_dir),
-                    "task_paths": [str(path) for path in task_paths],
-                    "validation_successful": validation_report.validation_successful,
-                    "issues": [
-                        {
-                            "code": issue.code,
-                            "message": issue.message,
-                            "path": issue.path,
-                        }
-                        for issue in validation_report.issues
-                    ],
+                    "selected_skill_file": str(selected_skill.path),
+                    "summary_path": str(summary_path),
+                    "summary": summary,
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -366,61 +350,54 @@ def run_workflow_chat(
             file=stdout,
         )
     else:
-        print(f"Wrote workflow tasks to {output_dir}", file=stdout)
-        print(validation_report.validation_successful, file=stdout)
-
-    if not validation_report.validation_successful:
-        print(validate_workflow_task_directory(output_dir), file=stderr, end="")
-        return 1
+        print(f"Wrote skill execution summary to {summary_path}", file=stdout)
 
     return 0
+
+
+def _load_skill_catalog(
+    skills_dir: Path,
+    *,
+    stderr: TextIO,
+) -> tuple[SkillCatalogEntry, ...]:
+    resolved_dir = skills_dir.expanduser().resolve()
+    if not resolved_dir.exists():
+        print(f"Skill directory does not exist: {resolved_dir}", file=stderr)
+        return ()
+    if not resolved_dir.is_dir():
+        print(f"Skill path is not a directory: {resolved_dir}", file=stderr)
+        return ()
+
+    report = build_skill_directory_validation_report(resolved_dir)
+    if not report.validation_successful:
+        for issue in report.issues:
+            print(f"{issue.path}: {issue.code}: {issue.message}", file=stderr)
+        return ()
+
+    skill_paths = tuple(
+        skill_path
+        for skill_path in sorted(resolved_dir.glob("*.json"))
+        if skill_path.is_file()
+    )
+    skills = load_skills(resolved_dir)
+    entries = tuple(
+        SkillCatalogEntry(path=skill_path, skill=skill)
+        for skill_path, skill in zip(skill_paths, skills, strict=False)
+    )
+
+    return entries
 
 
 def _load_workflow_template_catalog(
     templates_dir: Path,
     *,
     stderr: TextIO,
-) -> tuple[WorkflowTemplateCatalogEntry, ...]:
-    resolved_dir = templates_dir.expanduser().resolve()
-    if not resolved_dir.exists():
-        print(
-            f"Workflow template directory does not exist: {resolved_dir}",
-            file=stderr,
-        )
-        return ()
-    if not resolved_dir.is_dir():
-        print(f"Workflow template path is not a directory: {resolved_dir}", file=stderr)
-        return ()
-
-    entries: list[WorkflowTemplateCatalogEntry] = []
-    for template_path in sorted(resolved_dir.glob("*.json")):
-        if not template_path.is_file():
-            continue
-        raw_template = template_path.read_text(encoding="utf-8")
-        report = build_workflow_template_validation_report(
-            raw_template,
-            source_path=template_path,
-        )
-        if not report.validation_successful:
-            for issue in report.issues:
-                print(
-                    f"{template_path}: {issue.code}: {issue.message}",
-                    file=stderr,
-                )
-            return ()
-        template = load_workflow_template(template_path)
-        entries.append(
-            WorkflowTemplateCatalogEntry(
-                path=template_path,
-                template=template,
-            )
-        )
-
-    return tuple(entries)
+) -> tuple[SkillCatalogEntry, ...]:
+    return _load_skill_catalog(templates_dir, stderr=stderr)
 
 
 def _build_selection_messages(
-    catalog: Sequence[WorkflowTemplateCatalogEntry],
+    catalog: Sequence[SkillCatalogEntry],
     transcript: Sequence[dict[str, str]],
 ) -> list[dict[str, str]]:
     return [
@@ -432,9 +409,7 @@ def _build_selection_messages(
             "role": "user",
             "content": json.dumps(
                 {
-                    "workflow_templates": [
-                        _catalog_entry_to_data(entry) for entry in catalog
-                    ],
+                    "skills": [_catalog_entry_to_data(entry) for entry in catalog],
                     "conversation": list(transcript),
                 },
                 indent=2,
@@ -444,128 +419,72 @@ def _build_selection_messages(
     ]
 
 
-def _build_generation_messages(
-    template: WorkflowTemplateCatalogEntry,
-    transcript: Sequence[dict[str, str]],
-) -> list[dict[str, str]]:
-    return [
-        {
-            "role": "system",
-            "content": _generation_system_prompt(),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "workflow_template_file": str(template.path),
-                    "workflow_template": template.template.to_data(),
-                    "conversation": list(transcript),
-                },
-                indent=2,
-                ensure_ascii=False,
-            ),
-        },
-    ]
-
-
-def _generate_workflow_tasks(
-    client: WorkflowChatClient,
-    template: WorkflowTemplateCatalogEntry,
-    transcript: Sequence[dict[str, str]],
-) -> WorkflowChatTaskBundle:
-    payload = client.complete_json(_build_generation_messages(template, transcript))
-    raw_tasks = payload.get("tasks")
-    if not isinstance(raw_tasks, list):
-        raise RuntimeError("Workflow task generation response did not include tasks.")
-
-    tasks = tuple(
-        WorkflowTask.from_data(task_data)
-        for task_data in raw_tasks
-        if isinstance(task_data, dict)
-    )
-    if not tasks:
-        raise RuntimeError("Workflow task generation response did not produce tasks.")
-    return WorkflowChatTaskBundle(tasks=tasks)
-
-
-def _write_task_bundle(
-    task_bundle: WorkflowChatTaskBundle,
-    output_dir: Path,
-) -> tuple[Path, ...]:
+def _write_skill_summary(summary: dict[str, Any], output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
-    task_paths: list[Path] = []
-    for task in task_bundle.tasks:
-        task_path = output_dir / f"{task.task_id}.json"
-        save_workflow_task(task, task_path)
-        task_paths.append(task_path)
-    return tuple(task_paths)
-
-
-def _validate_task_directory(directory: Path) -> WorkflowTaskValidationReport:
-    report = build_workflow_task_directory_validation_report(directory)
-    return report
+    summary_path = output_dir / "skill-execution.json"
+    summary_path.write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return summary_path
 
 
 def _parse_selection_response(
     payload: dict[str, Any],
-    catalog: Sequence[WorkflowTemplateCatalogEntry],
-) -> WorkflowChatSelection:
-    selected_template_path_value = payload.get("selected_template_path")
-    if (
-        not isinstance(selected_template_path_value, str)
-        or not selected_template_path_value
-    ):
+    catalog: Sequence[SkillCatalogEntry],
+) -> SkillChatSelection:
+    selected_skill_path_value = payload.get("selected_skill_path")
+    if not isinstance(selected_skill_path_value, str) or not selected_skill_path_value:
+        raise RuntimeError("Skill selection response must include selected_skill_path.")
+    selected_skill_path = _resolve_skill_path(selected_skill_path_value, catalog)
+    selected_skill_reason = payload.get("selected_skill_reason")
+    if not isinstance(selected_skill_reason, str) or not selected_skill_reason:
         raise RuntimeError(
-            "Workflow selection response must include selected_template_path."
-        )
-    selected_template_path = _resolve_template_path(
-        selected_template_path_value,
-        catalog,
-    )
-    selected_template_reason = payload.get("selected_template_reason")
-    if not isinstance(selected_template_reason, str) or not selected_template_reason:
-        raise RuntimeError(
-            "Workflow selection response must include selected_template_reason."
+            "Skill selection response must include selected_skill_reason."
         )
     next_question = payload.get("next_question")
     if next_question is not None and not isinstance(next_question, str):
-        raise RuntimeError(
-            "Workflow selection response next_question must be a string."
-        )
-    ready_to_generate = bool(payload.get("ready_to_generate"))
-    return WorkflowChatSelection(
-        selected_template_path=selected_template_path,
-        selected_template_reason=selected_template_reason,
+        raise RuntimeError("Skill selection response next_question must be a string.")
+    ready_to_execute = bool(payload.get("ready_to_execute"))
+    return SkillChatSelection(
+        selected_skill_path=selected_skill_path,
+        selected_skill_reason=selected_skill_reason,
         next_question=next_question,
-        ready_to_generate=ready_to_generate,
+        ready_to_execute=ready_to_execute,
+    )
+
+
+def _resolve_skill_path(
+    skill_path_value: str,
+    catalog: Sequence[SkillCatalogEntry],
+) -> Path:
+    normalized_value = _normalize_skill_path_value(skill_path_value)
+    for entry in catalog:
+        entry_value = str(entry.path)
+        entry_value_no_suffix = _path_without_suffix(entry_value)
+        if (
+            skill_path_value == entry_value
+            or skill_path_value == entry.path.name
+            or skill_path_value == entry.path.stem
+            or normalized_value == _normalize_skill_path_value(entry_value)
+            or normalized_value == _normalize_skill_path_value(entry.path.name)
+            or normalized_value == _normalize_skill_path_value(entry.path.stem)
+            or _path_without_suffix(skill_path_value) == entry_value_no_suffix
+        ):
+            return entry.path
+    raise RuntimeError(
+        f"Skill selection response referenced unknown skill {skill_path_value!r}."
     )
 
 
 def _resolve_template_path(
     template_path_value: str,
-    catalog: Sequence[WorkflowTemplateCatalogEntry],
+    catalog: Sequence[SkillCatalogEntry],
 ) -> Path:
-    normalized_value = _normalize_template_path_value(template_path_value)
-    for entry in catalog:
-        entry_value = str(entry.path)
-        entry_value_no_suffix = _path_without_suffix(entry_value)
-        if (
-            template_path_value == entry_value
-            or template_path_value == entry.path.name
-            or template_path_value == entry.path.stem
-            or normalized_value == _normalize_template_path_value(entry_value)
-            or normalized_value == _normalize_template_path_value(entry.path.name)
-            or normalized_value == _normalize_template_path_value(entry.path.stem)
-            or _path_without_suffix(template_path_value) == entry_value_no_suffix
-        ):
-            return entry.path
-    raise RuntimeError(
-        "Workflow selection response referenced unknown template "
-        f"{template_path_value!r}."
-    )
+    return _resolve_skill_path(template_path_value, catalog)
 
 
-def _normalize_template_path_value(value: str) -> str:
+def _normalize_skill_path_value(value: str) -> str:
     return value.strip().rstrip(".").rstrip()
 
 
@@ -630,70 +549,57 @@ def _generate_worktree_branch_name() -> str:
 
 
 def _find_catalog_entry(
-    catalog: Sequence[WorkflowTemplateCatalogEntry],
+    catalog: Sequence[SkillCatalogEntry],
     template_path: Path,
-) -> WorkflowTemplateCatalogEntry:
+) -> SkillCatalogEntry:
     for entry in catalog:
         if entry.path == template_path:
             return entry
-    raise RuntimeError(f"Could not find workflow template {template_path}.")
+    raise RuntimeError(f"Could not find skill {template_path}.")
 
 
-def _catalog_entry_to_data(entry: WorkflowTemplateCatalogEntry) -> dict[str, Any]:
+def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     return {
         "file": str(entry.path),
-        "when_to_use": list(entry.template.when_to_use),
-        "how_to_fill_this_out": list(entry.template.how_to_fill_this_out),
-        "task_templates": [
+        "name": entry.skill.name,
+        "when_to_use": list(entry.skill.when_to_use),
+        "steps": [
             {
-                "index": index,
-                "description": task_template.description,
-                "complexity": task_template.complexity.value,
-                "input_state": task_template.input_state,
-                "output_state_type": task_template.output_state_type,
-                "upstream_task_template_indexes": list(
-                    task_template.upstream_task_template_indexes
-                ),
-                "dependent_state": list(task_template.dependent_state),
-                "generation": (
-                    task_template.generation.to_data()
-                    if task_template.generation is not None
-                    else None
-                ),
+                "description": step.description,
+                "details": step.details,
+                "uses_skills": list(step.uses_skills),
             }
-            for index, task_template in enumerate(entry.template.task_templates)
+            for step in entry.skill.steps
         ],
     }
 
 
 def _selection_system_prompt() -> str:
     return (
-        "You are an interactive workflow template router.\n"
-        "Choose the best workflow template for the user's request.\n"
+        "You are an interactive skill router.\n"
+        "Choose the best skill for the user's request.\n"
         "If the request is not fully specified, ask exactly one concise "
         "follow-up question.\n"
-        "Return JSON with keys: selected_template_path, selected_template_reason, "
-        "next_question, ready_to_generate.\n"
-        "selected_template_path must match one of the catalog entries.\n"
-        "Use the template when_to_use and task descriptions to decide.\n"
+        "Return JSON with keys: selected_skill_path, selected_skill_reason, "
+        "next_question, ready_to_execute.\n"
+        "selected_skill_path must match one of the catalog entries.\n"
+        "Use the skill when_to_use and step descriptions to decide.\n"
         "Do not output markdown."
     )
 
 
-def _generation_system_prompt() -> str:
-    return (
-        "You are a workflow task generator.\n"
-        "Create concrete workflow tasks that satisfy the selected workflow template.\n"
-        "Return JSON with a top-level tasks array.\n"
-        "Every task must include task_id, status, description, complexity, "
-        "input_state, output_state_type, upstream_task_ids, and dependent_state.\n"
-        "Use status open for every generated task.\n"
-        "Make task IDs unique and filesystem-friendly.\n"
-        "Preserve the task ordering implied by the workflow template.\n"
-        "If the template includes a generation block, expand it when the conversation "
-        "provides multiple items that should become separate tasks.\n"
-        "Do not output markdown."
-    )
+def _build_skill_execution_summary(
+    selected_skill: SkillCatalogEntry,
+    selection: SkillChatSelection,
+    transcript: Sequence[dict[str, str]],
+) -> dict[str, Any]:
+    return {
+        "selected_skill_file": str(selected_skill.path),
+        "selected_skill_name": selected_skill.skill.name,
+        "selected_skill_reason": selection.selected_skill_reason,
+        "conversation": list(transcript),
+        "skill": selected_skill.skill.to_data(),
+    }
 
 
 def _prompt_user(

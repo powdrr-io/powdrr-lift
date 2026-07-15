@@ -861,10 +861,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     workflow_chat_parser.add_argument(
+        "--skills-dir",
         "--templates-dir",
+        dest="skills_dir",
         type=Path,
-        default=Path("templates"),
-        help="Directory containing workflow template JSON files.",
+        default=Path("skill-definitions"),
+        help="Directory containing skill JSON files.",
     )
     workflow_chat_parser.add_argument(
         "--output-dir",
@@ -1433,7 +1435,7 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     return run_workflow_chat(
         WorkflowChatConfig(
-            templates_dir=args.templates_dir,
+            skills_dir=args.skills_dir,
             repo_root=repo_root,
             output_dir=args.output_dir,
             provider=args.provider,

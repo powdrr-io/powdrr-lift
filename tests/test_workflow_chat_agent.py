@@ -259,6 +259,15 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             ),
         ]
 
+    step_descriptions = [
+        "Capture the feature goal and what success looks like.",
+        "Review the system context before deciding the feature shape.",
+        "Review the architecture context before choosing implementation details.",
+        "Generate the implementation template and fill it out.",
+        "Decide on proposed PRs and fill out each PR template.",
+        "Prompt the user to review the result.",
+    ]
+
     responses: Iterator[dict[str, object]] = iter(
         [
             {
@@ -268,6 +277,34 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 ),
                 "next_question": None,
                 "ready_to_execute": True,
+            },
+            {
+                "kind": "prompt_user",
+                "text": "What feature are you specifying?",
+                "decisions_and_context": (
+                    "Need the feature goal and success criteria."
+                ),
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": (
+                    "Goal captured: display related photos; success criteria: "
+                    "show related photos in the UI."
+                ),
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": (
+                    "System review complete: keep changes in the current "
+                    "worktree and use shell tools."
+                ),
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": (
+                    "Architecture review complete: align with existing "
+                    "entities and invariants."
+                ),
             },
             {
                 "kind": "invoke_tool",
@@ -280,6 +317,9 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                         "display-related-photos",
                     ],
                 },
+                "decisions_and_context": (
+                    "Start implementation spec generation for display-related-photos."
+                ),
             },
             {
                 "kind": "invoke_tool",
@@ -305,6 +345,10 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                         ),
                     ),
                 },
+                "decisions_and_context": (
+                    "Implementation template filled with the chosen layout and "
+                    "requirements."
+                ),
             },
             {
                 "kind": "invoke_tool",
@@ -317,6 +361,15 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                         "display-related-photos",
                     ],
                 },
+                "decisions_and_context": (
+                    "Implementation spec validated; move to PR planning."
+                ),
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": (
+                    "Implementation step complete; use this spec for PR scope."
+                ),
             },
             {
                 "kind": "invoke_tool",
@@ -329,6 +382,9 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                         "display-related-photos",
                     ],
                 },
+                "decisions_and_context": (
+                    "Start PR template generation for the feature."
+                ),
             },
             {
                 "kind": "invoke_tool",
@@ -370,10 +426,23 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                         ),
                     ),
                 },
+                "decisions_and_context": (
+                    "PR template filled with acceptance criteria and risks."
+                ),
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "PR step complete; handoff is ready.",
+            },
+            {
+                "kind": "prompt_user",
+                "text": "Please review the draft result.",
+                "decisions_and_context": "Ask the user to review the draft.",
             },
             {
                 "kind": "complete",
                 "text": "Feature specification complete.",
+                "decisions_and_context": "User review requested.",
             },
         ]
     )
@@ -399,16 +468,26 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             self,
             messages: list[dict[str, str]],
             *,
+            expected_step_index: int,
+            expected_step_description: str,
+            expected_context_suffix: str | None,
             expected_event_count: int,
             expected_last_event_kind: str | None = None,
         ) -> dict[str, object]:
             prompt = json.loads(messages[1]["content"])
             execution_events = prompt["execution_events"]
             assert len(execution_events) == expected_event_count
+            assert prompt["execution_mode"] == "execute_selected_skill"
+            assert prompt["selected_skill"]["name"] == "specify-a-feature"
+            assert prompt["current_step_index"] == expected_step_index
+            assert prompt["current_step"]["description"] == expected_step_description
+            assert prompt["transcript"][0]["content"] == "Build exports"
+            if expected_context_suffix is None:
+                assert prompt["step_context"] == []
+            else:
+                assert prompt["step_context"][-1] == expected_context_suffix
             if expected_last_event_kind is not None:
                 assert execution_events[-1]["kind"] == expected_last_event_kind
-            assert prompt["skill"]["name"] == "specify-a-feature"
-            assert prompt["transcript"][0]["content"] == "Build exports"
             return prompt
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
@@ -416,16 +495,67 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
             elif self._call_index == 1:
-                prompt = self._assert_execution_prompt(
+                self._assert_execution_prompt(
                     messages,
+                    expected_step_index=0,
+                    expected_step_description=step_descriptions[0],
+                    expected_context_suffix=None,
                     expected_event_count=0,
                 )
-                skill = cast(dict[str, object], prompt["skill"])
-                steps = cast(list[dict[str, object]], skill["steps"])
-                implementation_step = steps[3]
+            elif self._call_index == 2:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=0,
+                    expected_step_description=step_descriptions[0],
+                    expected_context_suffix=(
+                        "Need the feature goal and success criteria."
+                    ),
+                    expected_event_count=1,
+                    expected_last_event_kind="prompt_user",
+                )
+            elif self._call_index == 3:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=1,
+                    expected_step_description=step_descriptions[1],
+                    expected_context_suffix=(
+                        "Goal captured: display related photos; success criteria: "
+                        "show related photos in the UI."
+                    ),
+                    expected_event_count=2,
+                    expected_last_event_kind="next_step",
+                )
+            elif self._call_index == 4:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=2,
+                    expected_step_description=step_descriptions[2],
+                    expected_context_suffix=(
+                        "System review complete: keep changes in the current "
+                        "worktree and use shell tools."
+                    ),
+                    expected_event_count=3,
+                    expected_last_event_kind="next_step",
+                )
+            elif self._call_index == 5:
+                prompt = self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=3,
+                    expected_step_description=step_descriptions[3],
+                    expected_context_suffix=(
+                        "Architecture review complete: align with existing "
+                        "entities and invariants."
+                    ),
+                    expected_event_count=4,
+                    expected_last_event_kind="next_step",
+                )
+                current_step = cast(
+                    dict[str, object],
+                    prompt["current_step"],
+                )
                 tool_invocations = cast(
                     list[dict[str, object]],
-                    implementation_step["tool_invocations"],
+                    current_step["tool_invocations"],
                 )
                 assert tool_invocations[0]["command"] == [
                     "powdrr-lift",
@@ -433,38 +563,92 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--work-item-name",
                     "<work-item-name>",
                 ]
-            elif self._call_index == 2:
-                self._assert_execution_prompt(
-                    messages,
-                    expected_event_count=1,
-                    expected_last_event_kind="invoke_tool",
-                )
-            elif self._call_index == 3:
-                prompt = self._assert_execution_prompt(
-                    messages,
-                    expected_event_count=2,
-                    expected_last_event_kind="invoke_tool",
-                )
-                assert "implementation-specification.yaml" in json.dumps(prompt)
-            elif self._call_index == 4:
-                self._assert_execution_prompt(
-                    messages,
-                    expected_event_count=3,
-                    expected_last_event_kind="invoke_tool",
-                )
-            elif self._call_index == 5:
-                self._assert_execution_prompt(
-                    messages,
-                    expected_event_count=4,
-                    expected_last_event_kind="invoke_tool",
-                )
             elif self._call_index == 6:
-                prompt = self._assert_execution_prompt(
+                self._assert_execution_prompt(
                     messages,
+                    expected_step_index=3,
+                    expected_step_description=step_descriptions[3],
+                    expected_context_suffix=(
+                        "Start implementation spec generation for "
+                        "display-related-photos."
+                    ),
                     expected_event_count=5,
                     expected_last_event_kind="invoke_tool",
                 )
-                assert "proposed-pr-specification.yaml" in json.dumps(prompt)
+            elif self._call_index == 7:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=3,
+                    expected_step_description=step_descriptions[3],
+                    expected_context_suffix=(
+                        "Implementation template filled with the chosen layout "
+                        "and requirements."
+                    ),
+                    expected_event_count=6,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 8:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=3,
+                    expected_step_description=step_descriptions[3],
+                    expected_context_suffix=(
+                        "Implementation spec validated; move to PR planning."
+                    ),
+                    expected_event_count=7,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 9:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=4,
+                    expected_step_description=step_descriptions[4],
+                    expected_context_suffix=(
+                        "Implementation step complete; use this spec for PR scope."
+                    ),
+                    expected_event_count=8,
+                    expected_last_event_kind="next_step",
+                )
+            elif self._call_index == 10:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=4,
+                    expected_step_description=step_descriptions[4],
+                    expected_context_suffix=(
+                        "Start PR template generation for the feature."
+                    ),
+                    expected_event_count=9,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 11:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=4,
+                    expected_step_description=step_descriptions[4],
+                    expected_context_suffix=(
+                        "PR template filled with acceptance criteria and risks."
+                    ),
+                    expected_event_count=10,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 12:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=5,
+                    expected_step_description=step_descriptions[5],
+                    expected_context_suffix="PR step complete; handoff is ready.",
+                    expected_event_count=11,
+                    expected_last_event_kind="next_step",
+                )
+            elif self._call_index == 13:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=5,
+                    expected_step_description=step_descriptions[5],
+                    expected_context_suffix="Ask the user to review the draft.",
+                    expected_event_count=12,
+                    expected_last_event_kind="prompt_user",
+                )
             else:
                 raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
 
@@ -577,6 +761,8 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     stdout = io.StringIO()
     stderr = io.StringIO()
 
+    answers = iter(["Build exports", "Display related photos", "Looks good"])
+
     exit_code = run_workflow_chat(
         SkillChatConfig(
             skills_dir=skills_dir,
@@ -585,8 +771,9 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             provider="openai",
             model="test-model",
             api_key="test-key",
+            max_turns=20,
         ),
-        input_func=lambda: "Build exports",
+        input_func=lambda: next(answers),
         stdout=stdout,
         stderr=stderr,
     )
@@ -596,63 +783,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     assert summary_path.exists()
 
     messages = cast(list[list[dict[str, str]]], captured["messages"])
-    assert len(messages) == 7
+    assert len(messages) == 14
     action_prompt = json.loads(messages[1][1]["content"])
-    assert action_prompt["skill"]["name"] == "specify-a-feature"
-    assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["tool"] == "shell"
-    assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["command"] == [
-        "powdrr-lift",
-        "implementation-specification",
-        "--work-item-name",
-        "<work-item-name>",
-    ]
-    assert action_prompt["skill"]["steps"][4]["tool_invocations"][0]["command"] == [
-        "powdrr-lift",
-        "pr-specification",
-        "--work-item-name",
-        "<work-item-name>",
-    ]
-
-    implementation_fill_prompt = json.loads(messages[2][1]["content"])
-    assert len(implementation_fill_prompt["execution_events"]) == 1
-    assert implementation_fill_prompt["execution_events"][0]["parameters"][
-        "command"
-    ] == [
-        "powdrr-lift",
-        "implementation-specification",
-        "--work-item-name",
-        "display-related-photos",
-    ]
-
-    implementation_evaluation_prompt = json.loads(messages[3][1]["content"])
-    assert [
-        event["kind"] for event in implementation_evaluation_prompt["execution_events"]
-    ] == [
-        "invoke_tool",
-        "invoke_tool",
-    ]
-
-    pr_generation_prompt = json.loads(messages[4][1]["content"])
-    assert [event["kind"] for event in pr_generation_prompt["execution_events"]] == [
-        "invoke_tool",
-        "invoke_tool",
-        "invoke_tool",
-    ]
-
-    pr_fill_prompt = json.loads(messages[5][1]["content"])
-    assert [event["kind"] for event in pr_fill_prompt["execution_events"]] == [
-        "invoke_tool",
-        "invoke_tool",
-        "invoke_tool",
-        "invoke_tool",
-    ]
-
-    complete_prompt = json.loads(messages[6][1]["content"])
-    assert complete_prompt["execution_events"][-1]["kind"] == "invoke_tool"
-    assert complete_prompt["execution_events"][-1]["parameters"]["command"][0:2] == [
-        "python3",
-        "-c",
-    ]
+    assert action_prompt["execution_mode"] == "execute_selected_skill"
+    assert action_prompt["selected_skill"]["name"] == "specify-a-feature"
+    assert action_prompt["current_step_index"] == 0
+    assert action_prompt["current_step"]["description"] == step_descriptions[0]
+    assert action_prompt["step_context"] == []
 
     run_history = cast(list[dict[str, object]], captured["run_history"])
     assert len(run_history) == 5
@@ -694,11 +831,18 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["selected_skill_name"] == "specify-a-feature"
     assert [event["kind"] for event in summary["execution_events"]] == [
+        "prompt_user",
+        "next_step",
+        "next_step",
+        "next_step",
         "invoke_tool",
         "invoke_tool",
         "invoke_tool",
+        "next_step",
         "invoke_tool",
         "invoke_tool",
+        "next_step",
+        "prompt_user",
         "complete",
     ]
 

@@ -85,6 +85,7 @@ class SkillChatAction:
     tool: str | None = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
+    decisions_and_context: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -327,13 +328,28 @@ def run_workflow_chat(
         return 1
 
     execution_events: list[dict[str, Any]] = []
+    execution_context: list[str] = []
+    step_index = 0
     for turn in range(config.max_turns):
-        _verbose_print(stderr, config.verbose, f"Starting execution turn {turn + 1}")
+        if step_index >= len(selected_skill.skill.steps):
+            break
+        current_step = selected_skill.skill.steps[step_index]
+        _verbose_print(
+            stderr,
+            config.verbose,
+            (
+                f"Starting execution turn {turn + 1} "
+                f"for step {step_index + 1}/{len(selected_skill.skill.steps)}"
+            ),
+        )
         action_payload = client.complete_json(
-            _build_action_messages(
+            _build_step_execution_messages(
                 selected_skill=selected_skill,
+                current_step=current_step,
+                current_step_index=step_index,
                 transcript=transcript,
                 execution_events=execution_events,
+                execution_context=execution_context,
                 worktree_root=worktree_root,
             )
         )
@@ -346,6 +362,9 @@ def run_workflow_chat(
         action = _parse_action_response(action_payload)
         _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
 
+        if action.decisions_and_context:
+            execution_context.append(action.decisions_and_context)
+
         if action.kind == "complete":
             if action.text:
                 print(action.text, file=stdout)
@@ -353,9 +372,21 @@ def run_workflow_chat(
                 {
                     "kind": action.kind,
                     "text": action.text,
+                    "decisions_and_context": action.decisions_and_context,
                 }
             )
             break
+
+        if action.kind == "next_step":
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": step_index,
+                }
+            )
+            step_index += 1
+            continue
 
         if action.kind == "prompt_user":
             print(action.text or "", file=stdout)
@@ -373,6 +404,8 @@ def run_workflow_chat(
                     "kind": action.kind,
                     "text": action.text,
                     "answer": answer,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": step_index,
                 }
             )
             continue
@@ -416,6 +449,8 @@ def run_workflow_chat(
                     "kind": action.kind,
                     "parameters": action.parameters,
                     "result": tool_result,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": step_index,
                 }
             )
             continue
@@ -714,11 +749,14 @@ def _build_skill_execution_summary(
     }
 
 
-def _build_action_messages(
+def _build_step_execution_messages(
     *,
     selected_skill: SkillCatalogEntry,
+    current_step: Any,
+    current_step_index: int,
     transcript: Sequence[dict[str, str]],
     execution_events: Sequence[dict[str, Any]],
+    execution_context: Sequence[str],
     worktree_root: Path,
 ) -> list[dict[str, str]]:
     return [
@@ -730,6 +768,11 @@ def _build_action_messages(
             "role": "user",
             "content": json.dumps(
                 {
+                    "execution_mode": "execute_selected_skill",
+                    "current_step_index": current_step_index,
+                    "current_step_count": len(selected_skill.skill.steps),
+                    "current_step": _skill_step_to_data(current_step),
+                    "step_context": list(execution_context),
                     "available_tools": [
                         {
                             "name": "shell",
@@ -739,7 +782,7 @@ def _build_action_messages(
                         }
                     ],
                     "worktree_root": str(worktree_root),
-                    "skill": _catalog_entry_to_data(selected_skill),
+                    "selected_skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
                     "execution_events": list(execution_events),
                 },
@@ -753,15 +796,23 @@ def _build_action_messages(
 def _action_system_prompt() -> str:
     return (
         "You are executing a checked-in skill in a terminal workflow.\n"
+        "Use the current step, prior step context, transcript, and prior "
+        "execution events to determine the next action.\n"
         "Return exactly one JSON object with one of these forms:\n"
-        '{"kind":"prompt_user","text":"..."}\n'
-        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}}}\n'
-        '{"kind":"complete","text":"..."}\n'
-        "Use prompt_user when you need more information from the user.\n"
+        '{"kind":"prompt_user","text":"...","decisions_and_context":"..."}\n'
+        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"..."}\n'
+        '{"kind":"next_step","decisions_and_context":"..."}\n'
+        '{"kind":"complete","text":"...","decisions_and_context":"..."}\n'
+        "Use prompt_user only when you need more information to continue "
+        "executing the current step.\n"
         "Use invoke_tool for shell commands.\n"
-        "When the selected skill includes tool_invocations, choose one of those "
+        "When the current step includes tool_invocations, choose one of those "
         "structured invocations and fill in its parameters.\n"
+        "Use next_step when the current step is complete and the next step "
+        "should receive the accumulated context.\n"
         "Use complete when the skill is finished.\n"
+        "Always include decisions_and_context with the concise information "
+        "future steps will need.\n"
         "Do not output markdown."
     )
 
@@ -770,6 +821,7 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     kind = payload.get("kind")
     if not isinstance(kind, str) or not kind:
         raise RuntimeError("Workflow action response must include kind.")
+    decisions_and_context = _optional_string(payload.get("decisions_and_context"))
 
     if kind == "prompt_user":
         text = payload.get("text")
@@ -777,7 +829,11 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
             raise RuntimeError(
                 "Workflow prompt_user action must include non-empty text."
             )
-        return SkillChatAction(kind=kind, text=text.strip())
+        return SkillChatAction(
+            kind=kind,
+            text=text.strip(),
+            decisions_and_context=decisions_and_context,
+        )
 
     if kind == "invoke_tool":
         tool = payload.get("tool")
@@ -799,6 +855,7 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
                 kind=kind,
                 tool=tool.strip(),
                 parameters=normalized_parameters,
+                decisions_and_context=decisions_and_context,
             )
         if isinstance(command, Sequence) and not isinstance(
             command,
@@ -817,16 +874,24 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
                 kind=kind,
                 tool=tool.strip(),
                 parameters=normalized_parameters,
+                decisions_and_context=decisions_and_context,
             )
         raise RuntimeError(
             "Workflow invoke_tool action command must be a string or array."
         )
 
+    if kind == "next_step":
+        return SkillChatAction(kind=kind, decisions_and_context=decisions_and_context)
+
     if kind == "complete":
         text = payload.get("text")
         if text is not None and not isinstance(text, str):
             raise RuntimeError("Workflow complete action text must be a string.")
-        return SkillChatAction(kind=kind, text=(text.strip() if text else None))
+        return SkillChatAction(
+            kind=kind,
+            text=(text.strip() if text else None),
+            decisions_and_context=decisions_and_context,
+        )
 
     raise RuntimeError(f"Unknown workflow action kind: {kind!r}")
 
@@ -935,6 +1000,15 @@ def _required_shell_command_item(value: object) -> str:
             "Workflow invoke_tool action command items must be non-empty strings."
         )
     return value.strip()
+
+
+def _optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise RuntimeError("Workflow action decisions_and_context must be a string.")
+    normalized_value = value.strip()
+    return normalized_value or None
 
 
 def _prompt_user(

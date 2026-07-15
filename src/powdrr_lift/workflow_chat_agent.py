@@ -626,7 +626,7 @@ def _is_dedicated_worktree(repo_root: Path) -> bool:
 
 
 def _generate_worktree_branch_name() -> str:
-    return f"codex/workflow-chat-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}"
+    return f"workflow-chat-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}"
 
 
 def _find_catalog_entry(

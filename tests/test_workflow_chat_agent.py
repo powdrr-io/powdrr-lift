@@ -635,7 +635,7 @@ def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checko
     assert resolved == worktree_root.resolve()
     assert cast(list[str], captured["cmd"])[0] == "bash"
     assert cast(list[str], captured["cmd"])[1] == str(script_path)
-    assert cast(list[str], captured["cmd"])[2].startswith("codex/workflow-chat-")
+    assert cast(list[str], captured["cmd"])[2].startswith("workflow-chat-")
     assert captured["cwd"] == repo_root.resolve()
     assert "Creating dedicated worktree" in stderr.getvalue()
 

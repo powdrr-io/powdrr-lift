@@ -20,7 +20,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
 )
 
-_DEFAULT_MODEL = "gpt-4.1-mini"
+_DEFAULT_MODEL = "glm-5.2"
 
 
 @dataclass(frozen=True, slots=True)

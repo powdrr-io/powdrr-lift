@@ -65,6 +65,40 @@ def test_cli_workflow_chat_wires_configuration(
     assert config.verbose is False
 
 
+def test_cli_workflow_chat_defaults_to_glm_5_2(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
+        captured["config"] = config
+        return 0
+
+    monkeypatch.setattr("powdrr_lift.cli.run_workflow_chat", _fake_run_workflow_chat)
+
+    exit_code = main(
+        [
+            "workflow-chat",
+            "--repo-root",
+            str(repo_root),
+            "--skills-dir",
+            "skill-definitions",
+        ]
+    )
+
+    assert exit_code == 0
+    config = captured["config"]
+    assert isinstance(config, SkillChatConfig)
+    assert config.model == "glm-5.2"
+
+
 def test_cli_workflow_chat_wires_verbose_flag(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

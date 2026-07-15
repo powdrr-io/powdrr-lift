@@ -1174,7 +1174,9 @@ def test_run_workflow_chat_repairs_missing_action_fields(
                 }
             if call_index == 1:
                 return {
-                    "decisions_and_context": "The step is ready to complete, but the schema is missing kind.",
+                    "decisions_and_context": (
+                        "The step is ready to complete, but the schema is missing kind."
+                    ),
                 }
             if call_index == 2:
                 repair_request = messages[-1]["content"]

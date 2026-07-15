@@ -1070,7 +1070,8 @@ def _complete_json_with_repair(
                         return parser(repaired_payload)
                     except RuntimeError as repair_exc:
                         print(
-                            f"{context} repaired response was still invalid: {repair_exc}",
+                            "Repaired "
+                            f"{context} response was still invalid: {repair_exc}",
                             file=stderr,
                         )
             else:
@@ -1163,7 +1164,8 @@ def _attempt_json_repair(
     _verbose_print(
         stderr,
         verbose,
-        f"Repair prompt for {context}: {json.dumps(repair_messages, indent=2, ensure_ascii=False)}",
+        "Repair prompt for "
+        f"{context}: {json.dumps(repair_messages, indent=2, ensure_ascii=False)}",
     )
     try:
         return client.complete_json(repair_messages)

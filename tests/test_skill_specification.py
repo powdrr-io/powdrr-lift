@@ -166,3 +166,17 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Summarize the result into a concise implementation-ready note.",
     ]
     assert skill.steps[1].uses_skills == ("specify-system",)
+
+
+def test_checked_in_skill_definitions_directory_is_valid() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    report = build_skill_directory_validation_report(skills_dir)
+
+    assert report.validation_successful is True
+    assert report.skill_names == [
+        "specify-a-feature",
+        "specify-architecture",
+        "specify-implementation",
+        "specify-prs",
+        "specify-system",
+    ]

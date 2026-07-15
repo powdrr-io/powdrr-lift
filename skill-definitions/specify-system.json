@@ -1,0 +1,21 @@
+{
+  "name": "specify-system",
+  "when_to_use": [
+    "When you need to define the system requirements and implementation approach for a work item.",
+    "When the TUI should guide the user through a synchronous requirements-and-approach flow."
+  ],
+  "steps": [
+    {
+      "description": "Ask for the work item name and the minimum context needed to draft the requirements and approach."
+    },
+    {
+      "description": "Run `powdrr-lift system-specification --work-item-name <work-item-name>` to generate the template."
+    },
+    {
+      "description": "Fill out the requirements and approach sections with concise, testable statements."
+    },
+    {
+      "description": "Validate the filled template with `powdrr-lift evaluate-system-specification --work-item-name <work-item-name>` and fix issues until it passes."
+    }
+  ]
+}

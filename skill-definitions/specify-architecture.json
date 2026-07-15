@@ -1,0 +1,24 @@
+{
+  "name": "specify-architecture",
+  "when_to_use": [
+    "When the work item already has requirements and approach and needs an architecture specification.",
+    "When the TUI should guide the user through a synchronous architecture flow."
+  ],
+  "steps": [
+    {
+      "description": "Review the requirements and approach first.",
+      "uses_skills": [
+        "specify-system"
+      ]
+    },
+    {
+      "description": "Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` to generate the template."
+    },
+    {
+      "description": "Fill out entities, relationships, invariants, and guidance using only the allowed entity types."
+    },
+    {
+      "description": "Validate with `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` and fix any validation errors."
+    }
+  ]
+}

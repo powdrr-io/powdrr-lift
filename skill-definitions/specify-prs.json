@@ -1,0 +1,25 @@
+{
+  "name": "specify-prs",
+  "when_to_use": [
+    "When you need to capture proposed PRs for a work item.",
+    "When the TUI should guide the user through a synchronous PR specification flow."
+  ],
+  "steps": [
+    {
+      "description": "Review the requirements, approach, and implementation context first.",
+      "uses_skills": [
+        "specify-system",
+        "specify-implementation"
+      ]
+    },
+    {
+      "description": "Run `powdrr-lift pr-specification --work-item-name <work-item-name>` to generate the template."
+    },
+    {
+      "description": "Fill out the proposed PR intent, acceptance criteria, expected tests, expected outcomes, non-goals, and risks."
+    },
+    {
+      "description": "Validate with `powdrr-lift evaluate-pr-specification --input docs/specs/<work-item-name>/proposed-pr-specification.yaml` and fix issues until it passes."
+    }
+  ]
+}

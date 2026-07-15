@@ -217,6 +217,135 @@ def test_run_workflow_chat_generates_skill_summary(
     assert "Using openai credentials from --api-key" in stderr.getvalue()
 
 
+def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    source_skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    for skill_path in sorted(source_skills_dir.glob("*.json")):
+        save_skill(load_skill(skill_path), skills_dir / skill_path.name)
+
+    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    worktree_root.mkdir(parents=True)
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": (
+                    "The user wants a synchronous feature-specification flow."
+                ),
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "implementation-specification",
+                        "--work-item-name",
+                        "display-related-photos",
+                    ],
+                },
+            },
+            {
+                "kind": "complete",
+                "text": "Feature specification complete.",
+            },
+        ]
+    )
+
+    captured: dict[str, object] = {"messages": []}
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            captured["model"] = model
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            return next(responses)
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.returncode = 0
+            self.stdout = "generated implementation spec\n"
+            self.stderr = ""
+
+    def _fake_run(*args: object, **kwargs: object) -> _FakeProcess:
+        captured["run_args"] = args
+        captured["run_kwargs"] = kwargs
+        return _FakeProcess()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            provider="openai",
+            model="test-model",
+            api_key="test-key",
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    summary_path = worktree_root / "generated" / "skill-execution.json"
+    assert exit_code == 0
+    assert summary_path.exists()
+
+    messages = cast(list[list[dict[str, str]]], captured["messages"])
+    assert len(messages) == 3
+    action_prompt = json.loads(messages[1][1]["content"])
+    assert action_prompt["skill"]["name"] == "specify-a-feature"
+    assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["tool"] == "shell"
+    assert action_prompt["skill"]["steps"][3]["tool_invocations"][0]["command"] == [
+        "powdrr-lift",
+        "implementation-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    ]
+    complete_prompt = json.loads(messages[2][1]["content"])
+    assert complete_prompt["execution_events"][0]["kind"] == "invoke_tool"
+
+    run_args = cast(tuple[object, ...], captured["run_args"])
+    run_kwargs = cast(dict[str, object], captured["run_kwargs"])
+    assert run_args[0] == [
+        "powdrr-lift",
+        "implementation-specification",
+        "--work-item-name",
+        "display-related-photos",
+    ]
+    assert run_kwargs["shell"] is False
+    assert "generated implementation spec" in stdout.getvalue()
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["selected_skill_name"] == "specify-a-feature"
+    assert summary["execution_events"][0]["kind"] == "invoke_tool"
+    assert summary["execution_events"][1]["kind"] == "complete"
+
+
 def test_run_workflow_chat_verbose_prints_progress(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

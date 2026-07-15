@@ -385,10 +385,92 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url
+            self._call_index = 0
+
+        def _assert_selection_prompt(self, messages: list[dict[str, str]]) -> None:
+            prompt = json.loads(messages[1]["content"])
+            assert prompt["conversation"][0]["content"] == "Build exports"
+            assert any(
+                skill["name"] == "specify-a-feature" for skill in prompt["skills"]
+            )
+            assert any(skill["name"] == "review-system" for skill in prompt["skills"])
+
+        def _assert_execution_prompt(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            expected_event_count: int,
+            expected_last_event_kind: str | None = None,
+        ) -> dict[str, object]:
+            prompt = json.loads(messages[1]["content"])
+            execution_events = prompt["execution_events"]
+            assert len(execution_events) == expected_event_count
+            if expected_last_event_kind is not None:
+                assert execution_events[-1]["kind"] == expected_last_event_kind
+            assert prompt["skill"]["name"] == "specify-a-feature"
+            assert prompt["transcript"][0]["content"] == "Build exports"
+            return prompt
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
-            return next(responses)
+            if self._call_index == 0:
+                self._assert_selection_prompt(messages)
+            elif self._call_index == 1:
+                prompt = self._assert_execution_prompt(
+                    messages,
+                    expected_event_count=0,
+                )
+                skill = cast(dict[str, object], prompt["skill"])
+                steps = cast(list[dict[str, object]], skill["steps"])
+                implementation_step = steps[3]
+                tool_invocations = cast(
+                    list[dict[str, object]],
+                    implementation_step["tool_invocations"],
+                )
+                assert tool_invocations[0]["command"] == [
+                    "powdrr-lift",
+                    "implementation-specification",
+                    "--work-item-name",
+                    "<work-item-name>",
+                ]
+            elif self._call_index == 2:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_event_count=1,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 3:
+                prompt = self._assert_execution_prompt(
+                    messages,
+                    expected_event_count=2,
+                    expected_last_event_kind="invoke_tool",
+                )
+                assert "implementation-specification.yaml" in json.dumps(prompt)
+            elif self._call_index == 4:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_event_count=3,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 5:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_event_count=4,
+                    expected_last_event_kind="invoke_tool",
+                )
+            elif self._call_index == 6:
+                prompt = self._assert_execution_prompt(
+                    messages,
+                    expected_event_count=5,
+                    expected_last_event_kind="invoke_tool",
+                )
+                assert "proposed-pr-specification.yaml" in json.dumps(prompt)
+            else:
+                raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
+
+            response = next(responses)
+            self._call_index += 1
+            return response
 
     class _FakeProcess:
         def __init__(self, *, stdout: str = "", stderr: str = "") -> None:

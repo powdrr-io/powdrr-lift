@@ -292,24 +292,28 @@ def run_workflow_chat(
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
-        selection_payload = _complete_json_with_retry(
+        selection = _complete_json_with_repair(
             client,
             _build_selection_messages(catalog, transcript),
+            parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
+            repair_instructions=_selection_repair_prompt(catalog),
             config=config,
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
         )
-        if selection_payload is None:
+        if selection is None:
             return 1
         _verbose_print(
             stderr,
             config.verbose,
-            "Selection payload: "
-            f"{json.dumps(selection_payload, indent=2, ensure_ascii=False)}",
+            (
+                "Selection result: "
+                f"skill={selection.selected_skill_path}, "
+                f"ready_to_execute={selection.ready_to_execute}"
+            ),
         )
-        selection = _parse_selection_response(selection_payload, catalog)
         selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
         print(f"Matched skill: {selected_skill.path}", file=stdout)
         print(selection.selected_skill_reason, file=stdout)
@@ -350,7 +354,7 @@ def run_workflow_chat(
                 f"for step {step_index + 1}/{len(selected_skill.skill.steps)}"
             ),
         )
-        action_payload = _complete_json_with_retry(
+        action = _complete_json_with_repair(
             client,
             _build_step_execution_messages(
                 selected_skill=selected_skill,
@@ -361,24 +365,24 @@ def run_workflow_chat(
                 execution_context=execution_context,
                 worktree_root=worktree_root,
             ),
+            parser=_parse_action_response,
             context=(
                 f"workflow execution for step {step_index + 1}/"
                 f"{len(selected_skill.skill.steps)}"
             ),
+            repair_instructions=_action_repair_prompt(selected_skill),
             config=config,
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
         )
-        if action_payload is None:
+        if action is None:
             return 1
         _verbose_print(
             stderr,
             config.verbose,
-            "Execution payload: "
-            f"{json.dumps(action_payload, indent=2, ensure_ascii=False)}",
+            f"Execution result: kind={action.kind}",
         )
-        action = _parse_action_response(action_payload)
         _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
 
         if action.decisions_and_context:
@@ -1030,21 +1034,47 @@ def _optional_string(value: object) -> str | None:
     return normalized_value or None
 
 
-def _complete_json_with_retry(
+def _complete_json_with_repair(
     client: WorkflowChatClient,
     messages: list[dict[str, str]],
     *,
     context: str,
+    parser: Callable[[dict[str, Any]], Any],
+    repair_instructions: str,
     config: WorkflowChatConfig,
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
-) -> dict[str, Any] | None:
+) -> Any | None:
     while True:
         try:
-            return client.complete_json(messages)
+            payload = client.complete_json(messages)
         except RuntimeError as exc:
-            print(f"{context} failed: {exc}", file=stderr)
+            if _is_json_repairable_error(exc):
+                _verbose_print(
+                    stderr,
+                    config.verbose,
+                    f"Attempting automatic repair for {context} after provider failure",
+                )
+                repaired_payload = _attempt_json_repair(
+                    client,
+                    messages,
+                    context=context,
+                    error_message=str(exc),
+                    repair_instructions=repair_instructions,
+                    stderr=stderr,
+                    verbose=config.verbose,
+                )
+                if repaired_payload is not None:
+                    try:
+                        return parser(repaired_payload)
+                    except RuntimeError as repair_exc:
+                        print(
+                            f"{context} repaired response was still invalid: {repair_exc}",
+                            file=stderr,
+                        )
+            else:
+                print(f"{context} failed: {exc}", file=stderr)
             retry = _prompt_user(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
@@ -1054,6 +1084,47 @@ def _complete_json_with_retry(
                 stderr,
                 config.verbose,
                 f"User chose {retry!r} after {context} failure",
+            )
+            if retry.strip().lower() == "retry":
+                continue
+            print(f"Stopping after {context} failure.", file=stderr)
+            return None
+        try:
+            return parser(payload)
+        except RuntimeError as exc:
+            print(f"{context} response needs repair: {exc}", file=stderr)
+            _verbose_print(
+                stderr,
+                config.verbose,
+                f"Attempting automatic repair for {context} after validation failure",
+            )
+            repaired_payload = _attempt_json_repair(
+                client,
+                messages,
+                context=context,
+                error_message=str(exc),
+                repair_instructions=repair_instructions,
+                previous_payload=payload,
+                stderr=stderr,
+                verbose=config.verbose,
+            )
+            if repaired_payload is not None:
+                try:
+                    return parser(repaired_payload)
+                except RuntimeError as repair_exc:
+                    print(
+                        f"{context} repaired response was still invalid: {repair_exc}",
+                        file=stderr,
+                    )
+            retry = _prompt_user(
+                "Type 'retry' to try again or 'abort' to stop: ",
+                input_func=input_func,
+                stdout=stdout,
+            )
+            _verbose_print(
+                stderr,
+                config.verbose,
+                f"User chose {retry!r} after {context} repair failure",
             )
             if retry.strip().lower() == "retry":
                 continue
@@ -1069,6 +1140,103 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
     if not isinstance(parsed_content, dict):
         raise RuntimeError(f"{context} must be a JSON object.")
     return cast("dict[str, Any]", parsed_content)
+
+
+def _attempt_json_repair(
+    client: WorkflowChatClient,
+    messages: Sequence[dict[str, str]],
+    *,
+    context: str,
+    error_message: str,
+    repair_instructions: str,
+    stderr: TextIO,
+    verbose: bool,
+    previous_payload: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    repair_messages = _build_json_repair_messages(
+        messages,
+        context=context,
+        error_message=error_message,
+        repair_instructions=repair_instructions,
+        previous_payload=previous_payload,
+    )
+    _verbose_print(
+        stderr,
+        verbose,
+        f"Repair prompt for {context}: {json.dumps(repair_messages, indent=2, ensure_ascii=False)}",
+    )
+    try:
+        return client.complete_json(repair_messages)
+    except RuntimeError as exc:
+        print(f"{context} repair request failed: {exc}", file=stderr)
+        return None
+
+
+def _build_json_repair_messages(
+    messages: Sequence[dict[str, str]],
+    *,
+    context: str,
+    error_message: str,
+    repair_instructions: str,
+    previous_payload: dict[str, Any] | None,
+) -> list[dict[str, str]]:
+    repair_message = (
+        f"The previous {context} response was invalid because: {error_message}\n"
+        f"{repair_instructions}\n"
+        "Return only a corrected JSON object with no markdown or commentary."
+    )
+    if previous_payload is not None:
+        repair_message += (
+            "\nPrevious response:\n"
+            f"{json.dumps(previous_payload, indent=2, ensure_ascii=False)}"
+        )
+    repaired_messages = list(messages)
+    if previous_payload is not None:
+        repaired_messages.append(
+            {
+                "role": "assistant",
+                "content": json.dumps(previous_payload, indent=2, ensure_ascii=False),
+            }
+        )
+    repaired_messages.append({"role": "user", "content": repair_message})
+    return repaired_messages
+
+
+def _is_json_repairable_error(exc: RuntimeError) -> bool:
+    message = str(exc).lower()
+    return any(
+        phrase in message
+        for phrase in (
+            "was not valid json",
+            "content was empty",
+            "did not include any content",
+            "did not include any choices",
+            "choice was not an object",
+            "message was not an object",
+            "must be a json object",
+        )
+    )
+
+
+def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
+    catalog_entries = ", ".join(str(entry.path) for entry in catalog)
+    return (
+        "Fix the response so it matches the selection schema with keys "
+        "selected_skill_path, selected_skill_reason, next_question, and "
+        f"ready_to_execute. The selected_skill_path must be one of: {catalog_entries}."
+    )
+
+
+def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
+    step_kinds = ", ".join(
+        [step.description for step in selected_skill.skill.steps]
+    )
+    return (
+        "Fix the response so it matches the workflow action schema with keys "
+        "kind, tool, text, parameters, and decisions_and_context. "
+        "Allowed kinds are prompt_user, invoke_tool, next_step, and complete. "
+        f"The skill steps are: {step_kinds}."
+    )
 
 
 def _prompt_user(

@@ -1101,9 +1101,7 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
                     "decisions_and_context": "Step 1 complete.",
                 }
             if call_index == 2:
-                raise RuntimeError(
-                    "OpenAI response content was not valid JSON: Expecting value"
-                )
+                raise RuntimeError("OpenAI request failed with HTTP 429: rate limit")
             if call_index == 3:
                 return {
                     "kind": "complete",
@@ -1141,6 +1139,82 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
     assert cast(int, captured["calls"]) == 4
     assert "workflow execution for step 2/2 failed" in stderr.getvalue()
     assert "Type 'retry' to try again or 'abort' to stop:" in stdout.getvalue()
+    assert (worktree_root / "generated" / "skill-execution.json").exists()
+
+
+def test_run_workflow_chat_repairs_missing_action_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+
+    captured: dict[str, object] = {"calls": 0, "messages": []}
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            self.model = model
+            self.api_key = api_key
+            self.base_url = base_url
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            call_index = cast(int, captured["calls"])
+            captured["calls"] = call_index + 1
+            if call_index == 0:
+                return {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": "The request is to specify a feature.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if call_index == 1:
+                return {
+                    "decisions_and_context": "The step is ready to complete, but the schema is missing kind.",
+                }
+            if call_index == 2:
+                repair_request = messages[-1]["content"]
+                assert "workflow action schema" in repair_request
+                assert "kind" in repair_request
+                return {
+                    "kind": "complete",
+                    "text": "Skill execution complete.",
+                }
+            raise AssertionError(f"Unexpected call index: {call_index}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert cast(int, captured["calls"]) == 3
+    assert "response needs repair" in stderr.getvalue()
     assert (worktree_root / "generated" / "skill-execution.json").exists()
 
 

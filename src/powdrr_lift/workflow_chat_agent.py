@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
@@ -76,6 +78,13 @@ WorkflowTemplateCatalogEntry = SkillCatalogEntry
 WorkflowChatConfig = SkillChatConfig
 WorkflowChatResult = SkillChatResult
 WorkflowChatSelection = SkillChatSelection
+
+
+@dataclass(frozen=True, slots=True)
+class SkillChatAction:
+    kind: str
+    text: str | None = None
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,11 +242,12 @@ def run_workflow_chat(
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
 ) -> int:
-    repo_root = _resolve_worktree_context(
+    worktree_root = _resolve_worktree_context(
         config.repo_root,
         stderr=stderr,
         verbose=config.verbose,
     )
+    repo_root = worktree_root
     skills_dir = config.skills_dir
     if not skills_dir.is_absolute():
         skills_dir = repo_root / skills_dir
@@ -316,7 +326,109 @@ def run_workflow_chat(
         print("Could not select a skill.", file=stderr)
         return 1
 
-    summary = _build_skill_execution_summary(selected_skill, selection, transcript)
+    execution_events: list[dict[str, Any]] = []
+    for turn in range(config.max_turns):
+        _verbose_print(stderr, config.verbose, f"Starting execution turn {turn + 1}")
+        action_payload = client.complete_json(
+            _build_action_messages(
+                selected_skill=selected_skill,
+                transcript=transcript,
+                execution_events=execution_events,
+                worktree_root=worktree_root,
+            )
+        )
+        _verbose_print(
+            stderr,
+            config.verbose,
+            "Execution payload: "
+            f"{json.dumps(action_payload, indent=2, ensure_ascii=False)}",
+        )
+        action = _parse_action_response(action_payload)
+        _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
+
+        if action.kind == "complete":
+            if action.text:
+                print(action.text, file=stdout)
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "text": action.text,
+                }
+            )
+            break
+
+        if action.kind == "prompt_user":
+            print(action.text or "", file=stdout)
+            answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+            _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
+            transcript.append(
+                {
+                    "role": "assistant",
+                    "content": action.text or "",
+                }
+            )
+            transcript.append({"role": "user", "content": answer})
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "text": action.text,
+                    "answer": answer,
+                }
+            )
+            continue
+
+        if action.kind == "invoke_tool":
+            tool_result = _execute_shell_tool(
+                action.parameters,
+                worktree_root=worktree_root,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=config.verbose,
+            )
+            transcript.append(
+                {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        {
+                            "kind": action.kind,
+                            "parameters": action.parameters,
+                        },
+                        ensure_ascii=False,
+                    ),
+                }
+            )
+            transcript.append(
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {"tool_result": tool_result},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "parameters": action.parameters,
+                    "result": tool_result,
+                }
+            )
+            continue
+
+        raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
+    else:
+        print(
+            "Reached the maximum number of workflow turns without completion.",
+            file=stderr,
+        )
+        return 1
+
+    summary = _build_skill_execution_summary(
+        selected_skill,
+        selection,
+        transcript,
+        execution_events,
+    )
     _verbose_print(
         stderr,
         config.verbose,
@@ -563,14 +675,7 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
         "file": str(entry.path),
         "name": entry.skill.name,
         "when_to_use": list(entry.skill.when_to_use),
-        "steps": [
-            {
-                "description": step.description,
-                "details": step.details,
-                "uses_skills": list(step.uses_skills),
-            }
-            for step in entry.skill.steps
-        ],
+        "steps": [_skill_step_to_data(step) for step in entry.skill.steps],
     }
 
 
@@ -592,14 +697,264 @@ def _build_skill_execution_summary(
     selected_skill: SkillCatalogEntry,
     selection: SkillChatSelection,
     transcript: Sequence[dict[str, str]],
+    execution_events: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "selected_skill_file": str(selected_skill.path),
         "selected_skill_name": selected_skill.skill.name,
         "selected_skill_reason": selection.selected_skill_reason,
         "conversation": list(transcript),
+        "execution_events": list(execution_events),
         "skill": selected_skill.skill.to_data(),
     }
+
+
+def _build_action_messages(
+    *,
+    selected_skill: SkillCatalogEntry,
+    transcript: Sequence[dict[str, str]],
+    execution_events: Sequence[dict[str, Any]],
+    worktree_root: Path,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": _action_system_prompt(),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "available_tools": [
+                        {
+                            "name": "shell",
+                            "description": (
+                                "Execute a shell command in the current worktree."
+                            ),
+                        }
+                    ],
+                    "worktree_root": str(worktree_root),
+                    "skill": _catalog_entry_to_data(selected_skill),
+                    "transcript": list(transcript),
+                    "execution_events": list(execution_events),
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+        },
+    ]
+
+
+def _action_system_prompt() -> str:
+    return (
+        "You are executing a checked-in skill in a terminal workflow.\n"
+        "Return exactly one JSON object with one of these forms:\n"
+        '{"kind":"prompt_user","text":"..."}\n'
+        '{"kind":"invoke_tool","parameters":{"command":"...","cwd":"...","env":{...}}}\n'
+        '{"kind":"complete","text":"..."}\n'
+        "Use prompt_user when you need more information from the user.\n"
+        "Use invoke_tool for shell commands, including any CLI command that a "
+        "skill step describes in backticks.\n"
+        "Use complete when the skill is finished.\n"
+        "Do not output markdown."
+    )
+
+
+def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
+    kind = payload.get("kind")
+    if not isinstance(kind, str) or not kind:
+        raise RuntimeError("Workflow action response must include kind.")
+
+    if kind == "prompt_user":
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError(
+                "Workflow prompt_user action must include non-empty text."
+            )
+        return SkillChatAction(kind=kind, text=text.strip())
+
+    if kind == "invoke_tool":
+        parameters = payload.get("parameters")
+        if not isinstance(parameters, dict):
+            raise RuntimeError("Workflow invoke_tool action must include parameters.")
+        command = parameters.get("command")
+        if isinstance(command, str):
+            normalized_parameters = dict(parameters)
+            normalized_command = command.strip()
+            if not normalized_command:
+                raise RuntimeError(
+                    "Workflow invoke_tool action command must be non-empty."
+                )
+            normalized_parameters["command"] = normalized_command
+            return SkillChatAction(
+                kind=kind,
+                parameters=normalized_parameters,
+            )
+        if isinstance(command, Sequence) and not isinstance(
+            command,
+            (str, bytes, bytearray),
+        ):
+            normalized_command_list = [
+                _required_shell_command_item(item) for item in command
+            ]
+            if not normalized_command_list:
+                raise RuntimeError(
+                    "Workflow invoke_tool action command must not be empty."
+                )
+            normalized_parameters = dict(parameters)
+            normalized_parameters["command"] = normalized_command_list
+            return SkillChatAction(
+                kind=kind,
+                parameters=normalized_parameters,
+            )
+        raise RuntimeError(
+            "Workflow invoke_tool action command must be a string or array."
+        )
+
+    if kind == "complete":
+        text = payload.get("text")
+        if text is not None and not isinstance(text, str):
+            raise RuntimeError("Workflow complete action text must be a string.")
+        return SkillChatAction(kind=kind, text=(text.strip() if text else None))
+
+    raise RuntimeError(f"Unknown workflow action kind: {kind!r}")
+
+
+def _execute_shell_tool(
+    parameters: dict[str, Any],
+    *,
+    worktree_root: Path,
+    stdout: TextIO,
+    stderr: TextIO,
+    verbose: bool,
+) -> dict[str, Any]:
+    command = parameters.get("command")
+    if isinstance(command, str):
+        command_display = command
+        run_command: str | list[str] = command
+        use_shell = True
+    elif isinstance(command, Sequence) and not isinstance(
+        command,
+        (str, bytes, bytearray),
+    ):
+        normalized_command = [_required_shell_command_item(item) for item in command]
+        command_display = " ".join(shlex.quote(item) for item in normalized_command)
+        run_command = normalized_command
+        use_shell = False
+    else:
+        raise RuntimeError(
+            "Workflow invoke_tool action parameters must include a command."
+        )
+
+    cwd_value = parameters.get("cwd")
+    if cwd_value is None:
+        resolved_cwd = worktree_root
+    elif isinstance(cwd_value, str) and cwd_value.strip():
+        cwd_path = Path(cwd_value.strip())
+        resolved_cwd = cwd_path if cwd_path.is_absolute() else worktree_root / cwd_path
+    else:
+        raise RuntimeError("Workflow invoke_tool action cwd must be a string.")
+
+    env_value = parameters.get("env")
+    env = os.environ.copy()
+    if env_value is not None:
+        if not isinstance(env_value, dict):
+            raise RuntimeError("Workflow invoke_tool action env must be an object.")
+        for key, value in env_value.items():
+            if not isinstance(key, str) or not key:
+                raise RuntimeError(
+                    "Workflow invoke_tool action env keys must be non-empty strings."
+                )
+            if not isinstance(value, str):
+                raise RuntimeError(
+                    "Workflow invoke_tool action env values must be strings."
+                )
+            env[key] = value
+
+    print(f"Invoking shell tool: {command_display}", file=stdout)
+    _verbose_print(stderr, verbose, f"Invoking shell tool: {command_display}")
+    process = subprocess.run(
+        run_command,
+        shell=use_shell,
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=resolved_cwd,
+        env=env,
+    )
+    if process.stdout:
+        print(process.stdout, end="", file=stdout)
+    if process.stderr:
+        print(process.stderr, end="", file=stderr)
+    _verbose_print(
+        stderr,
+        verbose,
+        f"Shell tool exited with code {process.returncode}",
+    )
+    return {
+        "command": command_display,
+        "cwd": str(resolved_cwd),
+        "returncode": process.returncode,
+        "stdout": process.stdout,
+        "stderr": process.stderr,
+    }
+
+
+def _skill_step_to_data(step: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "description": step.description,
+        "details": step.details,
+        "uses_skills": list(step.uses_skills),
+    }
+    tool_hints = _skill_step_tool_hints(step.description, step.details)
+    if tool_hints:
+        data["tool_hints"] = [
+            {
+                "tool": "shell",
+                "command": tool_hint,
+            }
+            for tool_hint in tool_hints
+        ]
+    return data
+
+
+def _skill_step_tool_hints(description: str, details: str | None) -> tuple[str, ...]:
+    snippets: list[str] = []
+    snippets.extend(_extract_backticked_text(description))
+    if details is not None:
+        snippets.extend(_extract_backticked_text(details))
+
+    hints: list[str] = []
+    seen: set[str] = set()
+    for snippet in snippets:
+        normalized_snippet = snippet.strip()
+        if not normalized_snippet:
+            continue
+        if not _looks_like_shell_command(normalized_snippet):
+            continue
+        if normalized_snippet in seen:
+            continue
+        seen.add(normalized_snippet)
+        hints.append(normalized_snippet)
+    return tuple(hints)
+
+
+def _extract_backticked_text(text: str) -> list[str]:
+    return re.findall(r"`([^`]+)`", text)
+
+
+def _looks_like_shell_command(snippet: str) -> bool:
+    return snippet.startswith("powdrr-lift ") or snippet.startswith(
+        "uv run powdrr-lift "
+    )
+
+
+def _required_shell_command_item(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(
+            "Workflow invoke_tool action command items must be non-empty strings."
+        )
+    return value.strip()
 
 
 def _prompt_user(

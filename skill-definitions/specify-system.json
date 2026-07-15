@@ -10,16 +10,40 @@
       "details": "Collect just enough context to make the template specific without overloading the user with questions."
     },
     {
-      "description": "Run `powdrr-lift system-specification --work-item-name <work-item-name>` to generate the template.",
+      "description": "Generate the system specification template.",
       "details": "Use the generated file as the canonical place to capture system requirements and approach statements."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
       "description": "Fill out the requirements and approach sections with concise, testable statements.",
       "details": "Keep each statement concrete enough that it can be validated against the work item without interpretation."
     },
     {
-      "description": "Validate the filled template with `powdrr-lift evaluate-system-specification --work-item-name <work-item-name>` and fix issues until it passes.",
+      "description": "Validate the filled template and fix issues until it passes.",
       "details": "The user should leave with a coherent system spec that captures requirements and approach in a form that can be validated immediately."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     }
   ]
 }

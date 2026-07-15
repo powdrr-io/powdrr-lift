@@ -11,10 +11,12 @@ from urllib.request import Request
 import pytest
 
 from powdrr_lift.cli import main
-from powdrr_lift.core import Skill, SkillStep, save_skill
+from powdrr_lift.core import Skill, SkillStep, load_skill, save_skill
 from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
+    SkillCatalogEntry,
     SkillChatConfig,
+    _catalog_entry_to_data,
     _resolve_api_key,
     _resolve_skill_path,
     _resolve_worktree_context,
@@ -32,7 +34,7 @@ def test_cli_workflow_chat_wires_configuration(
     skills_dir.mkdir()
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
-    captured: dict[str, object] = {}
+    captured: dict[str, object] = {"messages": []}
 
     def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
         captured["config"] = config
@@ -75,7 +77,7 @@ def test_cli_workflow_chat_defaults_to_glm_5_2(
     skills_dir.mkdir()
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
-    captured: dict[str, object] = {}
+    captured: dict[str, object] = {"messages": []}
 
     def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
         captured["config"] = config
@@ -109,7 +111,7 @@ def test_cli_workflow_chat_wires_verbose_flag(
     skills_dir.mkdir()
     save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
 
-    captured: dict[str, object] = {}
+    captured: dict[str, object] = {"messages": []}
 
     def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
         captured["config"] = config
@@ -159,6 +161,10 @@ def test_run_workflow_chat_generates_skill_summary(
                 "selected_skill_reason": "The request is to specify a feature.",
                 "next_question": None,
                 "ready_to_execute": True,
+            },
+            {
+                "kind": "complete",
+                "text": "Skill execution complete.",
             },
         ]
     )
@@ -230,6 +236,10 @@ def test_run_workflow_chat_verbose_prints_progress(
                 "next_question": None,
                 "ready_to_execute": True,
             },
+            {
+                "kind": "complete",
+                "text": "Skill execution complete.",
+            },
         ]
     )
 
@@ -299,10 +309,14 @@ def test_run_workflow_chat_uses_anthropic_provider(
                 "next_question": None,
                 "ready_to_execute": True,
             },
+            {
+                "kind": "complete",
+                "text": "Skill execution complete.",
+            },
         ]
     )
 
-    captured: dict[str, object] = {}
+    captured: dict[str, object] = {"messages": []}
 
     class _FakeAnthropicClient:
         def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
@@ -369,6 +383,10 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
                 "next_question": None,
                 "ready_to_execute": True,
             },
+            {
+                "kind": "complete",
+                "text": "Skill execution complete.",
+            },
         ]
     )
 
@@ -415,6 +433,142 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     assert captured["base_url"] == "https://api.z.ai/api/paas/v4/"
     assert "Using zai credentials from ZAI_API_KEY" in stderr.getvalue()
     assert (worktree_root / output_dir / "skill-execution.json").exists()
+
+
+def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.json"
+    )
+    skill = load_skill(skill_path)
+    data = _catalog_entry_to_data(
+        SkillCatalogEntry(path=skill_path, skill=skill),
+    )
+
+    tool_invocations = [
+        tool_invocation
+        for step in data["steps"]
+        for tool_invocation in step.get("tool_invocations", [])
+    ]
+
+    assert tool_invocations == [
+        {
+            "tool": "shell",
+            "command": [
+                "powdrr-lift",
+                "evaluate-system-specification",
+                "--work-item-name",
+                "<work-item-name>",
+            ],
+        }
+    ]
+
+
+def test_run_workflow_chat_executes_shell_tool_actions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "codex" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to specify a feature.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "system-specification",
+                        "--work-item-name",
+                        "demo",
+                    ],
+                },
+            },
+            {
+                "kind": "complete",
+                "text": "Skill execution complete.",
+            },
+        ]
+    )
+
+    captured: dict[str, object] = {"messages": []}
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            captured["model"] = model
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            return next(responses)
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.returncode = 0
+            self.stdout = "tool stdout\n"
+            self.stderr = "tool stderr\n"
+
+    def _fake_run(*args: object, **kwargs: object) -> _FakeProcess:
+        captured["run_args"] = args
+        captured["run_kwargs"] = kwargs
+        return _FakeProcess()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
+
+    output_dir = Path("generated")
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=output_dir,
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    summary_path = worktree_root / output_dir / "skill-execution.json"
+    assert exit_code == 0
+    assert summary_path.exists()
+    run_args = cast(tuple[object, ...], captured["run_args"])
+    run_kwargs = cast(dict[str, object], captured["run_kwargs"])
+    assert run_args[0] == [
+        "powdrr-lift",
+        "system-specification",
+        "--work-item-name",
+        "demo",
+    ]
+    assert run_kwargs["shell"] is False
+    assert "tool stdout" in stdout.getvalue()
+    assert "tool stderr" in stderr.getvalue()
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["execution_events"][0]["kind"] == "invoke_tool"
+    assert summary["execution_events"][0]["result"]["returncode"] == 0
 
 
 def test_resolve_api_key_prefers_env_over_codex_auth(

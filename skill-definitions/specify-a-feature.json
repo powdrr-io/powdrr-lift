@@ -25,11 +25,33 @@
     },
     {
       "description": "Generate the implementation template and fill it out.",
-      "details": "Invoke the `specify-implementation` CLI endpoint, then complete the generated template with the feature decisions and reasoning."
+      "details": "Complete the generated template with the feature decisions and reasoning.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "implementation-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
       "description": "Decide on proposed PRs and fill out each PR template.",
-      "details": "Choose an appropriate set of proposed PRs, invoke the `specify-pr` flow for each one, and fill out those templates with the relevant intent, acceptance criteria, tests, and risks."
+      "details": "Choose an appropriate set of proposed PRs and fill out those templates with the relevant intent, acceptance criteria, tests, and risks.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "pr-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
       "description": "Prompt the user to review the result.",

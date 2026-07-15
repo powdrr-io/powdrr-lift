@@ -14,8 +14,22 @@
       ]
     },
     {
-      "description": "Run `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` on the filled template.",
+      "description": "Validate the filled architecture template.",
       "details": "Validate the template before judging the quality of the entity model itself."
+      ,
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        }
+      ]
     },
     {
       "description": "Check entities, relationships, invariants, and guidance for missing references or weak structure.",

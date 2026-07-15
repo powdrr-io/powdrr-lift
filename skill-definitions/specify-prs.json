@@ -7,6 +7,7 @@
   "steps": [
     {
       "description": "Review the requirements, approach, and implementation context first.",
+      "details": "Use the upstream specs to anchor the PR scope before writing the proposed change set.",
       "uses_skills": [
         "specify-system",
         "specify-implementation"
@@ -14,12 +15,15 @@
     },
     {
       "description": "Run `powdrr-lift pr-specification --work-item-name <work-item-name>` to generate the template."
+      ,"details": "Generate one proposed PR template per change idea so the review stays focused."
     },
     {
       "description": "Fill out the proposed PR intent, acceptance criteria, expected tests, expected outcomes, non-goals, and risks."
+      ,"details": "Keep the proposal self-contained and focused on what should change and why."
     },
     {
       "description": "Validate with `powdrr-lift evaluate-pr-specification --input docs/specs/<work-item-name>/proposed-pr-specification.yaml` and fix issues until it passes."
+      ,"details": "Iterate until ids, feature references, and intent fields are all coherent."
     }
   ]
 }

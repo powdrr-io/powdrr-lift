@@ -1,0 +1,28 @@
+{
+  "name": "review-system",
+  "when_to_use": [
+    "When you need to review a system specification before it is committed.",
+    "When the TUI should synchronously inspect the system spec for missing or weak requirements."
+  ],
+  "steps": [
+    {
+      "description": "Review the current requirements and approach context first.",
+      "details": "Use the upstream context to judge whether the system spec is complete enough to trust.",
+      "uses_skills": [
+        "specify-system"
+      ]
+    },
+    {
+      "description": "Run `powdrr-lift evaluate-system-specification --work-item-name <work-item-name>` on the filled template."
+      ,"details": "Treat any validation failure as a blocking issue before moving on to subjective review."
+    },
+    {
+      "description": "Check the requirements and approach for missing context, weak statements, or inconsistent supersedence."
+      ,"details": "Look for vague requirements, gaps between requirements and approach, and stale supersedence references."
+    },
+    {
+      "description": "Report findings and repeat the review until the system spec validates cleanly."
+      ,"details": "Keep feedback specific to the individual issue so the user can make the smallest possible fix."
+    }
+  ]
+}

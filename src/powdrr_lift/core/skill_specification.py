@@ -25,10 +25,13 @@ class SkillValidationReport:
 @dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
+    details: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {"description": self.description}
+        if self.details is not None:
+            data["details"] = self.details
         if self.uses_skills:
             data["uses_skills"] = list(self.uses_skills)
         return data
@@ -222,7 +225,7 @@ def build_skill_validation_report(
             step_mapping = cast("Mapping[str, Any]", step)
             _validate_unknown_keys(
                 step_mapping,
-                {"description", "uses_skills"},
+                {"description", "details", "uses_skills"},
                 issues,
                 path=step_path or "",
                 subject="skill step",
@@ -235,6 +238,16 @@ def build_skill_validation_report(
                         code="missing_description",
                         message="Skill steps must include a non-empty description.",
                         path=_child_path(step_path, "description"),
+                    )
+                )
+
+            details = step_mapping.get("details")
+            if details is not None and _optional_string(details) is None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_details",
+                        message="Skill step details must be a non-empty string.",
+                        path=_child_path(step_path, "details"),
                     )
                 )
 
@@ -448,8 +461,13 @@ def _parse_step(raw_step: object) -> SkillStep:
         raise ValueError("Skill steps must be objects.")
     raw_step_mapping = cast("Mapping[str, Any]", raw_step)
     description = _required_string(raw_step_mapping, "description")
+    details = _optional_string(raw_step_mapping.get("details"))
     uses_skills = _optional_string_sequence(raw_step_mapping.get("uses_skills"))
-    return SkillStep(description=description, uses_skills=uses_skills)
+    return SkillStep(
+        description=description,
+        details=details,
+        uses_skills=uses_skills,
+    )
 
 
 def _report_to_data(report: SkillValidationReport) -> dict[str, Any]:

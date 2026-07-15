@@ -6,22 +6,27 @@
   ],
   "steps": [
     {
-      "description": "Capture the feature goal and what success looks like."
+      "description": "Capture the feature goal and what success looks like.",
+      "details": "Focus on the user-visible outcome and the scope boundary before diving into implementation."
     },
     {
       "description": "Gather the relevant system context, entities, invariants, and guidance.",
+      "details": "Use the system spec and related context to collect only the facts needed for the feature.",
       "uses_skills": [
         "specify-system"
       ]
     },
     {
-      "description": "List the concrete feature decisions and the parts that need to change."
+      "description": "List the concrete feature decisions and the parts that need to change.",
+      "details": "Keep the decision list short and specific enough that it can guide implementation."
     },
     {
-      "description": "Record the intent and reasoning behind the chosen approach."
+      "description": "Record the intent and reasoning behind the chosen approach.",
+      "details": "Explain why the chosen approach is preferable to the alternatives that were considered."
     },
     {
-      "description": "Summarize the result into a concise implementation-ready note."
+      "description": "Summarize the result into a concise implementation-ready note.",
+      "details": "Leave the user with a compact handoff that can drive the implementation and PR specs."
     }
   ]
 }

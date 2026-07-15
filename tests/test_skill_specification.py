@@ -26,9 +26,13 @@ def test_skill_round_trips_through_json() -> None:
             ),
         ),
         steps=(
-            SkillStep(description="Capture the feature goal."),
+            SkillStep(
+                description="Capture the feature goal.",
+                details="Record the user-visible outcome first.",
+            ),
             SkillStep(
                 description="Pull in the system context.",
+                details="Use the system spec and related context.",
                 uses_skills=("specify-system",),
             ),
             SkillStep(description="Summarize the result."),
@@ -49,9 +53,13 @@ def test_skill_round_trips_through_json() -> None:
             ),
         ],
         "steps": [
-            {"description": "Capture the feature goal."},
+            {
+                "description": "Capture the feature goal.",
+                "details": "Record the user-visible outcome first.",
+            },
             {
                 "description": "Pull in the system context.",
+                "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
             },
             {"description": "Summarize the result."},
@@ -165,6 +173,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Record the intent and reasoning behind the chosen approach.",
         "Summarize the result into a concise implementation-ready note.",
     ]
+    assert skill.steps[0].details is not None
+    assert skill.steps[1].details is not None
     assert skill.steps[1].uses_skills == ("specify-system",)
 
 
@@ -174,9 +184,17 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
     assert report.validation_successful is True
     assert report.skill_names == [
+        "review-architeture",
+        "review-system",
         "specify-a-feature",
         "specify-architecture",
         "specify-implementation",
         "specify-prs",
         "specify-system",
     ]
+
+
+def test_checked_in_review_skill_definitions_exist() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    assert (skills_dir / "review-architeture.json").is_file()
+    assert (skills_dir / "review-system.json").is_file()

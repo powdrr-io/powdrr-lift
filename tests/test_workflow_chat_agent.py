@@ -1622,7 +1622,9 @@ def test_openai_chat_client_reports_malformed_json_content(
         base_url="https://api.openai.com/v1",
     )
 
-    with pytest.raises(RuntimeError, match="OpenAI response content was not valid JSON"):
+    with pytest.raises(
+        RuntimeError, match="OpenAI response content was not valid JSON"
+    ):
         client.complete_json([{"role": "user", "content": "hello"}])
 
 

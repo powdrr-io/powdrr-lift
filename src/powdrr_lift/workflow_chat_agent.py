@@ -1228,9 +1228,7 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
 
 
 def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
-    step_kinds = ", ".join(
-        [step.description for step in selected_skill.skill.steps]
-    )
+    step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
         "Fix the response so it matches the workflow action schema with keys "
         "kind, tool, text, parameters, and decisions_and_context. "

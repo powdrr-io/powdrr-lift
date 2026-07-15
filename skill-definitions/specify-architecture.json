@@ -6,23 +6,23 @@
   ],
   "steps": [
     {
-      "description": "Review the requirements and approach first.",
-      "details": "Use the requirements and approach as the source of truth before deciding on entities or relationships.",
+      "description": "Review the system context first.",
+      "details": "Use the system review flow to confirm the requirements, approach, and current constraints.",
       "uses_skills": [
-        "specify-system"
+        "review-system"
       ]
     },
     {
-      "description": "Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` to generate the template."
-      ,"details": "Generate the architecture template with the full allowed entity type set so validation can enforce the schema."
+      "description": "Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` to generate the template.",
+      "details": "Generate the architecture template with the full allowed entity type set so validation can enforce the schema."
     },
     {
-      "description": "Fill out entities, relationships, invariants, and guidance using only the allowed entity types."
-      ,"details": "Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships."
+      "description": "Fill out entities, relationships, invariants, and guidance using only the allowed entity types.",
+      "details": "Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships."
     },
     {
-      "description": "Validate with `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` and fix any validation errors."
-      ,"details": "Re-run validation until there are no unknown types or broken references."
+      "description": "Validate with `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...` and fix any validation errors.",
+      "details": "Re-run validation until there are no unknown types or broken references."
     }
   ]
 }

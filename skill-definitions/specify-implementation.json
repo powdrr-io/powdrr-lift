@@ -6,24 +6,24 @@
   ],
   "steps": [
     {
-      "description": "Review the requirements, approach, and source architecture first.",
-      "details": "Confirm the architecture id and the relevant entities before drafting implementation detail.",
+      "description": "Review the system and architecture context first.",
+      "details": "Confirm the source architecture id and the relevant entities before drafting implementation detail.",
       "uses_skills": [
-        "specify-system",
-        "specify-architecture"
+        "review-system",
+        "review-architecture"
       ]
     },
     {
-      "description": "Run `powdrr-lift implementation-specification --work-item-name <work-item-name>` to generate the template."
-      ,"details": "Use the generated implementation template as the canonical place to capture feature and decision detail."
+      "description": "Run `powdrr-lift implementation-specification --work-item-name <work-item-name>` to generate the template.",
+      "details": "Use the generated implementation template as the canonical place to capture feature and decision detail."
     },
     {
-      "description": "Fill out the feature and decision sections so they stay aligned with the architecture id."
-      ,"details": "Keep the implementation spec aligned with the source architecture version and do not invent new ids."
+      "description": "Fill out the feature and decision sections so they stay aligned with the architecture id.",
+      "details": "Keep the implementation spec aligned with the source architecture version and do not invent new ids."
     },
     {
-      "description": "Validate with `powdrr-lift evaluate-implementation-specification --work-item-name <work-item-name>` and fix issues until it passes."
-      ,"details": "Resolve architecture mismatches and duplicate ids before considering the document complete."
+      "description": "Validate with `powdrr-lift evaluate-implementation-specification --work-item-name <work-item-name>` and fix issues until it passes.",
+      "details": "Resolve architecture mismatches and duplicate ids before considering the document complete."
     }
   ]
 }

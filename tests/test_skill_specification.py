@@ -158,24 +158,26 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert skill.name == "specify-a-feature"
     assert skill.when_to_use == (
         (
-            "When the user wants to work through a feature in the TUI and leave "
-            "with a concrete, synchronous plan."
+            "When the user needs a concrete, actionable plan for a feature."
         ),
         (
-            "When the feature needs a guided sequence of clarifying questions "
-            "instead of an async task bundle."
+            "When the flow should gather context, review architecture, and drive "
+            "implementation details synchronously."
         ),
     )
     assert [step.description for step in skill.steps] == [
         "Capture the feature goal and what success looks like.",
-        "Gather the relevant system context, entities, invariants, and guidance.",
-        "List the concrete feature decisions and the parts that need to change.",
-        "Record the intent and reasoning behind the chosen approach.",
-        "Summarize the result into a concise implementation-ready note.",
+        "Review the system context before deciding the feature shape.",
+        "Review the architecture context before choosing implementation details.",
+        "Generate the implementation template and fill it out.",
+        "Decide on proposed PRs and fill out each PR template.",
+        "Prompt the user to review the result.",
     ]
     assert skill.steps[0].details is not None
     assert skill.steps[1].details is not None
-    assert skill.steps[1].uses_skills == ("specify-system",)
+    assert skill.steps[2].details is not None
+    assert skill.steps[1].uses_skills == ("review-system",)
+    assert skill.steps[2].uses_skills == ("review-architecture",)
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -184,17 +186,16 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
     assert report.validation_successful is True
     assert report.skill_names == [
-        "review-architeture",
+        "review-architecture",
         "review-system",
         "specify-a-feature",
         "specify-architecture",
         "specify-implementation",
-        "specify-prs",
         "specify-system",
     ]
 
 
 def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
-    assert (skills_dir / "review-architeture.json").is_file()
+    assert (skills_dir / "review-architecture.json").is_file()
     assert (skills_dir / "review-system.json").is_file()

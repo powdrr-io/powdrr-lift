@@ -796,9 +796,6 @@ def _build_step_execution_messages(
 def _action_system_prompt() -> str:
     return (
         "You are executing a checked-in skill in a terminal workflow.\n"
-        "A skill has already been selected.\n"
-        "Do not select a skill, do not re-rank skills, and do not ask the user "
-        "to pick a skill.\n"
         "Use the current step, prior step context, transcript, and prior "
         "execution events to determine the next action.\n"
         "Return exactly one JSON object with one of these forms:\n"

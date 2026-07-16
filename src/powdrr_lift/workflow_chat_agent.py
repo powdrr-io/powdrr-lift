@@ -16,9 +16,17 @@ from urllib.request import Request, urlopen
 
 from powdrr_lift.core import (
     Skill,
+    architecture_specification_default_output_path,
     build_skill_directory_validation_report,
+    codebase_state_default_output_path,
+    current_state_specification_default_output_path,
+    feature_pr_specification_default_output_path,
+    implementation_specification_default_output_path,
     load_skills,
+    pr_specification_default_output_path,
     resolve_repo_root,
+    system_map_specification_default_output_path,
+    system_specification_default_output_path,
 )
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
@@ -88,11 +96,21 @@ WorkflowChatSelection = SkillChatSelection
 class SkillChatAction:
     kind: str
     tool: str | None = None
+    file_path: str | None = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
+    edits: tuple[SkillChatEdit, ...] = field(default_factory=tuple)
     types: tuple[str, ...] = field(default_factory=tuple)
     keywords: tuple[str, ...] = field(default_factory=tuple)
     decisions_and_context: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SkillChatEdit:
+    kind: str
+    start_line: int
+    end_line: int | None = None
+    text: str | None = None
 
 
 @dataclass(slots=True)
@@ -103,6 +121,7 @@ class _WorkflowExecutionState:
     execution_context: list[str]
     step_index: int
     worktree_root: Path
+    current_file_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -387,6 +406,7 @@ def run_workflow_chat(
                 transcript=execution_state.transcript,
                 execution_events=execution_state.execution_events,
                 execution_context=execution_state.execution_context,
+                current_file_path=execution_state.current_file_path,
                 worktree_root=worktree_root,
             ),
             parser=_parse_action_response,
@@ -722,8 +742,10 @@ def _build_step_execution_messages(
     transcript: Sequence[dict[str, str]],
     execution_events: Sequence[dict[str, Any]],
     execution_context: Sequence[str],
+    current_file_path: Path | None,
     worktree_root: Path,
 ) -> list[dict[str, str]]:
+    current_file_context = _current_file_context(worktree_root, current_file_path)
     return [
         {
             "role": "system",
@@ -757,6 +779,7 @@ def _build_step_execution_messages(
                     "selected_skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
                     "execution_events": list(execution_events),
+                    "current_file": current_file_context,
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -777,6 +800,9 @@ def _action_system_prompt() -> str:
         '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
         '"decisions_and_context":"..."}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"..."}\n'
+        '{"kind":"edit","file_path":"docs/specs/example/system-specification.yaml",'
+        '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
+        '"text":"..."}],"decisions_and_context":"..."}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"..."}\n'
         '{"kind":"next_step","decisions_and_context":"..."}\n'
         '{"kind":"complete","text":"...","decisions_and_context":"..."}\n'
@@ -791,6 +817,11 @@ def _action_system_prompt() -> str:
         "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
+        "Use edit when you know the current file should be changed and you "
+        "have enough context to describe line-based removals, additions, or "
+        "replacements.\n"
+        "When edit is available, current_file includes the file path and its "
+        "current contents as context.\n"
         "Use invoke_tool for shell commands.\n"
         "When the current step includes tool_invocations, choose one of those "
         "structured invocations and fill in its parameters.\n"
@@ -851,6 +882,7 @@ def _workflow_action_handlers() -> dict[
 ]:
     return {
         "complete": _handle_workflow_action_complete,
+        "edit": _handle_workflow_action_edit,
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
@@ -881,6 +913,73 @@ def _handle_workflow_action_complete(
         }
     )
     return False
+
+
+def _handle_workflow_action_edit(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    _ = config
+    if action.file_path is None:
+        raise RuntimeError("Workflow edit action must include file_path.")
+    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
+    current_text = ""
+    if target_path.exists():
+        current_text = target_path.read_text(encoding="utf-8")
+    updated_text = _apply_file_edits(current_text, action.edits)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(updated_text, encoding="utf-8")
+    state.current_file_path = target_path
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.transcript.append(
+        {
+            "role": "assistant",
+            "content": json.dumps(
+                {
+                    "kind": action.kind,
+                    "file_path": action.file_path,
+                    "edits": [_edit_to_data(edit) for edit in action.edits],
+                },
+                ensure_ascii=False,
+            ),
+        }
+    )
+    state.transcript.append(
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "edit_result": {
+                        "file_path": str(target_path),
+                        "line_count": len(updated_text.splitlines()),
+                    }
+                },
+                ensure_ascii=False,
+            ),
+        }
+    )
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "file_path": action.file_path,
+            "edits": [_edit_to_data(edit) for edit in action.edits],
+            "result": {
+                "file_path": str(target_path),
+                "line_count": len(updated_text.splitlines()),
+            },
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    print(f"Edited file: {target_path}", file=stdout)
+    _verbose_print(stderr, config.verbose, f"Applied edit to {target_path}")
+    return True
 
 
 def _handle_workflow_action_next_step(
@@ -961,6 +1060,12 @@ def _handle_workflow_action_invoke_tool(
         stderr=stderr,
         verbose=config.verbose,
     )
+    inferred_path = _resolve_generated_file_path_from_command(
+        action.parameters.get("command"),
+        worktree_root=state.worktree_root,
+    )
+    if inferred_path is not None:
+        state.current_file_path = inferred_path
     state.transcript.append(
         {
             "role": "assistant",
@@ -1097,6 +1202,18 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
             )
         raise RuntimeError(
             "Workflow invoke_tool action command must be a string or array."
+        )
+
+    if kind == "edit":
+        file_path = payload.get("file_path")
+        if not isinstance(file_path, str) or not file_path.strip():
+            raise RuntimeError("Workflow edit action must include file_path.")
+        edits = _required_edit_operations(payload.get("edits"))
+        return SkillChatAction(
+            kind=kind,
+            file_path=file_path.strip(),
+            edits=edits,
+            decisions_and_context=decisions_and_context,
         )
 
     if kind == "gather-context":
@@ -1291,6 +1408,75 @@ def _optional_action_string_sequence(
     )
 
 
+def _required_edit_operations(value: object) -> tuple[SkillChatEdit, ...]:
+    if not isinstance(value, Sequence) or isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError("Workflow edit action edits must be an array.")
+
+    edits = tuple(_required_edit_operation(item) for item in value)
+    if not edits:
+        raise RuntimeError("Workflow edit action edits must not be empty.")
+    return edits
+
+
+def _required_edit_operation(value: object) -> SkillChatEdit:
+    if not isinstance(value, dict):
+        raise RuntimeError("Workflow edit action edits must be objects.")
+
+    kind = value.get("kind")
+    if not isinstance(kind, str) or not kind.strip():
+        raise RuntimeError("Workflow edit action edit kind must be a string.")
+    normalized_kind = kind.strip()
+    if normalized_kind not in {"add", "remove", "replace"}:
+        raise RuntimeError(
+            "Workflow edit action edit kind must be add, remove, or replace."
+        )
+
+    start_line = _required_edit_line_number(
+        value.get("start_line"),
+        field_name="start_line",
+    )
+    end_line_value = value.get("end_line")
+    end_line = None
+    if end_line_value is not None:
+        end_line = _required_edit_line_number(end_line_value, field_name="end_line")
+        if end_line < start_line:
+            raise RuntimeError("Workflow edit action end_line must be >= start_line.")
+
+    text_value = value.get("text")
+    if normalized_kind in {"add", "replace"}:
+        if not isinstance(text_value, str) or not text_value.strip():
+            raise RuntimeError(
+                "Workflow edit action add/replace edits must include text."
+            )
+        text = text_value
+    else:
+        if text_value is not None:
+            raise RuntimeError(
+                "Workflow edit action remove edits must not include text."
+            )
+        text = None
+        if end_line is None:
+            end_line = start_line
+
+    return SkillChatEdit(
+        kind=normalized_kind,
+        start_line=start_line,
+        end_line=end_line,
+        text=text,
+    )
+
+
+def _required_edit_line_number(value: object, *, field_name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise RuntimeError(
+            f"Workflow edit action {field_name} must be a positive integer."
+        )
+    return value
+
+
 def _optional_string(value: object) -> str | None:
     if value is None:
         return None
@@ -1409,6 +1595,189 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
     return cast("dict[str, Any]", parsed_content)
 
 
+def _edit_to_data(edit: SkillChatEdit) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "kind": edit.kind,
+        "start_line": edit.start_line,
+    }
+    if edit.end_line is not None:
+        data["end_line"] = edit.end_line
+    if edit.text is not None:
+        data["text"] = edit.text
+    return data
+
+
+def _current_file_context(
+    worktree_root: Path,
+    current_file_path: Path | None,
+) -> dict[str, Any] | None:
+    if current_file_path is None:
+        return None
+
+    resolved_path = _resolve_worktree_file_path(
+        str(current_file_path),
+        worktree_root,
+    )
+    if not resolved_path.exists():
+        return {
+            "path": str(resolved_path.relative_to(worktree_root)),
+            "exists": False,
+        }
+    if not resolved_path.is_file():
+        return {
+            "path": str(resolved_path.relative_to(worktree_root)),
+            "exists": False,
+        }
+
+    lines = resolved_path.read_text(encoding="utf-8").splitlines()
+    return {
+        "path": str(resolved_path.relative_to(worktree_root)),
+        "exists": True,
+        "line_count": len(lines),
+        "lines": [
+            {
+                "line_number": line_number,
+                "text": line,
+            }
+            for line_number, line in enumerate(lines, start=1)
+        ],
+    }
+
+
+def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
+    lines = current_text.splitlines()
+    for edit in sorted(edits, key=_edit_sort_key, reverse=True):
+        start_index = edit.start_line - 1
+        if edit.kind == "add":
+            if start_index > len(lines):
+                raise RuntimeError(
+                    "Workflow edit action add start_line is beyond the end of the file."
+                )
+            insert_lines = edit.text.splitlines() if edit.text is not None else []
+            lines[start_index:start_index] = insert_lines
+            continue
+
+        end_line = edit.end_line if edit.end_line is not None else edit.start_line
+        end_index = end_line
+        if end_index > len(lines):
+            raise RuntimeError(
+                "Workflow edit action range extends beyond the end of the file."
+            )
+
+        if edit.kind == "remove":
+            del lines[start_index:end_index]
+            continue
+
+        replacement_lines = edit.text.splitlines() if edit.text is not None else []
+        lines[start_index:end_index] = replacement_lines
+
+    if not lines:
+        return ""
+    return "\n".join(lines) + "\n"
+
+
+def _edit_sort_key(edit: SkillChatEdit) -> tuple[int, int]:
+    end_line = edit.end_line if edit.end_line is not None else edit.start_line
+    return edit.start_line, end_line
+
+
+def _resolve_worktree_file_path(file_path_value: str, worktree_root: Path) -> Path:
+    resolved_path = Path(file_path_value.strip())
+    if resolved_path.is_absolute():
+        candidate_path = resolved_path.resolve(strict=False)
+    else:
+        candidate_path = (worktree_root / resolved_path).resolve(strict=False)
+
+    resolved_worktree_root = worktree_root.resolve(strict=False)
+    if not candidate_path.is_relative_to(resolved_worktree_root):
+        raise RuntimeError(
+            f"Workflow edit action file_path must stay within {resolved_worktree_root}."
+        )
+    return candidate_path
+
+
+def _resolve_generated_file_path_from_command(
+    command: object,
+    *,
+    worktree_root: Path,
+) -> Path | None:
+    command_items = _command_items(command)
+    if not command_items or command_items[0] != "powdrr-lift" or len(command_items) < 2:
+        return None
+
+    output_path_value = _extract_command_option(command_items, "--output")
+    if output_path_value is not None:
+        return _resolve_worktree_file_path(output_path_value, worktree_root)
+
+    work_item_name = _extract_command_option(command_items, "--work-item-name")
+    if work_item_name is None:
+        return None
+
+    subcommand = command_items[1]
+    if subcommand == "system-specification":
+        return system_specification_default_output_path(work_item_name, worktree_root)
+    if subcommand == "architecture-specification":
+        return architecture_specification_default_output_path(
+            work_item_name,
+            worktree_root,
+        )
+    if subcommand == "implementation-specification":
+        return implementation_specification_default_output_path(
+            work_item_name,
+            worktree_root,
+        )
+    if subcommand == "pr-specification":
+        return pr_specification_default_output_path(work_item_name, worktree_root)
+    if subcommand == "feature-pr-specification":
+        return feature_pr_specification_default_output_path(
+            work_item_name,
+            worktree_root,
+        )
+    if subcommand == "system-map-specification":
+        return system_map_specification_default_output_path(
+            work_item_name,
+            worktree_root,
+        )
+    if subcommand == "current-state":
+        return current_state_specification_default_output_path(worktree_root)
+    if subcommand == "codebase-state":
+        return codebase_state_default_output_path(worktree_root)
+    return None
+
+
+def _command_items(command: object) -> list[str]:
+    if isinstance(command, str):
+        return [item for item in shlex.split(command) if item]
+    if isinstance(command, Sequence) and not isinstance(
+        command,
+        (str, bytes, bytearray),
+    ):
+        items: list[str] = []
+        for item in command:
+            if not isinstance(item, str):
+                raise RuntimeError(
+                    "Workflow invoke_tool action command items must be strings."
+                )
+            normalized_item = item.strip()
+            if normalized_item:
+                items.append(normalized_item)
+        return items
+    return []
+
+
+def _extract_command_option(
+    command_items: Sequence[str],
+    option_name: str,
+) -> str | None:
+    for index, item in enumerate(command_items):
+        if item != option_name:
+            continue
+        if index + 1 >= len(command_items):
+            return None
+        return command_items[index + 1]
+    return None
+
+
 def _attempt_json_repair(
     client: WorkflowChatClient,
     messages: Sequence[dict[str, str]],
@@ -1499,9 +1868,10 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
         "Fix the response so it matches the workflow action schema with keys "
-        "kind, tool, text, parameters, types, keywords, and decisions_and_context. "
-        "Allowed kinds are gather-context, prompt_user, invoke_tool, next_step, "
-        "and complete. "
+        "kind, tool, file_path, text, parameters, edits, types, keywords, and "
+        "decisions_and_context. "
+        "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
+        "next_step, and complete. "
         f"The skill steps are: {step_kinds}."
     )
 

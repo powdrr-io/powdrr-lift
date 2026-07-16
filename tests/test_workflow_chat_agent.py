@@ -13,7 +13,13 @@ from urllib.request import Request
 import pytest
 
 from powdrr_lift.cli import main
-from powdrr_lift.core import Skill, SkillStep, load_skill, save_skill
+from powdrr_lift.core import (
+    Skill,
+    SkillStep,
+    SkillToolInvocation,
+    load_skill,
+    save_skill,
+)
 from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     OpenAIChatClient,
@@ -225,6 +231,8 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     prompt = _action_system_prompt()
 
     assert "gather-context" in prompt
+    assert "edit" in prompt
+    assert "file_path" in prompt
     assert "requirements" in prompt
     assert "entity-relationships" in prompt
     assert "proposed PRs" in prompt
@@ -397,6 +405,223 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
         "complete",
     ]
     assert "Context gathered." in stdout.getvalue()
+
+
+def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(
+        Skill(
+            name="specify-a-feature",
+            when_to_use=("When the user needs a simple synchronous workflow.",),
+            steps=(
+                SkillStep(
+                    description="Generate the system template.",
+                    details="Create the system specification file first.",
+                    tool_invocations=(
+                        SkillToolInvocation(
+                            tool="shell",
+                            command=(
+                                "powdrr-lift",
+                                "system-specification",
+                                "--work-item-name",
+                                "display-related-photos",
+                            ),
+                        ),
+                    ),
+                ),
+                SkillStep(
+                    description="Edit the system template.",
+                    details="Update the generated file in place.",
+                ),
+                SkillStep(
+                    description="Finish the flow.",
+                    details="Report completion after the edit lands.",
+                ),
+            ),
+        ),
+        skills_dir / "specify-a-feature.json",
+    )
+
+    system_spec_path = (
+        worktree_root
+        / "docs"
+        / "specs"
+        / "display-related-photos"
+        / "system-specification.yaml"
+    )
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to inspect existing context.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "system-specification",
+                        "--work-item-name",
+                        "display-related-photos",
+                    ],
+                },
+                "decisions_and_context": "Create the system spec template.",
+            },
+            {
+                "kind": "edit",
+                "file_path": (
+                    "docs/specs/display-related-photos/system-specification.yaml"
+                ),
+                "edits": [
+                    {
+                        "kind": "replace",
+                        "start_line": 3,
+                        "end_line": 3,
+                        "text": "id: display-related-photos",
+                    }
+                ],
+                "decisions_and_context": "Set the system spec id.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "System template updated.",
+            },
+            {
+                "kind": "complete",
+                "text": "Done.",
+                "decisions_and_context": "Edit complete.",
+            },
+        ]
+    )
+
+    captured: dict[str, object] = {"messages": []}
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            captured["model"] = model
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+            self._call_index = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            prompt = json.loads(messages[1]["content"])
+            if self._call_index == 0:
+                assert "current_file" not in prompt
+            elif self._call_index == 1:
+                assert prompt["current_file"] is None
+            elif self._call_index == 2:
+                assert prompt["current_file"]["path"] == str(
+                    system_spec_path.relative_to(worktree_root)
+                )
+                assert prompt["current_file"]["lines"][0]["text"] == (
+                    "# System specification template."
+                )
+                assert prompt["current_file"]["lines"][2]["text"] == "id: null"
+            elif self._call_index == 3:
+                assert prompt["current_file"]["path"] == str(
+                    system_spec_path.relative_to(worktree_root)
+                )
+                assert prompt["execution_events"][-1]["kind"] == "edit"
+            elif self._call_index == 4:
+                assert prompt["current_file"]["path"] == str(
+                    system_spec_path.relative_to(worktree_root)
+                )
+                assert prompt["execution_events"][-1]["kind"] == "next_step"
+            else:
+                raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
+
+            response = next(responses)
+            self._call_index += 1
+            return response
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.returncode = 0
+            self.stdout = f"{system_spec_path}\n"
+            self.stderr = ""
+
+    def _fake_run(*args: object, **kwargs: object) -> _FakeProcess:
+        del args, kwargs
+        system_spec_path.parent.mkdir(parents=True, exist_ok=True)
+        system_spec_path.write_text(
+            "\n".join(
+                [
+                    "# System specification template.",
+                    "schema: https://powdrr.io/schemas/specification-v1",
+                    "id: null",
+                    "requirements:",
+                    "  - id: null",
+                    "    description: null",
+                    "    state: null",
+                    "approach:",
+                    "  - id: null",
+                    "    description: null",
+                    "    state: null",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return _FakeProcess()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        _fake_run,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+            max_turns=10,
+        ),
+        input_func=lambda: "Find the existing requirements",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert system_spec_path.read_text(encoding="utf-8").splitlines()[2] == (
+        "id: display-related-photos"
+    )
+    summary = json.loads(
+        (worktree_root / "generated" / "skill-execution.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert [event["kind"] for event in summary["execution_events"]] == [
+        "invoke_tool",
+        "edit",
+        "next_step",
+        "complete",
+    ]
 
 
 def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(

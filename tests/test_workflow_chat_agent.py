@@ -717,7 +717,7 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     tool_bin.mkdir()
     powdrr_lift_wrapper = tool_bin / "powdrr-lift"
     powdrr_lift_wrapper.write_text(
-        "#!/bin/sh\nexec uv run powdrr-lift \"$@\"\n",
+        '#!/bin/sh\nexec uv run powdrr-lift "$@"\n',
         encoding="utf-8",
     )
     powdrr_lift_wrapper.chmod(0o755)
@@ -1125,15 +1125,15 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "<work-item-name>",
                 ]
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "system-specification",
-                                "--work-item-name",
-                                "display-related-photos",
-                            ],
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "system-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                        ],
                     },
                     "decisions_and_context": (
                         "Start system spec generation for display-related-photos."
@@ -1205,14 +1205,14 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "<work-item-name>",
                 ]
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "evaluate-system-specification",
-                                "--work-item-name",
-                                "display-related-photos",
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "evaluate-system-specification",
+                            "--work-item-name",
+                            "display-related-photos",
                         ],
                     },
                     "decisions_and_context": (
@@ -1260,13 +1260,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "<type>",
                 ]
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "architecture-specification",
-                                "--work-item-name",
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "architecture-specification",
+                            "--work-item-name",
                             "display-related-photos",
                             "--entity-type",
                             "photo",
@@ -1343,13 +1343,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "<type>",
                 ]
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "evaluate-architecture-specification",
-                                "--work-item-name",
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "evaluate-architecture-specification",
+                            "--work-item-name",
                             "display-related-photos",
                             "--entity-type",
                             "photo",
@@ -1398,13 +1398,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "<work-item-name>",
                 ]
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "implementation-specification",
-                                "--work-item-name",
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "implementation-specification",
+                            "--work-item-name",
                             "display-related-photos",
                         ],
                     },
@@ -1450,13 +1450,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_last_event_kind="edit",
                 )
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "evaluate-implementation-specification",
-                                "--work-item-name",
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "evaluate-implementation-specification",
+                            "--work-item-name",
                             "display-related-photos",
                         ],
                     },
@@ -1503,13 +1503,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "<work-item-name>",
                 ]
                 response = {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {
-                            "command": [
-                                "powdrr-lift",
-                                "pr-specification",
-                                "--work-item-name",
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "pr-specification",
+                            "--work-item-name",
                             "display-related-photos",
                         ],
                     },

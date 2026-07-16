@@ -909,12 +909,11 @@ def _context_type_catalog() -> tuple[tuple[str, str], ...]:
         ),
         ("invariants", "discover the rules that must always remain true"),
         ("guidance", "discover implementation guidance or cautions"),
-        ("features", "discover the features already recorded"),
+        ("features", "discover the features already recorded or in scope"),
         (
             "human-decisions",
             "discover human decisions that must be preserved",
         ),
-        ("feature_ids", "discover which feature ids are already in scope"),
         ("intent", "discover the problem, goal, or reasoning already stated"),
         ("intents", "discover current-state intent records"),
         (

@@ -180,32 +180,44 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
 
     assert skill.name == "specify-a-feature"
     assert skill.when_to_use == (
-        ("When the user needs a concrete, actionable plan for a feature."),
-        (
-            "When the flow should gather context, review architecture, and drive "
-            "implementation details synchronously."
-        ),
+        ("When the user needs a concrete feature plan."),
+        ("When the flow must gather context and drive implementation."),
     )
     assert [step.description for step in skill.steps] == [
-        "Capture the feature goal and what success looks like.",
+        "Capture the feature goal and success criteria.",
+        "Generate the system template and fill it out.",
         "Review the system context before deciding the feature shape.",
-        "Review the architecture context before choosing implementation details.",
+        "Generate the architecture template and fill it out.",
+        "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
-        "Decide on proposed PRs and fill out each PR template.",
+        "Decide on proposed PRs and fill each template.",
         "Prompt the user to review the result.",
     ]
-    assert skill.steps[0].details is not None
-    assert skill.steps[1].details is not None
-    assert skill.steps[2].details is not None
-    assert skill.steps[1].uses_skills == ("review-system",)
+    for step in skill.steps:
+        assert step.details is not None
+    assert skill.steps[2].uses_skills == ("review-system",)
     assert skill.steps[1].tool_invocations[0].command == (
+        "powdrr-lift",
+        "system-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
+    assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",
         "evaluate-system-specification",
         "--work-item-name",
         "<work-item-name>",
     )
-    assert skill.steps[2].uses_skills == ("review-architecture",)
-    assert skill.steps[2].tool_invocations[0].command == (
+    assert skill.steps[3].tool_invocations[0].command == (
+        "powdrr-lift",
+        "architecture-specification",
+        "--work-item-name",
+        "<work-item-name>",
+        "--entity-type",
+        "<type>",
+    )
+    assert skill.steps[4].uses_skills == ("review-architecture",)
+    assert skill.steps[4].tool_invocations[0].command == (
         "powdrr-lift",
         "evaluate-architecture-specification",
         "--work-item-name",
@@ -213,13 +225,13 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--entity-type",
         "<type>",
     )
-    assert skill.steps[3].tool_invocations[0].command == (
+    assert skill.steps[5].tool_invocations[0].command == (
         "powdrr-lift",
         "implementation-specification",
         "--work-item-name",
         "<work-item-name>",
     )
-    assert skill.steps[4].tool_invocations[0].command == (
+    assert skill.steps[6].tool_invocations[0].command == (
         "powdrr-lift",
         "pr-specification",
         "--work-item-name",

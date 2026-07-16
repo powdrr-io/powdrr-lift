@@ -1,17 +1,32 @@
 {
   "name": "specify-a-feature",
   "when_to_use": [
-    "When the user needs a concrete, actionable plan for a feature.",
-    "When the flow should gather context, review architecture, and drive implementation details synchronously."
+    "When the user needs a concrete feature plan.",
+    "When the flow must gather context and drive implementation."
   ],
   "steps": [
     {
-      "description": "Capture the feature goal and what success looks like.",
-      "details": "Interview the user about outcomes, corner cases, test cases, and any constraints that change the shape of the plan."
+      "description": "Capture the feature goal and success criteria.",
+      "details": "Ask about outcomes, edge cases, tests, and constraints."
+    },
+    {
+      "description": "Generate the system template and fill it out.",
+      "details": "Fill the system template before review.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
       "description": "Review the system context before deciding the feature shape.",
-      "details": "Use the system review flow to confirm the requirements, approach, and current constraints.",
+      "details": "Confirm requirements, approach, and constraints after fill.",
       "uses_skills": [
         "review-system"
       ],
@@ -28,8 +43,25 @@
       ]
     },
     {
-      "description": "Review the architecture context before choosing implementation details.",
-      "details": "Use the architecture review flow to confirm the entity model, relationships, invariants, and guidance that the feature must respect.",
+      "description": "Generate the architecture template and fill it out.",
+      "details": "Capture the entity model before review.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Review architecture before implementation.",
+      "details": "Confirm model, relationships, invariants, and guidance after fill.",
       "uses_skills": [
         "review-architecture"
       ],
@@ -49,7 +81,7 @@
     },
     {
       "description": "Generate the implementation template and fill it out.",
-      "details": "Complete the generated template with the feature decisions and reasoning.",
+      "details": "Complete the template with decisions and reasoning.",
       "tool_invocations": [
         {
           "tool": "shell",
@@ -63,8 +95,8 @@
       ]
     },
     {
-      "description": "Decide on proposed PRs and fill out each PR template.",
-      "details": "Choose an appropriate set of proposed PRs and fill out those templates with the relevant intent, acceptance criteria, tests, and risks.",
+      "description": "Decide on proposed PRs and fill each template.",
+      "details": "Fill PR templates with intent, criteria, tests, and risks.",
       "tool_invocations": [
         {
           "tool": "shell",
@@ -79,7 +111,7 @@
     },
     {
       "description": "Prompt the user to review the result.",
-      "details": "Show the draft plan back to the user and confirm that the scoped feature, implementation, and PR breakdown still match what they want."
+      "details": "Show the draft plan and confirm it still matches."
     }
   ]
 }

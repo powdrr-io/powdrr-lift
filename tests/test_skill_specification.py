@@ -258,3 +258,104 @@ def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     assert (skills_dir / "review-architecture.json").is_file()
     assert (skills_dir / "review-system.json").is_file()
+
+
+def test_checked_in_review_system_skill_definition_matches_review_flow() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.json"
+    )
+    skill = load_skill(skill_path)
+
+    assert skill.name == "review-system"
+    assert skill.when_to_use == (
+        "When new needs may require updating the current system specification.",
+        (
+            "When the TUI should evaluate whether the system requirements and "
+            "approach still fit."
+        ),
+    )
+    assert [step.description for step in skill.steps] == [
+        "Gather the requirements and approach context.",
+        "Decide whether the current system specification needs to change.",
+        (
+            "Generate and fill the system specification template only when "
+            "changes are required."
+        ),
+        "Validate the updated system specification and confirm it is still consistent.",
+    ]
+    assert skill.steps[0].details == (
+        "Use the requirements and approach context to understand the new needs "
+        "before judging the system specification."
+    )
+    assert skill.steps[1].details == (
+        "Compare the gathered requirements and approach against the new needs. "
+        "If the existing spec already covers them, report that no update is "
+        "needed and stop."
+    )
+    assert skill.steps[2].tool_invocations[0].command == (
+        "powdrr-lift",
+        "system-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
+    assert skill.steps[3].tool_invocations[0].command == (
+        "powdrr-lift",
+        "evaluate-system-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
+
+
+def test_checked_in_review_architecture_skill_definition_matches_review_flow() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "review-architecture.json"
+    )
+    skill = load_skill(skill_path)
+
+    assert skill.name == "review-architecture"
+    assert skill.when_to_use == (
+        "When new needs may require updating the current architecture specification.",
+        (
+            "When the TUI should evaluate whether the architecture still fits "
+            "the system needs."
+        ),
+    )
+    assert [step.description for step in skill.steps] == [
+        "Gather the entities, entity relationships, invariants, and guidance context.",
+        "Decide whether the current architecture specification needs to change.",
+        (
+            "Generate and fill the architecture specification template only "
+            "when changes are required."
+        ),
+        (
+            "Validate the updated architecture specification and confirm it is "
+            "still consistent."
+        ),
+    ]
+    assert skill.steps[0].details == (
+        "Use the architecture context to understand the current model before "
+        "judging whether it needs to change."
+    )
+    assert skill.steps[1].details == (
+        "Compare the gathered entity model against the new needs. If the "
+        "existing spec already covers them, report that no update is needed "
+        "and stop."
+    )
+    assert skill.steps[2].tool_invocations[0].command == (
+        "powdrr-lift",
+        "architecture-specification",
+        "--work-item-name",
+        "<work-item-name>",
+        "--entity-type",
+        "<type>",
+    )
+    assert skill.steps[3].tool_invocations[0].command == (
+        "powdrr-lift",
+        "evaluate-architecture-specification",
+        "--work-item-name",
+        "<work-item-name>",
+        "--entity-type",
+        "<type>",
+    )

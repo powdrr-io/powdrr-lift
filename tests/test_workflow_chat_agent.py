@@ -19,6 +19,7 @@ from powdrr_lift.workflow_chat_agent import (
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
+    _action_system_prompt,
     _catalog_entry_to_data,
     _resolve_api_key,
     _resolve_skill_path,
@@ -218,6 +219,184 @@ def test_run_workflow_chat_generates_skill_summary(
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Using openai credentials from --api-key" in stderr.getvalue()
+
+
+def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
+    prompt = _action_system_prompt()
+
+    assert "gather-context" in prompt
+    assert "requirements" in prompt
+    assert "entity-relationships" in prompt
+    assert "proposed PRs" in prompt
+
+
+def test_run_workflow_chat_gathers_context_into_follow_up_step(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(
+        Skill(
+            name="specify-a-feature",
+            when_to_use=("When the user needs a simple synchronous workflow.",),
+            steps=(
+                SkillStep(
+                    description="Discover what requirements are already specified.",
+                    details=(
+                        "Use gather-context to retrieve existing requirement notes."
+                    ),
+                ),
+                SkillStep(
+                    description="Summarize the gathered context.",
+                    details="Describe the requirements that were found.",
+                ),
+            ),
+        ),
+        skills_dir / "specify-a-feature.json",
+    )
+
+    system_spec_path = (
+        worktree_root
+        / "docs"
+        / "specs"
+        / "display-related-photos"
+        / "system-specification.yaml"
+    )
+    system_spec_path.parent.mkdir(parents=True, exist_ok=True)
+    system_spec_path.write_text(
+        "\n".join(
+            [
+                "schema: https://powdrr.io/schemas/specification-v1",
+                "id: system-display-related-photos",
+                "requirements:",
+                "  - id: req-1",
+                "    description: Show related photos in the UI.",
+                "approach:",
+                "  - id: app-1",
+                "    description: Reuse the existing photo grid.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                "selected_skill_reason": "The request is to inspect existing context.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {
+                "kind": "gather-context",
+                "types": ["requirements"],
+                "keywords": ["related photos"],
+                "decisions_and_context": (
+                    "Need the existing requirements before summarizing."
+                ),
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "Requirements gathered.",
+            },
+            {
+                "kind": "complete",
+                "text": "Context gathered.",
+                "decisions_and_context": "Ready to summarize the requirements.",
+            },
+        ]
+    )
+
+    captured: dict[str, object] = {"messages": []}
+
+    class _FakeOpenAIClient:
+        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+            captured["model"] = model
+            captured["api_key"] = api_key
+            captured["base_url"] = base_url
+            self._call_index = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            prompt = json.loads(messages[1]["content"])
+            if self._call_index == 0:
+                assert (
+                    prompt["conversation"][0]["content"]
+                    == "Find the existing requirements"
+                )
+            elif self._call_index == 1:
+                assert prompt["current_step"]["description"] == (
+                    "Discover what requirements are already specified."
+                )
+                assert prompt["step_context"] == []
+            elif self._call_index == 2:
+                assert prompt["current_step"]["description"] == (
+                    "Discover what requirements are already specified."
+                )
+                assert "Gathered context:" in prompt["step_context"][-1]
+                assert "Show related photos in the UI." in prompt["step_context"][-1]
+                assert prompt["execution_events"][-1]["kind"] == "gather-context"
+                assert prompt["execution_events"][-1]["types"] == ["requirements"]
+                assert (
+                    prompt["execution_events"][-1]["result"]["matches"][0]["item"][
+                        "description"
+                    ]
+                    == "Show related photos in the UI."
+                )
+            elif self._call_index == 3:
+                assert prompt["current_step"]["description"] == (
+                    "Summarize the gathered context."
+                )
+                assert prompt["step_context"][-1] == "Requirements gathered."
+                assert prompt["execution_events"][-1]["kind"] == "next_step"
+            else:
+                raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
+
+            response = next(responses)
+            self._call_index += 1
+            return response
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+            max_turns=10,
+        ),
+        input_func=lambda: "Find the existing requirements",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    summary_path = worktree_root / "generated" / "skill-execution.json"
+    assert exit_code == 0
+    assert summary_path.exists()
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert [event["kind"] for event in summary["execution_events"]] == [
+        "gather-context",
+        "next_step",
+        "complete",
+    ]
+    assert "Context gathered." in stdout.getvalue()
 
 
 def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
@@ -1654,11 +1833,20 @@ def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
             "tool": "shell",
             "command": [
                 "powdrr-lift",
+                "system-specification",
+                "--work-item-name",
+                "<work-item-name>",
+            ],
+        },
+        {
+            "tool": "shell",
+            "command": [
+                "powdrr-lift",
                 "evaluate-system-specification",
                 "--work-item-name",
                 "<work-item-name>",
             ],
-        }
+        },
     ]
 
 

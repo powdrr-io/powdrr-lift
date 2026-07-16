@@ -20,6 +20,11 @@ from powdrr_lift.core import (
     load_skills,
     resolve_repo_root,
 )
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    normalize_context_type,
+    render_gather_context_report,
+)
 
 _DEFAULT_MODEL = "glm-5.2"
 
@@ -85,7 +90,19 @@ class SkillChatAction:
     tool: str | None = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
+    types: tuple[str, ...] = field(default_factory=tuple)
+    keywords: tuple[str, ...] = field(default_factory=tuple)
     decisions_and_context: str | None = None
+
+
+@dataclass(slots=True)
+class _WorkflowExecutionState:
+    selected_skill: SkillCatalogEntry
+    transcript: list[dict[str, str]]
+    execution_events: list[dict[str, Any]]
+    execution_context: list[str]
+    step_index: int
+    worktree_root: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,19 +356,26 @@ def run_workflow_chat(
         print("Could not select a skill.", file=stderr)
         return 1
 
-    execution_events: list[dict[str, Any]] = []
-    execution_context: list[str] = []
-    step_index = 0
+    execution_state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=transcript,
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=worktree_root,
+    )
+    action_handlers = _workflow_action_handlers()
     for turn in range(config.max_turns):
-        if step_index >= len(selected_skill.skill.steps):
+        if execution_state.step_index >= len(selected_skill.skill.steps):
             break
-        current_step = selected_skill.skill.steps[step_index]
+        current_step = selected_skill.skill.steps[execution_state.step_index]
         _verbose_print(
             stderr,
             config.verbose,
             (
                 f"Starting execution turn {turn + 1} "
-                f"for step {step_index + 1}/{len(selected_skill.skill.steps)}"
+                f"for step {execution_state.step_index + 1}/"
+                f"{len(selected_skill.skill.steps)}"
             ),
         )
         action = _complete_json_with_repair(
@@ -359,15 +383,15 @@ def run_workflow_chat(
             _build_step_execution_messages(
                 selected_skill=selected_skill,
                 current_step=current_step,
-                current_step_index=step_index,
-                transcript=transcript,
-                execution_events=execution_events,
-                execution_context=execution_context,
+                current_step_index=execution_state.step_index,
+                transcript=execution_state.transcript,
+                execution_events=execution_state.execution_events,
+                execution_context=execution_state.execution_context,
                 worktree_root=worktree_root,
             ),
             parser=_parse_action_response,
             context=(
-                f"workflow execution for step {step_index + 1}/"
+                f"workflow execution for step {execution_state.step_index + 1}/"
                 f"{len(selected_skill.skill.steps)}"
             ),
             repair_instructions=_action_repair_prompt(selected_skill),
@@ -385,100 +409,18 @@ def run_workflow_chat(
         )
         _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
 
-        if action.decisions_and_context:
-            execution_context.append(action.decisions_and_context)
-
-        if action.kind == "complete":
-            if action.text:
-                print(action.text, file=stdout)
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "text": action.text,
-                    "decisions_and_context": action.decisions_and_context,
-                }
-            )
+        handler = action_handlers.get(action.kind)
+        if handler is None:
+            raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
+        if not handler(
+            action,
+            execution_state,
+            stdout,
+            stderr,
+            input_func,
+            config,
+        ):
             break
-
-        if action.kind == "next_step":
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "decisions_and_context": action.decisions_and_context,
-                    "step_index": step_index,
-                }
-            )
-            step_index += 1
-            continue
-
-        if action.kind == "prompt_user":
-            print(action.text or "", file=stdout)
-            answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
-            _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
-            transcript.append(
-                {
-                    "role": "assistant",
-                    "content": action.text or "",
-                }
-            )
-            transcript.append({"role": "user", "content": answer})
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "text": action.text,
-                    "answer": answer,
-                    "decisions_and_context": action.decisions_and_context,
-                    "step_index": step_index,
-                }
-            )
-            continue
-
-        if action.kind == "invoke_tool":
-            if action.tool != "shell":
-                raise RuntimeError(
-                    "Unsupported workflow tool "
-                    f"{action.tool!r}; only shell is supported."
-                )
-            tool_result = _execute_shell_tool(
-                action.parameters,
-                worktree_root=worktree_root,
-                stdout=stdout,
-                stderr=stderr,
-                verbose=config.verbose,
-            )
-            transcript.append(
-                {
-                    "role": "assistant",
-                    "content": json.dumps(
-                        {
-                            "kind": action.kind,
-                            "parameters": action.parameters,
-                        },
-                        ensure_ascii=False,
-                    ),
-                }
-            )
-            transcript.append(
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {"tool_result": tool_result},
-                        ensure_ascii=False,
-                    ),
-                }
-            )
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "parameters": action.parameters,
-                    "result": tool_result,
-                    "decisions_and_context": action.decisions_and_context,
-                    "step_index": step_index,
-                }
-            )
-            continue
-
-        raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
     else:
         print(
             "Reached the maximum number of workflow turns without completion.",
@@ -489,8 +431,8 @@ def run_workflow_chat(
     summary = _build_skill_execution_summary(
         selected_skill,
         selection,
-        transcript,
-        execution_events,
+        execution_state.transcript,
+        execution_state.execution_events,
     )
     _verbose_print(
         stderr,
@@ -804,6 +746,13 @@ def _build_step_execution_messages(
                             ),
                         }
                     ],
+                    "available_context_types": [
+                        {
+                            "name": context_type,
+                            "when_to_use": description,
+                        }
+                        for context_type, description in _context_type_catalog()
+                    ],
                     "worktree_root": str(worktree_root),
                     "selected_skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
@@ -817,15 +766,29 @@ def _build_step_execution_messages(
 
 
 def _action_system_prompt() -> str:
+    context_type_lines = "\n".join(
+        f"- {name}: {description}" for name, description in _context_type_catalog()
+    )
     return (
         "You are executing a checked-in skill in a terminal workflow.\n"
         "Use the current step, prior step context, transcript, and prior "
         "execution events to determine the next action.\n"
         "Return exactly one JSON object with one of these forms:\n"
+        '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
+        '"decisions_and_context":"..."}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"..."}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"..."}\n'
         '{"kind":"next_step","decisions_and_context":"..."}\n'
         '{"kind":"complete","text":"...","decisions_and_context":"..."}\n'
+        "Use gather-context when you need to discover information already "
+        "specified in checked-in specs before deciding the next action.\n"
+        "Use gather-context to discover what requirements are already "
+        "specified, find related entities, inspect approach notes, or gather "
+        "current features, decisions, risks, or proposed PRs.\n"
+        "The supported context types are:\n"
+        f"{context_type_lines}\n"
+        "Use keywords to narrow results to items that mention one or more "
+        "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
         "Use invoke_tool for shell commands.\n"
@@ -838,6 +801,239 @@ def _action_system_prompt() -> str:
         "future steps will need.\n"
         "Do not output markdown."
     )
+
+
+def _context_type_catalog() -> tuple[tuple[str, str], ...]:
+    return (
+        ("requirements", "discover what requirements are already specified"),
+        ("approach", "discover the existing approach or solution shape"),
+        ("entities", "discover the domain entities already described"),
+        (
+            "entity-relationships",
+            "discover how entities are already related",
+        ),
+        ("invariants", "discover the rules that must always remain true"),
+        ("guidance", "discover implementation guidance or cautions"),
+        ("features", "discover the features already recorded or in scope"),
+        (
+            "human-decisions",
+            "discover human decisions that must be preserved",
+        ),
+        ("intent", "discover the problem, goal, or reasoning already stated"),
+        ("intents", "discover current-state intent records"),
+        (
+            "acceptance_criteria",
+            "discover acceptance criteria already written down",
+        ),
+        ("expected_tests", "discover expected tests already listed"),
+        ("required_test_cases", "discover required test cases already listed"),
+        ("expected_outcomes", "discover expected outcomes already stated"),
+        ("non_goals", "discover what is explicitly out of scope"),
+        ("risks", "discover open risks or concerns"),
+        ("decisions", "discover recorded decisions or tradeoffs"),
+        ("proposed_prs", "discover proposed PR records and their status"),
+    )
+
+
+def _workflow_action_handlers() -> dict[
+    str,
+    Callable[
+        [
+            SkillChatAction,
+            _WorkflowExecutionState,
+            TextIO,
+            TextIO,
+            Callable[[], str],
+            WorkflowChatConfig,
+        ],
+        bool,
+    ],
+]:
+    return {
+        "complete": _handle_workflow_action_complete,
+        "next_step": _handle_workflow_action_next_step,
+        "prompt_user": _handle_workflow_action_prompt_user,
+        "invoke_tool": _handle_workflow_action_invoke_tool,
+        "gather-context": _handle_workflow_action_gather_context,
+    }
+
+
+def _handle_workflow_action_complete(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = stderr
+    _ = input_func
+    _ = config
+    if action.text:
+        print(action.text, file=stdout)
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "text": action.text,
+            "decisions_and_context": action.decisions_and_context,
+        }
+    )
+    return False
+
+
+def _handle_workflow_action_next_step(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = stdout
+    _ = stderr
+    _ = input_func
+    _ = config
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    state.step_index += 1
+    return True
+
+
+def _handle_workflow_action_prompt_user(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = stderr
+    print(action.text or "", file=stdout)
+    answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+    _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
+    state.transcript.append(
+        {
+            "role": "assistant",
+            "content": action.text or "",
+        }
+    )
+    state.transcript.append({"role": "user", "content": answer})
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "text": action.text,
+            "answer": answer,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    return True
+
+
+def _handle_workflow_action_invoke_tool(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    if action.tool != "shell":
+        raise RuntimeError(
+            f"Unsupported workflow tool {action.tool!r}; only shell is supported."
+        )
+    tool_result = _execute_shell_tool(
+        action.parameters,
+        worktree_root=state.worktree_root,
+        stdout=stdout,
+        stderr=stderr,
+        verbose=config.verbose,
+    )
+    state.transcript.append(
+        {
+            "role": "assistant",
+            "content": json.dumps(
+                {
+                    "kind": action.kind,
+                    "parameters": action.parameters,
+                },
+                ensure_ascii=False,
+            ),
+        }
+    )
+    state.transcript.append(
+        {
+            "role": "user",
+            "content": json.dumps(
+                {"tool_result": tool_result},
+                ensure_ascii=False,
+            ),
+        }
+    )
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "parameters": action.parameters,
+            "result": tool_result,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    return True
+
+
+def _handle_workflow_action_gather_context(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    gathered_context = gather_specification_context(
+        state.worktree_root,
+        types=list(action.types),
+        keywords=list(action.keywords) if action.keywords else None,
+    )
+    gathered_context_text = render_gather_context_report(gathered_context)
+    _verbose_print(
+        stderr,
+        config.verbose,
+        (
+            "Gathered context for "
+            f"types={list(action.types)} keywords={list(action.keywords)}"
+        ),
+    )
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_context.append(f"Gathered context:\n{gathered_context_text}")
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "types": list(action.types),
+            "keywords": list(action.keywords),
+            "result": json.loads(gathered_context_text),
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    _ = stdout
+    return True
 
 
 def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
@@ -901,6 +1097,25 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
             )
         raise RuntimeError(
             "Workflow invoke_tool action command must be a string or array."
+        )
+
+    if kind == "gather-context":
+        types = _required_action_string_sequence(
+            payload.get("types"),
+            field_name="types",
+        )
+        keywords = _optional_action_string_sequence(
+            payload.get("keywords"),
+            field_name="keywords",
+        )
+        normalized_types = tuple(
+            normalize_context_type(context_type) for context_type in types
+        )
+        return SkillChatAction(
+            kind=kind,
+            types=normalized_types,
+            keywords=keywords,
+            decisions_and_context=decisions_and_context,
         )
 
     if kind == "next_step":
@@ -1023,6 +1238,57 @@ def _required_shell_command_item(value: object) -> str:
             "Workflow invoke_tool action command items must be non-empty strings."
         )
     return value.strip()
+
+
+def _required_action_string_item(value: object, *, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(
+            "Workflow gather-context action "
+            f"{field_name} must contain non-empty strings."
+        )
+    return value.strip()
+
+
+def _required_action_string_sequence(
+    value: object,
+    *,
+    field_name: str,
+) -> tuple[str, ...]:
+    if not isinstance(value, Sequence) or isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError(
+            f"Workflow gather-context action {field_name} must be an array."
+        )
+
+    normalized_values = tuple(
+        _required_action_string_item(item, field_name=field_name) for item in value
+    )
+    if not normalized_values:
+        raise RuntimeError(
+            f"Workflow gather-context action {field_name} must not be empty."
+        )
+    return normalized_values
+
+
+def _optional_action_string_sequence(
+    value: object,
+    *,
+    field_name: str,
+) -> tuple[str, ...]:
+    if value is None:
+        return tuple()
+    if not isinstance(value, Sequence) or isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError(
+            f"Workflow gather-context action {field_name} must be an array."
+        )
+    return tuple(
+        _required_action_string_item(item, field_name=field_name) for item in value
+    )
 
 
 def _optional_string(value: object) -> str | None:
@@ -1233,8 +1499,9 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
         "Fix the response so it matches the workflow action schema with keys "
-        "kind, tool, text, parameters, and decisions_and_context. "
-        "Allowed kinds are prompt_user, invoke_tool, next_step, and complete. "
+        "kind, tool, text, parameters, types, keywords, and decisions_and_context. "
+        "Allowed kinds are gather-context, prompt_user, invoke_tool, next_step, "
+        "and complete. "
         f"The skill steps are: {step_kinds}."
     )
 

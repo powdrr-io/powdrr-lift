@@ -36,6 +36,8 @@ from powdrr_lift.core.spec_context import (
 
 _DEFAULT_MODEL = "glm-5.2"
 
+WorkflowActionParser = Callable[[dict[str, Any], str | None], "SkillChatAction"]
+
 
 @dataclass(frozen=True, slots=True)
 class SkillCatalogEntry:
@@ -1143,112 +1145,147 @@ def _handle_workflow_action_gather_context(
 
 def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     kind = payload.get("kind")
-    if not isinstance(kind, str) or not kind:
+    if not isinstance(kind, str):
+        raise RuntimeError("Workflow action response must include kind.")
+    normalized_kind = kind.strip()
+    if not normalized_kind:
         raise RuntimeError("Workflow action response must include kind.")
     decisions_and_context = _optional_string(payload.get("decisions_and_context"))
+    parser = _workflow_action_parsers().get(normalized_kind)
+    if parser is None:
+        raise RuntimeError(f"Unknown workflow action kind: {normalized_kind!r}")
+    return parser(payload, decisions_and_context)
 
-    if kind == "prompt_user":
-        text = payload.get("text")
-        if not isinstance(text, str) or not text.strip():
-            raise RuntimeError(
-                "Workflow prompt_user action must include non-empty text."
-            )
+
+def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
+    return {
+        "complete": _parse_workflow_action_complete,
+        "edit": _parse_workflow_action_edit,
+        "gather-context": _parse_workflow_action_gather_context,
+        "invoke_tool": _parse_workflow_action_invoke_tool,
+        "next_step": _parse_workflow_action_next_step,
+        "prompt_user": _parse_workflow_action_prompt_user,
+    }
+
+
+def _parse_workflow_action_complete(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+) -> SkillChatAction:
+    text = payload.get("text")
+    if text is not None and not isinstance(text, str):
+        raise RuntimeError("Workflow complete action text must be a string.")
+    return SkillChatAction(
+        kind="complete",
+        text=(text.strip() if text else None),
+        decisions_and_context=decisions_and_context,
+    )
+
+
+def _parse_workflow_action_edit(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+) -> SkillChatAction:
+    file_path = payload.get("file_path")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise RuntimeError("Workflow edit action must include file_path.")
+    edits = _required_edit_operations(payload.get("edits"))
+    return SkillChatAction(
+        kind="edit",
+        file_path=file_path.strip(),
+        edits=edits,
+        decisions_and_context=decisions_and_context,
+    )
+
+
+def _parse_workflow_action_gather_context(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+) -> SkillChatAction:
+    types = _required_action_string_sequence(
+        payload.get("types"),
+        field_name="types",
+    )
+    keywords = _optional_action_string_sequence(
+        payload.get("keywords"),
+        field_name="keywords",
+    )
+    normalized_types = tuple(
+        normalize_context_type(context_type) for context_type in types
+    )
+    return SkillChatAction(
+        kind="gather-context",
+        types=normalized_types,
+        keywords=keywords,
+        decisions_and_context=decisions_and_context,
+    )
+
+
+def _parse_workflow_action_invoke_tool(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+) -> SkillChatAction:
+    tool = payload.get("tool")
+    if not isinstance(tool, str) or not tool.strip():
+        raise RuntimeError("Workflow invoke_tool action must include tool.")
+    parameters = payload.get("parameters")
+    if not isinstance(parameters, dict):
+        raise RuntimeError("Workflow invoke_tool action must include parameters.")
+    command = parameters.get("command")
+    if isinstance(command, str):
+        normalized_parameters = dict(parameters)
+        normalized_command = command.strip()
+        if not normalized_command:
+            raise RuntimeError("Workflow invoke_tool action command must be non-empty.")
+        normalized_parameters["command"] = normalized_command
         return SkillChatAction(
-            kind=kind,
-            text=text.strip(),
+            kind="invoke_tool",
+            tool=tool.strip(),
+            parameters=normalized_parameters,
             decisions_and_context=decisions_and_context,
         )
-
-    if kind == "invoke_tool":
-        tool = payload.get("tool")
-        if not isinstance(tool, str) or not tool.strip():
-            raise RuntimeError("Workflow invoke_tool action must include tool.")
-        parameters = payload.get("parameters")
-        if not isinstance(parameters, dict):
-            raise RuntimeError("Workflow invoke_tool action must include parameters.")
-        command = parameters.get("command")
-        if isinstance(command, str):
-            normalized_parameters = dict(parameters)
-            normalized_command = command.strip()
-            if not normalized_command:
-                raise RuntimeError(
-                    "Workflow invoke_tool action command must be non-empty."
-                )
-            normalized_parameters["command"] = normalized_command
-            return SkillChatAction(
-                kind=kind,
-                tool=tool.strip(),
-                parameters=normalized_parameters,
-                decisions_and_context=decisions_and_context,
-            )
-        if isinstance(command, Sequence) and not isinstance(
-            command,
-            (str, bytes, bytearray),
-        ):
-            normalized_command_list = [
-                _required_shell_command_item(item) for item in command
-            ]
-            if not normalized_command_list:
-                raise RuntimeError(
-                    "Workflow invoke_tool action command must not be empty."
-                )
-            normalized_parameters = dict(parameters)
-            normalized_parameters["command"] = normalized_command_list
-            return SkillChatAction(
-                kind=kind,
-                tool=tool.strip(),
-                parameters=normalized_parameters,
-                decisions_and_context=decisions_and_context,
-            )
-        raise RuntimeError(
-            "Workflow invoke_tool action command must be a string or array."
-        )
-
-    if kind == "edit":
-        file_path = payload.get("file_path")
-        if not isinstance(file_path, str) or not file_path.strip():
-            raise RuntimeError("Workflow edit action must include file_path.")
-        edits = _required_edit_operations(payload.get("edits"))
+    if isinstance(command, Sequence) and not isinstance(
+        command,
+        (str, bytes, bytearray),
+    ):
+        normalized_command_list = [
+            _required_shell_command_item(item) for item in command
+        ]
+        if not normalized_command_list:
+            raise RuntimeError("Workflow invoke_tool action command must not be empty.")
+        normalized_parameters = dict(parameters)
+        normalized_parameters["command"] = normalized_command_list
         return SkillChatAction(
-            kind=kind,
-            file_path=file_path.strip(),
-            edits=edits,
+            kind="invoke_tool",
+            tool=tool.strip(),
+            parameters=normalized_parameters,
             decisions_and_context=decisions_and_context,
         )
+    raise RuntimeError("Workflow invoke_tool action command must be a string or array.")
 
-    if kind == "gather-context":
-        types = _required_action_string_sequence(
-            payload.get("types"),
-            field_name="types",
-        )
-        keywords = _optional_action_string_sequence(
-            payload.get("keywords"),
-            field_name="keywords",
-        )
-        normalized_types = tuple(
-            normalize_context_type(context_type) for context_type in types
-        )
-        return SkillChatAction(
-            kind=kind,
-            types=normalized_types,
-            keywords=keywords,
-            decisions_and_context=decisions_and_context,
-        )
 
-    if kind == "next_step":
-        return SkillChatAction(kind=kind, decisions_and_context=decisions_and_context)
+def _parse_workflow_action_next_step(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+) -> SkillChatAction:
+    _ = payload
+    return SkillChatAction(
+        kind="next_step", decisions_and_context=decisions_and_context
+    )
 
-    if kind == "complete":
-        text = payload.get("text")
-        if text is not None and not isinstance(text, str):
-            raise RuntimeError("Workflow complete action text must be a string.")
-        return SkillChatAction(
-            kind=kind,
-            text=(text.strip() if text else None),
-            decisions_and_context=decisions_and_context,
-        )
 
-    raise RuntimeError(f"Unknown workflow action kind: {kind!r}")
+def _parse_workflow_action_prompt_user(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+) -> SkillChatAction:
+    text = payload.get("text")
+    if text is not None and not isinstance(text, str):
+        raise RuntimeError("Workflow prompt_user action text must be a string.")
+    return SkillChatAction(
+        kind="prompt_user",
+        text=(text.strip() if text else None),
+        decisions_and_context=decisions_and_context,
+    )
 
 
 def _execute_shell_tool(

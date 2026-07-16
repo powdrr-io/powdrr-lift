@@ -25,7 +25,9 @@ from powdrr_lift.workflow_chat_agent import (
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
+    SkillChatEdit,
     _action_system_prompt,
+    _apply_file_edits,
     _catalog_entry_to_data,
     _resolve_api_key,
     _resolve_skill_path,
@@ -622,6 +624,70 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
         "next_step",
         "complete",
     ]
+
+
+@pytest.mark.parametrize(
+    ("current_text", "edits", "expected_text"),
+    [
+        (
+            "\n".join(["line-1", "line-2", "line-3", "line-4", "line-5"]) + "\n",
+            (
+                SkillChatEdit(kind="add", start_line=2, text="insert-a"),
+                SkillChatEdit(kind="remove", start_line=4, end_line=4),
+                SkillChatEdit(
+                    kind="replace",
+                    start_line=5,
+                    end_line=5,
+                    text="line-5-updated",
+                ),
+            ),
+            "\n".join(
+                [
+                    "line-1",
+                    "insert-a",
+                    "line-2",
+                    "line-3",
+                    "line-5-updated",
+                ]
+            )
+            + "\n",
+        ),
+        (
+            "\n".join(["line-1", "line-2", "line-3", "line-4", "line-5", "line-6"])
+            + "\n",
+            (
+                SkillChatEdit(kind="add", start_line=2, text="insert-a"),
+                SkillChatEdit(kind="remove", start_line=4, end_line=5),
+                SkillChatEdit(kind="add", start_line=6, text="insert-b"),
+            ),
+            "\n".join(
+                [
+                    "line-1",
+                    "insert-a",
+                    "line-2",
+                    "line-3",
+                    "insert-b",
+                    "line-6",
+                ]
+            )
+            + "\n",
+        ),
+        (
+            "\n".join(["line-1", "line-2", "line-3"]) + "\n",
+            (
+                SkillChatEdit(kind="remove", start_line=2, end_line=3),
+                SkillChatEdit(kind="add", start_line=4, text="tail"),
+            ),
+            "\n".join(["line-1", "tail"]) + "\n",
+        ),
+    ],
+)
+def test_apply_file_edits_uses_original_line_numbers_for_interleaved_edits(
+    current_text: str,
+    edits: tuple[SkillChatEdit, ...],
+    expected_text: str,
+) -> None:
+    assert _apply_file_edits(current_text, edits) == expected_text
 
 
 def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(

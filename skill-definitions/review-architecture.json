@@ -1,22 +1,38 @@
 {
   "name": "review-architecture",
   "when_to_use": [
-    "When you need to review an architecture specification before it is committed.",
-    "When the TUI should synchronously inspect the architecture spec for weak entity or relationship modeling."
+    "When new needs may require updating the current architecture specification.",
+    "When the TUI should evaluate whether the architecture still fits the system needs."
   ],
   "steps": [
     {
-      "description": "Review the system specification context first.",
-      "details": "Start with the system spec so the architecture review stays anchored to the intended behavior.",
-      "uses_skills": [
-        "review-system",
-        "specify-system"
+      "description": "Gather the entities, entity relationships, invariants, and guidance context.",
+      "details": "Use the architecture context to understand the current model before judging whether it needs to change."
+    },
+    {
+      "description": "Decide whether the current architecture specification needs to change.",
+      "details": "Compare the gathered entity model against the new needs. If the existing spec already covers them, report that no update is needed and stop."
+    },
+    {
+      "description": "Generate and fill the architecture specification template only when changes are required.",
+      "details": "Run the architecture specification command, then fill the generated template with the required updates.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        }
       ]
     },
     {
-      "description": "Validate the filled architecture template.",
-      "details": "Validate the template before judging the quality of the entity model itself."
-      ,
+      "description": "Validate the updated architecture specification and confirm it is still consistent.",
+      "details": "Re-run architecture validation after edits and report any remaining inconsistencies.",
       "tool_invocations": [
         {
           "tool": "shell",
@@ -30,14 +46,6 @@
           ]
         }
       ]
-    },
-    {
-      "description": "Check entities, relationships, invariants, and guidance for missing references or weak structure.",
-      "details": "Confirm that every explicit reference points at a listed entity and that the model is not over- or under-specified."
-    },
-    {
-      "description": "Report findings and repeat the review until the architecture spec validates cleanly.",
-      "details": "Give the user a concrete list of issues to fix and rerun the review after the edits land."
     }
   ]
 }

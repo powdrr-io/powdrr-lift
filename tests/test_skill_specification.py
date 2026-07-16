@@ -304,3 +304,58 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
         "--work-item-name",
         "<work-item-name>",
     )
+
+
+def test_checked_in_review_architecture_skill_definition_matches_review_flow() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "review-architecture.json"
+    )
+    skill = load_skill(skill_path)
+
+    assert skill.name == "review-architecture"
+    assert skill.when_to_use == (
+        "When new needs may require updating the current architecture specification.",
+        (
+            "When the TUI should evaluate whether the architecture still fits "
+            "the system needs."
+        ),
+    )
+    assert [step.description for step in skill.steps] == [
+        "Gather the entities, entity relationships, invariants, and guidance context.",
+        "Decide whether the current architecture specification needs to change.",
+        (
+            "Generate and fill the architecture specification template only "
+            "when changes are required."
+        ),
+        (
+            "Validate the updated architecture specification and confirm it is "
+            "still consistent."
+        ),
+    ]
+    assert skill.steps[0].details == (
+        "Use the architecture context to understand the current model before "
+        "judging whether it needs to change."
+    )
+    assert skill.steps[1].details == (
+        "Compare the gathered entity model against the new needs. If the "
+        "existing spec already covers them, report that no update is needed "
+        "and stop."
+    )
+    assert skill.steps[2].tool_invocations[0].command == (
+        "powdrr-lift",
+        "architecture-specification",
+        "--work-item-name",
+        "<work-item-name>",
+        "--entity-type",
+        "<type>",
+    )
+    assert skill.steps[3].tool_invocations[0].command == (
+        "powdrr-lift",
+        "evaluate-architecture-specification",
+        "--work-item-name",
+        "<work-item-name>",
+        "--entity-type",
+        "<type>",
+    )

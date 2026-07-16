@@ -198,7 +198,21 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert skill.steps[1].details is not None
     assert skill.steps[2].details is not None
     assert skill.steps[1].uses_skills == ("review-system",)
+    assert skill.steps[1].tool_invocations[0].command == (
+        "powdrr-lift",
+        "evaluate-system-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
     assert skill.steps[2].uses_skills == ("review-architecture",)
+    assert skill.steps[2].tool_invocations[0].command == (
+        "powdrr-lift",
+        "evaluate-architecture-specification",
+        "--work-item-name",
+        "<work-item-name>",
+        "--entity-type",
+        "<type>",
+    )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
         "implementation-specification",

@@ -14,6 +14,17 @@
       "details": "Use the system review flow to confirm the requirements, approach, and current constraints.",
       "uses_skills": [
         "review-system"
+      ],
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
       ]
     },
     {
@@ -21,6 +32,19 @@
       "details": "Use the architecture review flow to confirm the entity model, relationships, invariants, and guidance that the feature must respect.",
       "uses_skills": [
         "review-architecture"
+      ],
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        }
       ]
     },
     {

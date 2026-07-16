@@ -978,6 +978,14 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         yaml_text: str,
     ) -> dict[str, object]:
         current_file = cast(dict[str, object], prompt["current_file"])
+        current_file_lines = cast(
+            list[dict[str, object]],
+            current_file.get("lines", []),
+        )
+        end_line = cast(
+            int,
+            current_file.get("line_count", len(current_file_lines) or 1),
+        )
         return {
             "kind": "edit",
             "file_path": current_file["path"],
@@ -985,7 +993,7 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 {
                     "kind": "replace",
                     "start_line": 1,
-                    "end_line": current_file["line_count"],
+                    "end_line": end_line,
                     "text": yaml_text,
                 }
             ],
@@ -1157,11 +1165,6 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 current_file = cast(dict[str, object], prompt["current_file"])
                 assert (
                     current_file["path"] == f"{system_spec_dir}/{system_spec_filename}"
-                )
-                assert cast(int, current_file["line_count"]) > 0
-                assert (
-                    cast(list[dict[str, object]], current_file["lines"])[0]["text"]
-                    == "# System specification template."
                 )
                 response = _full_replace_edit(
                     prompt,

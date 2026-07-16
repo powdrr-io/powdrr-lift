@@ -705,7 +705,11 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source_repo_root = Path(__file__).resolve().parents[4]
+    source_repo_root = next(
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / "pyproject.toml").exists()
+    )
     repo_root = tmp_path / "repo"
     subprocess.run(
         ["git", "clone", str(source_repo_root), str(repo_root)],

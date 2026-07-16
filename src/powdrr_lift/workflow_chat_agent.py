@@ -20,6 +20,11 @@ from powdrr_lift.core import (
     load_skills,
     resolve_repo_root,
 )
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    normalize_context_type,
+    render_gather_context_report,
+)
 
 _DEFAULT_MODEL = "glm-5.2"
 
@@ -85,6 +90,8 @@ class SkillChatAction:
     tool: str | None = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
+    types: tuple[str, ...] = field(default_factory=tuple)
+    keywords: tuple[str, ...] = field(default_factory=tuple)
     decisions_and_context: str | None = None
 
 
@@ -478,6 +485,36 @@ def run_workflow_chat(
             )
             continue
 
+        if action.kind == "gather-context":
+            gathered_context = gather_specification_context(
+                worktree_root,
+                types=list(action.types),
+                keywords=list(action.keywords) if action.keywords else None,
+            )
+            gathered_context_text = render_gather_context_report(gathered_context)
+            _verbose_print(
+                stderr,
+                config.verbose,
+                (
+                    "Gathered context for "
+                    f"types={list(action.types)} keywords={list(action.keywords)}"
+                ),
+            )
+            execution_context.append(
+                f"Gathered context:\n{gathered_context_text}"
+            )
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "types": list(action.types),
+                    "keywords": list(action.keywords),
+                    "result": json.loads(gathered_context_text),
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": step_index,
+                }
+            )
+            continue
+
         raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
     else:
         print(
@@ -804,6 +841,13 @@ def _build_step_execution_messages(
                             ),
                         }
                     ],
+                    "available_context_types": [
+                        {
+                            "name": context_type,
+                            "when_to_use": description,
+                        }
+                        for context_type, description in _context_type_catalog()
+                    ],
                     "worktree_root": str(worktree_root),
                     "selected_skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
@@ -817,15 +861,29 @@ def _build_step_execution_messages(
 
 
 def _action_system_prompt() -> str:
+    context_type_lines = "\n".join(
+        f"- {name}: {description}" for name, description in _context_type_catalog()
+    )
     return (
         "You are executing a checked-in skill in a terminal workflow.\n"
         "Use the current step, prior step context, transcript, and prior "
         "execution events to determine the next action.\n"
         "Return exactly one JSON object with one of these forms:\n"
+        '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
+        '"decisions_and_context":"..."}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"..."}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"..."}\n'
         '{"kind":"next_step","decisions_and_context":"..."}\n'
         '{"kind":"complete","text":"...","decisions_and_context":"..."}\n'
+        "Use gather-context when you need to discover information already "
+        "specified in checked-in specs before deciding the next action.\n"
+        "Use gather-context to discover what requirements are already "
+        "specified, find related entities, inspect approach notes, or gather "
+        "current features, decisions, risks, or proposed PRs.\n"
+        "The supported context types are:\n"
+        f"{context_type_lines}\n"
+        "Use keywords to narrow results to items that mention one or more "
+        "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
         "Use invoke_tool for shell commands.\n"
@@ -837,6 +895,39 @@ def _action_system_prompt() -> str:
         "Always include decisions_and_context with the concise information "
         "future steps will need.\n"
         "Do not output markdown."
+    )
+
+
+def _context_type_catalog() -> tuple[tuple[str, str], ...]:
+    return (
+        ("requirements", "discover what requirements are already specified"),
+        ("approach", "discover the existing approach or solution shape"),
+        ("entities", "discover the domain entities already described"),
+        (
+            "entity-relationships",
+            "discover how entities are already related",
+        ),
+        ("invariants", "discover the rules that must always remain true"),
+        ("guidance", "discover implementation guidance or cautions"),
+        ("features", "discover the features already recorded"),
+        (
+            "human-decisions",
+            "discover human decisions that must be preserved",
+        ),
+        ("feature_ids", "discover which feature ids are already in scope"),
+        ("intent", "discover the problem, goal, or reasoning already stated"),
+        ("intents", "discover current-state intent records"),
+        (
+            "acceptance_criteria",
+            "discover acceptance criteria already written down",
+        ),
+        ("expected_tests", "discover expected tests already listed"),
+        ("required_test_cases", "discover required test cases already listed"),
+        ("expected_outcomes", "discover expected outcomes already stated"),
+        ("non_goals", "discover what is explicitly out of scope"),
+        ("risks", "discover open risks or concerns"),
+        ("decisions", "discover recorded decisions or tradeoffs"),
+        ("proposed_prs", "discover proposed PR records and their status"),
     )
 
 
@@ -901,6 +992,25 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
             )
         raise RuntimeError(
             "Workflow invoke_tool action command must be a string or array."
+        )
+
+    if kind == "gather-context":
+        types = _required_action_string_sequence(
+            payload.get("types"),
+            field_name="types",
+        )
+        keywords = _optional_action_string_sequence(
+            payload.get("keywords"),
+            field_name="keywords",
+        )
+        normalized_types = tuple(
+            normalize_context_type(context_type) for context_type in types
+        )
+        return SkillChatAction(
+            kind=kind,
+            types=normalized_types,
+            keywords=keywords,
+            decisions_and_context=decisions_and_context,
         )
 
     if kind == "next_step":
@@ -1023,6 +1133,57 @@ def _required_shell_command_item(value: object) -> str:
             "Workflow invoke_tool action command items must be non-empty strings."
         )
     return value.strip()
+
+
+def _required_action_string_item(value: object, *, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(
+            "Workflow gather-context action "
+            f"{field_name} must contain non-empty strings."
+        )
+    return value.strip()
+
+
+def _required_action_string_sequence(
+    value: object,
+    *,
+    field_name: str,
+) -> tuple[str, ...]:
+    if not isinstance(value, Sequence) or isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError(
+            f"Workflow gather-context action {field_name} must be an array."
+        )
+
+    normalized_values = tuple(
+        _required_action_string_item(item, field_name=field_name) for item in value
+    )
+    if not normalized_values:
+        raise RuntimeError(
+            f"Workflow gather-context action {field_name} must not be empty."
+        )
+    return normalized_values
+
+
+def _optional_action_string_sequence(
+    value: object,
+    *,
+    field_name: str,
+) -> tuple[str, ...]:
+    if value is None:
+        return tuple()
+    if not isinstance(value, Sequence) or isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError(
+            f"Workflow gather-context action {field_name} must be an array."
+        )
+    return tuple(
+        _required_action_string_item(item, field_name=field_name) for item in value
+    )
 
 
 def _optional_string(value: object) -> str | None:
@@ -1233,8 +1394,9 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
         "Fix the response so it matches the workflow action schema with keys "
-        "kind, tool, text, parameters, and decisions_and_context. "
-        "Allowed kinds are prompt_user, invoke_tool, next_step, and complete. "
+        "kind, tool, text, parameters, types, keywords, and decisions_and_context. "
+        "Allowed kinds are gather-context, prompt_user, invoke_tool, next_step, "
+        "and complete. "
         f"The skill steps are: {step_kinds}."
     )
 

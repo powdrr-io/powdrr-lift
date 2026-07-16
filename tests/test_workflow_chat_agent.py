@@ -1833,11 +1833,20 @@ def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
             "tool": "shell",
             "command": [
                 "powdrr-lift",
+                "system-specification",
+                "--work-item-name",
+                "<work-item-name>",
+            ],
+        },
+        {
+            "tool": "shell",
+            "command": [
+                "powdrr-lift",
                 "evaluate-system-specification",
                 "--work-item-name",
                 "<work-item-name>",
             ],
-        }
+        },
     ]
 
 

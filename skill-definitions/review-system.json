@@ -1,21 +1,36 @@
 {
   "name": "review-system",
   "when_to_use": [
-    "When you need to review a system specification before it is committed.",
-    "When the TUI should synchronously inspect the system spec for missing or weak requirements."
+    "When new needs may require updating the current system specification.",
+    "When the TUI should evaluate whether the system requirements and approach still fit."
   ],
   "steps": [
     {
-      "description": "Review the current requirements and approach context first.",
-      "details": "Use the upstream context to judge whether the system spec is complete enough to trust.",
-      "uses_skills": [
-        "specify-system"
+      "description": "Gather the requirements and approach context.",
+      "details": "Use the requirements and approach context to understand the new needs before judging the system specification."
+    },
+    {
+      "description": "Decide whether the current system specification needs to change.",
+      "details": "Compare the gathered requirements and approach against the new needs. If the existing spec already covers them, report that no update is needed and stop."
+    },
+    {
+      "description": "Generate and fill the system specification template only when changes are required.",
+      "details": "Run the system specification command, then fill the generated template with the required updates.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
       ]
     },
     {
-      "description": "Validate the filled system template.",
-      "details": "Treat any validation failure as a blocking issue before moving on to subjective review."
-      ,
+      "description": "Validate the updated system specification and confirm it is still consistent.",
+      "details": "Re-run system validation after edits and report any remaining inconsistencies.",
       "tool_invocations": [
         {
           "tool": "shell",
@@ -27,14 +42,6 @@
           ]
         }
       ]
-    },
-    {
-      "description": "Check the requirements and approach for missing context, weak statements, or inconsistent supersedence.",
-      "details": "Look for vague requirements, gaps between requirements and approach, and stale supersedence references."
-    },
-    {
-      "description": "Report findings and repeat the review until the system spec validates cleanly.",
-      "details": "Keep feedback specific to the individual issue so the user can make the smallest possible fix."
     }
   ]
 }

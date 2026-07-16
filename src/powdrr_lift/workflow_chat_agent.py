@@ -956,8 +956,7 @@ def _handle_workflow_action_invoke_tool(
     _ = input_func
     if action.tool != "shell":
         raise RuntimeError(
-            "Unsupported workflow tool "
-            f"{action.tool!r}; only shell is supported."
+            f"Unsupported workflow tool {action.tool!r}; only shell is supported."
         )
     tool_result = _execute_shell_tool(
         action.parameters,

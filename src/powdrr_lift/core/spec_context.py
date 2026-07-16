@@ -84,9 +84,7 @@ def normalize_context_type(value: str) -> str:
     try:
         return _CONTEXT_TYPE_ALIASES[normalized_value]
     except KeyError as exc:
-        raise ValueError(
-            f"Unsupported context type {value!r}."
-        ) from exc
+        raise ValueError(f"Unsupported context type {value!r}.") from exc
 
 
 def gather_specification_context(

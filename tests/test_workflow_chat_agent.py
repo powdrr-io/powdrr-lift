@@ -242,9 +242,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
     save_skill(
         Skill(
             name="specify-a-feature",
-            when_to_use=(
-                "When the user needs a simple synchronous workflow.",
-            ),
+            when_to_use=("When the user needs a simple synchronous workflow.",),
             steps=(
                 SkillStep(
                     description="Discover what requirements are already specified.",

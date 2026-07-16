@@ -263,10 +263,12 @@ def build_server(config: OpenAIProxyConfig) -> ThreadingHTTPServer:
             }
             if error_text is not None:
                 record["error"] = error_text
-            record_path.write_text(
+            temp_record_path = record_path.with_name(f"{record_path.name}.tmp")
+            temp_record_path.write_text(
                 json.dumps(record, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
+            temp_record_path.replace(record_path)
 
     server = ThreadingHTTPServer((config.host, config.port), _Handler)
     server.upstream_base_url = config.upstream_base_url  # type: ignore[attr-defined]

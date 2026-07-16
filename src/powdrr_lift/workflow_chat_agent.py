@@ -415,10 +415,10 @@ def run_workflow_chat(
         if not handler(
             action,
             execution_state,
-            stdout=stdout,
-            stderr=stderr,
-            input_func=input_func,
-            config=config,
+            stdout,
+            stderr,
+            input_func,
+            config,
         ):
             break
     else:
@@ -861,7 +861,6 @@ def _workflow_action_handlers() -> dict[
 def _handle_workflow_action_complete(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
-    *,
     stdout: TextIO,
     stderr: TextIO,
     input_func: Callable[[], str],
@@ -887,7 +886,6 @@ def _handle_workflow_action_complete(
 def _handle_workflow_action_next_step(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
-    *,
     stdout: TextIO,
     stderr: TextIO,
     input_func: Callable[[], str],
@@ -913,7 +911,6 @@ def _handle_workflow_action_next_step(
 def _handle_workflow_action_prompt_user(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
-    *,
     stdout: TextIO,
     stderr: TextIO,
     input_func: Callable[[], str],
@@ -947,7 +944,6 @@ def _handle_workflow_action_prompt_user(
 def _handle_workflow_action_invoke_tool(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
-    *,
     stdout: TextIO,
     stderr: TextIO,
     input_func: Callable[[], str],
@@ -1003,7 +999,6 @@ def _handle_workflow_action_invoke_tool(
 def _handle_workflow_action_gather_context(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
-    *,
     stdout: TextIO,
     stderr: TextIO,
     input_func: Callable[[], str],

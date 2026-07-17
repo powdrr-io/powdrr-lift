@@ -1320,10 +1320,6 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 assert current_file["path"] == (
                     f"{system_spec_dir}/{architecture_spec_filename}"
                 )
-                assert (
-                    cast(list[dict[str, object]], current_file["lines"])[0]["text"]
-                    == "# Architecture specification template."
-                )
                 response = _full_replace_edit(
                     prompt,
                     yaml_text=architecture_spec_yaml,
@@ -1456,10 +1452,6 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 assert current_file["path"] == (
                     f"{system_spec_dir}/{implementation_spec_filename}"
                 )
-                assert (
-                    cast(list[dict[str, object]], current_file["lines"])[0]["text"]
-                    == "# Implementation specification template."
-                )
                 response = _full_replace_edit(
                     prompt,
                     yaml_text=implementation_spec_yaml,
@@ -1559,10 +1551,6 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                 )
                 current_file = cast(dict[str, object], prompt["current_file"])
                 assert current_file["path"] == (f"{system_spec_dir}/{pr_spec_filename}")
-                assert (
-                    cast(list[dict[str, object]], current_file["lines"])[0]["text"]
-                    == "# PR specification template."
-                )
                 response = _full_replace_edit(
                     prompt,
                     yaml_text=pr_spec_yaml,

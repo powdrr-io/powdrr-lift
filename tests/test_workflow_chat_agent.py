@@ -982,18 +982,40 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             list[dict[str, object]],
             current_file.get("lines", []),
         )
-        end_line = cast(
-            int,
-            current_file.get("line_count", len(current_file_lines) or 1),
-        )
+        line_count = current_file.get("line_count")
+        if isinstance(line_count, int) and line_count > 0:
+            return {
+                "kind": "edit",
+                "file_path": current_file["path"],
+                "edits": [
+                    {
+                        "kind": "replace",
+                        "start_line": 1,
+                        "end_line": line_count,
+                        "text": yaml_text,
+                    }
+                ],
+            }
+        if current_file_lines:
+            return {
+                "kind": "edit",
+                "file_path": current_file["path"],
+                "edits": [
+                    {
+                        "kind": "replace",
+                        "start_line": 1,
+                        "end_line": len(current_file_lines),
+                        "text": yaml_text,
+                    }
+                ],
+            }
         return {
             "kind": "edit",
             "file_path": current_file["path"],
             "edits": [
                 {
-                    "kind": "replace",
+                    "kind": "add",
                     "start_line": 1,
-                    "end_line": end_line,
                     "text": yaml_text,
                 }
             ],

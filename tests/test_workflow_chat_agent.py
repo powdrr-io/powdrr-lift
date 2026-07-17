@@ -47,6 +47,16 @@ from powdrr_lift.workflow_chat_agent import (
 # ruff: noqa: E501
 
 
+def _assert_validation_success(
+    report: dict[str, object],
+    *,
+    label: str,
+) -> None:
+    assert report["validation_successful"] is True, (
+        f"{label} validation failed:\n{yaml.safe_dump(report, sort_keys=False)}"
+    )
+
+
 def test_cli_workflow_chat_wires_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1710,10 +1720,10 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         )
     )
 
-    assert system_report["validation_successful"] is True
-    assert architecture_report["validation_successful"] is True
-    assert implementation_report["validation_successful"] is True
-    assert pr_report["validation_successful"] is True
+    _assert_validation_success(system_report, label="system")
+    _assert_validation_success(architecture_report, label="architecture")
+    _assert_validation_success(implementation_report, label="implementation")
+    _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Please review the draft result." in stdout.getvalue()
 

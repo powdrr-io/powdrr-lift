@@ -27,7 +27,10 @@ from powdrr_lift.core.architecture_specification import (
 from powdrr_lift.core.implementation_specification import (
     validate_implementation_specification_yaml,
 )
-from powdrr_lift.core.pr_specification import validate_pr_specification_yaml
+from powdrr_lift.core.pr_specification import (
+    _load_feature_catalog,
+    validate_pr_specification_yaml,
+)
 from powdrr_lift.core.system_specification import validate_system_specification_yaml
 from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
@@ -55,6 +58,12 @@ def _assert_validation_success(
     assert report["validation_successful"] is True, (
         f"{label} validation failed:\n{yaml.safe_dump(report, sort_keys=False)}"
     )
+
+
+def _repo_feature_ids(repo_root: Path, *, count: int = 2) -> list[str]:
+    feature_ids = [entry.feature_id for entry in _load_feature_catalog(repo_root)]
+    assert len(feature_ids) >= count, "Expected at least two current feature ids."
+    return feature_ids[:count]
 
 
 def test_cli_workflow_chat_wires_configuration(
@@ -910,10 +919,7 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         {
             "schema": "https://powdrr.io/schemas/specification-v1",
             "id": "display-related-photos",
-            "feature_ids": [
-                "specify-system",
-                "specify-architecture",
-            ],
+            "feature_ids": _repo_feature_ids(repo_root),
             "intent": {
                 "problem": (
                     "Users need a structured workflow for specifying related photos."

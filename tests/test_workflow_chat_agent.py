@@ -1706,7 +1706,7 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         validate_pr_specification_yaml(
             pr_path.read_text(encoding="utf-8"),
             work_item_name="display-related-photos",
-            repo_root=worktree_root,
+            repo_root=repo_root,
         )
     )
 

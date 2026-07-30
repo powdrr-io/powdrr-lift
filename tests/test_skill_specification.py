@@ -192,6 +192,18 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Generate the implementation template and fill it out.",
         "Decide on proposed PRs and fill each template.",
         "Prompt the user to review the result.",
+        "Incorporate the user's approved feedback into the feature plan.",
+        "Validate every generated specification before implementation.",
+        "Prepare the implementation work from the approved feature plan.",
+        "Implement the approved feature changes and their tests.",
+        "Run local formatting, linting, type checks, and tests.",
+        "Create or update the pull request for the validated feature.",
+        "Wait 30 seconds for CI to make progress.",
+        "If CI has finished, check its result.",
+        "If CI passed, break out of the CI monitoring loop.",
+        "If CI failed, fix the reported failures and return to the wait step.",
+        "If CI is still running, return to the wait step.",
+        "Prompt the user to review the implementation and CI result.",
     ]
     for step in skill.steps:
         assert step.details is not None

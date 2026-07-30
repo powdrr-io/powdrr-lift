@@ -112,6 +112,76 @@
     {
       "description": "Prompt the user to review the result.",
       "details": "Show the draft plan and confirm it still matches."
+    },
+    {
+      "description": "Incorporate the user's approved feedback into the feature plan.",
+      "details": "Update the specifications and proposed PRs only when the user confirms a change."
+    },
+    {
+      "description": "Validate every generated specification before implementation.",
+      "details": "Fix validation issues and repeat validation until the system, architecture, implementation, and proposed-PR documents agree."
+    },
+    {
+      "description": "Prepare the implementation work from the approved feature plan.",
+      "details": "Keep implementation tasks, tests, and the proposed PR scope traceable to the approved specifications."
+    },
+    {
+      "description": "Implement the approved feature changes and their tests.",
+      "details": "Keep the specifications and implementation aligned as the code changes are made."
+    },
+    {
+      "description": "Run local formatting, linting, type checks, and tests.",
+      "details": "Fix local failures before creating or updating the pull request.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "uv",
+            "run",
+            "pytest",
+            "-q"
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Create or update the pull request for the validated feature.",
+      "details": "Include the feature intent, implementation scope, validation evidence, and any remaining risks."
+    },
+    {
+      "description": "Wait 30 seconds for CI to make progress.",
+      "details": "This is the first checkpoint in the CI monitoring loop."
+    },
+    {
+      "description": "If CI has finished, check its result.",
+      "details": "Inspect all required checks for the pull request before deciding whether the loop can exit.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "gh",
+            "pr",
+            "checks",
+            "<pr-number>"
+          ]
+        }
+      ]
+    },
+    {
+      "description": "If CI passed, break out of the CI monitoring loop.",
+      "details": "Record the successful checks and continue to the final user handoff."
+    },
+    {
+      "description": "If CI failed, fix the reported failures and return to the wait step.",
+      "details": "Apply only fixes supported by the failure evidence, rerun local validation, and keep the pull request updated."
+    },
+    {
+      "description": "If CI is still running, return to the wait step.",
+      "details": "Do not treat pending checks as a failure or as completion."
+    },
+    {
+      "description": "Prompt the user to review the implementation and CI result.",
+      "details": "Show the final pull request, validation evidence, and CI outcome for approval."
     }
   ]
 }

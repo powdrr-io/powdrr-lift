@@ -1,0 +1,72 @@
+{
+  "name": "start-implementing-feature",
+  "when_to_use": [
+    "When the user is ready to begin implementing a feature in the workflow chat.",
+    "When the feature needs a durable workflow instantiated from the appropriate workflow template before implementation starts.",
+    "When the generated workflow and first task should be placed in a pull request for user review."
+  ],
+  "steps": [
+    {
+      "description": "Confirm the feature, work-item name, and workflow template.",
+      "details": "Capture the feature the user wants to implement and choose the matching template from templates/. Use templates/specify-a-feature.json for a feature that is moving from specification into implementation unless another template is a better match. Ask the user for any missing feature or work-item information before continuing."
+    },
+    {
+      "description": "Read the selected workflow template and explain the generated task graph.",
+      "details": "Inspect the selected template's task templates, dependencies, input state, output state types, and dependent state. Tell the user what workflow and first task will be generated before making repository changes.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "sed",
+            "-n",
+            "1,260p",
+            "<template-path>"
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Instantiate the workflow and generate its first task.",
+      "details": "Use the repository's workflow-template and workflow-task models to create docs/workflows/<work-item-name>/ with one persisted task per template task. Keep tasks open, preserve the template dependencies and state, and verify that task-001 is the only ready task. Do not overwrite an existing workflow directory without user approval.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "uv",
+            "run",
+            "python",
+            "scripts/instantiate_workflow.py",
+            "--work-item-name",
+            "<work-item-name>",
+            "--template",
+            "<template-path>"
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Review the generated workflow and first task with the user.",
+      "details": "Inspect the generated files and show the first task's description, inputs, dependencies, and expected output. If the workflow or first task is not appropriate, ask what should change and update the artifacts before creating the pull request."
+    },
+    {
+      "description": "Commit the generated workflow and open a draft pull request.",
+      "details": "After the user confirms the generated workflow looks correct, commit only the workflow artifacts, push the feature branch, and create a draft pull request describing the selected template and first task. Do not implement the first task or merge the pull request.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "gh",
+            "pr",
+            "create",
+            "--draft",
+            "--fill"
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Hand the pull request to the user for review.",
+      "details": "Show the pull request URL and summarize the generated workflow and first task. Stop after requesting the user's review; implementation begins only after the user approves the pull request."
+    }
+  ]
+}

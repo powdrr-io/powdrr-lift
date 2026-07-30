@@ -16,9 +16,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 try:
+    import readline
     import termios
     import tty
 except ImportError:  # pragma: no cover - only used on non-POSIX platforms
+    readline = None  # type: ignore[assignment]
     termios = None  # type: ignore[assignment]
     tty = None  # type: ignore[assignment]
 
@@ -2012,11 +2014,18 @@ def _prompt_user(
     input_func: Callable[[], str],
     stdout: TextIO,
 ) -> str:
+    if input_func is input and _supports_readline_input(stdout):
+        return input(prompt).strip()
     stdout.write(prompt)
     stdout.flush()
     if input_func is input and _supports_interactive_line_editing(stdout):
         return _read_interactive_line(prompt, stdout=stdout).strip()
     return input_func().strip()
+
+
+def _supports_readline_input(stdout: TextIO) -> bool:
+    """Return whether native readline can safely own this terminal prompt."""
+    return sys.stdin.isatty() and stdout.isatty() and readline is not None
 
 
 def _supports_interactive_line_editing(stdout: TextIO) -> bool:

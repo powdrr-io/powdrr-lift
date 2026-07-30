@@ -288,6 +288,12 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--draft",
         "--fill",
     )
+    assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
+        ("uv", "run", "ruff", "format", "--check", "."),
+        ("uv", "run", "ruff", "check", "."),
+        ("uv", "run", "mypy", "src", "tests"),
+        ("uv", "run", "pytest", "-q"),
+    ]
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:

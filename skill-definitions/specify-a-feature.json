@@ -182,6 +182,37 @@
           "command": [
             "uv",
             "run",
+            "ruff",
+            "format",
+            "--check",
+            "."
+          ]
+        },
+        {
+          "tool": "shell",
+          "command": [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            "."
+          ]
+        },
+        {
+          "tool": "shell",
+          "command": [
+            "uv",
+            "run",
+            "mypy",
+            "src",
+            "tests"
+          ]
+        },
+        {
+          "tool": "shell",
+          "command": [
+            "uv",
+            "run",
             "pytest",
             "-q"
           ]

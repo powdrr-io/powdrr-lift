@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -55,6 +56,9 @@ from powdrr_lift.core import (
     validate_implementation_specification_yaml,
     validate_pr_specification_yaml,
     validate_system_specification_yaml,
+)
+from powdrr_lift.core.workflow_template_specification import (
+    instantiate_workflow_template,
 )
 from powdrr_lift.openai_proxy import (
     OpenAIProxyConfig,
@@ -919,6 +923,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workflow_chat_parser.set_defaults(func=_run_workflow_chat)
 
+    instantiate_workflow_parser = subparsers.add_parser(
+        "instantiate-workflow",
+        aliases=["instantiate_workflow"],
+        help="Instantiate a workflow template as durable task documents.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help="Feature or work-item name used for the workflow directory.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--template",
+        type=Path,
+        default=Path("templates") / "specify-a-feature.json",
+        help="Workflow template JSON to instantiate.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=Path("docs") / "workflows",
+        help="Directory under which the work-item workflow directory is created.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used to resolve relative paths.",
+    )
+    instantiate_workflow_parser.set_defaults(func=_run_instantiate_workflow)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -990,6 +1023,38 @@ def _run_init(args: argparse.Namespace) -> int:
             "When it passes, include it in the PR as "
             f"docs/changelogs/PR-{args.pr_number}-changelog.yaml"
         )
+    return 0
+
+
+def _run_instantiate_workflow(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    template_path = args.template
+    if not template_path.is_absolute():
+        template_path = repo_root / template_path
+    output_root = args.output_root
+    if not output_root.is_absolute():
+        output_root = repo_root / output_root
+    try:
+        output_directory, tasks = instantiate_workflow_template(
+            template_path=template_path,
+            work_item_name=args.work_item_name,
+            output_root=output_root,
+        )
+    except (FileExistsError, OSError, ValueError) as exc:
+        print(f"Could not instantiate workflow: {exc}", file=sys.stderr)
+        return 1
+
+    print(
+        json.dumps(
+            {
+                "workflow_directory": str(output_directory),
+                "task_count": len(tasks),
+                "first_task": str(output_directory / f"{tasks[0].task_id}.json"),
+                "first_task_id": tasks[0].task_id,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

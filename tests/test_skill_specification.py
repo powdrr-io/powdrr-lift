@@ -332,10 +332,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "Hand the pull request to the user for review.",
     ]
     assert skill.steps[2].tool_invocations[0].command == (
-        "uv",
-        "run",
-        "python",
-        "scripts/instantiate_workflow.py",
+        "powdrr-lift",
+        "instantiate-workflow",
         "--work-item-name",
         "<work-item-name>",
         "--template",

@@ -1,7 +1,7 @@
 {
   "name": "start-implementing-feature",
   "when_to_use": [
-    "When the user is ready to begin implementing a feature in the workflow chat.",
+    "When the user is ready to begin implementing a feature.",
     "When the feature needs a durable workflow instantiated from the appropriate workflow template before implementation starts.",
     "When the generated workflow and first task should be placed in a pull request for user review."
   ],
@@ -32,10 +32,8 @@
         {
           "tool": "shell",
           "command": [
-            "uv",
-            "run",
-            "python",
-            "scripts/instantiate_workflow.py",
+            "powdrr-lift",
+            "instantiate-workflow",
             "--work-item-name",
             "<work-item-name>",
             "--template",

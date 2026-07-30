@@ -60,7 +60,9 @@ from powdrr_lift.core import (
 
 def _load_fastmcp() -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP as fastmcp
+        from mcp.server.fastmcp import (  # type: ignore[import-not-found]
+            FastMCP as fastmcp,
+        )
     except ImportError:  # pragma: no cover
         return None
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import select
 import shlex
 import subprocess
 import sys
@@ -13,6 +14,13 @@ from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+try:
+    import termios
+    import tty
+except ImportError:  # pragma: no cover - only used on non-POSIX platforms
+    termios = None  # type: ignore[assignment]
+    tty = None  # type: ignore[assignment]
 
 from powdrr_lift.core import (
     Skill,
@@ -35,6 +43,7 @@ from powdrr_lift.core.spec_context import (
 )
 
 _DEFAULT_MODEL = "glm-5.2"
+_MAX_COMPLETION_TOKENS = 32768
 
 WorkflowActionParser = Callable[[dict[str, Any], str | None], "SkillChatAction"]
 
@@ -154,6 +163,7 @@ class OpenAIChatClient:
             "model": self._model,
             "messages": messages,
             "temperature": 0,
+            "max_tokens": _MAX_COMPLETION_TOKENS,
             "response_format": {"type": "json_object"},
         }
         request = Request(
@@ -216,7 +226,7 @@ class AnthropicChatClient:
         system_prompt, conversation_messages = _split_system_message(messages)
         payload: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": 4096,
+            "max_tokens": _MAX_COMPLETION_TOKENS,
             "messages": [
                 _anthropic_message(message) for message in conversation_messages
             ],
@@ -1921,7 +1931,80 @@ def _prompt_user(
 ) -> str:
     stdout.write(prompt)
     stdout.flush()
+    if input_func is input and _supports_interactive_line_editing(stdout):
+        return _read_interactive_line(prompt, stdout=stdout).strip()
     return input_func().strip()
+
+
+def _supports_interactive_line_editing(stdout: TextIO) -> bool:
+    """Return whether the process has a terminal we can safely edit in place."""
+    return sys.stdin.isatty() and stdout.isatty() and hasattr(termios, "tcgetattr")
+
+
+def _read_interactive_line(prompt: str, *, stdout: TextIO) -> str:
+    """Read a line with cursor movement support when readline is unavailable."""
+    stdin = sys.stdin
+    chars: list[str] = []
+    cursor = 0
+    original_attributes = termios.tcgetattr(stdin.fileno())
+
+    def redraw() -> None:
+        # Repaint the line and position the cursor after the edited prefix.
+        stdout.write("\r" + prompt + "".join(chars) + "\x1b[K")
+        distance_from_end = len(chars) - cursor
+        if distance_from_end:
+            stdout.write(f"\x1b[{distance_from_end}D")
+        stdout.flush()
+
+    try:
+        tty.setraw(stdin.fileno())
+        while True:
+            character = stdin.read(1)
+            if character in {"\r", "\n"}:
+                stdout.write("\r\n")
+                stdout.flush()
+                return "".join(chars)
+            if character == "\x03":
+                raise KeyboardInterrupt
+            if character == "\x04":
+                if not chars:
+                    raise EOFError
+                continue
+            if character in {"\x7f", "\b"}:
+                if cursor:
+                    del chars[cursor - 1]
+                    cursor -= 1
+                    redraw()
+                continue
+            if character != "\x1b":
+                chars[cursor:cursor] = [character]
+                cursor += 1
+                stdout.write(character)
+                stdout.flush()
+                continue
+
+            # Arrow and editing keys arrive as ANSI escape sequences. Read the
+            # rest only when it is immediately available so a lone Escape can
+            # still be entered as a normal control key without hanging.
+            sequence = ""
+            while select.select([stdin], [], [], 0.01)[0]:
+                sequence += stdin.read(1)
+                if sequence[-1:] in "~ABCDEFGH":
+                    break
+            if sequence in {"[D", "OD"}:
+                cursor = max(0, cursor - 1)
+            elif sequence in {"[C", "OC"}:
+                cursor = min(len(chars), cursor + 1)
+            elif sequence in {"[H", "OH", "[1~"}:
+                cursor = 0
+            elif sequence in {"[F", "OF", "[4~"}:
+                cursor = len(chars)
+            elif sequence == "[3~" and cursor < len(chars):
+                del chars[cursor]
+            if sequence:
+                redraw()
+    finally:
+        termios.tcsetattr(stdin.fileno(), termios.TCSADRAIN, original_attributes)
 
 
 def _build_chat_client(

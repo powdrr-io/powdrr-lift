@@ -2466,7 +2466,7 @@ def test_anthropic_chat_client_sends_messages_api_request(
     assert captured["url"] == "https://api.anthropic.com/v1/messages"
     assert captured["body"] == {
         "model": "claude-sonnet-4.5",
-        "max_tokens": 4096,
+        "max_tokens": 32768,
         "system": "system prompt",
         "messages": [
             {

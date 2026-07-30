@@ -56,7 +56,7 @@ ZAI_LLM_MAPPINGS: Mapping[str, str] = {
     "standard_reasoning": "glm-4.7",
     "simple_task": "glm-4.7-flash",
     "fast_iteration": "glm-4.7-flashx",
-    "long_context": "glm-5.1",
+    "long_context": "glm-5.2",
     "vision": "glm-4.6v",
 }
 
@@ -400,6 +400,7 @@ def run_workflow_chat(
             selection.llm_type,
             fallback_model=config.model,
             mappings=config.llm_mappings,
+            provider=provider,
         )
         provider = _resolve_provider(config.provider, current_model)
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
@@ -446,6 +447,7 @@ def run_workflow_chat(
             current_step.llm_type or selection.llm_type,
             fallback_model=current_model,
             mappings=config.llm_mappings,
+            provider=provider,
         )
         provider = _resolve_provider(config.provider, current_model)
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
@@ -490,6 +492,7 @@ def run_workflow_chat(
             action.llm_type,
             fallback_model=current_model,
             mappings=config.llm_mappings,
+            provider=provider,
         )
         _verbose_print(
             stderr,
@@ -1711,8 +1714,9 @@ def _resolve_llm_model(
     *,
     fallback_model: str,
     mappings: Sequence[tuple[str, str]],
+    provider: str = "zai",
 ) -> str:
-    if llm_type is None:
+    if llm_type is None or provider != "zai":
         return fallback_model
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(ZAI_LLM_MAPPINGS)

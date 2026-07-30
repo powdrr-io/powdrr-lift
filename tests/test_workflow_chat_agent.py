@@ -65,6 +65,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
             "simple-task",
             fallback_model="test-model",
             mappings=(("simple_task", "custom-fast-model"),),
+            provider="zai",
         )
         == "custom-fast-model"
     )
@@ -75,6 +76,15 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
             mappings=(),
         )
         == "test-model"
+    )
+    assert (
+        _resolve_llm_model(
+            "high_reasoning",
+            fallback_model="gpt-test-model",
+            mappings=(),
+            provider="openai",
+        )
+        == "gpt-test-model"
     )
 
 

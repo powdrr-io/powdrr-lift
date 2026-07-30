@@ -149,9 +149,10 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 - Workflow skill steps and every routing/action response carry an `llm_type`
   descriptor. The z.ai mapping routes `high_reasoning` to `glm-5.2`,
   `standard_reasoning` to `glm-4.7`, `simple_task` to `glm-4.7-flash`,
-  `fast_iteration` to `glm-4.7-flashx`, `long_context` to `glm-5.1`, and
+  `fast_iteration` to `glm-4.7-flashx`, `long_context` to `glm-5.2`, and
   `vision` to `glm-4.6v`. The descriptor selected in one roundtrip controls
-  the model used for the next roundtrip.
+  the model used for the next roundtrip. Mappings currently apply only when
+  the selected provider is z.ai.
 - Set `OPENAI_BASE_URL` to point at the local proxy if you want to record the
   requests.
 - If you omit `--output-dir`, the generated task set is written to a temporary

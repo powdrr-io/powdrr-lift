@@ -64,6 +64,7 @@ class SkillChatConfig:
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
+    max_stalled_roundtrips: int = 3
     verbose: bool = False
 
     @property
@@ -396,16 +397,21 @@ def run_workflow_chat(
         worktree_root=worktree_root,
     )
     action_handlers = _workflow_action_handlers()
-    for turn in range(config.max_turns):
-        if execution_state.step_index >= len(selected_skill.skill.steps):
-            break
+    step_roundtrips = 0
+    stalled_roundtrips = 0
+    previous_action_signature: str | None = None
+    while execution_state.step_index < len(selected_skill.skill.steps):
+        current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
+        step_roundtrips += 1
+        before_file_contents = _current_file_contents(execution_state)
+        before_last_user_message = _last_user_message(execution_state)
         _verbose_print(
             stderr,
             config.verbose,
             (
-                f"Starting execution turn {turn + 1} "
-                f"for step {execution_state.step_index + 1}/"
+                f"Starting execution roundtrip {step_roundtrips} for "
+                f"step {execution_state.step_index + 1}/"
                 f"{len(selected_skill.skill.steps)}"
             ),
         )
@@ -444,21 +450,47 @@ def run_workflow_chat(
         handler = action_handlers.get(action.kind)
         if handler is None:
             raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
-        if not handler(
+        should_continue = handler(
             action,
             execution_state,
             stdout,
             stderr,
             input_func,
             config,
-        ):
-            break
-    else:
-        print(
-            "Reached the maximum number of workflow turns without completion.",
-            file=stderr,
         )
-        return 1
+        action_signature = _workflow_action_signature(action)
+        made_progress = _workflow_action_made_progress(
+            action,
+            previous_action_signature=previous_action_signature,
+            before_file_contents=before_file_contents,
+            before_last_user_message=before_last_user_message,
+            state=execution_state,
+        )
+        previous_action_signature = action_signature
+        if made_progress:
+            stalled_roundtrips = 0
+        else:
+            stalled_roundtrips += 1
+            _verbose_print(
+                stderr,
+                config.verbose,
+                (
+                    f"No progress detected for workflow step "
+                    f"({stalled_roundtrips}/{config.max_stalled_roundtrips})"
+                ),
+            )
+            if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
+                print(
+                    "Workflow stopped after repeated roundtrips without progress.",
+                    file=stderr,
+                )
+                return 1
+        if execution_state.step_index != current_step_index:
+            step_roundtrips = 0
+            stalled_roundtrips = 0
+            previous_action_signature = None
+        if not should_continue:
+            break
 
     summary = _build_skill_execution_summary(
         selected_skill,
@@ -900,6 +932,57 @@ def _workflow_action_handlers() -> dict[
         "invoke_tool": _handle_workflow_action_invoke_tool,
         "gather-context": _handle_workflow_action_gather_context,
     }
+
+
+def _current_file_contents(state: _WorkflowExecutionState) -> str | None:
+    if state.current_file_path is None or not state.current_file_path.exists():
+        return None
+    return state.current_file_path.read_text(encoding="utf-8")
+
+
+def _last_user_message(state: _WorkflowExecutionState) -> str | None:
+    if not state.transcript or state.transcript[-1]["role"] != "user":
+        return None
+    return state.transcript[-1]["content"]
+
+
+def _workflow_action_signature(action: SkillChatAction) -> str:
+    return json.dumps(
+        {
+            "kind": action.kind,
+            "tool": action.tool,
+            "file_path": action.file_path,
+            "text": action.text,
+            "parameters": action.parameters,
+            "edits": [_edit_to_data(edit) for edit in action.edits],
+            "types": action.types,
+            "keywords": action.keywords,
+            "decisions_and_context": action.decisions_and_context,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+
+
+def _workflow_action_made_progress(
+    action: SkillChatAction,
+    *,
+    previous_action_signature: str | None,
+    before_file_contents: str | None,
+    before_last_user_message: str | None,
+    state: _WorkflowExecutionState,
+) -> bool:
+    if action.kind in {"complete", "next_step"}:
+        return True
+    if previous_action_signature is None:
+        return True
+    if _workflow_action_signature(action) != previous_action_signature:
+        return True
+    if action.kind == "edit":
+        return _current_file_contents(state) != before_file_contents
+    if action.kind == "prompt_user":
+        return _last_user_message(state) != before_last_user_message
+    return False
 
 
 def _handle_workflow_action_complete(

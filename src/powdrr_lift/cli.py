@@ -899,6 +899,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum number of follow-up turns before the chat agent stops.",
     )
     workflow_chat_parser.add_argument(
+        "--max-stalled-roundtrips",
+        type=int,
+        default=3,
+        help=(
+            "Maximum consecutive workflow roundtrips without progress before "
+            "the agent stops."
+        ),
+    )
+    workflow_chat_parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print additional progress details to stderr.",
@@ -1443,6 +1452,7 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
             api_key=args.api_key,
             base_url=args.base_url,
             max_turns=args.max_turns,
+            max_stalled_roundtrips=args.max_stalled_roundtrips,
             verbose=args.verbose,
         ),
     )

@@ -95,6 +95,8 @@ def test_cli_workflow_chat_wires_configuration(
             "generated",
             "--model",
             "test-model",
+            "--max-stalled-roundtrips",
+            "5",
         ]
     )
 
@@ -106,7 +108,141 @@ def test_cli_workflow_chat_wires_configuration(
     assert config.templates_dir == Path("skill-definitions")
     assert config.output_dir == Path("generated")
     assert config.model == "test-model"
+    assert config.max_stalled_roundtrips == 5
     assert config.verbose is False
+
+
+def test_workflow_execution_allows_more_roundtrips_than_max_turns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    skill_path = skills_dir / "specify-a-feature.json"
+    save_skill(_build_skill(), skill_path)
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            self.call_index = 0
+
+        def complete_json(self, _: list[dict[str, str]]) -> dict[str, object]:
+            call_index = self.call_index
+            self.call_index += 1
+            if call_index == 0:
+                return {
+                    "selected_skill_path": str(skill_path),
+                    "selected_skill_reason": "The skill matches the request.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if 1 <= call_index <= 6:
+                return {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": f"printf progress-{call_index}"},
+                }
+            if call_index == 7:
+                return {"kind": "next_step"}
+            if call_index == 8:
+                return {"kind": "complete", "text": "Done."}
+            raise AssertionError(f"Unexpected LLM call index: {call_index}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: repo_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=tmp_path / "generated",
+            provider="openai",
+            api_key="test-key",
+            max_turns=1,
+        ),
+        input_func=lambda: "Build the feature",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert "Done." in stdout.getvalue()
+
+
+def test_workflow_execution_stops_after_repeated_no_progress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    skill_path = skills_dir / "one-step.json"
+    save_skill(
+        Skill(
+            name="one-step",
+            when_to_use=("For testing stalled workflow execution.",),
+            steps=(SkillStep(description="Do the work.", details="Do it."),),
+        ),
+        skill_path,
+    )
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            self.call_index = 0
+
+        def complete_json(self, _: list[dict[str, str]]) -> dict[str, object]:
+            self.call_index += 1
+            if self.call_index == 1:
+                return {
+                    "selected_skill_path": str(skill_path),
+                    "selected_skill_reason": "The skill matches the request.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            return {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": "printf same"},
+            }
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: repo_root,
+    )
+
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=tmp_path / "generated",
+            provider="openai",
+            api_key="test-key",
+            max_stalled_roundtrips=2,
+        ),
+        input_func=lambda: "Build the feature",
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 1
+    assert "without progress" in stderr.getvalue()
 
 
 def test_cli_workflow_chat_defaults_to_glm_5_2(

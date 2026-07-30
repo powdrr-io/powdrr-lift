@@ -182,6 +182,7 @@ from powdrr_lift.core.template import (
 from powdrr_lift.core.workflow_task_specification import (
     TaskComplexity,
     TaskStatus,
+    ReadyWorkflowTask,
     WorkflowTask,
     WorkflowTaskDocument,
     WorkflowTaskValidationIssue,
@@ -191,6 +192,7 @@ from powdrr_lift.core.workflow_task_specification import (
     load_workflow_task_document,
     load_workflow_task_documents,
     load_workflow_tasks,
+    load_ready_workflow_tasks,
     save_workflow_task,
     save_workflow_task_document,
     select_ready_workflow_tasks,

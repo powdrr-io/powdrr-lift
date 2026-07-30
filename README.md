@@ -146,6 +146,12 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
+- Workflow skill steps and every routing/action response carry an `llm_type`
+  descriptor. The z.ai mapping routes `high_reasoning` to `glm-5.2`,
+  `standard_reasoning` to `glm-4.7`, `simple_task` to `glm-4.7-flash`,
+  `fast_iteration` to `glm-4.7-flashx`, `long_context` to `glm-5.1`, and
+  `vision` to `glm-4.6v`. The descriptor selected in one roundtrip controls
+  the model used for the next roundtrip.
 - Set `OPENAI_BASE_URL` to point at the local proxy if you want to record the
   requests.
 - If you omit `--output-dir`, the generated task set is written to a temporary

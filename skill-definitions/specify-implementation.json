@@ -7,6 +7,7 @@
   "steps": [
     {
       "description": "Review the system and architecture context first.",
+      "llm_type": "high_reasoning",
       "details": "Confirm the source architecture id and the relevant entities before drafting implementation detail.",
       "uses_skills": [
         "review-system",
@@ -15,6 +16,7 @@
     },
     {
       "description": "Generate the implementation specification template.",
+      "llm_type": "simple_task",
       "details": "Use the generated implementation template as the canonical place to capture feature and decision detail."
       ,
       "tool_invocations": [
@@ -31,10 +33,12 @@
     },
     {
       "description": "Fill out the feature and decision sections so they stay aligned with the architecture id.",
+      "llm_type": "standard_reasoning",
       "details": "Keep the implementation spec aligned with the source architecture version and do not invent new ids."
     },
     {
       "description": "Validate the filled implementation template and fix issues until it passes.",
+      "llm_type": "fast_iteration",
       "details": "Resolve architecture mismatches and duplicate ids before considering the document complete."
       ,
       "tool_invocations": [

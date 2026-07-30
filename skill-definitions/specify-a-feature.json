@@ -7,10 +7,12 @@
   "steps": [
     {
       "description": "Capture the feature goal and success criteria.",
+      "llm_type": "high_reasoning",
       "details": "Ask about outcomes, edge cases, tests, and constraints."
     },
     {
       "description": "Generate the system template and fill it out.",
+      "llm_type": "simple_task",
       "details": "Fill the system template before review.",
       "tool_invocations": [
         {
@@ -26,6 +28,7 @@
     },
     {
       "description": "Review the system context before deciding the feature shape.",
+      "llm_type": "high_reasoning",
       "details": "Confirm requirements, approach, and constraints after fill.",
       "uses_skills": [
         "review-system"
@@ -44,6 +47,7 @@
     },
     {
       "description": "Generate the architecture template and fill it out.",
+      "llm_type": "simple_task",
       "details": "Capture the entity model before review.",
       "tool_invocations": [
         {
@@ -61,6 +65,7 @@
     },
     {
       "description": "Review architecture before implementation.",
+      "llm_type": "high_reasoning",
       "details": "Confirm model, relationships, invariants, and guidance after fill.",
       "uses_skills": [
         "review-architecture"
@@ -81,6 +86,7 @@
     },
     {
       "description": "Generate the implementation template and fill it out.",
+      "llm_type": "simple_task",
       "details": "Complete the template with decisions and reasoning.",
       "tool_invocations": [
         {
@@ -96,6 +102,7 @@
     },
     {
       "description": "Decide on proposed PRs and fill each template.",
+      "llm_type": "high_reasoning",
       "details": "Fill PR templates with intent, criteria, tests, and risks.",
       "tool_invocations": [
         {
@@ -111,14 +118,17 @@
     },
     {
       "description": "Prompt the user to review the result.",
+      "llm_type": "standard_reasoning",
       "details": "Show the draft plan and confirm it still matches."
     },
     {
       "description": "Incorporate the user's approved feedback into the feature plan.",
+      "llm_type": "high_reasoning",
       "details": "Update the specifications and proposed PRs only when the user confirms a change."
     },
     {
       "description": "Validate every generated specification before implementation.",
+      "llm_type": "fast_iteration",
       "details": "Run every validation command below in order. If any command fails, fix the reported issue and restart this validation step; advance only when all four documents agree.",
       "tool_invocations": [
         {
@@ -163,18 +173,22 @@
     },
     {
       "description": "If any specification validation fails, fix it and return to the validation step.",
+      "llm_type": "fast_iteration",
       "details": "Do not begin implementation or create a pull request while any required specification remains invalid."
     },
     {
       "description": "Prepare an implementation checklist from each approved proposed PR.",
+      "llm_type": "high_reasoning",
       "details": "For every proposed PR, identify the code files, tests, acceptance criteria, dependencies, and validation commands before making changes. Keep each item traceable to the approved specifications."
     },
     {
       "description": "Implement the approved feature changes and their tests.",
+      "llm_type": "standard_reasoning",
       "details": "Keep the specifications and implementation aligned as the code changes are made."
     },
     {
       "description": "Run local formatting, linting, type checks, and tests.",
+      "llm_type": "fast_iteration",
       "details": "Fix local failures before creating or updating the pull request.",
       "tool_invocations": [
         {
@@ -221,6 +235,7 @@
     },
     {
       "description": "Create or update the pull request for the validated feature.",
+      "llm_type": "simple_task",
       "details": "Create the draft pull request from the feature branch with the feature intent, implementation scope, validation evidence, and remaining risks. If a pull request already exists for the branch, update it instead.",
       "tool_invocations": [
         {
@@ -237,10 +252,12 @@
     },
     {
       "description": "Wait 30 seconds for CI to make progress.",
+      "llm_type": "simple_task",
       "details": "This is the first checkpoint in the CI monitoring loop."
     },
     {
       "description": "If CI has finished, check its result.",
+      "llm_type": "fast_iteration",
       "details": "Inspect all required checks for the pull request before deciding whether the loop can exit.",
       "tool_invocations": [
         {
@@ -256,18 +273,22 @@
     },
     {
       "description": "If CI passed, break out of the CI monitoring loop.",
+      "llm_type": "simple_task",
       "details": "Record the successful checks and continue to the final user handoff."
     },
     {
       "description": "If CI failed, fix the reported failures and return to the wait step.",
+      "llm_type": "standard_reasoning",
       "details": "Apply only fixes supported by the failure evidence, rerun local validation, and keep the pull request updated."
     },
     {
       "description": "If CI is still running, return to the wait step.",
+      "llm_type": "simple_task",
       "details": "Do not treat pending checks as a failure or as completion."
     },
     {
       "description": "Prompt the user to review the implementation and CI result.",
+      "llm_type": "standard_reasoning",
       "details": "Show the final pull request, validation evidence, and CI outcome for approval."
     }
   ]

@@ -7,7 +7,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -45,9 +45,24 @@ from powdrr_lift.core.spec_context import (
 )
 
 _DEFAULT_MODEL = "glm-5.2"
+_DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
 
-WorkflowActionParser = Callable[[dict[str, Any], str | None], "SkillChatAction"]
+# These are semantic task classes, rather than model names. Keeping the
+# mapping here lets a workflow describe the capability it needs while the
+# provider configuration decides which concrete model handles the roundtrip.
+ZAI_LLM_MAPPINGS: Mapping[str, str] = {
+    "high_reasoning": "glm-5.2",
+    "standard_reasoning": "glm-4.7",
+    "simple_task": "glm-4.7-flash",
+    "fast_iteration": "glm-4.7-flashx",
+    "long_context": "glm-5.1",
+    "vision": "glm-4.6v",
+}
+
+WorkflowActionParser = Callable[
+    [dict[str, Any], str | None, str | None], "SkillChatAction"
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +78,7 @@ class SkillChatConfig:
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
+    llm_mappings: tuple[tuple[str, str], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -86,6 +102,7 @@ class SkillChatSelection:
     selected_skill_reason: str
     next_question: str | None = None
     ready_to_execute: bool = False
+    llm_type: str | None = None
 
     @property
     def selected_template_path(self) -> Path:
@@ -117,6 +134,7 @@ class SkillChatAction:
     types: tuple[str, ...] = field(default_factory=tuple)
     keywords: tuple[str, ...] = field(default_factory=tuple)
     decisions_and_context: str | None = None
+    llm_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,8 +330,24 @@ def run_workflow_chat(
         print(f"No skills found in {skills_dir}.", file=stderr)
         return 1
 
-    provider = _resolve_provider(config.provider, config.model)
+    current_model = config.model
+    provider = _resolve_provider(config.provider, current_model)
     credentials = _resolve_credentials(provider, config.api_key, config.base_url)
+    clients: dict[tuple[str, str], WorkflowChatClient] = {}
+
+    def client_for(
+        selected_provider: str,
+        selected_credentials: WorkflowChatCredentials,
+        selected_model: str,
+    ) -> WorkflowChatClient:
+        key = (selected_provider, selected_model)
+        if key not in clients:
+            clients[key] = _build_chat_client(
+                selected_credentials,
+                model=selected_model,
+            )
+        return clients[key]
+
     print(
         f"Using {credentials.provider} credentials from {credentials.source} "
         f"with base URL from {credentials.base_url_source}: {credentials.base_url}",
@@ -326,10 +360,6 @@ def run_workflow_chat(
     )
     _verbose_print(stderr, config.verbose, f"Selected provider: {provider}")
     _verbose_print(stderr, config.verbose, f"Selected model: {config.model}")
-    client = _build_chat_client(
-        credentials,
-        model=config.model,
-    )
 
     user_request = _prompt_user(
         "What do you want to do? ",
@@ -344,7 +374,7 @@ def run_workflow_chat(
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
         selection = _complete_json_with_repair(
-            client,
+            client_for(provider, credentials, current_model),
             _build_selection_messages(catalog, transcript),
             parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
@@ -366,6 +396,13 @@ def run_workflow_chat(
             ),
         )
         selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
+        current_model = _resolve_llm_model(
+            selection.llm_type,
+            fallback_model=config.model,
+            mappings=config.llm_mappings,
+        )
+        provider = _resolve_provider(config.provider, current_model)
+        credentials = _resolve_credentials(provider, config.api_key, config.base_url)
         print(f"Matched skill: {selected_skill.path}", file=stdout)
         print(selection.selected_skill_reason, file=stdout)
         if selection.ready_to_execute and selection.next_question is None:
@@ -405,6 +442,13 @@ def run_workflow_chat(
     while execution_state.step_index < len(selected_skill.skill.steps):
         current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
+        current_model = _resolve_llm_model(
+            current_step.llm_type or selection.llm_type,
+            fallback_model=current_model,
+            mappings=config.llm_mappings,
+        )
+        provider = _resolve_provider(config.provider, current_model)
+        credentials = _resolve_credentials(provider, config.api_key, config.base_url)
         step_roundtrips += 1
         before_file_contents = _current_file_contents(execution_state)
         before_last_user_message = _last_user_message(execution_state)
@@ -418,7 +462,7 @@ def run_workflow_chat(
             ),
         )
         action = _complete_json_with_repair(
-            client,
+            client_for(provider, credentials, current_model),
             _build_step_execution_messages(
                 selected_skill=selected_skill,
                 current_step=current_step,
@@ -442,6 +486,11 @@ def run_workflow_chat(
         )
         if action is None:
             return 1
+        current_model = _resolve_llm_model(
+            action.llm_type,
+            fallback_model=current_model,
+            mappings=config.llm_mappings,
+        )
         _verbose_print(
             stderr,
             config.verbose,
@@ -629,11 +678,13 @@ def _parse_selection_response(
     if next_question is not None and not isinstance(next_question, str):
         raise RuntimeError("Skill selection response next_question must be a string.")
     ready_to_execute = bool(payload.get("ready_to_execute"))
+    llm_type = _optional_llm_type(payload.get("llm_type"))
     return SkillChatSelection(
         selected_skill_path=selected_skill_path,
         selected_skill_reason=selected_skill_reason,
         next_question=next_question,
         ready_to_execute=ready_to_execute,
+        llm_type=llm_type,
     )
 
 
@@ -757,7 +808,10 @@ def _selection_system_prompt() -> str:
         "If the request is not fully specified, ask exactly one concise "
         "follow-up question.\n"
         "Return JSON with keys: selected_skill_path, selected_skill_reason, "
-        "next_question, ready_to_execute.\n"
+        "next_question, ready_to_execute, llm_type.\n"
+        "llm_type describes the capability needed for the next roundtrip; use "
+        "high_reasoning, standard_reasoning, simple_task, fast_iteration, "
+        "long_context, or vision.\n"
         "selected_skill_path must match one of the catalog entries.\n"
         "Use the skill when_to_use and step descriptions to decide.\n"
         "Do not output markdown."
@@ -844,14 +898,19 @@ def _action_system_prompt() -> str:
         "execution events to determine the next action.\n"
         "Return exactly one JSON object with one of these forms:\n"
         '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
-        '"decisions_and_context":"..."}\n'
-        '{"kind":"prompt_user","text":"...","decisions_and_context":"..."}\n'
+        '"decisions_and_context":"...","llm_type":"simple_task"}\n'
+        '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
+        '"llm_type":"standard_reasoning"}\n'
         '{"kind":"edit","file_path":"docs/specs/example/system-specification.yaml",'
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
-        '"text":"..."}],"decisions_and_context":"..."}\n'
-        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"..."}\n'
-        '{"kind":"next_step","decisions_and_context":"..."}\n'
-        '{"kind":"complete","text":"...","decisions_and_context":"..."}\n'
+        '"text":"..."}],"decisions_and_context":"...",'
+        '"llm_type":"standard_reasoning"}\n'
+        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
+        '"llm_type":"simple_task"}\n'
+        '{"kind":"next_step","decisions_and_context":"...",'
+        '"llm_type":"standard_reasoning"}\n'
+        '{"kind":"complete","text":"...","decisions_and_context":"...",'
+        '"llm_type":"high_reasoning"}\n'
         "Use gather-context when you need to discover information already "
         "specified in checked-in specs before deciding the next action.\n"
         "Use gather-context to discover what requirements are already "
@@ -876,6 +935,11 @@ def _action_system_prompt() -> str:
         "Use complete when the skill is finished.\n"
         "Always include decisions_and_context with the concise information "
         "future steps will need.\n"
+        "Always include llm_type to select the model for the next roundtrip. "
+        "Use high_reasoning for architecture, difficult reasoning, and final "
+        "review; standard_reasoning for normal implementation; simple_task "
+        "for mechanical work; fast_iteration for quick feedback; long_context "
+        "for large specifications; and vision for image-oriented tasks.\n"
         "Do not output markdown."
     )
 
@@ -960,6 +1024,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
             "types": action.types,
             "keywords": action.keywords,
             "decisions_and_context": action.decisions_and_context,
+            "llm_type": action.llm_type,
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -1246,10 +1311,11 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     if not normalized_kind:
         raise RuntimeError("Workflow action response must include kind.")
     decisions_and_context = _optional_string(payload.get("decisions_and_context"))
+    llm_type = _optional_llm_type(payload.get("llm_type"))
     parser = _workflow_action_parsers().get(normalized_kind)
     if parser is None:
         raise RuntimeError(f"Unknown workflow action kind: {normalized_kind!r}")
-    return parser(payload, decisions_and_context)
+    return parser(payload, decisions_and_context, llm_type)
 
 
 def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
@@ -1266,6 +1332,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
 def _parse_workflow_action_complete(
     payload: dict[str, Any],
     decisions_and_context: str | None,
+    llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
     if text is not None and not isinstance(text, str):
@@ -1274,12 +1341,14 @@ def _parse_workflow_action_complete(
         kind="complete",
         text=(text.strip() if text else None),
         decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
     )
 
 
 def _parse_workflow_action_edit(
     payload: dict[str, Any],
     decisions_and_context: str | None,
+    llm_type: str | None,
 ) -> SkillChatAction:
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
@@ -1290,12 +1359,14 @@ def _parse_workflow_action_edit(
         file_path=file_path.strip(),
         edits=edits,
         decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
     )
 
 
 def _parse_workflow_action_gather_context(
     payload: dict[str, Any],
     decisions_and_context: str | None,
+    llm_type: str | None,
 ) -> SkillChatAction:
     types = _required_action_string_sequence(
         payload.get("types"),
@@ -1313,12 +1384,14 @@ def _parse_workflow_action_gather_context(
         types=normalized_types,
         keywords=keywords,
         decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
     )
 
 
 def _parse_workflow_action_invoke_tool(
     payload: dict[str, Any],
     decisions_and_context: str | None,
+    llm_type: str | None,
 ) -> SkillChatAction:
     tool = payload.get("tool")
     if not isinstance(tool, str) or not tool.strip():
@@ -1338,6 +1411,7 @@ def _parse_workflow_action_invoke_tool(
             tool=tool.strip(),
             parameters=normalized_parameters,
             decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
         )
     if isinstance(command, Sequence) and not isinstance(
         command,
@@ -1355,6 +1429,7 @@ def _parse_workflow_action_invoke_tool(
             tool=tool.strip(),
             parameters=normalized_parameters,
             decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
         )
     raise RuntimeError("Workflow invoke_tool action command must be a string or array.")
 
@@ -1362,16 +1437,20 @@ def _parse_workflow_action_invoke_tool(
 def _parse_workflow_action_next_step(
     payload: dict[str, Any],
     decisions_and_context: str | None,
+    llm_type: str | None,
 ) -> SkillChatAction:
     _ = payload
     return SkillChatAction(
-        kind="next_step", decisions_and_context=decisions_and_context
+        kind="next_step",
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
     )
 
 
 def _parse_workflow_action_prompt_user(
     payload: dict[str, Any],
     decisions_and_context: str | None,
+    llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
     if text is not None and not isinstance(text, str):
@@ -1380,6 +1459,7 @@ def _parse_workflow_action_prompt_user(
         kind="prompt_user",
         text=(text.strip() if text else None),
         decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
     )
 
 
@@ -1616,6 +1696,30 @@ def _optional_string(value: object) -> str | None:
         raise RuntimeError("Workflow action decisions_and_context must be a string.")
     normalized_value = value.strip()
     return normalized_value or None
+
+
+def _optional_llm_type(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError("Workflow llm_type must be a non-empty string.")
+    return value.strip().lower().replace("-", "_")
+
+
+def _resolve_llm_model(
+    llm_type: str | None,
+    *,
+    fallback_model: str,
+    mappings: Sequence[tuple[str, str]],
+) -> str:
+    if llm_type is None:
+        return fallback_model
+    normalized_llm_type = llm_type.strip().lower().replace("-", "_")
+    mapping = dict(ZAI_LLM_MAPPINGS)
+    mapping.update(
+        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
+    )
+    return mapping.get(normalized_llm_type, fallback_model)
 
 
 def _complete_json_with_repair(
@@ -2001,7 +2105,7 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     return (
         "Fix the response so it matches the workflow action schema with keys "
         "kind, tool, file_path, text, parameters, edits, types, keywords, and "
-        "decisions_and_context. "
+        "decisions_and_context, and llm_type. "
         "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
         "next_step, and complete. "
         f"The skill steps are: {step_kinds}."

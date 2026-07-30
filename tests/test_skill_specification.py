@@ -192,6 +192,22 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Generate the implementation template and fill it out.",
         "Decide on proposed PRs and fill each template.",
         "Prompt the user to review the result.",
+        "Incorporate the user's approved feedback into the feature plan.",
+        "Validate every generated specification before implementation.",
+        (
+            "If any specification validation fails, fix it and return to the "
+            "validation step."
+        ),
+        "Prepare an implementation checklist from each approved proposed PR.",
+        "Implement the approved feature changes and their tests.",
+        "Run local formatting, linting, type checks, and tests.",
+        "Create or update the pull request for the validated feature.",
+        "Wait 30 seconds for CI to make progress.",
+        "If CI has finished, check its result.",
+        "If CI passed, break out of the CI monitoring loop.",
+        "If CI failed, fix the reported failures and return to the wait step.",
+        "If CI is still running, return to the wait step.",
+        "Prompt the user to review the implementation and CI result.",
     ]
     for step in skill.steps:
         assert step.details is not None
@@ -237,6 +253,47 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     )
+    assert [invocation.command for invocation in skill.steps[9].tool_invocations] == [
+        (
+            "powdrr-lift",
+            "evaluate-system-specification",
+            "--work-item-name",
+            "<work-item-name>",
+        ),
+        (
+            "powdrr-lift",
+            "evaluate-architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>",
+        ),
+        (
+            "powdrr-lift",
+            "evaluate-implementation-specification",
+            "--work-item-name",
+            "<work-item-name>",
+        ),
+        (
+            "powdrr-lift",
+            "evaluate-pr-specification",
+            "--work-item-name",
+            "<work-item-name>",
+        ),
+    ]
+    assert skill.steps[14].tool_invocations[0].command == (
+        "gh",
+        "pr",
+        "create",
+        "--draft",
+        "--fill",
+    )
+    assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
+        ("uv", "run", "ruff", "format", "--check", "."),
+        ("uv", "run", "ruff", "check", "."),
+        ("uv", "run", "mypy", "src", "tests"),
+        ("uv", "run", "pytest", "-q"),
+    ]
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:

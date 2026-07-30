@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import ast
 import io
 import json
-import re
+import os
+import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import cast
+from typing import TextIO, cast
 from urllib.request import Request
 
 import pytest
+import yaml
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -20,6 +21,17 @@ from powdrr_lift.core import (
     load_skill,
     save_skill,
 )
+from powdrr_lift.core.architecture_specification import (
+    validate_architecture_specification_yaml,
+)
+from powdrr_lift.core.implementation_specification import (
+    validate_implementation_specification_yaml,
+)
+from powdrr_lift.core.pr_specification import (
+    _load_feature_catalog,
+    validate_pr_specification_yaml,
+)
+from powdrr_lift.core.system_specification import validate_system_specification_yaml
 from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     OpenAIChatClient,
@@ -34,6 +46,24 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     run_workflow_chat,
 )
+
+# ruff: noqa: E501
+
+
+def _assert_validation_success(
+    report: dict[str, object],
+    *,
+    label: str,
+) -> None:
+    assert report["validation_successful"] is True, (
+        f"{label} validation failed:\n{yaml.safe_dump(report, sort_keys=False)}"
+    )
+
+
+def _repo_feature_ids(repo_root: Path, *, count: int = 2) -> list[str]:
+    feature_ids = [entry.feature_id for entry in _load_feature_catalog(repo_root)]
+    assert len(feature_ids) >= count, "Expected at least two current feature ids."
+    return feature_ids[:count]
 
 
 def test_cli_workflow_chat_wires_configuration(
@@ -694,55 +724,318 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    source_repo_root = next(
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / "pyproject.toml").exists()
+    )
     repo_root = tmp_path / "repo"
-    repo_root.mkdir()
+    subprocess.run(
+        ["git", "clone", str(source_repo_root), str(repo_root)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    tool_bin = tmp_path / "bin"
+    tool_bin.mkdir()
+    powdrr_lift_wrapper = tool_bin / "powdrr-lift"
+    powdrr_lift_wrapper.write_text(
+        '#!/bin/sh\nexec uv run powdrr-lift "$@"\n',
+        encoding="utf-8",
+    )
+    powdrr_lift_wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tool_bin}:{os.environ['PATH']}")
     skills_dir = repo_root / "skill-definitions"
-    skills_dir.mkdir()
-    source_skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
-    for skill_path in sorted(source_skills_dir.glob("*.json")):
-        save_skill(load_skill(skill_path), skills_dir / skill_path.name)
-
-    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
-    worktree_root.mkdir(parents=True)
-
-    system_spec_path = (
-        worktree_root
-        / "docs"
-        / "specs"
-        / "display-related-photos"
-        / "system-specification.yaml"
+    worktree_root_holder: dict[str, Path] = {}
+    system_spec_dir = "docs/specs/display-related-photos"
+    system_spec_filename = "system-specification.yaml"
+    architecture_spec_filename = "architecture-specification.yaml"
+    implementation_spec_filename = "implementation-specification.yaml"
+    pr_spec_filename = "proposed-pr-specification.yaml"
+    system_goal_description = "Show related photos in the feature view."
+    system_grid_description = "Reuse the existing grid layout for related photos."
+    system_grid_approach_description = "Render related photos in the existing grid."
+    system_empty_state_description = (
+        "Provide a helpful empty state when there are no related photos."
     )
-    architecture_spec_path = (
-        worktree_root
-        / "docs"
-        / "specs"
-        / "display-related-photos"
-        / "architecture-specification.yaml"
+    architecture_related_photo_rationale = (
+        'Align with "req-related-photos" and "app-related-photos-grid".'
     )
-    implementation_spec_path = (
-        worktree_root
-        / "docs"
-        / "specs"
-        / "display-related-photos"
-        / "implementation-specification.yaml"
+    architecture_gallery_photo_rationale = (
+        'Align with "req-gallery-grid" and "app-related-photos-grid".'
     )
-    pr_spec_path = (
-        worktree_root
-        / "docs"
-        / "specs"
-        / "display-related-photos"
-        / "proposed-pr-specification.yaml"
+    architecture_relationship_rationale = (
+        'Keep the grouping aligned with "app-related-photos-grid".'
+    )
+    architecture_invariant_rationale = (
+        'Preserve "req-related-photos" and "app-related-photos-grid".'
+    )
+    architecture_guidance_rationale = (
+        'Preserve "req-gallery-grid" and "app-related-photos-grid".'
+    )
+    implementation_functional_requirement = "Show related photos in the UI."
+    implementation_responsive_requirement = (
+        "Keep the layout responsive on mobile and desktop."
     )
 
-    def _write_python_command(target: Path, content: str) -> list[str]:
-        return [
-            "python3",
-            "-c",
-            (
-                "from pathlib import Path; "
-                f"Path({str(target)!r}).write_text({content!r}, encoding='utf-8')"
-            ),
-        ]
+    system_spec_yaml = yaml.safe_dump(
+        {
+            "schema": "https://powdrr.io/schemas/specification-v1",
+            "id": "display-related-photos-system",
+            "title": "Display related photos",
+            "requirements": [
+                {
+                    "id": "req-related-photos",
+                    "description": system_goal_description,
+                    "state": "added",
+                },
+                {
+                    "id": "req-gallery-grid",
+                    "description": system_grid_description,
+                    "state": "added",
+                },
+            ],
+            "approach": [
+                {
+                    "id": "app-related-photos-grid",
+                    "description": system_grid_approach_description,
+                    "state": "added",
+                },
+                {
+                    "id": "app-related-photos-empty",
+                    "description": system_empty_state_description,
+                    "state": "added",
+                },
+            ],
+        },
+        sort_keys=False,
+    )
+    architecture_spec_yaml = yaml.safe_dump(
+        {
+            "schema": "https://powdrr.io/schemas/specification-v1",
+            "id": "2026-07-16-display-related-photos-architecture",
+            "title": "Display related photos architecture",
+            "entities": [
+                {
+                    "id": "related-photo",
+                    "type": "photo",
+                    "summary": "A photo related to the current feature.",
+                    "rationale": architecture_related_photo_rationale,
+                },
+                {
+                    "id": "gallery-photo",
+                    "type": "photo",
+                    "summary": "A photo shown in the feature gallery.",
+                    "rationale": architecture_gallery_photo_rationale,
+                },
+            ],
+            "entity_relationships": [
+                {
+                    "id": "related-photo-groups-with-gallery-photo",
+                    "source": "related-photo",
+                    "target": "gallery-photo",
+                    "relationship": "groups_with",
+                    "description": "Related photos are grouped in the gallery.",
+                    "rationale": architecture_relationship_rationale,
+                }
+            ],
+            "invariants": [
+                {
+                    "id": "related-photo-invariant",
+                    "description": "Related photos stay within the gallery flow.",
+                    "rationale": architecture_invariant_rationale,
+                    "related": {
+                        "entities": ["related-photo", "gallery-photo"],
+                        "entity_relationships": [
+                            "related-photo-groups-with-gallery-photo"
+                        ],
+                    },
+                }
+            ],
+            "guidance": [
+                {
+                    "id": "related-photo-guidance",
+                    "description": (
+                        "Prefer the existing grid layout for related photos."
+                    ),
+                    "rationale": architecture_guidance_rationale,
+                    "related": {
+                        "entities": ["related-photo", "gallery-photo"],
+                        "entity_relationships": [
+                            "related-photo-groups-with-gallery-photo"
+                        ],
+                    },
+                }
+            ],
+        },
+        sort_keys=False,
+    )
+    implementation_spec_yaml = yaml.safe_dump(
+        {
+            "schema": "https://powdrr.io/schemas/specification-v1",
+            "title": "Display related photos implementation",
+            "architecture_id": "2026-07-16-display-related-photos-architecture",
+            "entities": [
+                {
+                    "id": "related-photo",
+                    "action": "added",
+                    "rationale": "Add the related-photo entity from the architecture.",
+                },
+                {
+                    "id": "gallery-photo",
+                    "action": "added",
+                    "rationale": "Add the gallery-photo entity from the architecture.",
+                },
+            ],
+            "entity_relationships": [
+                {
+                    "id": "related-photo-groups-with-gallery-photo",
+                    "action": "added",
+                    "rationale": "Add the grouping relationship from the architecture.",
+                }
+            ],
+            "features": [
+                {
+                    "id": "display-related-photos",
+                    "action": "added",
+                    "description": "Display related photos in the feature view.",
+                    "functional_requirements": [
+                        implementation_functional_requirement,
+                        implementation_responsive_requirement,
+                    ],
+                }
+            ],
+            "decisions": [
+                {
+                    "id": "display-related-photos-grid",
+                    "action": "added",
+                    "description": "Reuse the existing photo grid layout.",
+                }
+            ],
+        },
+        sort_keys=False,
+    )
+    pr_spec_yaml = yaml.safe_dump(
+        {
+            "schema": "https://powdrr.io/schemas/specification-v1",
+            "id": "display-related-photos",
+            "feature_ids": _repo_feature_ids(repo_root),
+            "intent": {
+                "problem": (
+                    "Users need a structured workflow for specifying related photos."
+                ),
+                "goal": (
+                    "Produce validated system, architecture, implementation, and PR "
+                    "specifications."
+                ),
+                "reasoning": (
+                    "The feature-specification flow should leave a durable record "
+                    "for follow-up work."
+                ),
+            },
+            "acceptance_criteria": [
+                {
+                    "id": "ac-display-related-photos",
+                    "description": (
+                        "The proposed PR captures the feature scope and validation "
+                        "trail."
+                    ),
+                }
+            ],
+            "expected_tests": [
+                {
+                    "id": "test-display-related-photos",
+                    "description": (
+                        "The workflow produces a validated set of specification files."
+                    ),
+                }
+            ],
+            "required_test_cases": [
+                {
+                    "id": "rtc-display-related-photos",
+                    "description": (
+                        "Verify the workflow creates and validates the system, "
+                        "architecture, implementation, and PR specs."
+                    ),
+                }
+            ],
+            "expected_outcomes": [
+                {
+                    "id": "outcome-display-related-photos",
+                    "description": (
+                        "The feature plan is ready for asynchronous "
+                        "implementation work."
+                    ),
+                }
+            ],
+            "non_goals": [
+                {
+                    "id": "ng-display-related-photos",
+                    "description": (
+                        "Do not execute the async implementation work in this test."
+                    ),
+                }
+            ],
+            "risks": [
+                {
+                    "id": "risk-display-related-photos",
+                    "description": (
+                        "The current feature catalog may need refreshing if ids change."
+                    ),
+                }
+            ],
+        },
+        sort_keys=False,
+    )
+
+    def _full_replace_edit(
+        prompt: dict[str, object],
+        *,
+        yaml_text: str,
+    ) -> dict[str, object]:
+        current_file = cast(dict[str, object], prompt["current_file"])
+        current_file_lines = cast(
+            list[dict[str, object]],
+            current_file.get("lines", []),
+        )
+        line_count = current_file.get("line_count")
+        if isinstance(line_count, int) and line_count > 0:
+            return {
+                "kind": "edit",
+                "file_path": current_file["path"],
+                "edits": [
+                    {
+                        "kind": "replace",
+                        "start_line": 1,
+                        "end_line": line_count,
+                        "text": yaml_text,
+                    }
+                ],
+            }
+        if current_file_lines:
+            return {
+                "kind": "edit",
+                "file_path": current_file["path"],
+                "edits": [
+                    {
+                        "kind": "replace",
+                        "start_line": 1,
+                        "end_line": len(current_file_lines),
+                        "text": yaml_text,
+                    }
+                ],
+            }
+        return {
+            "kind": "edit",
+            "file_path": current_file["path"],
+            "edits": [
+                {
+                    "kind": "add",
+                    "start_line": 1,
+                    "text": yaml_text,
+                }
+            ],
+        }
 
     step_descriptions = [
         "Capture the feature goal and success criteria.",
@@ -755,314 +1048,23 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         "Prompt the user to review the result.",
     ]
 
-    responses: Iterator[dict[str, object]] = iter(
-        [
-            {
-                "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
-                "selected_skill_reason": (
-                    "The user wants a synchronous feature-specification flow."
-                ),
-                "next_question": None,
-                "ready_to_execute": True,
-            },
-            {
-                "kind": "prompt_user",
-                "text": "What feature are you specifying?",
-                "decisions_and_context": (
-                    "Need the feature goal and success criteria."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": (
-                    "Goal captured: display related photos; success criteria: "
-                    "show related photos in the UI."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "system-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Start system spec generation for display-related-photos."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": _write_python_command(
-                        system_spec_path,
-                        "\n".join(
-                            [
-                                "schema: https://powdrr.io/schemas/specification-v1",
-                                "work_item_name: display-related-photos",
-                                "feature_goal: Display related photos.",
-                                "success_criteria:",
-                                "  - Show related photos in the UI.",
-                                "constraints:",
-                                "  - Keep the worktree changes local.",
-                            ]
-                        ),
-                    ),
-                },
-                "decisions_and_context": (
-                    "System template filled with the captured goal and "
-                    "success criteria."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": (
-                    "System template filled; move to system review."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "evaluate-system-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Start system review for display-related-photos."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": (
-                    "System review complete: keep changes in the current "
-                    "worktree and use shell tools."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "architecture-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                        "--entity-type",
-                        "photo",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Start architecture spec generation for display-related-photos."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": _write_python_command(
-                        architecture_spec_path,
-                        "\n".join(
-                            [
-                                "schema: https://powdrr.io/schemas/specification-v1",
-                                "work_item_name: display-related-photos",
-                                "entity_type: photo",
-                                "entities:",
-                                "  - id: related-photo",
-                                "    description: A photo related to the feature.",
-                                "relationships:",
-                                "  - from: related-photo",
-                                "    to: feature-view",
-                                "invariants:",
-                                "  - Related photos belong to the current feature.",
-                            ]
-                        ),
-                    ),
-                },
-                "decisions_and_context": (
-                    "Architecture template filled with the chosen entity "
-                    "model and relationships."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": (
-                    "Architecture template filled; move to architecture review."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "evaluate-architecture-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                        "--entity-type",
-                        "photo",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Start architecture review for display-related-photos."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": (
-                    "Architecture review complete: align with existing "
-                    "entities and invariants."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "implementation-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Start implementation spec generation for display-related-photos."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": _write_python_command(
-                        implementation_spec_path,
-                        "\n".join(
-                            [
-                                "schema: https://powdrr.io/schemas/specification-v1",
-                                "architecture_id: arch-2026-07-15",
-                                "features:",
-                                "  - id: display-related-photos",
-                                "    action: added",
-                                "    description: Display related photos.",
-                                "    functional_requirements:",
-                                "      - Show related photos in the UI.",
-                                "decisions:",
-                                "  - id: display-related-photos-layout",
-                                "    action: added",
-                                "    description: Use a responsive photo grid.",
-                            ]
-                        ),
-                    ),
-                },
-                "decisions_and_context": (
-                    "Implementation template filled with the chosen layout and "
-                    "requirements."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "evaluate-implementation-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Implementation spec validated; move to PR planning."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": (
-                    "Implementation step complete; use this spec for PR scope."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "pr-specification",
-                        "--work-item-name",
-                        "display-related-photos",
-                    ],
-                },
-                "decisions_and_context": (
-                    "Start PR template generation for the feature."
-                ),
-            },
-            {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": _write_python_command(
-                        pr_spec_path,
-                        "\n".join(
-                            [
-                                "schema: https://powdrr.io/schemas/specification-v1",
-                                "id: pr-display-related-photos",
-                                "feature_ids:",
-                                "  - display-related-photos",
-                                "intent:",
-                                "  problem: Users need related photos surfaced.",
-                                "  goal: Add related photos to the feature view.",
-                                "  reasoning: The implementation spec defines the",
-                                "    behavior and the PR spec captures the intended",
-                                "    scope for the async follow-up.",
-                                "acceptance_criteria:",
-                                "  - id: ac-1",
-                                "    description: Related photos are visible.",
-                                "expected_tests:",
-                                "  - id: test-1",
-                                "    description: The related photo list renders.",
-                                "required_test_cases:",
-                                "  - id: rtc-1",
-                                "    description: Verify empty and populated states.",
-                                "expected_outcomes:",
-                                "  - id: outcome-1",
-                                "    description: The workflow identifies scope.",
-                                "non_goals:",
-                                "  - id: ng-1",
-                                "    description: No image upload changes.",
-                                "risks:",
-                                "  - id: risk-1",
-                                "    description: The layout may need extra space.",
-                            ]
-                        ),
-                    ),
-                },
-                "decisions_and_context": (
-                    "PR template filled with acceptance criteria and risks."
-                ),
-            },
-            {
-                "kind": "next_step",
-                "decisions_and_context": "PR step complete; handoff is ready.",
-            },
-            {
-                "kind": "prompt_user",
-                "text": "Please review the draft result.",
-                "decisions_and_context": "Ask the user to review the draft.",
-            },
-            {
-                "kind": "complete",
-                "text": "Feature specification complete.",
-                "decisions_and_context": "User review requested.",
-            },
-        ]
-    )
+    captured: dict[str, object] = {"messages": []}
 
-    captured: dict[str, object] = {"messages": [], "run_history": []}
+    real_resolve_worktree_context = _resolve_worktree_context
+
+    def _capture_worktree_context(
+        repo_root_value: Path,
+        *,
+        stderr: TextIO,
+        verbose: bool,
+    ) -> Path:
+        resolved = real_resolve_worktree_context(
+            repo_root_value,
+            stderr=stderr,
+            verbose=verbose,
+        )
+        worktree_root_holder["path"] = resolved
+        return resolved
 
     class _FakeOpenAIClient:
         def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
@@ -1109,6 +1111,14 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
+                response: dict[str, object] = {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": (
+                        "The user wants a synchronous feature-specification flow."
+                    ),
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
             elif self._call_index == 1:
                 self._assert_execution_prompt(
                     messages,
@@ -1117,6 +1127,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_context_suffix=None,
                     expected_event_count=0,
                 )
+                response = {
+                    "kind": "prompt_user",
+                    "text": "What feature are you specifying?",
+                    "decisions_and_context": (
+                        "Need the feature goal and success criteria."
+                    ),
+                }
             elif self._call_index == 2:
                 self._assert_execution_prompt(
                     messages,
@@ -1128,6 +1145,13 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=1,
                     expected_last_event_kind="prompt_user",
                 )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": (
+                        "Goal captured: display related photos; success criteria: "
+                        "show related photos in the UI."
+                    ),
+                }
             elif self._call_index == 3:
                 prompt = self._assert_execution_prompt(
                     messages,
@@ -1150,8 +1174,23 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--work-item-name",
                     "<work-item-name>",
                 ]
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "system-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Start system spec generation for display-related-photos."
+                    ),
+                }
             elif self._call_index == 4:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=1,
                     expected_step_description=step_descriptions[1],
@@ -1161,30 +1200,36 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=3,
                     expected_last_event_kind="invoke_tool",
                 )
+                current_file = cast(dict[str, object], prompt["current_file"])
+                assert (
+                    current_file["path"] == f"{system_spec_dir}/{system_spec_filename}"
+                )
+                response = _full_replace_edit(
+                    prompt,
+                    yaml_text=system_spec_yaml,
+                )
+                response["decisions_and_context"] = (
+                    "System template filled with the captured goal and success criteria."
+                )
             elif self._call_index == 5:
-                prompt = self._assert_execution_prompt(
+                self._assert_execution_prompt(
                     messages,
                     expected_step_index=1,
                     expected_step_description=step_descriptions[1],
                     expected_context_suffix=(
-                        "System template filled with the captured goal and "
-                        "success criteria."
+                        "System template filled with the captured goal and success criteria."
                     ),
                     expected_event_count=4,
-                    expected_last_event_kind="invoke_tool",
+                    expected_last_event_kind="edit",
                 )
-                current_step = cast(dict[str, object], prompt["current_step"])
-                tool_invocations = cast(
-                    list[dict[str, object]], current_step["tool_invocations"]
-                )
-                assert tool_invocations[0]["command"] == [
-                    "powdrr-lift",
-                    "system-specification",
-                    "--work-item-name",
-                    "<work-item-name>",
-                ]
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": (
+                        "System template filled; move to system review."
+                    ),
+                }
             elif self._call_index == 6:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=2,
                     expected_step_description=step_descriptions[2],
@@ -1194,7 +1239,6 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=5,
                     expected_last_event_kind="next_step",
                 )
-                prompt = json.loads(messages[1]["content"])
                 current_step = cast(dict[str, object], prompt["current_step"])
                 tool_invocations = cast(
                     list[dict[str, object]], current_step["tool_invocations"]
@@ -1205,6 +1249,21 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--work-item-name",
                     "<work-item-name>",
                 ]
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "evaluate-system-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Start system review for display-related-photos."
+                    ),
+                }
             elif self._call_index == 7:
                 self._assert_execution_prompt(
                     messages,
@@ -1216,19 +1275,23 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=6,
                     expected_last_event_kind="invoke_tool",
                 )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": (
+                        "System review complete: keep changes in the current worktree and use shell tools."
+                    ),
+                }
             elif self._call_index == 8:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=3,
                     expected_step_description=step_descriptions[3],
                     expected_context_suffix=(
-                        "System review complete: keep changes in the current "
-                        "worktree and use shell tools."
+                        "System review complete: keep changes in the current worktree and use shell tools."
                     ),
                     expected_event_count=7,
                     expected_last_event_kind="next_step",
                 )
-                prompt = json.loads(messages[1]["content"])
                 current_step = cast(dict[str, object], prompt["current_step"])
                 tool_invocations = cast(
                     list[dict[str, object]], current_step["tool_invocations"]
@@ -1241,8 +1304,25 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--entity-type",
                     "<type>",
                 ]
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "architecture-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                            "--entity-type",
+                            "photo",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Start architecture spec generation for display-related-photos."
+                    ),
+                }
             elif self._call_index == 9:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=3,
                     expected_step_description=step_descriptions[3],
@@ -1252,18 +1332,34 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=8,
                     expected_last_event_kind="invoke_tool",
                 )
+                current_file = cast(dict[str, object], prompt["current_file"])
+                assert current_file["path"] == (
+                    f"{system_spec_dir}/{architecture_spec_filename}"
+                )
+                response = _full_replace_edit(
+                    prompt,
+                    yaml_text=architecture_spec_yaml,
+                )
+                response["decisions_and_context"] = (
+                    "Architecture template filled with the chosen entity model and relationships."
+                )
             elif self._call_index == 10:
                 self._assert_execution_prompt(
                     messages,
                     expected_step_index=3,
                     expected_step_description=step_descriptions[3],
                     expected_context_suffix=(
-                        "Architecture template filled with the chosen entity "
-                        "model and relationships."
+                        "Architecture template filled with the chosen entity model and relationships."
                     ),
                     expected_event_count=9,
-                    expected_last_event_kind="invoke_tool",
+                    expected_last_event_kind="edit",
                 )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": (
+                        "Architecture template filled; move to architecture review."
+                    ),
+                }
             elif self._call_index == 11:
                 prompt = self._assert_execution_prompt(
                     messages,
@@ -1287,6 +1383,23 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--entity-type",
                     "<type>",
                 ]
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "evaluate-architecture-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                            "--entity-type",
+                            "photo",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Start architecture review for display-related-photos."
+                    ),
+                }
             elif self._call_index == 12:
                 self._assert_execution_prompt(
                     messages,
@@ -1298,14 +1411,19 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=11,
                     expected_last_event_kind="invoke_tool",
                 )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": (
+                        "Architecture review complete: align with existing entities and invariants."
+                    ),
+                }
             elif self._call_index == 13:
                 prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=5,
                     expected_step_description=step_descriptions[5],
                     expected_context_suffix=(
-                        "Architecture review complete: align with existing "
-                        "entities and invariants."
+                        "Architecture review complete: align with existing entities and invariants."
                     ),
                     expected_event_count=12,
                     expected_last_event_kind="next_step",
@@ -1320,17 +1438,42 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--work-item-name",
                     "<work-item-name>",
                 ]
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "implementation-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Start implementation spec generation for display-related-photos."
+                    ),
+                }
             elif self._call_index == 14:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=5,
                     expected_step_description=step_descriptions[5],
                     expected_context_suffix=(
-                        "Start implementation spec generation for "
-                        "display-related-photos."
+                        "Start implementation spec generation for display-related-photos."
                     ),
                     expected_event_count=13,
                     expected_last_event_kind="invoke_tool",
+                )
+                current_file = cast(dict[str, object], prompt["current_file"])
+                assert current_file["path"] == (
+                    f"{system_spec_dir}/{implementation_spec_filename}"
+                )
+                response = _full_replace_edit(
+                    prompt,
+                    yaml_text=implementation_spec_yaml,
+                )
+                response["decisions_and_context"] = (
+                    "Implementation template filled with the chosen layout and requirements."
                 )
             elif self._call_index == 15:
                 self._assert_execution_prompt(
@@ -1338,12 +1481,26 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_step_index=5,
                     expected_step_description=step_descriptions[5],
                     expected_context_suffix=(
-                        "Implementation template filled with the chosen layout "
-                        "and requirements."
+                        "Implementation template filled with the chosen layout and requirements."
                     ),
                     expected_event_count=14,
-                    expected_last_event_kind="invoke_tool",
+                    expected_last_event_kind="edit",
                 )
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "evaluate-implementation-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Implementation spec validated; move to PR planning."
+                    ),
+                }
             elif self._call_index == 16:
                 self._assert_execution_prompt(
                     messages,
@@ -1355,8 +1512,14 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=15,
                     expected_last_event_kind="invoke_tool",
                 )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": (
+                        "Implementation step complete; use this spec for PR scope."
+                    ),
+                }
             elif self._call_index == 17:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=6,
                     expected_step_description=step_descriptions[6],
@@ -1366,7 +1529,6 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=16,
                     expected_last_event_kind="next_step",
                 )
-                prompt = json.loads(messages[1]["content"])
                 current_step = cast(dict[str, object], prompt["current_step"])
                 tool_invocations = cast(
                     list[dict[str, object]], current_step["tool_invocations"]
@@ -1377,8 +1539,23 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     "--work-item-name",
                     "<work-item-name>",
                 ]
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "pr-specification",
+                            "--work-item-name",
+                            "display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": (
+                        "Start PR template generation for the feature."
+                    ),
+                }
             elif self._call_index == 18:
-                self._assert_execution_prompt(
+                prompt = self._assert_execution_prompt(
                     messages,
                     expected_step_index=6,
                     expected_step_description=step_descriptions[6],
@@ -1387,6 +1564,15 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     ),
                     expected_event_count=17,
                     expected_last_event_kind="invoke_tool",
+                )
+                current_file = cast(dict[str, object], prompt["current_file"])
+                assert current_file["path"] == (f"{system_spec_dir}/{pr_spec_filename}")
+                response = _full_replace_edit(
+                    prompt,
+                    yaml_text=pr_spec_yaml,
+                )
+                response["decisions_and_context"] = (
+                    "PR template filled with acceptance criteria and risks."
                 )
             elif self._call_index == 19:
                 self._assert_execution_prompt(
@@ -1397,8 +1583,12 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                         "PR template filled with acceptance criteria and risks."
                     ),
                     expected_event_count=18,
-                    expected_last_event_kind="invoke_tool",
+                    expected_last_event_kind="edit",
                 )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": "PR step complete; handoff is ready.",
+                }
             elif self._call_index == 20:
                 self._assert_execution_prompt(
                     messages,
@@ -1408,6 +1598,11 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=19,
                     expected_last_event_kind="next_step",
                 )
+                response = {
+                    "kind": "prompt_user",
+                    "text": "Please review the draft result.",
+                    "decisions_and_context": "Ask the user to review the draft.",
+                }
             elif self._call_index == 21:
                 self._assert_execution_prompt(
                     messages,
@@ -1417,179 +1612,27 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
                     expected_event_count=20,
                     expected_last_event_kind="prompt_user",
                 )
+                response = {
+                    "kind": "complete",
+                    "text": "Feature specification complete.",
+                    "decisions_and_context": "User review requested.",
+                }
             else:
                 raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
 
-            response = next(responses)
             self._call_index += 1
             return response
 
-    class _FakeProcess:
-        def __init__(self, *, stdout: str = "", stderr: str = "") -> None:
-            self.returncode = 0
-            self.stdout = stdout
-            self.stderr = stderr
-
-    def _fake_run(*args: object, **kwargs: object) -> _FakeProcess:
-        command = cast(list[str] | str, args[0])
-        shell = bool(kwargs.get("shell"))
-        cwd = cast(Path, kwargs.get("cwd", worktree_root))
-        run_history = cast(list[dict[str, object]], captured["run_history"])
-        run_history.append({"command": command, "shell": shell, "cwd": cwd})
-
-        if command == [
-            "powdrr-lift",
-            "system-specification",
-            "--work-item-name",
-            "display-related-photos",
-        ]:
-            system_spec_path.parent.mkdir(parents=True, exist_ok=True)
-            system_spec_path.write_text(
-                "\n".join(
-                    [
-                        "# System specification template.",
-                        "schema: https://powdrr.io/schemas/specification-v1",
-                        "work_item_name: display-related-photos",
-                        "feature_goal: null",
-                        "success_criteria: []",
-                        "constraints: []",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            return _FakeProcess(stdout=f"generated {system_spec_path}\n")
-
-        if command == [
-            "powdrr-lift",
-            "evaluate-system-specification",
-            "--work-item-name",
-            "display-related-photos",
-        ]:
-            return _FakeProcess(stdout="system specification valid\n")
-
-        if command == [
-            "powdrr-lift",
-            "architecture-specification",
-            "--work-item-name",
-            "display-related-photos",
-            "--entity-type",
-            "photo",
-        ]:
-            architecture_spec_path.parent.mkdir(parents=True, exist_ok=True)
-            architecture_spec_path.write_text(
-                "\n".join(
-                    [
-                        "# Architecture specification template.",
-                        "schema: https://powdrr.io/schemas/specification-v1",
-                        "work_item_name: display-related-photos",
-                        "entity_type: photo",
-                        "entities: []",
-                        "relationships: []",
-                        "invariants: []",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            return _FakeProcess(stdout=f"generated {architecture_spec_path}\n")
-
-        if command == [
-            "powdrr-lift",
-            "evaluate-architecture-specification",
-            "--work-item-name",
-            "display-related-photos",
-            "--entity-type",
-            "photo",
-        ]:
-            return _FakeProcess(stdout="architecture specification valid\n")
-
-        if command == [
-            "powdrr-lift",
-            "implementation-specification",
-            "--work-item-name",
-            "display-related-photos",
-        ]:
-            implementation_spec_path.parent.mkdir(parents=True, exist_ok=True)
-            implementation_spec_path.write_text(
-                "\n".join(
-                    [
-                        "# Implementation specification template.",
-                        "schema: https://powdrr.io/schemas/specification-v1",
-                        "architecture_id: arch-2026-07-15",
-                        "features: []",
-                        "decisions: []",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            return _FakeProcess(stdout=f"generated {implementation_spec_path}\n")
-
-        if command == [
-            "powdrr-lift",
-            "evaluate-implementation-specification",
-            "--work-item-name",
-            "display-related-photos",
-        ]:
-            return _FakeProcess(stdout="implementation specification valid\n")
-
-        if command == [
-            "powdrr-lift",
-            "pr-specification",
-            "--work-item-name",
-            "display-related-photos",
-        ]:
-            pr_spec_path.parent.mkdir(parents=True, exist_ok=True)
-            pr_spec_path.write_text(
-                "\n".join(
-                    [
-                        "# PR specification template.",
-                        "schema: https://powdrr.io/schemas/specification-v1",
-                        "id: pr-display-related-photos",
-                        "feature_ids: []",
-                        "intent:",
-                        "  problem: null",
-                        "  goal: null",
-                        "  reasoning: null",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            return _FakeProcess(stdout=f"generated {pr_spec_path}\n")
-
-        if (
-            isinstance(command, list)
-            and len(command) == 3
-            and command[0] == "python3"
-            and command[1] == "-c"
-        ):
-            script = command[2]
-            match = re.fullmatch(
-                (
-                    r"from pathlib import Path; Path\((?P<path>.+)\)"
-                    r"\.write_text\((?P<content>.+), encoding='utf-8'\)"
-                ),
-                script,
-                flags=re.DOTALL,
-            )
-            if match is None:
-                raise AssertionError(f"Unexpected python command: {script}")
-            target = Path(ast.literal_eval(match.group("path")))
-            content = ast.literal_eval(match.group("content"))
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
-            return _FakeProcess(stdout=f"wrote {target}\n")
-
-        raise AssertionError(f"Unexpected shell command: {command!r}")
-
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("UV_CACHE_DIR", "/private/tmp/uv-cache-4")
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
-        lambda repo_root, stderr, verbose: worktree_root,
+        _capture_worktree_context,
     )
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
 
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -1611,125 +1654,84 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
         stderr=stderr,
     )
 
-    summary_path = worktree_root / "generated" / "skill-execution.json"
     assert exit_code == 0
+    assert "path" in worktree_root_holder
+    worktree_root = worktree_root_holder["path"]
+    summary_path = worktree_root / "generated" / "skill-execution.json"
+    system_path = worktree_root / system_spec_dir / system_spec_filename
+    architecture_path = worktree_root / system_spec_dir / architecture_spec_filename
+    implementation_path = worktree_root / system_spec_dir / implementation_spec_filename
+    pr_path = worktree_root / system_spec_dir / pr_spec_filename
+
     assert summary_path.exists()
+    assert system_path.exists()
+    assert architecture_path.exists()
+    assert implementation_path.exists()
+    assert pr_path.exists()
 
-    messages = cast(list[list[dict[str, str]]], captured["messages"])
-    assert len(messages) == 22
-    action_prompt = json.loads(messages[1][1]["content"])
-    assert action_prompt["execution_mode"] == "execute_selected_skill"
-    assert action_prompt["selected_skill"]["name"] == "specify-a-feature"
-    assert action_prompt["current_step_index"] == 0
-    assert action_prompt["current_step"]["description"] == step_descriptions[0]
-    assert action_prompt["step_context"] == []
-
-    run_history = cast(list[dict[str, object]], captured["run_history"])
-    assert len(run_history) == 11
-    assert run_history[0]["command"] == [
-        "powdrr-lift",
-        "system-specification",
-        "--work-item-name",
-        "display-related-photos",
-    ]
-    system_write_command = cast(list[str], run_history[1]["command"])
-    assert system_write_command[:2] == ["python3", "-c"]
-    assert "system-specification.yaml" in system_write_command[2]
-    assert "Show related photos in the UI." in system_write_command[2]
-    assert run_history[2]["command"] == [
-        "powdrr-lift",
-        "evaluate-system-specification",
-        "--work-item-name",
-        "display-related-photos",
-    ]
-    assert run_history[3]["command"] == [
-        "powdrr-lift",
-        "architecture-specification",
-        "--work-item-name",
-        "display-related-photos",
-        "--entity-type",
-        "photo",
-    ]
-    architecture_write_command = cast(list[str], run_history[4]["command"])
-    assert architecture_write_command[:2] == ["python3", "-c"]
-    assert "architecture-specification.yaml" in architecture_write_command[2]
-    assert "entity_type: photo" in architecture_write_command[2]
-    assert run_history[5]["command"] == [
-        "powdrr-lift",
-        "evaluate-architecture-specification",
-        "--work-item-name",
-        "display-related-photos",
-        "--entity-type",
-        "photo",
-    ]
-    assert run_history[6]["command"] == [
-        "powdrr-lift",
-        "implementation-specification",
-        "--work-item-name",
-        "display-related-photos",
-    ]
-    implementation_write_command = cast(list[str], run_history[7]["command"])
-    assert implementation_write_command[:2] == ["python3", "-c"]
-    assert "implementation-specification.yaml" in implementation_write_command[2]
-    assert "Show related photos in the UI." in implementation_write_command[2]
-    assert run_history[8]["command"] == [
-        "powdrr-lift",
-        "evaluate-implementation-specification",
-        "--work-item-name",
-        "display-related-photos",
-    ]
-    assert run_history[9]["command"] == [
-        "powdrr-lift",
-        "pr-specification",
-        "--work-item-name",
-        "display-related-photos",
-    ]
-    pr_write_command = cast(list[str], run_history[10]["command"])
-    assert pr_write_command[:2] == ["python3", "-c"]
-    assert "proposed-pr-specification.yaml" in pr_write_command[2]
-    assert "Related photos are visible." in pr_write_command[2]
-    assert system_spec_path.exists()
-    assert architecture_spec_path.exists()
-    assert implementation_spec_path.exists()
-    assert pr_spec_path.exists()
-    system_text = system_spec_path.read_text(encoding="utf-8")
-    assert "display-related-photos" in system_text
-    assert "Show related photos in the UI." in system_text
-    architecture_text = architecture_spec_path.read_text(encoding="utf-8")
-    assert "display-related-photos" in architecture_text
-    assert "entity_type: photo" in architecture_text
-    implementation_text = implementation_spec_path.read_text(encoding="utf-8")
-    assert "display-related-photos" in implementation_text
-    assert "Show related photos in the UI." in implementation_text
-    pr_text = pr_spec_path.read_text(encoding="utf-8")
-    assert "pr-display-related-photos" in pr_text
-    assert "Related photos are visible." in pr_text
-    assert "generated" in stdout.getvalue()
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["selected_skill_name"] == "specify-a-feature"
     assert [event["kind"] for event in summary["execution_events"]] == [
         "prompt_user",
         "next_step",
         "invoke_tool",
-        "invoke_tool",
+        "edit",
         "next_step",
         "invoke_tool",
         "next_step",
         "invoke_tool",
-        "invoke_tool",
+        "edit",
         "next_step",
         "invoke_tool",
         "next_step",
         "invoke_tool",
-        "invoke_tool",
+        "edit",
         "invoke_tool",
         "next_step",
         "invoke_tool",
-        "invoke_tool",
+        "edit",
         "next_step",
         "prompt_user",
         "complete",
     ]
+
+    system_report = yaml.safe_load(
+        validate_system_specification_yaml(
+            system_path.read_text(encoding="utf-8"),
+            work_item_name="display-related-photos",
+            repo_root=worktree_root,
+        )
+    )
+    architecture_report = yaml.safe_load(
+        validate_architecture_specification_yaml(
+            architecture_path.read_text(encoding="utf-8"),
+            entity_types=["photo"],
+            work_item_name="display-related-photos",
+            repo_root=worktree_root,
+        )
+    )
+    implementation_report = yaml.safe_load(
+        validate_implementation_specification_yaml(
+            implementation_path.read_text(encoding="utf-8"),
+            work_item_name="display-related-photos",
+            architecture_specification_path=architecture_path,
+            repo_root=worktree_root,
+        )
+    )
+    pr_report = yaml.safe_load(
+        validate_pr_specification_yaml(
+            pr_path.read_text(encoding="utf-8"),
+            work_item_name="display-related-photos",
+            repo_root=repo_root,
+        )
+    )
+
+    _assert_validation_success(system_report, label="system")
+    _assert_validation_success(architecture_report, label="architecture")
+    _assert_validation_success(implementation_report, label="implementation")
+    _assert_validation_success(pr_report, label="proposed PR")
+    assert "Wrote skill execution summary to" in stdout.getvalue()
+    assert "Please review the draft result." in stdout.getvalue()
 
 
 def test_run_workflow_chat_verbose_prints_progress(

@@ -119,11 +119,55 @@
     },
     {
       "description": "Validate every generated specification before implementation.",
-      "details": "Fix validation issues and repeat validation until the system, architecture, implementation, and proposed-PR documents agree."
+      "details": "Run every validation command below in order. If any command fails, fix the reported issue and restart this validation step; advance only when all four documents agree.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-system-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        },
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>"
+          ]
+        },
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-implementation-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        },
+        {
+          "tool": "shell",
+          "command": [
+            "powdrr-lift",
+            "evaluate-pr-specification",
+            "--work-item-name",
+            "<work-item-name>"
+          ]
+        }
+      ]
     },
     {
-      "description": "Prepare the implementation work from the approved feature plan.",
-      "details": "Keep implementation tasks, tests, and the proposed PR scope traceable to the approved specifications."
+      "description": "If any specification validation fails, fix it and return to the validation step.",
+      "details": "Do not begin implementation or create a pull request while any required specification remains invalid."
+    },
+    {
+      "description": "Prepare an implementation checklist from each approved proposed PR.",
+      "details": "For every proposed PR, identify the code files, tests, acceptance criteria, dependencies, and validation commands before making changes. Keep each item traceable to the approved specifications."
     },
     {
       "description": "Implement the approved feature changes and their tests.",
@@ -146,7 +190,19 @@
     },
     {
       "description": "Create or update the pull request for the validated feature.",
-      "details": "Include the feature intent, implementation scope, validation evidence, and any remaining risks."
+      "details": "Create the draft pull request from the feature branch with the feature intent, implementation scope, validation evidence, and remaining risks. If a pull request already exists for the branch, update it instead.",
+      "tool_invocations": [
+        {
+          "tool": "shell",
+          "command": [
+            "gh",
+            "pr",
+            "create",
+            "--draft",
+            "--fill"
+          ]
+        }
+      ]
     },
     {
       "description": "Wait 30 seconds for CI to make progress.",

@@ -194,7 +194,11 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Prompt the user to review the result.",
         "Incorporate the user's approved feedback into the feature plan.",
         "Validate every generated specification before implementation.",
-        "Prepare the implementation work from the approved feature plan.",
+        (
+            "If any specification validation fails, fix it and return to the "
+            "validation step."
+        ),
+        "Prepare an implementation checklist from each approved proposed PR.",
         "Implement the approved feature changes and their tests.",
         "Run local formatting, linting, type checks, and tests.",
         "Create or update the pull request for the validated feature.",
@@ -248,6 +252,41 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "pr-specification",
         "--work-item-name",
         "<work-item-name>",
+    )
+    assert [invocation.command for invocation in skill.steps[9].tool_invocations] == [
+        (
+            "powdrr-lift",
+            "evaluate-system-specification",
+            "--work-item-name",
+            "<work-item-name>",
+        ),
+        (
+            "powdrr-lift",
+            "evaluate-architecture-specification",
+            "--work-item-name",
+            "<work-item-name>",
+            "--entity-type",
+            "<type>",
+        ),
+        (
+            "powdrr-lift",
+            "evaluate-implementation-specification",
+            "--work-item-name",
+            "<work-item-name>",
+        ),
+        (
+            "powdrr-lift",
+            "evaluate-pr-specification",
+            "--work-item-name",
+            "<work-item-name>",
+        ),
+    ]
+    assert skill.steps[14].tool_invocations[0].command == (
+        "gh",
+        "pr",
+        "create",
+        "--draft",
+        "--fill",
     )
 
 

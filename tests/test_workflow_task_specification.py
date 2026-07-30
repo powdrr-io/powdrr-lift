@@ -9,6 +9,7 @@ from powdrr_lift.core.workflow_task_specification import (
     WorkflowTask,
     build_workflow_task_directory_validation_report,
     build_workflow_task_validation_report,
+    load_ready_workflow_tasks,
     load_workflow_task,
     load_workflow_tasks,
     save_workflow_task,
@@ -291,6 +292,30 @@ def test_select_ready_workflow_tasks_excludes_missing_upstreams() -> None:
     )
 
     assert select_ready_workflow_tasks((task,)) == ()
+
+
+def test_load_ready_workflow_tasks_scans_all_work_items(tmp_path: Path) -> None:
+    for work_item_name, task_id in (("feature-a", "task-a"), ("feature-b", "task-b")):
+        work_item_directory = tmp_path / work_item_name
+        save_workflow_task(
+            WorkflowTask(
+                task_id=task_id,
+                status=TaskStatus.OPEN,
+                upstream_task_ids=(),
+                dependent_state=("ready",),
+                complexity=TaskComplexity.LOW,
+                input_state={},
+                description=f"Ready task for {work_item_name}.",
+            ),
+            work_item_directory / f"{task_id}.json",
+        )
+
+    ready_tasks = load_ready_workflow_tasks(tmp_path)
+
+    assert [(item.work_item_name, item.task.task_id) for item in ready_tasks] == [
+        ("feature-a", "task-a"),
+        ("feature-b", "task-b"),
+    ]
 
 
 def test_workflow_task_directory_validation_flags_open_task_with_closed_downstream(

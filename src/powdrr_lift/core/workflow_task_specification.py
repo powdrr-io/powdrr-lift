@@ -83,6 +83,12 @@ class WorkflowTask:
 WorkflowTaskDocument = WorkflowTask
 
 
+@dataclass(frozen=True, slots=True)
+class ReadyWorkflowTask:
+    work_item_name: str
+    task: WorkflowTask
+
+
 def workflow_task_to_json(task: WorkflowTask) -> str:
     return json.dumps(task.to_data(), indent=2, ensure_ascii=False) + "\n"
 
@@ -151,6 +157,28 @@ def select_ready_workflow_tasks(
             for upstream_task_id in task.upstream_task_ids
         )
     )
+
+
+def load_ready_workflow_tasks(
+    workflows_root: str | Path,
+) -> tuple[ReadyWorkflowTask, ...]:
+    """Load ready tasks from every work-item directory under a workflow root."""
+    root = Path(workflows_root)
+    if not root.exists():
+        return ()
+    if not root.is_dir():
+        raise NotADirectoryError(f"Workflow root is not a directory: {root}")
+
+    ready_tasks: list[ReadyWorkflowTask] = []
+    for work_item_directory in sorted(root.iterdir()):
+        if not work_item_directory.is_dir():
+            continue
+        tasks = load_workflow_tasks(work_item_directory)
+        ready_tasks.extend(
+            ReadyWorkflowTask(work_item_name=work_item_directory.name, task=task)
+            for task in select_ready_workflow_tasks(tasks)
+        )
+    return tuple(ready_tasks)
 
 
 def build_workflow_task_validation_report(

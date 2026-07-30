@@ -12,6 +12,8 @@
     {
       "description": "Gather the requirements and approach.",
       "complexity": "medium",
+      "assignee_type": "agent",
+      "assignee_role": "architect",
       "input_state": {
         "feature": null,
         "requirements": [],
@@ -27,6 +29,8 @@
     {
       "description": "Gather the entities, invariants, and guidance.",
       "complexity": "medium",
+      "assignee_type": "agent",
+      "assignee_role": "architect",
       "input_state": {
         "entities": [],
         "invariants": [],
@@ -45,6 +49,8 @@
     {
       "description": "Gather the features and decisions.",
       "complexity": "medium",
+      "assignee_type": "human",
+      "assignee_role": "decider",
       "input_state": {
         "features": [],
         "decisions": []
@@ -68,6 +74,8 @@
     {
       "description": "Gather the intent and reasoning.",
       "complexity": "medium",
+      "assignee_type": "human",
+      "assignee_role": "decider",
       "input_state": {
         "intent": null,
         "reasoning": null
@@ -84,6 +92,8 @@
     {
       "description": "Specify proposed PRs.",
       "complexity": "high",
+      "assignee_type": "agent",
+      "assignee_role": "architect",
       "input_state": {
         "proposed_prs": []
       },

@@ -8,12 +8,16 @@ from pathlib import Path
 from typing import Any, cast
 
 from powdrr_lift.core.workflow_task_specification import (
+    AgentRole,
+    AssigneeRole,
+    AssigneeType,
     TaskComplexity,
     TaskStatus,
     WorkflowTask,
     build_workflow_task_directory_validation_report,
     save_workflow_task,
     select_ready_workflow_tasks,
+    validate_assignee,
 )
 
 
@@ -50,16 +54,27 @@ class WorkflowTaskTemplate:
     description: str
     complexity: TaskComplexity
     input_state: Any
+    assignee_type: AssigneeType = AssigneeType.AGENT
+    assignee_role: AssigneeRole = AgentRole.CODER
     output_state_type: str = "state"
     upstream_task_template_indexes: tuple[int, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
+
+    def __post_init__(self) -> None:
+        assignee_type, assignee_role = validate_assignee(
+            self.assignee_type, self.assignee_role
+        )
+        object.__setattr__(self, "assignee_type", assignee_type)
+        object.__setattr__(self, "assignee_role", assignee_role)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "description": self.description,
             "complexity": self.complexity.value,
             "input_state": self.input_state,
+            "assignee_type": self.assignee_type.value,
+            "assignee_role": self.assignee_role.value,
             "output_state_type": self.output_state_type,
             "upstream_task_template_indexes": list(self.upstream_task_template_indexes),
             "dependent_state": list(self.dependent_state),
@@ -162,6 +177,8 @@ def instantiate_workflow_template(
             description=task_template.description,
             complexity=task_template.complexity,
             input_state=task_template.input_state,
+            assignee_type=task_template.assignee_type,
+            assignee_role=task_template.assignee_role,
             output_state_type=task_template.output_state_type,
             upstream_task_ids=tuple(
                 task_ids[upstream_index]
@@ -303,6 +320,8 @@ def build_workflow_template_validation_report(
                 "description",
                 "complexity",
                 "input_state",
+                "assignee_type",
+                "assignee_role",
                 "output_state_type",
                 "upstream_task_template_indexes",
                 "dependent_state",
@@ -347,6 +366,42 @@ def build_workflow_template_validation_report(
                     path=_child_path(task_template_path, "complexity"),
                 )
             )
+
+        assignee_type = _optional_string(raw_task_template_mapping.get("assignee_type"))
+        assignee_role = _optional_string(raw_task_template_mapping.get("assignee_role"))
+        if assignee_type is None:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="missing_assignee_type",
+                    message=(
+                        "Workflow task templates must include a non-empty "
+                        "assignee_type."
+                    ),
+                    path=_child_path(task_template_path, "assignee_type"),
+                )
+            )
+        if assignee_role is None:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="missing_assignee_role",
+                    message=(
+                        "Workflow task templates must include a non-empty "
+                        "assignee_role."
+                    ),
+                    path=_child_path(task_template_path, "assignee_role"),
+                )
+            )
+        if assignee_type is not None and assignee_role is not None:
+            try:
+                validate_assignee(assignee_type, assignee_role)
+            except ValueError as exc:
+                issues.append(
+                    WorkflowTemplateValidationIssue(
+                        code="invalid_assignee_role",
+                        message=str(exc),
+                        path=_child_path(task_template_path, "assignee_role"),
+                    )
+                )
 
         if "input_state" not in raw_task_template_mapping:
             issues.append(
@@ -617,6 +672,10 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
     input_state = data.get("input_state", _MISSING)
     if input_state is _MISSING:
         raise ValueError("Workflow task templates must include input_state.")
+    assignee_type, assignee_role = validate_assignee(
+        _required_string(data, "assignee_type"),
+        _required_string(data, "assignee_role"),
+    )
     output_state_type = _required_string(data, "output_state_type")
     upstream_task_template_indexes = _required_int_sequence(
         data,
@@ -631,6 +690,8 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         description=description,
         complexity=complexity,
         input_state=input_state,
+        assignee_type=assignee_type,
+        assignee_role=assignee_role,
         output_state_type=output_state_type,
         upstream_task_template_indexes=upstream_task_template_indexes,
         dependent_state=dependent_state,

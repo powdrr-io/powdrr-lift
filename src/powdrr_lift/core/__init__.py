@@ -180,9 +180,13 @@ from powdrr_lift.core.template import (
     render_change_log_template,
 )
 from powdrr_lift.core.workflow_task_specification import (
+    AgentRole,
+    AssigneeRole,
+    AssigneeType,
+    HumanRole,
+    ReadyWorkflowTask,
     TaskComplexity,
     TaskStatus,
-    ReadyWorkflowTask,
     WorkflowTask,
     WorkflowTaskDocument,
     WorkflowTaskValidationIssue,
@@ -196,6 +200,7 @@ from powdrr_lift.core.workflow_task_specification import (
     save_workflow_task,
     save_workflow_task_document,
     select_ready_workflow_tasks,
+    validate_assignee,
     validate_workflow_task_directory,
     validate_workflow_task_directory_json,
     validate_workflow_task_json,

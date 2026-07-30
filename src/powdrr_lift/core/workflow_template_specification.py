@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_lift.core.workflow_task_specification import TaskComplexity
+from powdrr_lift.core.workflow_task_specification import (
+    TaskComplexity,
+    TaskStatus,
+    WorkflowTask,
+    build_workflow_task_directory_validation_report,
+    save_workflow_task,
+    select_ready_workflow_tasks,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +130,60 @@ def workflow_template_from_data(data: Mapping[str, Any]) -> WorkflowTemplate:
 
 def load_workflow_template(path: str | Path) -> WorkflowTemplate:
     return workflow_template_from_json(Path(path).read_text(encoding="utf-8"))
+
+
+def instantiate_workflow_template(
+    template_path: str | Path,
+    work_item_name: str,
+    output_root: str | Path = Path("docs") / "workflows",
+) -> tuple[Path, tuple[WorkflowTask, ...]]:
+    """Materialize a workflow template as validated durable task documents."""
+    template = load_workflow_template(template_path)
+    slug = re.sub(r"[^a-z0-9]+", "-", work_item_name.strip().lower()).strip("-")
+    if not slug:
+        raise ValueError("work-item-name must contain at least one letter or digit")
+
+    output_directory = Path(output_root) / slug
+    if output_directory.exists() and any(output_directory.iterdir()):
+        raise FileExistsError(
+            f"Workflow output directory is not empty: {output_directory}. "
+            "Choose a new work item or remove it with explicit approval."
+        )
+
+    output_directory.mkdir(parents=True, exist_ok=True)
+    task_ids = tuple(
+        f"task-{index + 1:03d}" for index in range(len(template.task_templates))
+    )
+    tasks: list[WorkflowTask] = []
+    for index, task_template in enumerate(template.task_templates):
+        task = WorkflowTask(
+            task_id=task_ids[index],
+            status=TaskStatus.OPEN,
+            description=task_template.description,
+            complexity=task_template.complexity,
+            input_state=task_template.input_state,
+            output_state_type=task_template.output_state_type,
+            upstream_task_ids=tuple(
+                task_ids[upstream_index]
+                for upstream_index in task_template.upstream_task_template_indexes
+            ),
+            dependent_state=task_template.dependent_state,
+        )
+        save_workflow_task(task, output_directory / f"{task.task_id}.json")
+        tasks.append(task)
+
+    report = build_workflow_task_directory_validation_report(output_directory)
+    if not report.validation_successful:
+        issues = "; ".join(issue.message for issue in report.issues)
+        raise ValueError(f"Generated workflow failed validation: {issues}")
+
+    ready_tasks = select_ready_workflow_tasks(tuple(tasks))
+    if len(ready_tasks) != 1 or ready_tasks[0].task_id != task_ids[0]:
+        raise ValueError(
+            "Generated workflow must have exactly one ready first task; "
+            f"found {[task.task_id for task in ready_tasks]}"
+        )
+    return output_directory, tuple(tasks)
 
 
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:

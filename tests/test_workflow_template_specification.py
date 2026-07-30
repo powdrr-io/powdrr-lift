@@ -9,6 +9,7 @@ from powdrr_lift.core.workflow_template_specification import (
     WorkflowTaskTemplateGeneration,
     WorkflowTemplate,
     build_workflow_template_validation_report,
+    instantiate_workflow_template,
     load_workflow_template,
     save_workflow_template,
     validate_workflow_template_json,
@@ -229,3 +230,21 @@ def test_specify_feature_workflow_template_file_is_checked_in() -> None:
         ).validation_successful
         is True
     )
+
+
+def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "specify-a-feature.json"
+    )
+
+    output_directory, tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Example Feature",
+        output_root=tmp_path / "workflows",
+    )
+
+    assert output_directory == tmp_path / "workflows" / "example-feature"
+    assert len(tasks) == 5
+    assert tasks[0].task_id == "task-001"
+    assert tasks[1].upstream_task_ids == ("task-001",)
+    assert all(task.status.value == "open" for task in tasks)

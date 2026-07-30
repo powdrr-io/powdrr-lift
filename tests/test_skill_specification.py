@@ -308,6 +308,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "specify-architecture",
         "specify-implementation",
         "specify-system",
+        "start-implementing-feature",
     ]
 
 
@@ -315,6 +316,29 @@ def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     assert (skills_dir / "review-architecture.json").is_file()
     assert (skills_dir / "review-system.json").is_file()
+
+
+def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    skill = load_skill(skills_dir / "start-implementing-feature.json")
+
+    assert skill.name == "start-implementing-feature"
+    assert [step.description for step in skill.steps] == [
+        "Confirm the feature, work-item name, and workflow template.",
+        "Read the selected workflow template and explain the generated task graph.",
+        "Instantiate the workflow and generate its first task.",
+        "Review the generated workflow and first task with the user.",
+        "Commit the generated workflow and open a draft pull request.",
+        "Hand the pull request to the user for review.",
+    ]
+    assert skill.steps[2].tool_invocations[0].command == (
+        "powdrr-lift",
+        "instantiate-workflow",
+        "--work-item-name",
+        "<work-item-name>",
+        "--template",
+        "<template-path>",
+    )
 
 
 def test_checked_in_review_system_skill_definition_matches_review_flow() -> None:

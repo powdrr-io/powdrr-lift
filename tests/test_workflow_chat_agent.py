@@ -42,12 +42,50 @@ from powdrr_lift.workflow_chat_agent import (
     _apply_file_edits,
     _catalog_entry_to_data,
     _resolve_api_key,
+    _resolve_llm_model,
     _resolve_skill_path,
     _resolve_worktree_context,
     run_workflow_chat,
 )
 
 # ruff: noqa: E501
+
+
+def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
+    assert (
+        _resolve_llm_model(
+            "high_reasoning",
+            fallback_model="test-model",
+            mappings=(),
+        )
+        == "glm-5.2"
+    )
+    assert (
+        _resolve_llm_model(
+            "simple-task",
+            fallback_model="test-model",
+            mappings=(("simple_task", "custom-fast-model"),),
+            provider="zai",
+        )
+        == "custom-fast-model"
+    )
+    assert (
+        _resolve_llm_model(
+            None,
+            fallback_model="test-model",
+            mappings=(),
+        )
+        == "test-model"
+    )
+    assert (
+        _resolve_llm_model(
+            "high_reasoning",
+            fallback_model="gpt-test-model",
+            mappings=(),
+            provider="openai",
+        )
+        == "gpt-test-model"
+    )
 
 
 def _assert_validation_success(

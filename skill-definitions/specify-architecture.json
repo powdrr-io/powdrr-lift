@@ -7,6 +7,7 @@
   "steps": [
     {
       "description": "Review the system context first.",
+      "llm_type": "high_reasoning",
       "details": "Use the system review flow to confirm the requirements, approach, and current constraints.",
       "uses_skills": [
         "review-system"
@@ -14,6 +15,7 @@
     },
     {
       "description": "Generate the architecture specification template.",
+      "llm_type": "simple_task",
       "details": "Generate the architecture template with the full allowed entity type set so validation can enforce the schema."
       ,
       "tool_invocations": [
@@ -32,10 +34,12 @@
     },
     {
       "description": "Fill out entities, relationships, invariants, and guidance using only the allowed entity types.",
+      "llm_type": "high_reasoning",
       "details": "Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships."
     },
     {
       "description": "Validate the filled architecture template and fix any validation errors.",
+      "llm_type": "fast_iteration",
       "details": "Re-run validation until there are no unknown types or broken references."
       ,
       "tool_invocations": [

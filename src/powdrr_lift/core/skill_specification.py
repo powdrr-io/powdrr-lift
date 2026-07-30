@@ -45,6 +45,7 @@ class SkillToolInvocation:
 class SkillStep:
     description: str
     details: str | None = None
+    llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
 
@@ -52,6 +53,8 @@ class SkillStep:
         data: dict[str, Any] = {"description": self.description}
         if self.details is not None:
             data["details"] = self.details
+        if self.llm_type is not None:
+            data["llm_type"] = self.llm_type
         if self.uses_skills:
             data["uses_skills"] = list(self.uses_skills)
         if self.tool_invocations:
@@ -249,7 +252,13 @@ def build_skill_validation_report(
             step_mapping = cast("Mapping[str, Any]", step)
             _validate_unknown_keys(
                 step_mapping,
-                {"description", "details", "uses_skills", "tool_invocations"},
+                {
+                    "description",
+                    "details",
+                    "llm_type",
+                    "uses_skills",
+                    "tool_invocations",
+                },
                 issues,
                 path=step_path or "",
                 subject="skill step",
@@ -272,6 +281,16 @@ def build_skill_validation_report(
                         code="invalid_details",
                         message="Skill step details must be a non-empty string.",
                         path=_child_path(step_path, "details"),
+                    )
+                )
+
+            llm_type = step_mapping.get("llm_type")
+            if llm_type is not None and _optional_string(llm_type) is None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_llm_type",
+                        message="Skill step llm_type must be a non-empty string.",
+                        path=_child_path(step_path, "llm_type"),
                     )
                 )
 
@@ -631,6 +650,7 @@ def _parse_step(raw_step: object) -> SkillStep:
     raw_step_mapping = cast("Mapping[str, Any]", raw_step)
     description = _required_string(raw_step_mapping, "description")
     details = _optional_string(raw_step_mapping.get("details"))
+    llm_type = _optional_string(raw_step_mapping.get("llm_type"))
     uses_skills = _optional_string_sequence(raw_step_mapping.get("uses_skills"))
     tool_invocations = _optional_tool_invocations(
         raw_step_mapping.get("tool_invocations"),
@@ -638,6 +658,7 @@ def _parse_step(raw_step: object) -> SkillStep:
     return SkillStep(
         description=description,
         details=details,
+        llm_type=llm_type,
         uses_skills=uses_skills,
         tool_invocations=tool_invocations,
     )

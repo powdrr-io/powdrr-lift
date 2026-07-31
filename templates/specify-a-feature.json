@@ -14,6 +14,7 @@
       "complexity": "medium",
       "assignee_type": "agent",
       "assignee_role": "architect",
+      "execution_skill": "specify-system",
       "input_state": {
         "feature": null,
         "requirements": [],
@@ -31,6 +32,7 @@
       "complexity": "medium",
       "assignee_type": "agent",
       "assignee_role": "architect",
+      "execution_skill": "specify-architecture",
       "input_state": {
         "entities": [],
         "invariants": [],
@@ -51,6 +53,7 @@
       "complexity": "medium",
       "assignee_type": "human",
       "assignee_role": "decider",
+      "execution_skill": "specify-implementation",
       "input_state": {
         "features": [],
         "decisions": []
@@ -76,6 +79,7 @@
       "complexity": "medium",
       "assignee_type": "human",
       "assignee_role": "decider",
+      "execution_skill": "specify-a-feature",
       "input_state": {
         "intent": null,
         "reasoning": null
@@ -94,6 +98,7 @@
       "complexity": "high",
       "assignee_type": "agent",
       "assignee_role": "architect",
+      "execution_skill": "specify-prs",
       "input_state": {
         "proposed_prs": []
       },

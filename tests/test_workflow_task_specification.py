@@ -49,6 +49,7 @@ def test_workflow_task_round_trips_through_json() -> None:
         "input_state": {"environment": "staging"},
         "assignee_type": "agent",
         "assignee_role": "coder",
+        "execution_skill": "unspecified",
         "output_state_type": "state",
         "description": "Prepare the deployment environment.",
     }
@@ -177,6 +178,7 @@ def test_workflow_task_validation_reports_unknown_keys() -> None:
                 "input_state": {"ready": True},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
+                "execution_skill": "test-skill",
                 "output_state_type": "state",
                 "description": "Task one.",
                 "unexpected": "field",
@@ -201,6 +203,7 @@ def test_workflow_task_validation_rejects_invalid_status() -> None:
                 "input_state": {"ready": True},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
+                "execution_skill": "test-skill",
                 "output_state_type": "state",
                 "description": "Task one.",
             }
@@ -224,6 +227,7 @@ def test_workflow_task_validation_accepts_closed_status() -> None:
                 "input_state": {"ready": True},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
+                "execution_skill": "test-skill",
                 "output_state_type": "state",
                 "description": "Task one.",
             }

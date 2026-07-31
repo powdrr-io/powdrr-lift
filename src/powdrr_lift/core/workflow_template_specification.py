@@ -56,6 +56,7 @@ class WorkflowTaskTemplate:
     input_state: Any
     assignee_type: AssigneeType = AssigneeType.AGENT
     assignee_role: AssigneeRole = AgentRole.CODER
+    execution_skill: str = "unspecified"
     output_state_type: str = "state"
     upstream_task_template_indexes: tuple[int, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -65,8 +66,14 @@ class WorkflowTaskTemplate:
         assignee_type, assignee_role = validate_assignee(
             self.assignee_type, self.assignee_role
         )
+        execution_skill = self.execution_skill.strip()
+        if not execution_skill:
+            raise ValueError(
+                "Workflow task template execution_skill must not be empty."
+            )
         object.__setattr__(self, "assignee_type", assignee_type)
         object.__setattr__(self, "assignee_role", assignee_role)
+        object.__setattr__(self, "execution_skill", execution_skill)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -75,6 +82,7 @@ class WorkflowTaskTemplate:
             "input_state": self.input_state,
             "assignee_type": self.assignee_type.value,
             "assignee_role": self.assignee_role.value,
+            "execution_skill": self.execution_skill,
             "output_state_type": self.output_state_type,
             "upstream_task_template_indexes": list(self.upstream_task_template_indexes),
             "dependent_state": list(self.dependent_state),
@@ -179,6 +187,7 @@ def instantiate_workflow_template(
             input_state=task_template.input_state,
             assignee_type=task_template.assignee_type,
             assignee_role=task_template.assignee_role,
+            execution_skill=task_template.execution_skill,
             output_state_type=task_template.output_state_type,
             upstream_task_ids=tuple(
                 task_ids[upstream_index]
@@ -322,6 +331,7 @@ def build_workflow_template_validation_report(
                 "input_state",
                 "assignee_type",
                 "assignee_role",
+                "execution_skill",
                 "output_state_type",
                 "upstream_task_template_indexes",
                 "dependent_state",
@@ -402,6 +412,21 @@ def build_workflow_template_validation_report(
                         path=_child_path(task_template_path, "assignee_role"),
                     )
                 )
+
+        execution_skill = _optional_string(
+            raw_task_template_mapping.get("execution_skill")
+        )
+        if execution_skill is None:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="missing_execution_skill",
+                    message=(
+                        "Workflow task templates must include a non-empty "
+                        "execution_skill."
+                    ),
+                    path=_child_path(task_template_path, "execution_skill"),
+                )
+            )
 
         if "input_state" not in raw_task_template_mapping:
             issues.append(
@@ -676,6 +701,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         _required_string(data, "assignee_type"),
         _required_string(data, "assignee_role"),
     )
+    execution_skill = _required_string(data, "execution_skill")
     output_state_type = _required_string(data, "output_state_type")
     upstream_task_template_indexes = _required_int_sequence(
         data,
@@ -692,6 +718,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         input_state=input_state,
         assignee_type=assignee_type,
         assignee_role=assignee_role,
+        execution_skill=execution_skill,
         output_state_type=output_state_type,
         upstream_task_template_indexes=upstream_task_template_indexes,
         dependent_state=dependent_state,

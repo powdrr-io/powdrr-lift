@@ -7,6 +7,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_lift.core.skill_specification import (
+    SkillToolInvocation,
+    skill_step_from_data,
+)
+
 
 class TaskComplexity(StrEnum):
     LOW = "low"
@@ -66,7 +71,10 @@ class WorkflowTask:
     input_state: Any
     assignee_type: AssigneeType = AssigneeType.AGENT
     assignee_role: AssigneeRole = AgentRole.CODER
-    execution_skill: str = "unspecified"
+    details: str | None = None
+    llm_type: str | None = None
+    uses_skills: tuple[str, ...] = field(default_factory=tuple)
+    tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -75,15 +83,11 @@ class WorkflowTask:
         assignee_type, assignee_role = validate_assignee(
             self.assignee_type, self.assignee_role
         )
-        execution_skill = self.execution_skill.strip()
-        if not execution_skill:
-            raise ValueError("Workflow task execution_skill must not be empty.")
         object.__setattr__(self, "assignee_type", assignee_type)
         object.__setattr__(self, "assignee_role", assignee_role)
-        object.__setattr__(self, "execution_skill", execution_skill)
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "task_id": self.task_id,
             "status": self.status.value,
             "upstream_task_ids": list(self.upstream_task_ids),
@@ -92,10 +96,20 @@ class WorkflowTask:
             "input_state": self.input_state,
             "assignee_type": self.assignee_type.value,
             "assignee_role": self.assignee_role.value,
-            "execution_skill": self.execution_skill,
             "output_state_type": self.output_state_type,
             "description": self.description,
         }
+        step_data = {
+            "description": self.description,
+            "details": self.details,
+            "llm_type": self.llm_type,
+            "uses_skills": list(self.uses_skills),
+            "tool_invocations": [
+                invocation.to_data() for invocation in self.tool_invocations
+            ],
+        }
+        data.update({key: value for key, value in step_data.items() if value})
+        return data
 
     def to_json(self) -> str:
         return workflow_task_to_json(self)
@@ -146,7 +160,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     if "input_state" not in data:
         raise ValueError("Workflow task entries must include input_state.")
     assignee_type, assignee_role = _required_assignee(data)
-    execution_skill = _required_string(data, "execution_skill")
+    step = skill_step_from_data(data)
     output_state_type = _required_string(data, "output_state_type")
 
     return WorkflowTask(
@@ -157,7 +171,10 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         input_state=data["input_state"],
         assignee_type=assignee_type,
         assignee_role=assignee_role,
-        execution_skill=execution_skill,
+        details=step.details,
+        llm_type=step.llm_type,
+        uses_skills=step.uses_skills,
+        tool_invocations=step.tool_invocations,
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
@@ -288,7 +305,10 @@ def build_workflow_task_validation_report(
             "description",
             "assignee_type",
             "assignee_role",
-            "execution_skill",
+            "details",
+            "llm_type",
+            "uses_skills",
+            "tool_invocations",
         },
         issues,
         path=_format_path(source_path) or "",
@@ -393,19 +413,6 @@ def build_workflow_task_validation_report(
                     path=_format_child_path(source_path, "assignee_role"),
                 )
             )
-
-    execution_skill = _optional_string(raw_task.get("execution_skill"))
-    if execution_skill is None:
-        issues.append(
-            WorkflowTaskValidationIssue(
-                code="missing_execution_skill",
-                message=(
-                    "Workflow task entries must include a non-empty execution_skill."
-                ),
-                path=_format_child_path(source_path, "execution_skill"),
-            )
-        )
-
     if "input_state" not in raw_task:
         issues.append(
             WorkflowTaskValidationIssue(

@@ -70,7 +70,6 @@ def test_workflow_template_round_trips_through_json() -> None:
                 "input_state": {"files": []},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
-                "execution_skill": "unspecified",
                 "output_state_type": "state",
                 "upstream_task_template_indexes": [],
                 "dependent_state": ["files-discovered"],
@@ -85,7 +84,6 @@ def test_workflow_template_round_trips_through_json() -> None:
                 "input_state": {"ready": True},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
-                "execution_skill": "unspecified",
                 "output_state_type": "state",
                 "upstream_task_template_indexes": [0],
                 "dependent_state": ["validation-ready"],
@@ -106,7 +104,6 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                     "input_state": {"items": []},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
-                    "execution_skill": "test-skill",
                     "output_state_type": "state",
                     "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
@@ -121,7 +118,6 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                     "input_state": {"ready": True},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
-                    "execution_skill": "test-skill",
                     "output_state_type": "state",
                     "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
@@ -154,7 +150,6 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                     "input_state": {"items": []},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
-                    "execution_skill": "test-skill",
                     "output_state_type": "state",
                     "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
@@ -169,7 +164,6 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                     "input_state": {"ready": True},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
-                    "execution_skill": "test-skill",
                     "output_state_type": "state",
                     "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
@@ -248,6 +242,14 @@ def test_specify_feature_workflow_template_file_is_checked_in() -> None:
         ("human", "decider"),
         ("agent", "architect"),
     ]
+    assert [task.llm_type for task in template.task_templates] == [
+        "high_reasoning",
+        "high_reasoning",
+        "standard_reasoning",
+        "high_reasoning",
+        "standard_reasoning",
+    ]
+    assert all(task.details for task in template.task_templates)
     assert template.task_templates[2].generation == WorkflowTaskTemplateGeneration(
         for_each="each feature or decision that needs dedicated follow-up",
         downstream_task_template_indexes=(3, 4),

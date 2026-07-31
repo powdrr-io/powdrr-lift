@@ -1531,6 +1531,9 @@ def _execute_shell_tool(
     )
     if process.stdout:
         print(process.stdout, end="", file=stdout)
+        _verbose_print(
+            stderr, verbose, f"Shell tool stdout:\n{process.stdout.rstrip()}"
+        )
     if process.stderr:
         print(process.stderr, end="", file=stderr)
     _verbose_print(

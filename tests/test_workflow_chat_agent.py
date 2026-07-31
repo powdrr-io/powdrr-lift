@@ -2450,6 +2450,28 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
     assert run.call_args.args[0] == "rtk git status"
 
 
+def test_execute_shell_tool_verbose_prints_stdout(
+    tmp_path: Path,
+) -> None:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+        run.return_value.returncode = 0
+        run.return_value.stdout = "tool stdout\n"
+        run.return_value.stderr = ""
+
+        _execute_shell_tool(
+            {"command": ["echo", "tool stdout"]},
+            worktree_root=tmp_path,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=True,
+        )
+
+    assert "[verbose] Shell tool stdout:\ntool stdout" in stderr.getvalue()
+
+
 def test_resolve_api_key_prefers_env_over_codex_auth(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -7,7 +7,7 @@ import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TextIO, cast
+from typing import Any, TextIO, cast
 from unittest.mock import patch
 from urllib.request import Request
 
@@ -33,6 +33,10 @@ from powdrr_lift.core.pr_specification import (
     validate_pr_specification_yaml,
 )
 from powdrr_lift.core.system_specification import validate_system_specification_yaml
+from powdrr_lift.core.workflow_task_specification import (
+    load_workflow_tasks,
+    select_ready_workflow_tasks,
+)
 from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     OpenAIChatClient,
@@ -896,7 +900,7 @@ def test_apply_file_edits_uses_original_line_numbers_for_interleaved_edits(
     assert _apply_file_edits(current_text, edits) == expected_text
 
 
-def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
+def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_calls(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1908,6 +1912,218 @@ def test_cli_workflow_chat_end_to_end_specify_feature_with_mocked_llm_calls(
     _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Please review the draft result." in stdout.getvalue()
+
+    start_skills_dir = worktree_root / "skill-definitions"
+    start_output_dir = Path("start-generated")
+    start_responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(
+                    start_skills_dir / "start-implementing-feature.json"
+                ),
+                "selected_skill_reason": (
+                    "The feature has validated specifications and is ready for "
+                    "implementation planning."
+                ),
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The feature and work item are confirmed.",
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "sed",
+                        "-n",
+                        "1,260p",
+                        "templates/specify-a-feature.json",
+                    ]
+                },
+                "decisions_and_context": "The specify-a-feature template is selected.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The generated task graph is appropriate.",
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "instantiate-workflow",
+                        "--work-item-name",
+                        "display-related-photos",
+                        "--template",
+                        "templates/specify-a-feature.json",
+                    ]
+                },
+                "decisions_and_context": "The durable implementation workflow is created.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The first task is ready for review.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The generated workflow looks correct.",
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "gh",
+                        "pr",
+                        "create",
+                        "--draft",
+                        "--fill",
+                    ]
+                },
+                "decisions_and_context": "The generated workflow is handed off for review.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The draft pull request is ready.",
+            },
+            {
+                "kind": "complete",
+                "text": "Implementation workflow ready for review.",
+                "decisions_and_context": "Stop until the user approves implementation.",
+            },
+        ]
+    )
+
+    start_captured: dict[str, object] = {"messages": []}
+
+    def _expected_start_step(call_index: int) -> int:
+        return {
+            1: 0,
+            2: 1,
+            3: 1,
+            4: 2,
+            5: 2,
+            6: 3,
+            7: 4,
+            8: 4,
+            9: 5,
+        }[call_index]
+
+    class _FakeStartOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            self._call_index = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            cast(list[list[dict[str, str]]], start_captured["messages"]).append(
+                messages
+            )
+            prompt = json.loads(messages[1]["content"])
+            if self._call_index == 0:
+                assert prompt["conversation"][0]["content"] == (
+                    "Start implementing display related photos"
+                )
+                assert any(
+                    skill["name"] == "start-implementing-feature"
+                    for skill in prompt["skills"]
+                )
+            else:
+                assert prompt["selected_skill"]["name"] == (
+                    "start-implementing-feature"
+                )
+                assert prompt["execution_mode"] == "execute_selected_skill"
+                assert prompt["current_step_index"] == _expected_start_step(
+                    self._call_index
+                )
+            response = next(start_responses)
+            self._call_index += 1
+            return response
+
+    real_subprocess_run = subprocess.run
+
+    def _fake_start_subprocess_run(*args: Any, **kwargs: Any) -> Any:
+        command = args[0] if args else kwargs.get("args")
+        if isinstance(command, list) and command[:2] == ["rtk", "gh"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="https://github.com/example/repo/pull/123\n",
+                stderr="",
+            )
+        return real_subprocess_run(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeStartOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        _fake_start_subprocess_run,
+    )
+
+    start_stdout = io.StringIO()
+    start_stderr = io.StringIO()
+    start_exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=start_skills_dir,
+            repo_root=worktree_root,
+            output_dir=start_output_dir,
+            provider="openai",
+            model="test-model",
+            api_key="test-key",
+            max_turns=10,
+        ),
+        input_func=lambda: "Start implementing display related photos",
+        stdout=start_stdout,
+        stderr=start_stderr,
+    )
+
+    assert start_exit_code == 0
+    start_summary_path = worktree_root / start_output_dir / "skill-execution.json"
+    assert start_summary_path.exists()
+    start_summary = json.loads(start_summary_path.read_text(encoding="utf-8"))
+    assert start_summary["selected_skill_name"] == "start-implementing-feature"
+    assert [event["kind"] for event in start_summary["execution_events"]] == [
+        "next_step",
+        "invoke_tool",
+        "next_step",
+        "invoke_tool",
+        "next_step",
+        "next_step",
+        "invoke_tool",
+        "next_step",
+        "complete",
+    ]
+
+    workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
+    tasks = load_workflow_tasks(workflow_directory)
+    assert [task.task_id for task in tasks] == [
+        "task-001",
+        "task-002",
+        "task-003",
+        "task-004",
+        "task-005",
+    ]
+    assert [task.description for task in tasks] == [
+        "Gather the requirements and approach.",
+        "Gather the entities, invariants, and guidance.",
+        "Gather the features and decisions.",
+        "Gather the intent and reasoning.",
+        "Specify proposed PRs.",
+    ]
+    assert [task.upstream_task_ids for task in tasks] == [
+        (),
+        ("task-001",),
+        ("task-002",),
+        ("task-003",),
+        ("task-004",),
+    ]
+    assert all(task.status.value == "open" for task in tasks)
+    assert select_ready_workflow_tasks(tasks) == (tasks[0],)
+    assert "Implementation workflow ready for review." in start_stdout.getvalue()
 
 
 def test_run_workflow_chat_verbose_prints_progress(

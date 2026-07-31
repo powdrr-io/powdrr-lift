@@ -200,59 +200,53 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
     assert load_workflow_template(output_path) == template
 
 
-def test_specify_feature_workflow_template_file_is_checked_in() -> None:
+def test_implement_feature_workflow_template_file_is_checked_in() -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "specify-a-feature.json"
+        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.json"
     )
     template = load_workflow_template(template_path)
 
     assert template.when_to_use == (
-        "When a feature needs to move from an idea to implementation-ready work.",
-        "When the work should gather requirements, supporting context, intent, and "
-        "proposed PRs in a single workflow.",
+        "When a feature has plan documents and is ready to become implementation work.",
+        "When the work should confirm requirements before splitting the plan into "
+        "proposed PRs.",
     )
     assert template.how_to_fill_this_out == (
-        "Fill in the steps in order and keep each step focused on the named output.",
-        "Use the generation block to fan out follow-up tasks when one step needs "
-        "to produce several related tasks.",
-        "Keep dependencies explicit so later steps only rely on completed upstream "
-        "templates.",
+        "Review the existing plan documents before making implementation decisions.",
+        "Keep the confirmed requirements explicit in the task state.",
+        "Generate one execute-proposed-pr workflow for each approved proposed PR.",
     )
     assert [task.description for task in template.task_templates] == [
-        "Gather the requirements and approach.",
-        "Gather the entities, invariants, and guidance.",
-        "Gather the features and decisions.",
-        "Gather the intent and reasoning.",
-        "Specify proposed PRs.",
+        "Review plan documents",
+        "Confirm requirements",
+        "Generate proposed PRs",
     ]
     assert [task.output_state_type for task in template.task_templates] == [
-        "requirements-and-approach-state",
-        "entities-invariants-guidance-state",
-        "features-and-decisions-state",
-        "intent-and-reasoning-state",
-        "proposed-prs-state",
+        "reviewed-plan-documents-state",
+        "confirmed-requirements-state",
+        "proposed-prs-and-execution-workflows-state",
     ]
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates
     ] == [
         ("agent", "architect"),
-        ("agent", "architect"),
-        ("human", "decider"),
         ("human", "decider"),
         ("agent", "architect"),
     ]
     assert [task.llm_type for task in template.task_templates] == [
         "high_reasoning",
-        "high_reasoning",
         "standard_reasoning",
         "high_reasoning",
-        "standard_reasoning",
     ]
     assert all(task.details for task in template.task_templates)
-    assert template.task_templates[2].generation == WorkflowTaskTemplateGeneration(
-        for_each="each feature or decision that needs dedicated follow-up",
-        downstream_task_template_indexes=(3, 4),
+    assert template.task_templates[2].tool_invocations[0].command == (
+        "powdrr-lift",
+        "instantiate-workflow",
+        "--work-item-name",
+        "<execute-work-item-name>",
+        "--template",
+        "templates/execute-proposed-pr.json",
     )
     assert (
         build_workflow_template_validation_report(
@@ -262,9 +256,45 @@ def test_specify_feature_workflow_template_file_is_checked_in() -> None:
     )
 
 
+def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.json"
+    )
+    template = load_workflow_template(template_path)
+
+    assert [task.description for task in template.task_templates] == [
+        "Review proposed PR plan",
+        "Review overall plan",
+        "Confirm requirements",
+        "Generate test diffs",
+        "Generate functionality diffs",
+        "Confirm completeness",
+        "Confirm goals",
+        "Lint and cleanup",
+        "Create PR",
+    ]
+    assert [
+        (task.assignee_type.value, task.assignee_role.value)
+        for task in template.task_templates
+    ] == [
+        ("agent", "architect"),
+        ("agent", "architect"),
+        ("human", "decider"),
+        ("agent", "coder"),
+        ("agent", "coder"),
+        ("human", "reviewer"),
+        ("human", "decider"),
+        ("agent", "reviewer"),
+        ("human", "reviewer"),
+    ]
+    assert build_workflow_template_validation_report(
+        template.to_json()
+    ).validation_successful
+
+
 def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "specify-a-feature.json"
+        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.json"
     )
 
     output_directory, tasks = instantiate_workflow_template(
@@ -274,7 +304,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
-    assert len(tasks) == 5
+    assert len(tasks) == 3
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)

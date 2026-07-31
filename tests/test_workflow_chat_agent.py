@@ -3,8 +3,10 @@ from __future__ import annotations
 import io
 import json
 import os
+import shutil
 import subprocess
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TextIO, cast
@@ -34,7 +36,10 @@ from powdrr_lift.core.pr_specification import (
 )
 from powdrr_lift.core.system_specification import validate_system_specification_yaml
 from powdrr_lift.core.workflow_task_specification import (
+    TaskStatus,
+    load_ready_workflow_tasks,
     load_workflow_tasks,
+    save_workflow_task,
     select_ready_workflow_tasks,
 )
 from powdrr_lift.workflow_chat_agent import (
@@ -1244,6 +1249,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             verbose=verbose,
         )
         worktree_root_holder["path"] = resolved
+        for relative_path in (
+            Path("templates") / "implement-a-feature.json",
+            Path("templates") / "execute-proposed-pr.json",
+            Path("skill-definitions") / "start-implementing-feature.json",
+        ):
+            target_path = resolved / relative_path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_repo_root / relative_path, target_path)
         return resolved
 
     class _FakeOpenAIClient:
@@ -1940,10 +1953,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "sed",
                         "-n",
                         "1,260p",
-                        "templates/specify-a-feature.json",
+                        "templates/implement-a-feature.json",
                     ]
                 },
-                "decisions_and_context": "The specify-a-feature template is selected.",
+                "decisions_and_context": "The implement-a-feature template is selected.",
             },
             {
                 "kind": "next_step",
@@ -1959,7 +1972,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "--work-item-name",
                         "display-related-photos",
                         "--template",
-                        "templates/specify-a-feature.json",
+                        "templates/implement-a-feature.json",
                     ]
                 },
                 "decisions_and_context": "The durable implementation workflow is created.",
@@ -2104,26 +2117,89 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "task-001",
         "task-002",
         "task-003",
-        "task-004",
-        "task-005",
     ]
     assert [task.description for task in tasks] == [
-        "Gather the requirements and approach.",
-        "Gather the entities, invariants, and guidance.",
-        "Gather the features and decisions.",
-        "Gather the intent and reasoning.",
-        "Specify proposed PRs.",
+        "Review plan documents",
+        "Confirm requirements",
+        "Generate proposed PRs",
     ]
     assert [task.upstream_task_ids for task in tasks] == [
         (),
         ("task-001",),
         ("task-002",),
-        ("task-003",),
-        ("task-004",),
     ]
     assert all(task.status.value == "open" for task in tasks)
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
     assert "Implementation workflow ready for review." in start_stdout.getvalue()
+
+    workflow_root = worktree_root / "docs" / "workflows"
+    assignment_batches: list[tuple[str, str]] = []
+    while ready_tasks := load_ready_workflow_tasks(workflow_root):
+        current_assignment = (
+            ready_tasks[0].task.assignee_type.value,
+            ready_tasks[0].task.assignee_role.value,
+        )
+        assignment_batches.append(current_assignment)
+        assigned_ready_tasks = load_ready_workflow_tasks(
+            workflow_root,
+            assignee_type=current_assignment[0],
+            assignee_role=current_assignment[1],
+        )
+        assert assigned_ready_tasks
+        for ready_task in assigned_ready_tasks:
+            task = ready_task.task
+            for invocation in task.tool_invocations:
+                command = [
+                    item.replace(
+                        "<execute-work-item-name>",
+                        "display-related-photos-pr-001",
+                    )
+                    for item in invocation.command
+                ]
+                result = _execute_shell_tool(
+                    {"command": command},
+                    worktree_root=worktree_root,
+                    stdout=start_stdout,
+                    stderr=start_stderr,
+                    verbose=False,
+                )
+                assert result["returncode"] == 0
+            save_workflow_task(
+                replace(task, status=TaskStatus.COMPLETED),
+                workflow_root / ready_task.work_item_name / f"{task.task_id}.json",
+            )
+
+    assert assignment_batches == [
+        ("agent", "architect"),
+        ("human", "decider"),
+        ("agent", "architect"),
+        ("agent", "architect"),
+        ("agent", "architect"),
+        ("human", "decider"),
+        ("agent", "coder"),
+        ("agent", "coder"),
+        ("human", "reviewer"),
+        ("human", "decider"),
+        ("agent", "reviewer"),
+        ("human", "reviewer"),
+    ]
+    assert load_ready_workflow_tasks(workflow_root) == ()
+
+    execute_workflow_directory = workflow_root / "display-related-photos-pr-001"
+    execute_tasks = load_workflow_tasks(execute_workflow_directory)
+    assert len(execute_tasks) == 9
+    assert [task.description for task in execute_tasks] == [
+        "Review proposed PR plan",
+        "Review overall plan",
+        "Confirm requirements",
+        "Generate test diffs",
+        "Generate functionality diffs",
+        "Confirm completeness",
+        "Confirm goals",
+        "Lint and cleanup",
+        "Create PR",
+    ]
+    assert all(task.status is TaskStatus.COMPLETED for task in execute_tasks)
 
 
 def test_run_workflow_chat_verbose_prints_progress(

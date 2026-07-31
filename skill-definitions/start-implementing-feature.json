@@ -2,13 +2,13 @@
   "name": "start-implementing-feature",
   "when_to_use": [
     "When the user is ready to begin implementing a feature.",
-    "When the feature needs a durable workflow instantiated from the appropriate workflow template before implementation starts.",
+    "When the feature needs a durable implement-a-feature workflow instantiated from the plan before implementation starts.",
     "When the generated workflow and first task should be placed in a pull request for user review."
   ],
   "steps": [
     {
       "description": "Confirm the feature, work-item name, and workflow template.",
-      "details": "Capture the feature the user wants to implement and choose the matching template from templates/. Use templates/specify-a-feature.json for a feature that is moving from specification into implementation unless another template is a better match. Ask the user for any missing feature or work-item information before continuing."
+      "details": "Capture the feature the user wants to implement and fill out templates/implement-a-feature.json from the approved plan documents. Ask the user for any missing feature or work-item information before continuing."
     },
     {
       "description": "Read the selected workflow template and explain the generated task graph.",
@@ -20,7 +20,7 @@
             "sed",
             "-n",
             "1,260p",
-            "<template-path>"
+            "templates/implement-a-feature.json"
           ]
         }
       ]
@@ -37,7 +37,7 @@
             "--work-item-name",
             "<work-item-name>",
             "--template",
-            "<template-path>"
+            "templates/implement-a-feature.json"
           ]
         }
       ]

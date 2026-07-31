@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from powdrr_lift.core.skill_specification import SkillToolInvocation
 from powdrr_lift.core.workflow_task_specification import (
     AgentRole,
     AssigneeType,
@@ -52,6 +53,29 @@ def test_workflow_task_round_trips_through_json() -> None:
         "output_state_type": "state",
         "description": "Prepare the deployment environment.",
     }
+
+
+def test_workflow_task_round_trips_executable_step_fields() -> None:
+    task = WorkflowTask(
+        task_id="task-1",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={},
+        description="Run the implementation step.",
+        details="Use the approved design and preserve the recorded decisions.",
+        llm_type="standard_reasoning",
+        uses_skills=("review-context",),
+        tool_invocations=(SkillToolInvocation(tool="shell", command=("pytest", "-q")),),
+    )
+
+    parsed = workflow_task_from_json(workflow_task_to_json(task))
+
+    assert parsed == task
+    assert parsed.to_data()["tool_invocations"] == [
+        {"tool": "shell", "command": ["pytest", "-q"]}
+    ]
 
 
 def test_workflow_task_directory_loader_reads_all_json_files(

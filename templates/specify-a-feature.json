@@ -14,6 +14,8 @@
       "complexity": "medium",
       "assignee_type": "agent",
       "assignee_role": "architect",
+      "llm_type": "high_reasoning",
+      "details": "Capture the feature requirements and proposed approach from the available context, identifying unresolved decisions for the next task.",
       "input_state": {
         "feature": null,
         "requirements": [],
@@ -31,6 +33,8 @@
       "complexity": "medium",
       "assignee_type": "agent",
       "assignee_role": "architect",
+      "llm_type": "high_reasoning",
+      "details": "Use the requirements and approach state to identify entities, invariants, and implementation guidance.",
       "input_state": {
         "entities": [],
         "invariants": [],
@@ -51,6 +55,8 @@
       "complexity": "medium",
       "assignee_type": "human",
       "assignee_role": "decider",
+      "llm_type": "standard_reasoning",
+      "details": "Turn the approved domain context into concrete feature and implementation decisions, preserving any human decisions in the task output.",
       "input_state": {
         "features": [],
         "decisions": []
@@ -76,6 +82,8 @@
       "complexity": "medium",
       "assignee_type": "human",
       "assignee_role": "decider",
+      "llm_type": "high_reasoning",
+      "details": "Capture the intent and reasoning that connect the selected features and decisions to the requested outcome.",
       "input_state": {
         "intent": null,
         "reasoning": null
@@ -94,6 +102,8 @@
       "complexity": "high",
       "assignee_type": "agent",
       "assignee_role": "architect",
+      "llm_type": "standard_reasoning",
+      "details": "Decompose the approved intent into proposed pull requests with clear scope, acceptance criteria, and validation expectations.",
       "input_state": {
         "proposed_prs": []
       },

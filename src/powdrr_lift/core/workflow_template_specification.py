@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_lift.core.skill_specification import (
+    SkillToolInvocation,
+    skill_step_from_data,
+)
 from powdrr_lift.core.workflow_task_specification import (
     AgentRole,
     AssigneeRole,
@@ -56,6 +60,10 @@ class WorkflowTaskTemplate:
     input_state: Any
     assignee_type: AssigneeType = AssigneeType.AGENT
     assignee_role: AssigneeRole = AgentRole.CODER
+    details: str | None = None
+    llm_type: str | None = None
+    uses_skills: tuple[str, ...] = field(default_factory=tuple)
+    tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     upstream_task_template_indexes: tuple[int, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -79,6 +87,15 @@ class WorkflowTaskTemplate:
             "upstream_task_template_indexes": list(self.upstream_task_template_indexes),
             "dependent_state": list(self.dependent_state),
         }
+        step_data = {
+            "details": self.details,
+            "llm_type": self.llm_type,
+            "uses_skills": list(self.uses_skills),
+            "tool_invocations": [
+                invocation.to_data() for invocation in self.tool_invocations
+            ],
+        }
+        data.update({key: value for key, value in step_data.items() if value})
         if self.generation is not None:
             data["generation"] = self.generation.to_data()
         return data
@@ -179,6 +196,10 @@ def instantiate_workflow_template(
             input_state=task_template.input_state,
             assignee_type=task_template.assignee_type,
             assignee_role=task_template.assignee_role,
+            details=task_template.details,
+            llm_type=task_template.llm_type,
+            uses_skills=task_template.uses_skills,
+            tool_invocations=task_template.tool_invocations,
             output_state_type=task_template.output_state_type,
             upstream_task_ids=tuple(
                 task_ids[upstream_index]
@@ -322,6 +343,10 @@ def build_workflow_template_validation_report(
                 "input_state",
                 "assignee_type",
                 "assignee_role",
+                "details",
+                "llm_type",
+                "uses_skills",
+                "tool_invocations",
                 "output_state_type",
                 "upstream_task_template_indexes",
                 "dependent_state",
@@ -676,6 +701,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         _required_string(data, "assignee_type"),
         _required_string(data, "assignee_role"),
     )
+    step = skill_step_from_data(data)
     output_state_type = _required_string(data, "output_state_type")
     upstream_task_template_indexes = _required_int_sequence(
         data,
@@ -692,6 +718,10 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         input_state=input_state,
         assignee_type=assignee_type,
         assignee_role=assignee_role,
+        details=step.details,
+        llm_type=step.llm_type,
+        uses_skills=step.uses_skills,
+        tool_invocations=step.tool_invocations,
         output_state_type=output_state_type,
         upstream_task_template_indexes=upstream_task_template_indexes,
         dependent_state=dependent_state,

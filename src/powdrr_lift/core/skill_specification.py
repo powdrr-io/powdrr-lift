@@ -647,13 +647,17 @@ def _parse_steps(raw_steps: object) -> tuple[SkillStep, ...]:
 def _parse_step(raw_step: object) -> SkillStep:
     if not isinstance(raw_step, Mapping):
         raise ValueError("Skill steps must be objects.")
-    raw_step_mapping = cast("Mapping[str, Any]", raw_step)
-    description = _required_string(raw_step_mapping, "description")
-    details = _optional_string(raw_step_mapping.get("details"))
-    llm_type = _optional_string(raw_step_mapping.get("llm_type"))
-    uses_skills = _optional_string_sequence(raw_step_mapping.get("uses_skills"))
+    return skill_step_from_data(cast("Mapping[str, Any]", raw_step))
+
+
+def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
+    """Parse the reusable executable-step shape used by skills and workflows."""
+    description = _required_string(data, "description")
+    details = _optional_string(data.get("details"))
+    llm_type = _optional_string(data.get("llm_type"))
+    uses_skills = _optional_string_sequence(data.get("uses_skills"))
     tool_invocations = _optional_tool_invocations(
-        raw_step_mapping.get("tool_invocations"),
+        data.get("tool_invocations"),
     )
     return SkillStep(
         description=description,

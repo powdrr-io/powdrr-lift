@@ -242,6 +242,14 @@ def test_specify_feature_workflow_template_file_is_checked_in() -> None:
         ("human", "decider"),
         ("agent", "architect"),
     ]
+    assert [task.llm_type for task in template.task_templates] == [
+        "high_reasoning",
+        "high_reasoning",
+        "standard_reasoning",
+        "high_reasoning",
+        "standard_reasoning",
+    ]
+    assert all(task.details for task in template.task_templates)
     assert template.task_templates[2].generation == WorkflowTaskTemplateGeneration(
         for_each="each feature or decision that needs dedicated follow-up",
         downstream_task_template_indexes=(3, 4),

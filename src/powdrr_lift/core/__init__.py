@@ -144,6 +144,7 @@ from powdrr_lift.core.skill_specification import (
     save_skill,
     skill_from_data,
     skill_from_json,
+    skill_step_from_data,
     skill_to_json,
     validate_skill_directory,
     validate_skill_directory_json,
@@ -428,6 +429,7 @@ _EXPORTS: dict[str, str] = {
     "workflow_template_to_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "skill_from_data": _SKILL,
     "skill_from_json": _SKILL,
+    "skill_step_from_data": _SKILL,
     "skill_to_json": _SKILL,
 }
 

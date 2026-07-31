@@ -7,6 +7,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_lift.core.skill_specification import (
+    SkillToolInvocation,
+    skill_step_from_data,
+)
+
 
 class TaskComplexity(StrEnum):
     LOW = "low"
@@ -66,6 +71,10 @@ class WorkflowTask:
     input_state: Any
     assignee_type: AssigneeType = AssigneeType.AGENT
     assignee_role: AssigneeRole = AgentRole.CODER
+    details: str | None = None
+    llm_type: str | None = None
+    uses_skills: tuple[str, ...] = field(default_factory=tuple)
+    tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -78,7 +87,7 @@ class WorkflowTask:
         object.__setattr__(self, "assignee_role", assignee_role)
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "task_id": self.task_id,
             "status": self.status.value,
             "upstream_task_ids": list(self.upstream_task_ids),
@@ -90,6 +99,17 @@ class WorkflowTask:
             "output_state_type": self.output_state_type,
             "description": self.description,
         }
+        step_data = {
+            "description": self.description,
+            "details": self.details,
+            "llm_type": self.llm_type,
+            "uses_skills": list(self.uses_skills),
+            "tool_invocations": [
+                invocation.to_data() for invocation in self.tool_invocations
+            ],
+        }
+        data.update({key: value for key, value in step_data.items() if value})
+        return data
 
     def to_json(self) -> str:
         return workflow_task_to_json(self)
@@ -140,6 +160,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     if "input_state" not in data:
         raise ValueError("Workflow task entries must include input_state.")
     assignee_type, assignee_role = _required_assignee(data)
+    step = skill_step_from_data(data)
     output_state_type = _required_string(data, "output_state_type")
 
     return WorkflowTask(
@@ -150,6 +171,10 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         input_state=data["input_state"],
         assignee_type=assignee_type,
         assignee_role=assignee_role,
+        details=step.details,
+        llm_type=step.llm_type,
+        uses_skills=step.uses_skills,
+        tool_invocations=step.tool_invocations,
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
@@ -280,6 +305,10 @@ def build_workflow_task_validation_report(
             "description",
             "assignee_type",
             "assignee_role",
+            "details",
+            "llm_type",
+            "uses_skills",
+            "tool_invocations",
         },
         issues,
         path=_format_path(source_path) or "",
@@ -384,7 +413,6 @@ def build_workflow_task_validation_report(
                     path=_format_child_path(source_path, "assignee_role"),
                 )
             )
-
     if "input_state" not in raw_task:
         issues.append(
             WorkflowTaskValidationIssue(

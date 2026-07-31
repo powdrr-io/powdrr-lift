@@ -56,7 +56,7 @@ task_templates:
           - --work-item-name
           - <execute-work-item-name>
           - --template
-          - templates/execute-proposed-pr.json
+          - templates/execute-proposed-pr.yaml
     input_state:
       proposed_prs: []
     output_state_type: proposed-prs-and-execution-workflows-state

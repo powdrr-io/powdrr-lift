@@ -144,6 +144,10 @@ def workflow_template_to_json(template: WorkflowTemplate) -> str:
     return json.dumps(template.to_data(), indent=2, ensure_ascii=False) + "\n"
 
 
+def workflow_template_to_yaml(template: WorkflowTemplate) -> str:
+    return yaml.safe_dump(template.to_data(), sort_keys=False)
+
+
 def workflow_template_from_json(json_content: str) -> WorkflowTemplate:
     loaded_content = json.loads(json_content)
     if not isinstance(loaded_content, Mapping):
@@ -240,7 +244,12 @@ def instantiate_workflow_template(
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:
     resolved_path = Path(path)
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_path.write_text(workflow_template_to_json(template), encoding="utf-8")
+    content = (
+        workflow_template_to_yaml(template)
+        if resolved_path.suffix.lower() in {".yaml", ".yml"}
+        else workflow_template_to_json(template)
+    )
+    resolved_path.write_text(content, encoding="utf-8")
     return resolved_path
 
 

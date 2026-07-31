@@ -931,6 +931,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     powdrr_lift_wrapper.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tool_bin}:{os.environ['PATH']}")
     skills_dir = repo_root / "skill-definitions"
+    for old_skill_path in skills_dir.glob("*.json"):
+        old_skill_path.unlink()
+    for source_skill_path in sorted(
+        (source_repo_root / "skill-definitions").glob("*.yaml")
+    ):
+        shutil.copy2(source_skill_path, skills_dir / source_skill_path.name)
     worktree_root_holder: dict[str, Path] = {}
     system_spec_dir = "docs/specs/display-related-photos"
     system_spec_filename = "system-specification.yaml"
@@ -1249,14 +1255,21 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             verbose=verbose,
         )
         worktree_root_holder["path"] = resolved
-        for relative_path in (
+        for old_skill_path in (resolved / "skill-definitions").glob("*.json"):
+            old_skill_path.unlink()
+        relative_paths = (
             Path("templates") / "implement-a-feature.yaml",
-            Path("templates") / "execute-proposed-pr.json",
-            Path("skill-definitions") / "start-implementing-feature.json",
+            Path("templates") / "execute-proposed-pr.yaml",
             Path("src") / "powdrr_lift" / "core" / "workflow_template_specification.py",
+            Path("src") / "powdrr_lift" / "core" / "skill_specification.py",
+            Path("src") / "powdrr_lift" / "core" / "spec_paths.py",
             Path("src") / "powdrr_lift" / "core" / "__init__.py",
             Path("src") / "powdrr_lift" / "__init__.py",
-        ):
+        ) + tuple(
+            path.relative_to(source_repo_root)
+            for path in sorted((source_repo_root / "skill-definitions").glob("*.yaml"))
+        )
+        for relative_path in relative_paths:
             target_path = resolved / relative_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_repo_root / relative_path, target_path)
@@ -1308,7 +1321,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
                 response: dict[str, object] = {
-                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.yaml"),
                     "selected_skill_reason": (
                         "The user wants a synchronous feature-specification flow."
                     ),
@@ -1850,7 +1863,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         stderr=stderr,
     )
 
-    assert exit_code == 0
+    assert exit_code == 0, stderr.getvalue()
     assert "path" in worktree_root_holder
     worktree_root = worktree_root_holder["path"]
     summary_path = worktree_root / "generated" / "skill-execution.json"
@@ -1935,7 +1948,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         [
             {
                 "selected_skill_path": str(
-                    start_skills_dir / "start-implementing-feature.json"
+                    start_skills_dir / "start-implementing-feature.yaml"
                 ),
                 "selected_skill_reason": (
                     "The feature has validated specifications and is ready for "
@@ -2120,7 +2133,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "task-001",
         "task-002",
         "task-003",
-    ]
+    ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
         "Review plan documents",
         "Confirm requirements",
@@ -2579,7 +2592,7 @@ def test_run_workflow_chat_repairs_missing_action_fields(
 
 def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
     skill_path = (
-        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.json"
+        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.yaml"
     )
     skill = load_skill(skill_path)
     data = _catalog_entry_to_data(
@@ -2949,7 +2962,7 @@ def test_anthropic_chat_client_sends_messages_api_request(
                             "text": json.dumps(
                                 {
                                     "selected_skill_path": (
-                                        "skill-definitions/specify-a-feature.json"
+                                        "skill-definitions/specify-a-feature.yaml"
                                     )
                                 }
                             ),
@@ -2992,7 +3005,7 @@ def test_anthropic_chat_client_sends_messages_api_request(
         ],
     }
     assert response == {
-        "selected_skill_path": "skill-definitions/specify-a-feature.json"
+        "selected_skill_path": "skill-definitions/specify-a-feature.yaml"
     }
 
 

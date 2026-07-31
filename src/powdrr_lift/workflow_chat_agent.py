@@ -611,7 +611,8 @@ def _load_skill_catalog(
 
     skill_paths = tuple(
         skill_path
-        for skill_path in sorted(resolved_dir.glob("*.json"))
+        for pattern in ("*.yaml", "*.yml", "*.json")
+        for skill_path in sorted(resolved_dir.glob(pattern))
         if skill_path.is_file()
     )
     skills = load_skills(resolved_dir)

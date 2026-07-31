@@ -254,7 +254,7 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
         "--work-item-name",
         "<execute-work-item-name>",
         "--template",
-        "templates/execute-proposed-pr.json",
+        "templates/execute-proposed-pr.yaml",
     )
     assert (
         build_workflow_template_validation_report(
@@ -266,7 +266,7 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
 
 def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.json"
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
     )
     template = load_workflow_template(template_path)
 

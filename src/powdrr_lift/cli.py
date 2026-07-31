@@ -936,7 +936,7 @@ def build_parser() -> argparse.ArgumentParser:
     instantiate_workflow_parser.add_argument(
         "--template",
         type=Path,
-        default=Path("templates") / "specify-a-feature.json",
+        default=Path("templates") / "implement-a-feature.yaml",
         help="Workflow template JSON to instantiate.",
     )
     instantiate_workflow_parser.add_argument(

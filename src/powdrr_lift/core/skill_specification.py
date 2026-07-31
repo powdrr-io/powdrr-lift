@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+import yaml
+
 
 @dataclass(frozen=True, slots=True)
 class SkillValidationIssue:
@@ -103,10 +105,21 @@ def skill_to_json(skill: Skill) -> str:
     return json.dumps(skill.to_data(), indent=2, ensure_ascii=False) + "\n"
 
 
+def skill_to_yaml(skill: Skill) -> str:
+    return yaml.safe_dump(skill.to_data(), sort_keys=False)
+
+
 def skill_from_json(json_content: str) -> Skill:
     loaded_content = json.loads(json_content)
     if not isinstance(loaded_content, Mapping):
         raise ValueError("Skill JSON must decode to an object.")
+    return skill_from_data(cast("Mapping[str, Any]", loaded_content))
+
+
+def skill_from_yaml(yaml_content: str) -> Skill:
+    loaded_content = yaml.safe_load(yaml_content)
+    if not isinstance(loaded_content, Mapping):
+        raise ValueError("Skill YAML must decode to an object.")
     return skill_from_data(cast("Mapping[str, Any]", loaded_content))
 
 
@@ -118,23 +131,34 @@ def skill_from_data(data: Mapping[str, Any]) -> Skill:
 
 
 def load_skill(path: str | Path) -> Skill:
-    return skill_from_json(Path(path).read_text(encoding="utf-8"))
+    skill_path = Path(path)
+    skill_content = skill_path.read_text(encoding="utf-8")
+    if skill_path.suffix.lower() in {".yaml", ".yml"}:
+        return skill_from_yaml(skill_content)
+    return skill_from_json(skill_content)
 
 
 def save_skill(skill: Skill, path: str | Path) -> Path:
     resolved_path = Path(path)
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_path.write_text(skill_to_json(skill), encoding="utf-8")
+    content = (
+        skill_to_yaml(skill)
+        if resolved_path.suffix.lower() in {".yaml", ".yml"}
+        else skill_to_json(skill)
+    )
+    resolved_path.write_text(content, encoding="utf-8")
     return resolved_path
 
 
 def load_skills(directory: str | Path) -> tuple[Skill, ...]:
     directory_path = Path(directory)
-    return tuple(
-        load_skill(skill_path)
-        for skill_path in sorted(directory_path.glob("*.json"))
-        if skill_path.is_file()
+    skill_paths = sorted(
+        path
+        for pattern in ("*.yaml", "*.yml", "*.json")
+        for path in directory_path.glob(pattern)
+        if path.is_file()
     )
+    return tuple(load_skill(skill_path) for skill_path in skill_paths)
 
 
 def build_skill_validation_report(
@@ -143,14 +167,20 @@ def build_skill_validation_report(
     source_path: str | Path | None = None,
 ) -> SkillValidationReport:
     try:
-        loaded_content = json.loads(json_content)
+        if source_path is not None and Path(source_path).suffix.lower() in {
+            ".yaml",
+            ".yml",
+        }:
+            loaded_content = yaml.safe_load(json_content)
+        else:
+            loaded_content = json.loads(json_content)
     except Exception as exc:  # noqa: BLE001
         return SkillValidationReport(
             validation_successful=False,
             issues=[
                 SkillValidationIssue(
                     code="invalid_json",
-                    message=f"Could not parse skill JSON: {exc}",
+                    message=f"Could not parse skill document: {exc}",
                     path=_path_prefix(source_path),
                 )
             ],
@@ -162,7 +192,7 @@ def build_skill_validation_report(
             issues=[
                 SkillValidationIssue(
                     code="invalid_root_type",
-                    message="Skill JSON must decode to an object.",
+                    message="Skill document must decode to an object.",
                     path=_path_prefix(source_path),
                 )
             ],
@@ -533,9 +563,13 @@ def build_skill_directory_validation_report(
     skill_paths_by_name: dict[str, Path] = {}
     step_references: list[tuple[Path, Skill]] = []
 
-    for skill_path in sorted(directory_path.glob("*.json")):
-        if not skill_path.is_file():
-            continue
+    discovered_skill_paths = sorted(
+        path
+        for pattern in ("*.yaml", "*.yml", "*.json")
+        for path in directory_path.glob(pattern)
+        if path.is_file()
+    )
+    for skill_path in discovered_skill_paths:
         skill_paths.append(str(skill_path))
         raw_content = skill_path.read_text(encoding="utf-8")
         file_report = build_skill_validation_report(raw_content, source_path=skill_path)
@@ -543,7 +577,7 @@ def build_skill_directory_validation_report(
         if not file_report.validation_successful or not file_report.skill_names:
             continue
 
-        skill = skill_from_json(raw_content)
+        skill = load_skill(skill_path)
         skill_name = skill.name
         step_references.append((skill_path, skill))
         if skill_name in skills_by_name:

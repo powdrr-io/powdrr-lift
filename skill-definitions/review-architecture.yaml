@@ -1,0 +1,42 @@
+---
+name: review-architecture
+when_to_use:
+- When new needs may require updating the current architecture specification.
+- When the TUI should evaluate whether the architecture still fits the system needs.
+steps:
+- description: Gather the entities, entity relationships, invariants, and guidance
+    context.
+  llm_type: simple_task
+  details: Use the architecture context to understand the current model before judging
+    whether it needs to change.
+- description: Decide whether the current architecture specification needs to change.
+  llm_type: high_reasoning
+  details: Compare the gathered entity model against the new needs. If the existing
+    spec already covers them, report that no update is needed and stop.
+- description: Generate and fill the architecture specification template only when
+    changes are required.
+  llm_type: high_reasoning
+  details: Run the architecture specification command, then fill the generated template
+    with the required updates.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - architecture-specification
+    - "--work-item-name"
+    - "<work-item-name>"
+    - "--entity-type"
+    - "<type>"
+- description: Validate the updated architecture specification and confirm it is still
+    consistent.
+  llm_type: fast_iteration
+  details: Re-run architecture validation after edits and report any remaining inconsistencies.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - evaluate-architecture-specification
+    - "--work-item-name"
+    - "<work-item-name>"
+    - "--entity-type"
+    - "<type>"

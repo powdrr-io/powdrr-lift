@@ -1,0 +1,37 @@
+---
+name: review-system
+when_to_use:
+- When new needs may require updating the current system specification.
+- When the TUI should evaluate whether the system requirements and approach still
+  fit.
+steps:
+- description: Gather the requirements and approach context.
+  llm_type: simple_task
+  details: Use the requirements and approach context to understand the new needs before
+    judging the system specification.
+- description: Decide whether the current system specification needs to change.
+  llm_type: high_reasoning
+  details: Compare the gathered requirements and approach against the new needs. If
+    the existing spec already covers them, report that no update is needed and stop.
+- description: Generate and fill the system specification template only when changes
+    are required.
+  llm_type: standard_reasoning
+  details: Run the system specification command, then fill the generated template
+    with the required updates.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - system-specification
+    - "--work-item-name"
+    - "<work-item-name>"
+- description: Validate the updated system specification and confirm it is still consistent.
+  llm_type: fast_iteration
+  details: Re-run system validation after edits and report any remaining inconsistencies.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - evaluate-system-specification
+    - "--work-item-name"
+    - "<work-item-name>"

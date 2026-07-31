@@ -2,6 +2,9 @@
 
 ## Installation
 
+RTK must be installed and available as `rtk` on your `PATH` before installing
+Powdrr-Lift. Workflow shell tool invocations are run through RTK.
+
 ### Quick Install
 ```bash
 ./scripts/install-skills.sh

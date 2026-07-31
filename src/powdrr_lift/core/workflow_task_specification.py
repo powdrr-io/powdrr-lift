@@ -23,6 +23,25 @@ class TaskStatus(StrEnum):
     LOCKED = "locked"
 
 
+class AssigneeType(StrEnum):
+    AGENT = "agent"
+    HUMAN = "human"
+
+
+class AgentRole(StrEnum):
+    ARCHITECT = "architect"
+    CODER = "coder"
+    REVIEWER = "reviewer"
+
+
+class HumanRole(StrEnum):
+    DECIDER = "decider"
+    REVIEWER = "reviewer"
+
+
+AssigneeRole = AgentRole | HumanRole
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowTaskValidationIssue:
     code: str
@@ -45,9 +64,18 @@ class WorkflowTask:
     description: str
     complexity: TaskComplexity
     input_state: Any
+    assignee_type: AssigneeType = AssigneeType.AGENT
+    assignee_role: AssigneeRole = AgentRole.CODER
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        assignee_type, assignee_role = validate_assignee(
+            self.assignee_type, self.assignee_role
+        )
+        object.__setattr__(self, "assignee_type", assignee_type)
+        object.__setattr__(self, "assignee_role", assignee_role)
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -57,6 +85,8 @@ class WorkflowTask:
             "dependent_state": list(self.dependent_state),
             "complexity": self.complexity.value,
             "input_state": self.input_state,
+            "assignee_type": self.assignee_type.value,
+            "assignee_role": self.assignee_role.value,
             "output_state_type": self.output_state_type,
             "description": self.description,
         }
@@ -109,6 +139,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     dependent_state = _required_string_sequence(data, "dependent_state")
     if "input_state" not in data:
         raise ValueError("Workflow task entries must include input_state.")
+    assignee_type, assignee_role = _required_assignee(data)
     output_state_type = _required_string(data, "output_state_type")
 
     return WorkflowTask(
@@ -117,6 +148,8 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         description=description,
         complexity=complexity,
         input_state=data["input_state"],
+        assignee_type=assignee_type,
+        assignee_role=assignee_role,
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
@@ -145,12 +178,20 @@ def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:
 
 def select_ready_workflow_tasks(
     tasks: Sequence[WorkflowTask],
+    *,
+    assignee_type: AssigneeType | str | None = None,
+    assignee_role: AssigneeRole | str | None = None,
 ) -> tuple[WorkflowTask, ...]:
+    normalized_type, normalized_role = _normalize_assignee_filters(
+        assignee_type, assignee_role
+    )
     tasks_by_id = {task.task_id: task for task in tasks}
     return tuple(
         task
         for task in tasks
         if task.status is TaskStatus.OPEN
+        and (normalized_type is None or task.assignee_type is normalized_type)
+        and (normalized_role is None or task.assignee_role.value == normalized_role)
         and all(
             tasks_by_id.get(upstream_task_id) is not None
             and tasks_by_id[upstream_task_id].status is TaskStatus.COMPLETED
@@ -161,6 +202,9 @@ def select_ready_workflow_tasks(
 
 def load_ready_workflow_tasks(
     workflows_root: str | Path,
+    *,
+    assignee_type: AssigneeType | str | None = None,
+    assignee_role: AssigneeRole | str | None = None,
 ) -> tuple[ReadyWorkflowTask, ...]:
     """Load ready tasks from every work-item directory under a workflow root."""
     root = Path(workflows_root)
@@ -176,7 +220,11 @@ def load_ready_workflow_tasks(
         tasks = load_workflow_tasks(work_item_directory)
         ready_tasks.extend(
             ReadyWorkflowTask(work_item_name=work_item_directory.name, task=task)
-            for task in select_ready_workflow_tasks(tasks)
+            for task in select_ready_workflow_tasks(
+                tasks,
+                assignee_type=assignee_type,
+                assignee_role=assignee_role,
+            )
         )
     return tuple(ready_tasks)
 
@@ -230,6 +278,8 @@ def build_workflow_task_validation_report(
             "input_state",
             "output_state_type",
             "description",
+            "assignee_type",
+            "assignee_role",
         },
         issues,
         path=_format_path(source_path) or "",
@@ -296,6 +346,44 @@ def build_workflow_task_validation_report(
                 path=_format_child_path(source_path, "complexity"),
             )
         )
+
+    assignee_type = _optional_string(raw_task.get("assignee_type"))
+    assignee_role = _optional_string(raw_task.get("assignee_role"))
+    if assignee_type is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_assignee_type",
+                message="Workflow task entries must include a non-empty assignee_type.",
+                path=_format_child_path(source_path, "assignee_type"),
+            )
+        )
+    elif assignee_type not in {member.value for member in AssigneeType}:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_assignee_type",
+                message="Workflow task assignee_type must be agent or human.",
+                path=_format_child_path(source_path, "assignee_type"),
+            )
+        )
+    if assignee_role is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_assignee_role",
+                message="Workflow task entries must include a non-empty assignee_role.",
+                path=_format_child_path(source_path, "assignee_role"),
+            )
+        )
+    elif assignee_type in {member.value for member in AssigneeType}:
+        try:
+            validate_assignee(assignee_type, assignee_role)
+        except ValueError as exc:
+            issues.append(
+                WorkflowTaskValidationIssue(
+                    code="invalid_assignee_role",
+                    message=str(exc),
+                    path=_format_child_path(source_path, "assignee_role"),
+                )
+            )
 
     if "input_state" not in raw_task:
         issues.append(
@@ -651,6 +739,60 @@ def _required_status(data: Mapping[str, Any], key: str) -> TaskStatus:
             "Workflow task status must be one of open, completed, superceded, "
             "abandoned, or locked."
         ) from exc
+
+
+def _required_assignee(
+    data: Mapping[str, Any],
+) -> tuple[AssigneeType, AssigneeRole]:
+    return validate_assignee(
+        _required_string(data, "assignee_type"),
+        _required_string(data, "assignee_role"),
+    )
+
+
+def validate_assignee(
+    assignee_type: AssigneeType | str,
+    assignee_role: AssigneeRole | str,
+) -> tuple[AssigneeType, AssigneeRole]:
+    try:
+        normalized_type = AssigneeType(assignee_type)
+    except ValueError as exc:
+        raise ValueError("Workflow task assignee_type must be agent or human.") from exc
+
+    role_enum: type[AgentRole] | type[HumanRole] = (
+        AgentRole if normalized_type is AssigneeType.AGENT else HumanRole
+    )
+    try:
+        normalized_role = role_enum(str(assignee_role))
+    except ValueError as exc:
+        allowed_roles = ", ".join(role.value for role in role_enum)
+        raise ValueError(
+            f"Workflow task assignee_role for {normalized_type.value} must be "
+            f"one of {allowed_roles}."
+        ) from exc
+    return normalized_type, normalized_role
+
+
+def _normalize_assignee_filters(
+    assignee_type: AssigneeType | str | None,
+    assignee_role: AssigneeRole | str | None,
+) -> tuple[AssigneeType | None, str | None]:
+    if assignee_type is None and assignee_role is None:
+        return None, None
+    if assignee_type is not None:
+        normalized_type = AssigneeType(assignee_type)
+        if assignee_role is None:
+            return normalized_type, None
+        _, normalized_role = validate_assignee(normalized_type, assignee_role)
+        return normalized_type, normalized_role.value
+
+    role_value = str(assignee_role)
+    valid_roles = {role.value for role in AgentRole} | {
+        role.value for role in HumanRole
+    }
+    if role_value not in valid_roles:
+        raise ValueError(f"Unknown workflow task assignee_role: {role_value}")
+    return None, role_value
 
 
 def _required_string_sequence(data: Mapping[str, Any], key: str) -> tuple[str, ...]:

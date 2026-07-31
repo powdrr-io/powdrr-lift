@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.core.workflow_task_specification import (
+    AgentRole,
+    AssigneeType,
+    HumanRole,
     TaskComplexity,
     TaskStatus,
     WorkflowTask,
@@ -42,6 +47,8 @@ def test_workflow_task_round_trips_through_json() -> None:
         "dependent_state": ["state-a", "state-b"],
         "complexity": "medium",
         "input_state": {"environment": "staging"},
+        "assignee_type": "agent",
+        "assignee_role": "coder",
         "output_state_type": "state",
         "description": "Prepare the deployment environment.",
     }
@@ -168,6 +175,8 @@ def test_workflow_task_validation_reports_unknown_keys() -> None:
                 "dependent_state": ["state-a"],
                 "complexity": "low",
                 "input_state": {"ready": True},
+                "assignee_type": "agent",
+                "assignee_role": "coder",
                 "output_state_type": "state",
                 "description": "Task one.",
                 "unexpected": "field",
@@ -190,6 +199,8 @@ def test_workflow_task_validation_rejects_invalid_status() -> None:
                 "dependent_state": ["state-a"],
                 "complexity": "low",
                 "input_state": {"ready": True},
+                "assignee_type": "agent",
+                "assignee_role": "coder",
                 "output_state_type": "state",
                 "description": "Task one.",
             }
@@ -211,6 +222,8 @@ def test_workflow_task_validation_accepts_closed_status() -> None:
                 "dependent_state": ["state-a"],
                 "complexity": "low",
                 "input_state": {"ready": True},
+                "assignee_type": "agent",
+                "assignee_role": "coder",
                 "output_state_type": "state",
                 "description": "Task one.",
             }
@@ -292,6 +305,58 @@ def test_select_ready_workflow_tasks_excludes_missing_upstreams() -> None:
     )
 
     assert select_ready_workflow_tasks((task,)) == ()
+
+
+def test_select_ready_workflow_tasks_filters_by_assignee_type_and_role() -> None:
+    agent_task = WorkflowTask(
+        task_id="agent-task",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={},
+        description="Agent task.",
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.ARCHITECT,
+    )
+    human_task = WorkflowTask(
+        task_id="human-task",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={},
+        description="Human task.",
+        assignee_type=AssigneeType.HUMAN,
+        assignee_role=HumanRole.DECIDER,
+    )
+
+    assert select_ready_workflow_tasks(
+        (agent_task, human_task), assignee_type=AssigneeType.AGENT
+    ) == (agent_task,)
+    assert select_ready_workflow_tasks(
+        (agent_task, human_task), assignee_role="decider"
+    ) == (human_task,)
+    assert select_ready_workflow_tasks(
+        (agent_task, human_task),
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.ARCHITECT,
+    ) == (agent_task,)
+
+
+def test_workflow_task_rejects_role_for_the_wrong_assignee_type() -> None:
+    with pytest.raises(ValueError, match="assignee_role for agent"):
+        WorkflowTask(
+            task_id="invalid-task",
+            status=TaskStatus.OPEN,
+            upstream_task_ids=(),
+            dependent_state=(),
+            complexity=TaskComplexity.LOW,
+            input_state={},
+            description="Invalid assignment.",
+            assignee_type=AssigneeType.AGENT,
+            assignee_role=HumanRole.DECIDER,
+        )
 
 
 def test_load_ready_workflow_tasks_scans_all_work_items(tmp_path: Path) -> None:

@@ -8,7 +8,7 @@
   "steps": [
     {
       "description": "Confirm the feature, work-item name, and workflow template.",
-      "details": "Capture the feature the user wants to implement and fill out templates/implement-a-feature.json from the approved plan documents. Ask the user for any missing feature or work-item information before continuing."
+      "details": "Capture the feature the user wants to implement and fill out templates/implement-a-feature.yaml from the approved plan documents. Ask the user for any missing feature or work-item information before continuing."
     },
     {
       "description": "Read the selected workflow template and explain the generated task graph.",
@@ -20,7 +20,7 @@
             "sed",
             "-n",
             "1,260p",
-            "templates/implement-a-feature.json"
+            "templates/implement-a-feature.yaml"
           ]
         }
       ]
@@ -37,7 +37,7 @@
             "--work-item-name",
             "<work-item-name>",
             "--template",
-            "templates/implement-a-feature.json"
+            "templates/implement-a-feature.yaml"
           ]
         }
       ]

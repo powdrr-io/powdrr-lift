@@ -324,7 +324,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
 
     assert skill.name == "start-implementing-feature"
     assert skill.steps[0].details is not None
-    assert "templates/implement-a-feature.json" in skill.steps[0].details
+    assert "templates/implement-a-feature.yaml" in skill.steps[0].details
     assert [step.description for step in skill.steps] == [
         "Confirm the feature, work-item name, and workflow template.",
         "Read the selected workflow template and explain the generated task graph.",
@@ -339,7 +339,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--work-item-name",
         "<work-item-name>",
         "--template",
-        "templates/implement-a-feature.json",
+        "templates/implement-a-feature.yaml",
     )
 
 

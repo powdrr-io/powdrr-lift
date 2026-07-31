@@ -183,6 +183,7 @@ __all__ = [
     "workflow_task_to_json",
     "workflow_template_from_data",
     "workflow_template_from_json",
+    "workflow_template_from_yaml",
     "workflow_template_to_json",
     "save_workflow_template",
     "validate_change_log_yaml",
@@ -789,6 +790,7 @@ def __getattr__(name: str) -> Any:
         "validate_workflow_template_json_file",
         "workflow_template_from_data",
         "workflow_template_from_json",
+        "workflow_template_from_yaml",
         "workflow_template_to_json",
     }:
         from powdrr_lift.core.workflow_template_specification import (
@@ -805,6 +807,7 @@ def __getattr__(name: str) -> Any:
             validate_workflow_template_json_file,
             workflow_template_from_data,
             workflow_template_from_json,
+            workflow_template_from_yaml,
             workflow_template_to_json,
         )
 
@@ -826,6 +829,7 @@ def __getattr__(name: str) -> Any:
             ),
             "workflow_template_from_data": workflow_template_from_data,
             "workflow_template_from_json": workflow_template_from_json,
+            "workflow_template_from_yaml": workflow_template_from_yaml,
             "workflow_template_to_json": workflow_template_to_json,
         }[name]
 

@@ -1250,9 +1250,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         )
         worktree_root_holder["path"] = resolved
         for relative_path in (
-            Path("templates") / "implement-a-feature.json",
+            Path("templates") / "implement-a-feature.yaml",
             Path("templates") / "execute-proposed-pr.json",
             Path("skill-definitions") / "start-implementing-feature.json",
+            Path("src") / "powdrr_lift" / "core" / "workflow_template_specification.py",
+            Path("src") / "powdrr_lift" / "core" / "__init__.py",
+            Path("src") / "powdrr_lift" / "__init__.py",
         ):
             target_path = resolved / relative_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1953,7 +1956,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "sed",
                         "-n",
                         "1,260p",
-                        "templates/implement-a-feature.json",
+                        "templates/implement-a-feature.yaml",
                     ]
                 },
                 "decisions_and_context": "The implement-a-feature template is selected.",
@@ -1972,7 +1975,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "--work-item-name",
                         "display-related-photos",
                         "--template",
-                        "templates/implement-a-feature.json",
+                        "templates/implement-a-feature.yaml",
                     ]
                 },
                 "decisions_and_context": "The durable implementation workflow is created.",

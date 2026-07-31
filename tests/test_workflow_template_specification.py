@@ -202,7 +202,7 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
 
 def test_implement_feature_workflow_template_file_is_checked_in() -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.json"
+        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
     )
     template = load_workflow_template(template_path)
 
@@ -226,6 +226,14 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
         "confirmed-requirements-state",
         "proposed-prs-and-execution-workflows-state",
     ]
+    assert template.task_templates[0].input_state == {
+        "plan_documents": [
+            "docs/specs/<work-item-name>/system-specification.yaml",
+            "docs/specs/<work-item-name>/architecture-specification.yaml",
+            "docs/specs/<work-item-name>/implementation-specification.yaml",
+            "docs/specs/<work-item-name>/proposed-pr-specification.yaml",
+        ]
+    }
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates
@@ -294,7 +302,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
 
 def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.json"
+        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
     )
 
     output_directory, tasks = instantiate_workflow_template(

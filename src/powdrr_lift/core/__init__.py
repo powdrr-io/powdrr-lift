@@ -227,6 +227,7 @@ from powdrr_lift.core.workflow_template_specification import (
     validate_workflow_template_json_file,
     workflow_template_from_data,
     workflow_template_from_json,
+    workflow_template_from_yaml,
     workflow_template_to_json,
 )
 
@@ -426,6 +427,7 @@ _EXPORTS: dict[str, str] = {
     "workflow_task_document_to_json": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_template_from_data": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_template_from_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "workflow_template_from_yaml": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_template_to_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "skill_from_data": _SKILL,
     "skill_from_json": _SKILL,

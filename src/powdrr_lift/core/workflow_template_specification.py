@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+import yaml
+
 from powdrr_lift.core.skill_specification import (
     SkillToolInvocation,
     skill_step_from_data,
@@ -149,6 +151,13 @@ def workflow_template_from_json(json_content: str) -> WorkflowTemplate:
     return workflow_template_from_data(cast("Mapping[str, Any]", loaded_content))
 
 
+def workflow_template_from_yaml(yaml_content: str) -> WorkflowTemplate:
+    loaded_content = yaml.safe_load(yaml_content)
+    if not isinstance(loaded_content, Mapping):
+        raise ValueError("Workflow template YAML must decode to an object.")
+    return workflow_template_from_data(cast("Mapping[str, Any]", loaded_content))
+
+
 def workflow_template_from_data(data: Mapping[str, Any]) -> WorkflowTemplate:
     when_to_use = _required_string_sequence(data, "when_to_use")
     how_to_fill_this_out = _required_string_sequence(data, "how_to_fill_this_out")
@@ -161,7 +170,11 @@ def workflow_template_from_data(data: Mapping[str, Any]) -> WorkflowTemplate:
 
 
 def load_workflow_template(path: str | Path) -> WorkflowTemplate:
-    return workflow_template_from_json(Path(path).read_text(encoding="utf-8"))
+    template_path = Path(path)
+    template_text = template_path.read_text(encoding="utf-8")
+    if template_path.suffix.lower() in {".yaml", ".yml"}:
+        return workflow_template_from_yaml(template_text)
+    return workflow_template_from_json(template_text)
 
 
 def instantiate_workflow_template(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from powdrr_lift.core.workflow_task_specification import (
     AgentRole,
     AssigneeType,
     HumanRole,
+    ReadyWorkflowTask,
     TaskComplexity,
     TaskStatus,
     WorkflowTask,
@@ -104,6 +106,82 @@ def test_workflow_task_directory_loader_reads_all_json_files(
     save_workflow_task(task_a, tmp_path / "a.json")
 
     assert load_workflow_tasks(tmp_path) == (task_a, task_b)
+
+
+def test_workflow_pauses_for_human_input_then_resumes_agent_task(
+    tmp_path: Path,
+) -> None:
+    """A workflow can hand an unresolved agent decision to a human and resume."""
+    workflow_directory = tmp_path / "feature"
+    agent_request = WorkflowTask(
+        task_id="agent-request",
+        status=TaskStatus.COMPLETED,
+        upstream_task_ids=(),
+        dependent_state=("human-input-requested",),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"question": "Which API version should this use?"},
+        description="Identify the unresolved API choice.",
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.ARCHITECT,
+        output_state_type="human-decision-request",
+    )
+    human_decision = WorkflowTask(
+        task_id="human-decision",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("agent-request",),
+        dependent_state=("human-decision-provided",),
+        complexity=TaskComplexity.LOW,
+        input_state={
+            "question": "Which API version should this use?",
+            "context": "The agent could not determine this from the repository.",
+        },
+        description="Choose the API version for the implementation.",
+        assignee_type=AssigneeType.HUMAN,
+        assignee_role=HumanRole.DECIDER,
+        output_state_type="api-decision",
+    )
+    implementation = WorkflowTask(
+        task_id="implementation",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("human-decision",),
+        dependent_state=(),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"use_decision_from": "human-decision"},
+        description="Implement the API using the selected version.",
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.CODER,
+    )
+
+    for task in (agent_request, human_decision, implementation):
+        save_workflow_task(task, workflow_directory / f"{task.task_id}.json")
+
+    ready_human_tasks = load_ready_workflow_tasks(
+        tmp_path, assignee_type=AssigneeType.HUMAN
+    )
+    assert ready_human_tasks == (
+        ReadyWorkflowTask(work_item_name="feature", task=human_decision),
+    )
+
+    human_response = replace(
+        human_decision,
+        status=TaskStatus.COMPLETED,
+        input_state={
+            **human_decision.input_state,
+            "decision": "Use v2 because the existing clients support it.",
+        },
+    )
+    save_workflow_task(human_response, workflow_directory / "human-decision.json")
+
+    ready_agent_tasks = load_ready_workflow_tasks(
+        tmp_path, assignee_type=AssigneeType.AGENT
+    )
+    assert [item.task.task_id for item in ready_agent_tasks] == ["implementation"]
+    assert (
+        load_workflow_task(workflow_directory / "human-decision.json").input_state[
+            "decision"
+        ]
+        == "Use v2 because the existing clients support it."
+    )
 
 
 def test_workflow_task_directory_validation_accepts_known_dependencies(

@@ -1476,16 +1476,17 @@ def _execute_shell_tool(
 ) -> dict[str, Any]:
     command = parameters.get("command")
     if isinstance(command, str):
-        command_display = command
-        run_command: str | list[str] = command
+        command_display = _rtk_command_display(command)
+        run_command: str | list[str] = _wrap_shell_command(command)
         use_shell = True
     elif isinstance(command, Sequence) and not isinstance(
         command,
         (str, bytes, bytearray),
     ):
         normalized_command = [_required_shell_command_item(item) for item in command]
-        command_display = " ".join(shlex.quote(item) for item in normalized_command)
-        run_command = normalized_command
+        wrapped_command = _wrap_argument_command(normalized_command)
+        command_display = " ".join(shlex.quote(item) for item in wrapped_command)
+        run_command = wrapped_command
         use_shell = False
     else:
         raise RuntimeError(
@@ -1530,6 +1531,9 @@ def _execute_shell_tool(
     )
     if process.stdout:
         print(process.stdout, end="", file=stdout)
+        _verbose_print(
+            stderr, verbose, f"Shell tool stdout:\n{process.stdout.rstrip()}"
+        )
     if process.stderr:
         print(process.stderr, end="", file=stderr)
     _verbose_print(
@@ -1570,6 +1574,31 @@ def _required_shell_command_item(value: object) -> str:
             "Workflow invoke_tool action command items must be non-empty strings."
         )
     return value.strip()
+
+
+def _wrap_shell_command(command: str) -> str:
+    """Run a shell tool command through rtk without wrapping it twice."""
+    if _shell_command_starts_with_rtk(command):
+        return command
+    return f"rtk {command}"
+
+
+def _rtk_command_display(command: str) -> str:
+    return _wrap_shell_command(command)
+
+
+def _wrap_argument_command(command: list[str]) -> list[str]:
+    if command and command[0] == "rtk":
+        return command
+    return ["rtk", *command]
+
+
+def _shell_command_starts_with_rtk(command: str) -> bool:
+    try:
+        command_items = shlex.split(command)
+    except ValueError:
+        return False
+    return bool(command_items) and command_items[0] == "rtk"
 
 
 def _required_action_string_item(value: object, *, field_name: str) -> str:

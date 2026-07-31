@@ -89,12 +89,18 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
    cd powdrr-lift
    ```
 
-2. **Install the skills**
+2. **Install RTK**
+
+   Install the `rtk` command and make sure it is available on your `PATH`.
+   Powdrr-Lift requires RTK because every workflow shell tool invocation runs
+   through it.
+
+3. **Install the skills**
    ```bash
    ./scripts/install-skills.sh
    ```
 
-3. **OpenCode will automatically load the skills**
+4. **OpenCode will automatically load the skills**
    - Skills are installed to `~/.config/opencode/skills/`
    - Configuration is installed to `~/.config/opencode/opencode.json`
    - Skills are enabled for default agents

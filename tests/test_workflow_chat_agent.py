@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TextIO, cast
+from unittest.mock import patch
 from urllib.request import Request
 
 import pytest
@@ -41,6 +42,7 @@ from powdrr_lift.workflow_chat_agent import (
     _action_system_prompt,
     _apply_file_edits,
     _catalog_entry_to_data,
+    _execute_shell_tool,
     _resolve_api_key,
     _resolve_llm_model,
     _resolve_skill_path,
@@ -2412,6 +2414,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
     run_args = cast(tuple[object, ...], captured["run_args"])
     run_kwargs = cast(dict[str, object], captured["run_kwargs"])
     assert run_args[0] == [
+        "rtk",
         "powdrr-lift",
         "system-specification",
         "--work-item-name",
@@ -2423,6 +2426,50 @@ def test_run_workflow_chat_executes_shell_tool_actions(
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["execution_events"][0]["kind"] == "invoke_tool"
     assert summary["execution_events"][0]["result"]["returncode"] == 0
+
+
+def test_execute_shell_tool_does_not_double_wrap_rtk(
+    tmp_path: Path,
+) -> None:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+        run.return_value.returncode = 0
+        run.return_value.stdout = ""
+        run.return_value.stderr = ""
+
+        _execute_shell_tool(
+            {"command": "rtk git status"},
+            worktree_root=tmp_path,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=False,
+        )
+
+    assert run.call_args.args[0] == "rtk git status"
+
+
+def test_execute_shell_tool_verbose_prints_stdout(
+    tmp_path: Path,
+) -> None:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+        run.return_value.returncode = 0
+        run.return_value.stdout = "tool stdout\n"
+        run.return_value.stderr = ""
+
+        _execute_shell_tool(
+            {"command": ["echo", "tool stdout"]},
+            worktree_root=tmp_path,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=True,
+        )
+
+    assert "[verbose] Shell tool stdout:\ntool stdout" in stderr.getvalue()
 
 
 def test_resolve_api_key_prefers_env_over_codex_auth(

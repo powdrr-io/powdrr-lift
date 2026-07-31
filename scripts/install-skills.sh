@@ -3,6 +3,13 @@ set -e
 
 # Install Powdrr-Lift skills for OpenCode
 
+if ! command -v rtk >/dev/null 2>&1; then
+    echo "✗ RTK is required for installation and shell tool execution."
+    echo "  Install RTK: https://www.rtk-ai.app/docs/getting-started/installation/"
+    echo "  Then rerun this script."
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILLS_DIR="$REPO_ROOT/skills"

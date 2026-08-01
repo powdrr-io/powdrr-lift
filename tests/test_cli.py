@@ -68,8 +68,6 @@ def test_cli_process_workflow_task_wires_configuration(
                 str(tmp_path),
                 "--task-id",
                 "task-1",
-                "--model",
-                "test-model",
                 "--max-roundtrips",
                 "4",
             ]
@@ -81,7 +79,6 @@ def test_cli_process_workflow_task_wires_configuration(
     assert config.workflow_dir == workflow_dir
     assert config.repo_root == tmp_path
     assert config.task_id == "task-1"
-    assert config.model == "test-model"
     assert config.max_roundtrips == 4
 
 

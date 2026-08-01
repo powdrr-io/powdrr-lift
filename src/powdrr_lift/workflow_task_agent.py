@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -15,7 +14,12 @@ from powdrr_lift.core import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.workflow_chat_agent import _execute_shell_tool
+from powdrr_lift.workflow_chat_agent import (
+    ZAI_LLM_MAPPINGS,
+    _execute_shell_tool,
+    _resolve_credentials,
+    _resolve_llm_model,
+)
 
 
 class WorkflowTaskChatClient(Protocol):
@@ -27,9 +31,8 @@ class WorkflowTaskAgentConfig:
     workflow_dir: Path
     repo_root: Path = Path(".")
     task_id: str | None = None
-    model: str = "glm-5.2"
     api_key: str | None = None
-    base_url: str = "https://api.openai.com/v1"
+    base_url: str | None = None
     max_roundtrips: int = 12
     verbose: bool = False
 
@@ -58,7 +61,7 @@ def run_workflow_task(
     task = workflow.claim_task(task.task_id)
     print(f"Claimed workflow task: {task.task_id}", file=stdout)
     if client is None:
-        client = _build_openai_client(config)
+        client = _build_zai_client(config, task)
 
     events: list[dict[str, Any]] = []
     for _roundtrip in range(max(1, config.max_roundtrips)):
@@ -147,7 +150,8 @@ def _build_task_messages(
 
 def _task_system_prompt() -> str:
     return (
-        "You are processing one claimed task from a durable workflow.\n"
+        "You are a staff engineer processing one claimed task from a durable "
+        "workflow.\n"
         "Use the task input, completed upstream outputs, task details, and prior "
         "events to make progress. Return exactly one JSON object.\n"
         '{"kind":"invoke_tool","parameters":{"command":["..."]}}\n'
@@ -295,14 +299,21 @@ def _next_handoff_id(workflow: WorkflowInstance) -> str:
     return f"human-input-{index}"
 
 
-def _build_openai_client(config: WorkflowTaskAgentConfig) -> WorkflowTaskChatClient:
+def _build_zai_client(
+    config: WorkflowTaskAgentConfig,
+    task: WorkflowTask,
+) -> WorkflowTaskChatClient:
     from powdrr_lift.workflow_chat_agent import OpenAIChatClient
 
-    api_key = config.api_key or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("An OpenAI API key is required to process a workflow task.")
+    model = _resolve_llm_model(
+        task.llm_type,
+        fallback_model="glm-5.2",
+        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
+        provider="zai",
+    )
+    credentials = _resolve_credentials("zai", config.api_key, config.base_url)
     return OpenAIChatClient(
-        model=config.model,
-        api_key=api_key,
-        base_url=config.base_url,
+        model=model,
+        api_key=credentials.api_key,
+        base_url=credentials.base_url,
     )

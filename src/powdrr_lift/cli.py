@@ -976,15 +976,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--task-id",
         help="Process this task instead of the first ready agent task.",
     )
-    process_workflow_task_parser.add_argument(
-        "--model",
-        default="glm-5.2",
-        help="Model to use for workflow task processing.",
-    )
     process_workflow_task_parser.add_argument("--api-key")
     process_workflow_task_parser.add_argument(
         "--base-url",
-        default="https://api.openai.com/v1",
+        help="Optional z.ai-compatible base URL override.",
     )
     process_workflow_task_parser.add_argument(
         "--max-roundtrips",
@@ -1111,7 +1106,6 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
             workflow_dir=workflow_dir,
             repo_root=repo_root,
             task_id=args.task_id,
-            model=args.model,
             api_key=args.api_key,
             base_url=args.base_url,
             max_roundtrips=args.max_roundtrips,

@@ -1893,6 +1893,10 @@ def _complete_json_with_repair(
                         f"{context} automatic retries exhausted for model {model!r}.",
                         file=stderr,
                     )
+                    if _is_timeout_error(exc):
+                        raise _ModelUnavailableError(
+                            f"provider timed out repeatedly for model {model!r}"
+                        ) from exc
             elif _is_json_repairable_error(exc):
                 _verbose_print(
                     stderr,
@@ -2253,9 +2257,13 @@ def _is_transient_provider_error(exc: RuntimeError) -> bool:
         "http 429" in message
         or '"code":"1305"' in message
         or "temporarily overloaded" in message
-        or "timed out" in message
-        or "timeout" in message
+        or _is_timeout_error(exc)
     )
+
+
+def _is_timeout_error(exc: RuntimeError) -> bool:
+    message = str(exc).lower()
+    return "timed out" in message or "timeout" in message
 
 
 def _is_model_unavailable_error(exc: RuntimeError) -> bool:

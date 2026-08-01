@@ -143,6 +143,47 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
     assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
 
 
+def test_repeated_timeouts_use_backup_model_after_retries() -> None:
+    class _FakeClient:
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            if self.model == "glm-4.7-flash":
+                raise RuntimeError(
+                    "OpenAI request timed out: The read operation timed out"
+                )
+            return {"ok": True}
+
+    clients: list[str] = []
+
+    def client_for(model: str) -> _FakeClient:
+        clients.append(model)
+        return _FakeClient(model)
+
+    result, model = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[],
+        context="test request",
+        model="glm-4.7-flash",
+        parser=lambda payload: payload,
+        repair_instructions="",
+        config=SkillChatConfig(
+            skills_dir=Path("skills"),
+            provider_retry_attempts=2,
+            provider_retry_delay_seconds=0,
+        ),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        backup_models=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
+    )
+
+    assert result == {"ok": True}
+    assert model == "GLM-4.7-FlashX"
+    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+
+
 def test_openai_read_timeout_is_reported_as_provider_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

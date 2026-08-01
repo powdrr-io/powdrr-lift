@@ -2470,9 +2470,12 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
                     "kind": "next_step",
                     "decisions_and_context": "Step 1 complete.",
                 }
-            if call_index == 2:
-                raise RuntimeError("OpenAI request failed with HTTP 429: rate limit")
-            if call_index == 3:
+            if call_index in (2, 3, 4):
+                raise RuntimeError(
+                    "OpenAI request failed with HTTP 429: "
+                    '{"error":{"code":"1305","message":"temporarily overloaded"}}'
+                )
+            if call_index == 5:
                 return {
                     "kind": "complete",
                     "text": "Skill execution complete.",
@@ -2488,6 +2491,11 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.time.sleep",
+        sleep_calls.append,
+    )
 
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -2499,16 +2507,21 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
             output_dir=Path("generated"),
             api_key="test-key",
             model="test-model",
+            provider_retry_delay_seconds=0,
         ),
-        input_func=iter(["Build exports", "retry"]).__next__,
+        input_func=iter(["Build exports"]).__next__,
         stdout=stdout,
         stderr=stderr,
     )
 
     assert exit_code == 0
-    assert cast(int, captured["calls"]) == 4
-    assert "workflow execution for step 2/2 failed" in stderr.getvalue()
-    assert "Type 'retry' to try again or 'abort' to stop:" in stdout.getvalue()
+    assert cast(int, captured["calls"]) == 6
+    assert sleep_calls == [0, 0, 0]
+    assert "workflow execution for step 2/2 failed for model 'test-model'" in (
+        stderr.getvalue()
+    )
+    assert "automatic retry 3/3" in stderr.getvalue()
+    assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()
     assert (worktree_root / "generated" / "skill-execution.json").exists()
 
 

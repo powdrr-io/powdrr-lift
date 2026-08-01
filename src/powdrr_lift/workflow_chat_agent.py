@@ -7,6 +7,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -83,6 +84,8 @@ class SkillChatConfig:
     base_url: str | None = None
     max_turns: int = 8
     max_stalled_roundtrips: int = 3
+    provider_retry_attempts: int = 3
+    provider_retry_delay_seconds: float = 30.0
     verbose: bool = False
 
     @property
@@ -378,6 +381,7 @@ def run_workflow_chat(
             _build_selection_messages(catalog, transcript),
             parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
+            model=current_model,
             repair_instructions=_selection_repair_prompt(catalog),
             config=config,
             input_func=input_func,
@@ -480,6 +484,7 @@ def run_workflow_chat(
                 f"workflow execution for step {execution_state.step_index + 1}/"
                 f"{len(selected_skill.skill.steps)}"
             ),
+            model=current_model,
             repair_instructions=_action_repair_prompt(selected_skill),
             config=config,
             input_func=input_func,
@@ -1761,6 +1766,7 @@ def _complete_json_with_repair(
     messages: list[dict[str, str]],
     *,
     context: str,
+    model: str,
     parser: Callable[[dict[str, Any]], Any],
     repair_instructions: str,
     config: WorkflowChatConfig,
@@ -1772,7 +1778,39 @@ def _complete_json_with_repair(
         try:
             payload = client.complete_json(messages)
         except RuntimeError as exc:
-            if _is_json_repairable_error(exc):
+            if _is_transient_provider_error(exc):
+                retry_attempts = max(1, config.provider_retry_attempts)
+                for retry_attempt in range(1, retry_attempts + 1):
+                    delay_seconds = max(0.0, config.provider_retry_delay_seconds)
+                    print(
+                        f"{context} failed for model {model!r}: {exc}. "
+                        f"Waiting {delay_seconds:g} seconds before automatic "
+                        f"retry {retry_attempt}/{retry_attempts}.",
+                        file=stderr,
+                    )
+                    time.sleep(delay_seconds)
+                    try:
+                        payload = client.complete_json(messages)
+                        break
+                    except RuntimeError as retry_exc:
+                        exc = retry_exc
+                else:
+                    payload = None
+
+                if payload is not None:
+                    try:
+                        return parser(payload)
+                    except RuntimeError as retry_parse_exc:
+                        print(
+                            f"{context} retry response needs repair: {retry_parse_exc}",
+                            file=stderr,
+                        )
+                else:
+                    print(
+                        f"{context} automatic retries exhausted for model {model!r}.",
+                        file=stderr,
+                    )
+            elif _is_json_repairable_error(exc):
                 _verbose_print(
                     stderr,
                     config.verbose,
@@ -1812,6 +1850,7 @@ def _complete_json_with_repair(
                 continue
             print(f"Stopping after {context} failure.", file=stderr)
             return None
+        assert payload is not None
         try:
             return parser(payload)
         except RuntimeError as exc:
@@ -2122,6 +2161,15 @@ def _is_json_repairable_error(exc: RuntimeError) -> bool:
             "message was not an object",
             "must be a json object",
         )
+    )
+
+
+def _is_transient_provider_error(exc: RuntimeError) -> bool:
+    message = str(exc).lower()
+    return (
+        "http 429" in message
+        or '"code":"1305"' in message
+        or "temporarily overloaded" in message
     )
 
 

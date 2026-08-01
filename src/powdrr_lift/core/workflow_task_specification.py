@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
@@ -69,6 +69,7 @@ class WorkflowTask:
     description: str
     complexity: TaskComplexity
     input_state: Any
+    output_state: Any = None
     assignee_type: AssigneeType = AssigneeType.AGENT
     assignee_role: AssigneeRole = AgentRole.CODER
     details: str | None = None
@@ -99,6 +100,8 @@ class WorkflowTask:
             "output_state_type": self.output_state_type,
             "description": self.description,
         }
+        if self.output_state is not None:
+            data["output_state"] = self.output_state
         step_data = {
             "description": self.description,
             "details": self.details,
@@ -139,6 +142,96 @@ class ReadyWorkflowTask:
     task: WorkflowTask
 
 
+@dataclass(slots=True)
+class WorkflowInstance:
+    """A mutable, durable workflow made up of task documents in one directory."""
+
+    directory: Path
+    _tasks: dict[str, WorkflowTask] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def create(
+        cls,
+        directory: str | Path,
+        initial_tasks: Sequence[WorkflowTask] = (),
+    ) -> WorkflowInstance:
+        workflow = cls(Path(directory))
+        workflow.directory.mkdir(parents=True, exist_ok=True)
+        for task in initial_tasks:
+            workflow.add_task(task)
+        return workflow
+
+    @classmethod
+    def from_directory(cls, directory: str | Path) -> WorkflowInstance:
+        directory_path = Path(directory)
+        return cls(
+            directory_path,
+            {task.task_id: task for task in load_workflow_tasks(directory_path)},
+        )
+
+    @property
+    def tasks(self) -> tuple[WorkflowTask, ...]:
+        return tuple(self._tasks.values())
+
+    def add_task(self, task: WorkflowTask) -> WorkflowTask:
+        """Insert a task into the running workflow and persist it immediately."""
+        if task.task_id in self._tasks:
+            raise ValueError(f"Workflow already contains task: {task.task_id}")
+        missing_upstreams = [
+            task_id for task_id in task.upstream_task_ids if task_id not in self._tasks
+        ]
+        if missing_upstreams:
+            raise ValueError(
+                f"Workflow task {task.task_id} references missing upstream tasks: "
+                f"{', '.join(missing_upstreams)}"
+            )
+        self.directory.mkdir(parents=True, exist_ok=True)
+        save_workflow_task(task, self.directory / f"{task.task_id}.json")
+        self._tasks[task.task_id] = task
+        return task
+
+    def complete_task(self, task_id: str, output_state: Any = None) -> WorkflowTask:
+        """Complete an open task with the state produced by its assignee."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            raise KeyError(f"Unknown workflow task: {task_id}")
+        if task.status is not TaskStatus.OPEN:
+            raise ValueError(f"Workflow task is not open: {task_id}")
+        completed_task = replace(
+            task,
+            status=TaskStatus.COMPLETED,
+            output_state=output_state,
+        )
+        save_workflow_task(completed_task, self.directory / f"{task_id}.json")
+        self._tasks[task_id] = completed_task
+        return completed_task
+
+    def ready_tasks(
+        self,
+        *,
+        assignee_type: AssigneeType | str | None = None,
+        assignee_role: AssigneeRole | str | None = None,
+    ) -> tuple[WorkflowTask, ...]:
+        return select_ready_workflow_tasks(
+            self.tasks,
+            assignee_type=assignee_type,
+            assignee_role=assignee_role,
+        )
+
+    def task_context(self, task_id: str) -> dict[str, Any]:
+        """Return task input plus completed upstream outputs for an assignee."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            raise KeyError(f"Unknown workflow task: {task_id}")
+        return {
+            "input_state": task.input_state,
+            "upstream_outputs": {
+                upstream_id: self._tasks[upstream_id].output_state
+                for upstream_id in task.upstream_task_ids
+            },
+        }
+
+
 def workflow_task_to_json(task: WorkflowTask) -> str:
     return json.dumps(task.to_data(), indent=2, ensure_ascii=False) + "\n"
 
@@ -169,6 +262,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         description=description,
         complexity=complexity,
         input_state=data["input_state"],
+        output_state=data.get("output_state"),
         assignee_type=assignee_type,
         assignee_role=assignee_role,
         details=step.details,
@@ -301,6 +395,7 @@ def build_workflow_task_validation_report(
             "dependent_state",
             "complexity",
             "input_state",
+            "output_state",
             "output_state_type",
             "description",
             "assignee_type",

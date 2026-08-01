@@ -740,6 +740,20 @@ def _verbose_print(stderr: TextIO, verbose: bool, message: str) -> None:
         print(f"[verbose] {message}", file=stderr)
 
 
+def _verbose_json(
+    stderr: TextIO,
+    verbose: bool,
+    label: str,
+    value: object,
+) -> None:
+    if not verbose:
+        return
+    serialized = json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True)
+    for line_number, line in enumerate(serialized.splitlines()):
+        prefix = f"{label}: " if line_number == 0 else "  "
+        _verbose_print(stderr, verbose, f"{prefix}{line}")
+
+
 def _resolve_worktree_context(
     repo_root: Path | None,
     *,
@@ -1775,8 +1789,20 @@ def _complete_json_with_repair(
     stderr: TextIO,
 ) -> Any | None:
     while True:
+        _verbose_json(
+            stderr,
+            config.verbose,
+            f"{context} LLM input (model={model})",
+            messages,
+        )
         try:
             payload = client.complete_json(messages)
+            _verbose_json(
+                stderr,
+                config.verbose,
+                f"{context} LLM output (model={model})",
+                payload,
+            )
         except RuntimeError as exc:
             if _is_transient_provider_error(exc):
                 retry_attempts = max(1, config.provider_retry_attempts)
@@ -1791,6 +1817,12 @@ def _complete_json_with_repair(
                     time.sleep(delay_seconds)
                     try:
                         payload = client.complete_json(messages)
+                        _verbose_json(
+                            stderr,
+                            config.verbose,
+                            f"{context} LLM retry output (model={model})",
+                            payload,
+                        )
                         break
                     except RuntimeError as retry_exc:
                         exc = retry_exc
@@ -1820,6 +1852,7 @@ def _complete_json_with_repair(
                     client,
                     messages,
                     context=context,
+                    model=model,
                     error_message=str(exc),
                     repair_instructions=repair_instructions,
                     stderr=stderr,
@@ -1864,6 +1897,7 @@ def _complete_json_with_repair(
                 client,
                 messages,
                 context=context,
+                model=model,
                 error_message=str(exc),
                 repair_instructions=repair_instructions,
                 previous_payload=payload,
@@ -2092,6 +2126,7 @@ def _attempt_json_repair(
     messages: Sequence[dict[str, str]],
     *,
     context: str,
+    model: str,
     error_message: str,
     repair_instructions: str,
     stderr: TextIO,
@@ -2105,14 +2140,21 @@ def _attempt_json_repair(
         repair_instructions=repair_instructions,
         previous_payload=previous_payload,
     )
-    _verbose_print(
+    _verbose_json(
         stderr,
         verbose,
-        "Repair prompt for "
-        f"{context}: {json.dumps(repair_messages, indent=2, ensure_ascii=False)}",
+        f"{context} repair LLM input (model={model})",
+        repair_messages,
     )
     try:
-        return client.complete_json(repair_messages)
+        repaired_payload = client.complete_json(repair_messages)
+        _verbose_json(
+            stderr,
+            verbose,
+            f"{context} repair LLM output (model={model})",
+            repaired_payload,
+        )
+        return repaired_payload
     except RuntimeError as exc:
         print(f"{context} repair request failed: {exc}", file=stderr)
         return None

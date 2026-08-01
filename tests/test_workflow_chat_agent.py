@@ -1833,7 +1833,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             return response
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("UV_CACHE_DIR", "/private/tmp/uv-cache-4")
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "uv-cache"))
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
         _FakeOpenAIClient,

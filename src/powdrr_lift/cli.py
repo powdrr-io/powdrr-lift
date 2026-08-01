@@ -968,6 +968,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory containing the durable workflow task JSON files.",
     )
     process_workflow_task_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used as the working directory for task tools.",
+    )
+    process_workflow_task_parser.add_argument(
         "--task-id",
         help="Process this task instead of the first ready agent task.",
     )
@@ -1097,9 +1102,14 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
 
 
 def _run_process_workflow_task(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    workflow_dir = args.workflow_dir
+    if not workflow_dir.is_absolute():
+        workflow_dir = repo_root / workflow_dir
     return run_workflow_task(
         WorkflowTaskAgentConfig(
-            workflow_dir=args.workflow_dir,
+            workflow_dir=workflow_dir,
+            repo_root=repo_root,
             task_id=args.task_id,
             model=args.model,
             api_key=args.api_key,

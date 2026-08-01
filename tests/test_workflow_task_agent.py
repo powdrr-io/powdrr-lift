@@ -51,7 +51,10 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     client = _FakeClient([{"kind": "complete", "output_state": {"version": "v2"}}])
 
     exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(workflow_dir=workflow.directory),
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
         client=client,
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -95,7 +98,10 @@ def test_process_workflow_task_blocks_with_human_handoff_and_follow_up(
     )
 
     exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(workflow_dir=workflow.directory),
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
         client=client,
         stdout=io.StringIO(),
         stderr=io.StringIO(),

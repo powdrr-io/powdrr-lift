@@ -25,6 +25,7 @@ class WorkflowTaskChatClient(Protocol):
 @dataclass(frozen=True, slots=True)
 class WorkflowTaskAgentConfig:
     workflow_dir: Path
+    repo_root: Path = Path(".")
     task_id: str | None = None
     model: str = "glm-5.2"
     api_key: str | None = None
@@ -66,7 +67,7 @@ def run_workflow_task(
         if action.kind == "invoke_tool":
             result = _execute_shell_tool(
                 action.parameters,
-                worktree_root=config.workflow_dir,
+                worktree_root=config.repo_root,
                 stdout=stdout,
                 stderr=stderr,
                 verbose=config.verbose,

@@ -64,6 +64,8 @@ def test_cli_process_workflow_task_wires_configuration(
                 "process-workflow-task",
                 "--workflow-dir",
                 str(workflow_dir),
+                "--repo-root",
+                str(tmp_path),
                 "--task-id",
                 "task-1",
                 "--model",
@@ -77,6 +79,7 @@ def test_cli_process_workflow_task_wires_configuration(
     config = captured["config"]
     assert isinstance(config, WorkflowTaskAgentConfig)
     assert config.workflow_dir == workflow_dir
+    assert config.repo_root == tmp_path
     assert config.task_id == "task-1"
     assert config.model == "test-model"
     assert config.max_roundtrips == 4

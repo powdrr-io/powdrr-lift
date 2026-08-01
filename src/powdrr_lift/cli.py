@@ -71,6 +71,10 @@ from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
     run_workflow_chat,
 )
+from powdrr_lift.workflow_task_agent import (
+    WorkflowTaskAgentConfig,
+    run_workflow_task,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -952,6 +956,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     instantiate_workflow_parser.set_defaults(func=_run_instantiate_workflow)
 
+    process_workflow_task_parser = subparsers.add_parser(
+        "process-workflow-task",
+        aliases=["process_workflow_task"],
+        help="Pull and process one ready agent task from a durable workflow.",
+    )
+    process_workflow_task_parser.add_argument(
+        "--workflow-dir",
+        type=Path,
+        required=True,
+        help="Directory containing the durable workflow task JSON files.",
+    )
+    process_workflow_task_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used as the working directory for task tools.",
+    )
+    process_workflow_task_parser.add_argument(
+        "--task-id",
+        help="Process this task instead of the first ready agent task.",
+    )
+    process_workflow_task_parser.add_argument("--api-key")
+    process_workflow_task_parser.add_argument(
+        "--base-url",
+        help="Optional z.ai-compatible base URL override.",
+    )
+    process_workflow_task_parser.add_argument(
+        "--max-roundtrips",
+        type=int,
+        default=12,
+        help="Maximum LLM action roundtrips for the claimed task.",
+    )
+    process_workflow_task_parser.add_argument("--verbose", action="store_true")
+    process_workflow_task_parser.set_defaults(func=_run_process_workflow_task)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -1056,6 +1094,26 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _run_process_workflow_task(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    workflow_dir = args.workflow_dir
+    if not workflow_dir.is_absolute():
+        workflow_dir = repo_root / workflow_dir
+    return run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow_dir,
+            repo_root=repo_root,
+            task_id=args.task_id,
+            api_key=args.api_key,
+            base_url=args.base_url,
+            max_roundtrips=args.max_roundtrips,
+            verbose=args.verbose,
+        ),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
 
 
 def _run_init_from_plan_diff(args: argparse.Namespace) -> int:

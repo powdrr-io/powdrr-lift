@@ -905,6 +905,106 @@ def test_apply_file_edits_uses_original_line_numbers_for_interleaved_edits(
     assert _apply_file_edits(current_text, edits) == expected_text
 
 
+def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+    notes_path = worktree_root / "notes.txt"
+    notes_path.write_text("original\n", encoding="utf-8")
+    captured_messages: list[dict[str, str]] = []
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            self.call_index = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            captured_messages.append(messages[1])
+            call_index = self.call_index
+            self.call_index += 1
+            if call_index == 0:
+                return {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": "The request is a feature task.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if call_index == 1:
+                return {
+                    "kind": "edit",
+                    "file_path": "notes.txt",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 5,
+                            "end_line": 5,
+                            "text": "incorrect range",
+                        }
+                    ],
+                }
+            if call_index == 2:
+                prompt = json.loads(messages[1]["content"])
+                assert prompt["current_file"] == {
+                    "path": "notes.txt",
+                    "exists": True,
+                    "line_count": 1,
+                    "lines": [{"line_number": 1, "text": "original"}],
+                }
+                assert "line 5" in prompt["transcript"][-1]["content"]
+                return {
+                    "kind": "edit",
+                    "file_path": "notes.txt",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "end_line": 1,
+                            "text": "corrected",
+                        }
+                    ],
+                }
+            if call_index == 3:
+                return {"kind": "next_step"}
+            if call_index == 4:
+                return {"kind": "complete", "text": "Done."}
+            raise AssertionError(f"Unexpected call index: {call_index}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=iter(["Fix notes"]).__next__,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert notes_path.read_text(encoding="utf-8") == "corrected\n"
+    assert "Workflow edit action failed" in stderr.getvalue()
+    assert len(captured_messages) == 5
+
+
 def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_calls(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -228,10 +228,10 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
     ]
     assert template.task_templates[0].input_state == {
         "plan_documents": [
-            "docs/specs/<work-item-name>/system-specification.yaml",
-            "docs/specs/<work-item-name>/architecture-specification.yaml",
-            "docs/specs/<work-item-name>/implementation-specification.yaml",
-            "docs/specs/<work-item-name>/proposed-pr-specification.yaml",
+            "docs/specs/<feature-name>/system-specification.yaml",
+            "docs/specs/<feature-name>/architecture-specification.yaml",
+            "docs/specs/<feature-name>/implementation-specification.yaml",
+            "docs/specs/<feature-name>/proposed-pr-specification.yaml",
         ]
     }
     assert [

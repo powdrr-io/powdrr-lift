@@ -4,9 +4,9 @@ when_to_use:
 - When the user needs a concrete feature plan.
 - When the flow must gather context and drive implementation.
 steps:
-- description: Capture the feature goal and success criteria.
+- description: Capture the feature name, goal, and success criteria.
   llm_type: high_reasoning
-  details: Ask about outcomes, edge cases, tests, and constraints.
+  details: Choose a stable kebab-case feature name and ask about outcomes, edge cases, tests, and constraints. Reuse this exact feature name as the work-item name for every generated document.
 - description: Generate the system template and fill it out.
   llm_type: simple_task
   details: Fill the system template before review.

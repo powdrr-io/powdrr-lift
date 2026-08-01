@@ -17,10 +17,10 @@ task_templates:
     # Fill these paths from the work-item's approved specification documents.
     input_state:
       plan_documents:
-        - docs/specs/<work-item-name>/system-specification.yaml
-        - docs/specs/<work-item-name>/architecture-specification.yaml
-        - docs/specs/<work-item-name>/implementation-specification.yaml
-        - docs/specs/<work-item-name>/proposed-pr-specification.yaml
+        - docs/specs/<feature-name>/system-specification.yaml
+        - docs/specs/<feature-name>/architecture-specification.yaml
+        - docs/specs/<feature-name>/implementation-specification.yaml
+        - docs/specs/<feature-name>/proposed-pr-specification.yaml
     output_state_type: reviewed-plan-documents-state
     upstream_task_template_indexes: []
     dependent_state:

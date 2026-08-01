@@ -184,7 +184,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("When the flow must gather context and drive implementation."),
     )
     assert [step.description for step in skill.steps] == [
-        "Capture the feature goal and success criteria.",
+        "Capture the feature name, goal, and success criteria.",
         "Generate the system template and fill it out.",
         "Review the system context before deciding the feature shape.",
         "Generate the architecture template and fill it out.",
@@ -211,6 +211,9 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     ]
     for step in skill.steps:
         assert step.details is not None
+    first_step_details = skill.steps[0].details
+    assert first_step_details is not None
+    assert "exact feature name as the work-item name" in first_step_details
     assert skill.steps[2].uses_skills == ("review-system",)
     assert skill.steps[1].tool_invocations[0].command == (
         "powdrr-lift",
@@ -323,10 +326,16 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     skill = load_skill(skills_dir / "start-implementing-feature.yaml")
 
     assert skill.name == "start-implementing-feature"
-    assert skill.steps[0].details is not None
-    assert "templates/implement-a-feature.yaml" in skill.steps[0].details
+    first_step_details = skill.steps[0].details
+    assert first_step_details is not None
+    assert "templates/implement-a-feature.yaml" in first_step_details
+    assert "docs/specs/<feature-name>/" in first_step_details
+    assert "exact feature name" in first_step_details
+    third_step_details = skill.steps[2].details
+    assert third_step_details is not None
+    assert "docs/workflows/<feature-name>/" in third_step_details
     assert [step.description for step in skill.steps] == [
-        "Confirm the feature, work-item name, and workflow template.",
+        "Confirm the feature name and workflow template.",
         "Read the selected workflow template and explain the generated task graph.",
         "Instantiate the workflow and generate its first task.",
         "Review the generated workflow and first task with the user.",

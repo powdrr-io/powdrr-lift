@@ -878,14 +878,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory to write generated workflow task JSON files to.",
     )
     workflow_chat_parser.add_argument(
-        "--workflow-dir",
-        type=Path,
-        help=(
-            "Directory for durable workflow task JSON files created when the "
-            "agent requests human input."
-        ),
-    )
-    workflow_chat_parser.add_argument(
         "--model",
         default="glm-5.2",
         help="Model to use for template matching and task generation.",
@@ -1520,7 +1512,6 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
             skills_dir=args.skills_dir,
             repo_root=repo_root,
             output_dir=args.output_dir,
-            workflow_dir=args.workflow_dir,
             provider=args.provider,
             model=args.model,
             api_key=args.api_key,

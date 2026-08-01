@@ -25,14 +25,7 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
     tty = None  # type: ignore[assignment]
 
 from powdrr_lift.core import (
-    AgentRole,
-    AssigneeType,
-    HumanRole,
     Skill,
-    TaskComplexity,
-    TaskStatus,
-    WorkflowInstance,
-    WorkflowTask,
     architecture_specification_default_output_path,
     build_skill_directory_validation_report,
     codebase_state_default_output_path,
@@ -83,7 +76,6 @@ class SkillChatConfig:
     skills_dir: Path
     repo_root: Path | None = None
     output_dir: Path | None = None
-    workflow_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
     llm_mappings: tuple[tuple[str, str], ...] = ()
@@ -143,7 +135,6 @@ class SkillChatAction:
     keywords: tuple[str, ...] = field(default_factory=tuple)
     decisions_and_context: str | None = None
     llm_type: str | None = None
-    human_input: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,7 +154,6 @@ class _WorkflowExecutionState:
     step_index: int
     worktree_root: Path
     current_file_path: Path | None = None
-    workflow: WorkflowInstance | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,9 +324,6 @@ def run_workflow_chat(
     output_dir = config.output_dir
     if output_dir is not None and not output_dir.is_absolute():
         output_dir = repo_root / output_dir
-    workflow_dir = config.workflow_dir
-    if workflow_dir is not None and not workflow_dir.is_absolute():
-        workflow_dir = repo_root / workflow_dir
 
     catalog = _load_skill_catalog(skills_dir, stderr=stderr)
     if not catalog:
@@ -448,11 +435,6 @@ def run_workflow_chat(
         execution_context=[],
         step_index=0,
         worktree_root=worktree_root,
-        workflow=(
-            WorkflowInstance.from_directory(workflow_dir)
-            if workflow_dir is not None
-            else None
-        ),
     )
     action_handlers = _workflow_action_handlers()
     step_roundtrips = 0
@@ -492,11 +474,6 @@ def run_workflow_chat(
                 execution_context=execution_state.execution_context,
                 current_file_path=execution_state.current_file_path,
                 worktree_root=worktree_root,
-                workflow_dir=(
-                    execution_state.workflow.directory
-                    if execution_state.workflow is not None
-                    else None
-                ),
             ),
             parser=_parse_action_response,
             context=(
@@ -871,7 +848,6 @@ def _build_step_execution_messages(
     execution_context: Sequence[str],
     current_file_path: Path | None,
     worktree_root: Path,
-    workflow_dir: Path | None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(worktree_root, current_file_path)
     return [
@@ -904,8 +880,6 @@ def _build_step_execution_messages(
                         for context_type, description in _context_type_catalog()
                     ],
                     "worktree_root": str(worktree_root),
-                    "workflow_dir": str(workflow_dir) if workflow_dir else None,
-                    "workflow_mutation_supported": workflow_dir is not None,
                     "selected_skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
                     "execution_events": list(execution_events),
@@ -931,12 +905,6 @@ def _action_system_prompt() -> str:
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
-        '{"kind":"get-human-input","human_input":{"human_task":'
-        '{"description":"...","role":"decider","input_state":{},'
-        '"output_state_type":"decision"},"incorporation_instructions":"...",'
-        '"follow_up_task":{"description":"...","role":"coder",'
-        '"input_state":{},"output_state_type":"state"}},'
-        '"decisions_and_context":"...","llm_type":"high_reasoning"}\n'
         '{"kind":"edit","file_path":"docs/specs/example/system-specification.yaml",'
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
@@ -958,17 +926,6 @@ def _action_system_prompt() -> str:
         "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
-        "Use get-human-input when you cannot safely decide or complete the "
-        "current work without a human. This action changes the durable workflow "
-        "when workflow_dir is available: it inserts a human task and, when "
-        "provided, a follow-up agent task that depends on it, then pauses this "
-        "execution. human_task must state exactly what the human should do, "
-        "the required human role (decider or reviewer), the input_state/context "
-        "to show them, and the output_state_type describing their response. "
-        "incorporation_instructions must explain how the follow-up should use "
-        "that response. The follow_up_task is optional; include it when the "
-        "workflow needs a dedicated agent step to incorporate the human output. "
-        "Do not use get-human-input for an ordinary conversational clarification.\n"
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
@@ -1044,7 +1001,6 @@ def _workflow_action_handlers() -> dict[
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
         "gather-context": _handle_workflow_action_gather_context,
-        "get-human-input": _handle_workflow_action_get_human_input,
     }
 
 
@@ -1073,7 +1029,6 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
             "keywords": action.keywords,
             "decisions_and_context": action.decisions_and_context,
             "llm_type": action.llm_type,
-            "human_input": action.human_input,
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -1251,87 +1206,6 @@ def _handle_workflow_action_prompt_user(
     return True
 
 
-def _handle_workflow_action_get_human_input(
-    action: SkillChatAction,
-    state: _WorkflowExecutionState,
-    stdout: TextIO,
-    stderr: TextIO,
-    input_func: Callable[[], str],
-    config: WorkflowChatConfig,
-) -> bool:
-    _ = input_func
-    _ = config
-    if action.human_input is None:
-        raise RuntimeError("Workflow get-human-input action is missing human_input.")
-    human_spec = cast("dict[str, Any]", action.human_input["human_task"])
-    human_task_id = _next_human_input_task_id(state)
-    human_task = WorkflowTask(
-        task_id=human_task_id,
-        status=TaskStatus.OPEN,
-        description=human_spec["description"],
-        complexity=TaskComplexity.LOW,
-        input_state=human_spec["input_state"],
-        assignee_type=AssigneeType.HUMAN,
-        assignee_role=HumanRole(human_spec["role"]),
-        output_state_type=human_spec["output_state_type"],
-    )
-    follow_up_spec = action.human_input.get("follow_up_task")
-    follow_up_task_id: str | None = None
-    if follow_up_spec is not None:
-        follow_up_spec = cast("dict[str, Any]", follow_up_spec)
-        follow_up_task_id = f"{human_task_id}-follow-up"
-        follow_up_task = WorkflowTask(
-            task_id=follow_up_task_id,
-            status=TaskStatus.OPEN,
-            description=follow_up_spec["description"],
-            complexity=TaskComplexity.MEDIUM,
-            input_state=follow_up_spec["input_state"],
-            assignee_type=AssigneeType.AGENT,
-            assignee_role=AgentRole(follow_up_spec["role"]),
-            output_state_type=follow_up_spec["output_state_type"],
-            upstream_task_ids=(human_task_id,),
-        )
-    else:
-        follow_up_task = None
-
-    if state.workflow is not None:
-        state.workflow.add_task(human_task)
-        if follow_up_task is not None:
-            state.workflow.add_task(follow_up_task)
-    else:
-        print(
-            "Human input requested; configure workflow_dir to persist the task.",
-            file=stderr,
-        )
-    if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
-    state.execution_context.append(
-        str(action.human_input["incorporation_instructions"])
-    )
-    state.execution_events.append(
-        {
-            "kind": action.kind,
-            "human_input": action.human_input,
-            "human_task_id": human_task_id,
-            "follow_up_task_id": follow_up_task_id,
-            "workflow_persisted": state.workflow is not None,
-            "decisions_and_context": action.decisions_and_context,
-            "step_index": state.step_index,
-        }
-    )
-    print(f"Human input task created: {human_task_id}", file=stdout)
-    return False
-
-
-def _next_human_input_task_id(state: _WorkflowExecutionState) -> str:
-    attempt = len(state.execution_events) + 1
-    while state.workflow is not None and f"human-input-{attempt}" in {
-        task.task_id for task in state.workflow.tasks
-    }:
-        attempt += 1
-    return f"human-input-{attempt}"
-
-
 def _handle_workflow_action_invoke_tool(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
@@ -1456,7 +1330,6 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "next_step": _parse_workflow_action_next_step,
         "prompt_user": _parse_workflow_action_prompt_user,
-        "get-human-input": _parse_workflow_action_get_human_input,
     }
 
 
@@ -1592,94 +1465,6 @@ def _parse_workflow_action_prompt_user(
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
-
-
-def _parse_workflow_action_get_human_input(
-    payload: dict[str, Any],
-    decisions_and_context: str | None,
-    llm_type: str | None,
-) -> SkillChatAction:
-    raw_human_input = payload.get("human_input")
-    if not isinstance(raw_human_input, dict):
-        raise RuntimeError("Workflow get-human-input action must include human_input.")
-    human_task = _parse_human_input_task(
-        raw_human_input.get("human_task"),
-        role_type=HumanRole,
-        field_name="human_task",
-    )
-    incorporation_instructions = raw_human_input.get("incorporation_instructions")
-    if not isinstance(incorporation_instructions, str) or not (
-        incorporation_instructions.strip()
-    ):
-        raise RuntimeError(
-            "Workflow get-human-input action must include non-empty "
-            "incorporation_instructions."
-        )
-    raw_follow_up_task = raw_human_input.get("follow_up_task")
-    follow_up_task = None
-    if raw_follow_up_task is not None:
-        follow_up_task = _parse_human_input_task(
-            raw_follow_up_task,
-            role_type=AgentRole,
-            field_name="follow_up_task",
-        )
-    return SkillChatAction(
-        kind="get-human-input",
-        human_input={
-            "human_task": human_task,
-            "incorporation_instructions": incorporation_instructions.strip(),
-            "follow_up_task": follow_up_task,
-        },
-        decisions_and_context=decisions_and_context,
-        llm_type=llm_type,
-    )
-
-
-def _parse_human_input_task(
-    value: object,
-    *,
-    role_type: type[HumanRole] | type[AgentRole],
-    field_name: str,
-) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise RuntimeError(
-            f"Workflow get-human-input action {field_name} must be an object."
-        )
-    description = value.get("description")
-    role = value.get("role")
-    output_state_type = value.get("output_state_type")
-    if not isinstance(description, str) or not description.strip():
-        raise RuntimeError(
-            f"Workflow get-human-input action {field_name} must include "
-            "non-empty description."
-        )
-    if not isinstance(role, str) or not role.strip():
-        raise RuntimeError(
-            f"Workflow get-human-input action {field_name} must include role."
-        )
-    try:
-        normalized_role = role_type(role.strip()).value
-    except ValueError as exc:
-        allowed_roles = ", ".join(member.value for member in role_type)
-        raise RuntimeError(
-            f"Workflow get-human-input action {field_name} role must be one of "
-            f"{allowed_roles}."
-        ) from exc
-    if not isinstance(output_state_type, str) or not output_state_type.strip():
-        raise RuntimeError(
-            f"Workflow get-human-input action {field_name} must include "
-            "output_state_type."
-        )
-    if "input_state" not in value:
-        raise RuntimeError(
-            f"Workflow get-human-input action {field_name} must include input_state."
-        )
-    return {
-        "description": description.strip(),
-        "role": normalized_role,
-        "input_state": value["input_state"],
-        "output_state_type": output_state_type.strip(),
-    }
 
 
 def _execute_shell_tool(
@@ -2354,9 +2139,9 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     return (
         "Fix the response so it matches the workflow action schema with keys "
         "kind, tool, file_path, text, parameters, edits, types, keywords, and "
-        "human_input, decisions_and_context, and llm_type. "
+        "decisions_and_context, and llm_type. "
         "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
-        "get-human-input, next_step, and complete. "
+        "next_step, and complete. "
         f"The skill steps are: {step_kinds}."
     )
 

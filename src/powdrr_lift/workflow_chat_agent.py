@@ -50,19 +50,22 @@ _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
 
-# These are semantic task classes, rather than model names. Keeping the
-# mapping here lets a workflow describe the capability it needs while the
-# provider configuration decides which concrete model handles the roundtrip.
-# Concrete model-to-backup entries live in this same mapping so each model can
-# declare its own fallback without creating a second configuration list.
-ZAI_LLM_MAPPINGS: Mapping[str, str] = {
-    "high_reasoning": "glm-5.2",
-    "standard_reasoning": "glm-4.7",
-    "simple_task": "glm-4.7-flash",
-    "fast_iteration": "glm-4.7-flashx",
-    "long_context": "glm-5.2",
-    "vision": "glm-4.6v",
-    "glm-4.7-flash": "GLM-4.7-FlashX",
+
+@dataclass(frozen=True, slots=True)
+class LLMModelMapping:
+    model: str
+    backup_model: str | None = None
+
+
+# These are semantic task classes, rather than model names. Each capability
+# maps to its primary model and, when needed, its per-model backup.
+ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
+    "high_reasoning": LLMModelMapping("glm-5.2"),
+    "standard_reasoning": LLMModelMapping("glm-4.7"),
+    "simple_task": LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX"),
+    "fast_iteration": LLMModelMapping("glm-4.7-flashx"),
+    "long_context": LLMModelMapping("glm-5.2"),
+    "vision": LLMModelMapping("glm-4.6v"),
 }
 
 WorkflowActionParser = Callable[
@@ -83,7 +86,7 @@ class SkillChatConfig:
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
-    llm_mappings: tuple[tuple[str, str], ...] = ()
+    llm_mappings: tuple[tuple[str, str | LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -399,7 +402,10 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
-            model_mappings=tuple(ZAI_LLM_MAPPINGS.items()) + config.llm_mappings,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            + tuple(
+                (key, _as_model_mapping(value)) for key, value in config.llm_mappings
+            ),
         )
         if selection is None:
             return 1
@@ -503,7 +509,10 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
-            model_mappings=tuple(ZAI_LLM_MAPPINGS.items()) + config.llm_mappings,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            + tuple(
+                (key, _as_model_mapping(value)) for key, value in config.llm_mappings
+            ),
         )
         if action is None:
             return 1
@@ -1762,7 +1771,7 @@ def _resolve_llm_model(
     llm_type: str | None,
     *,
     fallback_model: str,
-    mappings: Sequence[tuple[str, str]],
+    mappings: Sequence[tuple[str, str | LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
     if llm_type is None or provider != "zai":
@@ -1770,9 +1779,13 @@ def _resolve_llm_model(
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(ZAI_LLM_MAPPINGS)
     mapping.update(
-        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
+        {
+            key.strip().lower().replace("-", "_"): _as_model_mapping(value)
+            for key, value in mappings
+        }
     )
-    return mapping.get(normalized_llm_type, fallback_model)
+    resolved_mapping = mapping.get(normalized_llm_type)
+    return resolved_mapping.model if resolved_mapping is not None else fallback_model
 
 
 def _complete_json_with_model_fallback(
@@ -1787,7 +1800,7 @@ def _complete_json_with_model_fallback(
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
-    model_mappings: Sequence[tuple[str, str]],
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
 ) -> tuple[Any | None, str]:
     active_model = model
     attempted_models = {model.casefold()}
@@ -1826,13 +1839,19 @@ def _complete_json_with_model_fallback(
 
 def _backup_model_for(
     model: str,
-    backup_models: Sequence[tuple[str, str]],
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
 ) -> str | None:
     normalized_model = model.casefold()
-    for source_model, backup_model in backup_models:
-        if source_model.casefold() == normalized_model:
-            return backup_model
+    for _, mapping in model_mappings:
+        if mapping.model.casefold() == normalized_model:
+            return mapping.backup_model
     return None
+
+
+def _as_model_mapping(value: str | LLMModelMapping) -> LLMModelMapping:
+    if isinstance(value, LLMModelMapping):
+        return value
+    return LLMModelMapping(value)
 
 
 def _complete_json_with_repair(

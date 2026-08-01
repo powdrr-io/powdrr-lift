@@ -45,6 +45,7 @@ from powdrr_lift.core.workflow_task_specification import (
 from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
+    LLMModelMapping,
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
@@ -141,7 +142,9 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
+        model_mappings=(
+            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
+        ),
     )
 
     assert result == {"ok": True}
@@ -182,7 +185,9 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
+        model_mappings=(
+            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
+        ),
     )
 
     assert result == {"ok": True}

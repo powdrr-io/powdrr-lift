@@ -509,14 +509,51 @@ def run_workflow_chat(
         handler = action_handlers.get(action.kind)
         if handler is None:
             raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
-        should_continue = handler(
-            action,
-            execution_state,
-            stdout,
-            stderr,
-            input_func,
-            config,
-        )
+        try:
+            should_continue = handler(
+                action,
+                execution_state,
+                stdout,
+                stderr,
+                input_func,
+                config,
+            )
+        except RuntimeError as exc:
+            feedback = (
+                f"Workflow {action.kind} action failed: {exc}. "
+                "Re-read the current file context and return a corrected action."
+            )
+            print(feedback, file=stderr)
+            execution_state.transcript.append(
+                {
+                    "role": "assistant",
+                    "content": _workflow_action_signature(action),
+                }
+            )
+            execution_state.transcript.append(
+                {
+                    "role": "user",
+                    "content": feedback,
+                }
+            )
+            execution_state.execution_context.append(feedback)
+            execution_state.execution_events.append(
+                {
+                    "kind": "action_error",
+                    "action_kind": action.kind,
+                    "error": str(exc),
+                    "step_index": execution_state.step_index,
+                }
+            )
+            stalled_roundtrips += 1
+            if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
+                print(
+                    "Workflow stopped after repeated action failures.",
+                    file=stderr,
+                )
+                return 1
+            previous_action_signature = None
+            continue
         action_signature = _workflow_action_signature(action)
         made_progress = _workflow_action_made_progress(
             action,
@@ -1102,6 +1139,7 @@ def _handle_workflow_action_edit(
     current_text = ""
     if target_path.exists():
         current_text = target_path.read_text(encoding="utf-8")
+    state.current_file_path = target_path
     updated_text = _apply_file_edits(current_text, action.edits)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(updated_text, encoding="utf-8")
@@ -1960,7 +1998,9 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
         if edit.kind == "add":
             if start_index > len(lines):
                 raise RuntimeError(
-                    "Workflow edit action add start_line is beyond the end of the file."
+                    "Workflow edit action add start_line "
+                    f"{edit.start_line} is beyond the end of the file, which has "
+                    f"{len(lines)} lines."
                 )
             insert_lines = edit.text.splitlines() if edit.text is not None else []
             lines[start_index:start_index] = insert_lines
@@ -1970,7 +2010,8 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
         end_index = end_line
         if end_index > len(lines):
             raise RuntimeError(
-                "Workflow edit action range extends beyond the end of the file."
+                "Workflow edit action range ends at line "
+                f"{end_line}, but the file has {len(lines)} lines."
             )
 
         if edit.kind == "remove":

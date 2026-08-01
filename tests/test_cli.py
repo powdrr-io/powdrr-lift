@@ -9,6 +9,7 @@ import pytest
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import main
+from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig
 
 
 def test_cli_init_writes_template(tmp_path: Path) -> None:
@@ -35,6 +36,50 @@ def test_cli_init_writes_template(tmp_path: Path) -> None:
         "src/app.py",
         "tests/test_app.py",
     ]
+
+
+def test_cli_process_workflow_task_wires_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_process_workflow_task(
+        config: WorkflowTaskAgentConfig,
+        *,
+        stdout: object,
+        stderr: object,
+    ) -> int:
+        captured["config"] = config
+        return 0
+
+    monkeypatch.setattr(
+        "powdrr_lift.cli.run_workflow_task", _fake_process_workflow_task
+    )
+    workflow_dir = tmp_path / "workflow"
+
+    assert (
+        main(
+            [
+                "process-workflow-task",
+                "--workflow-dir",
+                str(workflow_dir),
+                "--task-id",
+                "task-1",
+                "--model",
+                "test-model",
+                "--max-roundtrips",
+                "4",
+            ]
+        )
+        == 0
+    )
+    config = captured["config"]
+    assert isinstance(config, WorkflowTaskAgentConfig)
+    assert config.workflow_dir == workflow_dir
+    assert config.task_id == "task-1"
+    assert config.model == "test-model"
+    assert config.max_roundtrips == 4
 
 
 def test_cli_init_uses_pr_changelog_path(tmp_path: Path) -> None:

@@ -195,8 +195,8 @@ class WorkflowInstance:
         task = self._tasks.get(task_id)
         if task is None:
             raise KeyError(f"Unknown workflow task: {task_id}")
-        if task.status is not TaskStatus.OPEN:
-            raise ValueError(f"Workflow task is not open: {task_id}")
+        if task.status not in {TaskStatus.OPEN, TaskStatus.LOCKED}:
+            raise ValueError(f"Workflow task is not available to complete: {task_id}")
         completed_task = replace(
             task,
             status=TaskStatus.COMPLETED,
@@ -205,6 +205,18 @@ class WorkflowInstance:
         save_workflow_task(completed_task, self.directory / f"{task_id}.json")
         self._tasks[task_id] = completed_task
         return completed_task
+
+    def claim_task(self, task_id: str) -> WorkflowTask:
+        """Claim a ready task so another agent cannot pull it concurrently."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            raise KeyError(f"Unknown workflow task: {task_id}")
+        if task not in self.ready_tasks():
+            raise ValueError(f"Workflow task is not ready to claim: {task_id}")
+        claimed_task = replace(task, status=TaskStatus.LOCKED)
+        save_workflow_task(claimed_task, self.directory / f"{task_id}.json")
+        self._tasks[task_id] = claimed_task
+        return claimed_task
 
     def ready_tasks(
         self,

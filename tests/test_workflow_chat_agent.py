@@ -21,6 +21,7 @@ from powdrr_lift.core import (
     Skill,
     SkillStep,
     SkillToolInvocation,
+    WorkflowInstance,
     load_skill,
     save_skill,
 )
@@ -52,10 +53,13 @@ from powdrr_lift.workflow_chat_agent import (
     _apply_file_edits,
     _catalog_entry_to_data,
     _execute_shell_tool,
+    _parse_action_response,
     _resolve_api_key,
     _resolve_llm_model,
     _resolve_skill_path,
     _resolve_worktree_context,
+    _workflow_action_handlers,
+    _WorkflowExecutionState,
     run_workflow_chat,
 )
 
@@ -448,11 +452,71 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     prompt = _action_system_prompt()
 
     assert "gather-context" in prompt
+    assert "get-human-input" in prompt
+    assert "incorporation_instructions" in prompt
+    assert "human role" in prompt
     assert "edit" in prompt
     assert "file_path" in prompt
     assert "requirements" in prompt
     assert "entity-relationships" in prompt
     assert "proposed PRs" in prompt
+
+
+def test_get_human_input_action_inserts_durable_handoff_tasks(
+    tmp_path: Path,
+) -> None:
+    workflow = WorkflowInstance.create(tmp_path / "workflow")
+    action = _parse_action_response(
+        {
+            "kind": "get-human-input",
+            "human_input": {
+                "human_task": {
+                    "description": "Choose the supported API version.",
+                    "role": "decider",
+                    "input_state": {"question": "v1 or v2?"},
+                    "output_state_type": "api-version-decision",
+                },
+                "incorporation_instructions": (
+                    "Use the selected version when implementing the API."
+                ),
+                "follow_up_task": {
+                    "description": "Implement the API using the decision.",
+                    "role": "coder",
+                    "input_state": {"source": "human-input-1"},
+                    "output_state_type": "implementation-state",
+                },
+            },
+            "llm_type": "high_reasoning",
+        }
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(Path("skill.json"), _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        workflow=workflow,
+    )
+
+    should_continue = _workflow_action_handlers()["get-human-input"](
+        action,
+        state,
+        io.StringIO(),
+        io.StringIO(),
+        lambda: "unused",
+        SkillChatConfig(skills_dir=tmp_path),
+    )
+
+    assert should_continue is False
+    assert [task.task_id for task in workflow.ready_tasks()] == ["human-input-1"]
+    assert [task.task_id for task in workflow.tasks] == [
+        "human-input-1",
+        "human-input-1-follow-up",
+    ]
+    assert workflow.tasks[0].assignee_role.value == "decider"
+    assert workflow.tasks[1].upstream_task_ids == ("human-input-1",)
+    assert workflow.tasks[1].input_state == {"source": "human-input-1"}
 
 
 def test_run_workflow_chat_gathers_context_into_follow_up_step(

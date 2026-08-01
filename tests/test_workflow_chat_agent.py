@@ -1229,7 +1229,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         }
 
     step_descriptions = [
-        "Capture the feature goal and success criteria.",
+        "Capture the feature name, goal, and success criteria.",
         "Generate the system template and fill it out.",
         "Review the system context before deciding the feature shape.",
         "Generate the architecture template and fill it out.",

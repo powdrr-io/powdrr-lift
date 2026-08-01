@@ -7,10 +7,10 @@ when_to_use:
 - When the generated workflow and first task should be placed in a pull request for
   user review.
 steps:
-- description: Confirm the feature, work-item name, and workflow template.
-  details: Capture the feature the user wants to implement and fill out templates/implement-a-feature.yaml
-    from the approved plan documents. Ask the user for any missing feature or work-item
-    information before continuing.
+- description: Confirm the feature name and workflow template.
+  details: Capture the exact feature name used by specify-a-feature and fill out templates/implement-a-feature.yaml
+    from the approved plan documents in docs/specs/<feature-name>/. Ask the user for
+    the feature name if it is missing before continuing.
 - description: Read the selected workflow template and explain the generated task
     graph.
   details: Inspect the selected template's task templates, dependencies, input state,
@@ -25,7 +25,8 @@ steps:
     - templates/implement-a-feature.yaml
 - description: Instantiate the workflow and generate its first task.
   details: Use the repository's workflow-template and workflow-task models to create
-    docs/workflows/<work-item-name>/ with one persisted task per template task. Keep
+    docs/workflows/<feature-name>/ with one persisted task per template task. Pass the
+    same feature name as --work-item-name. Keep
     tasks open, preserve the template dependencies and state, and verify that task-001
     is the only ready task. Do not overwrite an existing workflow directory without
     user approval.

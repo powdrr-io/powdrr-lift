@@ -119,52 +119,12 @@ steps:
   llm_type: fast_iteration
   details: Do not begin implementation or create a pull request while any required
     specification remains invalid.
-- description: Prepare an implementation checklist from each approved proposed PR.
-  llm_type: high_reasoning
-  details: For every proposed PR, identify the code files, tests, acceptance criteria,
-    dependencies, and validation commands before making changes. Keep each item traceable
-    to the approved specifications.
-- description: Implement the approved feature changes and their tests.
-  llm_type: standard_reasoning
-  details: Keep the specifications and implementation aligned as the code changes
-    are made.
-- description: Run local formatting, linting, type checks, and tests.
-  llm_type: fast_iteration
-  details: Fix local failures before creating or updating the pull request.
-  tool_invocations:
-  - tool: shell
-    command:
-    - uv
-    - run
-    - ruff
-    - format
-    - "--check"
-    - "."
-  - tool: shell
-    command:
-    - uv
-    - run
-    - ruff
-    - check
-    - "."
-  - tool: shell
-    command:
-    - uv
-    - run
-    - mypy
-    - src
-    - tests
-  - tool: shell
-    command:
-    - uv
-    - run
-    - pytest
-    - "-q"
 - description: Create or update the pull request for the validated feature.
   llm_type: simple_task
-  details: Create the draft pull request from the feature branch with the feature
-    intent, implementation scope, validation evidence, and remaining risks. If a pull
-    request already exists for the branch, update it instead.
+  details: Create the draft pull request from the feature branch with the validated
+    specification documents, feature intent, proposed PR scope, and validation evidence.
+    If a pull request already exists for the branch, update it instead. Do not begin
+    implementation in this skill.
   tool_invocations:
   - tool: shell
     command:
@@ -173,30 +133,3 @@ steps:
     - create
     - "--draft"
     - "--fill"
-- description: Wait 30 seconds for CI to make progress.
-  llm_type: simple_task
-  details: This is the first checkpoint in the CI monitoring loop.
-- description: If CI has finished, check its result.
-  llm_type: fast_iteration
-  details: Inspect all required checks for the pull request before deciding whether
-    the loop can exit.
-  tool_invocations:
-  - tool: shell
-    command:
-    - gh
-    - pr
-    - checks
-    - "<pr-number>"
-- description: If CI passed, break out of the CI monitoring loop.
-  llm_type: simple_task
-  details: Record the successful checks and continue to the final user handoff.
-- description: If CI failed, fix the reported failures and return to the wait step.
-  llm_type: standard_reasoning
-  details: Apply only fixes supported by the failure evidence, rerun local validation,
-    and keep the pull request updated.
-- description: If CI is still running, return to the wait step.
-  llm_type: simple_task
-  details: Do not treat pending checks as a failure or as completion.
-- description: Prompt the user to review the implementation and CI result.
-  llm_type: standard_reasoning
-  details: Show the final pull request, validation evidence, and CI outcome for approval.

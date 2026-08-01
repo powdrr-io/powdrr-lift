@@ -198,16 +198,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
             "If any specification validation fails, fix it and return to the "
             "validation step."
         ),
-        "Prepare an implementation checklist from each approved proposed PR.",
-        "Implement the approved feature changes and their tests.",
-        "Run local formatting, linting, type checks, and tests.",
         "Create or update the pull request for the validated feature.",
-        "Wait 30 seconds for CI to make progress.",
-        "If CI has finished, check its result.",
-        "If CI passed, break out of the CI monitoring loop.",
-        "If CI failed, fix the reported failures and return to the wait step.",
-        "If CI is still running, return to the wait step.",
-        "Prompt the user to review the implementation and CI result.",
     ]
     for step in skill.steps:
         assert step.details is not None
@@ -284,19 +275,13 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
             "<work-item-name>",
         ),
     ]
-    assert skill.steps[14].tool_invocations[0].command == (
+    assert skill.steps[11].tool_invocations[0].command == (
         "gh",
         "pr",
         "create",
         "--draft",
         "--fill",
     )
-    assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
-        ("uv", "run", "ruff", "format", "--check", "."),
-        ("uv", "run", "ruff", "check", "."),
-        ("uv", "run", "mypy", "src", "tests"),
-        ("uv", "run", "pytest", "-q"),
-    ]
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -335,9 +320,9 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert third_step_details is not None
     assert "docs/workflows/<feature-name>/" in third_step_details
     assert [step.description for step in skill.steps] == [
-        "Confirm the feature name and workflow template.",
-        "Read the selected workflow template and explain the generated task graph.",
-        "Instantiate the workflow and generate its first task.",
+        "Confirm the feature name, approved plan documents, and workflow template.",
+        "Prepare an implementation checklist and explain the planning workflow.",
+        "Instantiate the planning workflow and generate its first task.",
         "Review the generated workflow and first task with the user.",
         "Commit the generated workflow and open a draft pull request.",
         "Hand the pull request to the user for review.",

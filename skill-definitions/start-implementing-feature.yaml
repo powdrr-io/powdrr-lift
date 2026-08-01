@@ -7,15 +7,16 @@ when_to_use:
 - When the generated workflow and first task should be placed in a pull request for
   user review.
 steps:
-- description: Confirm the feature name and workflow template.
-  details: Capture the exact feature name used by specify-a-feature and fill out templates/implement-a-feature.yaml
-    from the approved plan documents in docs/specs/<feature-name>/. Ask the user for
-    the feature name if it is missing before continuing.
-- description: Read the selected workflow template and explain the generated task
-    graph.
-  details: Inspect the selected template's task templates, dependencies, input state,
-    output state types, and dependent state. Tell the user what workflow and first
-    task will be generated before making repository changes.
+- description: Confirm the feature name, approved plan documents, and workflow template.
+  details: Capture the exact feature name used by specify-a-feature and confirm the
+    approved plan documents in docs/specs/<feature-name>/. Use templates/implement-a-feature.yaml
+    as the planning workflow template.
+- description: Prepare an implementation checklist and explain the planning workflow.
+  details: For every approved proposed PR, identify the code files, tests, acceptance
+    criteria, dependencies, and validation commands before implementation begins.
+    Explain how the planning workflow will review the documents, confirm requirements,
+    generate proposed PR specs, and create one execute-proposed-pr workflow per approved
+    proposed PR.
   tool_invocations:
   - tool: shell
     command:
@@ -23,10 +24,11 @@ steps:
     - "-n"
     - 1,260p
     - templates/implement-a-feature.yaml
-- description: Instantiate the workflow and generate its first task.
+- description: Instantiate the planning workflow and generate its first task.
   details: Use the repository's workflow-template and workflow-task models to create
-    docs/workflows/<feature-name>/ with one persisted task per template task. Pass the
-    same feature name as --work-item-name. Keep
+    docs/workflows/<feature-name>/ with one persisted task per planning template task.
+    Its final task generates the proposed PR specs and one execute-proposed-pr workflow
+    for each approved proposed PR. Pass the same feature name as --work-item-name. Keep
     tasks open, preserve the template dependencies and state, and verify that task-001
     is the only ready task. Do not overwrite an existing workflow directory without
     user approval.
@@ -58,5 +60,4 @@ steps:
     - "--fill"
 - description: Hand the pull request to the user for review.
   details: Show the pull request URL and summarize the generated workflow and first
-    task. Stop after requesting the user's review; implementation begins only after
-    the user approves the pull request.
+    task. Wait for the user's approval before beginning implementation.

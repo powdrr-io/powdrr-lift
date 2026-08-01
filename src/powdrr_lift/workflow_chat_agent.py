@@ -49,13 +49,12 @@ from powdrr_lift.core.spec_context import (
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
-_DEFAULT_BACKUP_MODELS: tuple[tuple[str, str], ...] = (
-    ("glm-4.7-flash", "GLM-4.7-FlashX"),
-)
 
 # These are semantic task classes, rather than model names. Keeping the
 # mapping here lets a workflow describe the capability it needs while the
 # provider configuration decides which concrete model handles the roundtrip.
+# Concrete model-to-backup entries live in this same mapping so each model can
+# declare its own fallback without creating a second configuration list.
 ZAI_LLM_MAPPINGS: Mapping[str, str] = {
     "high_reasoning": "glm-5.2",
     "standard_reasoning": "glm-4.7",
@@ -63,6 +62,7 @@ ZAI_LLM_MAPPINGS: Mapping[str, str] = {
     "fast_iteration": "glm-4.7-flashx",
     "long_context": "glm-5.2",
     "vision": "glm-4.6v",
+    "glm-4.7-flash": "GLM-4.7-FlashX",
 }
 
 WorkflowActionParser = Callable[
@@ -84,7 +84,6 @@ class SkillChatConfig:
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
     llm_mappings: tuple[tuple[str, str], ...] = ()
-    backup_models: tuple[tuple[str, str], ...] = _DEFAULT_BACKUP_MODELS
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -400,7 +399,7 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
-            backup_models=config.backup_models,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items()) + config.llm_mappings,
         )
         if selection is None:
             return 1
@@ -504,7 +503,7 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
-            backup_models=config.backup_models,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items()) + config.llm_mappings,
         )
         if action is None:
             return 1
@@ -1788,7 +1787,7 @@ def _complete_json_with_model_fallback(
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
-    backup_models: Sequence[tuple[str, str]],
+    model_mappings: Sequence[tuple[str, str]],
 ) -> tuple[Any | None, str]:
     active_model = model
     attempted_models = {model.casefold()}
@@ -1808,7 +1807,7 @@ def _complete_json_with_model_fallback(
             )
             return result, active_model
         except _ModelUnavailableError as exc:
-            backup_model = _backup_model_for(active_model, backup_models)
+            backup_model = _backup_model_for(active_model, model_mappings)
             if backup_model is None or backup_model.casefold() in attempted_models:
                 print(
                     f"{context} model {active_model!r} is unavailable and no "

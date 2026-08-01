@@ -43,6 +43,7 @@ from powdrr_lift.core.workflow_task_specification import (
     select_ready_workflow_tasks,
 )
 from powdrr_lift.workflow_chat_agent import (
+    ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
     OpenAIChatClient,
     SkillCatalogEntry,
@@ -102,8 +103,13 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
 
 
 def test_default_backup_model_maps_flash_to_flashx() -> None:
-    config = SkillChatConfig(skills_dir=Path("skills"))
-    assert _backup_model_for("GLM-4.7-FLASH", config.backup_models) == "GLM-4.7-FlashX"
+    assert (
+        _backup_model_for(
+            "GLM-4.7-FLASH",
+            tuple(ZAI_LLM_MAPPINGS.items()),
+        )
+        == "GLM-4.7-FlashX"
+    )
 
 
 def test_model_unavailable_uses_backup_model_without_prompting() -> None:
@@ -135,7 +141,7 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        backup_models=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
+        model_mappings=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
     )
 
     assert result == {"ok": True}
@@ -176,7 +182,7 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        backup_models=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
+        model_mappings=(("glm-4.7-flash", "GLM-4.7-FlashX"),),
     )
 
     assert result == {"ok": True}

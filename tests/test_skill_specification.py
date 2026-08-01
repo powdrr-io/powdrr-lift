@@ -320,22 +320,12 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert third_step_details is not None
     assert "docs/workflows/<feature-name>/" in third_step_details
     assert [step.description for step in skill.steps] == [
-        "Confirm the feature name and workflow template.",
-        "Read the selected workflow template and explain the generated task graph.",
-        "Instantiate the workflow and generate its first task.",
+        "Confirm the feature name, approved plan documents, and workflow template.",
+        "Prepare an implementation checklist and explain the planning workflow.",
+        "Instantiate the planning workflow and generate its first task.",
         "Review the generated workflow and first task with the user.",
         "Commit the generated workflow and open a draft pull request.",
         "Hand the pull request to the user for review.",
-        "Prepare an implementation checklist from each approved proposed PR.",
-        "Implement the approved feature changes and their tests.",
-        "Run local formatting, linting, type checks, and tests.",
-        "Create or update the implementation pull request.",
-        "Wait 30 seconds for CI to make progress.",
-        "If CI has finished, check its result.",
-        "If CI passed, break out of the CI monitoring loop.",
-        "If CI failed, fix the reported failures and return to the wait step.",
-        "If CI is still running, return to the wait step.",
-        "Prompt the user to review the implementation and CI result.",
     ]
     assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",
@@ -345,12 +335,6 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--template",
         "templates/implement-a-feature.yaml",
     )
-    assert [invocation.command for invocation in skill.steps[8].tool_invocations] == [
-        ("uv", "run", "ruff", "format", "--check", "."),
-        ("uv", "run", "ruff", "check", "."),
-        ("uv", "run", "mypy", "src", "tests"),
-        ("uv", "run", "pytest", "-q"),
-    ]
 
 
 def test_checked_in_review_system_skill_definition_matches_review_flow() -> None:

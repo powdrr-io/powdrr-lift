@@ -144,8 +144,10 @@ from powdrr_lift.core.skill_specification import (
     save_skill,
     skill_from_data,
     skill_from_json,
+    skill_from_yaml,
     skill_step_from_data,
     skill_to_json,
+    skill_to_yaml,
     validate_skill_directory,
     validate_skill_directory_json,
     validate_skill_json,
@@ -227,7 +229,9 @@ from powdrr_lift.core.workflow_template_specification import (
     validate_workflow_template_json_file,
     workflow_template_from_data,
     workflow_template_from_json,
+    workflow_template_from_yaml,
     workflow_template_to_json,
+    workflow_template_to_yaml,
 )
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
@@ -426,11 +430,15 @@ _EXPORTS: dict[str, str] = {
     "workflow_task_document_to_json": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_template_from_data": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_template_from_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "workflow_template_from_yaml": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "workflow_template_to_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "workflow_template_to_yaml": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "skill_from_data": _SKILL,
     "skill_from_json": _SKILL,
+    "skill_from_yaml": _SKILL,
     "skill_step_from_data": _SKILL,
     "skill_to_json": _SKILL,
+    "skill_to_yaml": _SKILL,
 }
 
 __all__ = sorted(_EXPORTS)

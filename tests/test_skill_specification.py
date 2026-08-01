@@ -174,7 +174,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     skill_path = (
         Path(__file__).resolve().parents[1]
         / "skill-definitions"
-        / "specify-a-feature.json"
+        / "specify-a-feature.yaml"
     )
     skill = load_skill(skill_path)
 
@@ -314,15 +314,17 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
 def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
-    assert (skills_dir / "review-architecture.json").is_file()
-    assert (skills_dir / "review-system.json").is_file()
+    assert (skills_dir / "review-architecture.yaml").is_file()
+    assert (skills_dir / "review-system.yaml").is_file()
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
-    skill = load_skill(skills_dir / "start-implementing-feature.json")
+    skill = load_skill(skills_dir / "start-implementing-feature.yaml")
 
     assert skill.name == "start-implementing-feature"
+    assert skill.steps[0].details is not None
+    assert "templates/implement-a-feature.yaml" in skill.steps[0].details
     assert [step.description for step in skill.steps] == [
         "Confirm the feature, work-item name, and workflow template.",
         "Read the selected workflow template and explain the generated task graph.",
@@ -337,13 +339,13 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--work-item-name",
         "<work-item-name>",
         "--template",
-        "<template-path>",
+        "templates/implement-a-feature.yaml",
     )
 
 
 def test_checked_in_review_system_skill_definition_matches_review_flow() -> None:
     skill_path = (
-        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.json"
+        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.yaml"
     )
     skill = load_skill(skill_path)
 
@@ -391,7 +393,7 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
     skill_path = (
         Path(__file__).resolve().parents[1]
         / "skill-definitions"
-        / "review-architecture.json"
+        / "review-architecture.yaml"
     )
     skill = load_skill(skill_path)
 

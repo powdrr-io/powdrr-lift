@@ -15,7 +15,7 @@ PROPOSED_PR_SPECIFICATION_FILENAME = "proposed-pr-specification.yaml"
 SYSTEM_MAP_SPECIFICATION_FILENAME = "system-map-specification.yaml"
 FEATURE_PR_SPECIFICATION_FILENAME = "feature-pr-specification.yaml"
 PLAN_DIFF_SPECIFICATION_FILENAME = "plan-diff.yaml"
-SKILL_DEFINITION_FILENAME_SUFFIX = ".json"
+SKILL_DEFINITION_FILENAME_SUFFIX = ".yaml"
 
 
 def normalize_work_item_name(work_item_name: str) -> str:

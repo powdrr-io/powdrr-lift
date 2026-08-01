@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+import yaml
+
 from powdrr_lift.core.skill_specification import (
     SkillToolInvocation,
     skill_step_from_data,
@@ -142,10 +144,21 @@ def workflow_template_to_json(template: WorkflowTemplate) -> str:
     return json.dumps(template.to_data(), indent=2, ensure_ascii=False) + "\n"
 
 
+def workflow_template_to_yaml(template: WorkflowTemplate) -> str:
+    return yaml.safe_dump(template.to_data(), sort_keys=False)
+
+
 def workflow_template_from_json(json_content: str) -> WorkflowTemplate:
     loaded_content = json.loads(json_content)
     if not isinstance(loaded_content, Mapping):
         raise ValueError("Workflow template JSON must decode to an object.")
+    return workflow_template_from_data(cast("Mapping[str, Any]", loaded_content))
+
+
+def workflow_template_from_yaml(yaml_content: str) -> WorkflowTemplate:
+    loaded_content = yaml.safe_load(yaml_content)
+    if not isinstance(loaded_content, Mapping):
+        raise ValueError("Workflow template YAML must decode to an object.")
     return workflow_template_from_data(cast("Mapping[str, Any]", loaded_content))
 
 
@@ -161,7 +174,11 @@ def workflow_template_from_data(data: Mapping[str, Any]) -> WorkflowTemplate:
 
 
 def load_workflow_template(path: str | Path) -> WorkflowTemplate:
-    return workflow_template_from_json(Path(path).read_text(encoding="utf-8"))
+    template_path = Path(path)
+    template_text = template_path.read_text(encoding="utf-8")
+    if template_path.suffix.lower() in {".yaml", ".yml"}:
+        return workflow_template_from_yaml(template_text)
+    return workflow_template_from_json(template_text)
 
 
 def instantiate_workflow_template(
@@ -227,7 +244,12 @@ def instantiate_workflow_template(
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:
     resolved_path = Path(path)
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_path.write_text(workflow_template_to_json(template), encoding="utf-8")
+    content = (
+        workflow_template_to_yaml(template)
+        if resolved_path.suffix.lower() in {".yaml", ".yml"}
+        else workflow_template_to_json(template)
+    )
+    resolved_path.write_text(content, encoding="utf-8")
     return resolved_path
 
 

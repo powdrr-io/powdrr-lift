@@ -143,7 +143,7 @@ workflow templates, ask follow-up questions, and generate a validated task
 directory.
 
 ```bash
-powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/specify-a-feature
+powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/implement-a-feature
 ```
 
 - The command uses `OPENAI_API_KEY` by default and also accepts `CODEX_API_KEY`.

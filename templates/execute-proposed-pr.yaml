@@ -1,0 +1,121 @@
+---
+when_to_use:
+- When an approved proposed PR is ready to execute.
+- When implementation must be validated against the full plan before creating the
+  PR.
+how_to_fill_this_out:
+- Keep each task focused on one implementation or validation checkpoint.
+- Preserve the plan and requirements through every task.
+- Do not create the PR until completeness, goals, lint, and cleanup are confirmed.
+task_templates:
+- description: Review proposed PR plan
+  complexity: high
+  assignee_type: agent
+  assignee_role: architect
+  llm_type: high_reasoning
+  input_state:
+    proposed_pr: 
+  output_state_type: reviewed-proposed-pr-plan-state
+  upstream_task_template_indexes: []
+  dependent_state:
+  - proposed-pr-plan-reviewed
+- description: Review overall plan
+  complexity: high
+  assignee_type: agent
+  assignee_role: architect
+  llm_type: high_reasoning
+  input_state:
+    overall_plan: 
+  output_state_type: reviewed-overall-plan-state
+  upstream_task_template_indexes:
+  - 0
+  dependent_state:
+  - overall-plan-reviewed
+- description: Confirm requirements
+  complexity: medium
+  assignee_type: human
+  assignee_role: decider
+  llm_type: standard_reasoning
+  input_state:
+    requirements: []
+    acceptance_criteria: []
+  output_state_type: confirmed-execution-requirements-state
+  upstream_task_template_indexes:
+  - 1
+  dependent_state:
+  - execution-requirements-confirmed
+- description: Generate test diffs
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    test_plan: []
+  output_state_type: test-diffs-state
+  upstream_task_template_indexes:
+  - 2
+  dependent_state:
+  - test-diffs-generated
+- description: Generate functionality diffs
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    implementation_plan: []
+  output_state_type: functionality-diffs-state
+  upstream_task_template_indexes:
+  - 3
+  dependent_state:
+  - functionality-diffs-generated
+- description: Confirm completeness
+  complexity: medium
+  assignee_type: human
+  assignee_role: reviewer
+  llm_type: high_reasoning
+  input_state:
+    changed_files: []
+    test_results: []
+  output_state_type: confirmed-completeness-state
+  upstream_task_template_indexes:
+  - 4
+  dependent_state:
+  - completeness-confirmed
+- description: Confirm goals
+  complexity: medium
+  assignee_type: human
+  assignee_role: decider
+  llm_type: standard_reasoning
+  input_state:
+    goals: []
+    acceptance_results: []
+  output_state_type: confirmed-goals-state
+  upstream_task_template_indexes:
+  - 5
+  dependent_state:
+  - goals-confirmed
+- description: Lint and cleanup
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  input_state:
+    lint_results: []
+    cleanup_items: []
+  output_state_type: linted-and-cleaned-state
+  upstream_task_template_indexes:
+  - 6
+  dependent_state:
+  - lint-and-cleanup-complete
+- description: Create PR
+  complexity: high
+  assignee_type: human
+  assignee_role: reviewer
+  llm_type: standard_reasoning
+  input_state:
+    pull_request: 
+  output_state_type: pull-request-created-state
+  upstream_task_template_indexes:
+  - 7
+  dependent_state:
+  - pull-request-created

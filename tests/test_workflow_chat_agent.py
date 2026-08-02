@@ -43,14 +43,18 @@ from powdrr_lift.core.workflow_task_specification import (
     select_ready_workflow_tasks,
 )
 from powdrr_lift.workflow_chat_agent import (
+    ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
+    LLMModelMapping,
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
     SkillChatEdit,
     _action_system_prompt,
     _apply_file_edits,
+    _backup_model_for,
     _catalog_entry_to_data,
+    _complete_json_with_model_fallback,
     _execute_shell_tool,
     _resolve_api_key,
     _resolve_llm_model,
@@ -97,6 +101,115 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         )
         == "gpt-test-model"
     )
+
+
+def test_default_backup_model_maps_flash_to_flashx() -> None:
+    assert (
+        _backup_model_for(
+            "GLM-4.7-FLASH",
+            tuple(ZAI_LLM_MAPPINGS.items()),
+        )
+        == "GLM-4.7-FlashX"
+    )
+
+
+def test_model_unavailable_uses_backup_model_without_prompting() -> None:
+    class _FakeClient:
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            if self.model == "glm-4.7-flash":
+                raise RuntimeError(
+                    "OpenAI request failed with HTTP 404: model is not available"
+                )
+            return {"ok": True}
+
+    clients: list[str] = []
+
+    def client_for(model: str) -> _FakeClient:
+        clients.append(model)
+        return _FakeClient(model)
+
+    result, model = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[],
+        context="test request",
+        model="glm-4.7-flash",
+        parser=lambda payload: payload,
+        repair_instructions="",
+        config=SkillChatConfig(skills_dir=Path("skills")),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        model_mappings=(
+            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
+        ),
+    )
+
+    assert result == {"ok": True}
+    assert model == "GLM-4.7-FlashX"
+    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+
+
+def test_repeated_timeouts_use_backup_model_after_retries() -> None:
+    class _FakeClient:
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            if self.model == "glm-4.7-flash":
+                raise RuntimeError(
+                    "OpenAI request timed out: The read operation timed out"
+                )
+            return {"ok": True}
+
+    clients: list[str] = []
+
+    def client_for(model: str) -> _FakeClient:
+        clients.append(model)
+        return _FakeClient(model)
+
+    result, model = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[],
+        context="test request",
+        model="glm-4.7-flash",
+        parser=lambda payload: payload,
+        repair_instructions="",
+        config=SkillChatConfig(
+            skills_dir=Path("skills"),
+            provider_retry_attempts=2,
+            provider_retry_delay_seconds=0,
+        ),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        model_mappings=(
+            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
+        ),
+    )
+
+    assert result == {"ok": True}
+    assert model == "GLM-4.7-FlashX"
+    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+
+
+def test_openai_read_timeout_is_reported_as_provider_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _timed_out(request: Request, timeout: float) -> object:
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _timed_out)
+    client = OpenAIChatClient(
+        model="test-model",
+        api_key="test-key",
+        base_url="https://api.openai.com/v1",
+    )
+
+    with pytest.raises(RuntimeError, match="OpenAI request timed out"):
+        client.complete_json([{"role": "user", "content": "hello"}])
 
 
 def _assert_validation_success(

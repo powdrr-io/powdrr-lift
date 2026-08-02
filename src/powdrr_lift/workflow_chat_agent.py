@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
@@ -49,16 +50,22 @@ _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
 
-# These are semantic task classes, rather than model names. Keeping the
-# mapping here lets a workflow describe the capability it needs while the
-# provider configuration decides which concrete model handles the roundtrip.
-ZAI_LLM_MAPPINGS: Mapping[str, str] = {
-    "high_reasoning": "glm-5.2",
-    "standard_reasoning": "glm-4.7",
-    "simple_task": "glm-4.7-flash",
-    "fast_iteration": "glm-4.7-flashx",
-    "long_context": "glm-5.2",
-    "vision": "glm-4.6v",
+
+@dataclass(frozen=True, slots=True)
+class LLMModelMapping:
+    model: str
+    backup_model: str | None = None
+
+
+# These are semantic task classes, rather than model names. Each capability
+# maps to its primary model and, when needed, its per-model backup.
+ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
+    "high_reasoning": LLMModelMapping("glm-5.2"),
+    "standard_reasoning": LLMModelMapping("glm-4.7"),
+    "simple_task": LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX"),
+    "fast_iteration": LLMModelMapping("glm-4.7-flashx"),
+    "long_context": LLMModelMapping("glm-5.2"),
+    "vision": LLMModelMapping("glm-4.6v"),
 }
 
 WorkflowActionParser = Callable[
@@ -79,7 +86,7 @@ class SkillChatConfig:
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
-    llm_mappings: tuple[tuple[str, str], ...] = ()
+    llm_mappings: tuple[tuple[str, str | LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -209,6 +216,8 @@ class OpenAIChatClient:
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
+        except TimeoutError as exc:
+            raise RuntimeError(f"OpenAI request timed out: {exc}") from exc
 
         loaded_response = _parse_json_object(
             raw_response,
@@ -278,6 +287,8 @@ class AnthropicChatClient:
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
+        except TimeoutError as exc:
+            raise RuntimeError(f"Anthropic request timed out: {exc}") from exc
 
         loaded_response = _parse_json_object(
             raw_response,
@@ -306,6 +317,10 @@ class AnthropicChatClient:
 
 class WorkflowChatClient(Protocol):
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
+
+
+class _ModelUnavailableError(RuntimeError):
+    pass
 
 
 def run_workflow_chat(
@@ -376,9 +391,9 @@ def run_workflow_chat(
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
-        selection = _complete_json_with_repair(
-            client_for(provider, credentials, current_model),
-            _build_selection_messages(catalog, transcript),
+        selection, current_model = _complete_json_with_model_fallback(
+            client_for=partial(client_for, provider, credentials),
+            messages=_build_selection_messages(catalog, transcript),
             parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
             model=current_model,
@@ -387,6 +402,10 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            + tuple(
+                (key, _as_model_mapping(value)) for key, value in config.llm_mappings
+            ),
         )
         if selection is None:
             return 1
@@ -467,9 +486,9 @@ def run_workflow_chat(
                 f"{len(selected_skill.skill.steps)}"
             ),
         )
-        action = _complete_json_with_repair(
-            client_for(provider, credentials, current_model),
-            _build_step_execution_messages(
+        action, current_model = _complete_json_with_model_fallback(
+            client_for=partial(client_for, provider, credentials),
+            messages=_build_step_execution_messages(
                 selected_skill=selected_skill,
                 current_step=current_step,
                 current_step_index=execution_state.step_index,
@@ -490,6 +509,10 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            + tuple(
+                (key, _as_model_mapping(value)) for key, value in config.llm_mappings
+            ),
         )
         if action is None:
             return 1
@@ -1786,7 +1809,7 @@ def _resolve_llm_model(
     llm_type: str | None,
     *,
     fallback_model: str,
-    mappings: Sequence[tuple[str, str]],
+    mappings: Sequence[tuple[str, str | LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
     if llm_type is None or provider != "zai":
@@ -1794,9 +1817,79 @@ def _resolve_llm_model(
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(ZAI_LLM_MAPPINGS)
     mapping.update(
-        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
+        {
+            key.strip().lower().replace("-", "_"): _as_model_mapping(value)
+            for key, value in mappings
+        }
     )
-    return mapping.get(normalized_llm_type, fallback_model)
+    resolved_mapping = mapping.get(normalized_llm_type)
+    return resolved_mapping.model if resolved_mapping is not None else fallback_model
+
+
+def _complete_json_with_model_fallback(
+    *,
+    client_for: Callable[[str], WorkflowChatClient],
+    messages: list[dict[str, str]],
+    context: str,
+    model: str,
+    parser: Callable[[dict[str, Any]], Any],
+    repair_instructions: str,
+    config: SkillChatConfig,
+    input_func: Callable[[], str],
+    stdout: TextIO,
+    stderr: TextIO,
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
+) -> tuple[Any | None, str]:
+    active_model = model
+    attempted_models = {model.casefold()}
+    while True:
+        try:
+            result = _complete_json_with_repair(
+                client_for(active_model),
+                messages,
+                context=context,
+                model=active_model,
+                parser=parser,
+                repair_instructions=repair_instructions,
+                config=config,
+                input_func=input_func,
+                stdout=stdout,
+                stderr=stderr,
+            )
+            return result, active_model
+        except _ModelUnavailableError as exc:
+            backup_model = _backup_model_for(active_model, model_mappings)
+            if backup_model is None or backup_model.casefold() in attempted_models:
+                print(
+                    f"{context} model {active_model!r} is unavailable and no "
+                    "unused backup model is configured.",
+                    file=stderr,
+                )
+                return None, active_model
+            print(
+                f"{context} model {active_model!r} is unavailable: {exc}. "
+                f"Switching to backup model {backup_model!r}.",
+                file=stderr,
+            )
+            attempted_models.add(backup_model.casefold())
+            active_model = backup_model
+
+
+def _backup_model_for(
+    model: str,
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
+) -> str | None:
+    normalized_model = model.casefold()
+    for _, mapping in model_mappings:
+        if mapping.model.casefold() == normalized_model:
+            return mapping.backup_model
+    return None
+
+
+def _as_model_mapping(value: str | LLMModelMapping) -> LLMModelMapping:
+    if isinstance(value, LLMModelMapping):
+        return value
+    return LLMModelMapping(value)
 
 
 def _complete_json_with_repair(
@@ -1816,6 +1909,10 @@ def _complete_json_with_repair(
         try:
             payload = client.complete_json(messages)
         except RuntimeError as exc:
+            if _is_model_unavailable_error(exc):
+                raise _ModelUnavailableError(
+                    f"provider reported that model {model!r} is unavailable"
+                ) from exc
             if _is_transient_provider_error(exc):
                 retry_attempts = max(1, config.provider_retry_attempts)
                 for retry_attempt in range(1, retry_attempts + 1):
@@ -1831,6 +1928,10 @@ def _complete_json_with_repair(
                         payload = client.complete_json(messages)
                         break
                     except RuntimeError as retry_exc:
+                        if _is_model_unavailable_error(retry_exc):
+                            raise _ModelUnavailableError(
+                                f"provider reported that model {model!r} is unavailable"
+                            ) from retry_exc
                         exc = retry_exc
                 else:
                     payload = None
@@ -1848,6 +1949,10 @@ def _complete_json_with_repair(
                         f"{context} automatic retries exhausted for model {model!r}.",
                         file=stderr,
                     )
+                    if _is_timeout_error(exc):
+                        raise _ModelUnavailableError(
+                            f"provider timed out repeatedly for model {model!r}"
+                        ) from exc
             elif _is_json_repairable_error(exc):
                 _verbose_print(
                     stderr,
@@ -2211,6 +2316,23 @@ def _is_transient_provider_error(exc: RuntimeError) -> bool:
         "http 429" in message
         or '"code":"1305"' in message
         or "temporarily overloaded" in message
+        or _is_timeout_error(exc)
+    )
+
+
+def _is_timeout_error(exc: RuntimeError) -> bool:
+    message = str(exc).lower()
+    return "timed out" in message or "timeout" in message
+
+
+def _is_model_unavailable_error(exc: RuntimeError) -> bool:
+    message = str(exc).lower()
+    return "model" in message and (
+        "not available" in message
+        or "unavailable" in message
+        or "not found" in message
+        or "does not exist" in message
+        or "unsupported" in message
     )
 
 

@@ -81,7 +81,14 @@ def test_workflow_task_client_uses_task_llm_type_for_zai_model(
     captured: dict[str, str] = {}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured.update(model=model, api_key=api_key, base_url=base_url)
 
     monkeypatch.setenv("ZAI_API_KEY", "test-key")

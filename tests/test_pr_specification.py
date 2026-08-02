@@ -6,7 +6,10 @@ from pathlib import Path
 
 import yaml
 
-from powdrr_lift import build_pr_specification_validation_report
+from powdrr_lift import (
+    build_pr_specification_validation_report,
+    validate_pr_specification_yaml,
+)
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
     pr_specification_default_output_path,
@@ -214,6 +217,12 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
         "unknown_feature_id",
         "duplicate_detail_id",
     }
+    report_yaml = validate_pr_specification_yaml(
+        proposed_spec,
+        work_item_name="PR-123",
+        repo_root=tmp_path,
+    )
+    assert report_yaml.index("issues:") < report_yaml.index("available_feature_ids:")
 
 
 def test_validate_pr_specification_reports_success_for_valid_spec(

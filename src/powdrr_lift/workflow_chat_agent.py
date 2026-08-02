@@ -50,6 +50,8 @@ _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
+_LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
+_LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,7 +277,7 @@ class LocalLlamaChatClient:
         except ImportError as exc:
             raise RuntimeError(
                 "Local provider requires llama-cpp-python. Install the local "
-                "extra with Metal support on macOS."
+                "dependencies with Metal support on macOS."
             ) from exc
         if not model_path.is_file():
             raise RuntimeError(f"Local GGUF model file does not exist: {model_path}")
@@ -2741,11 +2743,7 @@ def _build_chat_client(
     model_path: Path | None = None,
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
-        resolved_model_path = model_path or _local_model_path_from_environment()
-        if resolved_model_path is None:
-            raise RuntimeError(
-                "Local provider requires --model-path or LOCAL_LLM_MODEL_PATH."
-            )
+        resolved_model_path = _resolve_local_model_path(model_path)
         return LocalLlamaChatClient(model_path=resolved_model_path)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
@@ -2870,6 +2868,35 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
         "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
         "sign in with Codex so ~/.codex/auth.json is available."
     )
+
+
+def _resolve_local_model_path(model_path: Path | None = None) -> Path:
+    explicit_path = model_path or _local_model_path_from_environment()
+    if explicit_path is not None:
+        return explicit_path
+    try:
+        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise RuntimeError(
+            "Automatic local model downloads require huggingface-hub."
+        ) from exc
+    try:
+        snapshot_directory = Path(
+            snapshot_download(
+                repo_id=_LOCAL_MODEL_REPOSITORY,
+                allow_patterns=[_LOCAL_MODEL_PATTERN],
+            )
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not download the Qwen Q5_K_M model from Hugging Face."
+        ) from exc
+    model_paths = sorted(snapshot_directory.glob("*.gguf"))
+    if not model_paths:
+        raise RuntimeError(
+            "The Hugging Face Qwen repository did not contain a Q5_K_M GGUF file."
+        )
+    return model_paths[0]
 
 
 def _local_model_path_from_environment() -> Path | None:

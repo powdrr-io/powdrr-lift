@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -23,6 +22,7 @@ from powdrr_lift.workflow_chat_agent import (
     _print_waiting_for_model,
     _resolve_credentials,
     _resolve_llm_model,
+    _resolve_local_model_path,
 )
 
 
@@ -324,17 +324,9 @@ def _build_zai_client(
         provider="zai",
     )
     if model == _QWEN_2_5_CODER_MODEL:
-        model_path = config.model_path
-        if model_path is None:
-            model_path_value = os.environ.get("LOCAL_LLM_MODEL_PATH")
-            model_path = (
-                Path(model_path_value).expanduser() if model_path_value else None
-            )
-        if model_path is None:
-            raise RuntimeError(
-                "Local Qwen model requires --model-path or LOCAL_LLM_MODEL_PATH."
-            )
-        return LocalLlamaChatClient(model_path=model_path)
+        return LocalLlamaChatClient(
+            model_path=_resolve_local_model_path(config.model_path)
+        )
     credentials = _resolve_credentials("zai", config.api_key, config.base_url)
     return OpenAIChatClient(
         model=model,

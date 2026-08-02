@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -62,6 +63,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_api_key,
     _resolve_base_url,
     _resolve_llm_model,
+    _resolve_local_model_path,
     _resolve_skill_path,
     _resolve_worktree_context,
     _WorkflowExecutionState,
@@ -154,6 +156,29 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
         )
         == "glm-4.7"
     )
+
+
+def test_local_model_path_downloads_q5_k_m_shards_automatically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_shard = tmp_path / "qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf"
+    second_shard = tmp_path / "qwen2.5-coder-14b-instruct-q5_k_m-00002-of-00002.gguf"
+    first_shard.touch()
+    second_shard.touch()
+
+    class _FakeHuggingFaceHub:
+        @staticmethod
+        def snapshot_download(**kwargs: object) -> str:
+            assert kwargs["repo_id"] == "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
+            assert kwargs["allow_patterns"] == [
+                "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
+            ]
+            return str(tmp_path)
+
+    monkeypatch.setitem(sys.modules, "huggingface_hub", _FakeHuggingFaceHub)
+
+    assert _resolve_local_model_path() == first_shard
 
 
 def test_model_unavailable_uses_backup_model_without_prompting() -> None:

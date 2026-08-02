@@ -7,10 +7,14 @@ authors = [
     { name = "Greg Fee", email = "fee.gregory@yahoo.com" }
 ]
 requires-python = ">=3.12"
-dependencies = ["PyYAML>=6.0.2", "mcp>=1.0.0"]
+dependencies = [
+    "PyYAML>=6.0.2",
+    "huggingface-hub>=0.26.0",
+    "llama-cpp-python>=0.3.16",
+    "mcp>=1.0.0",
+]
 
 [project.optional-dependencies]
-local = ["llama-cpp-python>=0.3.16"]
 dev = [
     "mypy>=1.10",
     "pytest>=8.3",

@@ -151,13 +151,12 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
   `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
-- Use the local Qwen provider with `llama-cpp-python` and a GGUF model path:
-  install `llama-cpp-python` with Metal enabled, download the Q5_K_M shards
-  from `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF`, and pass
-  `--provider local --model Qwen/Qwen2.5-Coder-14B-Instruct --model-path
-  /path/to/qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf` (or set
-  `LOCAL_LLM_MODEL_PATH`). On Apple Silicon, install with
-  `CMAKE_ARGS="-DGGML_METAL=on" uv pip install llama-cpp-python`.
+- The default mapping combines remote GLM models with local Qwen execution.
+  The first Qwen request automatically downloads the Q5_K_M GGUF shards from
+  `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF` into the Hugging Face cache and reuses
+  them afterward. Set `LOCAL_LLM_MODEL_PATH` or pass `--model-path` only to
+  override the downloaded model. On Apple Silicon, install with Metal enabled:
+  `CMAKE_ARGS="-DGGML_METAL=on" uv sync`.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
 - Workflow skill steps and every routing/action response carry an `llm_type`
   descriptor. The default mapping routes `high_reasoning` to `glm-5.2`,

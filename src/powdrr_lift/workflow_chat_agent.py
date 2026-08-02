@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import select
 import shlex
@@ -49,6 +50,14 @@ from powdrr_lift.core.spec_context import (
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
+_TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
+_CONTEXT_SAFETY_MARGIN_TOKENS = 1024
+
+
+@dataclass(frozen=True, slots=True)
+class LLMModelLimits:
+    context_window: int
+    max_output_tokens: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,12 +66,54 @@ class LLMModelMapping:
     backup_model: str | None = None
 
 
+_DEFAULT_MODEL_LIMITS = LLMModelLimits(
+    context_window=128_000,
+    max_output_tokens=_MAX_COMPLETION_TOKENS,
+)
+
+ZAI_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
+    "glm-5.2": LLMModelLimits(context_window=200_000, max_output_tokens=131_072),
+    "glm-4.7": LLMModelLimits(context_window=200_000, max_output_tokens=131_072),
+    "glm-4.7-flashx": LLMModelLimits(
+        context_window=200_000,
+        max_output_tokens=131_072,
+    ),
+    "glm-4.7-flash": LLMModelLimits(
+        context_window=200_000,
+        max_output_tokens=131_072,
+    ),
+    "glm-4.6v": LLMModelLimits(context_window=200_000, max_output_tokens=32_768),
+}
+
+# DeepInfra exposes model-specific limits through its model metadata API. Keep
+# conservative limits for the configured models so requests never claim more
+# output than the documented 16K cap for most hosted models.
+DEEPINFRA_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
+    "deepseek-ai/deepseek-v4-pro": LLMModelLimits(
+        context_window=1_000_000,
+        max_output_tokens=16_384,
+    ),
+    "deepseek-ai/deepseek-v4-flash": LLMModelLimits(
+        context_window=1_000_000,
+        max_output_tokens=16_384,
+    ),
+    "qwen/qwen3-next-80b-a3b-instruct": LLMModelLimits(
+        context_window=128_000,
+        max_output_tokens=16_384,
+    ),
+    "qwen/qwen2.5-vl-32b-instruct": LLMModelLimits(
+        context_window=128_000,
+        max_output_tokens=16_384,
+    ),
+}
+
+
 # These are semantic task classes, rather than model names. Each capability
 # maps to its primary model and, when needed, its per-model backup.
 ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     "high_reasoning": LLMModelMapping("glm-5.2"),
     "standard_reasoning": LLMModelMapping("glm-4.7"),
-    "simple_task": LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX"),
+    "simple_task": LLMModelMapping("glm-4.7-flashx", "glm-4.7"),
     "fast_iteration": LLMModelMapping("glm-4.7-flashx"),
     "long_context": LLMModelMapping("glm-5.2"),
     "vision": LLMModelMapping("glm-4.6v"),
@@ -199,18 +250,24 @@ class OpenAIChatClient:
         api_key: str,
         base_url: str,
         timeout: float = 120.0,
+        limits: LLMModelLimits | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._limits = limits or _DEFAULT_MODEL_LIMITS
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        max_tokens, estimated_input_tokens = _request_token_budget(
+            messages,
+            self._limits,
+        )
         payload = {
             "model": self._model,
             "messages": messages,
             "temperature": 0,
-            "max_tokens": _MAX_COMPLETION_TOKENS,
+            "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }
         request = Request(
@@ -243,6 +300,8 @@ class OpenAIChatClient:
                     elapsed=time.monotonic() - request_started,
                     message=str(exc),
                     message_count=len(messages),
+                    max_tokens=max_tokens,
+                    estimated_input_tokens=estimated_input_tokens,
                 )
             ) from exc
 
@@ -275,18 +334,24 @@ class AnthropicChatClient:
         base_url: str,
         timeout: float = 120.0,
         api_version: str = "2023-06-01",
+        limits: LLMModelLimits | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._api_version = api_version
+        self._limits = limits or _DEFAULT_MODEL_LIMITS
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        max_tokens, estimated_input_tokens = _request_token_budget(
+            messages,
+            self._limits,
+        )
         system_prompt, conversation_messages = _split_system_message(messages)
         payload: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": _MAX_COMPLETION_TOKENS,
+            "max_tokens": max_tokens,
             "messages": [
                 _anthropic_message(message) for message in conversation_messages
             ],
@@ -325,6 +390,8 @@ class AnthropicChatClient:
                     elapsed=time.monotonic() - request_started,
                     message=str(exc),
                     message_count=len(conversation_messages),
+                    max_tokens=max_tokens,
+                    estimated_input_tokens=estimated_input_tokens,
                 )
             ) from exc
 
@@ -362,12 +429,43 @@ def _provider_timeout_message(
     elapsed: float,
     message: str,
     message_count: int,
+    max_tokens: int,
+    estimated_input_tokens: int,
 ) -> str:
     return (
         f"{provider} request timed out for model {model!r}: {message}. "
         f"Elapsed {elapsed:.1f}s of configured {timeout:g}s timeout; "
         f"endpoint={endpoint!r}, messages={message_count}, "
-        f"max_tokens={_MAX_COMPLETION_TOKENS}."
+        f"estimated_input_tokens={estimated_input_tokens}, "
+        f"max_tokens={max_tokens}."
+    )
+
+
+def _request_token_budget(
+    messages: list[dict[str, str]],
+    limits: LLMModelLimits,
+) -> tuple[int, int]:
+    estimated_input_tokens = _estimate_message_tokens(messages)
+    available_output_tokens = (
+        limits.context_window - estimated_input_tokens - _CONTEXT_SAFETY_MARGIN_TOKENS
+    )
+    if available_output_tokens < 1:
+        raise RuntimeError(
+            "Model context window is exhausted: "
+            f"estimated input is {estimated_input_tokens} tokens, "
+            f"context window is {limits.context_window} tokens."
+        )
+    return (
+        min(_MAX_COMPLETION_TOKENS, limits.max_output_tokens, available_output_tokens),
+        estimated_input_tokens,
+    )
+
+
+def _estimate_message_tokens(messages: list[dict[str, str]]) -> int:
+    serialized = json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
+    return max(
+        1,
+        math.ceil(len(serialized) / _TOKEN_ESTIMATE_CHARS_PER_TOKEN),
     )
 
 
@@ -1155,6 +1253,9 @@ def _action_system_prompt() -> str:
         "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
+        "Do not ask for information already present in the transcript or "
+        "execution context. Every prompt_user action must include a concise, "
+        "non-empty question or instruction in text.\n"
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
@@ -1705,8 +1806,8 @@ def _parse_workflow_action_prompt_user(
     llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
-    if text is not None and not isinstance(text, str):
-        raise RuntimeError("Workflow prompt_user action text must be a string.")
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError("Workflow prompt_user action must include non-empty text.")
     return SkillChatAction(
         kind="prompt_user",
         text=(text.strip() if text else None),
@@ -2199,6 +2300,8 @@ def _complete_json_with_repair(
                     repair_instructions=repair_instructions,
                     stderr=stderr,
                     verbose=config.verbose,
+                    retry_attempts=config.provider_retry_attempts,
+                    retry_delay_seconds=config.provider_retry_delay_seconds,
                 )
                 if repaired_payload is not None:
                     try:
@@ -2246,6 +2349,8 @@ def _complete_json_with_repair(
                 previous_payload=payload,
                 stderr=stderr,
                 verbose=config.verbose,
+                retry_attempts=config.provider_retry_attempts,
+                retry_delay_seconds=config.provider_retry_delay_seconds,
             )
             if repaired_payload is not None:
                 try:
@@ -2486,6 +2591,8 @@ def _attempt_json_repair(
     stderr: TextIO,
     verbose: bool,
     previous_payload: dict[str, Any] | None = None,
+    retry_attempts: int = 0,
+    retry_delay_seconds: float = 0.0,
 ) -> dict[str, Any] | None:
     repair_messages = _build_json_repair_messages(
         messages,
@@ -2500,18 +2607,30 @@ def _attempt_json_repair(
         f"{context} repair LLM input (model={model})",
         repair_messages,
     )
-    try:
-        repaired_payload = client.complete_json(repair_messages)
-        _verbose_json(
-            stderr,
-            verbose,
-            f"{context} repair LLM output (model={model})",
-            repaired_payload,
-        )
-        return repaired_payload
-    except RuntimeError as exc:
-        print(f"{context} repair request failed: {exc}", file=stderr)
-        return None
+    attempts = max(1, retry_attempts + 1)
+    for attempt in range(1, attempts + 1):
+        try:
+            repaired_payload = client.complete_json(repair_messages)
+            _verbose_json(
+                stderr,
+                verbose,
+                f"{context} repair LLM output (model={model})",
+                repaired_payload,
+            )
+            return repaired_payload
+        except RuntimeError as exc:
+            if attempt == attempts:
+                print(f"{context} repair request failed: {exc}", file=stderr)
+                return None
+            delay_seconds = max(0.0, retry_delay_seconds)
+            print(
+                f"{context} repair request failed for model {model!r}: {exc}. "
+                f"Waiting {delay_seconds:g} seconds before automatic repair "
+                f"retry {attempt}/{attempts - 1}.",
+                file=stderr,
+            )
+            time.sleep(delay_seconds)
+    return None
 
 
 def _build_json_repair_messages(
@@ -2710,23 +2829,37 @@ def _build_chat_client(
     *,
     model: str,
 ) -> OpenAIChatClient | AnthropicChatClient:
+    limits = _model_limits_for(credentials.provider, model)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
             model=model,
             api_key=credentials.api_key,
             base_url=credentials.base_url,
+            limits=limits,
         )
     if credentials.provider == "zai":
         return OpenAIChatClient(
             model=model,
             api_key=credentials.api_key,
             base_url=credentials.base_url,
+            limits=limits,
         )
     return OpenAIChatClient(
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
+        limits=limits,
     )
+
+
+def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
+    if provider == "zai":
+        limits = ZAI_MODEL_LIMITS
+    elif provider == "deepinfra":
+        limits = DEEPINFRA_MODEL_LIMITS
+    else:
+        return _DEFAULT_MODEL_LIMITS
+    return limits.get(model.casefold(), _DEFAULT_MODEL_LIMITS)
 
 
 def _resolve_credentials(

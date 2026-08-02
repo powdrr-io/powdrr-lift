@@ -46,6 +46,7 @@ from powdrr_lift.workflow_chat_agent import (
     DEEPINFRA_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
+    LLMModelLimits,
     LLMModelMapping,
     OpenAIChatClient,
     SkillCatalogEntry,
@@ -60,6 +61,7 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_edit,
     _parse_action_response,
     _prompt_user,
+    _request_token_budget,
     _resolve_api_key,
     _resolve_base_url,
     _resolve_llm_model,
@@ -171,14 +173,41 @@ def test_workflow_progress_callback_replaces_stream_rendering() -> None:
     assert updates == [(skill, 0, "waiting on LLM response...")]
 
 
-def test_default_backup_model_maps_flash_to_flashx() -> None:
+def test_default_simple_task_model_uses_flashx_with_glm_backup() -> None:
+    assert (
+        _resolve_llm_model(
+            "simple_task",
+            fallback_model="test-model",
+            mappings=(),
+            provider="zai",
+        )
+        == "glm-4.7-flashx"
+    )
     assert (
         _backup_model_for(
-            "GLM-4.7-FLASH",
+            "glm-4.7-flashx",
             tuple(ZAI_LLM_MAPPINGS.items()),
         )
-        == "GLM-4.7-FlashX"
+        == "glm-4.7"
     )
+
+
+def test_request_token_budget_reserves_input_context_and_model_limit() -> None:
+    max_tokens, estimated_input_tokens = _request_token_budget(
+        [{"role": "user", "content": "x" * 3_000}],
+        LLMModelLimits(context_window=2_500, max_output_tokens=2_000),
+    )
+
+    assert estimated_input_tokens == 1_010
+    assert max_tokens == 466
+
+
+def test_request_token_budget_rejects_exhausted_context() -> None:
+    with pytest.raises(RuntimeError, match="context window is exhausted"):
+        _request_token_budget(
+            [{"role": "user", "content": "x" * 3_000}],
+            LLMModelLimits(context_window=1_000, max_output_tokens=2_000),
+        )
 
 
 def test_model_unavailable_uses_backup_model_without_prompting() -> None:
@@ -187,7 +216,7 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
             self.model = model
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 raise RuntimeError(
                     "OpenAI request failed with HTTP 404: model is not available"
                 )
@@ -203,21 +232,19 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(skills_dir=Path("skills")),
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_repeated_timeouts_use_backup_model_after_retries() -> None:
@@ -226,7 +253,7 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
             self.model = model
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 raise RuntimeError(
                     "OpenAI request timed out: The read operation timed out"
                 )
@@ -242,7 +269,7 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -253,14 +280,12 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
@@ -271,7 +296,7 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             self.calls += 1
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 if self.calls == 1:
                     raise RuntimeError("OpenAI request timed out")
                 raise RuntimeError(
@@ -289,7 +314,7 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -300,14 +325,12 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
@@ -316,7 +339,7 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
             self.model = model
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 raise RuntimeError(
                     "OpenAI request failed with HTTP 429: "
                     '{"error":{"code":"1302","message":"Rate limit reached for requests"}}'
@@ -333,7 +356,7 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -344,14 +367,12 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_openai_read_timeout_is_reported_as_provider_runtime_error(
@@ -703,7 +724,14 @@ def test_run_workflow_chat_generates_skill_summary(
     )
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             self.model = model
             self.api_key = api_key
             self.base_url = base_url
@@ -845,7 +873,14 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
     captured: dict[str, object] = {"messages": []}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url
@@ -1031,7 +1066,14 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
     captured: dict[str, object] = {"messages": []}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url
@@ -1286,6 +1328,14 @@ def test_edit_action_can_update_multiple_files_in_one_response(
     assert first_path.read_text(encoding="utf-8") == "updated first\n"
     assert second_path.read_text(encoding="utf-8") == "updated second\n"
     assert len(state.execution_events[0]["result"]) == 2
+
+
+def test_prompt_user_action_requires_nonempty_text() -> None:
+    with pytest.raises(
+        RuntimeError,
+        match="prompt_user action must include non-empty text",
+    ):
+        _parse_action_response({"kind": "prompt_user", "text": "  "})
 
 
 def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
@@ -1760,7 +1810,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         return resolved
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url
@@ -2729,7 +2786,14 @@ def test_run_workflow_chat_verbose_prints_progress(
     )
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             self.model = model
             self.api_key = api_key
             self.base_url = base_url
@@ -2811,7 +2875,14 @@ def test_run_workflow_chat_uses_anthropic_provider(
     captured: dict[str, object] = {"messages": []}
 
     class _FakeAnthropicClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url
@@ -2885,7 +2956,14 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     captured: dict[str, object] = {}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url
@@ -2941,7 +3019,14 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
     captured: dict[str, object] = {"calls": 0}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             self.model = model
             self.api_key = api_key
             self.base_url = base_url
@@ -3030,7 +3115,14 @@ def test_run_workflow_chat_repairs_missing_action_fields(
     captured: dict[str, object] = {"calls": 0, "messages": []}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             self.model = model
             self.api_key = api_key
             self.base_url = base_url
@@ -3092,6 +3184,74 @@ def test_run_workflow_chat_repairs_missing_action_fields(
     assert cast(int, captured["calls"]) == 3
     assert "response needs repair" in stderr.getvalue()
     assert (worktree_root / "generated" / "skill-execution.json").exists()
+
+
+def test_workflow_action_repair_retries_empty_provider_response_automatically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+
+    calls = 0
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": "The request is to specify a feature.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if calls == 2:
+                return {"kind": "invoke_tool"}
+            if calls == 3:
+                raise RuntimeError("OpenAI response message content was empty.")
+            if calls == 4:
+                return {"kind": "complete", "text": "Skill execution complete."}
+            raise AssertionError(f"Unexpected call count: {calls}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+            provider_retry_delay_seconds=0,
+            provider_retry_attempts=1,
+        ),
+        input_func=lambda: "Build exports",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert calls == 4
+    assert "automatic repair retry 1/1" in stderr.getvalue()
+    assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()
 
 
 def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
@@ -3172,7 +3332,14 @@ def test_run_workflow_chat_executes_shell_tool_actions(
     captured: dict[str, object] = {"messages": []}
 
     class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            **_: object,
+        ) -> None:
             captured["model"] = model
             captured["api_key"] = api_key
             captured["base_url"] = base_url

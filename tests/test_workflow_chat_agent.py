@@ -1254,6 +1254,14 @@ def test_edit_action_can_update_multiple_files_in_one_response(
     assert len(state.execution_events[0]["result"]) == 2
 
 
+def test_prompt_user_action_requires_nonempty_text() -> None:
+    with pytest.raises(
+        RuntimeError,
+        match="prompt_user action must include non-empty text",
+    ):
+        _parse_action_response({"kind": "prompt_user", "text": "  "})
+
+
 def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

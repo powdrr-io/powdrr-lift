@@ -1139,6 +1139,9 @@ def _action_system_prompt() -> str:
         "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
+        "Do not ask for information already present in the transcript or "
+        "execution context. Every prompt_user action must include a concise, "
+        "non-empty question or instruction in text.\n"
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
@@ -1685,8 +1688,8 @@ def _parse_workflow_action_prompt_user(
     llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
-    if text is not None and not isinstance(text, str):
-        raise RuntimeError("Workflow prompt_user action text must be a string.")
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError("Workflow prompt_user action must include non-empty text.")
     return SkillChatAction(
         kind="prompt_user",
         text=(text.strip() if text else None),

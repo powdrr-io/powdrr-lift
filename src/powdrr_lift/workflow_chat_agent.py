@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import select
 import shlex
 import subprocess
@@ -11,7 +12,6 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from functools import partial
 from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
@@ -57,23 +57,23 @@ _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 @dataclass(frozen=True, slots=True)
 class LLMModelMapping:
     model: str
-    backup_model: str | None = None
-    provider: str = "zai"
+    provider: str
+    backup_model: LLMModelMapping | None = None
 
 
 # These are semantic task classes, rather than model names. Each capability
 # maps to its primary model and, when needed, its per-model backup.
 ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    "high_reasoning": LLMModelMapping("glm-5.2"),
-    "standard_reasoning": LLMModelMapping("glm-4.7"),
+    "high_reasoning": LLMModelMapping("glm-5.2", provider="zai"),
+    "standard_reasoning": LLMModelMapping("glm-4.7", provider="zai"),
     "simple_task": LLMModelMapping(
         _QWEN_2_5_CODER_MODEL,
-        backup_model="glm-4.7",
         provider="local",
+        backup_model=LLMModelMapping("glm-4.7", provider="zai"),
     ),
     "fast_iteration": LLMModelMapping(_QWEN_2_5_CODER_MODEL, provider="local"),
-    "long_context": LLMModelMapping("glm-5.2"),
-    "vision": LLMModelMapping("glm-4.6v"),
+    "long_context": LLMModelMapping("glm-5.2", provider="zai"),
+    "vision": LLMModelMapping("glm-4.6v", provider="zai"),
 }
 
 DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
@@ -113,7 +113,7 @@ class SkillChatConfig:
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
-    llm_mappings: tuple[tuple[str, str | LLMModelMapping], ...] = ()
+    llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -523,8 +523,19 @@ def run_workflow_chat(
             clients[key] = _build_chat_client(
                 selected_credentials,
                 model=selected_model,
+                model_cache_dir=repo_root / ".powdrr" / "models",
             )
         return clients[key]
+
+    def client_for_model(
+        selected_model: str, selected_provider: str
+    ) -> WorkflowChatClient:
+        selected_credentials = _resolve_credentials(
+            selected_provider,
+            config.api_key,
+            config.base_url,
+        )
+        return client_for(selected_provider, selected_credentials, selected_model)
 
     print(
         f"Using {credentials.provider} credentials from {credentials.source} "
@@ -551,8 +562,8 @@ def run_workflow_chat(
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
-        selection, current_model = _complete_json_with_model_fallback(
-            client_for=partial(client_for, provider, credentials),
+        selection, current_model, provider = _complete_json_with_model_fallback(
+            client_for=client_for_model,
             messages=_build_selection_messages(catalog, transcript),
             parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
@@ -562,10 +573,9 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
+            provider=provider,
             model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
-            + tuple(
-                (key, _as_model_mapping(value)) for key, value in config.llm_mappings
-            ),
+            + tuple((key, value) for key, value in config.llm_mappings),
         )
         if selection is None:
             return 1
@@ -638,13 +648,21 @@ def run_workflow_chat(
             mappings=config.llm_mappings,
             provider=provider,
         )
-        if step_mapping is not None:
-            current_model = step_mapping.model
-            provider = _resolve_provider(
-                config.provider,
-                current_model,
-                mapping=step_mapping,
-            )
+        if step_mapping is None:
+            if provider in {"zai", "deepinfra", "local"} and (
+                current_step.llm_type is not None or selection.llm_type is not None
+            ):
+                raise RuntimeError(
+                    "The workflow step llm_type did not resolve to an LLM mapping."
+                )
+            step_mapping = LLMModelMapping(current_model, provider=provider)
+        assert step_mapping is not None
+        current_model = step_mapping.model
+        provider = _resolve_provider(
+            config.provider,
+            current_model,
+            mapping=step_mapping,
+        )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
         step_roundtrips += 1
         before_file_contents = _current_file_contents(execution_state)
@@ -663,8 +681,8 @@ def run_workflow_chat(
             current_step_index=execution_state.step_index,
             status=f"waiting for {current_model} LLM response...",
         )
-        action, current_model = _complete_json_with_model_fallback(
-            client_for=partial(client_for, provider, credentials),
+        action, current_model, provider = _complete_json_with_model_fallback(
+            client_for=client_for_model,
             messages=_build_step_execution_messages(
                 selected_skill=selected_skill,
                 current_step=current_step,
@@ -686,19 +704,21 @@ def run_workflow_chat(
             input_func=input_func,
             stdout=stdout,
             stderr=stderr,
+            provider=provider,
             model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
-            + tuple(
-                (key, _as_model_mapping(value)) for key, value in config.llm_mappings
-            ),
+            + tuple((key, value) for key, value in config.llm_mappings),
         )
         if action is None:
             return 1
-        current_model = _resolve_llm_model(
-            action.llm_type,
-            fallback_model=current_model,
-            mappings=config.llm_mappings,
-            provider=provider,
-        )
+        if action.llm_type is not None:
+            action_mapping = _resolve_llm_mapping(
+                action.llm_type,
+                mappings=config.llm_mappings,
+                provider=provider,
+            )
+            assert action_mapping is not None
+            current_model = action_mapping.model
+            provider = action_mapping.provider
         _verbose_print(
             stderr,
             config.verbose,
@@ -2071,9 +2091,11 @@ def _resolve_llm_model(
     llm_type: str | None,
     *,
     fallback_model: str,
-    mappings: Sequence[tuple[str, str | LLMModelMapping]],
+    mappings: Sequence[tuple[str, LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
+    if llm_type is None or provider not in {"zai", "deepinfra", "local"}:
+        return fallback_model
     resolved_mapping = _resolve_llm_mapping(
         llm_type,
         mappings=mappings,
@@ -2085,27 +2107,32 @@ def _resolve_llm_model(
 def _resolve_llm_mapping(
     llm_type: str | None,
     *,
-    mappings: Sequence[tuple[str, str | LLMModelMapping]],
+    mappings: Sequence[tuple[str, LLMModelMapping]],
     provider: str,
 ) -> LLMModelMapping | None:
-    if llm_type is None or provider not in {"zai", "deepinfra", "local"}:
+    if llm_type is None:
+        return None
+    if provider not in {"zai", "deepinfra", "local"}:
         return None
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(
         ZAI_LLM_MAPPINGS if provider in {"zai", "local"} else DEEPINFRA_LLM_MAPPINGS
     )
     mapping.update(
-        {
-            key.strip().lower().replace("-", "_"): _as_model_mapping(value)
-            for key, value in mappings
-        }
+        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
     )
-    return mapping.get(normalized_llm_type)
+    resolved_mapping = mapping.get(normalized_llm_type)
+    if resolved_mapping is None:
+        raise RuntimeError(
+            f"No LLM mapping is configured for llm_type {llm_type!r} "
+            f"with provider {provider!r}."
+        )
+    return resolved_mapping
 
 
 def _complete_json_with_model_fallback(
     *,
-    client_for: Callable[[str], WorkflowChatClient],
+    client_for: Callable[[str, str], WorkflowChatClient],
     messages: list[dict[str, str]],
     context: str,
     model: str,
@@ -2116,13 +2143,15 @@ def _complete_json_with_model_fallback(
     stdout: TextIO,
     stderr: TextIO,
     model_mappings: Sequence[tuple[str, LLMModelMapping]],
-) -> tuple[Any | None, str]:
+    provider: str,
+) -> tuple[Any | None, str, str]:
     active_model = model
+    active_provider = provider
     attempted_models = {model.casefold()}
     while True:
         try:
             result = _complete_json_with_repair(
-                client_for(active_model),
+                client_for(active_model, active_provider),
                 messages,
                 context=context,
                 model=active_model,
@@ -2136,40 +2165,38 @@ def _complete_json_with_model_fallback(
                     _backup_model_for(active_model, model_mappings) is not None
                 ),
             )
-            return result, active_model
+            return result, active_model, active_provider
         except _ModelUnavailableError as exc:
             backup_model = _backup_model_for(active_model, model_mappings)
-            if backup_model is None or backup_model.casefold() in attempted_models:
+            if (
+                backup_model is None
+                or backup_model.model.casefold() in attempted_models
+            ):
                 print(
                     f"{context} model {active_model!r} is unavailable and no "
                     "unused backup model is configured.",
                     file=stderr,
                 )
-                return None, active_model
+                return None, active_model, active_provider
             print(
                 f"{context} model {active_model!r} is unavailable: {exc}. "
-                f"Switching to backup model {backup_model!r}.",
+                f"Switching to backup model {backup_model.model!r}.",
                 file=stderr,
             )
-            attempted_models.add(backup_model.casefold())
-            active_model = backup_model
+            attempted_models.add(backup_model.model.casefold())
+            active_model = backup_model.model
+            active_provider = backup_model.provider
 
 
 def _backup_model_for(
     model: str,
     model_mappings: Sequence[tuple[str, LLMModelMapping]],
-) -> str | None:
+) -> LLMModelMapping | None:
     normalized_model = model.casefold()
     for _, mapping in model_mappings:
         if mapping.model.casefold() == normalized_model:
             return mapping.backup_model
     return None
-
-
-def _as_model_mapping(value: str | LLMModelMapping) -> LLMModelMapping:
-    if isinstance(value, LLMModelMapping):
-        return value
-    return LLMModelMapping(value)
 
 
 def _complete_json_with_repair(
@@ -2776,9 +2803,10 @@ def _build_chat_client(
     credentials: WorkflowChatCredentials,
     *,
     model: str,
+    model_cache_dir: Path,
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
-        resolved_model_path = _resolve_local_model_path()
+        resolved_model_path = _resolve_local_model_path(model_cache_dir)
         return LocalLlamaChatClient(model_path=resolved_model_path)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
@@ -2910,7 +2938,11 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     )
 
 
-def _resolve_local_model_path() -> Path:
+def _resolve_local_model_path(model_cache_dir: Path) -> Path:
+    model_cache_dir.mkdir(parents=True, exist_ok=True)
+    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
+    if _has_all_local_model_shards(cached_model_paths):
+        return cached_model_paths[0]
     try:
         from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
     except ImportError as exc:
@@ -2922,18 +2954,27 @@ def _resolve_local_model_path() -> Path:
             snapshot_download(
                 repo_id=_LOCAL_MODEL_REPOSITORY,
                 allow_patterns=[_LOCAL_MODEL_PATTERN],
+                local_dir=str(model_cache_dir),
             )
         )
     except Exception as exc:
         raise RuntimeError(
             "Could not download the Qwen Q5_K_M model from Hugging Face."
         ) from exc
-    model_paths = sorted(snapshot_directory.glob("*.gguf"))
-    if not model_paths:
+    model_paths = sorted(snapshot_directory.glob(_LOCAL_MODEL_PATTERN))
+    if not _has_all_local_model_shards(model_paths):
         raise RuntimeError(
-            "The Hugging Face Qwen repository did not contain a Q5_K_M GGUF file."
+            "The Hugging Face Qwen repository did not provide all Q5_K_M GGUF shards."
         )
     return model_paths[0]
+
+
+def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
+    if not model_paths:
+        return False
+    match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
+    expected_shards = int(match.group(1)) if match else 1
+    return len(model_paths) >= expected_shards
 
 
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:

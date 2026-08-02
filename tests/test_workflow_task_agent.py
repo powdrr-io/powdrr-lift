@@ -90,7 +90,7 @@ def test_workflow_task_client_uses_task_llm_type_for_zai_model(
     )
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._resolve_local_model_path",
-        lambda: tmp_path / "qwen2.5-coder-q5_k_m.gguf",
+        lambda model_cache_dir: tmp_path / "qwen2.5-coder-q5_k_m.gguf",
     )
 
     _build_zai_client(

@@ -89,7 +89,12 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         _resolve_llm_model(
             "simple-task",
             fallback_model="test-model",
-            mappings=(("simple_task", "custom-fast-model"),),
+            mappings=(
+                (
+                    "simple_task",
+                    LLMModelMapping("custom-fast-model", provider="zai"),
+                ),
+            ),
             provider="zai",
         )
         == "custom-fast-model"
@@ -116,7 +121,6 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         mappings=(),
         provider="zai",
     )
-    assert simple_mapping is not None
     assert simple_mapping.provider == "local"
     assert _resolve_provider("auto", simple_mapping.model, mapping=simple_mapping) == (
         "local"
@@ -126,7 +130,6 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         mappings=(),
         provider="deepinfra",
     )
-    assert deepinfra_mapping is not None
     assert deepinfra_mapping.provider == "deepinfra"
 
 
@@ -172,7 +175,7 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
         _backup_model_for(
             "Qwen/Qwen2.5-Coder-14B-Instruct",
             tuple(ZAI_LLM_MAPPINGS.items()),
-        )
+        ).model
         == "glm-4.7"
     )
 
@@ -183,21 +186,27 @@ def test_local_model_path_downloads_q5_k_m_shards_automatically(
 ) -> None:
     first_shard = tmp_path / "qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf"
     second_shard = tmp_path / "qwen2.5-coder-14b-instruct-q5_k_m-00002-of-00002.gguf"
-    first_shard.touch()
-    second_shard.touch()
+    download_calls = 0
 
     class _FakeHuggingFaceHub:
         @staticmethod
         def snapshot_download(**kwargs: object) -> str:
+            nonlocal download_calls
+            download_calls += 1
             assert kwargs["repo_id"] == "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
             assert kwargs["allow_patterns"] == [
                 "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
             ]
+            assert kwargs["local_dir"] == str(tmp_path)
+            first_shard.touch()
+            second_shard.touch()
             return str(tmp_path)
 
     monkeypatch.setitem(sys.modules, "huggingface_hub", _FakeHuggingFaceHub)
 
-    assert _resolve_local_model_path() == first_shard
+    assert _resolve_local_model_path(tmp_path) == first_shard
+    assert _resolve_local_model_path(tmp_path) == first_shard
+    assert download_calls == 1
 
 
 def test_model_unavailable_uses_backup_model_without_prompting() -> None:
@@ -214,22 +223,32 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
 
     clients: list[str] = []
 
-    def client_for(model: str) -> _FakeClient:
+    def client_for(model: str, provider: str) -> _FakeClient:
         clients.append(model)
         return _FakeClient(model)
 
-    result, model = _complete_json_with_model_fallback(
+    result, model, provider = _complete_json_with_model_fallback(
         client_for=client_for,
         messages=[],
         context="test request",
         model="glm-4.7-flashx",
+        provider="zai",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(skills_dir=Path("skills")),
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
+        model_mappings=(
+            (
+                "simple_task",
+                LLMModelMapping(
+                    "glm-4.7-flashx",
+                    provider="zai",
+                    backup_model=LLMModelMapping("glm-4.7", provider="zai"),
+                ),
+            ),
+        ),
     )
 
     assert result == {"ok": True}
@@ -251,15 +270,16 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
 
     clients: list[str] = []
 
-    def client_for(model: str) -> _FakeClient:
+    def client_for(model: str, provider: str) -> _FakeClient:
         clients.append(model)
         return _FakeClient(model)
 
-    result, model = _complete_json_with_model_fallback(
+    result, model, provider = _complete_json_with_model_fallback(
         client_for=client_for,
         messages=[],
         context="test request",
         model="glm-4.7-flashx",
+        provider="zai",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -270,7 +290,16 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
+        model_mappings=(
+            (
+                "simple_task",
+                LLMModelMapping(
+                    "glm-4.7-flashx",
+                    provider="zai",
+                    backup_model=LLMModelMapping("glm-4.7", provider="zai"),
+                ),
+            ),
+        ),
     )
 
     assert result == {"ok": True}
@@ -296,15 +325,16 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
 
     clients: list[str] = []
 
-    def client_for(model: str) -> _FakeClient:
+    def client_for(model: str, provider: str) -> _FakeClient:
         clients.append(model)
         return _FakeClient(model)
 
-    result, model = _complete_json_with_model_fallback(
+    result, model, provider = _complete_json_with_model_fallback(
         client_for=client_for,
         messages=[],
         context="test request",
         model="glm-4.7-flashx",
+        provider="zai",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -315,7 +345,16 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
+        model_mappings=(
+            (
+                "simple_task",
+                LLMModelMapping(
+                    "glm-4.7-flashx",
+                    provider="zai",
+                    backup_model=LLMModelMapping("glm-4.7", provider="zai"),
+                ),
+            ),
+        ),
     )
 
     assert result == {"ok": True}
@@ -338,15 +377,16 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
 
     clients: list[str] = []
 
-    def client_for(model: str) -> _FakeClient:
+    def client_for(model: str, provider: str) -> _FakeClient:
         clients.append(model)
         return _FakeClient(model)
 
-    result, model = _complete_json_with_model_fallback(
+    result, model, provider = _complete_json_with_model_fallback(
         client_for=client_for,
         messages=[],
         context="test request",
         model="glm-4.7-flashx",
+        provider="zai",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -357,7 +397,16 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
+        model_mappings=(
+            (
+                "simple_task",
+                LLMModelMapping(
+                    "glm-4.7-flashx",
+                    provider="zai",
+                    backup_model=LLMModelMapping("glm-4.7", provider="zai"),
+                ),
+            ),
+        ),
     )
 
     assert result == {"ok": True}

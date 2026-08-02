@@ -43,6 +43,7 @@ from powdrr_lift.core.workflow_task_specification import (
     select_ready_workflow_tasks,
 )
 from powdrr_lift.workflow_chat_agent import (
+    DEEPINFRA_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
     LLMModelMapping,
@@ -59,6 +60,7 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_edit,
     _parse_action_response,
     _resolve_api_key,
+    _resolve_base_url,
     _resolve_llm_model,
     _resolve_skill_path,
     _resolve_worktree_context,
@@ -302,8 +304,42 @@ def test_openai_read_timeout_is_reported_as_provider_runtime_error(
         base_url="https://api.openai.com/v1",
     )
 
-    with pytest.raises(RuntimeError, match="OpenAI request timed out"):
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "OpenAI-compatible request timed out for model 'test-model'.*"
+            "configured 120s timeout.*messages=1.*max_tokens=32768"
+        ),
+    ):
         client.complete_json([{"role": "user", "content": "hello"}])
+
+
+def test_deepinfra_credentials_and_base_url_are_supported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+    monkeypatch.setenv("DEEPINFRA_BASE_URL", "https://deepinfra.example/v1/openai")
+
+    assert _resolve_api_key("deepinfra", None) == (
+        "deepinfra-token",
+        "DEEPINFRA_API_TOKEN",
+    )
+    assert _resolve_base_url("deepinfra", None) == (
+        "https://deepinfra.example/v1/openai",
+        "DEEPINFRA_BASE_URL",
+    )
+
+
+def test_llm_type_mapping_selects_deepinfra_model() -> None:
+    assert (
+        _resolve_llm_model(
+            "high_reasoning",
+            fallback_model="fallback-model",
+            mappings=tuple(DEEPINFRA_LLM_MAPPINGS.items()),
+            provider="deepinfra",
+        )
+        == "deepseek-ai/DeepSeek-V4-Pro"
+    )
 
 
 def _assert_validation_success(

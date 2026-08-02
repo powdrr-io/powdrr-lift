@@ -860,12 +860,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workflow_chat_parser.add_argument(
         "--provider",
-        choices=["auto", "openai", "anthropic", "zai"],
+        choices=["auto", "openai", "anthropic", "zai", "deepinfra"],
         default="auto",
         help=(
             "LLM provider to use. Auto picks Anthropic when Claude models or "
-            "Anthropic credentials are provided, and z.ai when GLM models or "
-            "z.ai credentials are provided."
+            "Anthropic credentials are provided, z.ai when GLM models or z.ai "
+            "credentials are provided, and DeepInfra when DeepInfra credentials "
+            "are provided."
         ),
     )
     workflow_chat_parser.add_argument(

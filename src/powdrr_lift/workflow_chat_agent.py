@@ -141,6 +141,7 @@ class SkillChatAction:
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
     edits: tuple[SkillChatEdit, ...] = field(default_factory=tuple)
+    file_edits: tuple[SkillChatFileEdits, ...] = field(default_factory=tuple)
     types: tuple[str, ...] = field(default_factory=tuple)
     keywords: tuple[str, ...] = field(default_factory=tuple)
     decisions_and_context: str | None = None
@@ -153,6 +154,12 @@ class SkillChatEdit:
     start_line: int
     end_line: int | None = None
     text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SkillChatFileEdits:
+    file_path: str
+    edits: tuple[SkillChatEdit, ...]
 
 
 @dataclass(slots=True)
@@ -993,6 +1000,8 @@ def _action_system_prompt() -> str:
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
+        "For edits across multiple files, use one edit action with "
+        '"file_edits":[{"file_path":"...","edits":[...]}].\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
         '"llm_type":"simple_task"}\n'
         '{"kind":"next_step","decisions_and_context":"...",'
@@ -1109,6 +1118,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
             "text": action.text,
             "parameters": action.parameters,
             "edits": [_edit_to_data(edit) for edit in action.edits],
+            "file_edits": [_file_edits_to_data(group) for group in action.file_edits],
             "types": action.types,
             "keywords": action.keywords,
             "decisions_and_context": action.decisions_and_context,
@@ -1175,61 +1185,66 @@ def _handle_workflow_action_edit(
 ) -> bool:
     _ = input_func
     _ = config
-    if action.file_path is None:
-        raise RuntimeError("Workflow edit action must include file_path.")
-    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
-    current_text = ""
-    if target_path.exists():
-        current_text = target_path.read_text(encoding="utf-8")
-    state.current_file_path = target_path
-    updated_text = _apply_file_edits(current_text, action.edits)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(updated_text, encoding="utf-8")
-    state.current_file_path = target_path
+    file_edits = action.file_edits
+    if not file_edits:
+        if action.file_path is None:
+            raise RuntimeError("Workflow edit action must include file_path.")
+        file_edits = (SkillChatFileEdits(action.file_path, action.edits),)
+
+    results: list[dict[str, Any]] = []
+    for file_edit in file_edits:
+        target_path = _resolve_worktree_file_path(
+            file_edit.file_path,
+            state.worktree_root,
+        )
+        current_text = ""
+        if target_path.exists():
+            current_text = target_path.read_text(encoding="utf-8")
+        state.current_file_path = target_path
+        updated_text = _apply_file_edits(current_text, file_edit.edits)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(updated_text, encoding="utf-8")
+        results.append(
+            {
+                "file_path": str(target_path),
+                "line_count": len(updated_text.splitlines()),
+            }
+        )
+
     if action.decisions_and_context:
         state.execution_context.append(action.decisions_and_context)
+    action_data = {
+        "kind": action.kind,
+        "file_edits": [_file_edits_to_data(group) for group in file_edits],
+    }
     state.transcript.append(
         {
             "role": "assistant",
-            "content": json.dumps(
-                {
-                    "kind": action.kind,
-                    "file_path": action.file_path,
-                    "edits": [_edit_to_data(edit) for edit in action.edits],
-                },
-                ensure_ascii=False,
-            ),
+            "content": json.dumps(action_data, ensure_ascii=False),
         }
     )
     state.transcript.append(
         {
             "role": "user",
-            "content": json.dumps(
-                {
-                    "edit_result": {
-                        "file_path": str(target_path),
-                        "line_count": len(updated_text.splitlines()),
-                    }
-                },
-                ensure_ascii=False,
-            ),
+            "content": json.dumps({"edit_result": results}, ensure_ascii=False),
         }
     )
     state.execution_events.append(
         {
             "kind": action.kind,
-            "file_path": action.file_path,
-            "edits": [_edit_to_data(edit) for edit in action.edits],
-            "result": {
-                "file_path": str(target_path),
-                "line_count": len(updated_text.splitlines()),
-            },
+            "file_edits": [_file_edits_to_data(group) for group in file_edits],
+            "result": results,
             "decisions_and_context": action.decisions_and_context,
             "step_index": state.step_index,
         }
     )
-    print(f"Edited file: {target_path}", file=stdout)
-    _verbose_print(stderr, config.verbose, f"Applied edit to {target_path}")
+    for result in results:
+        print(f"Edited file: {result['file_path']}", file=stdout)
+        _verbose_print(
+            stderr,
+            config.verbose,
+            f"Applied edit to {result['file_path']}",
+        )
     return True
 
 
@@ -1439,6 +1454,14 @@ def _parse_workflow_action_edit(
     decisions_and_context: str | None,
     llm_type: str | None,
 ) -> SkillChatAction:
+    file_edits_value = payload.get("file_edits")
+    if file_edits_value is not None:
+        return SkillChatAction(
+            kind="edit",
+            file_edits=_required_file_edits(file_edits_value),
+            decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
+        )
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
         raise RuntimeError("Workflow edit action must include file_path.")
@@ -1749,6 +1772,33 @@ def _required_edit_operations(value: object) -> tuple[SkillChatEdit, ...]:
     if not edits:
         raise RuntimeError("Workflow edit action edits must not be empty.")
     return edits
+
+
+def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
+    if not isinstance(value, Sequence) or isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError("Workflow edit action file_edits must be an array.")
+
+    file_edits: list[SkillChatFileEdits] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise RuntimeError("Workflow edit action file_edits must contain objects.")
+        file_path = item.get("file_path")
+        if not isinstance(file_path, str) or not file_path.strip():
+            raise RuntimeError(
+                "Workflow edit action file_edits entries must include file_path."
+            )
+        file_edits.append(
+            SkillChatFileEdits(
+                file_path=file_path.strip(),
+                edits=_required_edit_operations(item.get("edits")),
+            )
+        )
+    if not file_edits:
+        raise RuntimeError("Workflow edit action file_edits must not be empty.")
+    return tuple(file_edits)
 
 
 def _required_edit_operation(value: object) -> SkillChatEdit:
@@ -2080,6 +2130,13 @@ def _edit_to_data(edit: SkillChatEdit) -> dict[str, Any]:
     return data
 
 
+def _file_edits_to_data(file_edits: SkillChatFileEdits) -> dict[str, Any]:
+    return {
+        "file_path": file_edits.file_path,
+        "edits": [_edit_to_data(edit) for edit in file_edits.edits],
+    }
+
+
 def _current_file_context(
     worktree_root: Path,
     current_file_path: Path | None,
@@ -2370,7 +2427,8 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
         "Fix the response so it matches the workflow action schema with keys "
-        "kind, tool, file_path, text, parameters, edits, types, keywords, and "
+        "kind, tool, file_path, text, parameters, edits, file_edits, types, "
+        "keywords, and "
         "decisions_and_context, and llm_type. "
         "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
         "next_step, and complete. "

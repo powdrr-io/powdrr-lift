@@ -1777,7 +1777,7 @@ def _required_edit_operation(value: object) -> SkillChatEdit:
 
     text_value = value.get("text")
     if normalized_kind in {"add", "replace"}:
-        if not isinstance(text_value, str) or not text_value.strip():
+        if not isinstance(text_value, str):
             raise RuntimeError(
                 "Workflow edit action add/replace edits must include text."
             )
@@ -1874,6 +1874,9 @@ def _complete_json_with_model_fallback(
                 input_func=input_func,
                 stdout=stdout,
                 stderr=stderr,
+                fallback_on_transient_exhaustion=(
+                    _backup_model_for(active_model, model_mappings) is not None
+                ),
             )
             return result, active_model
         except _ModelUnavailableError as exc:
@@ -1923,6 +1926,7 @@ def _complete_json_with_repair(
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
+    fallback_on_transient_exhaustion: bool = False,
 ) -> Any | None:
     while True:
         try:
@@ -1934,7 +1938,6 @@ def _complete_json_with_repair(
                 ) from exc
             if _is_transient_provider_error(exc):
                 retry_attempts = max(1, config.provider_retry_attempts)
-                saw_timeout = _is_timeout_error(exc)
                 for retry_attempt in range(1, retry_attempts + 1):
                     delay_seconds = max(0.0, config.provider_retry_delay_seconds)
                     print(
@@ -1953,7 +1956,6 @@ def _complete_json_with_repair(
                                 f"provider reported that model {model!r} is unavailable"
                             ) from retry_exc
                         exc = retry_exc
-                        saw_timeout = saw_timeout or _is_timeout_error(retry_exc)
                 else:
                     payload = None
 
@@ -1970,9 +1972,9 @@ def _complete_json_with_repair(
                         f"{context} automatic retries exhausted for model {model!r}.",
                         file=stderr,
                     )
-                    if saw_timeout:
+                    if fallback_on_transient_exhaustion:
                         raise _ModelUnavailableError(
-                            f"provider timed out repeatedly for model {model!r}"
+                            f"provider retries were exhausted for model {model!r}"
                         ) from exc
             elif _is_json_repairable_error(exc):
                 _verbose_print(

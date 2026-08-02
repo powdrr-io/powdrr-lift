@@ -56,6 +56,7 @@ from powdrr_lift.workflow_chat_agent import (
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
     _execute_shell_tool,
+    _parse_action_response,
     _resolve_api_key,
     _resolve_llm_model,
     _resolve_skill_path,
@@ -227,6 +228,50 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         config=SkillChatConfig(
             skills_dir=Path("skills"),
             provider_retry_attempts=2,
+            provider_retry_delay_seconds=0,
+        ),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        model_mappings=(
+            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
+        ),
+    )
+
+    assert result == {"ok": True}
+    assert model == "GLM-4.7-FlashX"
+    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+
+
+def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
+    class _FakeClient:
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            if self.model == "glm-4.7-flash":
+                raise RuntimeError(
+                    "OpenAI request failed with HTTP 429: "
+                    '{"error":{"code":"1302","message":"Rate limit reached for requests"}}'
+                )
+            return {"ok": True}
+
+    clients: list[str] = []
+
+    def client_for(model: str) -> _FakeClient:
+        clients.append(model)
+        return _FakeClient(model)
+
+    result, model = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[],
+        context="test request",
+        model="glm-4.7-flash",
+        parser=lambda payload: payload,
+        repair_instructions="",
+        config=SkillChatConfig(
+            skills_dir=Path("skills"),
+            provider_retry_attempts=3,
             provider_retry_delay_seconds=0,
         ),
         input_func=lambda: "abort",
@@ -1063,6 +1108,25 @@ def test_apply_file_edits_uses_original_line_numbers_for_interleaved_edits(
     expected_text: str,
 ) -> None:
     assert _apply_file_edits(current_text, edits) == expected_text
+
+
+def test_empty_replace_text_removes_the_selected_lines() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": "notes.txt",
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 2,
+                    "end_line": 3,
+                    "text": "",
+                }
+            ],
+        }
+    )
+
+    assert _apply_file_edits("one\ntwo\nthree\nfour\n", action.edits) == ("one\nfour\n")
 
 
 def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(

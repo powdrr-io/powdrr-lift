@@ -1565,20 +1565,31 @@ def _run_openai_proxy(args: argparse.Namespace) -> int:
 
 def _run_workflow_chat(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    return run_workflow_chat(
-        WorkflowChatConfig(
-            skills_dir=args.skills_dir,
-            repo_root=repo_root,
-            output_dir=args.output_dir,
-            provider=args.provider,
-            model=args.model,
-            api_key=args.api_key,
-            base_url=args.base_url,
-            max_turns=args.max_turns,
-            max_stalled_roundtrips=args.max_stalled_roundtrips,
-            verbose=args.verbose,
-        ),
+    config = WorkflowChatConfig(
+        skills_dir=args.skills_dir,
+        repo_root=repo_root,
+        output_dir=args.output_dir,
+        provider=args.provider,
+        model=args.model,
+        api_key=args.api_key,
+        base_url=args.base_url,
+        max_turns=args.max_turns,
+        max_stalled_roundtrips=args.max_stalled_roundtrips,
+        verbose=args.verbose,
     )
+    while True:
+        exit_code = run_workflow_chat(config)
+        if exit_code != 0 or not sys.stdin.isatty():
+            return exit_code
+        try:
+            next_action = input(
+                "Workflow complete. Press Enter for another request or type "
+                "'exit' to quit: "
+            )
+        except EOFError:
+            return 0
+        if next_action.strip().lower() in {"exit", "quit"}:
+            return 0
 
 
 def _run_entity_decisions(args: argparse.Namespace) -> int:

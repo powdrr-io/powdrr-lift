@@ -58,6 +58,7 @@ _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 class LLMModelMapping:
     model: str
     backup_model: str | None = None
+    provider: str = "zai"
 
 
 # These are semantic task classes, rather than model names. Each capability
@@ -65,19 +66,33 @@ class LLMModelMapping:
 ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     "high_reasoning": LLMModelMapping("glm-5.2"),
     "standard_reasoning": LLMModelMapping("glm-4.7"),
-    "simple_task": LLMModelMapping(_QWEN_2_5_CODER_MODEL, "glm-4.7"),
-    "fast_iteration": LLMModelMapping(_QWEN_2_5_CODER_MODEL),
+    "simple_task": LLMModelMapping(
+        _QWEN_2_5_CODER_MODEL,
+        backup_model="glm-4.7",
+        provider="local",
+    ),
+    "fast_iteration": LLMModelMapping(_QWEN_2_5_CODER_MODEL, provider="local"),
     "long_context": LLMModelMapping("glm-5.2"),
     "vision": LLMModelMapping("glm-4.6v"),
 }
 
 DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    "high_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-V4-Pro"),
-    "standard_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-V4-Flash"),
-    "simple_task": LLMModelMapping("Qwen/Qwen3-Next-80B-A3B-Instruct"),
-    "fast_iteration": LLMModelMapping("Qwen/Qwen3-Next-80B-A3B-Instruct"),
-    "long_context": LLMModelMapping("deepseek-ai/DeepSeek-V4-Flash"),
-    "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct"),
+    "high_reasoning": LLMModelMapping(
+        "deepseek-ai/DeepSeek-V4-Pro", provider="deepinfra"
+    ),
+    "standard_reasoning": LLMModelMapping(
+        "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
+    ),
+    "simple_task": LLMModelMapping(
+        "Qwen/Qwen3-Next-80B-A3B-Instruct", provider="deepinfra"
+    ),
+    "fast_iteration": LLMModelMapping(
+        "Qwen/Qwen3-Next-80B-A3B-Instruct", provider="deepinfra"
+    ),
+    "long_context": LLMModelMapping(
+        "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
+    ),
+    "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct", provider="deepinfra"),
 }
 
 WorkflowActionParser = Callable[
@@ -98,7 +113,6 @@ class SkillChatConfig:
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
-    model_path: Path | None = None
     llm_mappings: tuple[tuple[str, str | LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
@@ -509,7 +523,6 @@ def run_workflow_chat(
             clients[key] = _build_chat_client(
                 selected_credentials,
                 model=selected_model,
-                model_path=config.model_path,
             )
         return clients[key]
 
@@ -566,13 +579,18 @@ def run_workflow_chat(
             ),
         )
         selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
-        current_model = _resolve_llm_model(
+        selection_mapping = _resolve_llm_mapping(
             selection.llm_type,
-            fallback_model=config.model,
             mappings=config.llm_mappings,
             provider=provider,
         )
-        provider = _resolve_provider(config.provider, current_model)
+        if selection_mapping is not None:
+            current_model = selection_mapping.model
+            provider = _resolve_provider(
+                config.provider,
+                current_model,
+                mapping=selection_mapping,
+            )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
         print(f"Matched skill: {selected_skill.path}", file=stdout)
         print(selection.selected_skill_reason, file=stdout)
@@ -615,13 +633,18 @@ def run_workflow_chat(
     while execution_state.step_index < len(selected_skill.skill.steps):
         current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
-        current_model = _resolve_llm_model(
+        step_mapping = _resolve_llm_mapping(
             current_step.llm_type or selection.llm_type,
-            fallback_model=current_model,
             mappings=config.llm_mappings,
             provider=provider,
         )
-        provider = _resolve_provider(config.provider, current_model)
+        if step_mapping is not None:
+            current_model = step_mapping.model
+            provider = _resolve_provider(
+                config.provider,
+                current_model,
+                mapping=step_mapping,
+            )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
         step_roundtrips += 1
         before_file_contents = _current_file_contents(execution_state)
@@ -2051,8 +2074,22 @@ def _resolve_llm_model(
     mappings: Sequence[tuple[str, str | LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
+    resolved_mapping = _resolve_llm_mapping(
+        llm_type,
+        mappings=mappings,
+        provider=provider,
+    )
+    return resolved_mapping.model if resolved_mapping is not None else fallback_model
+
+
+def _resolve_llm_mapping(
+    llm_type: str | None,
+    *,
+    mappings: Sequence[tuple[str, str | LLMModelMapping]],
+    provider: str,
+) -> LLMModelMapping | None:
     if llm_type is None or provider not in {"zai", "deepinfra", "local"}:
-        return fallback_model
+        return None
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(
         ZAI_LLM_MAPPINGS if provider in {"zai", "local"} else DEEPINFRA_LLM_MAPPINGS
@@ -2063,8 +2100,7 @@ def _resolve_llm_model(
             for key, value in mappings
         }
     )
-    resolved_mapping = mapping.get(normalized_llm_type)
-    return resolved_mapping.model if resolved_mapping is not None else fallback_model
+    return mapping.get(normalized_llm_type)
 
 
 def _complete_json_with_model_fallback(
@@ -2740,10 +2776,9 @@ def _build_chat_client(
     credentials: WorkflowChatCredentials,
     *,
     model: str,
-    model_path: Path | None = None,
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
-        resolved_model_path = _resolve_local_model_path(model_path)
+        resolved_model_path = _resolve_local_model_path()
         return LocalLlamaChatClient(model_path=resolved_model_path)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
@@ -2780,9 +2815,14 @@ def _resolve_credentials(
     )
 
 
-def _resolve_provider(provider_override: str, model: str) -> str:
-    if model == _QWEN_2_5_CODER_MODEL:
-        return "local"
+def _resolve_provider(
+    provider_override: str,
+    model: str,
+    *,
+    mapping: LLMModelMapping | None = None,
+) -> str:
+    if mapping is not None:
+        return mapping.provider
     if provider_override == "local":
         provider_override = "auto"
     if provider_override != "auto":
@@ -2870,10 +2910,7 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     )
 
 
-def _resolve_local_model_path(model_path: Path | None = None) -> Path:
-    explicit_path = model_path or _local_model_path_from_environment()
-    if explicit_path is not None:
-        return explicit_path
+def _resolve_local_model_path() -> Path:
     try:
         from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
     except ImportError as exc:
@@ -2897,11 +2934,6 @@ def _resolve_local_model_path(model_path: Path | None = None) -> Path:
             "The Hugging Face Qwen repository did not contain a Q5_K_M GGUF file."
         )
     return model_paths[0]
-
-
-def _local_model_path_from_environment() -> Path | None:
-    value = os.environ.get("LOCAL_LLM_MODEL_PATH")
-    return Path(value).expanduser() if value else None
 
 
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:

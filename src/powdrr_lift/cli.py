@@ -888,14 +888,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Model to use for template matching and task generation.",
     )
     workflow_chat_parser.add_argument(
-        "--model-path",
-        type=Path,
-        help=(
-            "Path to the local Qwen GGUF model shard. Defaults to "
-            "LOCAL_LLM_MODEL_PATH when using the local provider."
-        ),
-    )
-    workflow_chat_parser.add_argument(
         "--api-key",
         help=(
             "API key. Defaults to the provider-specific environment variable "
@@ -989,11 +981,6 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser.add_argument(
         "--base-url",
         help="Optional z.ai-compatible base URL override.",
-    )
-    process_workflow_task_parser.add_argument(
-        "--model-path",
-        type=Path,
-        help="Path to the local Qwen GGUF model shard.",
     )
     process_workflow_task_parser.add_argument(
         "--max-roundtrips",
@@ -1122,7 +1109,6 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
             task_id=args.task_id,
             api_key=args.api_key,
             base_url=args.base_url,
-            model_path=args.model_path,
             max_roundtrips=args.max_roundtrips,
             verbose=args.verbose,
         ),
@@ -1586,7 +1572,6 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
         output_dir=args.output_dir,
         provider=args.provider,
         model=args.model,
-        model_path=args.model_path,
         api_key=args.api_key,
         base_url=args.base_url,
         max_turns=args.max_turns,

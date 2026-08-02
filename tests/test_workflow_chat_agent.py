@@ -62,8 +62,10 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response,
     _resolve_api_key,
     _resolve_base_url,
+    _resolve_llm_mapping,
     _resolve_llm_model,
     _resolve_local_model_path,
+    _resolve_provider,
     _resolve_skill_path,
     _resolve_worktree_context,
     _WorkflowExecutionState,
@@ -109,6 +111,23 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         )
         == "gpt-test-model"
     )
+    simple_mapping = _resolve_llm_mapping(
+        "simple_task",
+        mappings=(),
+        provider="zai",
+    )
+    assert simple_mapping is not None
+    assert simple_mapping.provider == "local"
+    assert _resolve_provider("auto", simple_mapping.model, mapping=simple_mapping) == (
+        "local"
+    )
+    deepinfra_mapping = _resolve_llm_mapping(
+        "high_reasoning",
+        mappings=(),
+        provider="deepinfra",
+    )
+    assert deepinfra_mapping is not None
+    assert deepinfra_mapping.provider == "deepinfra"
 
 
 def test_workflow_progress_lists_steps_and_updates_status() -> None:

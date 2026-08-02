@@ -88,16 +88,17 @@ def test_workflow_task_client_uses_task_llm_type_for_zai_model(
         "powdrr_lift.workflow_task_agent.LocalLlamaChatClient",
         _FakeLocalClient,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._resolve_local_model_path",
+        lambda: tmp_path / "qwen2.5-coder-q5_k_m.gguf",
+    )
 
     _build_zai_client(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow.directory,
-            model_path=tmp_path / "qwen.gguf",
-        ),
+        WorkflowTaskAgentConfig(workflow_dir=workflow.directory),
         workflow.tasks[0],
     )
 
-    assert captured == {"model_path": str(tmp_path / "qwen.gguf")}
+    assert captured == {"model_path": str(tmp_path / "qwen2.5-coder-q5_k_m.gguf")}
 
 
 def test_process_workflow_task_blocks_with_human_handoff_and_follow_up(

@@ -154,8 +154,7 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 - The default mapping combines remote GLM models with local Qwen execution.
   The first Qwen request automatically downloads the Q5_K_M GGUF shards from
   `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF` into the Hugging Face cache and reuses
-  them afterward. Set `LOCAL_LLM_MODEL_PATH` or pass `--model-path` only to
-  override the downloaded model. On Apple Silicon, install with Metal enabled:
+  them afterward. On Apple Silicon, install with Metal enabled:
   `CMAKE_ARGS="-DGGML_METAL=on" uv sync`.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
 - Workflow skill steps and every routing/action response carry an `llm_type`

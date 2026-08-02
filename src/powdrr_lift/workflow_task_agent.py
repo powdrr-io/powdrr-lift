@@ -15,12 +15,12 @@ from powdrr_lift.core import (
     WorkflowTask,
 )
 from powdrr_lift.workflow_chat_agent import (
-    _QWEN_2_5_CODER_MODEL,
     ZAI_LLM_MAPPINGS,
     LocalLlamaChatClient,
     _execute_shell_tool,
     _print_waiting_for_model,
     _resolve_credentials,
+    _resolve_llm_mapping,
     _resolve_llm_model,
     _resolve_local_model_path,
 )
@@ -37,7 +37,6 @@ class WorkflowTaskAgentConfig:
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
-    model_path: Path | None = None
     max_roundtrips: int = 12
     verbose: bool = False
 
@@ -323,10 +322,13 @@ def _build_zai_client(
         mappings=tuple(ZAI_LLM_MAPPINGS.items()),
         provider="zai",
     )
-    if model == _QWEN_2_5_CODER_MODEL:
-        return LocalLlamaChatClient(
-            model_path=_resolve_local_model_path(config.model_path)
-        )
+    mapping = _resolve_llm_mapping(
+        task.llm_type,
+        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
+        provider="zai",
+    )
+    if mapping is not None and mapping.provider == "local":
+        return LocalLlamaChatClient(model_path=_resolve_local_model_path())
     credentials = _resolve_credentials("zai", config.api_key, config.base_url)
     return OpenAIChatClient(
         model=model,

@@ -12,6 +12,7 @@ dependencies = [
     "huggingface-hub>=0.26.0",
     "llama-cpp-python>=0.3.16",
     "mcp>=1.0.0",
+    "textual>=1.0",
 ]
 
 [project.optional-dependencies]

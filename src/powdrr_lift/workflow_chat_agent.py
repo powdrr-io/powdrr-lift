@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import select
@@ -52,6 +53,14 @@ _MAX_COMPLETION_TOKENS = 32768
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
+_TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
+_CONTEXT_SAFETY_MARGIN_TOKENS = 1024
+
+
+@dataclass(frozen=True, slots=True)
+class LLMModelLimits:
+    context_window: int
+    max_output_tokens: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +68,48 @@ class LLMModelMapping:
     model: str
     provider: str
     backup_model: LLMModelMapping | None = None
+
+
+_DEFAULT_MODEL_LIMITS = LLMModelLimits(
+    context_window=128_000,
+    max_output_tokens=_MAX_COMPLETION_TOKENS,
+)
+
+ZAI_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
+    "glm-5.2": LLMModelLimits(context_window=200_000, max_output_tokens=131_072),
+    "glm-4.7": LLMModelLimits(context_window=200_000, max_output_tokens=131_072),
+    "glm-4.7-flashx": LLMModelLimits(
+        context_window=200_000,
+        max_output_tokens=131_072,
+    ),
+    "glm-4.7-flash": LLMModelLimits(
+        context_window=200_000,
+        max_output_tokens=131_072,
+    ),
+    "glm-4.6v": LLMModelLimits(context_window=200_000, max_output_tokens=32_768),
+}
+
+# DeepInfra exposes model-specific limits through its model metadata API. Keep
+# conservative limits for the configured models so requests never claim more
+# output than the documented 16K cap for most hosted models.
+DEEPINFRA_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
+    "deepseek-ai/deepseek-v4-pro": LLMModelLimits(
+        context_window=1_000_000,
+        max_output_tokens=16_384,
+    ),
+    "deepseek-ai/deepseek-v4-flash": LLMModelLimits(
+        context_window=1_000_000,
+        max_output_tokens=16_384,
+    ),
+    "qwen/qwen3-next-80b-a3b-instruct": LLMModelLimits(
+        context_window=128_000,
+        max_output_tokens=16_384,
+    ),
+    "qwen/qwen2.5-vl-32b-instruct": LLMModelLimits(
+        context_window=128_000,
+        max_output_tokens=16_384,
+    ),
+}
 
 
 # These are semantic task classes, rather than model names. Each capability
@@ -217,18 +268,24 @@ class OpenAIChatClient:
         api_key: str,
         base_url: str,
         timeout: float = 120.0,
+        limits: LLMModelLimits | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._limits = limits or _DEFAULT_MODEL_LIMITS
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        max_tokens, estimated_input_tokens = _request_token_budget(
+            messages,
+            self._limits,
+        )
         payload = {
             "model": self._model,
             "messages": messages,
             "temperature": 0,
-            "max_tokens": _MAX_COMPLETION_TOKENS,
+            "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }
         request = Request(
@@ -261,6 +318,8 @@ class OpenAIChatClient:
                     elapsed=time.monotonic() - request_started,
                     message=str(exc),
                     message_count=len(messages),
+                    max_tokens=max_tokens,
+                    estimated_input_tokens=estimated_input_tokens,
                 )
             ) from exc
 
@@ -287,7 +346,7 @@ class OpenAIChatClient:
 class LocalLlamaChatClient:
     def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
         try:
-            from llama_cpp import Llama  # type: ignore[import-not-found]
+            from llama_cpp import Llama
         except ImportError as exc:
             raise RuntimeError(
                 "Local provider requires llama-cpp-python. Install the local "
@@ -300,7 +359,7 @@ class LocalLlamaChatClient:
                 "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
                 "model filename containing 'q5_k_m'."
             )
-        self._llama = Llama(
+        self._llama: Any = Llama(
             model_path=str(model_path),
             n_ctx=n_ctx,
             n_gpu_layers=-1,
@@ -338,18 +397,24 @@ class AnthropicChatClient:
         base_url: str,
         timeout: float = 120.0,
         api_version: str = "2023-06-01",
+        limits: LLMModelLimits | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._api_version = api_version
+        self._limits = limits or _DEFAULT_MODEL_LIMITS
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        max_tokens, estimated_input_tokens = _request_token_budget(
+            messages,
+            self._limits,
+        )
         system_prompt, conversation_messages = _split_system_message(messages)
         payload: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": _MAX_COMPLETION_TOKENS,
+            "max_tokens": max_tokens,
             "messages": [
                 _anthropic_message(message) for message in conversation_messages
             ],
@@ -388,6 +453,8 @@ class AnthropicChatClient:
                     elapsed=time.monotonic() - request_started,
                     message=str(exc),
                     message_count=len(conversation_messages),
+                    max_tokens=max_tokens,
+                    estimated_input_tokens=estimated_input_tokens,
                 )
             ) from exc
 
@@ -425,12 +492,43 @@ def _provider_timeout_message(
     elapsed: float,
     message: str,
     message_count: int,
+    max_tokens: int,
+    estimated_input_tokens: int,
 ) -> str:
     return (
         f"{provider} request timed out for model {model!r}: {message}. "
         f"Elapsed {elapsed:.1f}s of configured {timeout:g}s timeout; "
         f"endpoint={endpoint!r}, messages={message_count}, "
-        f"max_tokens={_MAX_COMPLETION_TOKENS}."
+        f"estimated_input_tokens={estimated_input_tokens}, "
+        f"max_tokens={max_tokens}."
+    )
+
+
+def _request_token_budget(
+    messages: list[dict[str, str]],
+    limits: LLMModelLimits,
+) -> tuple[int, int]:
+    estimated_input_tokens = _estimate_message_tokens(messages)
+    available_output_tokens = (
+        limits.context_window - estimated_input_tokens - _CONTEXT_SAFETY_MARGIN_TOKENS
+    )
+    if available_output_tokens < 1:
+        raise RuntimeError(
+            "Model context window is exhausted: "
+            f"estimated input is {estimated_input_tokens} tokens, "
+            f"context window is {limits.context_window} tokens."
+        )
+    return (
+        min(_MAX_COMPLETION_TOKENS, limits.max_output_tokens, available_output_tokens),
+        estimated_input_tokens,
+    )
+
+
+def _estimate_message_tokens(messages: list[dict[str, str]]) -> int:
+    serialized = json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
+    return max(
+        1,
+        math.ceil(len(serialized) / _TOKEN_ESTIMATE_CHARS_PER_TOKEN),
     )
 
 
@@ -443,8 +541,13 @@ class _ModelUnavailableError(RuntimeError):
 
 
 class _WorkflowProgressDisplay:
-    def __init__(self, stream: TextIO) -> None:
+    def __init__(
+        self,
+        stream: TextIO,
+        on_update: Callable[[SkillCatalogEntry, int, str], None] | None = None,
+    ) -> None:
         self._stream = stream
+        self._on_update = on_update
         self._dynamic = stream.isatty()
         self._rendered_line_count = 0
         self._last_step_index: int | None = None
@@ -456,6 +559,10 @@ class _WorkflowProgressDisplay:
         current_step_index: int,
         status: str,
     ) -> None:
+        if self._on_update is not None:
+            self._on_update(skill, current_step_index, status)
+            self._last_step_index = current_step_index
+            return
         if not self._dynamic and self._last_step_index == current_step_index:
             print(f"[workflow] {status}", file=self._stream, flush=True)
             return
@@ -489,6 +596,7 @@ def run_workflow_chat(
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
+    progress_callback: Callable[[SkillCatalogEntry, int, str], None] | None = None,
 ) -> int:
     worktree_root = _resolve_worktree_context(
         config.repo_root,
@@ -554,6 +662,7 @@ def run_workflow_chat(
         "What do you want to do? ",
         input_func=input_func,
         stdout=stdout,
+        status_stream=stderr,
     )
     transcript: list[dict[str, str]] = [{"role": "user", "content": user_request}]
     _verbose_print(stderr, config.verbose, f"Initial user request: {user_request}")
@@ -611,7 +720,12 @@ def run_workflow_chat(
             break
 
         print(selection.next_question, file=stdout)
-        answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+        answer = _prompt_user(
+            "> ",
+            input_func=input_func,
+            stdout=stdout,
+            status_stream=stderr,
+        )
         _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
         transcript.append({"role": "assistant", "content": selection.next_question})
         transcript.append({"role": "user", "content": answer})
@@ -626,7 +740,7 @@ def run_workflow_chat(
         print("Could not select a skill.", file=stderr)
         return 1
 
-    progress = _WorkflowProgressDisplay(stderr)
+    progress = _WorkflowProgressDisplay(stderr, on_update=progress_callback)
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
         transcript=transcript,
@@ -1232,6 +1346,9 @@ def _action_system_prompt() -> str:
         "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
+        "Do not ask for information already present in the transcript or "
+        "execution context. Every prompt_user action must include a concise, "
+        "non-empty question or instruction in text.\n"
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
@@ -1494,9 +1611,13 @@ def _handle_workflow_action_prompt_user(
     input_func: Callable[[], str],
     config: WorkflowChatConfig,
 ) -> bool:
-    _ = stderr
     print(action.text or "", file=stdout)
-    answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+    answer = _prompt_user(
+        "> ",
+        input_func=input_func,
+        stdout=stdout,
+        status_stream=stderr,
+    )
     _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
     state.transcript.append(
         {
@@ -1778,8 +1899,8 @@ def _parse_workflow_action_prompt_user(
     llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
-    if text is not None and not isinstance(text, str):
-        raise RuntimeError("Workflow prompt_user action text must be a string.")
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError("Workflow prompt_user action must include non-empty text.")
     return SkillChatAction(
         kind="prompt_user",
         text=(text.strip() if text else None),
@@ -2296,6 +2417,8 @@ def _complete_json_with_repair(
                     repair_instructions=repair_instructions,
                     stderr=stderr,
                     verbose=config.verbose,
+                    retry_attempts=config.provider_retry_attempts,
+                    retry_delay_seconds=config.provider_retry_delay_seconds,
                 )
                 if repaired_payload is not None:
                     try:
@@ -2312,6 +2435,7 @@ def _complete_json_with_repair(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
                 stdout=stdout,
+                status_stream=stderr,
             )
             _verbose_print(
                 stderr,
@@ -2342,6 +2466,8 @@ def _complete_json_with_repair(
                 previous_payload=payload,
                 stderr=stderr,
                 verbose=config.verbose,
+                retry_attempts=config.provider_retry_attempts,
+                retry_delay_seconds=config.provider_retry_delay_seconds,
             )
             if repaired_payload is not None:
                 try:
@@ -2355,6 +2481,7 @@ def _complete_json_with_repair(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
                 stdout=stdout,
+                status_stream=stderr,
             )
             _verbose_print(
                 stderr,
@@ -2585,6 +2712,8 @@ def _attempt_json_repair(
     stderr: TextIO,
     verbose: bool,
     previous_payload: dict[str, Any] | None = None,
+    retry_attempts: int = 0,
+    retry_delay_seconds: float = 0.0,
 ) -> dict[str, Any] | None:
     repair_messages = _build_json_repair_messages(
         messages,
@@ -2599,19 +2728,31 @@ def _attempt_json_repair(
         f"{context} repair LLM input (model={model})",
         repair_messages,
     )
-    try:
-        _print_waiting_for_model(stderr, model)
-        repaired_payload = client.complete_json(repair_messages)
-        _verbose_json(
-            stderr,
-            verbose,
-            f"{context} repair LLM output (model={model})",
-            repaired_payload,
-        )
-        return repaired_payload
-    except RuntimeError as exc:
-        print(f"{context} repair request failed: {exc}", file=stderr)
-        return None
+    attempts = max(1, retry_attempts + 1)
+    for attempt in range(1, attempts + 1):
+        try:
+            _print_waiting_for_model(stderr, model)
+            repaired_payload = client.complete_json(repair_messages)
+            _verbose_json(
+                stderr,
+                verbose,
+                f"{context} repair LLM output (model={model})",
+                repaired_payload,
+            )
+            return repaired_payload
+        except RuntimeError as exc:
+            if attempt == attempts:
+                print(f"{context} repair request failed: {exc}", file=stderr)
+                return None
+            delay_seconds = max(0.0, retry_delay_seconds)
+            print(
+                f"{context} repair request failed for model {model!r}: {exc}. "
+                f"Waiting {delay_seconds:g} seconds before automatic repair "
+                f"retry {attempt}/{attempts - 1}.",
+                file=stderr,
+            )
+            time.sleep(delay_seconds)
+    return None
 
 
 def _build_json_repair_messages(
@@ -2713,14 +2854,20 @@ def _prompt_user(
     *,
     input_func: Callable[[], str],
     stdout: TextIO,
+    status_stream: TextIO | None = None,
 ) -> str:
     if input_func is input and _supports_readline_input(stdout):
-        return input(prompt).strip()
-    stdout.write(prompt)
-    stdout.flush()
-    if input_func is input and _supports_interactive_line_editing(stdout):
-        return _read_interactive_line(prompt, stdout=stdout).strip()
-    return input_func().strip()
+        answer = input(prompt).strip()
+    else:
+        stdout.write(prompt)
+        stdout.flush()
+        if input_func is input and _supports_interactive_line_editing(stdout):
+            answer = _read_interactive_line(prompt, stdout=stdout).strip()
+        else:
+            answer = input_func().strip()
+    if status_stream is not None:
+        print("[workflow] thinking...", file=status_stream, flush=True)
+    return answer
 
 
 def _supports_readline_input(stdout: TextIO) -> bool:
@@ -2808,23 +2955,37 @@ def _build_chat_client(
     if credentials.provider == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
         return LocalLlamaChatClient(model_path=resolved_model_path)
+    limits = _model_limits_for(credentials.provider, model)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
             model=model,
             api_key=credentials.api_key,
             base_url=credentials.base_url,
+            limits=limits,
         )
     if credentials.provider == "zai":
         return OpenAIChatClient(
             model=model,
             api_key=credentials.api_key,
             base_url=credentials.base_url,
+            limits=limits,
         )
     return OpenAIChatClient(
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
+        limits=limits,
     )
+
+
+def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
+    if provider == "zai":
+        limits = ZAI_MODEL_LIMITS
+    elif provider == "deepinfra":
+        limits = DEEPINFRA_MODEL_LIMITS
+    else:
+        return _DEFAULT_MODEL_LIMITS
+    return limits.get(model.casefold(), _DEFAULT_MODEL_LIMITS)
 
 
 def _resolve_credentials(
@@ -2944,7 +3105,7 @@ def _resolve_local_model_path(model_cache_dir: Path) -> Path:
     if _has_all_local_model_shards(cached_model_paths):
         return cached_model_paths[0]
     try:
-        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+        from huggingface_hub import snapshot_download
     except ImportError as exc:
         raise RuntimeError(
             "Automatic local model downloads require huggingface-hub."

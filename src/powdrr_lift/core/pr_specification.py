@@ -949,9 +949,6 @@ def _report_to_data(
 ) -> Mapping[str, Any]:
     return {
         "validation_successful": report.validation_successful,
-        "proposed_pr_id": report.proposed_pr_id,
-        "available_feature_ids": report.available_feature_ids,
-        "known_pr_ids": report.known_pr_ids,
         "issues": [
             {
                 "code": issue.code,
@@ -960,6 +957,9 @@ def _report_to_data(
             }
             for issue in report.issues
         ],
+        "proposed_pr_id": report.proposed_pr_id,
+        "available_feature_ids": report.available_feature_ids,
+        "known_pr_ids": report.known_pr_ids,
     }
 
 

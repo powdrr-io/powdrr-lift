@@ -43,6 +43,7 @@ from powdrr_lift.core.workflow_task_specification import (
     select_ready_workflow_tasks,
 )
 from powdrr_lift.workflow_chat_agent import (
+    DEEPINFRA_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
     LLMModelMapping,
@@ -326,6 +327,18 @@ def test_deepinfra_credentials_and_base_url_are_supported(
     assert _resolve_base_url("deepinfra", None) == (
         "https://deepinfra.example/v1/openai",
         "DEEPINFRA_BASE_URL",
+    )
+
+
+def test_llm_type_mapping_selects_deepinfra_model() -> None:
+    assert (
+        _resolve_llm_model(
+            "high_reasoning",
+            fallback_model="fallback-model",
+            mappings=tuple(DEEPINFRA_LLM_MAPPINGS.items()),
+            provider="deepinfra",
+        )
+        == "deepseek-ai/DeepSeek-R1"
     )
 
 

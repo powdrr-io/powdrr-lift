@@ -68,6 +68,15 @@ ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     "vision": LLMModelMapping("glm-4.6v"),
 }
 
+DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
+    "high_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-R1"),
+    "standard_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-V3"),
+    "simple_task": LLMModelMapping("Qwen/Qwen3-30B-A3B"),
+    "fast_iteration": LLMModelMapping("Qwen/Qwen3-30B-A3B"),
+    "long_context": LLMModelMapping("deepseek-ai/DeepSeek-V3"),
+    "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct"),
+}
+
 WorkflowActionParser = Callable[
     [dict[str, Any], str | None, str | None], "SkillChatAction"
 ]
@@ -1935,10 +1944,10 @@ def _resolve_llm_model(
     mappings: Sequence[tuple[str, str | LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
-    if llm_type is None or provider != "zai":
+    if llm_type is None or provider not in {"zai", "deepinfra"}:
         return fallback_model
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
-    mapping = dict(ZAI_LLM_MAPPINGS)
+    mapping = dict(ZAI_LLM_MAPPINGS if provider == "zai" else DEEPINFRA_LLM_MAPPINGS)
     mapping.update(
         {
             key.strip().lower().replace("-", "_"): _as_model_mapping(value)

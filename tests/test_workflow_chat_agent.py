@@ -56,10 +56,13 @@ from powdrr_lift.workflow_chat_agent import (
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
     _execute_shell_tool,
+    _handle_workflow_action_edit,
+    _parse_action_response,
     _resolve_api_key,
     _resolve_llm_model,
     _resolve_skill_path,
     _resolve_worktree_context,
+    _WorkflowExecutionState,
     run_workflow_chat,
 )
 
@@ -1016,6 +1019,64 @@ def test_apply_file_edits_uses_original_line_numbers_for_interleaved_edits(
     expected_text: str,
 ) -> None:
     assert _apply_file_edits(current_text, edits) == expected_text
+
+
+def test_edit_action_can_update_multiple_files_in_one_response(
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "first.txt"
+    second_path = tmp_path / "nested" / "second.txt"
+    first_path.write_text("first\n", encoding="utf-8")
+    second_path.parent.mkdir()
+    second_path.write_text("second\n", encoding="utf-8")
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_edits": [
+                {
+                    "file_path": "first.txt",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "text": "updated first",
+                        }
+                    ],
+                },
+                {
+                    "file_path": "nested/second.txt",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "text": "updated second",
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.json", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+
+    _handle_workflow_action_edit(
+        action,
+        state,
+        io.StringIO(),
+        io.StringIO(),
+        lambda: "",
+        SkillChatConfig(skills_dir=tmp_path),
+    )
+
+    assert first_path.read_text(encoding="utf-8") == "updated first\n"
+    assert second_path.read_text(encoding="utf-8") == "updated second\n"
+    assert len(state.execution_events[0]["result"]) == 2
 
 
 def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(

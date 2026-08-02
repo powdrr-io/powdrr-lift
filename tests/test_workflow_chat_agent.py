@@ -137,7 +137,7 @@ def test_workflow_progress_lists_steps_and_updates_status() -> None:
     assert "performing local action..." in output
 
 
-def test_default_simple_task_model_uses_flashx_with_glm_backup() -> None:
+def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
     assert (
         _resolve_llm_model(
             "simple_task",
@@ -145,11 +145,11 @@ def test_default_simple_task_model_uses_flashx_with_glm_backup() -> None:
             mappings=(),
             provider="zai",
         )
-        == "glm-4.7-flashx"
+        == "Qwen/Qwen2.5-Coder-14B-Instruct"
     )
     assert (
         _backup_model_for(
-            "glm-4.7-flashx",
+            "Qwen/Qwen2.5-Coder-14B-Instruct",
             tuple(ZAI_LLM_MAPPINGS.items()),
         )
         == "glm-4.7"

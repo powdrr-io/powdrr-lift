@@ -151,14 +151,22 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
   `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
+- Use the local Qwen provider with `llama-cpp-python` and a GGUF model path:
+  install `llama-cpp-python` with Metal enabled, download the Q5_K_M shards
+  from `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF`, and pass
+  `--provider local --model Qwen/Qwen2.5-Coder-14B-Instruct --model-path
+  /path/to/qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf` (or set
+  `LOCAL_LLM_MODEL_PATH`). On Apple Silicon, install with
+  `CMAKE_ARGS="-DGGML_METAL=on" uv pip install llama-cpp-python`.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
 - Workflow skill steps and every routing/action response carry an `llm_type`
-  descriptor. The z.ai mapping routes `high_reasoning` to `glm-5.2`,
-  `standard_reasoning` to `glm-4.7`, `simple_task` to `glm-4.7-flash`,
-  `fast_iteration` to `glm-4.7-flashx`, `long_context` to `glm-5.2`, and
-  `vision` to `glm-4.6v`. The descriptor selected in one roundtrip controls
-  the model used for the next roundtrip. Mappings currently apply only when
-  the selected provider is z.ai.
+  descriptor. The default mapping routes `high_reasoning` to `glm-5.2`,
+  `standard_reasoning` to `glm-4.7`, `simple_task` and `fast_iteration` to
+  `Qwen/Qwen2.5-Coder-14B-Instruct`, `long_context` to `glm-5.2`, and
+  `vision` to `glm-4.6v`. Selecting the Qwen model automatically uses the
+  local provider, so a workflow can use remote GLM models and local Qwen
+  roundtrips together. The descriptor selected in one roundtrip controls the
+  model used for the next roundtrip.
 - Set `OPENAI_BASE_URL` to point at the local proxy if you want to record the
   requests.
 - If you omit `--output-dir`, the generated task set is written to a temporary

@@ -80,26 +80,24 @@ def test_workflow_task_client_uses_task_llm_type_for_zai_model(
     workflow = _workflow(tmp_path)
     captured: dict[str, str] = {}
 
-    class _FakeOpenAIClient:
-        def __init__(self, *, model: str, api_key: str, base_url: str) -> None:
-            captured.update(model=model, api_key=api_key, base_url=base_url)
+    class _FakeLocalClient:
+        def __init__(self, *, model_path: Path) -> None:
+            captured["model_path"] = str(model_path)
 
-    monkeypatch.setenv("ZAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
-        _FakeOpenAIClient,
+        "powdrr_lift.workflow_task_agent.LocalLlamaChatClient",
+        _FakeLocalClient,
     )
 
     _build_zai_client(
-        WorkflowTaskAgentConfig(workflow_dir=workflow.directory),
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            model_path=tmp_path / "qwen.gguf",
+        ),
         workflow.tasks[0],
     )
 
-    assert captured == {
-        "model": "glm-4.7-flashx",
-        "api_key": "test-key",
-        "base_url": "https://api.z.ai/api/paas/v4/",
-    }
+    assert captured == {"model_path": str(tmp_path / "qwen.gguf")}
 
 
 def test_process_workflow_task_blocks_with_human_handoff_and_follow_up(

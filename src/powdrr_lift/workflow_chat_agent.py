@@ -49,6 +49,7 @@ from powdrr_lift.core.spec_context import (
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
+_QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,8 +63,8 @@ class LLMModelMapping:
 ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     "high_reasoning": LLMModelMapping("glm-5.2"),
     "standard_reasoning": LLMModelMapping("glm-4.7"),
-    "simple_task": LLMModelMapping("glm-4.7-flashx", "glm-4.7"),
-    "fast_iteration": LLMModelMapping("glm-4.7-flashx"),
+    "simple_task": LLMModelMapping(_QWEN_2_5_CODER_MODEL, "glm-4.7"),
+    "fast_iteration": LLMModelMapping(_QWEN_2_5_CODER_MODEL),
     "long_context": LLMModelMapping("glm-5.2"),
     "vision": LLMModelMapping("glm-4.6v"),
 }
@@ -95,6 +96,7 @@ class SkillChatConfig:
     output_dir: Path | None = None
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
+    model_path: Path | None = None
     llm_mappings: tuple[tuple[str, str | LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
@@ -264,6 +266,51 @@ class OpenAIChatClient:
             raise RuntimeError("OpenAI response message content was empty.")
 
         return _parse_json_object(content, "OpenAI response content")
+
+
+class LocalLlamaChatClient:
+    def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
+        try:
+            from llama_cpp import Llama  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise RuntimeError(
+                "Local provider requires llama-cpp-python. Install the local "
+                "extra with Metal support on macOS."
+            ) from exc
+        if not model_path.is_file():
+            raise RuntimeError(f"Local GGUF model file does not exist: {model_path}")
+        if "q5_k_m" not in model_path.name.casefold():
+            raise RuntimeError(
+                "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
+                "model filename containing 'q5_k_m'."
+            )
+        self._llama = Llama(
+            model_path=str(model_path),
+            n_ctx=n_ctx,
+            n_gpu_layers=-1,
+            verbose=False,
+        )
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        response = self._llama.create_chat_completion(
+            messages=messages,
+            temperature=0,
+            max_tokens=_MAX_COMPLETION_TOKENS,
+            response_format={"type": "json_object"},
+        )
+        choices = response.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise RuntimeError("Local LLM response did not include any choices.")
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            raise RuntimeError("Local LLM response choice was not an object.")
+        message = first_choice.get("message")
+        if not isinstance(message, dict):
+            raise RuntimeError("Local LLM response message was not an object.")
+        content = message.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("Local LLM response content was empty.")
+        return _parse_json_object(content, "Local LLM response content")
 
 
 class AnthropicChatClient:
@@ -460,6 +507,7 @@ def run_workflow_chat(
             clients[key] = _build_chat_client(
                 selected_credentials,
                 model=selected_model,
+                model_path=config.model_path,
             )
         return clients[key]
 
@@ -588,7 +636,7 @@ def run_workflow_chat(
         progress.update(
             selected_skill,
             current_step_index=execution_state.step_index,
-            status="waiting on LLM response...",
+            status=f"waiting for {current_model} LLM response...",
         )
         action, current_model = _complete_json_with_model_fallback(
             client_for=partial(client_for, provider, credentials),
@@ -2001,10 +2049,12 @@ def _resolve_llm_model(
     mappings: Sequence[tuple[str, str | LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
-    if llm_type is None or provider not in {"zai", "deepinfra"}:
+    if llm_type is None or provider not in {"zai", "deepinfra", "local"}:
         return fallback_model
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
-    mapping = dict(ZAI_LLM_MAPPINGS if provider == "zai" else DEEPINFRA_LLM_MAPPINGS)
+    mapping = dict(
+        ZAI_LLM_MAPPINGS if provider in {"zai", "local"} else DEEPINFRA_LLM_MAPPINGS
+    )
     mapping.update(
         {
             key.strip().lower().replace("-", "_"): _as_model_mapping(value)
@@ -2105,6 +2155,7 @@ def _complete_json_with_repair(
             f"{context} LLM input (model={model})",
             messages,
         )
+        _print_waiting_for_model(stderr, model)
         try:
             payload = client.complete_json(messages)
             _verbose_json(
@@ -2130,6 +2181,7 @@ def _complete_json_with_repair(
                     )
                     time.sleep(delay_seconds)
                     try:
+                        _print_waiting_for_model(stderr, model)
                         payload = client.complete_json(messages)
                         _verbose_json(
                             stderr,
@@ -2248,6 +2300,10 @@ def _complete_json_with_repair(
                 continue
             print(f"Stopping after {context} failure.", file=stderr)
             return None
+
+
+def _print_waiting_for_model(stderr: TextIO, model: str) -> None:
+    print(f"waiting for {model} LLM response...", file=stderr, flush=True)
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:
@@ -2479,6 +2535,7 @@ def _attempt_json_repair(
         repair_messages,
     )
     try:
+        _print_waiting_for_model(stderr, model)
         repaired_payload = client.complete_json(repair_messages)
         _verbose_json(
             stderr,
@@ -2681,7 +2738,15 @@ def _build_chat_client(
     credentials: WorkflowChatCredentials,
     *,
     model: str,
-) -> OpenAIChatClient | AnthropicChatClient:
+    model_path: Path | None = None,
+) -> WorkflowChatClient:
+    if credentials.provider == "local":
+        resolved_model_path = model_path or _local_model_path_from_environment()
+        if resolved_model_path is None:
+            raise RuntimeError(
+                "Local provider requires --model-path or LOCAL_LLM_MODEL_PATH."
+            )
+        return LocalLlamaChatClient(model_path=resolved_model_path)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
             model=model,
@@ -2718,6 +2783,10 @@ def _resolve_credentials(
 
 
 def _resolve_provider(provider_override: str, model: str) -> str:
+    if model == _QWEN_2_5_CODER_MODEL:
+        return "local"
+    if provider_override == "local":
+        provider_override = "auto"
     if provider_override != "auto":
         return provider_override
     if model.startswith("claude-"):
@@ -2761,6 +2830,8 @@ def _resolve_provider(provider_override: str, model: str) -> str:
 def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--api-key"
+    if provider == "local":
+        return "local", "local"
     if provider == "anthropic":
         for env_name in ("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"):
             value = os.environ.get(env_name)
@@ -2801,9 +2872,16 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     )
 
 
+def _local_model_path_from_environment() -> Path | None:
+    value = os.environ.get("LOCAL_LLM_MODEL_PATH")
+    return Path(value).expanduser() if value else None
+
+
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--base-url"
+    if provider == "local":
+        return "local", "local"
     if provider == "anthropic":
         for env_name in ("ANTHROPIC_BASE_URL",):
             value = os.environ.get(env_name)

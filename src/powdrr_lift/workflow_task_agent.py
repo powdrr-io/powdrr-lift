@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -15,8 +16,11 @@ from powdrr_lift.core import (
     WorkflowTask,
 )
 from powdrr_lift.workflow_chat_agent import (
+    _QWEN_2_5_CODER_MODEL,
     ZAI_LLM_MAPPINGS,
+    LocalLlamaChatClient,
     _execute_shell_tool,
+    _print_waiting_for_model,
     _resolve_credentials,
     _resolve_llm_model,
 )
@@ -33,6 +37,7 @@ class WorkflowTaskAgentConfig:
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
+    model_path: Path | None = None
     max_roundtrips: int = 12
     verbose: bool = False
 
@@ -60,11 +65,18 @@ def run_workflow_task(
         return 1
     task = workflow.claim_task(task.task_id)
     print(f"Claimed workflow task: {task.task_id}", file=stdout)
+    model = _resolve_llm_model(
+        task.llm_type,
+        fallback_model="glm-5.2",
+        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
+        provider="zai",
+    )
     if client is None:
         client = _build_zai_client(config, task)
 
     events: list[dict[str, Any]] = []
     for _roundtrip in range(max(1, config.max_roundtrips)):
+        _print_waiting_for_model(stderr, model)
         response = client.complete_json(_build_task_messages(workflow, task, events))
         action = _parse_task_action(response)
         if action.kind == "invoke_tool":
@@ -311,6 +323,18 @@ def _build_zai_client(
         mappings=tuple(ZAI_LLM_MAPPINGS.items()),
         provider="zai",
     )
+    if model == _QWEN_2_5_CODER_MODEL:
+        model_path = config.model_path
+        if model_path is None:
+            model_path_value = os.environ.get("LOCAL_LLM_MODEL_PATH")
+            model_path = (
+                Path(model_path_value).expanduser() if model_path_value else None
+            )
+        if model_path is None:
+            raise RuntimeError(
+                "Local Qwen model requires --model-path or LOCAL_LLM_MODEL_PATH."
+            )
+        return LocalLlamaChatClient(model_path=model_path)
     credentials = _resolve_credentials("zai", config.api_key, config.base_url)
     return OpenAIChatClient(
         model=model,

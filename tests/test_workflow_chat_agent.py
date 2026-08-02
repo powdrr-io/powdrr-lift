@@ -338,7 +338,7 @@ def test_llm_type_mapping_selects_deepinfra_model() -> None:
             mappings=tuple(DEEPINFRA_LLM_MAPPINGS.items()),
             provider="deepinfra",
         )
-        == "deepseek-ai/DeepSeek-R1"
+        == "deepseek-ai/DeepSeek-V4-Pro"
     )
 
 

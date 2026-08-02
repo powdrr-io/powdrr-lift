@@ -69,11 +69,11 @@ ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
 }
 
 DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    "high_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-R1"),
-    "standard_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-V3"),
-    "simple_task": LLMModelMapping("Qwen/Qwen3-30B-A3B"),
-    "fast_iteration": LLMModelMapping("Qwen/Qwen3-30B-A3B"),
-    "long_context": LLMModelMapping("deepseek-ai/DeepSeek-V3"),
+    "high_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-V4-Pro"),
+    "standard_reasoning": LLMModelMapping("deepseek-ai/DeepSeek-V4-Flash"),
+    "simple_task": LLMModelMapping("Qwen/Qwen3-Next-80B-A3B-Instruct"),
+    "fast_iteration": LLMModelMapping("Qwen/Qwen3-Next-80B-A3B-Instruct"),
+    "long_context": LLMModelMapping("deepseek-ai/DeepSeek-V4-Flash"),
     "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct"),
 }
 

@@ -65,6 +65,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_skill_path,
     _resolve_worktree_context,
     _WorkflowExecutionState,
+    _WorkflowProgressDisplay,
     run_workflow_chat,
 )
 
@@ -106,6 +107,34 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         )
         == "gpt-test-model"
     )
+
+
+def test_workflow_progress_lists_steps_and_updates_status() -> None:
+    stream = io.StringIO()
+    progress = _WorkflowProgressDisplay(stream)
+    skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+
+    progress.update(
+        skill,
+        current_step_index=0,
+        status="waiting on LLM response...",
+    )
+    progress.update(
+        skill,
+        current_step_index=0,
+        status="performing local action...",
+    )
+    progress.update(
+        skill,
+        current_step_index=1,
+        status="waiting on LLM response...",
+    )
+
+    output = stream.getvalue()
+    assert "1. Capture the feature goal." in output
+    assert "2. Summarize the result." in output
+    assert "waiting on LLM response..." in output
+    assert "performing local action..." in output
 
 
 def test_default_backup_model_maps_flash_to_flashx() -> None:

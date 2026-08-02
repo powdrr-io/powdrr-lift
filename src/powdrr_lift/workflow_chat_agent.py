@@ -379,6 +379,47 @@ class _ModelUnavailableError(RuntimeError):
     pass
 
 
+class _WorkflowProgressDisplay:
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+        self._dynamic = stream.isatty()
+        self._rendered_line_count = 0
+        self._last_step_index: int | None = None
+
+    def update(
+        self,
+        skill: SkillCatalogEntry,
+        *,
+        current_step_index: int,
+        status: str,
+    ) -> None:
+        if not self._dynamic and self._last_step_index == current_step_index:
+            print(f"[workflow] {status}", file=self._stream, flush=True)
+            return
+
+        lines = ["Workflow progress:"]
+        for step_index, step in enumerate(skill.skill.steps):
+            if step_index < current_step_index:
+                marker = "✓"
+            elif step_index == current_step_index:
+                marker = "▶"
+            else:
+                marker = "·"
+            lines.append(f"  {marker} {step_index + 1}. {step.description}")
+        lines.append(f"Status: {status}")
+
+        if self._dynamic and self._rendered_line_count:
+            self._stream.write(f"\033[{self._rendered_line_count}A")
+        for line in lines:
+            if self._dynamic:
+                self._stream.write(f"\033[2K{line}\n")
+            else:
+                self._stream.write(f"{line}\n")
+        self._stream.flush()
+        self._rendered_line_count = len(lines)
+        self._last_step_index = current_step_index
+
+
 def run_workflow_chat(
     config: WorkflowChatConfig,
     *,
@@ -507,6 +548,7 @@ def run_workflow_chat(
         print("Could not select a skill.", file=stderr)
         return 1
 
+    progress = _WorkflowProgressDisplay(stderr)
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
         transcript=transcript,
@@ -542,6 +584,11 @@ def run_workflow_chat(
                 f"step {execution_state.step_index + 1}/"
                 f"{len(selected_skill.skill.steps)}"
             ),
+        )
+        progress.update(
+            selected_skill,
+            current_step_index=execution_state.step_index,
+            status="waiting on LLM response...",
         )
         action, current_model = _complete_json_with_model_fallback(
             client_for=partial(client_for, provider, credentials),
@@ -585,6 +632,11 @@ def run_workflow_chat(
             f"Execution result: kind={action.kind}",
         )
         _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
+        progress.update(
+            selected_skill,
+            current_step_index=execution_state.step_index,
+            status="performing local action...",
+        )
 
         handler = action_handlers.get(action.kind)
         if handler is None:
@@ -684,6 +736,11 @@ def run_workflow_chat(
             stalled_roundtrips = 0
             previous_action_signature = None
         if not should_continue:
+            progress.update(
+                selected_skill,
+                current_step_index=len(selected_skill.skill.steps),
+                status="workflow complete",
+            )
             break
 
     summary = _build_skill_execution_summary(

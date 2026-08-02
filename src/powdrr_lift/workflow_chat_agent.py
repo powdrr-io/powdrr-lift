@@ -213,6 +213,7 @@ class OpenAIChatClient:
             },
             method="POST",
         )
+        request_started = time.monotonic()
         try:
             with urlopen(request, timeout=self._timeout) as response:
                 raw_response = response.read().decode("utf-8")
@@ -224,7 +225,17 @@ class OpenAIChatClient:
         except URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
         except TimeoutError as exc:
-            raise RuntimeError(f"OpenAI request timed out: {exc}") from exc
+            raise RuntimeError(
+                _provider_timeout_message(
+                    provider="OpenAI-compatible",
+                    model=self._model,
+                    endpoint=request.full_url,
+                    timeout=self._timeout,
+                    elapsed=time.monotonic() - request_started,
+                    message=str(exc),
+                    message_count=len(messages),
+                )
+            ) from exc
 
         loaded_response = _parse_json_object(
             raw_response,
@@ -284,6 +295,7 @@ class AnthropicChatClient:
             },
             method="POST",
         )
+        request_started = time.monotonic()
         try:
             with urlopen(request, timeout=self._timeout) as response:
                 raw_response = response.read().decode("utf-8")
@@ -295,7 +307,17 @@ class AnthropicChatClient:
         except URLError as exc:
             raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
         except TimeoutError as exc:
-            raise RuntimeError(f"Anthropic request timed out: {exc}") from exc
+            raise RuntimeError(
+                _provider_timeout_message(
+                    provider="Anthropic",
+                    model=self._model,
+                    endpoint=request.full_url,
+                    timeout=self._timeout,
+                    elapsed=time.monotonic() - request_started,
+                    message=str(exc),
+                    message_count=len(conversation_messages),
+                )
+            ) from exc
 
         loaded_response = _parse_json_object(
             raw_response,
@@ -320,6 +342,24 @@ class AnthropicChatClient:
             raise RuntimeError("Anthropic response content was empty.")
 
         return _parse_json_object(response_text, "Anthropic response content")
+
+
+def _provider_timeout_message(
+    *,
+    provider: str,
+    model: str,
+    endpoint: str,
+    timeout: float,
+    elapsed: float,
+    message: str,
+    message_count: int,
+) -> str:
+    return (
+        f"{provider} request timed out for model {model!r}: {message}. "
+        f"Elapsed {elapsed:.1f}s of configured {timeout:g}s timeout; "
+        f"endpoint={endpoint!r}, messages={message_count}, "
+        f"max_tokens={_MAX_COMPLETION_TOKENS}."
+    )
 
 
 class WorkflowChatClient(Protocol):
@@ -2634,6 +2674,21 @@ def _resolve_provider(provider_override: str, model: str) -> str:
             or _resolve_codex_access_token() is not None
         ):
             return "zai"
+    if (
+        os.environ.get("DEEPINFRA_API_TOKEN")
+        or os.environ.get("DEEPINFRA_API_KEY")
+        or os.environ.get("DEEPINFRA_BASE_URL")
+    ):
+        if not (
+            os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("CODEX_API_KEY")
+            or os.environ.get("ANTHROPIC_API_KEY")
+            or os.environ.get("CLAUDE_API_KEY")
+            or os.environ.get("ZAI_API_KEY")
+            or os.environ.get("ZAI_BASE_URL")
+            or _resolve_codex_access_token() is not None
+        ):
+            return "deepinfra"
     return "openai"
 
 
@@ -2657,6 +2712,15 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
         raise RuntimeError(
             "No z.ai credentials found. Set ZAI_API_KEY or GLM_API_KEY, or "
             "pass --api-key."
+        )
+    if provider == "deepinfra":
+        for env_name in ("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"):
+            value = os.environ.get(env_name)
+            if value:
+                return value, env_name
+        raise RuntimeError(
+            "No DeepInfra credentials found. Set DEEPINFRA_API_TOKEN or "
+            "DEEPINFRA_API_KEY, or pass --api-key."
         )
     for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
         value = os.environ.get(env_name)
@@ -2686,6 +2750,11 @@ def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
             if value:
                 return value, env_name
         return "https://api.z.ai/api/paas/v4/", "default"
+    if provider == "deepinfra":
+        value = os.environ.get("DEEPINFRA_BASE_URL")
+        if value:
+            return value, "DEEPINFRA_BASE_URL"
+        return "https://api.deepinfra.com/v1/openai", "default"
     for env_name in ("OPENAI_BASE_URL", "CODEX_BASE_URL"):
         value = os.environ.get(env_name)
         if value:

@@ -1162,6 +1162,7 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
     assert exit_code == 0
     assert notes_path.read_text(encoding="utf-8") == "corrected\n"
     assert "Workflow edit action failed" in stderr.getvalue()
+    assert "current file has 1 lines" in stderr.getvalue()
     assert len(captured_messages) == 5
 
 

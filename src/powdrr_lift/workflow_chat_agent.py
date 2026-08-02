@@ -463,6 +463,7 @@ def run_workflow_chat(
     step_roundtrips = 0
     stalled_roundtrips = 0
     previous_action_signature: str | None = None
+    failed_action_signature: str | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
         current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
@@ -542,9 +543,22 @@ def run_workflow_chat(
                 config,
             )
         except RuntimeError as exc:
+            action_signature = _workflow_action_signature(action)
+            current_file_context = _current_file_context(
+                worktree_root,
+                execution_state.current_file_path,
+            )
+            line_count_feedback = ""
+            if current_file_context and current_file_context.get("exists"):
+                line_count_feedback = (
+                    " The current file has "
+                    f"{current_file_context['line_count']} lines; every edit "
+                    "range must stay within that line count."
+                )
             feedback = (
                 f"Workflow {action.kind} action failed: {exc}. "
                 "Re-read the current file context and return a corrected action."
+                f"{line_count_feedback}"
             )
             print(feedback, file=stderr)
             execution_state.transcript.append(
@@ -568,7 +582,11 @@ def run_workflow_chat(
                     "step_index": execution_state.step_index,
                 }
             )
-            stalled_roundtrips += 1
+            if action_signature == failed_action_signature:
+                stalled_roundtrips += 1
+            else:
+                stalled_roundtrips = 1
+                failed_action_signature = action_signature
             if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
                 print(
                     "Workflow stopped after repeated action failures.",
@@ -588,6 +606,7 @@ def run_workflow_chat(
         previous_action_signature = action_signature
         if made_progress:
             stalled_roundtrips = 0
+            failed_action_signature = None
         else:
             stalled_roundtrips += 1
             _verbose_print(

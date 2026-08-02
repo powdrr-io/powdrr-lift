@@ -478,8 +478,13 @@ class _ModelUnavailableError(RuntimeError):
 
 
 class _WorkflowProgressDisplay:
-    def __init__(self, stream: TextIO) -> None:
+    def __init__(
+        self,
+        stream: TextIO,
+        on_update: Callable[[SkillCatalogEntry, int, str], None] | None = None,
+    ) -> None:
         self._stream = stream
+        self._on_update = on_update
         self._dynamic = stream.isatty()
         self._rendered_line_count = 0
         self._last_step_index: int | None = None
@@ -491,6 +496,10 @@ class _WorkflowProgressDisplay:
         current_step_index: int,
         status: str,
     ) -> None:
+        if self._on_update is not None:
+            self._on_update(skill, current_step_index, status)
+            self._last_step_index = current_step_index
+            return
         if not self._dynamic and self._last_step_index == current_step_index:
             print(f"[workflow] {status}", file=self._stream, flush=True)
             return
@@ -524,6 +533,7 @@ def run_workflow_chat(
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
+    progress_callback: Callable[[SkillCatalogEntry, int, str], None] | None = None,
 ) -> int:
     worktree_root = _resolve_worktree_context(
         config.repo_root,
@@ -578,6 +588,7 @@ def run_workflow_chat(
         "What do you want to do? ",
         input_func=input_func,
         stdout=stdout,
+        status_stream=stderr,
     )
     transcript: list[dict[str, str]] = [{"role": "user", "content": user_request}]
     _verbose_print(stderr, config.verbose, f"Initial user request: {user_request}")
@@ -631,7 +642,12 @@ def run_workflow_chat(
             break
 
         print(selection.next_question, file=stdout)
-        answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+        answer = _prompt_user(
+            "> ",
+            input_func=input_func,
+            stdout=stdout,
+            status_stream=stderr,
+        )
         _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
         transcript.append({"role": "assistant", "content": selection.next_question})
         transcript.append({"role": "user", "content": answer})
@@ -646,7 +662,7 @@ def run_workflow_chat(
         print("Could not select a skill.", file=stderr)
         return 1
 
-    progress = _WorkflowProgressDisplay(stderr)
+    progress = _WorkflowProgressDisplay(stderr, on_update=progress_callback)
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
         transcript=transcript,
@@ -1502,9 +1518,13 @@ def _handle_workflow_action_prompt_user(
     input_func: Callable[[], str],
     config: WorkflowChatConfig,
 ) -> bool:
-    _ = stderr
     print(action.text or "", file=stdout)
-    answer = _prompt_user("> ", input_func=input_func, stdout=stdout)
+    answer = _prompt_user(
+        "> ",
+        input_func=input_func,
+        stdout=stdout,
+        status_stream=stderr,
+    )
     _verbose_print(stderr, config.verbose, f"Follow-up answer: {answer}")
     state.transcript.append(
         {
@@ -2298,6 +2318,7 @@ def _complete_json_with_repair(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
                 stdout=stdout,
+                status_stream=stderr,
             )
             _verbose_print(
                 stderr,
@@ -2343,6 +2364,7 @@ def _complete_json_with_repair(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
                 stdout=stdout,
+                status_stream=stderr,
             )
             _verbose_print(
                 stderr,
@@ -2710,14 +2732,20 @@ def _prompt_user(
     *,
     input_func: Callable[[], str],
     stdout: TextIO,
+    status_stream: TextIO | None = None,
 ) -> str:
     if input_func is input and _supports_readline_input(stdout):
-        return input(prompt).strip()
-    stdout.write(prompt)
-    stdout.flush()
-    if input_func is input and _supports_interactive_line_editing(stdout):
-        return _read_interactive_line(prompt, stdout=stdout).strip()
-    return input_func().strip()
+        answer = input(prompt).strip()
+    else:
+        stdout.write(prompt)
+        stdout.flush()
+        if input_func is input and _supports_interactive_line_editing(stdout):
+            answer = _read_interactive_line(prompt, stdout=stdout).strip()
+        else:
+            answer = input_func().strip()
+    if status_stream is not None:
+        print("[workflow] thinking...", file=status_stream, flush=True)
+    return answer
 
 
 def _supports_readline_input(stdout: TextIO) -> bool:

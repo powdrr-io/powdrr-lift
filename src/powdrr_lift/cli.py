@@ -71,6 +71,7 @@ from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
     run_workflow_chat,
 )
+from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
@@ -1579,7 +1580,10 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
         verbose=args.verbose,
     )
     while True:
-        exit_code = run_workflow_chat(config)
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            exit_code = run_workflow_chat_tui(config)
+        else:
+            exit_code = run_workflow_chat(config)
         if exit_code != 0 or not sys.stdin.isatty():
             return exit_code
         try:

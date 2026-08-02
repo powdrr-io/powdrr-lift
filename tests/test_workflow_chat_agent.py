@@ -60,6 +60,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_shell_tool,
     _handle_workflow_action_edit,
     _parse_action_response,
+    _prompt_user,
     _request_token_budget,
     _resolve_api_key,
     _resolve_base_url,
@@ -111,6 +112,22 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
     )
 
 
+def test_prompt_user_reports_thinking_after_input() -> None:
+    stdout = io.StringIO()
+    status_stream = io.StringIO()
+
+    answer = _prompt_user(
+        "Question: ",
+        input_func=lambda: "answer",
+        stdout=stdout,
+        status_stream=status_stream,
+    )
+
+    assert answer == "answer"
+    assert stdout.getvalue() == "Question: "
+    assert status_stream.getvalue() == "[workflow] thinking...\n"
+
+
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)
@@ -137,6 +154,23 @@ def test_workflow_progress_lists_steps_and_updates_status() -> None:
     assert "2. Summarize the result." in output
     assert "waiting on LLM response..." in output
     assert "performing local action..." in output
+
+
+def test_workflow_progress_callback_replaces_stream_rendering() -> None:
+    stream = io.StringIO()
+    updates: list[tuple[SkillCatalogEntry, int, str]] = []
+    progress = _WorkflowProgressDisplay(
+        stream,
+        on_update=lambda skill, step_index, status: updates.append(
+            (skill, step_index, status)
+        ),
+    )
+    skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+
+    progress.update(skill, current_step_index=0, status="waiting on LLM response...")
+
+    assert stream.getvalue() == ""
+    assert updates == [(skill, 0, "waiting on LLM response...")]
 
 
 def test_default_simple_task_model_uses_flashx_with_glm_backup() -> None:

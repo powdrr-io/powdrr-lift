@@ -96,7 +96,7 @@ def test_workflow_task_client_uses_task_llm_type_for_zai_model(
     )
 
     assert captured == {
-        "model": "glm-4.7-flash",
+        "model": "glm-4.7-flashx",
         "api_key": "test-key",
         "base_url": "https://api.z.ai/api/paas/v4/",
     }

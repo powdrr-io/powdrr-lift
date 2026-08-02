@@ -137,13 +137,22 @@ def test_workflow_progress_lists_steps_and_updates_status() -> None:
     assert "performing local action..." in output
 
 
-def test_default_backup_model_maps_flash_to_flashx() -> None:
+def test_default_simple_task_model_uses_flashx_with_glm_backup() -> None:
+    assert (
+        _resolve_llm_model(
+            "simple_task",
+            fallback_model="test-model",
+            mappings=(),
+            provider="zai",
+        )
+        == "glm-4.7-flashx"
+    )
     assert (
         _backup_model_for(
-            "GLM-4.7-FLASH",
+            "glm-4.7-flashx",
             tuple(ZAI_LLM_MAPPINGS.items()),
         )
-        == "GLM-4.7-FlashX"
+        == "glm-4.7"
     )
 
 
@@ -153,7 +162,7 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
             self.model = model
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 raise RuntimeError(
                     "OpenAI request failed with HTTP 404: model is not available"
                 )
@@ -169,21 +178,19 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(skills_dir=Path("skills")),
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_repeated_timeouts_use_backup_model_after_retries() -> None:
@@ -192,7 +199,7 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
             self.model = model
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 raise RuntimeError(
                     "OpenAI request timed out: The read operation timed out"
                 )
@@ -208,7 +215,7 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -219,14 +226,12 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
@@ -237,7 +242,7 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             self.calls += 1
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 if self.calls == 1:
                     raise RuntimeError("OpenAI request timed out")
                 raise RuntimeError(
@@ -255,7 +260,7 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -266,14 +271,12 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
@@ -282,7 +285,7 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
             self.model = model
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            if self.model == "glm-4.7-flash":
+            if self.model == "glm-4.7-flashx":
                 raise RuntimeError(
                     "OpenAI request failed with HTTP 429: "
                     '{"error":{"code":"1302","message":"Rate limit reached for requests"}}'
@@ -299,7 +302,7 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
         client_for=client_for,
         messages=[],
         context="test request",
-        model="glm-4.7-flash",
+        model="glm-4.7-flashx",
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
@@ -310,14 +313,12 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
-        model_mappings=(
-            ("simple_task", LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX")),
-        ),
+        model_mappings=(("simple_task", LLMModelMapping("glm-4.7-flashx", "glm-4.7")),),
     )
 
     assert result == {"ok": True}
-    assert model == "GLM-4.7-FlashX"
-    assert clients == ["glm-4.7-flash", "GLM-4.7-FlashX"]
+    assert model == "glm-4.7"
+    assert clients == ["glm-4.7-flashx", "glm-4.7"]
 
 
 def test_openai_read_timeout_is_reported_as_provider_runtime_error(

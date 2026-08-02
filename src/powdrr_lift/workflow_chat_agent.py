@@ -62,7 +62,7 @@ class LLMModelMapping:
 ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     "high_reasoning": LLMModelMapping("glm-5.2"),
     "standard_reasoning": LLMModelMapping("glm-4.7"),
-    "simple_task": LLMModelMapping("glm-4.7-flash", "GLM-4.7-FlashX"),
+    "simple_task": LLMModelMapping("glm-4.7-flashx", "glm-4.7"),
     "fast_iteration": LLMModelMapping("glm-4.7-flashx"),
     "long_context": LLMModelMapping("glm-5.2"),
     "vision": LLMModelMapping("glm-4.6v"),

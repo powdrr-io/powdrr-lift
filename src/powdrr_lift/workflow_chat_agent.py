@@ -346,11 +346,12 @@ class OpenAIChatClient:
 class LocalLlamaChatClient:
     def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
         try:
-            from llama_cpp import Llama
+            from llama_cpp import Llama  # type: ignore[import-not-found]
         except ImportError as exc:
             raise RuntimeError(
                 "Local provider requires llama-cpp-python. Install the local "
-                "dependencies with Metal support on macOS."
+                "extra (with Metal support on macOS): "
+                "CMAKE_ARGS='-DGGML_METAL=on' uv sync --extra local."
             ) from exc
         if not model_path.is_file():
             raise RuntimeError(f"Local GGUF model file does not exist: {model_path}")

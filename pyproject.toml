@@ -10,7 +10,6 @@ requires-python = ">=3.12"
 dependencies = [
     "PyYAML>=6.0.2",
     "huggingface-hub>=0.26.0",
-    "llama-cpp-python>=0.3.16",
     "mcp>=1.0.0",
     "textual>=1.0",
 ]
@@ -21,6 +20,9 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.8",
     "types-PyYAML>=6.0.12",
+]
+local = [
+    "llama-cpp-python>=0.3.16",
 ]
 
 [project.scripts]

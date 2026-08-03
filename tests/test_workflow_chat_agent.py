@@ -283,17 +283,20 @@ def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
 
 
 def test_textual_status_is_visible_and_not_collapsed() -> None:
-    async def exercise() -> tuple[str, int]:
+    async def exercise() -> tuple[str, int, int]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         async with app.run_test() as pilot:
             status = app.query_one("#status", Static)
             await pilot.pause()
-            return str(status.render()), status.region.height
+            app._set_status("x" * 200)
+            await pilot.pause()
+            return str(status.render()), status.region.height, status.region.width
 
-    rendered, height = asyncio.run(exercise())
+    rendered, height, width = asyncio.run(exercise())
     assert rendered.startswith("Status: ")
-    assert height >= 3
+    assert height > 4
+    assert width == 80
 
 
 def test_textual_status_shows_latest_output() -> None:

@@ -8,6 +8,7 @@ from queue import Queue
 from threading import Event, Thread
 from typing import Any, TextIO, cast
 
+from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.events import Key
@@ -95,6 +96,7 @@ class WorkflowChatApp(App[None]):
         padding: 0 1;
     }
     #status {
+        width: 100%;
         height: auto;
         min-height: 4;
         border: round $success;
@@ -130,7 +132,7 @@ class WorkflowChatApp(App[None]):
 
     def compose(self) -> ComposeResult:
         yield ListView(id="steps")
-        yield Label("Status: thinking...", id="status")
+        yield Label(self._status_text("thinking..."), markup=False, id="status")
         yield _WorkflowResponseTextArea(
             placeholder="Press Return to submit; multiline text is supported",
             id="response",
@@ -330,18 +332,22 @@ class WorkflowChatApp(App[None]):
 
     def _set_status(self, status: str) -> None:
         status_widget = self.query_one("#status", Label)
-        status_widget.update(f"Status: {status}")
+        status_widget.update(self._status_text(status))
         status_widget.refresh(repaint=True)
+
+    @staticmethod
+    def _status_text(status: str) -> Text:
+        return Text(f"Status: {status}", no_wrap=False, overflow="fold")
 
     def _set_message(self, message: str) -> None:
         self._set_status(message.strip())
 
     def _set_failure(self, message: str) -> None:
-        self.query_one("#status", Label).update(f"Status: failed — {message}")
+        self._set_status(f"failed — {message}")
 
     def _finish(self) -> None:
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
-        self.query_one("#status", Label).update(f"Status: {status}")
+        self._set_status(status)
         if self._exit_code == 0:
             self._set_message("Workflow complete. What would you like to do next?")
             if self._response is not None:

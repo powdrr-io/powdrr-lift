@@ -309,7 +309,29 @@ def test_textual_status_shows_latest_output() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "Status: fourth"
+    assert asyncio.run(exercise()) == "Status: first\n\nsecond\n\nthird\n\nfourth"
+
+
+def test_textual_status_keeps_all_questions_visible() -> None:
+    async def exercise() -> tuple[str, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            status = app.query_one("#status", Static)
+            for question in (
+                "1. What should be logged?",
+                "2. Which file format should be used?",
+                "3. Which platforms should be supported?",
+                "4. What should be redacted?",
+                "5. What performance constraints apply?",
+            ):
+                app._set_message(question)
+            await pilot.pause()
+            return str(status.render()), status.region.height
+
+    rendered, height = asyncio.run(exercise())
+    assert all(f"{number}." in rendered for number in range(1, 6))
+    assert height > 4
 
 
 def test_textual_output_hides_debug_and_promotes_question() -> None:

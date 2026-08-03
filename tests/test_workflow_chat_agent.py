@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import os
@@ -16,6 +17,7 @@ from urllib.request import Request
 
 import pytest
 import yaml
+from textual.widgets import Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -75,6 +77,7 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowProgressDisplay,
     run_workflow_chat,
 )
+from powdrr_lift.workflow_chat_tui import WorkflowChatApp
 
 # ruff: noqa: E501
 
@@ -152,6 +155,52 @@ def test_prompt_user_reports_thinking_after_input() -> None:
     assert answer == "answer"
     assert stdout.getvalue() == "Question: "
     assert status_stream.getvalue() == "[workflow] thinking...\n"
+
+
+def test_textual_response_grows_and_submits_on_return(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: list[str] = []
+
+    def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
+        kwargs["stdout"].write("What do you want to do? ")
+        received.append(kwargs["input_func"]())
+        return 0
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
+        fake_run_workflow_chat,
+    )
+
+    async def exercise() -> int:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert "waiting on LLM response" in str(
+                app.query_one("#status", Static).render()
+            )
+            response = app.query_one("#response", TextArea)
+            response.text = "line one\nline two"
+            await pilot.pause()
+            height_style = response.styles.height
+            assert height_style is not None
+            height = int(height_style.value)
+            await pilot.press("enter")
+            await pilot.pause()
+            return height
+
+    height = asyncio.run(exercise())
+
+    assert height >= 4
+    assert received == ["line one\nline two"]
+
+
+def test_textual_quit_unblocks_workflow_input() -> None:
+    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+
+    app.action_quit_workflow()
+
+    assert app._answers.get_nowait() == ""
 
 
 def test_workflow_progress_lists_steps_and_updates_status() -> None:

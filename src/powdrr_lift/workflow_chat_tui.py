@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from queue import Queue
-from typing import TextIO, cast
+from threading import Thread
+from typing import Any, TextIO, cast
 
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, Static
+from textual.events import Key
+from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.workflow_chat_agent import (
     SkillCatalogEntry,
@@ -39,7 +42,28 @@ class _TextualOutput:
         return False
 
 
+class _WorkflowResponseTextArea(TextArea):
+    def __init__(
+        self,
+        *,
+        submit_callback: Callable[[], None],
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._submit_callback = submit_callback
+
+    async def _on_key(self, event: Key) -> None:
+        if event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            self._submit_callback()
+            return
+        await super()._on_key(event)
+
+
 class WorkflowChatApp(App[None]):
+    BINDINGS = [("ctrl+q", "quit_workflow", "Quit")]
+
     CSS = """
     Screen {
         layout: vertical;
@@ -60,6 +84,8 @@ class WorkflowChatApp(App[None]):
     }
     #response {
         height: 3;
+        min-height: 3;
+        max-height: 12;
         margin: 0 1;
     }
     .completed {
@@ -76,30 +102,49 @@ class WorkflowChatApp(App[None]):
         self._config = config
         self._answers: Queue[str] = Queue()
         self._exit_code = 1
-        self._response: Input | None = None
+        self._failure_message: str | None = None
+        self._response: TextArea | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield ListView(id="steps")
-        yield Static("Status: starting...", id="status")
-        yield Static("", id="message")
-        yield Input(placeholder="Press Return to submit", id="response")
+        yield Static("Status: waiting for your request...", id="status")
+        yield Static("Enter your request below.", id="message")
+        yield _WorkflowResponseTextArea(
+            placeholder="Press Return to submit; multiline text is supported",
+            id="response",
+            submit_callback=self._submit_response,
+        )
         yield Footer()
 
     def on_mount(self) -> None:
-        self._response = self.query_one("#response", Input)
+        self._response = self.query_one("#response", TextArea)
         self._response.focus()
-        self.run_worker(self._run_workflow, thread=True)
+        self.query_one("#status", Static).update("Status: waiting on LLM response...")
+        Thread(target=self._run_workflow, daemon=True).start()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self._answers.put(event.value)
-        event.input.value = ""
-        event.input.disabled = True
+    def action_quit_workflow(self) -> None:
+        self._answers.put("")
+        self.exit()
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        if event.text_area.id != "response":
+            return
+        line_count = event.text_area.text.count("\n") + 1
+        event.text_area.styles.height = min(max(3, line_count + 2), 12)
+
+    def _submit_response(self) -> None:
+        if self._response is None or self._response.disabled:
+            return
+        self._answers.put(self._response.text.strip())
+        self._response.text = ""
+        self._response.disabled = True
         self.query_one("#status", Static).update("Status: thinking...")
 
     def _run_workflow(self) -> None:
         stdout = _TextualOutput(self, channel="stdout")
         stderr = _TextualOutput(self, channel="stderr")
+        self.call_from_thread(self._set_status, "waiting on LLM response...")
         try:
             self._exit_code = run_workflow_chat(
                 self._config,
@@ -109,6 +154,7 @@ class WorkflowChatApp(App[None]):
                 progress_callback=self._progress_update,
             )
         except Exception as exc:  # pragma: no cover - defensive UI boundary
+            self._failure_message = str(exc)
             self.call_from_thread(self._set_failure, str(exc))
             self._exit_code = 1
         self.call_from_thread(self._finish)
@@ -188,7 +234,13 @@ class WorkflowChatApp(App[None]):
     def _finish(self) -> None:
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
         self.query_one("#status", Static).update(f"Status: {status}")
-        self.exit()
+        if self._exit_code == 0:
+            self.exit()
+        else:
+            self.query_one("#message", Static).update(
+                "Workflow error: "
+                f"{self._failure_message or 'unknown error'}. Press Ctrl+C to exit."
+            )
 
     def on_unmount(self) -> None:
         self._answers.put("")

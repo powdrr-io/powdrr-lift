@@ -224,7 +224,7 @@ def test_textual_startup_shows_initial_question(
             response = app.query_one("#response", TextArea)
             return message.text, response.disabled
 
-    assert asyncio.run(exercise()) == ("What do you want to do? ", False)
+    assert asyncio.run(exercise()) == ("What do you want to do?", False)
 
 
 def test_textual_quit_unblocks_workflow_input() -> None:

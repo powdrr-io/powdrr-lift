@@ -129,14 +129,14 @@ class WorkflowChatApp(App[None]):
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
-        self._message_history: list[str] = []
+        self._message_history: list[str] = ["What do you want to do?"]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield ListView(id="steps")
-        yield Static("Status: waiting for your request...", id="status")
+        yield Static("Status: What do you want to do?", id="status")
         yield TextArea(
-            "Enter your request below.",
+            "What do you want to do?",
             read_only=True,
             id="message",
         )
@@ -210,8 +210,6 @@ class WorkflowChatApp(App[None]):
             self._failure_message = None
             self._exit_code = 1
             self._workflow_active = True
-            if first_workflow:
-                self.call_from_thread(self._set_status, "waiting for your request...")
             try:
                 self._exit_code = run_workflow_chat(
                     self._config,
@@ -310,7 +308,11 @@ class WorkflowChatApp(App[None]):
         status_widget.refresh(repaint=True)
 
     def _set_message(self, message: str) -> None:
-        self._message_history.append(message)
+        message = message.strip()
+        if self._message_history == ["What do you want to do?"]:
+            self._message_history = [message]
+        elif not self._message_history or self._message_history[-1] != message:
+            self._message_history.append(message)
         self._update_message()
 
     def _update_message(self) -> None:

@@ -82,7 +82,7 @@ class WorkflowChatApp(App[None]):
     #message {
         height: auto;
         min-height: 3;
-        max-height: 12;
+        max-height: 20;
         overflow-y: auto;
         padding: 1;
     }
@@ -111,6 +111,7 @@ class WorkflowChatApp(App[None]):
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
+        self._message_history: list[str] = []
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -144,11 +145,12 @@ class WorkflowChatApp(App[None]):
     def _submit_response(self) -> None:
         if self._response is None or self._response.disabled:
             return
-        self._answers.put(self._response.text.strip())
-        self._request_submitted.set()
+        answer = self._response.text.strip()
+        self.query_one("#status", Static).update("Status: thinking...")
         self._response.text = ""
         self._response.disabled = True
-        self.query_one("#status", Static).update("Status: thinking...")
+        self._answers.put(answer)
+        self._request_submitted.set()
 
     def _run_workflow(self) -> None:
         first_workflow = True
@@ -240,7 +242,7 @@ class WorkflowChatApp(App[None]):
         if not self._workflow_active:
             return
         if prompt.strip() != ">":
-            self._update_message(prompt)
+            self._set_message(prompt)
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -261,10 +263,12 @@ class WorkflowChatApp(App[None]):
         self.query_one("#status", Static).update(f"Status: {status}")
 
     def _set_message(self, message: str) -> None:
-        self._update_message(message)
+        self._message_history.append(message)
+        self._update_message()
 
-    def _update_message(self, message: str) -> None:
+    def _update_message(self) -> None:
         message_widget = self.query_one("#message", Static)
+        message = "\n".join(self._message_history)
         message_widget.update(message)
         available_width = message_widget.size.width - 4
         if available_width <= 0:
@@ -282,12 +286,12 @@ class WorkflowChatApp(App[None]):
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
         self.query_one("#status", Static).update(f"Status: {status}")
         if self._exit_code == 0:
-            self._update_message("Workflow complete. What would you like to do next?")
+            self._set_message("Workflow complete. What would you like to do next?")
             if self._response is not None:
                 self._response.disabled = False
                 self._response.focus()
         else:
-            self._update_message(
+            self._set_message(
                 "Workflow error: "
                 f"{self._failure_message or 'unknown error'}. Press Ctrl+C to exit."
             )

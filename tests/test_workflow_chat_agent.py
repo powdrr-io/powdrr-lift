@@ -226,6 +226,34 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
     assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
 
 
+def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "Build the feature"
+            app._submit_response()
+            await pilot.pause()
+            assert app._answers.get_nowait() == "Build the feature"
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "Status: thinking..."
+
+
+def test_textual_message_history_keeps_multiple_outputs_visible() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            for message in ("first", "second", "third", "fourth"):
+                app._set_message(message)
+            await pilot.pause()
+            return str(app.query_one("#message", Static).render())
+
+    assert asyncio.run(exercise()) == "first\nsecond\nthird\nfourth"
+
+
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)

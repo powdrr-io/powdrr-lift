@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections.abc import Callable
 from math import ceil
 from queue import Queue
 from threading import Event, Thread
 from typing import Any, TextIO, cast
 
+from textual import on
 from textual.app import App, ComposeResult
 from textual.events import Key
-from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, TextArea
+from textual.widgets import Label, ListItem, ListView, TextArea
 
 from powdrr_lift.workflow_chat_agent import (
     SkillCatalogEntry,
@@ -88,25 +91,21 @@ class WorkflowChatApp(App[None]):
     }
     #steps {
         height: 1fr;
-        border: round $accent;
+        border: round $warning;
         padding: 0 1;
     }
     #status {
-        height: 3;
-        border: round $success;
-        padding: 1;
-    }
-    #message {
         height: auto;
-        min-height: 3;
-        max-height: 20;
-        overflow-y: auto;
-        padding: 1;
+        min-height: 4;
+        border: round $success;
+        padding: 0 1;
+        content-align: left middle;
     }
     #response {
-        height: 3;
+        height: auto;
         min-height: 3;
-        max-height: 12;
+        max-height: 30;
+        border: round $primary;
         margin: 0 1;
     }
     .completed {
@@ -125,33 +124,51 @@ class WorkflowChatApp(App[None]):
         self._exit_code = 1
         self._failure_message: str | None = None
         self._response: TextArea | None = None
-        self._message: TextArea | None = None
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
-        self._message_history: list[str] = ["What do you want to do?"]
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
         yield ListView(id="steps")
-        yield Static("Status: What do you want to do?", id="status")
-        yield TextArea(
-            "What do you want to do?",
-            read_only=True,
-            id="message",
-        )
+        yield Label("Status: thinking...", id="status")
         yield _WorkflowResponseTextArea(
             placeholder="Press Return to submit; multiline text is supported",
             id="response",
             submit_callback=self._submit_response,
         )
-        yield Footer()
 
     def on_mount(self) -> None:
         self._response = self.query_one("#response", TextArea)
-        self._message = self.query_one("#message", TextArea)
+        # Paint the initial state before starting any repository or LLM work.
+        # The worker can block during setup, so this must not be the first
+        # operation that establishes visible state.
+        self._set_status("thinking...")
         self._response.focus()
         Thread(target=self._run_workflow, daemon=True).start()
+
+    def copy_to_clipboard(self, text: str) -> None:
+        """Copy through Textual and the native macOS clipboard when available.
+
+        Textual's terminal driver uses OSC 52. macOS Terminal does not consume
+        OSC 52, which made copy appear to work in tests (the in-process buffer
+        was populated) while nothing reached the user's clipboard.
+        """
+        super().copy_to_clipboard(text)
+        if sys.platform != "darwin":
+            return
+        try:
+            subprocess.run(
+                ["pbcopy"],
+                input=text,
+                text=True,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except (OSError, subprocess.SubprocessError):
+            # OSC 52 / Textual's in-process clipboard remains available as a
+            # fallback if pbcopy is unavailable.
+            return
 
     def action_quit_workflow(self) -> None:
         self._stop_requested.set()
@@ -170,23 +187,32 @@ class WorkflowChatApp(App[None]):
             text_area.action_cut()
 
     def _selected_text_area(self) -> TextArea | None:
-        candidates = [self.focused, self._response, self._message]
+        candidates = [self.focused, self._response]
         for candidate in candidates:
             if isinstance(candidate, TextArea) and candidate.selected_text:
                 return candidate
         return None
 
-    def on_text_area_changed(self, event: TextArea.Changed) -> None:
-        if event.text_area.id != "response":
-            return
-        line_count = event.text_area.text.count("\n") + 1
-        event.text_area.styles.height = min(max(3, line_count + 2), 12)
+    @on(TextArea.Changed, "#response")
+    def _on_response_changed(self, event: TextArea.Changed) -> None:
+        self._resize_text_area(event.text_area, max_height=30)
+
+    @staticmethod
+    def _resize_text_area(text_area: TextArea, *, max_height: int) -> None:
+        """Keep entered text visible, including wrapped long lines."""
+        width = max(text_area.size.width - 4, 20)
+        line_count = sum(
+            max(1, ceil(len(line) / width))
+            for line in (text_area.text.splitlines() or [""])
+        )
+        text_area.styles.height = min(max(3, line_count + 2), max_height)
 
     def _submit_response(self) -> None:
         if self._response is None or self._response.disabled:
             return
         answer = self._response.text.strip()
         self._set_status("thinking...")
+        self.query_one("#status", Label).refresh(repaint=True)
         self._response.text = ""
         self._response.disabled = True
         self.call_after_refresh(self._release_submitted_response, answer)
@@ -269,7 +295,7 @@ class WorkflowChatApp(App[None]):
                 item.add_class("completed")
             elif step_index == current_step_index:
                 item.add_class("current")
-        self.query_one("#status", Static).update(f"Status: {status}")
+        self.query_one("#status", Label).update(f"Status: {status}")
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -303,39 +329,19 @@ class WorkflowChatApp(App[None]):
             self.call_from_thread(self._set_message, line)
 
     def _set_status(self, status: str) -> None:
-        status_widget = self.query_one("#status", Static)
+        status_widget = self.query_one("#status", Label)
         status_widget.update(f"Status: {status}")
         status_widget.refresh(repaint=True)
 
     def _set_message(self, message: str) -> None:
-        message = message.strip()
-        if self._message_history == ["What do you want to do?"]:
-            self._message_history = [message]
-        elif not self._message_history or self._message_history[-1] != message:
-            self._message_history.append(message)
-        self._update_message()
-
-    def _update_message(self) -> None:
-        if self._message is None:
-            return
-        message_widget = self._message
-        message = "\n".join(self._message_history)
-        message_widget.text = message
-        available_width = message_widget.size.width - 4
-        if available_width <= 0:
-            available_width = 80
-        line_count = sum(
-            max(1, ceil(len(line) / available_width))
-            for line in (message.splitlines() or [""])
-        )
-        message_widget.styles.height = min(max(3, line_count + 2), 20)
+        self._set_status(message.strip())
 
     def _set_failure(self, message: str) -> None:
-        self.query_one("#status", Static).update(f"Status: failed — {message}")
+        self.query_one("#status", Label).update(f"Status: failed — {message}")
 
     def _finish(self) -> None:
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
-        self.query_one("#status", Static).update(f"Status: {status}")
+        self.query_one("#status", Label).update(f"Status: {status}")
         if self._exit_code == 0:
             self._set_message("Workflow complete. What would you like to do next?")
             if self._response is not None:

@@ -77,12 +77,12 @@ class _WorkflowResponseTextArea(TextArea):
         if event.key in {"ctrl+c", "super+c"}:
             event.stop()
             event.prevent_default()
-            self.app.action_copy_selection()
+            cast(WorkflowChatApp, self.app).action_copy_selection()
             return
         if event.key in {"ctrl+x", "super+x"}:
             event.stop()
             event.prevent_default()
-            self.app.action_cut_selection()
+            cast(WorkflowChatApp, self.app).action_cut_selection()
             return
         await super()._on_key(event)
 

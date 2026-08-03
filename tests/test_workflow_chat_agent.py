@@ -18,7 +18,7 @@ from urllib.request import Request
 
 import pytest
 import yaml
-from textual.widgets import Static, TextArea
+from textual.widgets import ListView, Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -241,7 +241,7 @@ def test_textual_startup_shows_initial_question(
             response = app.query_one("#response", TextArea)
             return str(app.query_one("#status", Static).render()), response.disabled
 
-    assert asyncio.run(exercise()) == ("Status: What do you want to do?", False)
+    assert asyncio.run(exercise()) == ("What do you want to do?", False)
 
 
 def test_textual_quit_unblocks_workflow_input() -> None:
@@ -263,9 +263,7 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == (
-        "Status: Which requirements should this feature satisfy?"
-    )
+    assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
 
 
 def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
@@ -279,7 +277,23 @@ def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "Status: thinking..."
+    assert asyncio.run(exercise()) == "thinking..."
+
+
+def test_textual_submit_removes_initial_prompt_from_status() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._show_prompt("What do you want to do?")
+            response = app.query_one("#response", TextArea)
+            response.text = "Build the feature"
+            app._submit_response()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "thinking..."
 
 
 def test_textual_status_is_visible_and_not_collapsed() -> None:
@@ -294,9 +308,24 @@ def test_textual_status_is_visible_and_not_collapsed() -> None:
             return str(status.render()), status.region.height, status.region.width
 
     rendered, height, width = asyncio.run(exercise())
-    assert rendered.startswith("Status: ")
+    assert rendered.startswith("x")
     assert height > 4
     assert width == 80
+
+
+def test_textual_panels_have_the_same_width() -> None:
+    async def exercise() -> tuple[int, int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            return (
+                app.query_one("#steps", ListView).region.width,
+                app.query_one("#status", Static).region.width,
+                app.query_one("#response", TextArea).region.width,
+            )
+
+    assert asyncio.run(exercise()) == (80, 80, 80)
 
 
 def test_textual_status_shows_latest_output() -> None:
@@ -309,7 +338,7 @@ def test_textual_status_shows_latest_output() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "Status: first\n\nsecond\n\nthird\n\nfourth"
+    assert asyncio.run(exercise()) == "first\n\nsecond\n\nthird\n\nfourth"
 
 
 def test_textual_status_keeps_all_questions_visible() -> None:
@@ -356,8 +385,8 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
             return str(status.render()), str(status.render())
 
     assert asyncio.run(exercise()) == (
-        "Status: Which requirements should this feature satisfy?",
-        "Status: Which requirements should this feature satisfy?",
+        "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
+        "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
     )
 
 

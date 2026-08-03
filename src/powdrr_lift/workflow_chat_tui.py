@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from queue import Queue
-from threading import Thread
+from threading import Event, Thread
 from typing import Any, TextIO, cast
 
 from textual.app import App, ComposeResult
@@ -104,6 +104,9 @@ class WorkflowChatApp(App[None]):
         self._exit_code = 1
         self._failure_message: str | None = None
         self._response: TextArea | None = None
+        self._stop_requested = Event()
+        self._request_submitted = Event()
+        self._workflow_active = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -120,10 +123,11 @@ class WorkflowChatApp(App[None]):
     def on_mount(self) -> None:
         self._response = self.query_one("#response", TextArea)
         self._response.focus()
-        self.query_one("#status", Static).update("Status: waiting on LLM response...")
         Thread(target=self._run_workflow, daemon=True).start()
 
     def action_quit_workflow(self) -> None:
+        self._stop_requested.set()
+        self._request_submitted.set()
         self._answers.put("")
         self.exit()
 
@@ -137,30 +141,54 @@ class WorkflowChatApp(App[None]):
         if self._response is None or self._response.disabled:
             return
         self._answers.put(self._response.text.strip())
+        self._request_submitted.set()
         self._response.text = ""
         self._response.disabled = True
         self.query_one("#status", Static).update("Status: thinking...")
 
     def _run_workflow(self) -> None:
-        stdout = _TextualOutput(self, channel="stdout")
-        stderr = _TextualOutput(self, channel="stderr")
-        self.call_from_thread(self._set_status, "waiting on LLM response...")
-        try:
-            self._exit_code = run_workflow_chat(
-                self._config,
-                input_func=self._next_answer,
-                stdout=cast(TextIO, stdout),
-                stderr=cast(TextIO, stderr),
-                progress_callback=self._progress_update,
-            )
-        except Exception as exc:  # pragma: no cover - defensive UI boundary
-            self._failure_message = str(exc)
-            self.call_from_thread(self._set_failure, str(exc))
+        first_workflow = True
+        while not self._stop_requested.is_set():
+            if not first_workflow:
+                self._request_submitted.wait()
+                self._request_submitted.clear()
+                if self._stop_requested.is_set():
+                    return
+            stdout = _TextualOutput(self, channel="stdout")
+            stderr = _TextualOutput(self, channel="stderr")
+            self._failure_message = None
             self._exit_code = 1
-        self.call_from_thread(self._finish)
+            self._workflow_active = True
+            self.call_from_thread(
+                self._set_status,
+                "waiting for your request..."
+                if first_workflow
+                else "waiting on LLM response...",
+            )
+            try:
+                self._exit_code = run_workflow_chat(
+                    self._config,
+                    input_func=self._next_answer,
+                    stdout=cast(TextIO, stdout),
+                    stderr=cast(TextIO, stderr),
+                    progress_callback=self._progress_update,
+                )
+            except Exception as exc:  # pragma: no cover - defensive UI boundary
+                self._failure_message = str(exc)
+                self.call_from_thread(self._set_failure, str(exc))
+                self._exit_code = 1
+            self._workflow_active = False
+            if self._stop_requested.is_set():
+                return
+            self.call_from_thread(self._finish)
+            if self._exit_code != 0:
+                return
+            first_workflow = False
 
     def _next_answer(self) -> str:
-        return self._answers.get()
+        answer = self._answers.get()
+        self._request_submitted.clear()
+        return answer
 
     def _progress_update(
         self,
@@ -205,6 +233,8 @@ class WorkflowChatApp(App[None]):
         self.call_from_thread(self._show_prompt, prompt)
 
     def _show_prompt(self, prompt: str) -> None:
+        if not self._workflow_active:
+            return
         self.query_one("#message", Static).update(prompt)
         if self._response is not None:
             self._response.disabled = False
@@ -235,7 +265,12 @@ class WorkflowChatApp(App[None]):
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
         self.query_one("#status", Static).update(f"Status: {status}")
         if self._exit_code == 0:
-            self.exit()
+            self.query_one("#message", Static).update(
+                "Workflow complete. What would you like to do next?"
+            )
+            if self._response is not None:
+                self._response.disabled = False
+                self._response.focus()
         else:
             self.query_one("#message", Static).update(
                 "Workflow error: "
@@ -243,6 +278,8 @@ class WorkflowChatApp(App[None]):
             )
 
     def on_unmount(self) -> None:
+        self._stop_requested.set()
+        self._request_submitted.set()
         self._answers.put("")
 
 

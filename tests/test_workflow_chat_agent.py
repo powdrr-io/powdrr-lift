@@ -165,7 +165,7 @@ def test_textual_response_grows_and_submits_on_return(
     def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
         kwargs["stdout"].write("What do you want to do? ")
         received.append(kwargs["input_func"]())
-        return 0
+        return 0 if len(received) == 1 else 1
 
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_tui.run_workflow_chat",
@@ -176,7 +176,7 @@ def test_textual_response_grows_and_submits_on_return(
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         async with app.run_test() as pilot:
             await pilot.pause()
-            assert "waiting on LLM response" in str(
+            assert "waiting for your request" in str(
                 app.query_one("#status", Static).render()
             )
             response = app.query_one("#response", TextArea)
@@ -186,13 +186,22 @@ def test_textual_response_grows_and_submits_on_return(
             assert height_style is not None
             height = int(height_style.value)
             await pilot.press("enter")
-            await pilot.pause()
+            for _ in range(20):
+                await pilot.pause(0.05)
+                if received:
+                    break
+            assert "Workflow complete" in str(
+                app.query_one("#message", Static).render()
+            )
+            response.text = "follow-up request"
+            await pilot.press("enter")
+            await pilot.pause(0.1)
             return height
 
     height = asyncio.run(exercise())
 
     assert height >= 4
-    assert received == ["line one\nline two"]
+    assert received == ["line one\nline two", "follow-up request"]
 
 
 def test_textual_quit_unblocks_workflow_input() -> None:

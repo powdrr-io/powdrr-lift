@@ -212,6 +212,24 @@ def test_textual_quit_unblocks_workflow_input() -> None:
     assert app._answers.get_nowait() == ""
 
 
+def test_textual_message_expands_for_wrapped_follow_up() -> None:
+    async def exercise() -> tuple[int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            message = app.query_one("#message", Static)
+            app._set_message("line one\nline two\nline three\nline four")
+            await pilot.pause()
+            height = message.region.height
+            height_style = message.styles.height
+            assert height_style is not None
+            style_height = int(height_style.value)
+            return height, style_height
+
+    region_height, style_height = asyncio.run(exercise())
+    assert (region_height, style_height) == (6, 6)
+
+
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)

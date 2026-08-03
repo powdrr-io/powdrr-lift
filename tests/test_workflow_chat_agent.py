@@ -230,6 +230,20 @@ def test_textual_message_expands_for_wrapped_follow_up() -> None:
     assert (region_height, style_height) == (6, 6)
 
 
+def test_textual_input_marker_preserves_follow_up_question() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._set_message("Which requirements should this feature satisfy?")
+            app._show_prompt("> ")
+            await pilot.pause()
+            return str(app.query_one("#message", Static).render())
+
+    assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
+
+
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)

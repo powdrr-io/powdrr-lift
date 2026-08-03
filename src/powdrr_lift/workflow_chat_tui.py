@@ -239,7 +239,8 @@ class WorkflowChatApp(App[None]):
     def _show_prompt(self, prompt: str) -> None:
         if not self._workflow_active:
             return
-        self._update_message(prompt)
+        if prompt.strip() != ">":
+            self._update_message(prompt)
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()

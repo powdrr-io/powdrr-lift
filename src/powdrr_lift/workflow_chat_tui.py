@@ -38,7 +38,10 @@ class _TextualOutput:
             line, self._buffer = self._buffer.split("\n", 1)
             line = line.rstrip("\r")
             if self._channel == "stdout":
-                self._pending_stdout_lines = [line]
+                if line.startswith("Matched skill: "):
+                    self._app._output_line(self._channel, line)
+                else:
+                    self._pending_stdout_lines = [line]
             else:
                 self._app._output_line(self._channel, line)
         if self._buffer and self._channel == "stdout":
@@ -143,6 +146,7 @@ class WorkflowChatApp(App[None]):
         self._workflow_active = False
         self._message_history: list[str] = []
         self._current_status = "thinking..."
+        self._initial_prompt_visible = False
 
     def compose(self) -> ComposeResult:
         yield ListView(id="steps")
@@ -227,6 +231,9 @@ class WorkflowChatApp(App[None]):
         if self._response is None or self._response.disabled:
             return
         answer = self._response.text.strip()
+        if self._initial_prompt_visible:
+            self._message_history.clear()
+            self._initial_prompt_visible = False
         self._set_status("thinking...")
         self.query_one("#status", Label).refresh(repaint=True)
         self._response.text = ""
@@ -311,7 +318,7 @@ class WorkflowChatApp(App[None]):
                 item.add_class("completed")
             elif step_index == current_step_index:
                 item.add_class("current")
-        self.query_one("#status", Label).update(f"Status: {status}")
+        self._set_status(status)
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -325,9 +332,12 @@ class WorkflowChatApp(App[None]):
     def _show_prompt(self, prompt: str) -> None:
         if not self._workflow_active:
             return
-        if prompt.strip() != ">":
+        prompt = prompt.strip()
+        if prompt == "What do you want to do?":
+            self._initial_prompt_visible = True
+            self._set_status(prompt)
+        elif prompt != ">":
             self._set_message(prompt)
-            self._set_status(prompt.strip())
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -341,7 +351,7 @@ class WorkflowChatApp(App[None]):
                 )
             elif any(word in line.lower() for word in ("error", "failed", "stopping")):
                 self.call_from_thread(self._set_message, line)
-        elif line:
+        elif line.startswith("Matched skill: "):
             self.call_from_thread(self._set_message, line)
 
     def _set_status(self, status: str) -> None:
@@ -351,11 +361,11 @@ class WorkflowChatApp(App[None]):
     def _render_status(self) -> None:
         status_widget = self.query_one("#status", Label)
         if self._message_history:
-            content = "Status: " + "\n\n".join(self._message_history)
+            content = "\n\n".join(self._message_history)
             if self._message_history[-1] != self._current_status:
-                content += f"\n\nStatus: {self._current_status}"
+                content += f"\n\n{self._current_status}"
         else:
-            content = f"Status: {self._current_status}"
+            content = self._current_status
         status_widget.update(self._status_text(content))
         status_widget.refresh(repaint=True)
 

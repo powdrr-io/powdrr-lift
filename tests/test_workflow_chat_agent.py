@@ -182,7 +182,9 @@ def test_textual_response_grows_and_submits_on_return(
             response = app.query_one("#response", TextArea)
             response.text = "line one\nline two"
             await pilot.pause()
-            height = response.styles.height.value
+            height_style = response.styles.height
+            assert height_style is not None
+            height = int(height_style.value)
             await pilot.press("enter")
             await pilot.pause()
             return height

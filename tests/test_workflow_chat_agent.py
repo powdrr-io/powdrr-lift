@@ -203,6 +203,30 @@ def test_textual_response_grows_and_submits_on_return(
     assert received == ["line one\nline two", "follow-up request"]
 
 
+def test_textual_startup_shows_initial_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
+        kwargs["stdout"].write("What do you want to do? ")
+        kwargs["input_func"]()
+        return 1
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
+        fake_run_workflow_chat,
+    )
+
+    async def exercise() -> tuple[str, bool]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            message = app.query_one("#message", TextArea)
+            response = app.query_one("#response", TextArea)
+            return message.text, response.disabled
+
+    assert asyncio.run(exercise()) == ("What do you want to do? ", False)
+
+
 def test_textual_quit_unblocks_workflow_input() -> None:
     app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
 
@@ -280,6 +304,7 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
 
             def write_output() -> None:
                 output.write("Matched skill: internal-debug.yaml\n")
+                output.write("Internal skill-selection reason\n")
                 output.write("Which requirements should this feature satisfy?\n")
                 output.write("> ")
 
@@ -305,11 +330,28 @@ def test_textual_message_area_supports_copy() -> None:
             message = app.query_one("#message", TextArea)
             message.text = "copy this output"
             message.select_all()
-            message.action_copy()
+            message.focus()
+            app.action_copy_selection()
             await pilot.pause()
             return message.read_only, app.clipboard
 
     assert asyncio.run(exercise()) == (True, "copy this output")
+
+
+def test_textual_response_supports_cut_through_app_action() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "cut this response"
+            response.select_all()
+            response.focus()
+            app.action_cut_selection()
+            await pilot.pause()
+            return response.text, app.clipboard
+
+    assert asyncio.run(exercise()) == ("", "cut this response")
 
 
 def test_workflow_progress_lists_steps_and_updates_status() -> None:

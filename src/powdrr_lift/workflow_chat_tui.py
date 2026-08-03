@@ -74,7 +74,13 @@ class _WorkflowResponseTextArea(TextArea):
 
 
 class WorkflowChatApp(App[None]):
-    BINDINGS = [("ctrl+q", "quit_workflow", "Quit")]
+    BINDINGS = [
+        ("ctrl+q", "quit_workflow", "Quit"),
+        ("ctrl+c", "copy_selection", "Copy"),
+        ("super+c", "copy_selection", "Copy"),
+        ("ctrl+x", "cut_selection", "Cut"),
+        ("super+x", "cut_selection", "Cut"),
+    ]
 
     CSS = """
     Screen {
@@ -153,6 +159,23 @@ class WorkflowChatApp(App[None]):
         self._answers.put("")
         self.exit()
 
+    def action_copy_selection(self) -> None:
+        text_area = self._selected_text_area()
+        if text_area is not None:
+            text_area.action_copy()
+
+    def action_cut_selection(self) -> None:
+        text_area = self._selected_text_area()
+        if text_area is not None:
+            text_area.action_cut()
+
+    def _selected_text_area(self) -> TextArea | None:
+        candidates = [self.focused, self._response, self._message]
+        for candidate in candidates:
+            if isinstance(candidate, TextArea) and candidate.selected_text:
+                return candidate
+        return None
+
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         if event.text_area.id != "response":
             return
@@ -163,7 +186,7 @@ class WorkflowChatApp(App[None]):
         if self._response is None or self._response.disabled:
             return
         answer = self._response.text.strip()
-        self.query_one("#status", Static).update("Status: thinking...")
+        self._set_status("thinking...")
         self._response.text = ""
         self._response.disabled = True
         self.call_after_refresh(self._release_submitted_response, answer)
@@ -282,7 +305,9 @@ class WorkflowChatApp(App[None]):
             self.call_from_thread(self._set_message, line)
 
     def _set_status(self, status: str) -> None:
-        self.query_one("#status", Static).update(f"Status: {status}")
+        status_widget = self.query_one("#status", Static)
+        status_widget.update(f"Status: {status}")
+        status_widget.refresh(repaint=True)
 
     def _set_message(self, message: str) -> None:
         self._message_history.append(message)

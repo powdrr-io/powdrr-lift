@@ -101,6 +101,7 @@ class WorkflowChatApp(App[None]):
         layout: vertical;
     }
     #steps {
+        width: 100%;
         height: 1fr;
         border: round $warning;
         padding: 0 1;
@@ -114,11 +115,12 @@ class WorkflowChatApp(App[None]):
         content-align: left middle;
     }
     #response {
+        width: 100%;
         height: auto;
         min-height: 3;
         max-height: 30;
         border: round $primary;
-        margin: 0 1;
+        margin: 0;
     }
     .completed {
         color: $success;

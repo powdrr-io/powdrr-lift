@@ -18,7 +18,7 @@ from urllib.request import Request
 
 import pytest
 import yaml
-from textual.widgets import Static, TextArea
+from textual.widgets import ListView, Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -297,6 +297,21 @@ def test_textual_status_is_visible_and_not_collapsed() -> None:
     assert rendered.startswith("Status: ")
     assert height > 4
     assert width == 80
+
+
+def test_textual_panels_have_the_same_width() -> None:
+    async def exercise() -> tuple[int, int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            return (
+                app.query_one("#steps", ListView).region.width,
+                app.query_one("#status", Static).region.width,
+                app.query_one("#response", TextArea).region.width,
+            )
+
+    assert asyncio.run(exercise()) == (80, 80, 80)
 
 
 def test_textual_status_shows_latest_output() -> None:

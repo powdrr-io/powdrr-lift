@@ -24,6 +24,7 @@ class _TextualOutput:
         self._app = app
         self._channel = channel
         self._buffer = ""
+        self._pending_stdout_lines: list[str] = []
 
     def write(self, text: str) -> int:
         if not text:
@@ -31,9 +32,19 @@ class _TextualOutput:
         self._buffer += text
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
-            self._app._output_line(self._channel, line.rstrip("\r"))
+            line = line.rstrip("\r")
+            if self._channel == "stdout":
+                self._pending_stdout_lines = [line]
+            else:
+                self._app._output_line(self._channel, line)
         if self._buffer and self._channel == "stdout":
-            self._app._output_prompt(self._buffer)
+            prompt = self._buffer
+            if prompt.strip() == ">" and self._pending_stdout_lines:
+                self._app._output_question("\n".join(self._pending_stdout_lines))
+                self._pending_stdout_lines = []
+            elif prompt.strip() != ">":
+                self._pending_stdout_lines = []
+            self._app._output_prompt(prompt)
         return len(text)
 
     def flush(self) -> None:
@@ -108,6 +119,7 @@ class WorkflowChatApp(App[None]):
         self._exit_code = 1
         self._failure_message: str | None = None
         self._response: TextArea | None = None
+        self._message: TextArea | None = None
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
@@ -117,7 +129,11 @@ class WorkflowChatApp(App[None]):
         yield Header(show_clock=True)
         yield ListView(id="steps")
         yield Static("Status: waiting for your request...", id="status")
-        yield Static("Enter your request below.", id="message")
+        yield TextArea(
+            "Enter your request below.",
+            read_only=True,
+            id="message",
+        )
         yield _WorkflowResponseTextArea(
             placeholder="Press Return to submit; multiline text is supported",
             id="response",
@@ -127,6 +143,7 @@ class WorkflowChatApp(App[None]):
 
     def on_mount(self) -> None:
         self._response = self.query_one("#response", TextArea)
+        self._message = self.query_one("#message", TextArea)
         self._response.focus()
         Thread(target=self._run_workflow, daemon=True).start()
 
@@ -149,6 +166,11 @@ class WorkflowChatApp(App[None]):
         self.query_one("#status", Static).update("Status: thinking...")
         self._response.text = ""
         self._response.disabled = True
+        self.call_after_refresh(self._release_submitted_response, answer)
+
+    def _release_submitted_response(self, answer: str) -> None:
+        if self._stop_requested.is_set():
+            return
         self._answers.put(answer)
         self._request_submitted.set()
 
@@ -165,12 +187,8 @@ class WorkflowChatApp(App[None]):
             self._failure_message = None
             self._exit_code = 1
             self._workflow_active = True
-            self.call_from_thread(
-                self._set_status,
-                "waiting for your request..."
-                if first_workflow
-                else "waiting on LLM response...",
-            )
+            if first_workflow:
+                self.call_from_thread(self._set_status, "waiting for your request...")
             try:
                 self._exit_code = run_workflow_chat(
                     self._config,
@@ -238,11 +256,15 @@ class WorkflowChatApp(App[None]):
     def _output_prompt(self, prompt: str) -> None:
         self.call_from_thread(self._show_prompt, prompt)
 
+    def _output_question(self, question: str) -> None:
+        self.call_from_thread(self._show_prompt, question)
+
     def _show_prompt(self, prompt: str) -> None:
         if not self._workflow_active:
             return
         if prompt.strip() != ">":
             self._set_message(prompt)
+            self._set_status(prompt.strip())
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -267,9 +289,11 @@ class WorkflowChatApp(App[None]):
         self._update_message()
 
     def _update_message(self) -> None:
-        message_widget = self.query_one("#message", Static)
+        if self._message is None:
+            return
+        message_widget = self._message
         message = "\n".join(self._message_history)
-        message_widget.update(message)
+        message_widget.text = message
         available_width = message_widget.size.width - 4
         if available_width <= 0:
             available_width = 80
@@ -277,7 +301,7 @@ class WorkflowChatApp(App[None]):
             max(1, ceil(len(line) / available_width))
             for line in (message.splitlines() or [""])
         )
-        message_widget.styles.height = min(max(3, line_count + 2), 12)
+        message_widget.styles.height = min(max(3, line_count + 2), 20)
 
     def _set_failure(self, message: str) -> None:
         self.query_one("#status", Static).update(f"Status: failed — {message}")

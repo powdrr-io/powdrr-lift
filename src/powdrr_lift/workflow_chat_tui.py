@@ -8,6 +8,7 @@ from queue import Queue
 from threading import Event, Thread
 from typing import Any, TextIO, cast
 
+from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.events import Key
@@ -73,6 +74,16 @@ class _WorkflowResponseTextArea(TextArea):
             event.prevent_default()
             self._submit_callback()
             return
+        if event.key in {"ctrl+c", "super+c"}:
+            event.stop()
+            event.prevent_default()
+            cast(WorkflowChatApp, self.app).action_copy_selection()
+            return
+        if event.key in {"ctrl+x", "super+x"}:
+            event.stop()
+            event.prevent_default()
+            cast(WorkflowChatApp, self.app).action_cut_selection()
+            return
         await super()._on_key(event)
 
 
@@ -95,6 +106,7 @@ class WorkflowChatApp(App[None]):
         padding: 0 1;
     }
     #status {
+        width: 100%;
         height: auto;
         min-height: 4;
         border: round $success;
@@ -127,10 +139,12 @@ class WorkflowChatApp(App[None]):
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
+        self._message_history: list[str] = []
+        self._current_status = "thinking..."
 
     def compose(self) -> ComposeResult:
         yield ListView(id="steps")
-        yield Label("Status: thinking...", id="status")
+        yield Label(self._status_text("thinking..."), markup=False, id="status")
         yield _WorkflowResponseTextArea(
             placeholder="Press Return to submit; multiline text is supported",
             id="response",
@@ -329,19 +343,39 @@ class WorkflowChatApp(App[None]):
             self.call_from_thread(self._set_message, line)
 
     def _set_status(self, status: str) -> None:
+        self._current_status = status.strip()
+        self._render_status()
+
+    def _render_status(self) -> None:
         status_widget = self.query_one("#status", Label)
-        status_widget.update(f"Status: {status}")
+        if self._message_history:
+            content = "Status: " + "\n\n".join(self._message_history)
+            if self._message_history[-1] != self._current_status:
+                content += f"\n\nStatus: {self._current_status}"
+        else:
+            content = f"Status: {self._current_status}"
+        status_widget.update(self._status_text(content))
         status_widget.refresh(repaint=True)
 
+    @staticmethod
+    def _status_text(content: str) -> Text:
+        return Text(content, no_wrap=False, overflow="fold")
+
     def _set_message(self, message: str) -> None:
-        self._set_status(message.strip())
+        message = message.strip()
+        if not message:
+            return
+        if not self._message_history or self._message_history[-1] != message:
+            self._message_history.append(message)
+        self._current_status = message
+        self._render_status()
 
     def _set_failure(self, message: str) -> None:
-        self.query_one("#status", Label).update(f"Status: failed — {message}")
+        self._set_status(f"failed — {message}")
 
     def _finish(self) -> None:
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
-        self.query_one("#status", Label).update(f"Status: {status}")
+        self._set_status(status)
         if self._exit_code == 0:
             self._set_message("Workflow complete. What would you like to do next?")
             if self._response is not None:

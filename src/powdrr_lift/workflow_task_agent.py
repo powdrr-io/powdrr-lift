@@ -16,9 +16,12 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
+    LocalLlamaChatClient,
     _execute_shell_tool,
+    _print_waiting_for_model,
     _resolve_credentials,
-    _resolve_llm_model,
+    _resolve_llm_mapping,
+    _resolve_local_model_path,
 )
 
 
@@ -60,11 +63,20 @@ def run_workflow_task(
         return 1
     task = workflow.claim_task(task.task_id)
     print(f"Claimed workflow task: {task.task_id}", file=stdout)
+    mapping = _resolve_llm_mapping(
+        task.llm_type,
+        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
+        provider="zai",
+    )
+    if mapping is None:
+        raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
+    model = mapping.model
     if client is None:
         client = _build_zai_client(config, task)
 
     events: list[dict[str, Any]] = []
     for _roundtrip in range(max(1, config.max_roundtrips)):
+        _print_waiting_for_model(stderr, model)
         response = client.complete_json(_build_task_messages(workflow, task, events))
         action = _parse_task_action(response)
         if action.kind == "invoke_tool":
@@ -305,12 +317,20 @@ def _build_zai_client(
 ) -> WorkflowTaskChatClient:
     from powdrr_lift.workflow_chat_agent import OpenAIChatClient
 
-    model = _resolve_llm_model(
+    mapping = _resolve_llm_mapping(
         task.llm_type,
-        fallback_model="glm-5.2",
         mappings=tuple(ZAI_LLM_MAPPINGS.items()),
         provider="zai",
     )
+    if mapping is None:
+        raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
+    model = mapping.model
+    if mapping.provider == "local":
+        return LocalLlamaChatClient(
+            model_path=_resolve_local_model_path(
+                config.repo_root / ".powdrr" / "models"
+            )
+        )
     credentials = _resolve_credentials("zai", config.api_key, config.base_url)
     return OpenAIChatClient(
         model=model,

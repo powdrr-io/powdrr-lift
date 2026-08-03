@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from math import ceil
 from queue import Queue
 from threading import Event, Thread
 from typing import Any, TextIO, cast
@@ -79,7 +80,10 @@ class WorkflowChatApp(App[None]):
         padding: 1;
     }
     #message {
-        height: 3;
+        height: auto;
+        min-height: 3;
+        max-height: 12;
+        overflow-y: auto;
         padding: 1;
     }
     #response {
@@ -235,7 +239,8 @@ class WorkflowChatApp(App[None]):
     def _show_prompt(self, prompt: str) -> None:
         if not self._workflow_active:
             return
-        self.query_one("#message", Static).update(prompt)
+        if prompt.strip() != ">":
+            self._update_message(prompt)
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -256,7 +261,19 @@ class WorkflowChatApp(App[None]):
         self.query_one("#status", Static).update(f"Status: {status}")
 
     def _set_message(self, message: str) -> None:
-        self.query_one("#message", Static).update(message)
+        self._update_message(message)
+
+    def _update_message(self, message: str) -> None:
+        message_widget = self.query_one("#message", Static)
+        message_widget.update(message)
+        available_width = message_widget.size.width - 4
+        if available_width <= 0:
+            available_width = 80
+        line_count = sum(
+            max(1, ceil(len(line) / available_width))
+            for line in (message.splitlines() or [""])
+        )
+        message_widget.styles.height = min(max(3, line_count + 2), 12)
 
     def _set_failure(self, message: str) -> None:
         self.query_one("#status", Static).update(f"Status: failed — {message}")
@@ -265,14 +282,12 @@ class WorkflowChatApp(App[None]):
         status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
         self.query_one("#status", Static).update(f"Status: {status}")
         if self._exit_code == 0:
-            self.query_one("#message", Static).update(
-                "Workflow complete. What would you like to do next?"
-            )
+            self._update_message("Workflow complete. What would you like to do next?")
             if self._response is not None:
                 self._response.disabled = False
                 self._response.focus()
         else:
-            self.query_one("#message", Static).update(
+            self._update_message(
                 "Workflow error: "
                 f"{self._failure_message or 'unknown error'}. Press Ctrl+C to exit."
             )

@@ -303,7 +303,7 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
             output = _TextualOutput(app, channel="stdout")
 
             def write_output() -> None:
-                output.write("Matched skill: internal-debug.yaml\n")
+                output.write("Matched skill: internal-debug\n")
                 output.write("Internal skill-selection reason\n")
                 output.write("Which requirements should this feature satisfy?\n")
                 output.write("> ")
@@ -3130,6 +3130,73 @@ def test_run_workflow_chat_verbose_prints_progress(
     assert "test-key" not in stderr_value
     assert "[verbose] Prepared execution summary for specify-a-feature" in stderr_value
     assert (worktree_root / output_dir / "skill-execution.json").exists()
+
+
+def test_run_workflow_chat_prints_selection_follow_up_question(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "follow-up-skill.yaml")
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
+                "selected_skill_reason": "Internal reason not shown to users.",
+                "next_question": "Which requirements should this feature satisfy?",
+                "ready_to_execute": False,
+            },
+            {
+                "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
+                "selected_skill_reason": "Internal reason not shown to users.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {"kind": "complete", "text": "Skill execution complete."},
+        ]
+    )
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            return next(responses)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    answers = iter(["Build exports", "Requirement details"])
+    stdout = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=tmp_path / "generated",
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=lambda: next(answers),
+        stdout=stdout,
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert "Which requirements should this feature satisfy?" in stdout.getvalue()
+    assert "Internal reason not shown to users." not in stdout.getvalue()
+    assert str(skills_dir) not in stdout.getvalue()
 
 
 def test_run_workflow_chat_uses_anthropic_provider(

@@ -716,8 +716,7 @@ def run_workflow_chat(
                 mapping=selection_mapping,
             )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
-        print(f"Matched skill: {selected_skill.path}", file=stdout)
-        print(selection.selected_skill_reason, file=stdout)
+        print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
         if selection.ready_to_execute and selection.next_question is None:
             break
 

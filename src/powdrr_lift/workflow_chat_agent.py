@@ -698,10 +698,14 @@ def run_workflow_chat(
             ),
         )
         selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
-        selection_mapping = _resolve_llm_mapping(
-            selection.llm_type,
-            mappings=config.llm_mappings,
-            provider=provider,
+        selection_mapping = (
+            _resolve_llm_mapping(
+                selection.llm_type,
+                mappings=config.llm_mappings,
+                provider=provider,
+            )
+            if provider in {"zai", "deepinfra", "local"}
+            else None
         )
         if selection_mapping is not None:
             current_model = selection_mapping.model
@@ -757,10 +761,14 @@ def run_workflow_chat(
     while execution_state.step_index < len(selected_skill.skill.steps):
         current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
-        step_mapping = _resolve_llm_mapping(
-            current_step.llm_type or selection.llm_type,
-            mappings=config.llm_mappings,
-            provider=provider,
+        step_mapping = (
+            _resolve_llm_mapping(
+                current_step.llm_type or selection.llm_type,
+                mappings=config.llm_mappings,
+                provider=provider,
+            )
+            if provider in {"zai", "deepinfra", "local"}
+            else None
         )
         if step_mapping is None:
             if provider in {"zai", "deepinfra", "local"} and (
@@ -825,10 +833,14 @@ def run_workflow_chat(
         if action is None:
             return 1
         if action.llm_type is not None:
-            action_mapping = _resolve_llm_mapping(
-                action.llm_type,
-                mappings=config.llm_mappings,
-                provider=provider,
+            action_mapping = (
+                _resolve_llm_mapping(
+                    action.llm_type,
+                    mappings=config.llm_mappings,
+                    provider=provider,
+                )
+                if provider in {"zai", "deepinfra", "local"}
+                else None
             )
             assert action_mapping is not None
             current_model = action_mapping.model
@@ -2234,7 +2246,7 @@ def _resolve_llm_mapping(
     if llm_type is None:
         return None
     if provider not in {"zai", "deepinfra", "local"}:
-        return None
+        raise RuntimeError(f"LLM mappings are not supported for provider {provider!r}.")
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(
         ZAI_LLM_MAPPINGS if provider in {"zai", "local"} else DEEPINFRA_LLM_MAPPINGS

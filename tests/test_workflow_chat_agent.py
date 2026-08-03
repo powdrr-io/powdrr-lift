@@ -200,6 +200,15 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
     assert backup_mapping.model == "glm-4.7"
 
 
+def test_llm_mapping_rejects_unsupported_provider() -> None:
+    with pytest.raises(RuntimeError, match="not supported for provider 'openai'"):
+        _resolve_llm_mapping(
+            "simple_task",
+            mappings=(),
+            provider="openai",
+        )
+
+
 def test_local_model_path_downloads_q5_k_m_shards_automatically(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

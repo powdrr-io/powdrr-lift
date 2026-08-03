@@ -191,7 +191,7 @@ def test_textual_response_grows_and_submits_on_return(
                 await pilot.pause(0.05)
                 if received:
                     break
-            assert "Workflow complete" in app.query_one("#message", TextArea).text
+            assert "Workflow complete" in str(app.query_one("#status", Static).render())
             response.text = "follow-up request"
             await pilot.press("enter")
             await pilot.pause(0.1)
@@ -201,6 +201,24 @@ def test_textual_response_grows_and_submits_on_return(
 
     assert height >= 4
     assert received == ["line one\nline two", "follow-up request"]
+
+
+def test_textual_response_grows_for_wrapped_text() -> None:
+    async def exercise() -> tuple[int, float]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "x" * 200
+            await pilot.pause()
+            height_style = response.styles.height
+            assert height_style is not None
+            height = int(height_style.value)
+            return height, response.scroll_y
+
+    height, scroll_y = asyncio.run(exercise())
+    assert height > 3
+    assert scroll_y == 0
 
 
 def test_textual_startup_shows_initial_question(
@@ -220,11 +238,10 @@ def test_textual_startup_shows_initial_question(
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         async with app.run_test() as pilot:
             await pilot.pause()
-            message = app.query_one("#message", TextArea)
             response = app.query_one("#response", TextArea)
-            return message.text, response.disabled
+            return str(app.query_one("#status", Static).render()), response.disabled
 
-    assert asyncio.run(exercise()) == ("What do you want to do?", False)
+    assert asyncio.run(exercise()) == ("Status: What do you want to do?", False)
 
 
 def test_textual_quit_unblocks_workflow_input() -> None:
@@ -233,24 +250,6 @@ def test_textual_quit_unblocks_workflow_input() -> None:
     app.action_quit_workflow()
 
     assert app._answers.get_nowait() == ""
-
-
-def test_textual_message_expands_for_wrapped_follow_up() -> None:
-    async def exercise() -> tuple[int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            message = app.query_one("#message", TextArea)
-            app._set_message("line one\nline two\nline three\nline four")
-            await pilot.pause()
-            height = message.region.height
-            height_style = message.styles.height
-            assert height_style is not None
-            style_height = int(height_style.value)
-            return height, style_height
-
-    region_height, style_height = asyncio.run(exercise())
-    assert (region_height, style_height) == (6, 6)
 
 
 def test_textual_input_marker_preserves_follow_up_question() -> None:
@@ -262,9 +261,11 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
             app._set_message("Which requirements should this feature satisfy?")
             app._show_prompt("> ")
             await pilot.pause()
-            return app.query_one("#message", TextArea).text
+            return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
+    assert asyncio.run(exercise()) == (
+        "Status: Which requirements should this feature satisfy?"
+    )
 
 
 def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
@@ -281,7 +282,21 @@ def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
     assert asyncio.run(exercise()) == "Status: thinking..."
 
 
-def test_textual_message_history_keeps_multiple_outputs_visible() -> None:
+def test_textual_status_is_visible_and_not_collapsed() -> None:
+    async def exercise() -> tuple[str, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            status = app.query_one("#status", Static)
+            await pilot.pause()
+            return str(status.render()), status.region.height
+
+    rendered, height = asyncio.run(exercise())
+    assert rendered.startswith("Status: ")
+    assert height >= 3
+
+
+def test_textual_status_shows_latest_output() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
@@ -289,9 +304,9 @@ def test_textual_message_history_keeps_multiple_outputs_visible() -> None:
             for message in ("first", "second", "third", "fourth"):
                 app._set_message(message)
             await pilot.pause()
-            return app.query_one("#message", TextArea).text
+            return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "first\nsecond\nthird\nfourth"
+    assert asyncio.run(exercise()) == "Status: fourth"
 
 
 def test_textual_output_hides_debug_and_promotes_question() -> None:
@@ -312,30 +327,29 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
             writer.start()
             await pilot.pause()
             writer.join()
-            message = app.query_one("#message", TextArea)
             status = app.query_one("#status", Static)
-            return message.text, str(status.render())
+            return str(status.render()), str(status.render())
 
     assert asyncio.run(exercise()) == (
-        "Which requirements should this feature satisfy?",
+        "Status: Which requirements should this feature satisfy?",
         "Status: Which requirements should this feature satisfy?",
     )
 
 
-def test_textual_message_area_supports_copy() -> None:
+def test_textual_response_supports_copy() -> None:
     async def exercise() -> tuple[bool, str]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         async with app.run_test() as pilot:
-            message = app.query_one("#message", TextArea)
-            message.text = "copy this output"
-            message.select_all()
-            message.focus()
+            response = app.query_one("#response", TextArea)
+            response.text = "copy this output"
+            response.select_all()
+            response.focus()
             app.action_copy_selection()
             await pilot.pause()
-            return message.read_only, app.clipboard
+            return response.read_only, app.clipboard
 
-    assert asyncio.run(exercise()) == (True, "copy this output")
+    assert asyncio.run(exercise()) == (False, "copy this output")
 
 
 def test_textual_response_supports_cut_through_app_action() -> None:

@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import types
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -52,6 +53,7 @@ from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     LLMModelLimits,
     LLMModelMapping,
+    LocalLlamaChatClient,
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
@@ -81,6 +83,43 @@ from powdrr_lift.workflow_chat_agent import (
 from powdrr_lift.workflow_chat_tui import WorkflowChatApp, _TextualOutput
 
 # ruff: noqa: E501
+
+
+def test_local_llama_client_errors_without_gpu_offload_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+    model_path.touch()
+    llama_module = types.SimpleNamespace(
+        Llama=lambda **_: pytest.fail("Llama must not load without GPU support"),
+        llama_supports_gpu_offload=lambda: False,
+    )
+    monkeypatch.setitem(sys.modules, "llama_cpp", llama_module)
+
+    with pytest.raises(RuntimeError, match="requires GPU offload support"):
+        LocalLlamaChatClient(model_path=model_path)
+
+
+def test_local_llama_client_requests_full_gpu_offload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+    model_path.touch()
+    captured: dict[str, object] = {}
+
+    class FakeLlama:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    llama_module = types.SimpleNamespace(
+        Llama=FakeLlama,
+        llama_supports_gpu_offload=lambda: True,
+    )
+    monkeypatch.setitem(sys.modules, "llama_cpp", llama_module)
+
+    LocalLlamaChatClient(model_path=model_path)
+
+    assert captured["n_gpu_layers"] == -1
 
 
 def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:

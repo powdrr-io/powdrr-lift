@@ -53,6 +53,8 @@ _MAX_COMPLETION_TOKENS = 32768
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
+_DEFAULT_LOCAL_MODEL_CONTEXT = 24576
+_LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 
@@ -344,7 +346,12 @@ class OpenAIChatClient:
 
 
 class LocalLlamaChatClient:
-    def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
+    def __init__(
+        self,
+        *,
+        model_path: Path,
+        n_ctx: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
+    ) -> None:
         try:
             from llama_cpp import (  # type: ignore[import-not-found]
                 Llama,
@@ -2975,7 +2982,10 @@ def _build_chat_client(
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
-        return LocalLlamaChatClient(model_path=resolved_model_path)
+        return LocalLlamaChatClient(
+            model_path=resolved_model_path,
+            n_ctx=_resolve_local_model_context(),
+        )
     limits = _model_limits_for(credentials.provider, model)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
@@ -3157,6 +3167,25 @@ def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
     match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
     expected_shards = int(match.group(1)) if match else 1
     return len(model_paths) >= expected_shards
+
+
+def _resolve_local_model_context() -> int:
+    configured_context = os.environ.get(_LOCAL_MODEL_CONTEXT_ENV)
+    if configured_context is None or not configured_context.strip():
+        return _DEFAULT_LOCAL_MODEL_CONTEXT
+    try:
+        context = int(configured_context)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        ) from exc
+    if context <= 0:
+        raise RuntimeError(
+            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        )
+    return context
 
 
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:

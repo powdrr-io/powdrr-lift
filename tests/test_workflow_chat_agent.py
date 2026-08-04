@@ -72,6 +72,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_base_url,
     _resolve_llm_mapping,
     _resolve_llm_model,
+    _resolve_local_model_context,
     _resolve_local_model_path,
     _resolve_provider,
     _resolve_skill_path,
@@ -123,6 +124,22 @@ def test_local_llama_client_requests_full_gpu_offload(
     LocalLlamaChatClient(model_path=model_path)
 
     assert captured["n_gpu_layers"] == -1
+    assert captured["n_ctx"] == 24576
+
+
+def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
+
+    assert _resolve_local_model_context() == 8192
+
+
+def test_local_model_context_rejects_invalid_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "not-a-number")
+
+    with pytest.raises(RuntimeError, match="POWDRR_LOCAL_MODEL_CONTEXT"):
+        _resolve_local_model_context()
 
 
 def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:

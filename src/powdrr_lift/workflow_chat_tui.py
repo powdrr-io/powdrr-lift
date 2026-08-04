@@ -39,9 +39,12 @@ class _TextualOutput:
             line = line.rstrip("\r")
             if self._channel == "stdout":
                 if line.startswith("Matched skill: "):
+                    self._pending_stdout_lines = []
                     self._app._output_line(self._channel, line)
+                elif line.startswith("Internal skill-selection"):
+                    continue
                 else:
-                    self._pending_stdout_lines = [line]
+                    self._pending_stdout_lines.append(line)
             else:
                 self._app._output_line(self._channel, line)
         if self._buffer and self._channel == "stdout":
@@ -205,6 +208,15 @@ class WorkflowChatApp(App[None]):
         text_area = self._selected_text_area()
         if text_area is not None:
             text_area.action_cut()
+
+    async def on_key(self, event: Key) -> None:
+        if event.key in {"ctrl+c", "super+c", "ctrl+x", "super+x"}:
+            event.stop()
+            event.prevent_default()
+            if event.key in {"ctrl+c", "super+c"}:
+                self.action_copy_selection()
+            else:
+                self.action_cut_selection()
 
     def _selected_text_area(self) -> TextArea | None:
         candidates = [self.focused, self._response]
@@ -377,6 +389,10 @@ class WorkflowChatApp(App[None]):
         message = message.strip()
         if not message:
             return
+        if self._message_history and self._message_history[0] == (
+            "What do you want to do?"
+        ):
+            self._message_history.clear()
         if not self._message_history or self._message_history[-1] != message:
             self._message_history.append(message)
         self._current_status = message

@@ -390,6 +390,36 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
     )
 
 
+def test_textual_output_keeps_multiline_question_complete() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualOutput(app, channel="stdout")
+            writer = Thread(
+                target=output.write,
+                args=(
+                    "Matched skill: specify-a-feature\n"
+                    "1. What is the feature goal?\n"
+                    "2. Which requirements matter?\n"
+                    "Please answer whichever of these you can.\n"
+                    "> ",
+                ),
+            )
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "Matched skill: specify-a-feature\n\n"
+        "1. What is the feature goal?\n"
+        "2. Which requirements matter?\n"
+        "Please answer whichever of these you can."
+    )
+
+
 def test_textual_response_supports_copy() -> None:
     async def exercise() -> tuple[bool, str]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
@@ -416,6 +446,22 @@ def test_textual_response_supports_cut_through_app_action() -> None:
             response.select_all()
             response.focus()
             app.action_cut_selection()
+            await pilot.pause()
+            return response.text, app.clipboard
+
+    assert asyncio.run(exercise()) == ("", "cut this response")
+
+
+def test_textual_response_supports_cut_key_without_beeping() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "cut this response"
+            response.select_all()
+            response.focus()
+            await pilot.press("ctrl+x")
             await pilot.pause()
             return response.text, app.clipboard
 

@@ -396,21 +396,21 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
         app._workflow_active = True
         async with app.run_test() as pilot:
             output = _TextualOutput(app, channel="stdout")
-            writer = Thread(
-                target=lambda: (
-                    output.write("What do you want to do? "),
-                    output.write("Matched skill: specify-a-feature\n"),
-                    output.write(
-                        "1. What is the feature goal?\n"
-                        "2. Which requirements matter?\n"
-                        "Please answer whichever of these you can.\n"
-                    ),
-                    output.write("> "),
-                    output.write("Matched skill: next-skill\n"),
-                    output.write("Next question?\n"),
-                    output.write("> "),
-                ),
-            )
+
+            def write_output() -> None:
+                output.write("What do you want to do? ")
+                output.write("Matched skill: specify-a-feature\n")
+                output.write(
+                    "1. What is the feature goal?\n"
+                    "2. Which requirements matter?\n"
+                    "Please answer whichever of these you can.\n"
+                )
+                output.flush()
+                output.write("Matched skill: next-skill\n")
+                output.write("Next question?\n")
+                output.flush()
+
+            writer = Thread(target=write_output)
             writer.start()
             await pilot.pause()
             writer.join()
@@ -424,6 +424,42 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
         "Matched skill: next-skill\n\n"
         "Next question?"
     )
+
+
+def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualOutput(app, channel="stdout")
+
+            def write_initial_prompt() -> None:
+                output.write("What do you want to do? ")
+
+            writer = Thread(target=write_initial_prompt)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            response = app.query_one("#response", TextArea)
+            response.text = "Specify the feature"
+            app._submit_response()
+
+            def write_matched_skill() -> None:
+                output.write("Matched skill: specify-a-feature\n")
+                output.flush()
+
+            writer = Thread(target=write_matched_skill)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert rendered == "Matched skill: specify-a-feature"
+    assert "What do you want to do?" not in rendered
+    assert "thinking..." not in rendered
 
 
 def test_textual_response_supports_copy() -> None:

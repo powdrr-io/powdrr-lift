@@ -70,7 +70,8 @@ class _TextualOutput:
         return len(text)
 
     def flush(self) -> None:
-        return
+        if self._channel == "stdout":
+            self._flush_pending_stdout(question=True)
 
     def isatty(self) -> bool:
         return False

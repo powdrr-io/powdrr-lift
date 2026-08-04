@@ -346,7 +346,10 @@ class OpenAIChatClient:
 class LocalLlamaChatClient:
     def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
         try:
-            from llama_cpp import Llama  # type: ignore[import-not-found]
+            from llama_cpp import (  # type: ignore[import-not-found]
+                Llama,
+                llama_supports_gpu_offload,
+            )
         except ImportError as exc:
             raise RuntimeError(
                 "Local provider requires llama-cpp-python. Install the local "
@@ -359,6 +362,12 @@ class LocalLlamaChatClient:
             raise RuntimeError(
                 "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
                 "model filename containing 'q5_k_m'."
+            )
+        if not llama_supports_gpu_offload():
+            raise RuntimeError(
+                "Local model execution requires GPU offload support, but the "
+                "installed llama-cpp-python build cannot use a GPU. Reinstall "
+                "the local extra with Metal or CUDA support."
             )
         self._llama: Any = Llama(
             model_path=str(model_path),

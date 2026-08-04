@@ -29,32 +29,42 @@ class _TextualOutput:
         self._channel = channel
         self._buffer = ""
         self._pending_stdout_lines: list[str] = []
+        self._initial_prompt_pending = channel == "stdout"
+
+    def _flush_pending_stdout(self, *, question: bool) -> None:
+        if not self._pending_stdout_lines:
+            return
+        presentation = "\n".join(self._pending_stdout_lines)
+        self._pending_stdout_lines = []
+        if question:
+            self._app._output_question(presentation)
+        else:
+            self._app._output_line("stdout", presentation)
 
     def write(self, text: str) -> int:
         if not text:
             return 0
+        if self._channel == "stdout" and not self._buffer:
+            if text.strip() == ">":
+                self._flush_pending_stdout(question=True)
+            elif self._pending_stdout_lines:
+                self._flush_pending_stdout(question=False)
         self._buffer += text
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
             line = line.rstrip("\r")
             if self._channel == "stdout":
-                if line.startswith("Matched skill: "):
-                    self._pending_stdout_lines = []
-                    self._app._output_line(self._channel, line)
-                elif line.startswith("Internal skill-selection"):
-                    continue
-                else:
-                    self._pending_stdout_lines.append(line)
+                self._pending_stdout_lines.append(line)
             else:
                 self._app._output_line(self._channel, line)
         if self._buffer and self._channel == "stdout":
             prompt = self._buffer
-            if prompt.strip() == ">" and self._pending_stdout_lines:
-                self._app._output_question("\n".join(self._pending_stdout_lines))
-                self._pending_stdout_lines = []
-            elif prompt.strip() != ">":
-                self._pending_stdout_lines = []
-            self._app._output_prompt(prompt)
+            if prompt.strip() == ">":
+                self._flush_pending_stdout(question=True)
+                self._app._output_prompt(prompt)
+            elif self._initial_prompt_pending:
+                self._initial_prompt_pending = False
+                self._app._output_initial_prompt(prompt)
         return len(text)
 
     def flush(self) -> None:
@@ -338,6 +348,9 @@ class WorkflowChatApp(App[None]):
     def _output_prompt(self, prompt: str) -> None:
         self.call_from_thread(self._show_prompt, prompt)
 
+    def _output_initial_prompt(self, prompt: str) -> None:
+        self.call_from_thread(self._show_initial_prompt, prompt)
+
     def _output_question(self, question: str) -> None:
         self.call_from_thread(self._show_prompt, question)
 
@@ -345,11 +358,17 @@ class WorkflowChatApp(App[None]):
         if not self._workflow_active:
             return
         prompt = prompt.strip()
-        if prompt == "What do you want to do?":
-            self._initial_prompt_visible = True
-            self._set_status(prompt)
-        elif prompt != ">":
+        if prompt != ">":
             self._set_message(prompt)
+        if self._response is not None:
+            self._response.disabled = False
+            self._response.focus()
+
+    def _show_initial_prompt(self, prompt: str) -> None:
+        if not self._workflow_active:
+            return
+        self._initial_prompt_visible = True
+        self._set_status(prompt.strip())
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -363,7 +382,7 @@ class WorkflowChatApp(App[None]):
                 )
             elif any(word in line.lower() for word in ("error", "failed", "stopping")):
                 self.call_from_thread(self._set_message, line)
-        elif line.startswith("Matched skill: "):
+        elif channel == "stdout":
             self.call_from_thread(self._set_message, line)
 
     def _set_status(self, status: str) -> None:
@@ -389,10 +408,6 @@ class WorkflowChatApp(App[None]):
         message = message.strip()
         if not message:
             return
-        if self._message_history and self._message_history[0] == (
-            "What do you want to do?"
-        ):
-            self._message_history.clear()
         if not self._message_history or self._message_history[-1] != message:
             self._message_history.append(message)
         self._current_status = message

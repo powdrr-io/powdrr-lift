@@ -286,7 +286,7 @@ def test_textual_submit_removes_initial_prompt_from_status() -> None:
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
-            app._show_prompt("What do you want to do?")
+            app._show_initial_prompt("What do you want to do?")
             response = app.query_one("#response", TextArea)
             response.text = "Build the feature"
             app._submit_response()
@@ -373,7 +373,6 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
 
             def write_output() -> None:
                 output.write("Matched skill: internal-debug\n")
-                output.write("Internal skill-selection reason\n")
                 output.write("Which requirements should this feature satisfy?\n")
                 output.write("> ")
 
@@ -398,13 +397,14 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
         async with app.run_test() as pilot:
             output = _TextualOutput(app, channel="stdout")
             writer = Thread(
-                target=output.write,
-                args=(
-                    "Matched skill: specify-a-feature\n"
-                    "1. What is the feature goal?\n"
-                    "2. Which requirements matter?\n"
-                    "Please answer whichever of these you can.\n"
-                    "> ",
+                target=lambda: (
+                    output.write("Matched skill: specify-a-feature\n"),
+                    output.write(
+                        "1. What is the feature goal?\n"
+                        "2. Which requirements matter?\n"
+                        "Please answer whichever of these you can.\n"
+                    ),
+                    output.write("> "),
                 ),
             )
             writer.start()

@@ -157,6 +157,9 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
   them afterward. The local runtime is optional; on Apple Silicon, install it
   with Metal enabled:
   `CMAKE_ARGS="-DGGML_METAL=on" uv sync --extra local`.
+  The local client defaults to a 24,576-token context for reliable GPU
+  execution on Apple Silicon. Set `POWDRR_LOCAL_MODEL_CONTEXT` to adjust it
+  for a machine with more or less available memory.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
 - Workflow skill steps and every routing/action response carry an `llm_type`
   descriptor. The default mapping routes `high_reasoning` to `glm-5.2`,

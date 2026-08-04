@@ -53,6 +53,8 @@ _MAX_COMPLETION_TOKENS = 32768
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
+_DEFAULT_LOCAL_MODEL_CONTEXT = 24576
+_LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 
@@ -344,7 +346,12 @@ class OpenAIChatClient:
 
 
 class LocalLlamaChatClient:
-    def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
+    def __init__(
+        self,
+        *,
+        model_path: Path,
+        n_ctx: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
+    ) -> None:
         try:
             from llama_cpp import (  # type: ignore[import-not-found]
                 Llama,
@@ -369,20 +376,35 @@ class LocalLlamaChatClient:
                 "installed llama-cpp-python build cannot use a GPU. Reinstall "
                 "the local extra with Metal or CUDA support."
             )
-        self._llama: Any = Llama(
-            model_path=str(model_path),
-            n_ctx=n_ctx,
-            n_gpu_layers=-1,
-            verbose=False,
-        )
+        try:
+            self._llama: Any = Llama(
+                model_path=str(model_path),
+                n_ctx=n_ctx,
+                n_gpu_layers=-1,
+                verbose=False,
+            )
+        except Exception as exc:
+            raise LocalModelRuntimeError(
+                "Local Qwen GPU model failed to initialize. The model was "
+                "required to offload all layers to the GPU; no CPU fallback "
+                f"is allowed. Model={model_path}, context={n_ctx}. "
+                f"Underlying error: {exc}"
+            ) from exc
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-        response = self._llama.create_chat_completion(
-            messages=messages,
-            temperature=0,
-            max_tokens=_MAX_COMPLETION_TOKENS,
-            response_format={"type": "json_object"},
-        )
+        try:
+            response = self._llama.create_chat_completion(
+                messages=messages,
+                temperature=0,
+                max_tokens=_MAX_COMPLETION_TOKENS,
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:
+            raise LocalModelRuntimeError(
+                "Local Qwen GPU inference failed. The workflow cannot continue "
+                "with a CPU fallback. Check Metal/CUDA availability, GPU memory, "
+                f"and POWDRR_LOCAL_MODEL_CONTEXT. Underlying error: {exc}"
+            ) from exc
         choices = response.get("choices")
         if not isinstance(choices, list) or not choices:
             raise RuntimeError("Local LLM response did not include any choices.")
@@ -548,6 +570,10 @@ class WorkflowChatClient(Protocol):
 
 class _ModelUnavailableError(RuntimeError):
     pass
+
+
+class LocalModelRuntimeError(RuntimeError):
+    """Raised when the required local GPU model cannot run."""
 
 
 class _WorkflowProgressDisplay:
@@ -2372,6 +2398,8 @@ def _complete_json_with_repair(
                 payload,
             )
         except RuntimeError as exc:
+            if isinstance(exc, LocalModelRuntimeError):
+                raise
             if _is_model_unavailable_error(exc):
                 raise _ModelUnavailableError(
                     f"provider reported that model {model!r} is unavailable"
@@ -2762,6 +2790,8 @@ def _attempt_json_repair(
             )
             return repaired_payload
         except RuntimeError as exc:
+            if isinstance(exc, LocalModelRuntimeError):
+                raise
             if attempt == attempts:
                 print(f"{context} repair request failed: {exc}", file=stderr)
                 return None
@@ -2975,7 +3005,10 @@ def _build_chat_client(
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
-        return LocalLlamaChatClient(model_path=resolved_model_path)
+        return LocalLlamaChatClient(
+            model_path=resolved_model_path,
+            n_ctx=_resolve_local_model_context(),
+        )
     limits = _model_limits_for(credentials.provider, model)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
@@ -3157,6 +3190,25 @@ def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
     match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
     expected_shards = int(match.group(1)) if match else 1
     return len(model_paths) >= expected_shards
+
+
+def _resolve_local_model_context() -> int:
+    configured_context = os.environ.get(_LOCAL_MODEL_CONTEXT_ENV)
+    if configured_context is None or not configured_context.strip():
+        return _DEFAULT_LOCAL_MODEL_CONTEXT
+    try:
+        context = int(configured_context)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        ) from exc
+    if context <= 0:
+        raise RuntimeError(
+            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        )
+    return context
 
 
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:

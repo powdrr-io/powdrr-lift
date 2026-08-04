@@ -54,6 +54,7 @@ from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     LLMModelMapping,
     LocalLlamaChatClient,
+    LocalModelRuntimeError,
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
@@ -72,6 +73,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_base_url,
     _resolve_llm_mapping,
     _resolve_llm_model,
+    _resolve_local_model_context,
     _resolve_local_model_path,
     _resolve_provider,
     _resolve_skill_path,
@@ -123,6 +125,71 @@ def test_local_llama_client_requests_full_gpu_offload(
     LocalLlamaChatClient(model_path=model_path)
 
     assert captured["n_gpu_layers"] == -1
+    assert captured["n_ctx"] == 24576
+
+
+def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
+
+    assert _resolve_local_model_context() == 8192
+
+
+def test_local_model_context_rejects_invalid_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "not-a-number")
+
+    with pytest.raises(RuntimeError, match="POWDRR_LOCAL_MODEL_CONTEXT"):
+        _resolve_local_model_context()
+
+
+def test_local_llama_client_reports_gpu_initialization_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+
+    def fail_to_load(**_: object) -> object:
+        raise ValueError("failed to create Metal command queue")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llama_cpp",
+        types.SimpleNamespace(
+            Llama=fail_to_load,
+            llama_supports_gpu_offload=lambda: True,
+        ),
+    )
+    model_path.touch()
+
+    with pytest.raises(LocalModelRuntimeError, match="no CPU fallback"):
+        LocalLlamaChatClient(model_path=model_path)
+
+
+def test_local_llama_client_reports_gpu_inference_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+
+    class FailingLlama:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def create_chat_completion(self, **_: object) -> object:
+            raise RuntimeError("llama_decode returned -3")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llama_cpp",
+        types.SimpleNamespace(
+            Llama=FailingLlama,
+            llama_supports_gpu_offload=lambda: True,
+        ),
+    )
+    model_path.touch()
+    client = LocalLlamaChatClient(model_path=model_path)
+
+    with pytest.raises(LocalModelRuntimeError, match="inference failed"):
+        client.complete_json([{"role": "user", "content": "test"}])
 
 
 def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:

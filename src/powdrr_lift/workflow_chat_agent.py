@@ -376,20 +376,35 @@ class LocalLlamaChatClient:
                 "installed llama-cpp-python build cannot use a GPU. Reinstall "
                 "the local extra with Metal or CUDA support."
             )
-        self._llama: Any = Llama(
-            model_path=str(model_path),
-            n_ctx=n_ctx,
-            n_gpu_layers=-1,
-            verbose=False,
-        )
+        try:
+            self._llama: Any = Llama(
+                model_path=str(model_path),
+                n_ctx=n_ctx,
+                n_gpu_layers=-1,
+                verbose=False,
+            )
+        except Exception as exc:
+            raise LocalModelRuntimeError(
+                "Local Qwen GPU model failed to initialize. The model was "
+                "required to offload all layers to the GPU; no CPU fallback "
+                f"is allowed. Model={model_path}, context={n_ctx}. "
+                f"Underlying error: {exc}"
+            ) from exc
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-        response = self._llama.create_chat_completion(
-            messages=messages,
-            temperature=0,
-            max_tokens=_MAX_COMPLETION_TOKENS,
-            response_format={"type": "json_object"},
-        )
+        try:
+            response = self._llama.create_chat_completion(
+                messages=messages,
+                temperature=0,
+                max_tokens=_MAX_COMPLETION_TOKENS,
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:
+            raise LocalModelRuntimeError(
+                "Local Qwen GPU inference failed. The workflow cannot continue "
+                "with a CPU fallback. Check Metal/CUDA availability, GPU memory, "
+                f"and POWDRR_LOCAL_MODEL_CONTEXT. Underlying error: {exc}"
+            ) from exc
         choices = response.get("choices")
         if not isinstance(choices, list) or not choices:
             raise RuntimeError("Local LLM response did not include any choices.")
@@ -555,6 +570,10 @@ class WorkflowChatClient(Protocol):
 
 class _ModelUnavailableError(RuntimeError):
     pass
+
+
+class LocalModelRuntimeError(RuntimeError):
+    """Raised when the required local GPU model cannot run."""
 
 
 class _WorkflowProgressDisplay:
@@ -2379,6 +2398,8 @@ def _complete_json_with_repair(
                 payload,
             )
         except RuntimeError as exc:
+            if isinstance(exc, LocalModelRuntimeError):
+                raise
             if _is_model_unavailable_error(exc):
                 raise _ModelUnavailableError(
                     f"provider reported that model {model!r} is unavailable"
@@ -2769,6 +2790,8 @@ def _attempt_json_repair(
             )
             return repaired_payload
         except RuntimeError as exc:
+            if isinstance(exc, LocalModelRuntimeError):
+                raise
             if attempt == attempts:
                 print(f"{context} repair request failed: {exc}", file=stderr)
                 return None

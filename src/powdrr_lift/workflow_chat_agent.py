@@ -678,6 +678,7 @@ def run_workflow_chat(
     _verbose_print(stderr, config.verbose, f"Initial user request: {user_request}")
     selected_skill: SkillCatalogEntry | None = None
     selection: SkillChatSelection | None = None
+    skill_announced = False
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
@@ -725,7 +726,9 @@ def run_workflow_chat(
                 mapping=selection_mapping,
             )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
-        print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
+        if not skill_announced:
+            print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
+            skill_announced = True
         if selection.ready_to_execute and selection.next_question is None:
             break
 
@@ -2886,6 +2889,9 @@ def _prompt_user(
             answer = _read_interactive_line(prompt, stdout=stdout).strip()
         else:
             answer = input_func().strip()
+        if input_func is not input:
+            stdout.write("\n")
+            stdout.flush()
     if status_stream is not None:
         print("[workflow] thinking...", file=status_stream, flush=True)
     return answer

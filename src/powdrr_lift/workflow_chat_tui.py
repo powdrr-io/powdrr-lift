@@ -62,9 +62,11 @@ class _TextualOutput:
             if prompt.strip() == ">":
                 self._flush_pending_stdout(question=True)
                 self._app._output_prompt(prompt)
+                self._buffer = ""
             elif self._initial_prompt_pending:
                 self._initial_prompt_pending = False
                 self._app._output_initial_prompt(prompt)
+                self._buffer = ""
         return len(text)
 
     def flush(self) -> None:

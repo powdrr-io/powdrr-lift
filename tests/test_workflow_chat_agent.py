@@ -398,12 +398,16 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
             output = _TextualOutput(app, channel="stdout")
             writer = Thread(
                 target=lambda: (
+                    output.write("What do you want to do? "),
                     output.write("Matched skill: specify-a-feature\n"),
                     output.write(
                         "1. What is the feature goal?\n"
                         "2. Which requirements matter?\n"
                         "Please answer whichever of these you can.\n"
                     ),
+                    output.write("> "),
+                    output.write("Matched skill: next-skill\n"),
+                    output.write("Next question?\n"),
                     output.write("> "),
                 ),
             )
@@ -416,7 +420,9 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
         "Matched skill: specify-a-feature\n\n"
         "1. What is the feature goal?\n"
         "2. Which requirements matter?\n"
-        "Please answer whichever of these you can."
+        "Please answer whichever of these you can.\n\n"
+        "Matched skill: next-skill\n\n"
+        "Next question?"
     )
 
 

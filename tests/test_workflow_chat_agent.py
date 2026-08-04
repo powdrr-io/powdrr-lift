@@ -78,7 +78,10 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowProgressDisplay,
     run_workflow_chat,
 )
-from powdrr_lift.workflow_chat_tui import WorkflowChatApp, _TextualOutput
+from powdrr_lift.workflow_chat_tui import (
+    WorkflowChatApp,
+    _TextualStdoutOutput,
+)
 
 # ruff: noqa: E501
 
@@ -369,7 +372,7 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
-            output = _TextualOutput(app, channel="stdout")
+            output = _TextualStdoutOutput(app)
 
             def write_output() -> None:
                 output.write("Matched skill: internal-debug\n")
@@ -395,7 +398,7 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
-            output = _TextualOutput(app, channel="stdout")
+            output = _TextualStdoutOutput(app)
 
             def write_output() -> None:
                 output.write("What do you want to do? ")
@@ -432,7 +435,7 @@ def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
-            output = _TextualOutput(app, channel="stdout")
+            output = _TextualStdoutOutput(app)
 
             def write_initial_prompt() -> None:
                 output.write("What do you want to do? ")

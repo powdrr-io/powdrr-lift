@@ -22,20 +22,43 @@ from powdrr_lift.workflow_chat_agent import (
 
 
 class _TextualOutput:
-    """Small TextIO adapter that turns workflow output into screen updates."""
+    """TextIO adapter that turns line-oriented output into screen updates."""
 
     def __init__(self, app: WorkflowChatApp, *, channel: str) -> None:
         self._app = app
         self._channel = channel
         self._buffer = ""
-        self._pending_stdout_lines: list[str] = []
-        self._initial_prompt_pending = channel == "stdout"
 
-    def _flush_pending_stdout(self, *, question: bool) -> None:
-        if not self._pending_stdout_lines:
+    def write(self, text: str) -> int:
+        if not text:
+            return 0
+        self._buffer += text
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            line = line.rstrip("\r")
+            self._app._output_line(self._channel, line)
+        return len(text)
+
+    def flush(self) -> None:
+        return
+
+    def isatty(self) -> bool:
+        return False
+
+
+class _TextualStdoutOutput(_TextualOutput):
+    """Stdout adapter that preserves presentation boundaries for the TUI."""
+
+    def __init__(self, app: WorkflowChatApp) -> None:
+        super().__init__(app, channel="stdout")
+        self._pending_lines: list[str] = []
+        self._initial_prompt_pending = True
+
+    def _flush_pending(self, *, question: bool) -> None:
+        if not self._pending_lines:
             return
-        presentation = "\n".join(self._pending_stdout_lines)
-        self._pending_stdout_lines = []
+        presentation = "\n".join(self._pending_lines)
+        self._pending_lines = []
         if question:
             self._app._output_question(presentation)
         else:
@@ -44,23 +67,19 @@ class _TextualOutput:
     def write(self, text: str) -> int:
         if not text:
             return 0
-        if self._channel == "stdout" and not self._buffer:
+        if not self._buffer:
             if text.strip() == ">":
-                self._flush_pending_stdout(question=True)
-            elif self._pending_stdout_lines:
-                self._flush_pending_stdout(question=False)
+                self._flush_pending(question=True)
+            elif self._pending_lines:
+                self._flush_pending(question=False)
         self._buffer += text
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
-            line = line.rstrip("\r")
-            if self._channel == "stdout":
-                self._pending_stdout_lines.append(line)
-            else:
-                self._app._output_line(self._channel, line)
-        if self._buffer and self._channel == "stdout":
+            self._pending_lines.append(line.rstrip("\r"))
+        if self._buffer:
             prompt = self._buffer
             if prompt.strip() == ">":
-                self._flush_pending_stdout(question=True)
+                self._flush_pending(question=True)
                 self._app._output_prompt(prompt)
                 self._buffer = ""
             elif self._initial_prompt_pending:
@@ -70,11 +89,7 @@ class _TextualOutput:
         return len(text)
 
     def flush(self) -> None:
-        if self._channel == "stdout":
-            self._flush_pending_stdout(question=True)
-
-    def isatty(self) -> bool:
-        return False
+        self._flush_pending(question=True)
 
 
 class _WorkflowResponseTextArea(TextArea):
@@ -279,7 +294,7 @@ class WorkflowChatApp(App[None]):
                 self._request_submitted.clear()
                 if self._stop_requested.is_set():
                     return
-            stdout = _TextualOutput(self, channel="stdout")
+            stdout = _TextualStdoutOutput(self)
             stderr = _TextualOutput(self, channel="stderr")
             self._failure_message = None
             self._exit_code = 1

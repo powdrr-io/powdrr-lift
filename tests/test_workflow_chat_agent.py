@@ -81,6 +81,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
+    download_local_qwen_model,
     run_workflow_chat,
 )
 from powdrr_lift.workflow_chat_tui import (
@@ -697,7 +698,14 @@ def test_llm_mapping_rejects_unsupported_provider() -> None:
         )
 
 
-def test_local_model_path_downloads_q5_k_m_shards_automatically(
+def test_local_model_path_requires_pre_downloaded_q5_k_m_shards(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(RuntimeError, match="download-qwen-model"):
+        _resolve_local_model_path(tmp_path)
+
+
+def test_download_local_model_caches_q5_k_m_shards(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -721,8 +729,8 @@ def test_local_model_path_downloads_q5_k_m_shards_automatically(
 
     monkeypatch.setitem(sys.modules, "huggingface_hub", _FakeHuggingFaceHub)
 
-    assert _resolve_local_model_path(tmp_path) == first_shard
-    assert _resolve_local_model_path(tmp_path) == first_shard
+    assert download_local_qwen_model(tmp_path) == first_shard
+    assert download_local_qwen_model(tmp_path) == first_shard
     assert download_calls == 1
 
 
@@ -742,7 +750,7 @@ def test_local_model_download_reports_underlying_error(
     )
 
     with pytest.raises(RuntimeError, match="OSError: TLS handshake failed"):
-        _resolve_local_model_path(tmp_path)
+        download_local_qwen_model(tmp_path)
 
 
 def test_request_token_budget_reserves_input_context_and_model_limit() -> None:
@@ -1079,6 +1087,27 @@ def test_cli_workflow_chat_wires_configuration(
     assert config.model == "test-model"
     assert config.max_stalled_roundtrips == 5
     assert config.verbose is False
+
+
+def test_cli_download_qwen_model_uses_repository_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    captured: dict[str, Path] = {}
+    model_path = repo_root / ".powdrr" / "models" / "model.gguf"
+
+    def _fake_download(cache_dir: Path) -> Path:
+        captured["cache_dir"] = cache_dir
+        return model_path
+
+    monkeypatch.setattr("powdrr_lift.cli.download_local_qwen_model", _fake_download)
+
+    assert main(["download-qwen-model", "--repo-root", str(repo_root)]) == 0
+    assert captured["cache_dir"] == repo_root / ".powdrr" / "models"
+    assert capsys.readouterr().out == f"Qwen model cached at {model_path}\n"
 
 
 def test_workflow_execution_allows_more_roundtrips_than_max_turns(

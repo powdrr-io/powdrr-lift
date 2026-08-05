@@ -3238,6 +3238,18 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
 
 
 def _resolve_local_model_path(model_cache_dir: Path) -> Path:
+    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
+    if _has_all_local_model_shards(cached_model_paths):
+        return cached_model_paths[0]
+    raise RuntimeError(
+        "The local Qwen model is not fully cached. Run "
+        "`powdrr-lift download-qwen-model` before starting workflow-chat. "
+        f"Expected cache={model_cache_dir}."
+    )
+
+
+def download_local_qwen_model(model_cache_dir: Path) -> Path:
+    """Download the local Qwen GGUF shards into the configured cache."""
     model_cache_dir.mkdir(parents=True, exist_ok=True)
     cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
     if _has_all_local_model_shards(cached_model_paths):

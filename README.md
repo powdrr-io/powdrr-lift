@@ -152,8 +152,9 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
 - The default mapping combines remote GLM models with local Qwen execution.
-  The first Qwen request automatically downloads the Q5_K_M GGUF shards from
-  `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF` into `<project-root>/.powdrr/models`
+  Before starting a workflow that selects Qwen, download the Q5_K_M GGUF
+  shards with `powdrr-lift download-qwen-model`. The command caches them from
+  `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF` in `<project-root>/.powdrr/models`
   and reuses them across worktrees. The local runtime is optional; on Apple Silicon, install it
   with Metal enabled:
   `CMAKE_ARGS="-DGGML_METAL=on" uv sync --extra local`.

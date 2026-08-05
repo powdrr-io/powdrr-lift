@@ -75,6 +75,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_llm_model,
     _resolve_local_model_context,
     _resolve_local_model_path,
+    _resolve_project_root,
     _resolve_provider,
     _resolve_skill_path,
     _resolve_worktree_context,
@@ -723,6 +724,25 @@ def test_local_model_path_downloads_q5_k_m_shards_automatically(
     assert _resolve_local_model_path(tmp_path) == first_shard
     assert _resolve_local_model_path(tmp_path) == first_shard
     assert download_calls == 1
+
+
+def test_local_model_download_reports_underlying_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FailingHuggingFaceHub:
+        @staticmethod
+        def snapshot_download(**_: object) -> str:
+            raise OSError("TLS handshake failed")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        _FailingHuggingFaceHub,
+    )
+
+    with pytest.raises(RuntimeError, match="OSError: TLS handshake failed"):
+        _resolve_local_model_path(tmp_path)
 
 
 def test_request_token_budget_reserves_input_context_and_model_limit() -> None:
@@ -4280,6 +4300,16 @@ def test_resolve_worktree_context_uses_existing_dedicated_worktree(
 
     assert resolved == worktree_root.resolve()
     assert "Using existing worktree context" in stderr.getvalue()
+
+
+def test_local_model_cache_uses_primary_project_root_for_worktree() -> None:
+    project_root = Path("/Users/test/project")
+    worktree_root = project_root / ".worktrees" / "skill-chat"
+
+    assert (
+        _resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
+        == project_root
+    )
 
 
 def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checkout(

@@ -263,7 +263,7 @@ def test_prompt_user_reports_thinking_after_input() -> None:
     )
 
     assert answer == "answer"
-    assert stdout.getvalue() == "Question: "
+    assert stdout.getvalue() == "Question: \n"
     assert status_stream.getvalue() == "[workflow] thinking...\n"
 
 
@@ -3459,9 +3459,11 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
     )
 
     assert exit_code == 0
-    assert "Which requirements should this feature satisfy?" in stdout.getvalue()
-    assert "Internal reason not shown to users." not in stdout.getvalue()
-    assert str(skills_dir) not in stdout.getvalue()
+    output = stdout.getvalue()
+    assert output.count("Matched skill: specify-a-feature") == 1
+    assert "Which requirements should this feature satisfy?" in output
+    assert "Internal reason not shown to users." not in output
+    assert str(skills_dir) not in output
 
 
 def test_run_workflow_chat_uses_anthropic_provider(

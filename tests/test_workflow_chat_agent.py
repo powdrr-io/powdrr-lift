@@ -75,6 +75,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_llm_model,
     _resolve_local_model_context,
     _resolve_local_model_path,
+    _resolve_project_root,
     _resolve_provider,
     _resolve_skill_path,
     _resolve_worktree_context,
@@ -4203,6 +4204,16 @@ def test_resolve_worktree_context_uses_existing_dedicated_worktree(
 
     assert resolved == worktree_root.resolve()
     assert "Using existing worktree context" in stderr.getvalue()
+
+
+def test_local_model_cache_uses_primary_project_root_for_worktree() -> None:
+    project_root = Path("/Users/test/project")
+    worktree_root = project_root / ".worktrees" / "skill-chat"
+
+    assert (
+        _resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
+        == project_root
+    )
 
 
 def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checkout(

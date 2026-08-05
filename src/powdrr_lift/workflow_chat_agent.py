@@ -634,12 +634,14 @@ def run_workflow_chat(
     stderr: TextIO = sys.stderr,
     progress_callback: Callable[[SkillCatalogEntry, int, str], None] | None = None,
 ) -> int:
+    configured_repo_root = resolve_repo_root(config.repo_root)
     worktree_root = _resolve_worktree_context(
         config.repo_root,
         stderr=stderr,
         verbose=config.verbose,
     )
     repo_root = worktree_root
+    project_root = _resolve_project_root(configured_repo_root, worktree_root)
     skills_dir = config.skills_dir
     if not skills_dir.is_absolute():
         skills_dir = repo_root / skills_dir
@@ -667,7 +669,7 @@ def run_workflow_chat(
             clients[key] = _build_chat_client(
                 selected_credentials,
                 model=selected_model,
-                model_cache_dir=repo_root / ".powdrr" / "models",
+                model_cache_dir=project_root / ".powdrr" / "models",
             )
         return clients[key]
 
@@ -1241,6 +1243,24 @@ def _resolve_worktree_context(
         )
     _verbose_print(stderr, verbose, f"Using dedicated worktree at {worktree_path}")
     return worktree_path
+
+
+def _resolve_project_root(configured_repo_root: Path, worktree_root: Path) -> Path:
+    """Return the primary checkout root used for shared local model storage."""
+    if not _is_dedicated_worktree(configured_repo_root):
+        return configured_repo_root
+    worktree_parts = worktree_root.parts
+    worktree_marker = ".worktrees"
+    if worktree_marker not in worktree_parts:
+        raise RuntimeError(
+            f"Could not determine project root for worktree {worktree_root}."
+        )
+    marker_index = worktree_parts.index(worktree_marker)
+    if marker_index == 0:
+        raise RuntimeError(
+            f"Could not determine project root for worktree {worktree_root}."
+        )
+    return Path(*worktree_parts[:marker_index])
 
 
 def _is_dedicated_worktree(repo_root: Path) -> bool:

@@ -175,6 +175,7 @@ class WorkflowChatApp(App[None]):
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
+        self._execution_started = False
         self._message_history: list[str] = []
         self._current_status = "thinking..."
         self._initial_prompt_visible = False
@@ -299,6 +300,7 @@ class WorkflowChatApp(App[None]):
             self._failure_message = None
             self._exit_code = 1
             self._workflow_active = True
+            self._execution_started = False
             try:
                 self._exit_code = run_workflow_chat(
                     self._config,
@@ -343,6 +345,9 @@ class WorkflowChatApp(App[None]):
         current_step_index: int,
         status: str,
     ) -> None:
+        if not self._execution_started:
+            self._execution_started = True
+            self._clear_message_buffer()
         steps = self.query_one("#steps", ListView)
         items = list(steps.query(ListItem))
         if len(steps.children) != len(skill.skill.steps):
@@ -405,6 +410,11 @@ class WorkflowChatApp(App[None]):
 
     def _set_status(self, status: str) -> None:
         self._current_status = status.strip()
+        self._render_status()
+
+    def _clear_message_buffer(self) -> None:
+        self._message_history.clear()
+        self._current_status = ""
         self._render_status()
 
     def _render_status(self) -> None:

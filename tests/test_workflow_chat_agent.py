@@ -535,6 +535,28 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
     )
 
 
+def test_textual_execution_transition_clears_matched_skill_buffer() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+            app._set_message("Matched skill: specify-a-feature")
+            app._apply_progress(
+                skill,
+                current_step_index=0,
+                status="waiting on LLM response...",
+            )
+            app._show_prompt("What is the feature goal?")
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert rendered == "What is the feature goal?"
+    assert "Matched skill: specify-a-feature" not in rendered
+
+
 def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

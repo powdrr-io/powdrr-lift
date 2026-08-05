@@ -861,11 +861,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Download and cache the local Qwen model used by workflow-chat.",
     )
     download_qwen_parser.add_argument(
-        "--cache-dir",
-        type=Path,
-        help=("Directory for the model cache. Defaults to <repo-root>/.powdrr/models."),
-    )
-    download_qwen_parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root used to resolve the default model cache directory.",
@@ -1585,11 +1580,7 @@ def _run_openai_proxy(args: argparse.Namespace) -> int:
 
 def _run_download_qwen_model(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    cache_dir = (
-        args.cache_dir
-        if args.cache_dir is not None
-        else repo_root / ".powdrr" / "models"
-    )
+    cache_dir = repo_root / ".powdrr" / "models"
     model_path = download_local_qwen_model(cache_dir)
     print(f"Qwen model cached at {model_path}")
     return 0

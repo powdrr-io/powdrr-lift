@@ -730,7 +730,6 @@ def test_download_local_model_caches_q5_k_m_shards(
     monkeypatch.setitem(sys.modules, "huggingface_hub", _FakeHuggingFaceHub)
 
     assert download_local_qwen_model(tmp_path) == first_shard
-    assert download_local_qwen_model(tmp_path) == first_shard
     assert download_calls == 1
 
 

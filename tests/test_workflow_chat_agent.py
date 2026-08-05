@@ -3828,6 +3828,78 @@ def test_run_workflow_chat_repairs_missing_action_fields(
     assert (worktree_root / "generated" / "skill-execution.json").exists()
 
 
+def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+
+    calls = 0
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": "The request is to specify a feature.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if calls in {2, 3}:
+                return {"kind": "prompt_user", "text": "   "}
+            if calls == 4:
+                assert "non-empty" in messages[-1]["content"]
+                return {
+                    "kind": "prompt_user",
+                    "text": "What should this feature accomplish?",
+                }
+            if calls == 5:
+                return {"kind": "complete", "text": "Skill execution complete."}
+            raise AssertionError(f"Unexpected call count: {calls}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+            provider_retry_delay_seconds=0,
+        ),
+        input_func=iter(["Build exports", "The feature should accomplish X"]).__next__,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert calls == 5
+    assert "What should this feature accomplish?" in stdout.getvalue()
+    assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()
+    assert "received an empty user question" in stderr.getvalue()
+
+
 def test_workflow_action_repair_retries_empty_provider_response_automatically(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

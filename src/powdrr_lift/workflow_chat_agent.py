@@ -3174,7 +3174,9 @@ def _resolve_local_model_path(model_cache_dir: Path) -> Path:
         )
     except Exception as exc:
         raise RuntimeError(
-            "Could not download the Qwen Q5_K_M model from Hugging Face."
+            "Could not download the Qwen Q5_K_M model from Hugging Face. "
+            f"Repository={_LOCAL_MODEL_REPOSITORY}, cache={model_cache_dir}. "
+            f"Underlying error: {type(exc).__name__}: {exc}"
         ) from exc
     model_paths = sorted(snapshot_directory.glob(_LOCAL_MODEL_PATTERN))
     if not _has_all_local_model_shards(model_paths):

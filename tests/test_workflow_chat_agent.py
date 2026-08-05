@@ -703,6 +703,25 @@ def test_local_model_path_downloads_q5_k_m_shards_automatically(
     assert download_calls == 1
 
 
+def test_local_model_download_reports_underlying_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FailingHuggingFaceHub:
+        @staticmethod
+        def snapshot_download(**_: object) -> str:
+            raise OSError("TLS handshake failed")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        _FailingHuggingFaceHub,
+    )
+
+    with pytest.raises(RuntimeError, match="OSError: TLS handshake failed"):
+        _resolve_local_model_path(tmp_path)
+
+
 def test_request_token_budget_reserves_input_context_and_model_limit() -> None:
     max_tokens, estimated_input_tokens = _request_token_budget(
         [{"role": "user", "content": "x" * 3_000}],

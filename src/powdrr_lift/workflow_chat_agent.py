@@ -50,6 +50,7 @@ from powdrr_lift.core.spec_context import (
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
+_MAX_EMPTY_QUESTION_REPROMPTS = 3
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
@@ -2381,6 +2382,7 @@ def _complete_json_with_repair(
     stderr: TextIO,
     fallback_on_transient_exhaustion: bool = False,
 ) -> Any | None:
+    empty_question_reprompts = 0
     while True:
         _verbose_json(
             stderr,
@@ -2478,6 +2480,32 @@ def _complete_json_with_repair(
                             f"{context} response was still invalid: {repair_exc}",
                             file=stderr,
                         )
+                        if _is_empty_prompt_user_error(repair_exc):
+                            empty_question_reprompts += 1
+                            if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
+                                raise RuntimeError(
+                                    f"{context} LLM repeatedly returned an empty "
+                                    "user question."
+                                ) from repair_exc
+                            print(
+                                f"{context} received an empty user question. "
+                                "Requesting a clearer question from the LLM "
+                                f"(attempt {empty_question_reprompts}/"
+                                f"{_MAX_EMPTY_QUESTION_REPROMPTS}).",
+                                file=stderr,
+                            )
+                            messages = _build_json_repair_messages(
+                                messages,
+                                context=context,
+                                error_message=str(repair_exc),
+                                repair_instructions=(
+                                    repair_instructions
+                                    + " Return a concise, specific, non-empty "
+                                    "question in the prompt_user text field."
+                                ),
+                                previous_payload=repaired_payload,
+                            )
+                            continue
             else:
                 print(f"{context} failed: {exc}", file=stderr)
             retry = _prompt_user(
@@ -2526,6 +2554,32 @@ def _complete_json_with_repair(
                         f"{context} repaired response was still invalid: {repair_exc}",
                         file=stderr,
                     )
+                    if _is_empty_prompt_user_error(repair_exc):
+                        empty_question_reprompts += 1
+                        if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
+                            raise RuntimeError(
+                                f"{context} LLM repeatedly returned an empty user "
+                                "question."
+                            ) from repair_exc
+                        print(
+                            f"{context} received an empty user question. "
+                            "Requesting a clearer question from the LLM "
+                            f"(attempt {empty_question_reprompts}/"
+                            f"{_MAX_EMPTY_QUESTION_REPROMPTS}).",
+                            file=stderr,
+                        )
+                        messages = _build_json_repair_messages(
+                            messages,
+                            context=context,
+                            error_message=str(repair_exc),
+                            repair_instructions=(
+                                repair_instructions
+                                + " Return a concise, specific, non-empty question "
+                                "in the prompt_user text field."
+                            ),
+                            previous_payload=repaired_payload,
+                        )
+                        continue
             retry = _prompt_user(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
@@ -2545,6 +2599,10 @@ def _complete_json_with_repair(
 
 def _print_waiting_for_model(stderr: TextIO, model: str) -> None:
     print(f"waiting for {model} LLM response...", file=stderr, flush=True)
+
+
+def _is_empty_prompt_user_error(exc: RuntimeError) -> bool:
+    return "prompt_user action must include non-empty text" in str(exc)
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:

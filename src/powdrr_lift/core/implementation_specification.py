@@ -16,6 +16,7 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.spec_paths import (
     architecture_specification_path as _architecture_specification_path,
 )
+from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _ALLOWED_ACTIONS = {"added", "removed"}
 
@@ -957,7 +958,11 @@ def _report_to_data(
         "issues": [
             {
                 "code": issue.code,
-                "message": issue.message,
+                "message": instructional_validation_message(
+                    issue.message,
+                    code=issue.code,
+                    path=issue.path,
+                ),
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues

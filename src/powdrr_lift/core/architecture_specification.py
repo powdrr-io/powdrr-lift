@@ -15,6 +15,7 @@ from powdrr_lift.core.spec_paths import (
     architecture_specification_path,
     system_specification_path,
 )
+from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
 
@@ -860,7 +861,11 @@ def _report_to_data(
         "issues": [
             {
                 "code": issue.code,
-                "message": issue.message,
+                "message": instructional_validation_message(
+                    issue.message,
+                    code=issue.code,
+                    path=issue.path,
+                ),
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues

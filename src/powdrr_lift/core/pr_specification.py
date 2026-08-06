@@ -10,6 +10,7 @@ import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.codebase_state import build_codebase_state_report
+from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _DEFAULT_OUTPUT_PATH = Path("docs") / "specs"
 _IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "specs"
@@ -952,7 +953,11 @@ def _report_to_data(
         "issues": [
             {
                 "code": issue.code,
-                "message": issue.message,
+                "message": instructional_validation_message(
+                    issue.message,
+                    code=issue.code,
+                    path=issue.path,
+                ),
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues

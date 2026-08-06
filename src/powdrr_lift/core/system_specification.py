@@ -14,6 +14,7 @@ from powdrr_lift.core.spec_paths import (
     SPECIFICATION_SCHEMA_URL,
     system_specification_path,
 )
+from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _ALLOWED_STATES = {"added", "removed", "supercedes"}
 
@@ -710,7 +711,11 @@ def _report_to_data(report: SystemSpecificationValidationReport) -> dict[str, An
         "issues": [
             {
                 "code": issue.code,
-                "message": issue.message,
+                "message": instructional_validation_message(
+                    issue.message,
+                    code=issue.code,
+                    path=issue.path,
+                ),
                 "path": issue.path,
             }
             for issue in report.issues

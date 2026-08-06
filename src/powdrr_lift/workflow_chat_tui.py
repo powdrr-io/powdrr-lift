@@ -109,17 +109,28 @@ class _WorkflowResponseTextArea(TextArea):
             event.prevent_default()
             self._submit_callback()
             return
-        if event.key in {"ctrl+c", "super+c"}:
+        if event.key in {"ctrl+c", "meta+c", "super+c"}:
             event.stop()
             event.prevent_default()
             cast(WorkflowChatApp, self.app).action_copy_selection()
             return
-        if event.key in {"ctrl+x", "super+x"}:
+        if event.key in {"ctrl+x", "meta+x", "super+x"}:
             event.stop()
             event.prevent_default()
             cast(WorkflowChatApp, self.app).action_cut_selection()
             return
+        if event.key in {"ctrl+v", "meta+v", "super+v"}:
+            event.stop()
+            event.prevent_default()
+            cast(WorkflowChatApp, self.app).action_paste_selection()
+            return
         await super()._on_key(event)
+
+    def paste_text(self, text: str) -> None:
+        """Replace the selection with text while preserving TextArea editing."""
+        edit_result = self._replace_via_keyboard(text, *self.selection)
+        if edit_result is not None:
+            self.move_cursor(edit_result.end_location)
 
 
 class WorkflowChatApp(App[None]):
@@ -249,14 +260,44 @@ class WorkflowChatApp(App[None]):
         if text_area is not None:
             text_area.action_cut()
 
+    def action_paste_selection(self) -> None:
+        text_area = self._focused_text_area()
+        if isinstance(text_area, _WorkflowResponseTextArea):
+            text_area.paste_text(self._read_clipboard())
+
     async def on_key(self, event: Key) -> None:
-        if event.key in {"ctrl+c", "super+c", "ctrl+x", "super+x"}:
+        if event.key in {"ctrl+c", "meta+c", "super+c"}:
             event.stop()
             event.prevent_default()
-            if event.key in {"ctrl+c", "super+c"}:
-                self.action_copy_selection()
+            self.action_copy_selection()
+        elif event.key in {"ctrl+x", "meta+x", "super+x"}:
+            event.stop()
+            event.prevent_default()
+            self.action_cut_selection()
+        elif event.key in {"ctrl+v", "meta+v", "super+v"}:
+            event.stop()
+            event.prevent_default()
+            self.action_paste_selection()
+
+    def _focused_text_area(self) -> TextArea | None:
+        if isinstance(self.focused, TextArea):
+            return self.focused
+        return self._response
+
+    def _read_clipboard(self) -> str:
+        if sys.platform == "darwin":
+            try:
+                result = subprocess.run(
+                    ["pbpaste"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except (OSError, subprocess.SubprocessError):
+                pass
             else:
-                self.action_cut_selection()
+                return result.stdout
+        return self.clipboard
 
     def _selected_text_area(self) -> TextArea | None:
         candidates = [self.focused, self._response]

@@ -719,6 +719,52 @@ def test_textual_response_supports_cut_key_without_beeping() -> None:
     assert asyncio.run(exercise()) == ("", "cut this response")
 
 
+def test_textual_response_supports_command_copy_and_cut_keys() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "copy and cut this response"
+            response.select_all()
+            response.focus()
+            await pilot.press("super+c")
+            await pilot.pause()
+            copied = app.clipboard
+            response.select_all()
+            await pilot.press("super+x")
+            await pilot.pause()
+            return response.text, copied
+
+    assert asyncio.run(exercise()) == ("", "copy and cut this response")
+
+
+def test_textual_response_supports_command_paste_from_native_clipboard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.focus()
+            await pilot.press("super+v")
+            await pilot.pause()
+            return response.text
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
+        run.return_value.stdout = "pasted from macOS"
+        run.return_value.returncode = 0
+        assert asyncio.run(exercise()) == "pasted from macOS"
+    run.assert_called_once_with(
+        ["pbpaste"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)

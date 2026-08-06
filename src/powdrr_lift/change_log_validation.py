@@ -45,6 +45,7 @@ from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
 from powdrr_lift.core.system_specification import (
     build_system_specification_validation_report,
 )
+from powdrr_lift.core.validation_messages import instructional_validation_message
 
 
 @dataclass(frozen=True, slots=True)
@@ -880,7 +881,11 @@ def _report_to_data(report: ValidationReport) -> dict[str, Any]:
         "issues": [
             {
                 "code": issue.code,
-                "message": issue.message,
+                "message": instructional_validation_message(
+                    issue.message,
+                    code=issue.code,
+                    path=issue.path,
+                ),
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues

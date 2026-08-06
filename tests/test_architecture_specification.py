@@ -468,3 +468,6 @@ def test_cli_validate_architecture_specification_reports_yaml(
     assert {issue["code"] for issue in report["issues"]} == {
         "entity_type_not_allowed",
     }
+    issue = report["issues"][0]
+    assert "Corrective action:" in issue["message"]
+    assert "edit the specification at `entities[1].type`" in issue["message"]

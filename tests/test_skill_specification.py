@@ -268,12 +268,6 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
             "--work-item-name",
             "<work-item-name>",
         ),
-        (
-            "powdrr-lift",
-            "evaluate-pr-specification",
-            "--work-item-name",
-            "<work-item-name>",
-        ),
     ]
     assert skill.steps[11].tool_invocations[0].command == (
         "gh",

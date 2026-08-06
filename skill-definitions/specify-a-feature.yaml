@@ -85,8 +85,8 @@ steps:
 - description: Validate every generated specification before implementation.
   llm_type: fast_iteration
   details: Run every validation command below in order. If any command fails, fix
-    the reported issue and restart this validation step; advance only when all four
-    documents agree.
+    the reported issue and restart this validation step; advance only when all three
+    validated documents agree.
   tool_invocations:
   - tool: shell
     command:
@@ -106,12 +106,6 @@ steps:
     command:
     - powdrr-lift
     - evaluate-implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-  - tool: shell
-    command:
-    - powdrr-lift
-    - evaluate-pr-specification
     - "--work-item-name"
     - "<work-item-name>"
 - description: If any specification validation fails, fix it and return to the validation

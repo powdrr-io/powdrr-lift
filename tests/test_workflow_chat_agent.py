@@ -414,10 +414,15 @@ def test_textual_status_is_visible_and_not_collapsed() -> None:
         app._stop_requested.set()
         async with app.run_test() as pilot:
             status = app.query_one("#status", Static)
+            status_container = app.query_one("#status-container")
             await pilot.pause()
             app._set_status("x" * 200)
             await pilot.pause()
-            return str(status.render()), status.region.height, status.region.width
+            return (
+                str(status.render()),
+                status_container.region.height,
+                status_container.region.width,
+            )
 
     rendered, height, width = asyncio.run(exercise())
     assert rendered.startswith("x")
@@ -433,11 +438,58 @@ def test_textual_panels_have_the_same_width() -> None:
             await pilot.pause()
             return (
                 app.query_one("#steps", ListView).region.width,
-                app.query_one("#status", Static).region.width,
+                app.query_one("#status-container").region.width,
                 app.query_one("#response", TextArea).region.width,
             )
 
-    assert asyncio.run(exercise()) == (80, 80, 80)
+    assert asyncio.run(exercise()) == (0, 80, 80)
+
+
+def test_textual_panels_place_green_output_above_orange_steps() -> None:
+    async def exercise() -> tuple[int, int, int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+            steps = app.query_one("#steps", ListView)
+            status = app.query_one("#status", Static)
+            empty_height = steps.region.height
+            app._apply_progress(skill, current_step_index=0, status="running")
+            await pilot.pause()
+            return (
+                status.region.y,
+                steps.region.y,
+                empty_height,
+                steps.region.height,
+            )
+
+    status_y, steps_y, empty_height, populated_height = asyncio.run(exercise())
+    assert status_y < steps_y
+    assert empty_height == 0
+    assert populated_height > 0
+
+
+def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
+    async def exercise() -> tuple[str, float, int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test(size=(80, 12)) as pilot:
+            status = app.query_one("#status", Static)
+            for number in range(20):
+                app._set_message(f"output-{number}")
+            await pilot.pause()
+            return (
+                str(status.render()),
+                app.query_one("#status-container").scroll_y,
+                app.query_one("#status-container").region.height,
+                app.query_one("#status-container").virtual_size.height,
+            )
+
+    rendered, scroll_y, region_height, virtual_height = asyncio.run(exercise())
+    assert "output-19" in rendered
+    assert virtual_height > region_height
+    assert scroll_y > 0
 
 
 def test_textual_status_shows_latest_output() -> None:
@@ -538,7 +590,7 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
     )
 
 
-def test_textual_execution_transition_clears_matched_skill_buffer() -> None:
+def test_textual_execution_transition_retains_output_history() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
@@ -556,8 +608,31 @@ def test_textual_execution_transition_clears_matched_skill_buffer() -> None:
             return str(app.query_one("#status", Static).render())
 
     rendered = asyncio.run(exercise())
-    assert rendered == "What is the feature goal?"
-    assert "Matched skill: specify-a-feature" not in rendered
+    assert rendered == ("Matched skill: specify-a-feature\n\nWhat is the feature goal?")
+
+
+def test_textual_each_execution_step_retains_status_history() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+            app._apply_progress(
+                skill,
+                current_step_index=0,
+                status="first step is running",
+            )
+            app._set_message("first step output")
+            app._apply_progress(
+                skill,
+                current_step_index=1,
+                status="second step is running",
+            )
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "first step output\n\nsecond step is running"
 
 
 def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:

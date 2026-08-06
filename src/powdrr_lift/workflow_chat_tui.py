@@ -11,6 +11,7 @@ from typing import Any, TextIO, cast
 from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
+from textual.containers import ScrollableContainer
 from textual.events import Key
 from textual.widgets import Label, ListItem, ListView, TextArea
 
@@ -136,17 +137,25 @@ class WorkflowChatApp(App[None]):
     }
     #steps {
         width: 100%;
-        height: 1fr;
+        height: auto;
+        min-height: 0;
+        display: none;
         border: round $warning;
         padding: 0 1;
     }
-    #status {
+    #steps.has-content {
+        display: block;
+    }
+    #status-container {
         width: 100%;
-        height: auto;
-        min-height: 4;
+        height: 1fr;
+        min-height: 0;
         border: round $success;
         padding: 0 1;
-        content-align: left middle;
+        overflow-y: scroll;
+    }
+    #status {
+        width: 100%;
     }
     #response {
         width: 100%;
@@ -175,14 +184,16 @@ class WorkflowChatApp(App[None]):
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
-        self._execution_started = False
         self._message_history: list[str] = []
         self._current_status = "thinking..."
         self._initial_prompt_visible = False
 
     def compose(self) -> ComposeResult:
+        yield ScrollableContainer(
+            Label(self._status_text("thinking..."), markup=False, id="status"),
+            id="status-container",
+        )
         yield ListView(id="steps")
-        yield Label(self._status_text("thinking..."), markup=False, id="status")
         yield _WorkflowResponseTextArea(
             placeholder="Press Return to submit; multiline text is supported",
             id="response",
@@ -300,7 +311,6 @@ class WorkflowChatApp(App[None]):
             self._failure_message = None
             self._exit_code = 1
             self._workflow_active = True
-            self._execution_started = False
             try:
                 self._exit_code = run_workflow_chat(
                     self._config,
@@ -345,9 +355,6 @@ class WorkflowChatApp(App[None]):
         current_step_index: int,
         status: str,
     ) -> None:
-        if not self._execution_started:
-            self._execution_started = True
-            self._clear_message_buffer()
         steps = self.query_one("#steps", ListView)
         items = list(steps.query(ListItem))
         if len(steps.children) != len(skill.skill.steps):
@@ -357,6 +364,7 @@ class WorkflowChatApp(App[None]):
                 for step_index, step in enumerate(skill.skill.steps)
             ]
             steps.mount(*items)
+        steps.set_class(bool(items), "has-content")
         for step_index, item in enumerate(items):
             item.remove_class("completed", "current")
             if step_index < current_step_index:
@@ -412,12 +420,8 @@ class WorkflowChatApp(App[None]):
         self._current_status = status.strip()
         self._render_status()
 
-    def _clear_message_buffer(self) -> None:
-        self._message_history.clear()
-        self._current_status = ""
-        self._render_status()
-
     def _render_status(self) -> None:
+        status_container = self.query_one("#status-container", ScrollableContainer)
         status_widget = self.query_one("#status", Label)
         if self._message_history:
             content = "\n\n".join(self._message_history)
@@ -426,6 +430,8 @@ class WorkflowChatApp(App[None]):
         else:
             content = self._current_status
         status_widget.update(self._status_text(content))
+        status_container.scroll_end(animate=False)
+        status_container.call_after_refresh(status_container.scroll_end, animate=False)
         status_widget.refresh(repaint=True)
 
     @staticmethod

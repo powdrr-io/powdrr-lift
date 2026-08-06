@@ -10,55 +10,54 @@ steps:
 - description: Confirm the feature name, approved plan documents, and workflow template.
   llm_type: standard_reasoning
   details: Capture the exact feature name used by specify-a-feature and confirm the
-    approved plan documents in docs/specs/<feature-name>/. Use templates/implement-a-feature.yaml
-    as the planning workflow template.
-- description: Prepare an implementation checklist and explain the planning workflow.
-  llm_type: high_reasoning
-  details: For every approved proposed PR, identify the code files, tests, acceptance
-    criteria, dependencies, and validation commands before implementation begins.
-    Explain how the planning workflow will review the documents, confirm requirements,
-    generate proposed PR specs, and create one execute-proposed-pr workflow per approved
-    proposed PR.
+    approved plan documents in docs/specs/<feature-name>/.
+- description: Generate the proposed PR specification templates.
+  llm_type: simple_task
+  details: Generate and fill the proposed PR specification templates for the approved
+    feature plan. For every proposed PR, capture the implementation files, tests,
+    acceptance criteria, validation commands, risks, and dependencies between PRs.
   tool_invocations:
   - tool: shell
     command:
-    - sed
-    - "-n"
-    - 1,260p
-    - templates/implement-a-feature.yaml
-- description: Instantiate the planning workflow and generate its first task.
+    - powdrr-lift
+    - pr-specification
+    - "--work-item-name"
+    - "<work-item-name>"
+- description: Instantiate an execute-proposed-pr workflow for every approved PR.
   llm_type: simple_task
-  details: Use the repository's workflow-template and workflow-task models to create
-    docs/workflows/<feature-name>/ with one persisted task per planning template task.
-    Its final task generates the proposed PR specs and one execute-proposed-pr workflow
-    for each approved proposed PR. Pass the same feature name as --work-item-name. Keep
-    tasks open, preserve the template dependencies and state, and verify that task-001
-    is the only ready task. Do not overwrite an existing workflow directory without
-    user approval.
+  details: For each approved proposed PR, instantiate a separate
+    docs/workflows/<execute-work-item-name>/ workflow from
+    templates/execute-proposed-pr.yaml. Use a distinct execute work-item name for each
+    PR, preserve the proposed PR order, and capture dependencies between PRs in the
+    generated workflows' task dependencies and input state. Do not overwrite an
+    existing workflow directory without user approval.
   tool_invocations:
   - tool: shell
     command:
     - powdrr-lift
     - instantiate-workflow
     - "--work-item-name"
-    - "<work-item-name>"
+    - "<execute-work-item-name>"
     - "--template"
-    - templates/implement-a-feature.yaml
-- description: Review the generated workflow and first task with the user.
-  llm_type: standard_reasoning
-  details: Inspect the generated files and show the first task's description, inputs,
-    dependencies, and expected output. If the workflow or first task is not appropriate,
-    ask what should change and update the artifacts before creating the pull request.
-- description: Commit the generated workflow and open a draft pull request.
+    - templates/execute-proposed-pr.yaml
+- description: Validate the overall implementation approach with the user.
+  llm_type: high_reasoning
+  details: Review every generated proposed PR specification and execute-proposed-pr
+    workflow with the user. Confirm the PR boundaries, implementation files, tests,
+    acceptance criteria, validation commands, risks, and dependency ordering. Update
+    the artifacts when the user identifies a needed change, and do not create the
+    pull request until the overall approach is approved.
+- description: Commit all generated planning artifacts and open a draft pull request.
   llm_type: simple_task
-  details: After the user confirms the generated workflow looks correct, inspect the
-    worktree, stage every generated artifact under docs/workflows/<feature-name>/,
-    commit those artifacts, and push the current feature branch with its upstream
-    set. Then create or update a draft pull request describing the selected template
-    and first task. If a pull request already exists for the branch, update it instead
-    of attempting to create a second one. Do not report this step complete until the
+  details: After the user approves the overall approach, inspect the worktree and
+    stage every generated proposed PR specification under docs/specs/<feature-name>/
+    and every generated execution workflow under docs/workflows/. Commit all of those
+    artifacts, push the current feature branch with its upstream set, and create or
+    update a draft pull request describing the proposed PRs and their execution
+    workflows. If a pull request already exists for the branch, update it instead of
+    attempting to create a second one. Do not report this step complete until the
     GitHub command succeeds and its output includes the pull request URL. Do not
-    implement the first task or merge the pull request.
+    implement a proposed PR or merge the pull request.
   tool_invocations:
   - tool: shell
     command:
@@ -69,7 +68,8 @@ steps:
     command:
     - git
     - add
-    - docs/workflows/<feature-name>
+    - docs/specs/<feature-name>
+    - docs/workflows
   - tool: shell
     command:
     - git
@@ -92,5 +92,6 @@ steps:
     - "--fill"
 - description: Hand the pull request to the user for review.
   llm_type: standard_reasoning
-  details: Show the pull request URL and summarize the generated workflow and first
-    task. Wait for the user's approval before beginning implementation.
+  details: Show the pull request URL and summarize every proposed PR specification,
+    execution workflow, and dependency relationship. Wait for the user's approval
+    before beginning implementation.

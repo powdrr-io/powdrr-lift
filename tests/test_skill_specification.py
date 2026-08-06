@@ -312,39 +312,45 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert skill.name == "start-implementing-feature"
     first_step_details = skill.steps[0].details
     assert first_step_details is not None
-    assert "templates/implement-a-feature.yaml" in first_step_details
     assert "docs/specs/<feature-name>/" in first_step_details
     assert "exact feature name" in first_step_details
     third_step_details = skill.steps[2].details
     assert third_step_details is not None
-    assert "docs/workflows/<feature-name>/" in third_step_details
+    assert "templates/execute-proposed-pr.yaml" in third_step_details
     assert [step.description for step in skill.steps] == [
         "Confirm the feature name, approved plan documents, and workflow template.",
-        "Prepare an implementation checklist and explain the planning workflow.",
-        "Instantiate the planning workflow and generate its first task.",
-        "Review the generated workflow and first task with the user.",
-        "Commit the generated workflow and open a draft pull request.",
+        "Generate the proposed PR specification templates.",
+        "Instantiate an execute-proposed-pr workflow for every approved PR.",
+        "Validate the overall implementation approach with the user.",
+        "Commit all generated planning artifacts and open a draft pull request.",
         "Hand the pull request to the user for review.",
     ]
     assert [step.llm_type for step in skill.steps] == [
         "standard_reasoning",
+        "simple_task",
+        "simple_task",
         "high_reasoning",
         "simple_task",
         "standard_reasoning",
-        "simple_task",
-        "standard_reasoning",
     ]
+    assert skill.steps[1].tool_invocations[0].command == (
+        "powdrr-lift",
+        "pr-specification",
+        "--work-item-name",
+        "<work-item-name>",
+    )
     assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
         "--work-item-name",
-        "<work-item-name>",
+        "<execute-work-item-name>",
         "--template",
-        "templates/implement-a-feature.yaml",
+        "templates/execute-proposed-pr.yaml",
     )
+    assert "dependencies" in (skill.steps[2].details or "")
     assert [invocation.command for invocation in skill.steps[4].tool_invocations] == [
         ("git", "status", "--short"),
-        ("git", "add", "docs/workflows/<feature-name>"),
+        ("git", "add", "docs/specs/<feature-name>", "docs/workflows"),
         (
             "git",
             "commit",

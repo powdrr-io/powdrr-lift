@@ -79,6 +79,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_provider,
     _resolve_skill_path,
     _resolve_worktree_context,
+    _validate_user_question,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     download_local_qwen_model,
@@ -696,6 +697,21 @@ def test_llm_mapping_rejects_unsupported_provider() -> None:
             mappings=(),
             provider="openai",
         )
+
+
+@pytest.mark.parametrize("value", ["   ", "Please provide the requirements.", "???"])
+def test_user_question_validation_rejects_empty_or_malformed_questions(
+    value: str,
+) -> None:
+    with pytest.raises(RuntimeError, match="properly formed English question"):
+        _validate_user_question(value, field_name="test question")
+
+
+def test_user_question_validation_normalizes_valid_question() -> None:
+    assert (
+        _validate_user_question("  What should this feature do?  ", field_name="test")
+        == "What should this feature do?"
+    )
 
 
 def test_local_model_path_requires_pre_downloaded_q5_k_m_shards(
@@ -1954,7 +1970,7 @@ def test_edit_action_can_update_multiple_files_in_one_response(
 def test_prompt_user_action_requires_nonempty_text() -> None:
     with pytest.raises(
         RuntimeError,
-        match="prompt_user action must include non-empty text",
+        match="properly formed English question",
     ):
         _parse_action_response({"kind": "prompt_user", "text": "  "})
 
@@ -2971,7 +2987,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 )
                 response = {
                     "kind": "prompt_user",
-                    "text": "Please review the draft result.",
+                    "text": "Would you please review the draft result?",
                     "decisions_and_context": "Ask the user to review the draft.",
                 }
             elif self._call_index == 21:
@@ -3102,7 +3118,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     _assert_validation_success(implementation_report, label="implementation")
     _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
-    assert "Please review the draft result." in stdout.getvalue()
+    assert "Would you please review the draft result?" in stdout.getvalue()
 
     start_skills_dir = worktree_root / "skill-definitions"
     start_output_dir = Path("start-generated")
@@ -3483,6 +3499,12 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
             {
                 "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
                 "selected_skill_reason": "Internal reason not shown to users.",
+                "next_question": "   ",
+                "ready_to_execute": False,
+            },
+            {
+                "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
+                "selected_skill_reason": "Internal reason not shown to users.",
                 "next_question": "Which requirements should this feature satisfy?",
                 "ready_to_execute": False,
             },
@@ -3515,6 +3537,7 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
 
     answers = iter(["Build exports", "Requirement details"])
     stdout = io.StringIO()
+    stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
             skills_dir=skills_dir,
@@ -3525,13 +3548,14 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
         ),
         input_func=lambda: next(answers),
         stdout=stdout,
-        stderr=io.StringIO(),
+        stderr=stderr,
     )
 
     assert exit_code == 0
     output = stdout.getvalue()
     assert output.count("Matched skill: specify-a-feature") == 1
     assert "Which requirements should this feature satisfy?" in output
+    assert "skill selection response needs repair" in stderr.getvalue()
     assert "Internal reason not shown to users." not in output
     assert str(skills_dir) not in output
 
@@ -3945,7 +3969,7 @@ def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
     assert calls == 5
     assert "What should this feature accomplish?" in stdout.getvalue()
     assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()
-    assert "received an empty user question" in stderr.getvalue()
+    assert "received an invalid user question" in stderr.getvalue()
 
 
 def test_workflow_action_repair_retries_empty_provider_response_automatically(

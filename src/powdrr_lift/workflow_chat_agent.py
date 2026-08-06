@@ -1138,6 +1138,11 @@ def _parse_selection_response(
     next_question = payload.get("next_question")
     if next_question is not None and not isinstance(next_question, str):
         raise RuntimeError("Skill selection response next_question must be a string.")
+    if next_question is not None:
+        next_question = _validate_user_question(
+            next_question,
+            field_name="Skill selection response next_question",
+        )
     ready_to_execute = bool(payload.get("ready_to_execute"))
     llm_type = _optional_llm_type(payload.get("llm_type"))
     return SkillChatSelection(
@@ -1147,6 +1152,19 @@ def _parse_selection_response(
         ready_to_execute=ready_to_execute,
         llm_type=llm_type,
     )
+
+
+def _validate_user_question(value: str, *, field_name: str) -> str:
+    normalized_value = value.strip()
+    if (
+        not normalized_value
+        or not re.search(r"[A-Za-z]", normalized_value)
+        or not normalized_value.endswith("?")
+    ):
+        raise RuntimeError(
+            f"{field_name} must be a non-empty, properly formed English question."
+        )
+    return normalized_value
 
 
 def _resolve_skill_path(
@@ -1300,6 +1318,10 @@ def _selection_system_prompt() -> str:
         "Choose the best skill for the user's request.\n"
         "If the request is not fully specified, ask exactly one concise "
         "follow-up question.\n"
+        "A user question must be a properly formed English question: it must "
+        "contain meaningful words, cannot be empty or only whitespace, and "
+        "must end with a question mark. Never return whitespace or an "
+        "instruction as next_question.\n"
         "Return JSON with keys: selected_skill_path, selected_skill_reason, "
         "next_question, ready_to_execute, llm_type.\n"
         "llm_type describes the capability needed for the next roundtrip; use "
@@ -1419,7 +1441,9 @@ def _action_system_prompt() -> str:
         "executing the current step.\n"
         "Do not ask for information already present in the transcript or "
         "execution context. Every prompt_user action must include a concise, "
-        "non-empty question or instruction in text.\n"
+        "properly formed English question in text. The question must contain "
+        "meaningful words, cannot be empty or only whitespace, and must end "
+        "with a question mark; never return an instruction or placeholder.\n"
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
@@ -1970,8 +1994,12 @@ def _parse_workflow_action_prompt_user(
     llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
-    if not isinstance(text, str) or not text.strip():
-        raise RuntimeError("Workflow prompt_user action must include non-empty text.")
+    if not isinstance(text, str):
+        raise RuntimeError("Workflow prompt_user action text must be a string.")
+    text = _validate_user_question(
+        text,
+        field_name="Workflow prompt_user action text",
+    )
     return SkillChatAction(
         kind="prompt_user",
         text=(text.strip() if text else None),
@@ -2503,16 +2531,17 @@ def _complete_json_with_repair(
                             f"{context} response was still invalid: {repair_exc}",
                             file=stderr,
                         )
-                        if _is_empty_prompt_user_error(repair_exc):
+                        if _is_invalid_user_question_error(repair_exc):
                             empty_question_reprompts += 1
                             if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
                                 raise RuntimeError(
-                                    f"{context} LLM repeatedly returned an empty "
+                                    f"{context} LLM repeatedly returned an invalid "
                                     "user question."
                                 ) from repair_exc
                             print(
-                                f"{context} received an empty user question. "
-                                "Requesting a clearer question from the LLM "
+                                f"{context} received an invalid user question. "
+                                "Requesting a properly formed English question "
+                                "from the LLM "
                                 f"(attempt {empty_question_reprompts}/"
                                 f"{_MAX_EMPTY_QUESTION_REPROMPTS}).",
                                 file=stderr,
@@ -2523,8 +2552,9 @@ def _complete_json_with_repair(
                                 error_message=str(repair_exc),
                                 repair_instructions=(
                                     repair_instructions
-                                    + " Return a concise, specific, non-empty "
-                                    "question in the prompt_user text field."
+                                    + " Return a concise, specific, properly formed "
+                                    "English question ending with a question mark in "
+                                    "the user-question field."
                                 ),
                                 previous_payload=repaired_payload,
                             )
@@ -2577,16 +2607,17 @@ def _complete_json_with_repair(
                         f"{context} repaired response was still invalid: {repair_exc}",
                         file=stderr,
                     )
-                    if _is_empty_prompt_user_error(repair_exc):
+                    if _is_invalid_user_question_error(repair_exc):
                         empty_question_reprompts += 1
                         if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
                             raise RuntimeError(
-                                f"{context} LLM repeatedly returned an empty user "
+                                f"{context} LLM repeatedly returned an invalid user "
                                 "question."
                             ) from repair_exc
                         print(
-                            f"{context} received an empty user question. "
-                            "Requesting a clearer question from the LLM "
+                            f"{context} received an invalid user question. "
+                            "Requesting a properly formed English question from "
+                            "the LLM "
                             f"(attempt {empty_question_reprompts}/"
                             f"{_MAX_EMPTY_QUESTION_REPROMPTS}).",
                             file=stderr,
@@ -2597,8 +2628,9 @@ def _complete_json_with_repair(
                             error_message=str(repair_exc),
                             repair_instructions=(
                                 repair_instructions
-                                + " Return a concise, specific, non-empty question "
-                                "in the prompt_user text field."
+                                + " Return a concise, specific, properly formed "
+                                "English question ending with a question mark in the "
+                                "user-question field."
                             ),
                             previous_payload=repaired_payload,
                         )
@@ -2624,8 +2656,8 @@ def _print_waiting_for_model(stderr: TextIO, model: str) -> None:
     print(f"waiting for {model} LLM response...", file=stderr, flush=True)
 
 
-def _is_empty_prompt_user_error(exc: RuntimeError) -> bool:
-    return "prompt_user action must include non-empty text" in str(exc)
+def _is_invalid_user_question_error(exc: RuntimeError) -> bool:
+    return "must be a non-empty, properly formed English question" in str(exc)
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:
@@ -2964,7 +2996,10 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
     return (
         "Fix the response so it matches the selection schema with keys "
         "selected_skill_path, selected_skill_reason, next_question, and "
-        f"ready_to_execute. The selected_skill_path must be one of: {catalog_entries}."
+        f"ready_to_execute. The selected_skill_path must be one of: {catalog_entries}. "
+        "If next_question is present, it must be a concise, properly formed "
+        "English question with meaningful words and a trailing question mark; "
+        "it cannot be empty or only whitespace."
     )
 
 
@@ -2977,7 +3012,9 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "decisions_and_context, and llm_type. "
         "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
         "next_step, and complete. "
-        f"The skill steps are: {step_kinds}."
+        f"The skill steps are: {step_kinds}. For prompt_user, text must be a "
+        "concise, properly formed English question with meaningful words and "
+        "a trailing question mark; it cannot be empty or only whitespace."
     )
 
 

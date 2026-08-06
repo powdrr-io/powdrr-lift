@@ -177,6 +177,8 @@ def test_cli_evaluate_reports_validation_failure(tmp_path: Path) -> None:
     report = parse_validation_report(stdout.getvalue())
     assert report.validation_successful is False
     assert report.issues[0].code == "missing_change"
+    assert "Corrective action:" in report.issues[0].message
+    assert "rerun the same evaluate command" in report.issues[0].message
 
 
 def test_cli_evaluate_uses_pr_changelog_path(tmp_path: Path) -> None:

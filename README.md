@@ -152,11 +152,15 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
 - The default mapping combines remote GLM models with local Qwen execution.
-  The first Qwen request automatically downloads the Q5_K_M GGUF shards from
-  `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF` into the Hugging Face cache and reuses
-  them afterward. The local runtime is optional; on Apple Silicon, install it
+  Before starting a workflow that selects Qwen, download the Q5_K_M GGUF
+  shards with `powdrr-lift download-qwen-model`. The command caches them from
+  `Qwen/Qwen2.5-Coder-14B-Instruct-GGUF` in `<project-root>/.powdrr/models`
+  and reuses them across worktrees. The local runtime is optional; on Apple Silicon, install it
   with Metal enabled:
   `CMAKE_ARGS="-DGGML_METAL=on" uv sync --extra local`.
+  The local client defaults to a 24,576-token context for reliable GPU
+  execution on Apple Silicon. Set `POWDRR_LOCAL_MODEL_CONTEXT` to adjust it
+  for a machine with more or less available memory.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
 - Workflow skill steps and every routing/action response carry an `llm_type`
   descriptor. The default mapping routes `high_reasoning` to `glm-5.2`,

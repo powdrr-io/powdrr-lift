@@ -50,9 +50,12 @@ from powdrr_lift.core.spec_context import (
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
+_MAX_EMPTY_QUESTION_REPROMPTS = 3
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
+_DEFAULT_LOCAL_MODEL_CONTEXT = 24576
+_LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 
@@ -344,9 +347,17 @@ class OpenAIChatClient:
 
 
 class LocalLlamaChatClient:
-    def __init__(self, *, model_path: Path, n_ctx: int = 32768) -> None:
+    def __init__(
+        self,
+        *,
+        model_path: Path,
+        n_ctx: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
+    ) -> None:
         try:
-            from llama_cpp import Llama  # type: ignore[import-not-found]
+            from llama_cpp import (  # type: ignore[import-not-found]
+                Llama,
+                llama_supports_gpu_offload,
+            )
         except ImportError as exc:
             raise RuntimeError(
                 "Local provider requires llama-cpp-python. Install the local "
@@ -360,20 +371,41 @@ class LocalLlamaChatClient:
                 "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
                 "model filename containing 'q5_k_m'."
             )
-        self._llama: Any = Llama(
-            model_path=str(model_path),
-            n_ctx=n_ctx,
-            n_gpu_layers=-1,
-            verbose=False,
-        )
+        if not llama_supports_gpu_offload():
+            raise RuntimeError(
+                "Local model execution requires GPU offload support, but the "
+                "installed llama-cpp-python build cannot use a GPU. Reinstall "
+                "the local extra with Metal or CUDA support."
+            )
+        try:
+            self._llama: Any = Llama(
+                model_path=str(model_path),
+                n_ctx=n_ctx,
+                n_gpu_layers=-1,
+                verbose=False,
+            )
+        except Exception as exc:
+            raise LocalModelRuntimeError(
+                "Local Qwen GPU model failed to initialize. The model was "
+                "required to offload all layers to the GPU; no CPU fallback "
+                f"is allowed. Model={model_path}, context={n_ctx}. "
+                f"Underlying error: {exc}"
+            ) from exc
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-        response = self._llama.create_chat_completion(
-            messages=messages,
-            temperature=0,
-            max_tokens=_MAX_COMPLETION_TOKENS,
-            response_format={"type": "json_object"},
-        )
+        try:
+            response = self._llama.create_chat_completion(
+                messages=messages,
+                temperature=0,
+                max_tokens=_MAX_COMPLETION_TOKENS,
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:
+            raise LocalModelRuntimeError(
+                "Local Qwen GPU inference failed. The workflow cannot continue "
+                "with a CPU fallback. Check Metal/CUDA availability, GPU memory, "
+                f"and POWDRR_LOCAL_MODEL_CONTEXT. Underlying error: {exc}"
+            ) from exc
         choices = response.get("choices")
         if not isinstance(choices, list) or not choices:
             raise RuntimeError("Local LLM response did not include any choices.")
@@ -541,6 +573,10 @@ class _ModelUnavailableError(RuntimeError):
     pass
 
 
+class LocalModelRuntimeError(RuntimeError):
+    """Raised when the required local GPU model cannot run."""
+
+
 class _WorkflowProgressDisplay:
     def __init__(
         self,
@@ -599,12 +635,14 @@ def run_workflow_chat(
     stderr: TextIO = sys.stderr,
     progress_callback: Callable[[SkillCatalogEntry, int, str], None] | None = None,
 ) -> int:
+    configured_repo_root = resolve_repo_root(config.repo_root)
     worktree_root = _resolve_worktree_context(
         config.repo_root,
         stderr=stderr,
         verbose=config.verbose,
     )
     repo_root = worktree_root
+    project_root = _resolve_project_root(configured_repo_root, worktree_root)
     skills_dir = config.skills_dir
     if not skills_dir.is_absolute():
         skills_dir = repo_root / skills_dir
@@ -632,7 +670,7 @@ def run_workflow_chat(
             clients[key] = _build_chat_client(
                 selected_credentials,
                 model=selected_model,
-                model_cache_dir=repo_root / ".powdrr" / "models",
+                model_cache_dir=project_root / ".powdrr" / "models",
             )
         return clients[key]
 
@@ -669,6 +707,7 @@ def run_workflow_chat(
     _verbose_print(stderr, config.verbose, f"Initial user request: {user_request}")
     selected_skill: SkillCatalogEntry | None = None
     selection: SkillChatSelection | None = None
+    skill_announced = False
 
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
@@ -716,8 +755,9 @@ def run_workflow_chat(
                 mapping=selection_mapping,
             )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
-        print(f"Matched skill: {selected_skill.path}", file=stdout)
-        print(selection.selected_skill_reason, file=stdout)
+        if not skill_announced:
+            print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
+            skill_announced = True
         if selection.ready_to_execute and selection.next_question is None:
             break
 
@@ -1098,6 +1138,11 @@ def _parse_selection_response(
     next_question = payload.get("next_question")
     if next_question is not None and not isinstance(next_question, str):
         raise RuntimeError("Skill selection response next_question must be a string.")
+    if next_question is not None:
+        next_question = _validate_user_question(
+            next_question,
+            field_name="Skill selection response next_question",
+        )
     ready_to_execute = bool(payload.get("ready_to_execute"))
     llm_type = _optional_llm_type(payload.get("llm_type"))
     return SkillChatSelection(
@@ -1107,6 +1152,19 @@ def _parse_selection_response(
         ready_to_execute=ready_to_execute,
         llm_type=llm_type,
     )
+
+
+def _validate_user_question(value: str, *, field_name: str) -> str:
+    normalized_value = value.strip()
+    if (
+        not normalized_value
+        or not re.search(r"[A-Za-z]", normalized_value)
+        or not normalized_value.endswith("?")
+    ):
+        raise RuntimeError(
+            f"{field_name} must be a non-empty, properly formed English question."
+        )
+    return normalized_value
 
 
 def _resolve_skill_path(
@@ -1209,6 +1267,24 @@ def _resolve_worktree_context(
     return worktree_path
 
 
+def _resolve_project_root(configured_repo_root: Path, worktree_root: Path) -> Path:
+    """Return the primary checkout root used for shared local model storage."""
+    if not _is_dedicated_worktree(configured_repo_root):
+        return configured_repo_root
+    worktree_parts = worktree_root.parts
+    worktree_marker = ".worktrees"
+    if worktree_marker not in worktree_parts:
+        raise RuntimeError(
+            f"Could not determine project root for worktree {worktree_root}."
+        )
+    marker_index = worktree_parts.index(worktree_marker)
+    if marker_index == 0:
+        raise RuntimeError(
+            f"Could not determine project root for worktree {worktree_root}."
+        )
+    return Path(*worktree_parts[:marker_index])
+
+
 def _is_dedicated_worktree(repo_root: Path) -> bool:
     return ".worktrees" in repo_root.parts
 
@@ -1242,6 +1318,10 @@ def _selection_system_prompt() -> str:
         "Choose the best skill for the user's request.\n"
         "If the request is not fully specified, ask exactly one concise "
         "follow-up question.\n"
+        "A user question must be a properly formed English question: it must "
+        "contain meaningful words, cannot be empty or only whitespace, and "
+        "must end with a question mark. Never return whitespace or an "
+        "instruction as next_question.\n"
         "Return JSON with keys: selected_skill_path, selected_skill_reason, "
         "next_question, ready_to_execute, llm_type.\n"
         "llm_type describes the capability needed for the next roundtrip; use "
@@ -1361,7 +1441,9 @@ def _action_system_prompt() -> str:
         "executing the current step.\n"
         "Do not ask for information already present in the transcript or "
         "execution context. Every prompt_user action must include a concise, "
-        "non-empty question or instruction in text.\n"
+        "properly formed English question in text. The question must contain "
+        "meaningful words, cannot be empty or only whitespace, and must end "
+        "with a question mark; never return an instruction or placeholder.\n"
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
@@ -1912,8 +1994,12 @@ def _parse_workflow_action_prompt_user(
     llm_type: str | None,
 ) -> SkillChatAction:
     text = payload.get("text")
-    if not isinstance(text, str) or not text.strip():
-        raise RuntimeError("Workflow prompt_user action must include non-empty text.")
+    if not isinstance(text, str):
+        raise RuntimeError("Workflow prompt_user action text must be a string.")
+    text = _validate_user_question(
+        text,
+        field_name="Workflow prompt_user action text",
+    )
     return SkillChatAction(
         kind="prompt_user",
         text=(text.strip() if text else None),
@@ -2347,6 +2433,7 @@ def _complete_json_with_repair(
     stderr: TextIO,
     fallback_on_transient_exhaustion: bool = False,
 ) -> Any | None:
+    empty_question_reprompts = 0
     while True:
         _verbose_json(
             stderr,
@@ -2364,6 +2451,8 @@ def _complete_json_with_repair(
                 payload,
             )
         except RuntimeError as exc:
+            if isinstance(exc, LocalModelRuntimeError):
+                raise
             if _is_model_unavailable_error(exc):
                 raise _ModelUnavailableError(
                     f"provider reported that model {model!r} is unavailable"
@@ -2442,6 +2531,34 @@ def _complete_json_with_repair(
                             f"{context} response was still invalid: {repair_exc}",
                             file=stderr,
                         )
+                        if _is_invalid_user_question_error(repair_exc):
+                            empty_question_reprompts += 1
+                            if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
+                                raise RuntimeError(
+                                    f"{context} LLM repeatedly returned an invalid "
+                                    "user question."
+                                ) from repair_exc
+                            print(
+                                f"{context} received an invalid user question. "
+                                "Requesting a properly formed English question "
+                                "from the LLM "
+                                f"(attempt {empty_question_reprompts}/"
+                                f"{_MAX_EMPTY_QUESTION_REPROMPTS}).",
+                                file=stderr,
+                            )
+                            messages = _build_json_repair_messages(
+                                messages,
+                                context=context,
+                                error_message=str(repair_exc),
+                                repair_instructions=(
+                                    repair_instructions
+                                    + " Return a concise, specific, properly formed "
+                                    "English question ending with a question mark in "
+                                    "the user-question field."
+                                ),
+                                previous_payload=repaired_payload,
+                            )
+                            continue
             else:
                 print(f"{context} failed: {exc}", file=stderr)
             retry = _prompt_user(
@@ -2490,6 +2607,34 @@ def _complete_json_with_repair(
                         f"{context} repaired response was still invalid: {repair_exc}",
                         file=stderr,
                     )
+                    if _is_invalid_user_question_error(repair_exc):
+                        empty_question_reprompts += 1
+                        if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
+                            raise RuntimeError(
+                                f"{context} LLM repeatedly returned an invalid user "
+                                "question."
+                            ) from repair_exc
+                        print(
+                            f"{context} received an invalid user question. "
+                            "Requesting a properly formed English question from "
+                            "the LLM "
+                            f"(attempt {empty_question_reprompts}/"
+                            f"{_MAX_EMPTY_QUESTION_REPROMPTS}).",
+                            file=stderr,
+                        )
+                        messages = _build_json_repair_messages(
+                            messages,
+                            context=context,
+                            error_message=str(repair_exc),
+                            repair_instructions=(
+                                repair_instructions
+                                + " Return a concise, specific, properly formed "
+                                "English question ending with a question mark in the "
+                                "user-question field."
+                            ),
+                            previous_payload=repaired_payload,
+                        )
+                        continue
             retry = _prompt_user(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
@@ -2509,6 +2654,10 @@ def _complete_json_with_repair(
 
 def _print_waiting_for_model(stderr: TextIO, model: str) -> None:
     print(f"waiting for {model} LLM response...", file=stderr, flush=True)
+
+
+def _is_invalid_user_question_error(exc: RuntimeError) -> bool:
+    return "must be a non-empty, properly formed English question" in str(exc)
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:
@@ -2754,6 +2903,8 @@ def _attempt_json_repair(
             )
             return repaired_payload
         except RuntimeError as exc:
+            if isinstance(exc, LocalModelRuntimeError):
+                raise
             if attempt == attempts:
                 print(f"{context} repair request failed: {exc}", file=stderr)
                 return None
@@ -2845,7 +2996,10 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
     return (
         "Fix the response so it matches the selection schema with keys "
         "selected_skill_path, selected_skill_reason, next_question, and "
-        f"ready_to_execute. The selected_skill_path must be one of: {catalog_entries}."
+        f"ready_to_execute. The selected_skill_path must be one of: {catalog_entries}. "
+        "If next_question is present, it must be a concise, properly formed "
+        "English question with meaningful words and a trailing question mark; "
+        "it cannot be empty or only whitespace."
     )
 
 
@@ -2858,7 +3012,9 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "decisions_and_context, and llm_type. "
         "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
         "next_step, and complete. "
-        f"The skill steps are: {step_kinds}."
+        f"The skill steps are: {step_kinds}. For prompt_user, text must be a "
+        "concise, properly formed English question with meaningful words and "
+        "a trailing question mark; it cannot be empty or only whitespace."
     )
 
 
@@ -2878,6 +3034,9 @@ def _prompt_user(
             answer = _read_interactive_line(prompt, stdout=stdout).strip()
         else:
             answer = input_func().strip()
+        if input_func is not input:
+            stdout.write("\n")
+            stdout.flush()
     if status_stream is not None:
         print("[workflow] thinking...", file=status_stream, flush=True)
     return answer
@@ -2967,7 +3126,10 @@ def _build_chat_client(
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
-        return LocalLlamaChatClient(model_path=resolved_model_path)
+        return LocalLlamaChatClient(
+            model_path=resolved_model_path,
+            n_ctx=_resolve_local_model_context(),
+        )
     limits = _model_limits_for(credentials.provider, model)
     if credentials.provider == "anthropic":
         return AnthropicChatClient(
@@ -3113,6 +3275,18 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
 
 
 def _resolve_local_model_path(model_cache_dir: Path) -> Path:
+    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
+    if _has_all_local_model_shards(cached_model_paths):
+        return cached_model_paths[0]
+    raise RuntimeError(
+        "The local Qwen model is not fully cached. Run "
+        "`powdrr-lift download-qwen-model` before starting workflow-chat. "
+        f"Expected cache={model_cache_dir}."
+    )
+
+
+def download_local_qwen_model(model_cache_dir: Path) -> Path:
+    """Download the local Qwen GGUF shards into the configured cache."""
     model_cache_dir.mkdir(parents=True, exist_ok=True)
     cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
     if _has_all_local_model_shards(cached_model_paths):
@@ -3133,7 +3307,9 @@ def _resolve_local_model_path(model_cache_dir: Path) -> Path:
         )
     except Exception as exc:
         raise RuntimeError(
-            "Could not download the Qwen Q5_K_M model from Hugging Face."
+            "Could not download the Qwen Q5_K_M model from Hugging Face. "
+            f"Repository={_LOCAL_MODEL_REPOSITORY}, cache={model_cache_dir}. "
+            f"Underlying error: {type(exc).__name__}: {exc}"
         ) from exc
     model_paths = sorted(snapshot_directory.glob(_LOCAL_MODEL_PATTERN))
     if not _has_all_local_model_shards(model_paths):
@@ -3149,6 +3325,25 @@ def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
     match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
     expected_shards = int(match.group(1)) if match else 1
     return len(model_paths) >= expected_shards
+
+
+def _resolve_local_model_context() -> int:
+    configured_context = os.environ.get(_LOCAL_MODEL_CONTEXT_ENV)
+    if configured_context is None or not configured_context.strip():
+        return _DEFAULT_LOCAL_MODEL_CONTEXT
+    try:
+        context = int(configured_context)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        ) from exc
+    if context <= 0:
+        raise RuntimeError(
+            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        )
+    return context
 
 
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:

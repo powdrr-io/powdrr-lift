@@ -1,21 +1,25 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+import types
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Thread
 from typing import Any, TextIO, cast
 from unittest.mock import patch
 from urllib.request import Request
 
 import pytest
 import yaml
+from textual.widgets import ListView, Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -49,6 +53,8 @@ from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     LLMModelLimits,
     LLMModelMapping,
+    LocalLlamaChatClient,
+    LocalModelRuntimeError,
     OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
@@ -67,16 +73,126 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_base_url,
     _resolve_llm_mapping,
     _resolve_llm_model,
+    _resolve_local_model_context,
     _resolve_local_model_path,
+    _resolve_project_root,
     _resolve_provider,
     _resolve_skill_path,
     _resolve_worktree_context,
+    _validate_user_question,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
+    download_local_qwen_model,
     run_workflow_chat,
+)
+from powdrr_lift.workflow_chat_tui import (
+    WorkflowChatApp,
+    _TextualStdoutOutput,
 )
 
 # ruff: noqa: E501
+
+
+def test_local_llama_client_errors_without_gpu_offload_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+    model_path.touch()
+    llama_module = types.SimpleNamespace(
+        Llama=lambda **_: pytest.fail("Llama must not load without GPU support"),
+        llama_supports_gpu_offload=lambda: False,
+    )
+    monkeypatch.setitem(sys.modules, "llama_cpp", llama_module)
+
+    with pytest.raises(RuntimeError, match="requires GPU offload support"):
+        LocalLlamaChatClient(model_path=model_path)
+
+
+def test_local_llama_client_requests_full_gpu_offload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+    model_path.touch()
+    captured: dict[str, object] = {}
+
+    class FakeLlama:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    llama_module = types.SimpleNamespace(
+        Llama=FakeLlama,
+        llama_supports_gpu_offload=lambda: True,
+    )
+    monkeypatch.setitem(sys.modules, "llama_cpp", llama_module)
+
+    LocalLlamaChatClient(model_path=model_path)
+
+    assert captured["n_gpu_layers"] == -1
+    assert captured["n_ctx"] == 24576
+
+
+def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
+
+    assert _resolve_local_model_context() == 8192
+
+
+def test_local_model_context_rejects_invalid_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "not-a-number")
+
+    with pytest.raises(RuntimeError, match="POWDRR_LOCAL_MODEL_CONTEXT"):
+        _resolve_local_model_context()
+
+
+def test_local_llama_client_reports_gpu_initialization_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+
+    def fail_to_load(**_: object) -> object:
+        raise ValueError("failed to create Metal command queue")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llama_cpp",
+        types.SimpleNamespace(
+            Llama=fail_to_load,
+            llama_supports_gpu_offload=lambda: True,
+        ),
+    )
+    model_path.touch()
+
+    with pytest.raises(LocalModelRuntimeError, match="no CPU fallback"):
+        LocalLlamaChatClient(model_path=model_path)
+
+
+def test_local_llama_client_reports_gpu_inference_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+
+    class FailingLlama:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def create_chat_completion(self, **_: object) -> object:
+            raise RuntimeError("llama_decode returned -3")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llama_cpp",
+        types.SimpleNamespace(
+            Llama=FailingLlama,
+            llama_supports_gpu_offload=lambda: True,
+        ),
+    )
+    model_path.touch()
+    client = LocalLlamaChatClient(model_path=model_path)
+
+    with pytest.raises(LocalModelRuntimeError, match="inference failed"):
+        client.complete_json([{"role": "user", "content": "test"}])
 
 
 def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
@@ -150,8 +266,382 @@ def test_prompt_user_reports_thinking_after_input() -> None:
     )
 
     assert answer == "answer"
-    assert stdout.getvalue() == "Question: "
+    assert stdout.getvalue() == "Question: \n"
     assert status_stream.getvalue() == "[workflow] thinking...\n"
+
+
+def test_textual_response_grows_and_submits_on_return(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: list[str] = []
+
+    def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
+        kwargs["stdout"].write("What do you want to do? ")
+        received.append(kwargs["input_func"]())
+        return 0 if len(received) == 1 else 1
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
+        fake_run_workflow_chat,
+    )
+
+    async def exercise() -> int:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert "What do you want to do?" in str(
+                app.query_one("#status", Static).render()
+            )
+            response = app.query_one("#response", TextArea)
+            response.text = "line one\nline two"
+            await pilot.pause()
+            height_style = response.styles.height
+            assert height_style is not None
+            height = int(height_style.value)
+            await pilot.press("enter")
+            for _ in range(20):
+                await pilot.pause(0.05)
+                if received:
+                    break
+            assert "Workflow complete" in str(app.query_one("#status", Static).render())
+            response.text = "follow-up request"
+            await pilot.press("enter")
+            await pilot.pause(0.1)
+            return height
+
+    height = asyncio.run(exercise())
+
+    assert height >= 4
+    assert received == ["line one\nline two", "follow-up request"]
+
+
+def test_textual_response_grows_for_wrapped_text() -> None:
+    async def exercise() -> tuple[int, float]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "x" * 200
+            await pilot.pause()
+            height_style = response.styles.height
+            assert height_style is not None
+            height = int(height_style.value)
+            return height, response.scroll_y
+
+    height, scroll_y = asyncio.run(exercise())
+    assert height > 3
+    assert scroll_y == 0
+
+
+def test_textual_startup_shows_initial_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
+        kwargs["stdout"].write("What do you want to do? ")
+        kwargs["input_func"]()
+        return 1
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
+        fake_run_workflow_chat,
+    )
+
+    async def exercise() -> tuple[str, bool]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            response = app.query_one("#response", TextArea)
+            return str(app.query_one("#status", Static).render()), response.disabled
+
+    assert asyncio.run(exercise()) == ("What do you want to do?", False)
+
+
+def test_textual_quit_unblocks_workflow_input() -> None:
+    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+
+    app.action_quit_workflow()
+
+    assert app._answers.get_nowait() == ""
+
+
+def test_textual_input_marker_preserves_follow_up_question() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._set_message("Which requirements should this feature satisfy?")
+            app._show_prompt("> ")
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
+
+
+def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "Build the feature"
+            app._submit_response()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "thinking..."
+
+
+def test_textual_submit_removes_initial_prompt_from_status() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._show_initial_prompt("What do you want to do?")
+            response = app.query_one("#response", TextArea)
+            response.text = "Build the feature"
+            app._submit_response()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "thinking..."
+
+
+def test_textual_status_is_visible_and_not_collapsed() -> None:
+    async def exercise() -> tuple[str, int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            status = app.query_one("#status", Static)
+            await pilot.pause()
+            app._set_status("x" * 200)
+            await pilot.pause()
+            return str(status.render()), status.region.height, status.region.width
+
+    rendered, height, width = asyncio.run(exercise())
+    assert rendered.startswith("x")
+    assert height > 4
+    assert width == 80
+
+
+def test_textual_panels_have_the_same_width() -> None:
+    async def exercise() -> tuple[int, int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            return (
+                app.query_one("#steps", ListView).region.width,
+                app.query_one("#status", Static).region.width,
+                app.query_one("#response", TextArea).region.width,
+            )
+
+    assert asyncio.run(exercise()) == (80, 80, 80)
+
+
+def test_textual_status_shows_latest_output() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            for message in ("first", "second", "third", "fourth"):
+                app._set_message(message)
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "first\n\nsecond\n\nthird\n\nfourth"
+
+
+def test_textual_status_keeps_all_questions_visible() -> None:
+    async def exercise() -> tuple[str, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            status = app.query_one("#status", Static)
+            for question in (
+                "1. What should be logged?",
+                "2. Which file format should be used?",
+                "3. Which platforms should be supported?",
+                "4. What should be redacted?",
+                "5. What performance constraints apply?",
+            ):
+                app._set_message(question)
+            await pilot.pause()
+            return str(status.render()), status.region.height
+
+    rendered, height = asyncio.run(exercise())
+    assert all(f"{number}." in rendered for number in range(1, 6))
+    assert height > 4
+
+
+def test_textual_output_hides_debug_and_promotes_question() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualStdoutOutput(app)
+
+            def write_output() -> None:
+                output.write("Matched skill: internal-debug\n")
+                output.write("Which requirements should this feature satisfy?\n")
+                output.write("> ")
+
+            writer = Thread(target=write_output)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            status = app.query_one("#status", Static)
+            return str(status.render()), str(status.render())
+
+    assert asyncio.run(exercise()) == (
+        "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
+        "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
+    )
+
+
+def test_textual_output_keeps_multiline_question_complete() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualStdoutOutput(app)
+
+            def write_output() -> None:
+                output.write("What do you want to do? ")
+                output.write("Matched skill: specify-a-feature\n")
+                output.write(
+                    "1. What is the feature goal?\n"
+                    "2. Which requirements matter?\n"
+                    "Please answer whichever of these you can.\n"
+                )
+                output.flush()
+                output.write("Matched skill: next-skill\n")
+                output.write("Next question?\n")
+                output.flush()
+
+            writer = Thread(target=write_output)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "Matched skill: specify-a-feature\n\n"
+        "1. What is the feature goal?\n"
+        "2. Which requirements matter?\n"
+        "Please answer whichever of these you can.\n\n"
+        "Matched skill: next-skill\n\n"
+        "Next question?"
+    )
+
+
+def test_textual_execution_transition_clears_matched_skill_buffer() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+            app._set_message("Matched skill: specify-a-feature")
+            app._apply_progress(
+                skill,
+                current_step_index=0,
+                status="waiting on LLM response...",
+            )
+            app._show_prompt("What is the feature goal?")
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert rendered == "What is the feature goal?"
+    assert "Matched skill: specify-a-feature" not in rendered
+
+
+def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualStdoutOutput(app)
+
+            def write_initial_prompt() -> None:
+                output.write("What do you want to do? ")
+
+            writer = Thread(target=write_initial_prompt)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            response = app.query_one("#response", TextArea)
+            response.text = "Specify the feature"
+            app._submit_response()
+
+            def write_matched_skill() -> None:
+                output.write("Matched skill: specify-a-feature\n")
+                output.flush()
+
+            writer = Thread(target=write_matched_skill)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert rendered == "Matched skill: specify-a-feature"
+    assert "What do you want to do?" not in rendered
+    assert "thinking..." not in rendered
+
+
+def test_textual_response_supports_copy() -> None:
+    async def exercise() -> tuple[bool, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "copy this output"
+            response.select_all()
+            response.focus()
+            app.action_copy_selection()
+            await pilot.pause()
+            return response.read_only, app.clipboard
+
+    assert asyncio.run(exercise()) == (False, "copy this output")
+
+
+def test_textual_response_supports_cut_through_app_action() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "cut this response"
+            response.select_all()
+            response.focus()
+            app.action_cut_selection()
+            await pilot.pause()
+            return response.text, app.clipboard
+
+    assert asyncio.run(exercise()) == ("", "cut this response")
+
+
+def test_textual_response_supports_cut_key_without_beeping() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "cut this response"
+            response.select_all()
+            response.focus()
+            await pilot.press("ctrl+x")
+            await pilot.pause()
+            return response.text, app.clipboard
+
+    assert asyncio.run(exercise()) == ("", "cut this response")
 
 
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
@@ -209,7 +699,29 @@ def test_llm_mapping_rejects_unsupported_provider() -> None:
         )
 
 
-def test_local_model_path_downloads_q5_k_m_shards_automatically(
+@pytest.mark.parametrize("value", ["   ", "Please provide the requirements.", "???"])
+def test_user_question_validation_rejects_empty_or_malformed_questions(
+    value: str,
+) -> None:
+    with pytest.raises(RuntimeError, match="properly formed English question"):
+        _validate_user_question(value, field_name="test question")
+
+
+def test_user_question_validation_normalizes_valid_question() -> None:
+    assert (
+        _validate_user_question("  What should this feature do?  ", field_name="test")
+        == "What should this feature do?"
+    )
+
+
+def test_local_model_path_requires_pre_downloaded_q5_k_m_shards(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(RuntimeError, match="download-qwen-model"):
+        _resolve_local_model_path(tmp_path)
+
+
+def test_download_local_model_caches_q5_k_m_shards(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -233,9 +745,27 @@ def test_local_model_path_downloads_q5_k_m_shards_automatically(
 
     monkeypatch.setitem(sys.modules, "huggingface_hub", _FakeHuggingFaceHub)
 
-    assert _resolve_local_model_path(tmp_path) == first_shard
-    assert _resolve_local_model_path(tmp_path) == first_shard
+    assert download_local_qwen_model(tmp_path) == first_shard
     assert download_calls == 1
+
+
+def test_local_model_download_reports_underlying_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FailingHuggingFaceHub:
+        @staticmethod
+        def snapshot_download(**_: object) -> str:
+            raise OSError("TLS handshake failed")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        _FailingHuggingFaceHub,
+    )
+
+    with pytest.raises(RuntimeError, match="OSError: TLS handshake failed"):
+        download_local_qwen_model(tmp_path)
 
 
 def test_request_token_budget_reserves_input_context_and_model_limit() -> None:
@@ -572,6 +1102,27 @@ def test_cli_workflow_chat_wires_configuration(
     assert config.model == "test-model"
     assert config.max_stalled_roundtrips == 5
     assert config.verbose is False
+
+
+def test_cli_download_qwen_model_uses_repository_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    captured: dict[str, Path] = {}
+    model_path = repo_root / ".powdrr" / "models" / "model.gguf"
+
+    def _fake_download(cache_dir: Path) -> Path:
+        captured["cache_dir"] = cache_dir
+        return model_path
+
+    monkeypatch.setattr("powdrr_lift.cli.download_local_qwen_model", _fake_download)
+
+    assert main(["download-qwen-model", "--repo-root", str(repo_root)]) == 0
+    assert captured["cache_dir"] == repo_root / ".powdrr" / "models"
+    assert capsys.readouterr().out == f"Qwen model cached at {model_path}\n"
 
 
 def test_workflow_execution_allows_more_roundtrips_than_max_turns(
@@ -1419,7 +1970,7 @@ def test_edit_action_can_update_multiple_files_in_one_response(
 def test_prompt_user_action_requires_nonempty_text() -> None:
     with pytest.raises(
         RuntimeError,
-        match="prompt_user action must include non-empty text",
+        match="properly formed English question",
     ):
         _parse_action_response({"kind": "prompt_user", "text": "  "})
 
@@ -2436,7 +2987,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 )
                 response = {
                     "kind": "prompt_user",
-                    "text": "Please review the draft result.",
+                    "text": "Would you please review the draft result?",
                     "decisions_and_context": "Ask the user to review the draft.",
                 }
             elif self._call_index == 21:
@@ -2567,7 +3118,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     _assert_validation_success(implementation_report, label="implementation")
     _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
-    assert "Please review the draft result." in stdout.getvalue()
+    assert "Would you please review the draft result?" in stdout.getvalue()
 
     start_skills_dir = worktree_root / "skill-definitions"
     start_output_dir = Path("start-generated")
@@ -2932,6 +3483,83 @@ def test_run_workflow_chat_verbose_prints_progress(
     assert (worktree_root / output_dir / "skill-execution.json").exists()
 
 
+def test_run_workflow_chat_prints_selection_follow_up_question(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "follow-up-skill.yaml")
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
+                "selected_skill_reason": "Internal reason not shown to users.",
+                "next_question": "   ",
+                "ready_to_execute": False,
+            },
+            {
+                "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
+                "selected_skill_reason": "Internal reason not shown to users.",
+                "next_question": "Which requirements should this feature satisfy?",
+                "ready_to_execute": False,
+            },
+            {
+                "selected_skill_path": str(skills_dir / "follow-up-skill.yaml"),
+                "selected_skill_reason": "Internal reason not shown to users.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {"kind": "complete", "text": "Skill execution complete."},
+        ]
+    )
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            return next(responses)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    answers = iter(["Build exports", "Requirement details"])
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=tmp_path / "generated",
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=lambda: next(answers),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    output = stdout.getvalue()
+    assert output.count("Matched skill: specify-a-feature") == 1
+    assert "Which requirements should this feature satisfy?" in output
+    assert "skill selection response needs repair" in stderr.getvalue()
+    assert "Internal reason not shown to users." not in output
+    assert str(skills_dir) not in output
+
+
 def test_run_workflow_chat_uses_anthropic_provider(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -3270,6 +3898,78 @@ def test_run_workflow_chat_repairs_missing_action_fields(
     assert cast(int, captured["calls"]) == 3
     assert "response needs repair" in stderr.getvalue()
     assert (worktree_root / "generated" / "skill-execution.json").exists()
+
+
+def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+
+    calls = 0
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": "The request is to specify a feature.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if calls in {2, 3}:
+                return {"kind": "prompt_user", "text": "   "}
+            if calls == 4:
+                assert "non-empty" in messages[-1]["content"]
+                return {
+                    "kind": "prompt_user",
+                    "text": "What should this feature accomplish?",
+                }
+            if calls == 5:
+                return {"kind": "complete", "text": "Skill execution complete."}
+            raise AssertionError(f"Unexpected call count: {calls}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+            provider_retry_delay_seconds=0,
+        ),
+        input_func=iter(["Build exports", "The feature should accomplish X"]).__next__,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert calls == 5
+    assert "What should this feature accomplish?" in stdout.getvalue()
+    assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()
+    assert "received an invalid user question" in stderr.getvalue()
 
 
 def test_workflow_action_repair_retries_empty_provider_response_automatically(
@@ -3652,6 +4352,16 @@ def test_resolve_worktree_context_uses_existing_dedicated_worktree(
 
     assert resolved == worktree_root.resolve()
     assert "Using existing worktree context" in stderr.getvalue()
+
+
+def test_local_model_cache_uses_primary_project_root_for_worktree() -> None:
+    project_root = Path("/Users/test/project")
+    worktree_root = project_root / ".worktrees" / "skill-chat"
+
+    assert (
+        _resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
+        == project_root
+    )
 
 
 def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checkout(

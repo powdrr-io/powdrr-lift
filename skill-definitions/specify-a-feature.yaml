@@ -115,11 +115,38 @@ steps:
     specification remains invalid.
 - description: Create or update the pull request for the validated feature.
   llm_type: simple_task
-  details: Create the draft pull request from the feature branch with the validated
-    specification documents, feature intent, proposed PR scope, and validation evidence.
-    If a pull request already exists for the branch, update it instead. Do not begin
-    implementation in this skill.
+  details: Before creating or updating the pull request, inspect the worktree, stage
+    only the validated specification artifacts under docs/specs/<work-item-name>/,
+    commit them, and push the current feature branch with its upstream set. Then
+    create the draft pull request with the validated specification documents, feature
+    intent, proposed PR scope, and validation evidence. If a pull request already
+    exists for the branch, update it instead of attempting to create a second one.
+    Do not report this step complete until the GitHub command succeeds and its output
+    includes the pull request URL. Do not begin implementation in this skill.
   tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - "--short"
+  - tool: shell
+    command:
+    - git
+    - add
+    - docs/specs/<work-item-name>
+  - tool: shell
+    command:
+    - git
+    - commit
+    - -m
+    - "Add <work-item-name> feature specification"
+  - tool: shell
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
   - tool: shell
     command:
     - gh

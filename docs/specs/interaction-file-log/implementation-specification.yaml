@@ -1,0 +1,48 @@
+# Implementation specification template.
+#
+# Instructions:
+# - Use the work item folder `docs/specs/interaction-file-log`.
+# - Keep `architecture_id` aligned with the architecture specification.
+# - Copy entity ids and relationship ids only from the architecture
+#   specification listed below.
+# - Give every entity and entity relationship an `action` of `added`
+#   or `removed`.
+# - Include `supercedes` only when it lists one or more ids; omit the
+#   field when it would be empty.
+# - Treat entity relationships with the same item shape as entities:
+#   `id`, `action`, `rationale`, and optional `supercedes`.
+# - Give each feature and decision an `action` of `added` or
+#   `removed`.
+# - Include `supercedes` only when it lists one or more ids; omit the
+#   field when it would be empty.
+# - Give each feature a unique id, description, and functional
+#   requirements.
+# - Give each decision a unique id and description.
+#
+schema: https://powdrr.io/schemas/specification-v1
+# Architecture id: 2026-08-06
+# Available entities:
+# - log-entry
+# Available relationships:
+title: Interaction File Log Implementation Specification
+architecture_id: "2026-08-06"
+entities:
+  - id: log-entry
+    action: added
+    rationale: 'Cites "log-interactions" and "append-interactions" - every interaction input and output must be logged as a discrete entry.'
+entity_relationships: []
+features:
+  - id: log-interactions
+    action: added
+    description: Log all human and LLM interactions (input and output) to a file.
+    functional_requirements:
+      - Each log entry must be a single valid JSON object on its own line in the log file.
+      - Binary content in interactions must be encoded (e.g., base64) within the JSONL entry to preserve data integrity.
+      - The log file must reside in the .powdrr hidden directory.
+      - Writes to the log file should be append-only to prevent data corruption and ensure every interaction is recorded.
+      - The .powdrr directory should be created if it does not already exist when writing the first log entry.
+      - Append a timestamp to the file name to make each CLI session get a unique file.
+decisions:
+  - id: -binary-support
+    action: added
+    description: Ensure JSON and binary field work.

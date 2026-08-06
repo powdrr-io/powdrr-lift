@@ -141,7 +141,11 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert "# - feature-a" in template_text
     assert "# - feature-b" in template_text
     assert (
-        "# - Delete these instructions and replace with a comment saying that"
+        "# - Delete these instructions and replace them with this comment at the top:"
+        in template_text
+    )
+    assert (
+        '#   "# This file is read-only and should never be edited by a tool or agent."'
         in template_text
     )
     assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
@@ -307,9 +311,8 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     # - Reference one or more current feature ids from the codebase state
     #   listed below.
     # - Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`.
-    # - Delete these instructions and replace with a comment saying that
-    #   this file is read-only and should never be editted by a tool or
-    #   agent.
+    # - Delete these instructions and replace them with this comment at the top:
+    #   "# This file is read-only and should never be edited by a tool or agent."
     # - Add acceptance criteria, expected tests, expected outcomes,
     #   required test cases, non-goals, and risks as concrete lists with `id` and
     #   `description`.

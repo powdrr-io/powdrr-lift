@@ -108,9 +108,8 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
         "# - Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`.",
-        "# - Delete these instructions and replace with a comment saying that",
-        "#   this file is read-only and should never be editted by a tool or",
-        "#   agent.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+        '#   "# This file is read-only and should never be edited by a tool or agent."',
         "# - Add acceptance criteria, expected tests, expected outcomes,",
         "#   required test cases, non-goals, and risks as concrete lists with `id` and",
         "#   `description`.",
@@ -706,7 +705,7 @@ def _validate_template_boilerplate_removed(
     boilerplate_markers = (
         "# PR specification template.",
         "# Current feature ids:",
-        "# - Delete these instructions and replace with a comment saying that",
+        "# - Delete these instructions and replace them with this comment at the top:",
     )
     for marker in boilerplate_markers:
         if marker in proposed_pr_specification_yaml:

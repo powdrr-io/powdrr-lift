@@ -44,11 +44,11 @@ def test_create_system_map_specification_template_prepopulates_current_index(
         "# - Analyze the full codebase deeply before writing anything." in template_text
     )
     assert (
-        "# - Delete these instructions and replace with a comment saying that"
+        "# - Delete these instructions and replace them with this comment at the top:"
         in template_text
     )
     assert (
-        "#   this file is read-only and should never be editted by a tool or"
+        '#   "# This file is read-only and should never be edited by a tool or agent."'
         in template_text
     )
     assert "system-map-feature-current-state" in template_text
@@ -138,11 +138,11 @@ def test_create_system_map_specification_template_uses_compact_instructions(
         "on to the next step" in template_text
     )
     assert (
-        "# - Delete these instructions and replace with a comment saying that"
+        "# - Delete these instructions and replace them with this comment at the top:"
         in template_text
     )
     assert (
-        "#   this file is read-only and should never be editted by a tool or"
+        '#   "# This file is read-only and should never be edited by a tool or agent."'
         in template_text
     )
     assert (

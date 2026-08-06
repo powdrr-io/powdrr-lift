@@ -68,9 +68,8 @@ def render_system_specification_template(
         "# Instructions:",
         f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
         "# - Fill in the requirements and approach sections.",
-        "# - Delete these instructions and replace with a comment saying that",
-        "#   this file is read-only and should never be editted by a tool or",
-        "#   agent.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+        '#   "# This file is read-only and should never be edited by a tool or agent."',
         "# - Set `id` to a unique identifier for this system description.",
         "# - Use `state: added` for new items and include a description.",
         "# - Use `state: removed` for retired items and leave description empty.",
@@ -184,6 +183,11 @@ def build_system_specification_validation_report(
             approach_ids=[],
             issues=issues,
         )
+
+    _validate_template_boilerplate_removed(
+        proposed_system_specification_yaml,
+        issues=issues,
+    )
 
     system_id = _required_string(
         raw_spec.get("id"),
@@ -436,6 +440,30 @@ def _validate_boilerplate_removed(
                     path=f"{section_name}[{index}]",
                 )
             )
+
+
+def _validate_template_boilerplate_removed(
+    proposed_system_specification_yaml: str,
+    *,
+    issues: list[SystemSpecificationValidationIssue],
+) -> None:
+    boilerplate_markers = (
+        "# System specification template.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+    )
+    if any(
+        marker in proposed_system_specification_yaml for marker in boilerplate_markers
+    ):
+        issues.append(
+            SystemSpecificationValidationIssue(
+                code="template_boilerplate_not_removed",
+                message=(
+                    "Remove the template instructions before validating the "
+                    "system specification."
+                ),
+                path=None,
+            )
+        )
 
 
 def _validate_section_item(

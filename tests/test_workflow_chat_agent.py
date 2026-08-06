@@ -19,6 +19,7 @@ from urllib.request import Request
 
 import pytest
 import yaml
+from textual.containers import ScrollableContainer
 from textual.widgets import ListView, Static, TextArea
 
 from powdrr_lift.cli import main
@@ -762,6 +763,33 @@ def test_textual_response_supports_command_paste_from_native_clipboard(
         check=True,
         capture_output=True,
         text=True,
+    )
+
+
+def test_textual_read_only_panels_support_copy_and_cut() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+            app._apply_progress(skill, current_step_index=0, status="running")
+            app._set_message("green output")
+            status_container = app.query_one("#status-container", ScrollableContainer)
+            status_container.focus()
+            await pilot.pause()
+            await pilot.press("super+c")
+            green_clipboard = app.clipboard
+            steps = app.query_one("#steps", ListView)
+            steps.focus()
+            await pilot.pause()
+            await pilot.press("super+x")
+            await pilot.pause()
+            return green_clipboard, app.clipboard
+
+    assert asyncio.run(exercise()) == (
+        "green output",
+        "1. Capture the feature goal.\n2. Summarize the result.",
     )
 
 

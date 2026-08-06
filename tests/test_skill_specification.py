@@ -326,6 +326,14 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "Commit the generated workflow and open a draft pull request.",
         "Hand the pull request to the user for review.",
     ]
+    assert [step.llm_type for step in skill.steps] == [
+        "standard_reasoning",
+        "high_reasoning",
+        "simple_task",
+        "standard_reasoning",
+        "simple_task",
+        "standard_reasoning",
+    ]
     assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
@@ -334,6 +342,18 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--template",
         "templates/implement-a-feature.yaml",
     )
+    assert [invocation.command for invocation in skill.steps[4].tool_invocations] == [
+        ("git", "status", "--short"),
+        ("git", "add", "docs/workflows/<feature-name>"),
+        (
+            "git",
+            "commit",
+            "-m",
+            "Add <feature-name> implementation workflow",
+        ),
+        ("git", "push", "-u", "origin", "HEAD"),
+        ("gh", "pr", "create", "--draft", "--fill"),
+    ]
 
 
 def test_checked_in_review_system_skill_definition_matches_review_flow() -> None:

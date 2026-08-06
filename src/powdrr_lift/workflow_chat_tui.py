@@ -213,6 +213,8 @@ class WorkflowChatApp(App[None]):
 
     def on_mount(self) -> None:
         self._response = self.query_one("#response", TextArea)
+        self.query_one("#status-container", ScrollableContainer).can_focus = True
+        self.query_one("#steps", ListView).can_focus = True
         # Paint the initial state before starting any repository or LLM work.
         # The worker can block during setup, so this must not be the first
         # operation that establishes visible state.
@@ -254,16 +256,22 @@ class WorkflowChatApp(App[None]):
         text_area = self._selected_text_area()
         if text_area is not None:
             text_area.action_copy()
+            return
+        if text := self._focused_box_text():
+            self.copy_to_clipboard(text)
 
     def action_cut_selection(self) -> None:
         text_area = self._selected_text_area()
         if text_area is not None:
             text_area.action_cut()
+            return
+        # The green and orange panels are read-only, so cut has the useful
+        # clipboard portion of the operation without deleting workflow output.
+        self.action_copy_selection()
 
     def action_paste_selection(self) -> None:
-        text_area = self._focused_text_area()
-        if isinstance(text_area, _WorkflowResponseTextArea):
-            text_area.paste_text(self._read_clipboard())
+        if isinstance(self.focused, _WorkflowResponseTextArea):
+            self.focused.paste_text(self._read_clipboard())
 
     async def on_key(self, event: Key) -> None:
         if event.key in {"ctrl+c", "meta+c", "super+c"}:
@@ -279,10 +287,15 @@ class WorkflowChatApp(App[None]):
             event.prevent_default()
             self.action_paste_selection()
 
-    def _focused_text_area(self) -> TextArea | None:
-        if isinstance(self.focused, TextArea):
-            return self.focused
-        return self._response
+    def _focused_box_text(self) -> str | None:
+        status_container = self.query_one("#status-container", ScrollableContainer)
+        if status_container.has_focus_within:
+            return self._status_content()
+        steps = self.query_one("#steps", ListView)
+        if steps.has_focus_within:
+            labels = [item.query_one(Label) for item in steps.query(ListItem)]
+            return "\n".join(str(label.render()) for label in labels)
+        return None
 
     def _read_clipboard(self) -> str:
         if sys.platform == "darwin":
@@ -464,16 +477,20 @@ class WorkflowChatApp(App[None]):
     def _render_status(self) -> None:
         status_container = self.query_one("#status-container", ScrollableContainer)
         status_widget = self.query_one("#status", Label)
+        content = self._status_content()
+        status_widget.update(self._status_text(content))
+        status_container.scroll_end(animate=False)
+        status_container.call_after_refresh(status_container.scroll_end, animate=False)
+        status_widget.refresh(repaint=True)
+
+    def _status_content(self) -> str:
         if self._message_history:
             content = "\n\n".join(self._message_history)
             if self._message_history[-1] != self._current_status:
                 content += f"\n\n{self._current_status}"
         else:
             content = self._current_status
-        status_widget.update(self._status_text(content))
-        status_container.scroll_end(animate=False)
-        status_container.call_after_refresh(status_container.scroll_end, animate=False)
-        status_widget.refresh(repaint=True)
+        return content
 
     @staticmethod
     def _status_text(content: str) -> Text:

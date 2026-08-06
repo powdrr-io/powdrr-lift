@@ -8,10 +8,12 @@ when_to_use:
   user review.
 steps:
 - description: Confirm the feature name, approved plan documents, and workflow template.
+  llm_type: standard_reasoning
   details: Capture the exact feature name used by specify-a-feature and confirm the
     approved plan documents in docs/specs/<feature-name>/. Use templates/implement-a-feature.yaml
     as the planning workflow template.
 - description: Prepare an implementation checklist and explain the planning workflow.
+  llm_type: high_reasoning
   details: For every approved proposed PR, identify the code files, tests, acceptance
     criteria, dependencies, and validation commands before implementation begins.
     Explain how the planning workflow will review the documents, confirm requirements,
@@ -25,6 +27,7 @@ steps:
     - 1,260p
     - templates/implement-a-feature.yaml
 - description: Instantiate the planning workflow and generate its first task.
+  llm_type: simple_task
   details: Use the repository's workflow-template and workflow-task models to create
     docs/workflows/<feature-name>/ with one persisted task per planning template task.
     Its final task generates the proposed PR specs and one execute-proposed-pr workflow
@@ -42,15 +45,44 @@ steps:
     - "--template"
     - templates/implement-a-feature.yaml
 - description: Review the generated workflow and first task with the user.
+  llm_type: standard_reasoning
   details: Inspect the generated files and show the first task's description, inputs,
     dependencies, and expected output. If the workflow or first task is not appropriate,
     ask what should change and update the artifacts before creating the pull request.
 - description: Commit the generated workflow and open a draft pull request.
-  details: After the user confirms the generated workflow looks correct, commit only
-    the workflow artifacts, push the feature branch, and create a draft pull request
-    describing the selected template and first task. Do not implement the first task
-    or merge the pull request.
+  llm_type: simple_task
+  details: After the user confirms the generated workflow looks correct, inspect the
+    worktree, stage every generated artifact under docs/workflows/<feature-name>/,
+    commit those artifacts, and push the current feature branch with its upstream
+    set. Then create or update a draft pull request describing the selected template
+    and first task. If a pull request already exists for the branch, update it instead
+    of attempting to create a second one. Do not report this step complete until the
+    GitHub command succeeds and its output includes the pull request URL. Do not
+    implement the first task or merge the pull request.
   tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - "--short"
+  - tool: shell
+    command:
+    - git
+    - add
+    - docs/workflows/<feature-name>
+  - tool: shell
+    command:
+    - git
+    - commit
+    - -m
+    - "Add <feature-name> implementation workflow"
+  - tool: shell
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
   - tool: shell
     command:
     - gh
@@ -59,5 +91,6 @@ steps:
     - "--draft"
     - "--fill"
 - description: Hand the pull request to the user for review.
+  llm_type: standard_reasoning
   details: Show the pull request URL and summarize the generated workflow and first
     task. Wait for the user's approval before beginning implementation.

@@ -76,6 +76,8 @@ def render_architecture_specification_template(
         "#   relationship listed in each item's related block.",
         "# - Keep every entity mentioned in a relationship, invariant, or",
         "#   guidance item present in the `entities` section.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+        '#   "# This file is read-only and should never be edited by a tool or agent."',
         "#",
         f"schema: {SPECIFICATION_SCHEMA_URL}",
         "# Allowed entity types:",
@@ -214,6 +216,11 @@ def build_architecture_specification_validation_report(
             issues=issues,
         )
 
+    _validate_template_boilerplate_removed(
+        proposed_architecture_specification_yaml,
+        issues=issues,
+    )
+
     title = _optional_string(raw_spec.get("title"))
     _required_string(
         raw_spec.get("id"),
@@ -282,6 +289,31 @@ def build_architecture_specification_validation_report(
         allowed_entity_types=allowed_entity_types,
         issues=issues,
     )
+
+
+def _validate_template_boilerplate_removed(
+    proposed_architecture_specification_yaml: str,
+    *,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    boilerplate_markers = (
+        "# Architecture specification template.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+    )
+    if any(
+        marker in proposed_architecture_specification_yaml
+        for marker in boilerplate_markers
+    ):
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="template_boilerplate_not_removed",
+                message=(
+                    "Remove the template instructions before validating the "
+                    "architecture specification."
+                ),
+                path=None,
+            )
+        )
 
 
 def _collect_entity_ids(

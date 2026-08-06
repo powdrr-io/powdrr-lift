@@ -35,14 +35,13 @@ def test_create_system_specification_template_writes_default_file(
     assert "# System specification template." in template_text
     assert "# - Set `id` to a unique identifier" in template_text
     assert (
-        "# - Delete these instructions and replace with a comment saying that"
+        "# - Delete these instructions and replace them with this comment at the top:"
         in template_text
     )
     assert (
-        "#   this file is read-only and should never be editted by a tool or"
+        '#   "# This file is read-only and should never be edited by a tool or agent."'
         in template_text
     )
-    assert "#   agent." in template_text
     assert (
         "# - `supercedes` is optional; omit it unless the item replaces ids."
         in template_text
@@ -127,6 +126,28 @@ def test_validate_system_specification_flags_boilerplate() -> None:
     assert {issue.code for issue in report.issues} == {
         "boilerplate_not_removed",
         "section_item_id_missing",
+    }
+
+
+def test_validate_system_specification_rejects_template_instructions() -> None:
+    proposed_spec = """
+    # System specification template.
+    #
+    # Instructions:
+    # - Delete these instructions and replace them with this comment at the top:
+    #   "# This file is read-only and should never be edited by a tool or agent."
+    version: 1
+    id: sys-1
+    """
+
+    report = build_system_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "template_boilerplate_not_removed",
     }
 
 

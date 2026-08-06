@@ -111,6 +111,8 @@ def render_implementation_specification_template(
         "# - Give each feature a unique id, description, and functional",
         "#   requirements.",
         "# - Give each decision a unique id and description.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+        '#   "# This file is read-only and should never be edited by a tool or agent."',
         "#",
         f"schema: {SPECIFICATION_SCHEMA_URL}",
         f"# Architecture id: {architecture_id}",
@@ -238,6 +240,11 @@ def build_implementation_specification_validation_report(
             issues=issues,
         )
 
+    _validate_template_boilerplate_removed(
+        proposed_implementation_specification_yaml,
+        issues=issues,
+    )
+
     proposed_architecture_id = _required_string(
         raw_spec.get("architecture_id"),
         path="architecture_id",
@@ -343,6 +350,31 @@ def build_implementation_specification_validation_report(
         available_relationship_ids=architecture_summary.relationship_ids,
         issues=issues,
     )
+
+
+def _validate_template_boilerplate_removed(
+    proposed_implementation_specification_yaml: str,
+    *,
+    issues: list[ImplementationSpecificationValidationIssue],
+) -> None:
+    boilerplate_markers = (
+        "# Implementation specification template.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+    )
+    if any(
+        marker in proposed_implementation_specification_yaml
+        for marker in boilerplate_markers
+    ):
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code="template_boilerplate_not_removed",
+                message=(
+                    "Remove the template instructions before validating the "
+                    "implementation specification."
+                ),
+                path=None,
+            )
+        )
 
 
 def _load_architecture_specification_summary(

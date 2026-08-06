@@ -98,9 +98,8 @@ def render_feature_pr_specification_template(
         "# - Double-check that nothing requested by the feature is missing.",
         "# - Put ALL CREATIVE AND DESIGN DECISIONS MADE BY THE HUMAN OPERATOR",
         "#   in the human-decisions section.",
-        "# - Delete these instructions and replace with a comment saying that",
-        "#   this file is read-only and should never be editted by a tool or",
-        "#   agent.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+        '#   "# This file is read-only and should never be edited by a tool or agent."',
         "# - Use `state` for requirements and approach items.",
         "# - Use `action` for features and human-decisions.",
         "# - Keep ids unique across the whole document.",
@@ -261,9 +260,10 @@ def _system_map_instruction_lines(
         return [
             "# - This file is already complete, delete this line and then move "
             "on to the next step",
-            "# - Delete these instructions and replace with a comment saying that",
-            "#   this file is read-only and should never be editted by a tool or",
-            "#   agent.",
+            "# - Delete these instructions and replace them with this comment "
+            "at the top:",
+            '#   "# This file is read-only and should never be edited by a tool '
+            'or agent."',
         ]
 
     return [
@@ -273,9 +273,8 @@ def _system_map_instruction_lines(
         "#   requirements, approach, entities, entity_relationships,",
         "#   invariants, guidance, features, decisions.",
         "# - Double-check each section before moving to the next one.",
-        "# - Delete these instructions and replace with a comment saying that",
-        "#   this file is read-only and should never be editted by a tool or",
-        "#   agent.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+        '#   "# This file is read-only and should never be edited by a tool or agent."',
         "# - Use `state` for requirements and approach items.",
         "# - Use `action` for features and decisions.",
         "# - Keep ids unique across the whole document.",

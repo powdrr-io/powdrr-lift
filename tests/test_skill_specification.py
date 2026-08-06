@@ -268,20 +268,19 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
             "--work-item-name",
             "<work-item-name>",
         ),
-        (
-            "powdrr-lift",
-            "evaluate-pr-specification",
-            "--work-item-name",
-            "<work-item-name>",
-        ),
     ]
-    assert skill.steps[11].tool_invocations[0].command == (
-        "gh",
-        "pr",
-        "create",
-        "--draft",
-        "--fill",
-    )
+    assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
+        ("git", "status", "--short"),
+        ("git", "add", "docs/specs/<work-item-name>"),
+        (
+            "git",
+            "commit",
+            "-m",
+            "Add <work-item-name> feature specification",
+        ),
+        ("git", "push", "-u", "origin", "HEAD"),
+        ("gh", "pr", "create", "--draft", "--fill"),
+    ]
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:

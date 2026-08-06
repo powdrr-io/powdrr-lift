@@ -80,6 +80,10 @@ def test_create_implementation_specification_template_writes_default_file(
     assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
     assert "    action: null" in template_text
     assert "    supercedes: null" in template_text
+    assert (
+        '#   "# This file is read-only and should never be edited by a tool or agent."'
+        in template_text
+    )
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
@@ -153,6 +157,32 @@ def test_validate_implementation_specification_reports_errors(
         "supercedes_empty",
         "unknown_architecture_relationship",
         "duplicate_specification_id",
+    }
+
+
+def test_validate_implementation_specification_rejects_template_boilerplate(
+    tmp_path: Path,
+) -> None:
+    _write_architecture_specification(tmp_path)
+    proposed_spec = """
+    # Implementation specification template.
+    #
+    # Instructions:
+    # - Delete these instructions and replace them with this comment at the top:
+    #   "# This file is read-only and should never be edited by a tool or agent."
+    version: 1
+    architecture_id: 2026-06-19
+    """
+
+    report = build_implementation_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "template_boilerplate_not_removed",
     }
 
 

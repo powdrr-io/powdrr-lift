@@ -143,10 +143,10 @@ class WorkflowChatApp(App[None]):
     #status {
         width: 100%;
         height: auto;
-        min-height: 4;
         border: round $success;
         padding: 0 1;
         content-align: left middle;
+        min-height: 5;
     }
     #response {
         width: 100%;
@@ -175,7 +175,7 @@ class WorkflowChatApp(App[None]):
         self._stop_requested = Event()
         self._request_submitted = Event()
         self._workflow_active = False
-        self._execution_started = False
+        self._status_step_index: int | None = None
         self._message_history: list[str] = []
         self._current_status = "thinking..."
         self._initial_prompt_visible = False
@@ -300,7 +300,7 @@ class WorkflowChatApp(App[None]):
             self._failure_message = None
             self._exit_code = 1
             self._workflow_active = True
-            self._execution_started = False
+            self._status_step_index = None
             try:
                 self._exit_code = run_workflow_chat(
                     self._config,
@@ -345,8 +345,8 @@ class WorkflowChatApp(App[None]):
         current_step_index: int,
         status: str,
     ) -> None:
-        if not self._execution_started:
-            self._execution_started = True
+        if self._status_step_index != current_step_index:
+            self._status_step_index = current_step_index
             self._clear_message_buffer()
         steps = self.query_one("#steps", ListView)
         items = list(steps.query(ListItem))

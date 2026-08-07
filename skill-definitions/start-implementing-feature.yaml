@@ -14,7 +14,7 @@ steps:
     name and existing specification documents when that directory contains them;
     inspect for proposed PR specification files before asking whether any already
     exist. The workflow template is fixed at templates/execute-proposed-pr.yaml;
-    use that path without asking the user. Do not ask whether approved documents
+    use that path without asking the user; do not ask whether approved documents
     exist until after checking the directory. Only ask a question if the inspection
     shows that the required documents are missing or the feature name cannot be
     matched.

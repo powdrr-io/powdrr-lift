@@ -146,6 +146,19 @@ directory.
 powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/implement-a-feature
 ```
 
+### Command-key clipboard shortcuts
+
+The workflow chat TUI uses Textual's Kitty keyboard protocol support. Textual
+enables the protocol on startup (`CSI > ... u`) and restores the terminal on
+exit (`CSI < u`), allowing supported terminals to deliver the standard
+`Cmd+C`, `Cmd+X`, and `Cmd+V` keys as `super+c`, `super+x`, and `super+v`.
+
+This requires a terminal that supports the Kitty keyboard protocol, such as
+recent iTerm2, Kitty, WezTerm, or Alacritty. In iTerm2, enable “Report
+modifiers using CSI u” in the profile's Keys preferences if Command keys are
+not being delivered. Apple Terminal does not support this protocol and will
+continue to handle Command shortcuts itself.
+
 - The command uses `OPENAI_API_KEY` by default and also accepts `CODEX_API_KEY`.
 - If those are unset, it falls back to the local Codex auth cache in
   `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.

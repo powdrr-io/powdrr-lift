@@ -573,6 +573,10 @@ class _ModelUnavailableError(RuntimeError):
     pass
 
 
+class _EmptyProviderResponseError(RuntimeError):
+    pass
+
+
 class LocalModelRuntimeError(RuntimeError):
     """Raised when the required local GPU model cannot run."""
 
@@ -2494,6 +2498,8 @@ def _complete_json_with_repair(
     fallback_on_transient_exhaustion: bool = False,
 ) -> Any | None:
     empty_question_reprompts = 0
+    empty_response_reprompts = 0
+    last_repair_fingerprint: tuple[str, str] | None = None
     while True:
         _verbose_json(
             stderr,
@@ -2570,17 +2576,72 @@ def _complete_json_with_repair(
                     config.verbose,
                     f"Attempting automatic repair for {context} after provider failure",
                 )
-                repaired_payload = _attempt_json_repair(
-                    client,
-                    messages,
-                    context=context,
-                    model=model,
-                    error_message=str(exc),
-                    repair_instructions=repair_instructions,
-                    stderr=stderr,
-                    verbose=config.verbose,
-                )
+                repair_error_message = str(exc)
+                if _is_empty_response_error(exc):
+                    repair_error_message += (
+                        " The response cannot be empty. Return a complete "
+                        "corrected JSON object."
+                    )
+                try:
+                    repaired_payload = _attempt_json_repair(
+                        client,
+                        messages,
+                        context=context,
+                        model=model,
+                        error_message=repair_error_message,
+                        repair_instructions=repair_instructions,
+                        stderr=stderr,
+                        verbose=config.verbose,
+                    )
+                except _EmptyProviderResponseError as empty_exc:
+                    empty_response_reprompts += 1
+                    if empty_response_reprompts > 1:
+                        if context.startswith("workflow execution"):
+                            print(
+                                f"{context} returned empty responses after a "
+                                "corrective reprompt; treating the step as complete.",
+                                file=stderr,
+                            )
+                            return parser(
+                                {
+                                    "kind": "next_step",
+                                    "decisions_and_context": (
+                                        "The model returned an empty response after "
+                                        "a corrective reprompt; treating the step "
+                                        "as complete."
+                                    ),
+                                }
+                            )
+                        return None
+                    print(
+                        f"{context} returned an empty response; requesting a "
+                        "corrected response.",
+                        file=stderr,
+                    )
+                    messages = _build_json_repair_messages(
+                        messages,
+                        context=context,
+                        error_message=(
+                            f"{empty_exc} The response cannot be empty. Return a "
+                            "complete corrected JSON object."
+                        ),
+                        repair_instructions=repair_instructions,
+                        previous_payload=None,
+                    )
+                    continue
                 if repaired_payload is not None:
+                    repair_fingerprint = _repair_response_fingerprint(
+                        messages,
+                        repaired_payload,
+                    )
+                    if repair_fingerprint == last_repair_fingerprint:
+                        print(
+                            f"{context} made no progress during response repair; "
+                            "stopping.",
+                            file=stderr,
+                        )
+                        return None
+                    last_repair_fingerprint = repair_fingerprint
                     try:
                         return parser(repaired_payload)
                     except RuntimeError as repair_exc:
@@ -2660,18 +2721,72 @@ def _complete_json_with_repair(
                 config.verbose,
                 f"Attempting automatic repair for {context} after validation failure",
             )
-            repaired_payload = _attempt_json_repair(
-                client,
-                messages,
-                context=context,
-                model=model,
-                error_message=str(exc),
-                repair_instructions=repair_instructions,
-                previous_payload=payload,
-                stderr=stderr,
-                verbose=config.verbose,
-            )
+            repair_error_message = str(exc)
+            if _is_empty_response_error(exc):
+                repair_error_message += (
+                    " The response cannot be empty. Return a complete corrected "
+                    "JSON object."
+                )
+            try:
+                repaired_payload = _attempt_json_repair(
+                    client,
+                    messages,
+                    context=context,
+                    model=model,
+                    error_message=repair_error_message,
+                    repair_instructions=repair_instructions,
+                    previous_payload=payload,
+                    stderr=stderr,
+                    verbose=config.verbose,
+                )
+            except _EmptyProviderResponseError as empty_exc:
+                empty_response_reprompts += 1
+                if empty_response_reprompts > 1:
+                    if context.startswith("workflow execution"):
+                        print(
+                            f"{context} returned empty responses after a corrective "
+                            "reprompt; treating the step as complete.",
+                            file=stderr,
+                        )
+                        return parser(
+                            {
+                                "kind": "next_step",
+                                "decisions_and_context": (
+                                    "The model returned an empty response after a "
+                                    "corrective reprompt; treating the step as "
+                                    "complete."
+                                ),
+                            }
+                        )
+                    return None
+                print(
+                    f"{context} returned an empty response; requesting a corrected "
+                    "response.",
+                    file=stderr,
+                )
+                messages = _build_json_repair_messages(
+                    messages,
+                    context=context,
+                    error_message=(
+                        f"{empty_exc} The response cannot be empty. Return a "
+                        "complete corrected JSON object."
+                    ),
+                    repair_instructions=repair_instructions,
+                    previous_payload=payload,
+                )
+                continue
             if repaired_payload is not None:
+                repair_fingerprint = _repair_response_fingerprint(
+                    messages,
+                    repaired_payload,
+                )
+                if repair_fingerprint == last_repair_fingerprint:
+                    print(
+                        f"{context} made no progress during response repair; stopping.",
+                        file=stderr,
+                    )
+                    return None
+                last_repair_fingerprint = repair_fingerprint
                 try:
                     return parser(repaired_payload)
                 except RuntimeError as repair_exc:
@@ -2989,8 +3104,20 @@ def _attempt_json_repair(
     except RuntimeError as exc:
         if isinstance(exc, LocalModelRuntimeError):
             raise
+        if _is_empty_response_error(exc):
+            raise _EmptyProviderResponseError(str(exc)) from exc
         print(f"{context} repair request failed: {exc}", file=stderr)
     return None
+
+
+def _repair_response_fingerprint(
+    messages: Sequence[dict[str, str]],
+    payload: dict[str, Any],
+) -> tuple[str, str]:
+    return (
+        json.dumps(messages, ensure_ascii=False, sort_keys=True),
+        json.dumps(payload, ensure_ascii=False, sort_keys=True),
+    )
 
 
 def _build_json_repair_messages(
@@ -3036,6 +3163,12 @@ def _is_json_repairable_error(exc: RuntimeError) -> bool:
             "message was not an object",
             "must be a json object",
         )
+    )
+
+
+def _is_empty_response_error(exc: RuntimeError) -> bool:
+    return "response message content was empty" in str(exc).lower() or (
+        "response content was empty" in str(exc).lower()
     )
 
 

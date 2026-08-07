@@ -9,8 +9,22 @@ when_to_use:
 steps:
 - description: Confirm the feature name, approved plan documents, and workflow template.
   llm_type: standard_reasoning
-  details: Capture the exact feature name used by specify-a-feature and confirm the
-    approved plan documents in docs/specs/<feature-name>/.
+  details: First inspect docs/specs/<feature-name>/ using the exact feature name
+    or naturally matched existing work-item name from the user's request. Reuse the canonical
+    name and existing specification documents when that directory contains them;
+    do not ask whether approved documents exist until after checking the directory.
+    Only ask a question if the inspection shows that the required documents are
+    missing or the feature name cannot be matched.
+  tool_invocations:
+  - tool: shell
+    command:
+    - find
+    - docs/specs/<feature-name>
+    - -maxdepth
+    - "2"
+    - -type
+    - f
+    - -print
 - description: Generate the proposed PR specification templates.
   llm_type: simple_task
   details: If the approved proposed PR specifications already exist under

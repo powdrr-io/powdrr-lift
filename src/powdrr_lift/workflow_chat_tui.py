@@ -352,8 +352,8 @@ class WorkflowChatApp(App[None]):
             return
         answer = self._response.text.strip()
         if self._initial_prompt_visible:
-            self._message_history.clear()
             self._initial_prompt_visible = False
+        self._set_message(f"User: {answer or '<empty response>'}")
         self._set_status("calling LLM...")
         self.query_one("#status", Label).refresh(repaint=True)
         self._response.text = ""
@@ -471,7 +471,7 @@ class WorkflowChatApp(App[None]):
         if not self._workflow_active:
             return
         self._initial_prompt_visible = True
-        self._set_status(prompt.strip())
+        self._set_message(prompt.strip())
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()

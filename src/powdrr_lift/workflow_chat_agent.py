@@ -2692,6 +2692,14 @@ def _complete_json_with_repair(
                     )
                 except _EmptyProviderResponseError as empty_exc:
                     empty_response_reprompts += 1
+                    _print_empty_response_exchange(
+                        context=context,
+                        model=model,
+                        attempts=empty_response_reprompts,
+                        provider_error=str(empty_exc),
+                        messages=empty_exc.messages or messages,
+                        stderr=stderr,
+                    )
                     if empty_response_reprompts > 1:
                         if not _ask_to_retry_empty_response(
                             context=context,
@@ -2834,6 +2842,14 @@ def _complete_json_with_repair(
                 )
             except _EmptyProviderResponseError as empty_exc:
                 empty_response_reprompts += 1
+                _print_empty_response_exchange(
+                    context=context,
+                    model=model,
+                    attempts=empty_response_reprompts,
+                    provider_error=str(empty_exc),
+                    messages=empty_exc.messages or messages,
+                    stderr=stderr,
+                )
                 if empty_response_reprompts > 1:
                     if not _ask_to_retry_empty_response(
                         context=context,
@@ -2964,6 +2980,38 @@ def _ask_to_retry_empty_response(
     stderr: TextIO,
 ) -> bool:
     """Ask for an explicit recovery choice instead of completing silently."""
+    _print_empty_response_exchange(
+        context=context,
+        model=model,
+        attempts=attempts,
+        provider_error=provider_error,
+        messages=messages,
+        stderr=stderr,
+    )
+
+    answer = _prompt_user(
+        (
+            f"{context} returned an empty response after {attempts} corrective "
+            "reprompt attempts. Would you like me to retry this LLM request? "
+            "Answer 'retry' or 'stop': "
+        ),
+        input_func=input_func,
+        stdout=stdout,
+        status_stream=stderr,
+    )
+    return answer.strip().lower() in {"retry", "yes", "y"}
+
+
+def _print_empty_response_exchange(
+    *,
+    context: str,
+    model: str,
+    attempts: int,
+    provider_error: str,
+    messages: Sequence[dict[str, str]],
+    stderr: TextIO,
+) -> None:
+    """Print every empty exchange, including ones recovered automatically."""
     diagnostic = (
         f"Empty-response context: {context}; model={model!r}; "
         f"corrective-reprompt-attempts={attempts}; provider_error={provider_error}\n"
@@ -2979,17 +3027,6 @@ def _ask_to_retry_empty_response(
         file=stderr,
         flush=True,
     )
-    answer = _prompt_user(
-        (
-            f"{context} returned an empty response after {attempts} corrective "
-            "reprompt attempts. Would you like me to retry this LLM request? "
-            "Answer 'retry' or 'stop': "
-        ),
-        input_func=input_func,
-        stdout=stdout,
-        status_stream=stderr,
-    )
-    return answer.strip().lower() in {"retry", "yes", "y"}
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:

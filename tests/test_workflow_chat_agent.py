@@ -360,7 +360,10 @@ def test_textual_startup_shows_initial_question(
             response = app.query_one("#response", TextArea)
             return str(app.query_one("#status", Static).render()), response.disabled
 
-    assert asyncio.run(exercise()) == ("What do you want to do?", False)
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\nWhat do you want to do?",
+        False,
+    )
 
 
 def test_textual_quit_unblocks_workflow_input() -> None:
@@ -382,7 +385,9 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\nWhich requirements should this feature satisfy?"
+    )
 
 
 def test_textual_submit_shows_user_response_before_calling_llm() -> None:
@@ -396,7 +401,9 @@ def test_textual_submit_shows_user_response_before_calling_llm() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "User: Build the feature\n\ncalling LLM..."
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\nUser: Build the feature\n\ncalling LLM..."
+    )
 
 
 def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> None:
@@ -413,6 +420,7 @@ def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> Non
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
         "What do you want to do?\n\nUser: Build the feature\n\ncalling LLM..."
     )
 
@@ -435,8 +443,10 @@ def test_textual_status_retains_multiple_user_responses() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
         "What do you want to do?\n\n"
         "User: First answer\n\n"
+        "calling LLM...\n\n"
         "User: Second answer\n\n"
         "calling LLM..."
     )
@@ -459,7 +469,7 @@ def test_textual_status_is_visible_and_not_collapsed() -> None:
             )
 
     rendered, height, width = asyncio.run(exercise())
-    assert rendered.startswith("x")
+    assert rendered.endswith("x" * 200)
     assert height > 4
     assert width == 80
 
@@ -536,7 +546,9 @@ def test_textual_status_shows_latest_output() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "first\n\nsecond\n\nthird\n\nfourth"
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\nfirst\n\nsecond\n\nthird\n\nfourth"
+    )
 
 
 def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
@@ -554,7 +566,40 @@ def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
             writer.join()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "waiting for test-model LLM response..."
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
+        "calling LLM...\n\nwaiting for test-model LLM response..."
+    )
+
+
+def test_textual_status_retains_full_empty_response_prompt() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        exchange = (
+            "[workflow] Empty-response exchange: "
+            'prompt=[{"role":"user","content":"Proceed with instantiating the workflow?"}] '
+            "response=<empty>"
+        )
+
+        def write_output() -> None:
+            app._output_line("stderr", exchange)
+            app._output_line("stderr", "[workflow] calling LLM...")
+
+        async with app.run_test() as pilot:
+            writer = Thread(target=write_output)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert "Empty-response exchange: prompt=" in rendered
+    assert '"content":"Proceed with instantiating the workflow?"' in rendered
+    assert "response=<empty>" in rendered
+    assert "calling LLM..." in rendered
 
 
 def test_textual_status_keeps_all_questions_visible() -> None:
@@ -600,7 +645,9 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
             return str(status.render()), str(status.render())
 
     assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
         "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
+        "starting workflow...\n\n"
         "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
     )
 
@@ -633,6 +680,7 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
         "What do you want to do?\n\n"
         "Matched skill: specify-a-feature\n\n"
         "1. What is the feature goal?\n"
@@ -661,7 +709,12 @@ def test_textual_execution_transition_retains_output_history() -> None:
             return str(app.query_one("#status", Static).render())
 
     rendered = asyncio.run(exercise())
-    assert rendered == ("Matched skill: specify-a-feature\n\nWhat is the feature goal?")
+    assert rendered == (
+        "starting workflow...\n\n"
+        "Matched skill: specify-a-feature\n\n"
+        "waiting on LLM response...\n\n"
+        "What is the feature goal?"
+    )
 
 
 def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> None:
@@ -676,6 +729,8 @@ def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> N
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
+        "waiting for model LLM response...\n\n"
         "WARNING: received empty response but need human input"
     )
 
@@ -694,7 +749,9 @@ def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> 
             writer.join()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "waiting for model LLM response..."
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\nwaiting for model LLM response..."
+    )
 
 
 def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> None:
@@ -717,7 +774,9 @@ def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> N
             writer.join()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "What do you want to do?"
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\ncalling LLM...\n\nWhat do you want to do?"
+    )
 
 
 def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() -> None:
@@ -739,6 +798,7 @@ def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() ->
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
         "The LLM returned an empty response. Retry this request?"
     )
 
@@ -764,7 +824,12 @@ def test_textual_each_execution_step_retains_status_history() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "first step output\n\nsecond step is running"
+    assert asyncio.run(exercise()) == (
+        "starting workflow...\n\n"
+        "first step is running\n\n"
+        "first step output\n\n"
+        "second step is running"
+    )
 
 
 def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> None:
@@ -799,8 +864,10 @@ def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> No
 
     rendered = asyncio.run(exercise())
     assert rendered == (
+        "starting workflow...\n\n"
         "What do you want to do?\n\n"
         "User: Specify the feature\n\n"
+        "calling LLM...\n\n"
         "Matched skill: specify-a-feature"
     )
     assert "thinking..." not in rendered
@@ -934,7 +1001,7 @@ def test_textual_read_only_panels_support_copy_and_cut() -> None:
             return green_clipboard, app.clipboard
 
     assert asyncio.run(exercise()) == (
-        "green output",
+        "starting workflow...\n\nrunning\n\ngreen output",
         "1. Capture the feature goal.\n2. Summarize the result.",
     )
 

@@ -162,6 +162,12 @@ powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir d
   execution on Apple Silicon. Set `POWDRR_LOCAL_MODEL_CONTEXT` to adjust it
   for a machine with more or less available memory.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
+- In the terminal UI, use `Ctrl+Shift+C` to copy, `Ctrl+Shift+X` to cut, and
+  `Ctrl+Shift+V` to paste. These key combinations are forwarded by macOS
+  Terminal and iTerm2. Unconfigured `Cmd+C`, `Cmd+X`, and `Cmd+V` are consumed
+  by the terminal emulator before the workflow application can receive them;
+  map those Command shortcuts to the corresponding `Ctrl+Shift` sequences in
+  your terminal profile if Command keys are required.
 - Workflow skill steps and every routing/action response carry an `llm_type`
   descriptor. The default mapping routes `high_reasoning` to `glm-5.2`,
   `standard_reasoning` to `glm-4.7`, `simple_task` and `fast_iteration` to

@@ -109,17 +109,17 @@ class _WorkflowResponseTextArea(TextArea):
             event.prevent_default()
             self._submit_callback()
             return
-        if event.key in {"ctrl+c", "meta+c", "super+c"}:
+        if event.key in {"ctrl+c", "ctrl+shift+c", "meta+c", "super+c"}:
             event.stop()
             event.prevent_default()
             cast(WorkflowChatApp, self.app).action_copy_selection()
             return
-        if event.key in {"ctrl+x", "meta+x", "super+x"}:
+        if event.key in {"ctrl+x", "ctrl+shift+x", "meta+x", "super+x"}:
             event.stop()
             event.prevent_default()
             cast(WorkflowChatApp, self.app).action_cut_selection()
             return
-        if event.key in {"ctrl+v", "meta+v", "super+v"}:
+        if event.key in {"ctrl+v", "ctrl+shift+v", "meta+v", "super+v"}:
             event.stop()
             event.prevent_default()
             cast(WorkflowChatApp, self.app).action_paste_selection()
@@ -137,9 +137,12 @@ class WorkflowChatApp(App[None]):
     BINDINGS = [
         ("ctrl+q", "quit_workflow", "Quit"),
         ("ctrl+c", "copy_selection", "Copy"),
+        ("ctrl+shift+c", "copy_selection", "Copy"),
         ("super+c", "copy_selection", "Copy"),
         ("ctrl+x", "cut_selection", "Cut"),
+        ("ctrl+shift+x", "cut_selection", "Cut"),
         ("super+x", "cut_selection", "Cut"),
+        ("ctrl+shift+v", "paste_selection", "Paste"),
     ]
 
     CSS = """
@@ -274,15 +277,15 @@ class WorkflowChatApp(App[None]):
             self.focused.paste_text(self._read_clipboard())
 
     async def on_key(self, event: Key) -> None:
-        if event.key in {"ctrl+c", "meta+c", "super+c"}:
+        if event.key in {"ctrl+c", "ctrl+shift+c", "meta+c", "super+c"}:
             event.stop()
             event.prevent_default()
             self.action_copy_selection()
-        elif event.key in {"ctrl+x", "meta+x", "super+x"}:
+        elif event.key in {"ctrl+x", "ctrl+shift+x", "meta+x", "super+x"}:
             event.stop()
             event.prevent_default()
             self.action_cut_selection()
-        elif event.key in {"ctrl+v", "meta+v", "super+v"}:
+        elif event.key in {"ctrl+v", "ctrl+shift+v", "meta+v", "super+v"}:
             event.stop()
             event.prevent_default()
             self.action_paste_selection()

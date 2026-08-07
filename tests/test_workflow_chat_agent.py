@@ -742,6 +742,26 @@ def test_textual_response_supports_command_copy_and_cut_keys() -> None:
     assert asyncio.run(exercise()) == ("", "copy and cut this response")
 
 
+def test_textual_response_supports_terminal_clipboard_keys() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "copy and cut this response"
+            response.select_all()
+            response.focus()
+            await pilot.press("ctrl+shift+c")
+            await pilot.pause()
+            copied = app.clipboard
+            response.select_all()
+            await pilot.press("ctrl+shift+x")
+            await pilot.pause()
+            return response.text, copied
+
+    assert asyncio.run(exercise()) == ("", "copy and cut this response")
+
+
 def test_textual_response_supports_command_paste_from_native_clipboard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

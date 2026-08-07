@@ -385,7 +385,7 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
     assert asyncio.run(exercise()) == "Which requirements should this feature satisfy?"
 
 
-def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
+def test_textual_submit_shows_user_response_before_calling_llm() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
@@ -396,10 +396,10 @@ def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "calling LLM..."
+    assert asyncio.run(exercise()) == "User: Build the feature\n\ncalling LLM..."
 
 
-def test_textual_submit_removes_initial_prompt_from_status() -> None:
+def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
@@ -412,7 +412,34 @@ def test_textual_submit_removes_initial_prompt_from_status() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "calling LLM..."
+    assert asyncio.run(exercise()) == (
+        "What do you want to do?\n\nUser: Build the feature\n\ncalling LLM..."
+    )
+
+
+def test_textual_status_retains_multiple_user_responses() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._show_initial_prompt("What do you want to do?")
+            response = app.query_one("#response", TextArea)
+            response.text = "First answer"
+            app._submit_response()
+            await pilot.pause()
+            response.disabled = False
+            response.text = "Second answer"
+            app._submit_response()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "What do you want to do?\n\n"
+        "User: First answer\n\n"
+        "User: Second answer\n\n"
+        "calling LLM..."
+    )
 
 
 def test_textual_status_is_visible_and_not_collapsed() -> None:
@@ -606,6 +633,7 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
+        "What do you want to do?\n\n"
         "Matched skill: specify-a-feature\n\n"
         "1. What is the feature goal?\n"
         "2. Which requirements matter?\n"
@@ -739,7 +767,7 @@ def test_textual_each_execution_step_retains_status_history() -> None:
     assert asyncio.run(exercise()) == "first step output\n\nsecond step is running"
 
 
-def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:
+def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
@@ -770,8 +798,11 @@ def test_textual_initial_prompt_is_gone_before_matched_skill() -> None:
             return str(app.query_one("#status", Static).render())
 
     rendered = asyncio.run(exercise())
-    assert rendered == "Matched skill: specify-a-feature"
-    assert "What do you want to do?" not in rendered
+    assert rendered == (
+        "What do you want to do?\n\n"
+        "User: Specify the feature\n\n"
+        "Matched skill: specify-a-feature"
+    )
     assert "thinking..." not in rendered
 
 

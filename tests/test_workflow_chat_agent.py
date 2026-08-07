@@ -652,6 +652,23 @@ def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> N
     )
 
 
+def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._set_status("waiting for model LLM response...")
+            output = _TextualStdoutOutput(app)
+            writer = Thread(target=output.write, args=("> ",))
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "waiting for model LLM response..."
+
+
 def test_textual_each_execution_step_retains_status_history() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

@@ -83,7 +83,9 @@ class _TextualStdoutOutput(_TextualOutput):
             prompt = self._buffer
             if prompt.strip() == ">":
                 self._flush_pending(question=True)
-                self._app._output_prompt(prompt)
+                # `> ` is only the input delimiter. A question, including an
+                # intentionally empty one, is delivered by _flush_pending.
+                # Do not interpret a bare delimiter as an empty LLM response.
                 self._buffer = ""
             elif self._initial_prompt_pending:
                 self._initial_prompt_pending = False
@@ -446,13 +448,9 @@ class WorkflowChatApp(App[None]):
             return
         prompt = prompt.strip()
         if prompt == ">":
-            # The marker is emitted after the question itself. If the LLM
-            # produced no question, do not leave the previous "waiting for
-            # ... LLM response" status visible while the UI waits for input.
-            if not self._message_history or self._current_status.startswith(
-                "waiting for "
-            ):
-                self._set_status(_EMPTY_HUMAN_INPUT_WARNING)
+            # The marker is only a delimiter. Empty-question detection happens
+            # when _output_question receives an empty presentation.
+            pass
         else:
             self._set_message(prompt or _EMPTY_HUMAN_INPUT_WARNING)
         if self._response is not None:

@@ -11,7 +11,9 @@ dependencies = [
     "PyYAML>=6.0.2",
     "huggingface-hub>=0.26.0",
     "mcp>=1.0.0",
-    "textual>=1.0",
+    # Textual 8.2 adds Kitty keyboard protocol negotiation and CSI-u parsing,
+    # which is required for Cmd/ Super key events in supported terminals.
+    "textual>=8.2",
 ]
 
 [project.optional-dependencies]

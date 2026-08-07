@@ -20,6 +20,7 @@ from urllib.request import Request
 import pytest
 import yaml
 from textual.containers import ScrollableContainer
+from textual.events import Key
 from textual.widgets import ListView, Static, TextArea
 
 from powdrr_lift.cli import main
@@ -740,6 +741,18 @@ def test_textual_response_supports_command_copy_and_cut_keys() -> None:
             return response.text, copied
 
     assert asyncio.run(exercise()) == ("", "copy and cut this response")
+
+
+def test_textual_kitty_protocol_decodes_command_key_sequence() -> None:
+    """Verify the terminal sequence emitted for Cmd+C reaches Textual."""
+    from textual._xterm_parser import XTermParser
+
+    events = list(XTermParser().feed("\x1b[99;9u"))
+
+    assert len(events) == 1
+    assert isinstance(events[0], Key)
+    assert events[0].key == "super+c"
+    assert events[0].character is None
 
 
 def test_textual_response_supports_command_paste_from_native_clipboard(

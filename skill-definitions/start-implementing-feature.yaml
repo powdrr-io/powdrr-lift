@@ -13,7 +13,9 @@ steps:
     approved plan documents in docs/specs/<feature-name>/.
 - description: Generate the proposed PR specification templates.
   llm_type: simple_task
-  details: Generate and fill the proposed PR specification templates for the approved
+  details: If the approved proposed PR specifications already exist under
+    docs/specs/<feature-name>/, inspect and reuse them and skip generation. Otherwise,
+    generate and fill the proposed PR specification templates for the approved
     feature plan. For every proposed PR, capture the implementation files, tests,
     acceptance criteria, validation commands, risks, and dependencies between PRs.
   tool_invocations:

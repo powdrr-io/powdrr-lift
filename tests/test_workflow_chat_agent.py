@@ -62,11 +62,13 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatEdit,
     _action_system_prompt,
     _apply_file_edits,
+    _available_work_item_names,
     _backup_model_for,
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
     _execute_shell_tool,
     _handle_workflow_action_edit,
+    _match_work_item_names,
     _parse_action_response,
     _prompt_user,
     _request_token_budget,
@@ -4153,6 +4155,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
             if calls == 3:
                 raise RuntimeError("OpenAI response message content was empty.")
             if calls == 4:
+                assert "repair request itself failed" in messages[-1]["content"]
                 return {"kind": "complete", "text": "Skill execution complete."}
             raise AssertionError(f"Unexpected call count: {calls}")
 
@@ -4185,8 +4188,32 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
 
     assert exit_code == 0
     assert calls == 4
-    assert "automatic repair retry 1/1" in stderr.getvalue()
+    assert "repair request failed; requesting the original response again" in (
+        stderr.getvalue()
+    )
+    assert "automatic repair retry" not in stderr.getvalue()
+    assert "Waiting 30 seconds" not in stderr.getvalue()
     assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()
+
+
+def test_work_item_names_match_natural_language_feature_requests(
+    tmp_path: Path,
+) -> None:
+    specifications_root = tmp_path / "docs" / "specs"
+    (specifications_root / "interaction-file-log").mkdir(parents=True)
+    (specifications_root / "other-feature").mkdir()
+
+    available = _available_work_item_names(tmp_path)
+
+    assert available == ("interaction-file-log", "other-feature")
+    assert _match_work_item_names(
+        [{"role": "user", "content": "Implement the interaction file log feature."}],
+        available,
+    ) == ("interaction-file-log",)
+    assert _match_work_item_names(
+        [{"role": "user", "content": "Implement interaction_file_log."}],
+        available,
+    ) == ("interaction-file-log",)
 
 
 def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:

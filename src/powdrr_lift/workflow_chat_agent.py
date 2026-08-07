@@ -1197,6 +1197,50 @@ def _resolve_template_path(
     return _resolve_skill_path(template_path_value, catalog)
 
 
+def _available_work_item_names(worktree_root: Path) -> tuple[str, ...]:
+    specifications_root = worktree_root / "docs" / "specs"
+    if not specifications_root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            path.name
+            for path in specifications_root.iterdir()
+            if path.is_dir() and not path.name.startswith(".")
+        )
+    )
+
+
+def _match_work_item_names(
+    transcript: Sequence[dict[str, str]],
+    work_item_names: Sequence[str],
+) -> tuple[str, ...]:
+    request_text = " ".join(
+        message.get("content", "")
+        for message in transcript
+        if message.get("role") == "user"
+    )
+    request_tokens = _work_item_name_tokens(request_text)
+    matches: list[str] = []
+    for work_item_name in work_item_names:
+        name_tokens = _work_item_name_tokens(work_item_name)
+        if not name_tokens:
+            continue
+        token_count = len(name_tokens)
+        contiguous_match = any(
+            request_tokens[index : index + token_count] == name_tokens
+            for index in range(len(request_tokens) - token_count + 1)
+        )
+        if contiguous_match or (
+            token_count > 1 and all(token in request_tokens for token in name_tokens)
+        ):
+            matches.append(work_item_name)
+    return tuple(matches)
+
+
+def _work_item_name_tokens(value: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
 def _normalize_skill_path_value(value: str) -> str:
     return value.strip().rstrip(".").rstrip()
 
@@ -1361,6 +1405,7 @@ def _build_step_execution_messages(
     worktree_root: Path,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(worktree_root, current_file_path)
+    available_work_items = _available_work_item_names(worktree_root)
     return [
         {
             "role": "system",
@@ -1391,6 +1436,15 @@ def _build_step_execution_messages(
                         for context_type, description in _context_type_catalog()
                     ],
                     "worktree_root": str(worktree_root),
+                    "work_item_context": {
+                        "available": list(available_work_items),
+                        "matches": list(
+                            _match_work_item_names(
+                                transcript,
+                                available_work_items,
+                            )
+                        ),
+                    },
                     "selected_skill": _catalog_entry_to_data(selected_skill),
                     "transcript": list(transcript),
                     "execution_events": list(execution_events),
@@ -1439,6 +1493,12 @@ def _action_system_prompt() -> str:
         "words.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
+        "When work_item_context contains matches, treat those names as the "
+        "canonical existing work items. Normalize case, spaces, underscores, "
+        "and hyphens when matching the user's wording, reuse the exact "
+        "canonical name, and do not ask the user to repeat it. Only ask for "
+        "a work-item name when no available work item is a reasonable match "
+        "and a new item is genuinely required.\n"
         "Do not ask for information already present in the transcript or "
         "execution context. Every prompt_user action must include a concise, "
         "properly formed English question in text. The question must contain "
@@ -2519,8 +2579,6 @@ def _complete_json_with_repair(
                     repair_instructions=repair_instructions,
                     stderr=stderr,
                     verbose=config.verbose,
-                    retry_attempts=config.provider_retry_attempts,
-                    retry_delay_seconds=config.provider_retry_delay_seconds,
                 )
                 if repaired_payload is not None:
                     try:
@@ -2559,6 +2617,22 @@ def _complete_json_with_repair(
                                 previous_payload=repaired_payload,
                             )
                             continue
+                print(
+                    f"{context} repair request failed; requesting the original "
+                    "response again with an updated correction instruction.",
+                    file=stderr,
+                )
+                messages = _build_json_repair_messages(
+                    messages,
+                    context=context,
+                    error_message=(
+                        f"{exc} The repair request itself failed. Correct the "
+                        "original response directly."
+                    ),
+                    repair_instructions=repair_instructions,
+                    previous_payload=None,
+                )
+                continue
             else:
                 print(f"{context} failed: {exc}", file=stderr)
             retry = _prompt_user(
@@ -2596,8 +2670,6 @@ def _complete_json_with_repair(
                 previous_payload=payload,
                 stderr=stderr,
                 verbose=config.verbose,
-                retry_attempts=config.provider_retry_attempts,
-                retry_delay_seconds=config.provider_retry_delay_seconds,
             )
             if repaired_payload is not None:
                 try:
@@ -2635,6 +2707,22 @@ def _complete_json_with_repair(
                             previous_payload=repaired_payload,
                         )
                         continue
+            print(
+                f"{context} repair request failed; requesting the original "
+                "response again with an updated correction instruction.",
+                file=stderr,
+            )
+            messages = _build_json_repair_messages(
+                messages,
+                context=context,
+                error_message=(
+                    f"{exc} The repair request itself failed. Correct the original "
+                    "response directly."
+                ),
+                repair_instructions=repair_instructions,
+                previous_payload=payload,
+            )
+            continue
             retry = _prompt_user(
                 "Type 'retry' to try again or 'abort' to stop: ",
                 input_func=input_func,
@@ -2874,8 +2962,6 @@ def _attempt_json_repair(
     stderr: TextIO,
     verbose: bool,
     previous_payload: dict[str, Any] | None = None,
-    retry_attempts: int = 0,
-    retry_delay_seconds: float = 0.0,
 ) -> dict[str, Any] | None:
     repair_messages = _build_json_repair_messages(
         messages,
@@ -2890,32 +2976,20 @@ def _attempt_json_repair(
         f"{context} repair LLM input (model={model})",
         repair_messages,
     )
-    attempts = max(1, retry_attempts + 1)
-    for attempt in range(1, attempts + 1):
-        try:
-            _print_waiting_for_model(stderr, model)
-            repaired_payload = client.complete_json(repair_messages)
-            _verbose_json(
-                stderr,
-                verbose,
-                f"{context} repair LLM output (model={model})",
-                repaired_payload,
-            )
-            return repaired_payload
-        except RuntimeError as exc:
-            if isinstance(exc, LocalModelRuntimeError):
-                raise
-            if attempt == attempts:
-                print(f"{context} repair request failed: {exc}", file=stderr)
-                return None
-            delay_seconds = max(0.0, retry_delay_seconds)
-            print(
-                f"{context} repair request failed for model {model!r}: {exc}. "
-                f"Waiting {delay_seconds:g} seconds before automatic repair "
-                f"retry {attempt}/{attempts - 1}.",
-                file=stderr,
-            )
-            time.sleep(delay_seconds)
+    try:
+        _print_waiting_for_model(stderr, model)
+        repaired_payload = client.complete_json(repair_messages)
+        _verbose_json(
+            stderr,
+            verbose,
+            f"{context} repair LLM output (model={model})",
+            repaired_payload,
+        )
+        return repaired_payload
+    except RuntimeError as exc:
+        if isinstance(exc, LocalModelRuntimeError):
+            raise
+        print(f"{context} repair request failed: {exc}", file=stderr)
     return None
 
 

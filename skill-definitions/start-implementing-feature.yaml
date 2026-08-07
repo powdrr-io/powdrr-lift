@@ -28,6 +28,17 @@ steps:
     - -maxdepth
     - "1"
     - -print
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/workflows
+    - -name
+    - <feature-name>
+    - -type
+    - d
+    - -maxdepth
+    - "3"
+    - -print
 - description: Generate the proposed PR specification templates.
   llm_type: simple_task
   details: If the approved proposed PR specifications already exist under
@@ -44,8 +55,10 @@ steps:
     - "<work-item-name>"
 - description: Instantiate an execute-proposed-pr workflow for every approved PR.
   llm_type: simple_task
-  details: For each approved proposed PR, instantiate a separate
-    docs/workflows/<execute-work-item-name>/ workflow from
+  details: For each approved proposed PR, first inspect docs/workflows for a
+    matching existing execute workflow. If one exists, reuse it; if none exists,
+    that is expected because this skill creates the workflow, so immediately
+    instantiate a separate docs/workflows/<execute-work-item-name>/ workflow from
     templates/execute-proposed-pr.yaml. This is the required template; never ask the
     user to provide or choose a template path. Use a distinct execute work-item name for each
     PR, preserve the proposed PR order, and capture dependencies between PRs in the

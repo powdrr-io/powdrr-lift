@@ -330,6 +330,17 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "1",
         "-print",
     )
+    assert skill.steps[0].tool_invocations[1].command == (
+        "fuzzy-match",
+        "docs/workflows",
+        "-name",
+        "<feature-name>",
+        "-type",
+        "d",
+        "-maxdepth",
+        "3",
+        "-print",
+    )
     assert [step.description for step in skill.steps] == [
         "Confirm the feature name, approved plan documents, and workflow template.",
         "Generate the proposed PR specification templates.",
@@ -361,6 +372,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "templates/execute-proposed-pr.yaml",
     )
     assert "dependencies" in (skill.steps[2].details or "")
+    assert "if none exists" in (skill.steps[2].details or "")
+    assert "this skill creates the workflow" in (skill.steps[2].details or "")
     assert [invocation.command for invocation in skill.steps[4].tool_invocations] == [
         ("git", "status", "--short"),
         ("git", "add", "docs/specs/<feature-name>", "docs/workflows"),

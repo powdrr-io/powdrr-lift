@@ -12,18 +12,45 @@ steps:
   details: First inspect docs/specs/<feature-name>/ using the exact feature name
     or naturally matched existing work-item name from the user's request. Reuse the canonical
     name and existing specification documents when that directory contains them;
-    do not ask whether approved documents exist until after checking the directory.
-    Only ask a question if the inspection shows that the required documents are
-    missing or the feature name cannot be matched.
+    inspect for proposed PR specification files before asking whether any already
+    exist. The workflow template is fixed at templates/execute-proposed-pr.yaml;
+    use that path without asking the user; do not ask whether approved documents
+    exist until after checking the directory. Only ask a question if the inspection
+    shows that the required documents are missing or the feature name cannot be
+    matched.
   tool_invocations:
-  - tool: shell
+  - tool: fuzzy-match
     command:
-    - find
-    - docs/specs/<feature-name>
+    - fuzzy-match
+    - docs/specs
+    - -name
+    - <feature-name>
+    - -type
+    - d
     - -maxdepth
-    - "2"
+    - "1"
+    - -print
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/workflows
+    - -name
+    - <feature-name>
+    - -type
+    - d
+    - -maxdepth
+    - "3"
+    - -print
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs/<feature-name>
+    - -name
+    - proposed PR specification
     - -type
     - f
+    - -maxdepth
+    - "1"
     - -print
 - description: Generate the proposed PR specification templates.
   llm_type: simple_task
@@ -41,19 +68,25 @@ steps:
     - "<work-item-name>"
 - description: Instantiate an execute-proposed-pr workflow for every approved PR.
   llm_type: simple_task
-  details: For each approved proposed PR, instantiate a separate
-    docs/workflows/<execute-work-item-name>/ workflow from
-    templates/execute-proposed-pr.yaml. Use a distinct execute work-item name for each
-    PR, preserve the proposed PR order, and capture dependencies between PRs in the
-    generated workflows' task dependencies and input state. Do not overwrite an
-    existing workflow directory without user approval.
+  details: For each approved proposed PR, first inspect docs/workflows for a
+    matching existing execute workflow. If one exists, reuse it; if none exists,
+    that is expected because this skill creates the workflow. Instantiate each PR
+    from templates/execute-proposed-pr.yaml in the shared
+    docs/workflows/<work-item-name>/ directory, using a distinct
+    <workflow-instance-name> for each PR so task IDs and files remain unique. This
+    is the required template; never ask the user to provide or choose a template
+    path. Preserve the proposed PR order and capture dependencies between PRs in
+    the generated workflows' task dependencies and input state. Do not overwrite
+    an existing workflow instance without user approval.
   tool_invocations:
   - tool: shell
     command:
     - powdrr-lift
     - instantiate-workflow
     - "--work-item-name"
-    - "<execute-work-item-name>"
+    - "<work-item-name>"
+    - "--workflow-instance-name"
+    - "<workflow-instance-name>"
     - "--template"
     - templates/execute-proposed-pr.yaml
 - description: Validate the overall implementation approach with the user.

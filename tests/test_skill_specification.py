@@ -314,6 +314,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert first_step_details is not None
     assert "docs/specs/<feature-name>/" in first_step_details
     assert "exact feature name" in first_step_details
+    assert "First inspect docs/specs/<feature-name>/" in first_step_details
+    assert "do not ask whether approved documents exist" in first_step_details
     third_step_details = skill.steps[2].details
     assert third_step_details is not None
     assert "templates/execute-proposed-pr.yaml" in third_step_details
@@ -373,6 +375,15 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "pr-specification",
         "--work-item-name",
         "<work-item-name>",
+    )
+    assert skill.steps[0].tool_invocations[0].command == (
+        "find",
+        "docs/specs/<feature-name>",
+        "-maxdepth",
+        "2",
+        "-type",
+        "f",
+        "-print",
     )
     assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",

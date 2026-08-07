@@ -78,7 +78,13 @@ class _TextualStdoutOutput(_TextualOutput):
         self._buffer += text
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
-            self._pending_lines.append(line.rstrip("\r"))
+            line = line.rstrip("\r")
+            # _prompt_user writes a newline after the submitted answer when
+            # driven by the TUI's queue. It is transport echo, not an empty
+            # LLM question; retaining it makes the next `> ` delimiter look
+            # like a real empty question.
+            if line or self._pending_lines:
+                self._pending_lines.append(line)
         if self._buffer:
             prompt = self._buffer
             if prompt.strip() == ">":

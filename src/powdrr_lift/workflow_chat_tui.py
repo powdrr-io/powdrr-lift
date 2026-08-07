@@ -21,6 +21,8 @@ from powdrr_lift.workflow_chat_agent import (
     run_workflow_chat,
 )
 
+_EMPTY_HUMAN_INPUT_WARNING = "WARNING: received empty response but need human input"
+
 
 class _TextualOutput:
     """TextIO adapter that turns line-oriented output into screen updates."""
@@ -443,8 +445,16 @@ class WorkflowChatApp(App[None]):
         if not self._workflow_active:
             return
         prompt = prompt.strip()
-        if prompt != ">":
-            self._set_message(prompt)
+        if prompt == ">":
+            # The marker is emitted after the question itself. If the LLM
+            # produced no question, do not leave the previous "waiting for
+            # ... LLM response" status visible while the UI waits for input.
+            if not self._message_history or self._current_status.startswith(
+                "waiting for "
+            ):
+                self._set_status(_EMPTY_HUMAN_INPUT_WARNING)
+        else:
+            self._set_message(prompt or _EMPTY_HUMAN_INPUT_WARNING)
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
@@ -465,6 +475,12 @@ class WorkflowChatApp(App[None]):
                     self._set_status,
                     line.removeprefix("[workflow] "),
                 )
+            elif line.startswith("waiting for ") and line.endswith(" LLM response..."):
+                # Model waits are emitted directly by the provider loop during
+                # selection and repair, before execution progress is updated.
+                # Surface them so the UI cannot remain on a stale "thinking..."
+                # label after a local tool such as git add completes.
+                self.call_from_thread(self._set_status, line)
             elif any(word in line.lower() for word in ("error", "failed", "stopping")):
                 self.call_from_thread(self._set_message, line)
         elif channel == "stdout":

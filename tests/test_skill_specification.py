@@ -321,11 +321,11 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
     assert skill.steps[0].tool_invocations[0].command == (
         "fuzzy-match",
-        "docs/specs/<feature-name>",
+        "docs/specs",
         "-name",
-        "proposed PR specification",
+        "<feature-name>",
         "-type",
-        "f",
+        "d",
         "-maxdepth",
         "1",
         "-print",
@@ -339,6 +339,17 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "d",
         "-maxdepth",
         "3",
+        "-print",
+    )
+    assert skill.steps[0].tool_invocations[2].command == (
+        "fuzzy-match",
+        "docs/specs/<feature-name>",
+        "-name",
+        "proposed PR specification",
+        "-type",
+        "f",
+        "-maxdepth",
+        "1",
         "-print",
     )
     assert [step.description for step in skill.steps] == [
@@ -367,7 +378,9 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "powdrr-lift",
         "instantiate-workflow",
         "--work-item-name",
-        "<execute-work-item-name>",
+        "<work-item-name>",
+        "--workflow-instance-name",
+        "<workflow-instance-name>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )

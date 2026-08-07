@@ -252,7 +252,9 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
         "powdrr-lift",
         "instantiate-workflow",
         "--work-item-name",
-        "<execute-work-item-name>",
+        "<work-item-name>",
+        "--workflow-instance-name",
+        "<workflow-instance-name>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
@@ -316,3 +318,31 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
+
+
+def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
+    tmp_path: Path,
+) -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
+    )
+    output_root = tmp_path / "workflows"
+
+    first_directory, first_tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Example Feature",
+        workflow_instance_name="first-pr",
+        output_root=output_root,
+    )
+    second_directory, second_tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Example Feature",
+        workflow_instance_name="second-pr",
+        output_root=output_root,
+    )
+
+    assert first_directory == second_directory == output_root / "example-feature"
+    assert first_tasks[0].task_id == "first-pr-task-001"
+    assert second_tasks[0].task_id == "second-pr-task-001"
+    assert (first_directory / "first-pr-task-001.json").is_file()
+    assert (second_directory / "second-pr-task-001.json").is_file()

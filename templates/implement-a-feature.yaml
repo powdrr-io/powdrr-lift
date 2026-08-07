@@ -54,7 +54,9 @@ task_templates:
           - powdrr-lift
           - instantiate-workflow
           - --work-item-name
-          - <execute-work-item-name>
+          - <work-item-name>
+          - --workflow-instance-name
+          - <workflow-instance-name>
           - --template
           - templates/execute-proposed-pr.yaml
     input_state:

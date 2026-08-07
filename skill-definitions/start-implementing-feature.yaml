@@ -20,11 +20,11 @@ steps:
   - tool: fuzzy-match
     command:
     - fuzzy-match
-    - docs/specs/<feature-name>
+    - docs/specs
     - -name
-    - proposed PR specification
+    - <feature-name>
     - -type
-    - f
+    - d
     - -maxdepth
     - "1"
     - -print
@@ -38,6 +38,17 @@ steps:
     - d
     - -maxdepth
     - "3"
+    - -print
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs/<feature-name>
+    - -name
+    - proposed PR specification
+    - -type
+    - f
+    - -maxdepth
+    - "1"
     - -print
 - description: Generate the proposed PR specification templates.
   llm_type: simple_task
@@ -57,20 +68,23 @@ steps:
   llm_type: simple_task
   details: For each approved proposed PR, first inspect docs/workflows for a
     matching existing execute workflow. If one exists, reuse it; if none exists,
-    that is expected because this skill creates the workflow, so immediately
-    instantiate a separate docs/workflows/<execute-work-item-name>/ workflow from
-    templates/execute-proposed-pr.yaml. This is the required template; never ask the
-    user to provide or choose a template path. Use a distinct execute work-item name for each
-    PR, preserve the proposed PR order, and capture dependencies between PRs in the
-    generated workflows' task dependencies and input state. Do not overwrite an
-    existing workflow directory without user approval.
+    that is expected because this skill creates the workflow. Instantiate each PR
+    from templates/execute-proposed-pr.yaml in the shared
+    docs/workflows/<work-item-name>/ directory, using a distinct
+    <workflow-instance-name> for each PR so task IDs and files remain unique. This
+    is the required template; never ask the user to provide or choose a template
+    path. Preserve the proposed PR order and capture dependencies between PRs in
+    the generated workflows' task dependencies and input state. Do not overwrite
+    an existing workflow instance without user approval.
   tool_invocations:
   - tool: shell
     command:
     - powdrr-lift
     - instantiate-workflow
     - "--work-item-name"
-    - "<execute-work-item-name>"
+    - "<work-item-name>"
+    - "--workflow-instance-name"
+    - "<workflow-instance-name>"
     - "--template"
     - templates/execute-proposed-pr.yaml
 - description: Validate the overall implementation approach with the user.

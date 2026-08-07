@@ -950,7 +950,14 @@ def build_parser() -> argparse.ArgumentParser:
     instantiate_workflow_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Feature or work-item name used for the workflow directory.",
+        help="Feature or work-item name used for the shared workflow directory.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--workflow-instance-name",
+        help=(
+            "Optional unique workflow instance name used to namespace task "
+            "files within the work-item directory."
+        ),
     )
     instantiate_workflow_parser.add_argument(
         "--template",
@@ -1092,6 +1099,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             template_path=template_path,
             work_item_name=args.work_item_name,
             output_root=output_root,
+            workflow_instance_name=args.workflow_instance_name,
         )
     except (FileExistsError, OSError, ValueError) as exc:
         print(f"Could not instantiate workflow: {exc}", file=sys.stderr)

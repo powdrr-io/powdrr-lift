@@ -185,6 +185,7 @@ def instantiate_workflow_template(
     template_path: str | Path,
     work_item_name: str,
     output_root: str | Path = Path("docs") / "workflows",
+    workflow_instance_name: str | None = None,
 ) -> tuple[Path, tuple[WorkflowTask, ...]]:
     """Materialize a workflow template as validated durable task documents."""
     template = load_workflow_template(template_path)
@@ -193,15 +194,30 @@ def instantiate_workflow_template(
         raise ValueError("work-item-name must contain at least one letter or digit")
 
     output_directory = Path(output_root) / slug
-    if output_directory.exists() and any(output_directory.iterdir()):
+    if (
+        workflow_instance_name is None
+        and output_directory.exists()
+        and any(output_directory.iterdir())
+    ):
         raise FileExistsError(
             f"Workflow output directory is not empty: {output_directory}. "
             "Choose a new work item or remove it with explicit approval."
         )
 
     output_directory.mkdir(parents=True, exist_ok=True)
+    instance_slug = re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        (workflow_instance_name or work_item_name).strip().lower(),
+    ).strip("-")
+    if not instance_slug:
+        raise ValueError(
+            "workflow-instance-name must contain at least one letter or digit"
+        )
+    task_prefix = f"{instance_slug}-" if workflow_instance_name else ""
     task_ids = tuple(
-        f"task-{index + 1:03d}" for index in range(len(template.task_templates))
+        f"{task_prefix}task-{index + 1:03d}"
+        for index in range(len(template.task_templates))
     )
     tasks: list[WorkflowTask] = []
     for index, task_template in enumerate(template.task_templates):
@@ -224,7 +240,13 @@ def instantiate_workflow_template(
             ),
             dependent_state=task_template.dependent_state,
         )
-        save_workflow_task(task, output_directory / f"{task.task_id}.json")
+        task_path = output_directory / f"{task.task_id}.json"
+        if task_path.exists():
+            raise FileExistsError(
+                f"Workflow task already exists: {task_path}. Choose a new "
+                "workflow-instance-name."
+            )
+        save_workflow_task(task, task_path)
         tasks.append(task)
 
     report = build_workflow_task_directory_validation_report(output_directory)

@@ -510,6 +510,24 @@ def test_textual_status_shows_latest_output() -> None:
     assert asyncio.run(exercise()) == "first\n\nsecond\n\nthird\n\nfourth"
 
 
+def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            app._set_status("thinking...")
+            writer = Thread(
+                target=app._output_line,
+                args=("stderr", "waiting for test-model LLM response..."),
+            )
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "waiting for test-model LLM response..."
+
+
 def test_textual_status_keeps_all_questions_visible() -> None:
     async def exercise() -> tuple[str, int]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
@@ -614,6 +632,22 @@ def test_textual_execution_transition_retains_output_history() -> None:
 
     rendered = asyncio.run(exercise())
     assert rendered == ("Matched skill: specify-a-feature\n\nWhat is the feature goal?")
+
+
+def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._set_status("waiting for model LLM response...")
+            app._show_prompt("")
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "WARNING: received empty response but need human input"
+    )
 
 
 def test_textual_each_execution_step_retains_status_history() -> None:
@@ -3513,6 +3547,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "<execute-work-item-name>",
                         "display-related-photos-pr-001",
                     )
+                    .replace("<feature-name>", "display-related-photos")
+                    .replace("<work-item-name>", "display-related-photos")
+                    .replace(
+                        "<workflow-instance-name>", "display-related-photos-pr-001"
+                    )
                     for item in invocation.command
                 ]
                 result = _execute_shell_tool(
@@ -3522,7 +3561,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     stderr=start_stderr,
                     verbose=False,
                 )
-                assert result["returncode"] == 0
+                assert result["returncode"] == 0, (
+                    f"command={command!r} result={result!r}"
+                )
             save_workflow_task(
                 replace(task, status=TaskStatus.COMPLETED),
                 workflow_root / ready_task.work_item_name / f"{task.task_id}.json",

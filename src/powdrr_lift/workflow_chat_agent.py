@@ -575,7 +575,14 @@ class _ModelUnavailableError(RuntimeError):
 
 
 class _EmptyProviderResponseError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        messages: Sequence[dict[str, str]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.messages = messages
 
 
 class LocalModelRuntimeError(RuntimeError):
@@ -2691,6 +2698,7 @@ def _complete_json_with_repair(
                             model=model,
                             attempts=empty_response_reprompts,
                             provider_error=str(empty_exc),
+                            messages=empty_exc.messages or messages,
                             input_func=input_func,
                             stdout=stdout,
                             stderr=stderr,
@@ -2832,6 +2840,7 @@ def _complete_json_with_repair(
                         model=model,
                         attempts=empty_response_reprompts,
                         provider_error=str(empty_exc),
+                        messages=empty_exc.messages or messages,
                         input_func=input_func,
                         stdout=stdout,
                         stderr=stderr,
@@ -2949,6 +2958,7 @@ def _ask_to_retry_empty_response(
     model: str,
     attempts: int,
     provider_error: str,
+    messages: Sequence[dict[str, str]],
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
@@ -2956,7 +2966,10 @@ def _ask_to_retry_empty_response(
     """Ask for an explicit recovery choice instead of completing silently."""
     diagnostic = (
         f"Empty-response context: {context}; model={model!r}; "
-        f"corrective-reprompt-attempts={attempts}; provider_error={provider_error}"
+        f"corrective-reprompt-attempts={attempts}; provider_error={provider_error}\n"
+        "LLM request messages:\n"
+        f"{json.dumps(list(messages), indent=2, ensure_ascii=False)}\n"
+        "LLM response: <empty>"
     )
     print(diagnostic, file=stderr)
     answer = _prompt_user(
@@ -3214,7 +3227,10 @@ def _attempt_json_repair(
         if isinstance(exc, LocalModelRuntimeError):
             raise
         if _is_empty_response_error(exc):
-            raise _EmptyProviderResponseError(str(exc)) from exc
+            raise _EmptyProviderResponseError(
+                str(exc),
+                messages=repair_messages,
+            ) from exc
         print(f"{context} repair request failed: {exc}", file=stderr)
     return None
 

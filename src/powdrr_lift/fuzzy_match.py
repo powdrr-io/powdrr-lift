@@ -28,7 +28,6 @@ def execute_fuzzy_match(
             "query": options["query"],
             "root": str(search_root),
             "matches": [],
-            "error": f"Search root does not exist: {root}",
         }
     if not search_root.is_dir():
         raise ValueError(f"fuzzy-match search root must be a directory: {root}")

@@ -652,6 +652,23 @@ def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> N
     )
 
 
+def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._set_status("waiting for model LLM response...")
+            output = _TextualStdoutOutput(app)
+            writer = Thread(target=output.write, args=("> ",))
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "waiting for model LLM response..."
+
+
 def test_textual_each_execution_step_retains_status_history() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
@@ -4255,6 +4272,9 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
     assert "returned an empty response" in stderr.getvalue()
     assert "Empty-response context:" in stderr.getvalue()
     assert "corrective-reprompt-attempts=2" in stderr.getvalue()
+    assert "LLM request messages:" in stderr.getvalue()
+    assert '"role": "user"' in stderr.getvalue()
+    assert "LLM response: <empty>" in stderr.getvalue()
     assert "Would you like me to retry this LLM request?" in stdout.getvalue()
     assert "treating the step as complete" not in stderr.getvalue()
     assert "automatic repair retry" not in stderr.getvalue()

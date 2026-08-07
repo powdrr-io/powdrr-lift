@@ -4354,6 +4354,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
     assert "LLM response: <empty>" in stderr.getvalue()
     assert "[workflow] Empty-response exchange: prompt=" in stderr.getvalue()
     assert "response=<empty>" in stderr.getvalue()
+    assert stderr.getvalue().count("[workflow] Empty-response exchange: prompt=") >= 2
     assert "Would you like me to retry this LLM request?" in stdout.getvalue()
     assert "treating the step as complete" not in stderr.getvalue()
     assert "automatic repair retry" not in stderr.getvalue()

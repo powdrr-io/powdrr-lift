@@ -63,8 +63,10 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatEdit,
     _action_system_prompt,
     _apply_file_edits,
+    _available_work_item_documents,
     _available_work_item_names,
     _backup_model_for,
+    _build_selection_messages,
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
     _execute_shell_tool,
@@ -4230,6 +4232,32 @@ def test_work_item_names_match_natural_language_feature_requests(
         [{"role": "user", "content": "Implement interaction_file_log."}],
         available,
     ) == ("interaction-file-log",)
+
+
+def test_selection_context_lists_matched_existing_specification_documents(
+    tmp_path: Path,
+) -> None:
+    specifications_root = tmp_path / "docs" / "specs" / "interaction-file-log"
+    specifications_root.mkdir(parents=True)
+    (specifications_root / "system-specification.yaml").touch()
+    (specifications_root / "implementation-specification.yaml").touch()
+
+    messages = _build_selection_messages(
+        (),
+        [{"role": "user", "content": "Start implementing interaction file log."}],
+        tmp_path,
+    )
+    payload = json.loads(messages[1]["content"])
+
+    assert payload["work_item_context"]["matches"] == ["interaction-file-log"]
+    assert payload["work_item_context"]["documents"]["interaction-file-log"] == [
+        "docs/specs/interaction-file-log/implementation-specification.yaml",
+        "docs/specs/interaction-file-log/system-specification.yaml",
+    ]
+    assert _available_work_item_documents(
+        tmp_path,
+        "interaction-file-log",
+    ) == tuple(payload["work_item_context"]["documents"]["interaction-file-log"])
 
 
 def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:

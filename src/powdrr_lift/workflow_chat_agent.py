@@ -717,7 +717,7 @@ def run_workflow_chat(
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
         selection, current_model, provider = _complete_json_with_model_fallback(
             client_for=client_for_model,
-            messages=_build_selection_messages(catalog, transcript),
+            messages=_build_selection_messages(catalog, transcript, repo_root),
             parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
             model=current_model,
@@ -1096,7 +1096,9 @@ def _load_workflow_template_catalog(
 def _build_selection_messages(
     catalog: Sequence[SkillCatalogEntry],
     transcript: Sequence[dict[str, str]],
+    worktree_root: Path,
 ) -> list[dict[str, str]]:
+    available_work_items = _available_work_item_names(worktree_root)
     return [
         {
             "role": "system",
@@ -1108,6 +1110,24 @@ def _build_selection_messages(
                 {
                     "skills": [_catalog_entry_to_data(entry) for entry in catalog],
                     "conversation": list(transcript),
+                    "work_item_context": {
+                        "available": list(available_work_items),
+                        "matches": list(
+                            _match_work_item_names(
+                                transcript,
+                                available_work_items,
+                            )
+                        ),
+                        "documents": {
+                            work_item_name: list(
+                                _available_work_item_documents(
+                                    worktree_root,
+                                    work_item_name,
+                                )
+                            )
+                            for work_item_name in available_work_items
+                        },
+                    },
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -1210,6 +1230,22 @@ def _available_work_item_names(worktree_root: Path) -> tuple[str, ...]:
             path.name
             for path in specifications_root.iterdir()
             if path.is_dir() and not path.name.startswith(".")
+        )
+    )
+
+
+def _available_work_item_documents(
+    worktree_root: Path,
+    work_item_name: str,
+) -> tuple[str, ...]:
+    work_item_root = worktree_root / "docs" / "specs" / work_item_name
+    if not work_item_root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            str(path.relative_to(worktree_root))
+            for path in work_item_root.rglob("*")
+            if path.is_file()
         )
     )
 
@@ -1377,6 +1413,11 @@ def _selection_system_prompt() -> str:
         "long_context, or vision.\n"
         "selected_skill_path must match one of the catalog entries.\n"
         "Use the skill when_to_use and step descriptions to decide.\n"
+        "The user may refer to an existing work item using natural language. "
+        "Before asking whether approved specification documents exist, inspect "
+        "work_item_context. When matches contains a reasonable canonical name "
+        "and its documents list is non-empty, reuse that exact name and existing "
+        "documents; do not ask the user to confirm that they exist.\n"
         "Do not output markdown."
     )
 

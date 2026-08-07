@@ -4245,7 +4245,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
             provider_retry_delay_seconds=0,
             provider_retry_attempts=1,
         ),
-        input_func=lambda: "Build exports",
+        input_func=lambda: "retry",
         stdout=stdout,
         stderr=stderr,
     )
@@ -4253,7 +4253,10 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
     assert exit_code == 0
     assert calls == 6
     assert "returned an empty response" in stderr.getvalue()
-    assert "treating the step as complete" in stderr.getvalue()
+    assert "Empty-response context:" in stderr.getvalue()
+    assert "corrective-reprompt-attempts=2" in stderr.getvalue()
+    assert "Would you like me to retry this LLM request?" in stdout.getvalue()
+    assert "treating the step as complete" not in stderr.getvalue()
     assert "automatic repair retry" not in stderr.getvalue()
     assert "Waiting 30 seconds" not in stderr.getvalue()
     assert "Type 'retry' to try again or 'abort' to stop:" not in stdout.getvalue()

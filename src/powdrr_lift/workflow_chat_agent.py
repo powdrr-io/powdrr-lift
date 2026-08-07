@@ -2686,23 +2686,18 @@ def _complete_json_with_repair(
                 except _EmptyProviderResponseError as empty_exc:
                     empty_response_reprompts += 1
                     if empty_response_reprompts > 1:
-                        if context.startswith("workflow execution"):
-                            print(
-                                f"{context} returned empty responses after a "
-                                "corrective reprompt; treating the step as complete.",
-                                file=stderr,
-                            )
-                            return parser(
-                                {
-                                    "kind": "next_step",
-                                    "decisions_and_context": (
-                                        "The model returned an empty response after "
-                                        "a corrective reprompt; treating the step "
-                                        "as complete."
-                                    ),
-                                }
-                            )
-                        return None
+                        if not _ask_to_retry_empty_response(
+                            context=context,
+                            model=model,
+                            attempts=empty_response_reprompts,
+                            provider_error=str(empty_exc),
+                            input_func=input_func,
+                            stdout=stdout,
+                            stderr=stderr,
+                        ):
+                            return None
+                        empty_response_reprompts = 0
+                        continue
                     print(
                         f"{context} returned an empty response; requesting a "
                         "corrected response.",
@@ -2832,23 +2827,18 @@ def _complete_json_with_repair(
             except _EmptyProviderResponseError as empty_exc:
                 empty_response_reprompts += 1
                 if empty_response_reprompts > 1:
-                    if context.startswith("workflow execution"):
-                        print(
-                            f"{context} returned empty responses after a corrective "
-                            "reprompt; treating the step as complete.",
-                            file=stderr,
-                        )
-                        return parser(
-                            {
-                                "kind": "next_step",
-                                "decisions_and_context": (
-                                    "The model returned an empty response after a "
-                                    "corrective reprompt; treating the step as "
-                                    "complete."
-                                ),
-                            }
-                        )
-                    return None
+                    if not _ask_to_retry_empty_response(
+                        context=context,
+                        model=model,
+                        attempts=empty_response_reprompts,
+                        provider_error=str(empty_exc),
+                        input_func=input_func,
+                        stdout=stdout,
+                        stderr=stderr,
+                    ):
+                        return None
+                    empty_response_reprompts = 0
+                    continue
                 print(
                     f"{context} returned an empty response; requesting a corrected "
                     "response.",
@@ -2951,6 +2941,35 @@ def _print_waiting_for_model(stderr: TextIO, model: str) -> None:
 
 def _is_invalid_user_question_error(exc: RuntimeError) -> bool:
     return "must be a non-empty, properly formed English question" in str(exc)
+
+
+def _ask_to_retry_empty_response(
+    *,
+    context: str,
+    model: str,
+    attempts: int,
+    provider_error: str,
+    input_func: Callable[[], str],
+    stdout: TextIO,
+    stderr: TextIO,
+) -> bool:
+    """Ask for an explicit recovery choice instead of completing silently."""
+    diagnostic = (
+        f"Empty-response context: {context}; model={model!r}; "
+        f"corrective-reprompt-attempts={attempts}; provider_error={provider_error}"
+    )
+    print(diagnostic, file=stderr)
+    answer = _prompt_user(
+        (
+            f"{context} returned an empty response after {attempts} corrective "
+            "reprompt attempts. Would you like me to retry this LLM request? "
+            "Answer 'retry' or 'stop': "
+        ),
+        input_func=input_func,
+        stdout=stdout,
+        status_stream=stderr,
+    )
+    return answer.strip().lower() in {"retry", "yes", "y"}
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:

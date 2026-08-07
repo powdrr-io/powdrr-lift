@@ -100,6 +100,10 @@ class _TextualStdoutOutput(_TextualOutput):
         return len(text)
 
     def flush(self) -> None:
+        if self._buffer:
+            prompt = self._buffer
+            self._buffer = ""
+            self._app._output_question(prompt)
         self._flush_pending(question=True)
 
 

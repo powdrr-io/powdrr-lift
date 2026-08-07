@@ -692,6 +692,29 @@ def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> N
     assert asyncio.run(exercise()) == "What do you want to do?"
 
 
+def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualStdoutOutput(app)
+
+            def write_prompt() -> None:
+                output.write("The LLM returned an empty response. Retry this request? ")
+                output.flush()
+
+            writer = Thread(target=write_prompt)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "The LLM returned an empty response. Retry this request?"
+    )
+
+
 def test_textual_each_execution_step_retains_status_history() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

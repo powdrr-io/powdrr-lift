@@ -78,7 +78,13 @@ class _TextualStdoutOutput(_TextualOutput):
         self._buffer += text
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
-            self._pending_lines.append(line.rstrip("\r"))
+            line = line.rstrip("\r")
+            # _prompt_user writes a newline after the submitted answer when
+            # driven by the TUI's queue. It is transport echo, not an empty
+            # LLM question; retaining it makes the next `> ` delimiter look
+            # like a real empty question.
+            if line or self._pending_lines:
+                self._pending_lines.append(line)
         if self._buffer:
             prompt = self._buffer
             if prompt.strip() == ">":
@@ -94,6 +100,10 @@ class _TextualStdoutOutput(_TextualOutput):
         return len(text)
 
     def flush(self) -> None:
+        if self._buffer:
+            prompt = self._buffer
+            self._buffer = ""
+            self._app._output_question(prompt)
         self._flush_pending(question=True)
 
 
@@ -200,12 +210,12 @@ class WorkflowChatApp(App[None]):
         self._request_submitted = Event()
         self._workflow_active = False
         self._message_history: list[str] = []
-        self._current_status = "thinking..."
+        self._current_status = "starting workflow..."
         self._initial_prompt_visible = False
 
     def compose(self) -> ComposeResult:
         yield ScrollableContainer(
-            Label(self._status_text("thinking..."), markup=False, id="status"),
+            Label(self._status_text("starting workflow..."), markup=False, id="status"),
             id="status-container",
         )
         yield ListView(id="steps")
@@ -222,7 +232,7 @@ class WorkflowChatApp(App[None]):
         # Paint the initial state before starting any repository or LLM work.
         # The worker can block during setup, so this must not be the first
         # operation that establishes visible state.
-        self._set_status("thinking...")
+        self._set_status("starting workflow...")
         self._response.focus()
         Thread(target=self._run_workflow, daemon=True).start()
 
@@ -344,7 +354,7 @@ class WorkflowChatApp(App[None]):
         if self._initial_prompt_visible:
             self._message_history.clear()
             self._initial_prompt_visible = False
-        self._set_status("thinking...")
+        self._set_status("calling LLM...")
         self.query_one("#status", Label).refresh(repaint=True)
         self._response.text = ""
         self._response.disabled = True

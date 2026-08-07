@@ -261,7 +261,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
     assert deepinfra_mapping.provider == "deepinfra"
 
 
-def test_prompt_user_reports_thinking_after_input() -> None:
+def test_prompt_user_reports_llm_call_after_input() -> None:
     stdout = io.StringIO()
     status_stream = io.StringIO()
 
@@ -274,7 +274,7 @@ def test_prompt_user_reports_thinking_after_input() -> None:
 
     assert answer == "answer"
     assert stdout.getvalue() == "Question: \n"
-    assert status_stream.getvalue() == "[workflow] thinking...\n"
+    assert status_stream.getvalue() == "[workflow] calling LLM...\n"
 
 
 def test_textual_response_grows_and_submits_on_return(
@@ -396,7 +396,7 @@ def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "thinking..."
+    assert asyncio.run(exercise()) == "calling LLM..."
 
 
 def test_textual_submit_removes_initial_prompt_from_status() -> None:
@@ -412,7 +412,7 @@ def test_textual_submit_removes_initial_prompt_from_status() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "thinking..."
+    assert asyncio.run(exercise()) == "calling LLM..."
 
 
 def test_textual_status_is_visible_and_not_collapsed() -> None:
@@ -517,7 +517,7 @@ def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         async with app.run_test() as pilot:
-            app._set_status("thinking...")
+            app._set_status("calling LLM...")
             writer = Thread(
                 target=app._output_line,
                 args=("stderr", "waiting for test-model LLM response..."),
@@ -667,6 +667,52 @@ def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> 
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == "waiting for model LLM response..."
+
+
+def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            app._set_status("calling LLM...")
+            output = _TextualStdoutOutput(app)
+            writer = Thread(
+                target=lambda: (
+                    output.write("What do you want to do? "),
+                    output.write("\n"),
+                    output.write("> "),
+                ),
+            )
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == "What do you want to do?"
+
+
+def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualStdoutOutput(app)
+
+            def write_prompt() -> None:
+                output.write("The LLM returned an empty response. Retry this request? ")
+                output.flush()
+
+            writer = Thread(target=write_prompt)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "The LLM returned an empty response. Retry this request?"
+    )
 
 
 def test_textual_each_execution_step_retains_status_history() -> None:
@@ -4275,6 +4321,8 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
     assert "LLM request messages:" in stderr.getvalue()
     assert '"role": "user"' in stderr.getvalue()
     assert "LLM response: <empty>" in stderr.getvalue()
+    assert "[workflow] Empty-response exchange: prompt=" in stderr.getvalue()
+    assert "response=<empty>" in stderr.getvalue()
     assert "Would you like me to retry this LLM request?" in stdout.getvalue()
     assert "treating the step as complete" not in stderr.getvalue()
     assert "automatic repair retry" not in stderr.getvalue()

@@ -2971,7 +2971,14 @@ def _ask_to_retry_empty_response(
         f"{json.dumps(list(messages), indent=2, ensure_ascii=False)}\n"
         "LLM response: <empty>"
     )
-    print(diagnostic, file=stderr)
+    serialized_prompt = json.dumps(list(messages), ensure_ascii=False)
+    print(diagnostic, file=stderr, flush=True)
+    print(
+        "[workflow] Empty-response exchange: "
+        f"prompt={serialized_prompt} response=<empty>",
+        file=stderr,
+        flush=True,
+    )
     answer = _prompt_user(
         (
             f"{context} returned an empty response after {attempts} corrective "
@@ -3370,7 +3377,7 @@ def _prompt_user(
             stdout.write("\n")
             stdout.flush()
     if status_stream is not None:
-        print("[workflow] thinking...", file=status_stream, flush=True)
+        print("[workflow] calling LLM...", file=status_stream, flush=True)
     return answer
 
 

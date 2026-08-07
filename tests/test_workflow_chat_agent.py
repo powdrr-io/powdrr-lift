@@ -4378,6 +4378,29 @@ def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
     assert result["matches"][0]["score"] == 1.0
 
 
+def test_fuzzy_match_missing_root_is_a_successful_empty_result(
+    tmp_path: Path,
+) -> None:
+    result = execute_fuzzy_match(
+        [
+            "fuzzy-match",
+            "docs/workflows/interaction-file-log",
+            "-name",
+            "proposed PR",
+            "-type",
+            "d",
+            "-print",
+        ],
+        worktree_root=tmp_path,
+    )
+
+    assert result == {
+        "query": "proposed PR",
+        "root": str(tmp_path / "docs" / "workflows" / "interaction-file-log"),
+        "matches": [],
+    }
+
+
 def test_selection_context_lists_matched_existing_specification_documents(
     tmp_path: Path,
 ) -> None:

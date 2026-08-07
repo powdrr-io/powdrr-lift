@@ -318,6 +318,18 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert third_step_details is not None
     assert "templates/execute-proposed-pr.yaml" in third_step_details
     assert "already exist" in (skill.steps[1].details or "")
+    assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
+    assert skill.steps[0].tool_invocations[0].command == (
+        "fuzzy-match",
+        "docs/specs/<feature-name>",
+        "-name",
+        "proposed PR specification",
+        "-type",
+        "f",
+        "-maxdepth",
+        "1",
+        "-print",
+    )
     assert [step.description for step in skill.steps] == [
         "Confirm the feature name, approved plan documents, and workflow template.",
         "Generate the proposed PR specification templates.",

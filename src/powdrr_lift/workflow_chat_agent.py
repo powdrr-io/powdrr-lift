@@ -46,6 +46,7 @@ from powdrr_lift.core.spec_context import (
     normalize_context_type,
     render_gather_context_report,
 )
+from powdrr_lift.fuzzy_match import fuzzy_match_json
 
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
@@ -1430,7 +1431,16 @@ def _build_step_execution_messages(
                             "description": (
                                 "Execute a shell command in the current worktree."
                             ),
-                        }
+                        },
+                        {
+                            "name": "fuzzy-match",
+                            "description": (
+                                "Search worktree paths with find-like filters and "
+                                "fuzzy name matching. Use command arrays such as "
+                                "['fuzzy-match', 'docs/specs', '-name', "
+                                "'<feature-name>', '-type', 'd', '-maxdepth', '2']."
+                            ),
+                        },
                     ],
                     "available_context_types": [
                         {
@@ -1513,7 +1523,19 @@ def _action_system_prompt() -> str:
         "replacements.\n"
         "When edit is available, current_file includes the file path and its "
         "current contents as context.\n"
-        "Use invoke_tool for shell commands.\n"
+        "Use invoke_tool for shell commands or fuzzy-match searches.\n"
+        "The fuzzy-match tool executes in Python and returns structured JSON. "
+        "Its command array starts with fuzzy-match followed by a search root and "
+        "supports -name/-iname, -path/-ipath, -type f|d, -maxdepth, -mindepth, "
+        "-threshold, and -print. Use -name for the natural-language query; it is "
+        "fuzzy matched rather than treated as an exact glob.\n"
+        "Before asking whether existing proposed PR specifications should be "
+        "used, invoke fuzzy-match in the current feature specification directory "
+        "with a query such as 'proposed PR specification'. Ask only after the "
+        "tool result establishes whether matching files exist.\n"
+        "For start-implementing-feature, the workflow template path is known and "
+        "fixed: templates/execute-proposed-pr.yaml. Use it directly when invoking "
+        "instantiate-workflow and never ask the user to supply or choose that path.\n"
         "When the current step includes tool_invocations, choose one of those "
         "structured invocations and fill in its parameters.\n"
         "Use next_step when the current step is complete and the next step "
@@ -1808,17 +1830,24 @@ def _handle_workflow_action_invoke_tool(
     config: WorkflowChatConfig,
 ) -> bool:
     _ = input_func
-    if action.tool != "shell":
-        raise RuntimeError(
-            f"Unsupported workflow tool {action.tool!r}; only shell is supported."
+    if action.tool == "fuzzy-match":
+        tool_result = _execute_fuzzy_match_tool(
+            action.parameters,
+            worktree_root=state.worktree_root,
         )
-    tool_result = _execute_shell_tool(
-        action.parameters,
-        worktree_root=state.worktree_root,
-        stdout=stdout,
-        stderr=stderr,
-        verbose=config.verbose,
-    )
+    elif action.tool == "shell":
+        tool_result = _execute_shell_tool(
+            action.parameters,
+            worktree_root=state.worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=config.verbose,
+        )
+    else:
+        raise RuntimeError(
+            f"Unsupported workflow tool {action.tool!r}; supported tools are shell "
+            "and fuzzy-match."
+        )
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
         worktree_root=state.worktree_root,
@@ -1858,6 +1887,23 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     return True
+
+
+def _execute_fuzzy_match_tool(
+    parameters: dict[str, Any],
+    *,
+    worktree_root: Path,
+) -> dict[str, Any]:
+    command = parameters.get("command")
+    if not isinstance(command, (str, list, tuple)):
+        raise RuntimeError(
+            "Workflow fuzzy-match tool parameters must include a command array."
+        )
+    return {
+        "tool": "fuzzy-match",
+        "command": list(command) if not isinstance(command, str) else command,
+        "result": json.loads(fuzzy_match_json(command, worktree_root=worktree_root)),
+    }
 
 
 def _handle_workflow_action_gather_context(

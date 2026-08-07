@@ -49,6 +49,7 @@ from powdrr_lift.core.workflow_task_specification import (
     save_workflow_task,
     select_ready_workflow_tasks,
 )
+from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.workflow_chat_agent import (
     DEEPINFRA_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
@@ -4230,6 +4231,34 @@ def test_work_item_names_match_natural_language_feature_requests(
         [{"role": "user", "content": "Implement interaction_file_log."}],
         available,
     ) == ("interaction-file-log",)
+
+
+def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
+    tmp_path: Path,
+) -> None:
+    specifications_root = tmp_path / "docs" / "specs" / "interaction-file-log"
+    specifications_root.mkdir(parents=True)
+    (specifications_root / "proposed-pr-specification.yaml").touch()
+
+    result = execute_fuzzy_match(
+        [
+            "fuzzy-match",
+            "docs/specs/interaction-file-log",
+            "-name",
+            "proposed PR specification",
+            "-type",
+            "f",
+            "-maxdepth",
+            "1",
+            "-print",
+        ],
+        worktree_root=tmp_path,
+    )
+
+    assert [match["path"] for match in result["matches"]] == [
+        "docs/specs/interaction-file-log/proposed-pr-specification.yaml"
+    ]
+    assert result["matches"][0]["score"] == 1.0
 
 
 def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:

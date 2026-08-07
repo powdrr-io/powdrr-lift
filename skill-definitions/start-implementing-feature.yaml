@@ -9,8 +9,25 @@ when_to_use:
 steps:
 - description: Confirm the feature name, approved plan documents, and workflow template.
   llm_type: standard_reasoning
-  details: Capture the exact feature name used by specify-a-feature and confirm the
-    approved plan documents in docs/specs/<feature-name>/.
+  details: First inspect docs/specs/<feature-name>/ using the exact feature name
+    or naturally matched existing work-item name from the user's request. Reuse the canonical
+    name and existing specification documents when that directory contains them;
+    inspect for proposed PR specification files before asking whether any already
+    exist. The workflow template is fixed at templates/execute-proposed-pr.yaml;
+    use that path without asking the user. Only ask a question after inspection
+    shows what is missing or available.
+  tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs/<feature-name>
+    - -name
+    - proposed PR specification
+    - -type
+    - f
+    - -maxdepth
+    - "1"
+    - -print
 - description: Generate the proposed PR specification templates.
   llm_type: simple_task
   details: If the approved proposed PR specifications already exist under
@@ -29,7 +46,8 @@ steps:
   llm_type: simple_task
   details: For each approved proposed PR, instantiate a separate
     docs/workflows/<execute-work-item-name>/ workflow from
-    templates/execute-proposed-pr.yaml. Use a distinct execute work-item name for each
+    templates/execute-proposed-pr.yaml. This is the required template; never ask the
+    user to provide or choose a template path. Use a distinct execute work-item name for each
     PR, preserve the proposed PR order, and capture dependencies between PRs in the
     generated workflows' task dependencies and input state. Do not overwrite an
     existing workflow directory without user approval.

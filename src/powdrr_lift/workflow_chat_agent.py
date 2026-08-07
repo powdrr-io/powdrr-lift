@@ -3377,7 +3377,7 @@ def _prompt_user(
             stdout.write("\n")
             stdout.flush()
     if status_stream is not None:
-        print("[workflow] thinking...", file=status_stream, flush=True)
+        print("[workflow] calling LLM...", file=status_stream, flush=True)
     return answer
 
 

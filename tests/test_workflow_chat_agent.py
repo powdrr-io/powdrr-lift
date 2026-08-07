@@ -261,7 +261,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
     assert deepinfra_mapping.provider == "deepinfra"
 
 
-def test_prompt_user_reports_thinking_after_input() -> None:
+def test_prompt_user_reports_llm_call_after_input() -> None:
     stdout = io.StringIO()
     status_stream = io.StringIO()
 
@@ -274,7 +274,7 @@ def test_prompt_user_reports_thinking_after_input() -> None:
 
     assert answer == "answer"
     assert stdout.getvalue() == "Question: \n"
-    assert status_stream.getvalue() == "[workflow] thinking...\n"
+    assert status_stream.getvalue() == "[workflow] calling LLM...\n"
 
 
 def test_textual_response_grows_and_submits_on_return(
@@ -396,7 +396,7 @@ def test_textual_submit_shows_thinking_before_releasing_workflow() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "What do you want to do?"
+    assert asyncio.run(exercise()) == "calling LLM..."
 
 
 def test_textual_submit_removes_initial_prompt_from_status() -> None:
@@ -412,7 +412,7 @@ def test_textual_submit_removes_initial_prompt_from_status() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    assert asyncio.run(exercise()) == "thinking..."
+    assert asyncio.run(exercise()) == "calling LLM..."
 
 
 def test_textual_status_is_visible_and_not_collapsed() -> None:
@@ -517,7 +517,7 @@ def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         async with app.run_test() as pilot:
-            app._set_status("thinking...")
+            app._set_status("calling LLM...")
             writer = Thread(
                 target=app._output_line,
                 args=("stderr", "waiting for test-model LLM response..."),
@@ -675,7 +675,7 @@ def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> N
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
-            app._set_status("thinking...")
+            app._set_status("calling LLM...")
             output = _TextualStdoutOutput(app)
             writer = Thread(
                 target=lambda: (

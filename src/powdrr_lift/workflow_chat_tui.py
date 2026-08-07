@@ -210,12 +210,12 @@ class WorkflowChatApp(App[None]):
         self._request_submitted = Event()
         self._workflow_active = False
         self._message_history: list[str] = []
-        self._current_status = "thinking..."
+        self._current_status = "starting workflow..."
         self._initial_prompt_visible = False
 
     def compose(self) -> ComposeResult:
         yield ScrollableContainer(
-            Label(self._status_text("thinking..."), markup=False, id="status"),
+            Label(self._status_text("starting workflow..."), markup=False, id="status"),
             id="status-container",
         )
         yield ListView(id="steps")
@@ -232,7 +232,7 @@ class WorkflowChatApp(App[None]):
         # Paint the initial state before starting any repository or LLM work.
         # The worker can block during setup, so this must not be the first
         # operation that establishes visible state.
-        self._set_status("thinking...")
+        self._set_status("starting workflow...")
         self._response.focus()
         Thread(target=self._run_workflow, daemon=True).start()
 
@@ -354,7 +354,7 @@ class WorkflowChatApp(App[None]):
         if self._initial_prompt_visible:
             self._message_history.clear()
             self._initial_prompt_visible = False
-        self._set_status("thinking...")
+        self._set_status("calling LLM...")
         self.query_one("#status", Label).refresh(repaint=True)
         self._response.text = ""
         self._response.disabled = True

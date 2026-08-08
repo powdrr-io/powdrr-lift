@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -56,6 +57,8 @@ class WorkflowTaskAgentConfig:
     api_key: str | None = None
     base_url: str | None = None
     max_roundtrips: int = 12
+    max_timeout_retries: int = 3
+    timeout_backoff_seconds: float = 2.0
     verbose: bool = False
 
 
@@ -159,15 +162,26 @@ def run_workflow_task(
                 file=stderr,
                 flush=True,
             )
-            compacted_context, before_tokens, after_tokens = (
-                _compact_workflow_task_context(
-                    workflow,
-                    task,
-                    events,
-                    client=compaction_client,
-                    stderr=stderr,
+            try:
+                compacted_context, before_tokens, after_tokens = (
+                    _compact_workflow_task_context(
+                        workflow,
+                        task,
+                        events,
+                        client=compaction_client,
+                        stderr=stderr,
+                        max_timeout_retries=config.max_timeout_retries,
+                        timeout_backoff_seconds=config.timeout_backoff_seconds,
+                    )
                 )
-            )
+            except _WorkflowTaskTimeoutExhausted as exc:
+                return _handle_exhausted_timeout(
+                    repo_root,
+                    task,
+                    stdout=stdout,
+                    stderr=stderr,
+                    error=exc,
+                )
             events.append(
                 {
                     "kind": "context_compaction",
@@ -187,8 +201,23 @@ def run_workflow_task(
         _print_waiting_for_model(stderr, model)
         response: dict[str, Any] | None = None
         try:
-            response = client.complete_json(messages)
+            response = _complete_task_json_with_timeout_retry(
+                client,
+                messages,
+                model=model,
+                stderr=stderr,
+                max_timeout_retries=config.max_timeout_retries,
+                timeout_backoff_seconds=config.timeout_backoff_seconds,
+            )
             action = _parse_task_action(response)
+        except _WorkflowTaskTimeoutExhausted as exc:
+            return _handle_exhausted_timeout(
+                repo_root,
+                task,
+                stdout=stdout,
+                stderr=stderr,
+                error=exc,
+            )
         except RuntimeError as exc:
             if not _is_repairable_task_response_error(exc):
                 raise
@@ -618,6 +647,96 @@ def _default_branch(repo_root: Path) -> str:
     return "main"
 
 
+class _WorkflowTaskTimeoutExhausted(RuntimeError):
+    pass
+
+
+def _complete_task_json_with_timeout_retry(
+    client: WorkflowTaskChatClient,
+    messages: list[dict[str, str]],
+    *,
+    model: str,
+    stderr: TextIO,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+) -> dict[str, Any]:
+    timeout_retries = 0
+    while True:
+        try:
+            return client.complete_json(messages)
+        except RuntimeError as exc:
+            if not _is_timeout_error(exc):
+                raise
+            if timeout_retries >= max(0, max_timeout_retries):
+                raise _WorkflowTaskTimeoutExhausted(
+                    f"LLM request timed out after {timeout_retries} retries: {exc}"
+                ) from exc
+            timeout_retries += 1
+            delay_seconds = timeout_backoff_seconds * (2 ** (timeout_retries - 1))
+            print(
+                f"LLM request timed out for {model}; retrying in "
+                f"{delay_seconds:g} seconds "
+                f"(retry {timeout_retries}/{max_timeout_retries}).",
+                file=stderr,
+                flush=True,
+            )
+            time.sleep(delay_seconds)
+
+
+def _is_timeout_error(error: RuntimeError) -> bool:
+    message = str(error).casefold()
+    return "timed out" in message or "timeout" in message
+
+
+def _handle_exhausted_timeout(
+    repo_root: Path,
+    task: WorkflowTask,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+    error: Exception,
+) -> int:
+    print(
+        f"LLM request timed out after retries for workflow task {task.task_id}: "
+        f"{error}",
+        file=stderr,
+        flush=True,
+    )
+    if ".worktrees" in repo_root.parts:
+        print(
+            f"Deleting dedicated workflow worktree after timeout: {repo_root}",
+            file=stderr,
+            flush=True,
+        )
+        _delete_workflow_task_worktree(repo_root, stderr=stderr)
+    else:
+        print(
+            "Keeping the configured repository because it is not a dedicated worktree.",
+            file=stderr,
+            flush=True,
+        )
+    return 2
+
+
+def _delete_workflow_task_worktree(repo_root: Path, *, stderr: TextIO) -> None:
+    project_root = _resolve_project_root(repo_root, repo_root)
+    result = subprocess.run(
+        ["git", "worktree", "remove", "--force", str(repo_root)],
+        cwd=project_root,
+        capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(
+            f"Failed to delete dedicated workflow worktree: {result.stderr.strip()}",
+            file=stderr,
+            flush=True,
+        )
+
+
 def _build_task_messages(
     workflow: WorkflowInstance,
     task: WorkflowTask,
@@ -676,6 +795,8 @@ def _compact_workflow_task_context(
     *,
     client: WorkflowTaskChatClient,
     stderr: TextIO,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
 ) -> tuple[dict[str, Any], int, int]:
     compaction_messages = [
         {
@@ -718,7 +839,14 @@ def _compact_workflow_task_context(
         file=stderr,
         flush=True,
     )
-    response = client.complete_json(compaction_messages)
+    response = _complete_task_json_with_timeout_retry(
+        client,
+        compaction_messages,
+        model="context-compaction",
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+    )
     compacted_context = response.get("compacted_context")
     if not isinstance(compacted_context, dict):
         raise RuntimeError(

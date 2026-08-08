@@ -18,6 +18,7 @@ from powdrr_lift.workflow_chat_agent import LLMModelLimits
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_zai_client,
+    _handle_exhausted_timeout,
     _workflow_file_command_error,
     run_workflow_task,
 )
@@ -302,6 +303,69 @@ def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
     assert "Compacting workflow task context" in status
     assert "waiting for context compaction LLM response" in status
     assert "Compacted workflow task context" in status
+
+
+def test_process_workflow_task_retries_llm_timeouts_with_backoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    client = _FakeClient([])
+    calls = 0
+    sleeps: list[float] = []
+
+    def _complete(messages: list[dict[str, str]]) -> dict[str, object]:
+        nonlocal calls
+        client.messages.append(messages)
+        calls += 1
+        if calls < 3:
+            raise RuntimeError("OpenAI-compatible request timed out")
+        return {"kind": "complete", "output_state": {"version": "v2"}}
+
+    client.complete_json = _complete  # type: ignore[method-assign]
+    monkeypatch.setattr("powdrr_lift.workflow_task_agent.time.sleep", sleeps.append)
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+            max_timeout_retries=2,
+            timeout_backoff_seconds=1.5,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert calls == 3
+    assert sleeps == [1.5, 3.0]
+    assert stderr.getvalue().count("retrying in") == 2
+
+
+def test_exhausted_timeout_deletes_only_dedicated_worktree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted: list[Path] = []
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._delete_workflow_task_worktree",
+        lambda path, *, stderr: deleted.append(path),
+    )
+    task = _workflow(tmp_path).tasks[0]
+    dedicated_worktree = tmp_path / ".worktrees" / "timed-out-task"
+
+    result = _handle_exhausted_timeout(
+        dedicated_worktree,
+        task,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        error=RuntimeError("timed out"),
+    )
+
+    assert result == 2
+    assert deleted == [dedicated_worktree]
 
 
 def test_process_workflow_task_prints_invalid_response_before_repair(

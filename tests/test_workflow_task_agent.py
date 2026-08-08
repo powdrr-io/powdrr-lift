@@ -155,6 +155,54 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
     assert "available_tools" in client.messages[0][1]["content"]
 
 
+def test_process_workflow_task_repairs_fuzzy_match_tool_error(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    (tmp_path / "candidate-spec.yaml").write_text("name: candidate\n", encoding="utf-8")
+    client = _FakeClient(
+        [
+            {
+                "kind": "invoke_tool",
+                "tool": "fuzzy-match",
+                "parameters": {"command": ["fuzzy-match", "."]},
+            },
+            {
+                "kind": "invoke_tool",
+                "tool": "fuzzy-match",
+                "parameters": {
+                    "command": [
+                        "fuzzy-match",
+                        ".",
+                        "-name",
+                        "candidate",
+                        "-type",
+                        "f",
+                    ]
+                },
+            },
+            {"kind": "complete", "output_state": {"found": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 3
+    correction = client.messages[1][1]["content"]
+    assert "fuzzy-match requires -name <query>" in correction
+    assert "corrected JSON action" in correction
+    assert "tool_error" in correction
+
+
 def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
     specs = tmp_path / "docs" / "specs" / "example"

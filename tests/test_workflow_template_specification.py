@@ -248,6 +248,8 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
         "high_reasoning",
     ]
     assert all(task.details for task in template.task_templates)
+    assert "workflow-instance context" in (template.task_templates[2].details or "")
+    assert "actual proposed PR" in (template.task_templates[2].details or "")
     assert template.task_templates[2].tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
@@ -283,6 +285,12 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "Lint and cleanup",
         "Create PR",
     ]
+    proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
+    assert (
+        "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
+    )
+    assert "actual proposed PR" in " ".join(template.how_to_fill_this_out)
+    assert "specification path" in (template.task_templates[0].details or "")
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates
@@ -346,3 +354,26 @@ def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
     assert second_tasks[0].task_id == "second-pr-task-001"
     assert (first_directory / "first-pr-task-001.json").is_file()
     assert (second_directory / "second-pr-task-001.json").is_file()
+
+
+def test_instantiate_execute_proposed_pr_fills_proposed_pr_context(
+    tmp_path: Path,
+) -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
+    )
+
+    _, tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="interaction-file-log",
+        workflow_instance_name="interaction-file-log-pr",
+        output_root=tmp_path / "workflows",
+    )
+
+    proposed_pr_input = tasks[0].input_state["proposed_pr"]
+    assert (
+        "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
+    )
+    assert "Instantiation context:" in (tasks[0].details or "")
+    assert "interaction-file-log" in (tasks[0].details or "")
+    assert "interaction-file-log-pr" in (tasks[0].details or "")

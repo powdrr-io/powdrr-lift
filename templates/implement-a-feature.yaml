@@ -47,7 +47,12 @@ task_templates:
     assignee_type: agent
     assignee_role: architect
     llm_type: high_reasoning
-    details: Turn the confirmed requirements into proposed PRs and generate an execute-proposed-pr workflow template for each approved PR.
+    details: >-
+      Turn the confirmed requirements into proposed PRs and generate an
+      execute-proposed-pr workflow template for each approved PR. The
+      instantiation command supplies work-item and workflow-instance context;
+      the first execute task must use that context to locate and verify the
+      actual proposed PR rather than assuming a path or id.
     tool_invocations:
       - tool: shell
         command:

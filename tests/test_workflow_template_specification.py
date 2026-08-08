@@ -328,6 +328,51 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert all(task.status.value == "open" for task in tasks)
 
 
+def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
+    tmp_path: Path,
+) -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
+    )
+
+    _, tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Interaction File Log",
+        workflow_instance_name="interaction-file-log-pr-001",
+        output_root=tmp_path / "workflows",
+    )
+
+    assert "instructions" in tasks[0].input_state["proposed_pr"]
+    assert "interaction-file-log-pr-001" in (tasks[0].details or "")
+    assert "Interaction File Log" in (tasks[0].details or "")
+
+
+def test_instantiate_workflow_template_accepts_generic_input_values(
+    tmp_path: Path,
+) -> None:
+    template = WorkflowTemplate(
+        when_to_use=("When a custom input is required.",),
+        how_to_fill_this_out=("Provide the custom value.",),
+        task_templates=(
+            WorkflowTaskTemplate(
+                description="Use the custom input.",
+                complexity=TaskComplexity.LOW,
+                input_state={"custom": "<custom-value>"},
+            ),
+        ),
+    )
+    template_path = save_workflow_template(template, tmp_path / "template.yaml")
+
+    _, tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Example",
+        output_root=tmp_path / "workflows",
+        template_values={"custom-value": "provided-value"},
+    )
+
+    assert tasks[0].input_state == {"custom": "provided-value"}
+
+
 def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
     tmp_path: Path,
 ) -> None:

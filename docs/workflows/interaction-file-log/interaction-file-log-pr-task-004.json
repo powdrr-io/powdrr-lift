@@ -1,0 +1,20 @@
+{
+  "task_id": "interaction-file-log-pr-task-004",
+  "status": "open",
+  "upstream_task_ids": [
+    "interaction-file-log-pr-task-003"
+  ],
+  "dependent_state": [
+    "test-diffs-generated"
+  ],
+  "complexity": "high",
+  "input_state": {
+    "test_plan": []
+  },
+  "assignee_type": "agent",
+  "assignee_role": "coder",
+  "output_state_type": "test-diffs-state",
+  "description": "Generate test diffs",
+  "details": "Instantiation context: work item name is 'interaction-file-log'; workflow instance name is 'interaction-file-log-pr'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "standard_reasoning"
+}

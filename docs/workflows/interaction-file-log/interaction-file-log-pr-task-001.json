@@ -1,0 +1,18 @@
+{
+  "task_id": "interaction-file-log-pr-task-001",
+  "status": "open",
+  "upstream_task_ids": [],
+  "dependent_state": [
+    "proposed-pr-plan-reviewed"
+  ],
+  "complexity": "high",
+  "input_state": {
+    "proposed_pr": "interaction-file-log-pr"
+  },
+  "assignee_type": "agent",
+  "assignee_role": "architect",
+  "output_state_type": "reviewed-proposed-pr-plan-state",
+  "description": "Review proposed PR plan",
+  "details": "Resolve input_state.proposed_pr before making implementation decisions. Use the instantiation context included with this task to find the actual proposed PR specification, inspect the candidate document, and record a concrete reference containing the proposed PR id and specification path in the reviewed output. Use that document as the source of truth for the PR's intent, acceptance criteria, tests, scope, and risks. If the reference does not resolve to the actual proposed PR, stop and report the missing or mismatched reference instead of guessing.\n\nInstantiation context: work item name is 'interaction-file-log'; workflow instance name is 'interaction-file-log-pr'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "high_reasoning"
+}

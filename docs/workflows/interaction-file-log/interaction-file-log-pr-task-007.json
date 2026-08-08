@@ -1,0 +1,21 @@
+{
+  "task_id": "interaction-file-log-pr-task-007",
+  "status": "open",
+  "upstream_task_ids": [
+    "interaction-file-log-pr-task-006"
+  ],
+  "dependent_state": [
+    "goals-confirmed"
+  ],
+  "complexity": "medium",
+  "input_state": {
+    "goals": [],
+    "acceptance_results": []
+  },
+  "assignee_type": "human",
+  "assignee_role": "decider",
+  "output_state_type": "confirmed-goals-state",
+  "description": "Confirm goals",
+  "details": "Instantiation context: work item name is 'interaction-file-log'; workflow instance name is 'interaction-file-log-pr'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "standard_reasoning"
+}

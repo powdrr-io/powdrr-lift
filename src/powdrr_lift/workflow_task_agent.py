@@ -16,6 +16,7 @@ from powdrr_lift.core import (
     TaskStatus,
     WorkflowInstance,
     WorkflowTask,
+    resolve_repo_root,
 )
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
@@ -35,6 +36,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_llm_mapping,
     _resolve_local_model_path,
     _resolve_project_root,
+    _resolve_worktree_context,
     _resolve_worktree_file_path,
 )
 
@@ -79,7 +81,14 @@ def run_workflow_task(
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
-    workflow = WorkflowInstance.from_directory(config.workflow_dir)
+    configured_repo_root = resolve_repo_root(config.repo_root)
+    repo_root, workflow_dir = _resolve_workflow_task_context(
+        config,
+        configured_repo_root=configured_repo_root,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    workflow = WorkflowInstance.from_directory(workflow_dir)
     task = _select_task(workflow, config.task_id)
     if task is None:
         print("No ready agent task found.", file=stderr)
@@ -88,7 +97,7 @@ def run_workflow_task(
     print(f"Claimed workflow task: {task.task_id}", file=stdout)
     print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
     _publish_workflow_progress(
-        config.repo_root,
+        repo_root,
         workflow,
         reason=f"claim {task.task_id}",
         stdout=stdout,
@@ -104,7 +113,8 @@ def run_workflow_task(
     if client is None:
         client = _build_zai_client(config, task)
     dump_root = _resolve_project_root(
-        config.repo_root.resolve(), config.repo_root.resolve()
+        configured_repo_root,
+        repo_root,
     )
     client = _LLMExchangeRecordingClient(client, dump_root)
 
@@ -146,7 +156,7 @@ def run_workflow_task(
         result: Any
         if action.kind == "gather-context":
             report = gather_specification_context(
-                config.repo_root,
+                repo_root,
                 types=list(action.types),
                 keywords=list(action.keywords),
             )
@@ -169,7 +179,7 @@ def run_workflow_task(
             continue
         if action.kind == "read_document":
             try:
-                result = _read_task_document(action, config.repo_root)
+                result = _read_task_document(action, repo_root)
             except (RuntimeError, ValueError) as exc:
                 response_correction = _action_response_correction(action, exc)
                 events.append(
@@ -189,7 +199,7 @@ def run_workflow_task(
             continue
         if action.kind == "edit":
             try:
-                result = _apply_task_edits(action, config.repo_root)
+                result = _apply_task_edits(action, repo_root)
             except (RuntimeError, ValueError) as exc:
                 response_correction = _action_response_correction(action, exc)
                 events.append(
@@ -221,7 +231,7 @@ def run_workflow_task(
                     file=stdout,
                 )
             _publish_workflow_progress(
-                config.repo_root,
+                repo_root,
                 workflow,
                 reason=f"handoff from {task.task_id}",
                 stdout=stdout,
@@ -251,7 +261,7 @@ def run_workflow_task(
                 print(command_error, file=stderr)
                 result = {
                     "command": action.parameters.get("command"),
-                    "cwd": str(config.repo_root),
+                    "cwd": str(repo_root),
                     "returncode": 2,
                     "stdout": "",
                     "stderr": command_error,
@@ -261,7 +271,7 @@ def run_workflow_task(
                     if action.tool == "shell":
                         result = _execute_shell_tool(
                             action.parameters,
-                            worktree_root=config.repo_root,
+                            worktree_root=repo_root,
                             stdout=stdout,
                             stderr=stderr,
                             verbose=config.verbose,
@@ -269,7 +279,7 @@ def run_workflow_task(
                     elif action.tool == "fuzzy-match":
                         result = _execute_fuzzy_match_tool(
                             action.parameters,
-                            worktree_root=config.repo_root,
+                            worktree_root=repo_root,
                         )
                     else:
                         raise RuntimeError(
@@ -307,7 +317,7 @@ def run_workflow_task(
                 print(action.text, file=stdout)
             print(f"Completed workflow task: {completed.task_id}", file=stdout)
             _publish_workflow_progress(
-                config.repo_root,
+                repo_root,
                 workflow,
                 reason=f"complete {completed.task_id}",
                 stdout=stdout,
@@ -326,7 +336,7 @@ def run_workflow_task(
                     file=stdout,
                 )
             _publish_workflow_progress(
-                config.repo_root,
+                repo_root,
                 workflow,
                 reason=f"human input required by {task.task_id}",
                 stdout=stdout,
@@ -339,7 +349,7 @@ def run_workflow_task(
         file=stderr,
     )
     _publish_workflow_progress(
-        config.repo_root,
+        repo_root,
         workflow,
         reason=f"roundtrip limit for {task.task_id}",
         stdout=stdout,
@@ -358,6 +368,35 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _resolve_workflow_task_context(
+    config: WorkflowTaskAgentConfig,
+    *,
+    configured_repo_root: Path,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> tuple[Path, Path]:
+    """Use the same dedicated worktree isolation as workflow chat."""
+    if not _is_git_worktree(configured_repo_root):
+        return configured_repo_root, config.workflow_dir.resolve()
+
+    worktree_root = _resolve_worktree_context(
+        configured_repo_root,
+        stderr=stderr,
+        verbose=config.verbose,
+    )
+    workflow_dir = config.workflow_dir.resolve()
+    try:
+        workflow_relative_path = workflow_dir.relative_to(configured_repo_root)
+    except ValueError as exc:
+        raise RuntimeError(
+            "Workflow directory must be inside the configured repository root "
+            "when workflow task execution creates a dedicated worktree."
+        ) from exc
+    relocated_workflow_dir = worktree_root / workflow_relative_path
+    print(f"Using workflow task worktree: {worktree_root}", file=stdout, flush=True)
+    return worktree_root, relocated_workflow_dir
 
 
 def _publish_workflow_progress(

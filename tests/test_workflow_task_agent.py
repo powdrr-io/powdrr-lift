@@ -74,6 +74,47 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert '"execution_mode": "process_workflow_task"' in prompt
 
 
+def test_process_workflow_task_repairs_invalid_json_response(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+
+    class _InvalidThenCompleteClient(_FakeClient):
+        def __init__(self) -> None:
+            super().__init__([])
+            self.calls = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            self.messages.append(messages)
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError(
+                    "OpenAI response content was not valid JSON: Expecting value"
+                )
+            return {"kind": "complete", "output_state": {"version": "v2"}}
+
+    client = _InvalidThenCompleteClient()
+    stderr = io.StringIO()
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert client.calls == 2
+    assert "response needs repair" in stderr.getvalue()
+    assert "response_correction" in client.messages[1][1]["content"]
+    assert "not valid JSON" in client.messages[1][1]["content"]
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
+        TaskStatus.COMPLETED
+    )
+
+
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     tmp_path: Path,
 ) -> None:

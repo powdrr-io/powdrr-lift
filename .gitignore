@@ -19,5 +19,6 @@ build/
 .aider.*
 .aider/
 .powdrr-lift/
+.powdrr/
 uv.lock
 opencode.json

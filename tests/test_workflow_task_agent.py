@@ -234,11 +234,39 @@ def test_process_workflow_task_repairs_invalid_json_response(
     assert exit_code == 0
     assert client.calls == 2
     assert "response needs repair" in stderr.getvalue()
+    assert "<no parsed response; client error:" in stderr.getvalue()
     assert "response_correction" in client.messages[1][1]["content"]
     assert "not valid JSON" in client.messages[1][1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED
     )
+
+
+def test_process_workflow_task_prints_invalid_response_before_repair(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stderr = io.StringIO()
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=_FakeClient(
+            [
+                {"kind": None, "diagnostic": "inspect me"},
+                {"kind": "complete", "output_state": {"version": "v2"}},
+            ]
+        ),
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    output = stderr.getvalue()
+    assert "Workflow task LLM response requiring repair:" in output
+    assert '"kind": null' in output
+    assert '"diagnostic": "inspect me"' in output
 
 
 def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None:

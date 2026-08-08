@@ -159,11 +159,43 @@ def run_workflow_task(
             )
             continue
         if action.kind == "read_document":
-            result = _read_task_document(action, config.repo_root)
+            try:
+                result = _read_task_document(action, config.repo_root)
+            except (RuntimeError, ValueError) as exc:
+                response_correction = _action_response_correction(action, exc)
+                events.append(
+                    {
+                        "kind": "action_error",
+                        "action_kind": action.kind,
+                        "error": str(exc),
+                    }
+                )
+                print(
+                    "Workflow task action needs correction; requesting a "
+                    "corrected action from the LLM.",
+                    file=stderr,
+                )
+                continue
             events.append({"kind": action.kind, "result": result})
             continue
         if action.kind == "edit":
-            result = _apply_task_edits(action, config.repo_root)
+            try:
+                result = _apply_task_edits(action, config.repo_root)
+            except (RuntimeError, ValueError) as exc:
+                response_correction = _action_response_correction(action, exc)
+                events.append(
+                    {
+                        "kind": "action_error",
+                        "action_kind": action.kind,
+                        "error": str(exc),
+                    }
+                )
+                print(
+                    "Workflow task action needs correction; requesting a "
+                    "corrected action from the LLM.",
+                    file=stderr,
+                )
+                continue
             events.append({"kind": action.kind, "result": result})
             continue
         if action.kind == "prompt_user":
@@ -230,7 +262,7 @@ def run_workflow_task(
                             "supported tools are shell and fuzzy-match."
                         )
                 except (RuntimeError, ValueError) as exc:
-                    response_correction = _tool_response_correction(action, exc)
+                    response_correction = _action_response_correction(action, exc)
                     events.append(
                         {
                             "kind": "tool_error",
@@ -353,13 +385,13 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
     )
 
 
-def _tool_response_correction(
+def _action_response_correction(
     action: WorkflowTaskAction,
     error: Exception,
 ) -> str:
     correction = (
-        f"The previous {action.kind} action failed while executing "
-        f"tool={action.tool!r}: {error}. Return a corrected JSON action and "
+        f"The previous {action.kind} action failed: {error}. "
+        "Return a corrected JSON action and "
         "do not repeat the failed command unchanged."
     )
     if action.tool == "fuzzy-match":
@@ -368,6 +400,12 @@ def _tool_response_correction(
             "['fuzzy-match', '<search-root>', '-name', '<query>']; add "
             "-name and its non-empty query, then any optional -type, -path, "
             "-maxdepth, -mindepth, -threshold, or -print options."
+        )
+    if action.kind == "read_document":
+        correction += (
+            " For read_document, use a positive start_line and end_line, keep "
+            "end_line greater than or equal to start_line, and keep the entire "
+            "range within the document line count stated in the error."
         )
     return correction
 
@@ -526,9 +564,18 @@ def _read_task_document(
     path = _resolve_worktree_file_path(action.file_path, repo_root)
     lines = path.read_text(encoding="utf-8").splitlines()
     if action.start_line < 1 or action.end_line < action.start_line:
-        raise RuntimeError("read_document action line range is invalid.")
+        raise RuntimeError(
+            "read_document action line range "
+            f"{action.start_line}-{action.end_line} is invalid. "
+            f"Request a range from 1 through {len(lines)}."
+        )
     if action.end_line > len(lines):
-        raise RuntimeError("read_document action line range is outside the document.")
+        raise RuntimeError(
+            "read_document action line range "
+            f"{action.start_line}-{action.end_line} is outside the document "
+            f"with {len(lines)} lines. Request a range from 1 through "
+            f"{len(lines)}."
+        )
     return {
         "path": action.file_path,
         "start_line": action.start_line,

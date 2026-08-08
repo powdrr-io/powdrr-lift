@@ -59,6 +59,7 @@ _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
 _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
+_MAX_DOCUMENT_CONTEXT_LINES = 2000
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +73,7 @@ class LLMModelMapping:
     model: str
     provider: str
     backup_model: LLMModelMapping | None = None
+    long_context_backup_model: LLMModelMapping | None = None
 
 
 _DEFAULT_MODEL_LIMITS = LLMModelLimits(
@@ -125,8 +127,13 @@ ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
         _QWEN_2_5_CODER_MODEL,
         provider="local",
         backup_model=LLMModelMapping("glm-4.7", provider="zai"),
+        long_context_backup_model=LLMModelMapping("glm-5.2", provider="zai"),
     ),
-    "fast_iteration": LLMModelMapping(_QWEN_2_5_CODER_MODEL, provider="local"),
+    "fast_iteration": LLMModelMapping(
+        _QWEN_2_5_CODER_MODEL,
+        provider="local",
+        long_context_backup_model=LLMModelMapping("glm-5.2", provider="zai"),
+    ),
     "long_context": LLMModelMapping("glm-5.2", provider="zai"),
     "vision": LLMModelMapping("glm-4.6v", provider="zai"),
 }
@@ -139,10 +146,20 @@ DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
         "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
     ),
     "simple_task": LLMModelMapping(
-        "Qwen/Qwen3-Next-80B-A3B-Instruct", provider="deepinfra"
+        "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        provider="deepinfra",
+        long_context_backup_model=LLMModelMapping(
+            "deepseek-ai/DeepSeek-V4-Flash",
+            provider="deepinfra",
+        ),
     ),
     "fast_iteration": LLMModelMapping(
-        "Qwen/Qwen3-Next-80B-A3B-Instruct", provider="deepinfra"
+        "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        provider="deepinfra",
+        long_context_backup_model=LLMModelMapping(
+            "deepseek-ai/DeepSeek-V4-Flash",
+            provider="deepinfra",
+        ),
     ),
     "long_context": LLMModelMapping(
         "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
@@ -220,6 +237,8 @@ class SkillChatAction:
     kind: str
     tool: str | None = None
     file_path: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
     edits: tuple[SkillChatEdit, ...] = field(default_factory=tuple)
@@ -842,6 +861,7 @@ def run_workflow_chat(
         step_roundtrips += 1
         before_file_contents = _current_file_contents(execution_state)
         before_last_user_message = _last_user_message(execution_state)
+        before_context_length = len(execution_state.execution_context)
         _verbose_print(
             stderr,
             config.verbose,
@@ -981,6 +1001,7 @@ def run_workflow_chat(
             previous_action_signature=previous_action_signature,
             before_file_contents=before_file_contents,
             before_last_user_message=before_last_user_message,
+            before_context_length=before_context_length,
             state=execution_state,
         )
         previous_action_signature = action_signature
@@ -1568,6 +1589,9 @@ def _action_system_prompt() -> str:
         "next action is a line-based file change.\n"
         "- invoke_tool: choose this when a shell or fuzzy-match command is the "
         "next action needed to inspect or modify the worktree.\n"
+        "- read_document: choose this when you know the document path but need "
+        "specific lines from that document before deciding the next action. "
+        "Request only the smallest useful contiguous range.\n"
         "- next_step: choose this when the current step is complete and the next "
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
@@ -1583,7 +1607,9 @@ def _action_system_prompt() -> str:
         "file_edits array, with each edit using add, remove, or replace and valid "
         "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
         "parameters.command as a non-empty string or string array; next_step has "
-        "no action-specific fields; complete may include a human-readable text.\n"
+        "no action-specific fields; read_document requires file_path, positive "
+        "start_line and positive end_line for a range of at most 2000 lines; "
+        "complete may include a human-readable text.\n"
         '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
@@ -1596,6 +1622,9 @@ def _action_system_prompt() -> str:
         '"file_edits":[{"file_path":"...","edits":[...]}].\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
         '"llm_type":"simple_task"}\n'
+        '{"kind":"read_document","file_path":"docs/specs/example/system-specification.yaml",'
+        '"start_line":1,"end_line":80,"decisions_and_context":"...",'
+        '"llm_type":"long_context"}\n'
         '{"kind":"next_step","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
         '{"kind":"complete","text":"...","decisions_and_context":"...",'
@@ -1628,6 +1657,9 @@ def _action_system_prompt() -> str:
         "When edit is available, current_file includes the file path and its "
         "current contents as context.\n"
         "Use invoke_tool for shell commands or fuzzy-match searches.\n"
+        "Use read_document instead of requesting or embedding an entire large "
+        "document when only a section is needed. The returned line-numbered "
+        "excerpt will be included in the next roundtrip context.\n"
         "The fuzzy-match tool executes in Python and returns structured JSON. "
         "Its command array starts with fuzzy-match followed by a search root and "
         "supports -name/-iname, -path/-ipath, -type f|d, -maxdepth, -mindepth, "
@@ -1708,6 +1740,7 @@ def _workflow_action_handlers() -> dict[
     return {
         "complete": _handle_workflow_action_complete,
         "edit": _handle_workflow_action_edit,
+        "read_document": _handle_workflow_action_read_document,
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
@@ -1733,6 +1766,8 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
             "kind": action.kind,
             "tool": action.tool,
             "file_path": action.file_path,
+            "start_line": action.start_line,
+            "end_line": action.end_line,
             "text": action.text,
             "parameters": action.parameters,
             "edits": [_edit_to_data(edit) for edit in action.edits],
@@ -1753,6 +1788,7 @@ def _workflow_action_made_progress(
     previous_action_signature: str | None,
     before_file_contents: str | None,
     before_last_user_message: str | None,
+    before_context_length: int,
     state: _WorkflowExecutionState,
 ) -> bool:
     if action.kind in {"complete", "next_step"}:
@@ -1765,6 +1801,8 @@ def _workflow_action_made_progress(
         return _current_file_contents(state) != before_file_contents
     if action.kind == "prompt_user":
         return _last_user_message(state) != before_last_user_message
+    if action.kind == "read_document":
+        return len(state.execution_context) > before_context_length
     return False
 
 
@@ -1863,6 +1901,104 @@ def _handle_workflow_action_edit(
             config.verbose,
             f"Applied edit to {result['file_path']}",
         )
+    return True
+
+
+def _handle_workflow_action_read_document(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = stdout
+    _ = input_func
+    if action.file_path is None:
+        raise RuntimeError("Workflow read_document action must include file_path.")
+    if action.start_line is None or action.end_line is None:
+        raise RuntimeError(
+            "Workflow read_document action must include start_line and end_line."
+        )
+    if action.end_line < action.start_line:
+        raise RuntimeError(
+            "Workflow read_document action end_line must be >= start_line."
+        )
+    requested_line_count = action.end_line - action.start_line + 1
+    if requested_line_count > _MAX_DOCUMENT_CONTEXT_LINES:
+        raise RuntimeError(
+            "Workflow read_document action may request at most "
+            f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."
+        )
+
+    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
+    if not target_path.exists() or not target_path.is_file():
+        raise RuntimeError(
+            f"Workflow read_document action file does not exist: {action.file_path}"
+        )
+    lines = target_path.read_text(encoding="utf-8").splitlines()
+    if action.start_line > len(lines) or action.end_line > len(lines):
+        raise RuntimeError(
+            f"Workflow read_document action line range {action.start_line}-"
+            f"{action.end_line} is outside the document, which has "
+            f"{len(lines)} lines."
+        )
+
+    excerpt = {
+        "path": str(target_path.relative_to(state.worktree_root)),
+        "start_line": action.start_line,
+        "end_line": action.end_line,
+        "document_line_count": len(lines),
+        "lines": [
+            {
+                "line_number": line_number,
+                "text": lines[line_number - 1],
+            }
+            for line_number in range(action.start_line, action.end_line + 1)
+        ],
+    }
+    excerpt_text = json.dumps(excerpt, ensure_ascii=False)
+    action_data = {
+        "kind": action.kind,
+        "file_path": action.file_path,
+        "start_line": action.start_line,
+        "end_line": action.end_line,
+    }
+    state.transcript.append(
+        {
+            "role": "assistant",
+            "content": json.dumps(action_data, ensure_ascii=False),
+        }
+    )
+    state.transcript.append(
+        {
+            "role": "user",
+            "content": json.dumps(
+                {"document_context": excerpt},
+                ensure_ascii=False,
+            ),
+        }
+    )
+    state.execution_context.append(f"Document context: {excerpt_text}")
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "file_path": action.file_path,
+            "start_line": action.start_line,
+            "end_line": action.end_line,
+            "result": excerpt,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    _verbose_print(
+        stderr,
+        config.verbose,
+        f"Read document context {action.file_path}:{action.start_line}-"
+        f"{action.end_line}",
+    )
     return True
 
 
@@ -2074,6 +2210,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "edit": _parse_workflow_action_edit,
         "gather-context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
+        "read_document": _parse_workflow_action_read_document,
         "next_step": _parse_workflow_action_next_step,
         "prompt_user": _parse_workflow_action_prompt_user,
     }
@@ -2190,6 +2327,41 @@ def _parse_workflow_action_invoke_tool(
             llm_type=llm_type,
         )
     raise RuntimeError("Workflow invoke_tool action command must be a string or array.")
+
+
+def _parse_workflow_action_read_document(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    file_path = payload.get("file_path")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise RuntimeError("Workflow read_document action must include file_path.")
+    start_line = _required_edit_line_number(
+        payload.get("start_line"),
+        field_name="start_line",
+    )
+    end_line = _required_edit_line_number(
+        payload.get("end_line"),
+        field_name="end_line",
+    )
+    if end_line < start_line:
+        raise RuntimeError(
+            "Workflow read_document action end_line must be >= start_line."
+        )
+    if end_line - start_line + 1 > _MAX_DOCUMENT_CONTEXT_LINES:
+        raise RuntimeError(
+            "Workflow read_document action may request at most "
+            f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."
+        )
+    return SkillChatAction(
+        kind="read_document",
+        file_path=file_path.strip(),
+        start_line=start_line,
+        end_line=end_line,
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
 
 
 def _parse_workflow_action_next_step(
@@ -2586,6 +2758,29 @@ def _complete_json_with_model_fallback(
     active_provider = provider
     attempted_models = {model.casefold()}
     while True:
+        long_context_backup = _long_context_backup_for(
+            active_model,
+            model_mappings,
+        )
+        estimated_input_tokens = _estimate_message_tokens(messages)
+        active_limits = _model_limits_for(active_provider, active_model)
+        if (
+            long_context_backup is not None
+            and estimated_input_tokens + _CONTEXT_SAFETY_MARGIN_TOKENS
+            >= active_limits.context_window
+            and long_context_backup.model.casefold() not in attempted_models
+        ):
+            print(
+                f"{context} estimated context is too large for model "
+                f"{active_model!r} ({estimated_input_tokens} input tokens; "
+                f"limit {active_limits.context_window}). Switching to long-"
+                f"context backup model {long_context_backup.model!r}.",
+                file=stderr,
+            )
+            attempted_models.add(long_context_backup.model.casefold())
+            active_model = long_context_backup.model
+            active_provider = long_context_backup.provider
+            continue
         try:
             result = _complete_json_with_repair(
                 client_for(active_model, active_provider),
@@ -2633,6 +2828,17 @@ def _backup_model_for(
     for _, mapping in model_mappings:
         if mapping.model.casefold() == normalized_model:
             return mapping.backup_model
+    return None
+
+
+def _long_context_backup_for(
+    model: str,
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
+) -> LLMModelMapping | None:
+    normalized_model = model.casefold()
+    for _, mapping in model_mappings:
+        if mapping.model.casefold() == normalized_model:
+            return mapping.long_context_backup_model
     return None
 
 
@@ -3449,16 +3655,18 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "single next action for the current skill step. Choose gather-context "
         "when repository context is missing, prompt_user only for a genuinely "
         "required human decision, edit for a known line-based file change, "
-        "invoke_tool for the next shell or fuzzy-match command, next_step when "
+        "invoke_tool for the next shell or fuzzy-match command, read_document "
+        "for a needed line range from a known document, next_step when "
         "the current step is complete, or complete when the skill is finished.\n"
         "Response: return exactly one JSON object matching one allowed workflow "
         "action schema shape. Fix all required fields for the selected action; "
         "do not combine outcomes. The response schema has keys "
-        "kind, tool, file_path, text, parameters, edits, file_edits, types, "
+        "kind, tool, file_path, start_line, end_line, text, parameters, edits, "
+        "file_edits, types, "
         "keywords, and "
         "decisions_and_context, and llm_type. "
         "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
-        "next_step, and complete. "
+        "read_document, next_step, and complete. "
         f"The skill steps are: {step_kinds}. For prompt_user, text must be a "
         "concise, properly formed English question with meaningful words and "
         "a trailing question mark; it cannot be empty or only whitespace."
@@ -3601,6 +3809,11 @@ def _build_chat_client(
 
 
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
+    if provider == "local":
+        return LLMModelLimits(
+            context_window=_resolve_local_model_context(),
+            max_output_tokens=_MAX_COMPLETION_TOKENS,
+        )
     if provider == "zai":
         limits = ZAI_MODEL_LIMITS
     elif provider == "deepinfra":

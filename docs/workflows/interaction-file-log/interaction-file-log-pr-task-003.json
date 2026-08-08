@@ -1,0 +1,32 @@
+{
+  "task_id": "interaction-file-log-pr-task-003",
+  "status": "open",
+  "upstream_task_ids": [
+    "interaction-file-log-pr-task-002"
+  ],
+  "dependent_state": [
+    "tests-generated"
+  ],
+  "complexity": "high",
+  "input_state": {
+    "proposed_pr_context": {},
+    "execution_plan": [],
+    "test_plan": []
+  },
+  "assignee_type": "agent",
+  "assignee_role": "coder",
+  "output_state_type": "generated-test-diffs-state",
+  "description": "Generate tests that will validate the new functionality",
+  "details": "Implement only the tests described by the execution plan. Add focused tests for the required behavior, edge cases, and acceptance criteria. Keep the tests deterministic and consistent with existing repository conventions. Do not implement product behavior yet. Inspect the changed test files and record the test paths, test names, and expected failure reasons in output_state. Use the shell tool for repository inspection and edits.\n\nInstantiation context: work item name is 'interaction-file-log'; workflow instance name is 'interaction-file-log-pr'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "standard_reasoning",
+  "tool_invocations": [
+    {
+      "tool": "shell",
+      "command": [
+        "git",
+        "status",
+        "--short"
+      ]
+    }
+  ]
+}

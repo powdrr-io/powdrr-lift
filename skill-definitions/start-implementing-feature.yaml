@@ -77,14 +77,19 @@ steps:
     If an execution workflow already exists for every proposed PR, inspect the
     matching workflow directories, reuse them, and skip this step. Otherwise
     invoke the workflow instantiation tool once for each proposed PR that does
-    not already have a workflow. Use the fixed
+    not already have a workflow. Before invoking it, inspect the selected
+    workflow template and identify every placeholder used in task input_state.
+    Resolve each placeholder from the matching proposed PR and pass every
+    template-specific value explicitly with a repeated
+    --template-value NAME=VALUE option. Use the fixed
     templates/execute-proposed-pr.yaml template, the canonical feature name as
     the shared work-item name, and a distinct workflow instance name derived
     from each proposed PR. Preserve the proposed-PR order and encode each
-    dependency in the workflow task dependencies and input state. Never ask
-    the user for a template path. Do not overwrite an existing workflow
-    instance without user approval. Pass every created or reused workflow file
-    and its proposed-PR relationship as context to the next step.
+    dependency in the workflow task dependencies and input state. Never leave
+    a required input_state placeholder empty. Never ask the user for a template
+    path. Do not overwrite an existing workflow instance without user approval.
+    Pass every created or reused workflow file and its proposed-PR relationship
+    as context to the next step.
   tool_invocations:
   - tool: shell
     command:
@@ -94,6 +99,8 @@ steps:
     - <feature-name>
     - --workflow-instance-name
     - <proposed-pr-name>
+    - --template-value
+    - <template-value-name>=<template-value>
     - --template
     - templates/execute-proposed-pr.yaml
 - description: Review and approve the implementation plan and workflows.

@@ -976,6 +976,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Repository root used to resolve relative paths.",
     )
+    instantiate_workflow_parser.add_argument(
+        "--template-value",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help=("Value for a template input-state placeholder; may be repeated."),
+    )
     instantiate_workflow_parser.set_defaults(func=_run_instantiate_workflow)
 
     process_workflow_task_parser = subparsers.add_parser(
@@ -1086,6 +1093,18 @@ def _run_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_template_values(values: list[str]) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for value in values:
+        name, separator, replacement = value.partition("=")
+        if not separator or not name.strip():
+            raise ValueError(
+                "--template-value must use NAME=VALUE with a non-empty NAME."
+            )
+        parsed[name.strip()] = replacement
+    return parsed
+
+
 def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     template_path = args.template
@@ -1100,6 +1119,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             work_item_name=args.work_item_name,
             output_root=output_root,
             workflow_instance_name=args.workflow_instance_name,
+            template_values=_parse_template_values(args.template_value),
         )
     except (FileExistsError, OSError, ValueError) as exc:
         print(f"Could not instantiate workflow: {exc}", file=sys.stderr)

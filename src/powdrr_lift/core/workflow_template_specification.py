@@ -186,6 +186,7 @@ def instantiate_workflow_template(
     work_item_name: str,
     output_root: str | Path = Path("docs") / "workflows",
     workflow_instance_name: str | None = None,
+    template_values: Mapping[str, str] | None = None,
 ) -> tuple[Path, tuple[WorkflowTask, ...]]:
     """Materialize a workflow template as validated durable task documents."""
     template = load_workflow_template(template_path)
@@ -215,6 +216,11 @@ def instantiate_workflow_template(
             "workflow-instance-name must contain at least one letter or digit"
         )
     task_prefix = f"{instance_slug}-" if workflow_instance_name else ""
+    substitutions = {
+        "work-item-name": work_item_name,
+        "workflow-instance-name": workflow_instance_name or work_item_name,
+    }
+    substitutions.update(template_values or {})
     task_ids = tuple(
         f"{task_prefix}task-{index + 1:03d}"
         for index in range(len(template.task_templates))
@@ -226,7 +232,9 @@ def instantiate_workflow_template(
             status=TaskStatus.OPEN,
             description=task_template.description,
             complexity=task_template.complexity,
-            input_state=task_template.input_state,
+            input_state=_substitute_workflow_placeholders(
+                task_template.input_state, substitutions
+            ),
             assignee_type=task_template.assignee_type,
             assignee_role=task_template.assignee_role,
             details=task_template.details,
@@ -261,6 +269,31 @@ def instantiate_workflow_template(
             f"found {[task.task_id for task in ready_tasks]}"
         )
     return output_directory, tuple(tasks)
+
+
+def _substitute_workflow_placeholders(
+    value: Any,
+    substitutions: Mapping[str, str],
+) -> Any:
+    if isinstance(value, str):
+        result = value
+        for placeholder, replacement in substitutions.items():
+            result = result.replace(f"<{placeholder}>", replacement)
+        return result
+    if isinstance(value, Mapping):
+        return {
+            key: _substitute_workflow_placeholders(item, substitutions)
+            for key, item in value.items()
+        }
+    if isinstance(value, tuple):
+        return tuple(
+            _substitute_workflow_placeholders(item, substitutions) for item in value
+        )
+    if isinstance(value, list):
+        return [
+            _substitute_workflow_placeholders(item, substitutions) for item in value
+        ]
+    return value
 
 
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:

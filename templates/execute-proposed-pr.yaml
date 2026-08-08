@@ -14,7 +14,7 @@ task_templates:
   assignee_role: architect
   llm_type: high_reasoning
   input_state:
-    proposed_pr: 
+    proposed_pr: <workflow-instance-name>
   output_state_type: reviewed-proposed-pr-plan-state
   upstream_task_template_indexes: []
   dependent_state:

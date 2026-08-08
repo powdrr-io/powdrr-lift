@@ -23,6 +23,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
+    _resolve_project_root,
 )
 
 
@@ -74,7 +75,10 @@ def run_workflow_task(
     model = mapping.model
     if client is None:
         client = _build_zai_client(config, task)
-    client = _LLMExchangeRecordingClient(client, config.repo_root)
+    dump_root = _resolve_project_root(
+        config.repo_root.resolve(), config.repo_root.resolve()
+    )
+    client = _LLMExchangeRecordingClient(client, dump_root)
 
     events: list[dict[str, Any]] = []
     for _roundtrip in range(max(1, config.max_roundtrips)):

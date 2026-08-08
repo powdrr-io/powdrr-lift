@@ -753,7 +753,7 @@ def run_workflow_chat(
                     model=selected_model,
                     model_cache_dir=project_root / ".powdrr" / "models",
                 ),
-                repo_root,
+                project_root,
             )
         return clients[key]
 

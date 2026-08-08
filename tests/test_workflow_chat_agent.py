@@ -3823,13 +3823,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert [task.upstream_task_ids for task in tasks] == [
         (),
         ("task-001",),
-        ("task-002",),
+        ("task-001", "task-002"),
         ("task-003",),
-        ("task-004",),
+        ("task-001", "task-002", "task-003", "task-004"),
         ("task-005",),
-        ("task-006",),
-        ("task-007",),
-        ("task-008",),
+        ("task-001", "task-002", "task-005", "task-006"),
+        ("task-005", "task-006", "task-007"),
+        ("task-001", "task-005", "task-006", "task-007", "task-008"),
     ]
     assert all(task.status.value == "open" for task in tasks)
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)

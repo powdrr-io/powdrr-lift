@@ -198,7 +198,7 @@ def test_workflow_materializes_upstream_output_contract_when_task_is_claimed(
         upstream_task_ids=("plan",),
         dependent_state=("implementation-created",),
         complexity=TaskComplexity.HIGH,
-        input_state={"plan": "provided by upstream_task_outputs"},
+        input_state={"plan": "plan.execution-plan-state"},
         description="Implement the plan.",
         output_state_type="implementation-state",
     )
@@ -212,13 +212,7 @@ def test_workflow_materializes_upstream_output_contract_when_task_is_claimed(
     claimed_task = workflow.claim_task("implement")
 
     assert claimed_task.input_state == {
-        "plan": "provided by upstream_task_outputs",
-        "upstream_task_outputs": {
-            "plan": {
-                "output_state_type": "execution-plan-state",
-                "output_state": {"steps": ["add the behavior", "validate it"]},
-            }
-        },
+        "plan": {"steps": ["add the behavior", "validate it"]},
     }
     persisted = WorkflowInstance.from_directory(tmp_path / "workflow").tasks
     persisted_downstream = next(

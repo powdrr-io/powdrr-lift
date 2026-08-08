@@ -213,19 +213,12 @@ class WorkflowInstance:
             raise KeyError(f"Unknown workflow task: {task_id}")
         if task not in self.ready_tasks():
             raise ValueError(f"Workflow task is not ready to claim: {task_id}")
-        upstream_outputs = {
-            upstream_id: {
-                "output_state_type": self._tasks[upstream_id].output_state_type,
-                "output_state": self._tasks[upstream_id].output_state,
-            }
-            for upstream_id in task.upstream_task_ids
-        }
         claimed_task = replace(
             task,
             status=TaskStatus.LOCKED,
-            input_state=_with_upstream_task_outputs(
+            input_state=_resolve_upstream_input_references(
                 task.input_state,
-                upstream_outputs,
+                self._tasks,
             ),
         )
         save_workflow_task(claimed_task, self.directory / f"{task_id}.json")
@@ -312,16 +305,29 @@ def save_workflow_task(task: WorkflowTask, path: str | Path) -> Path:
     return resolved_path
 
 
-def _with_upstream_task_outputs(
-    input_state: Any,
-    upstream_outputs: Mapping[str, Any],
+def _resolve_upstream_input_references(
+    value: Any,
+    tasks: Mapping[str, WorkflowTask],
 ) -> Any:
-    if isinstance(input_state, Mapping):
-        updated_input = dict(input_state)
-    else:
-        updated_input = {"declared_input_state": input_state}
-    updated_input["upstream_task_outputs"] = dict(upstream_outputs)
-    return updated_input
+    if isinstance(value, str):
+        task_id, separator, output_state_type = value.partition(".")
+        upstream_task = tasks.get(task_id) if separator else None
+        if (
+            upstream_task is not None
+            and output_state_type == upstream_task.output_state_type
+        ):
+            return upstream_task.output_state
+        return value
+    if isinstance(value, Mapping):
+        return {
+            key: _resolve_upstream_input_references(item, tasks)
+            for key, item in value.items()
+        }
+    if isinstance(value, tuple):
+        return tuple(_resolve_upstream_input_references(item, tasks) for item in value)
+    if isinstance(value, list):
+        return [_resolve_upstream_input_references(item, tasks) for item in value]
+    return value
 
 
 def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:

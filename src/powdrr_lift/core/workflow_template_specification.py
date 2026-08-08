@@ -226,6 +226,9 @@ def instantiate_workflow_template(
         f"{task_prefix}task-{index + 1:03d}"
         for index in range(len(template.task_templates))
     )
+    substitutions.update(
+        {f"upstream-task-{index}": task_id for index, task_id in enumerate(task_ids)}
+    )
     tasks: list[WorkflowTask] = []
     for index, task_template in enumerate(template.task_templates):
         upstream_task_indexes = task_template.upstream_task_template_indexes
@@ -251,7 +254,9 @@ def instantiate_workflow_template(
                 for invocation in task_template.tool_invocations
             ),
             output_state_type=task_template.output_state_type,
-            upstream_task_ids=tuple(task_ids[index] for index in upstream_task_indexes),
+            upstream_task_ids=tuple(
+                task_ids[upstream_index] for upstream_index in upstream_task_indexes
+            ),
             dependent_state=task_template.dependent_state,
         )
         task_path = output_directory / f"{task.task_id}.json"

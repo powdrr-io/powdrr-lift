@@ -242,6 +242,22 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     for task in template.task_templates[1:]:
         assert "upstream_task_outputs" not in (task.details or "")
         assert "runtime task ID" not in (task.details or "")
+    assert template.task_templates[1].input_state["proposed_pr_context"] == (
+        "<upstream-task-0>.proposed-pr-context-state"
+    )
+    assert template.task_templates[4].input_state["tests_proven_failing"] == (
+        "<upstream-task-3>.tests-proven-failing-state"
+    )
+    assert template.task_templates[8].input_state["lint_results"] == (
+        "<upstream-task-7>.linted-and-cleaned-state"
+    )
+    assert template.task_templates[8].upstream_task_template_indexes == (
+        0,
+        4,
+        5,
+        6,
+        7,
+    )
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",
@@ -285,7 +301,12 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     )
 
     assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
-    assert "upstream_task_outputs" not in tasks[1].input_state
+    assert tasks[1].input_state["proposed_pr_context"] == (
+        "interaction-file-log-pr-001-task-001.proposed-pr-context-state"
+    )
+    assert tasks[4].input_state["tests_proven_failing"] == (
+        "interaction-file-log-pr-001-task-004.tests-proven-failing-state"
+    )
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")
 

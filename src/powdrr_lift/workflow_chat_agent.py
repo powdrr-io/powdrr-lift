@@ -240,6 +240,7 @@ class SkillChatAction:
     start_line: int | None = None
     end_line: int | None = None
     text: str | None = None
+    output_state: Any = None
     parameters: dict[str, Any] = field(default_factory=dict)
     edits: tuple[SkillChatEdit, ...] = field(default_factory=tuple)
     file_edits: tuple[SkillChatFileEdits, ...] = field(default_factory=tuple)
@@ -1822,6 +1823,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
             "start_line": action.start_line,
             "end_line": action.end_line,
             "text": action.text,
+            "output_state": action.output_state,
             "parameters": action.parameters,
             "edits": [_edit_to_data(edit) for edit in action.edits],
             "file_edits": [_file_edits_to_data(group) for group in action.file_edits],
@@ -2280,6 +2282,7 @@ def _parse_workflow_action_complete(
     return SkillChatAction(
         kind="complete",
         text=(text.strip() if text else None),
+        output_state=payload.get("output_state"),
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )

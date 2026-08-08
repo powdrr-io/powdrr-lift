@@ -220,7 +220,8 @@ def instantiate_workflow_template(
         "work-item-name": work_item_name,
         "workflow-instance-name": workflow_instance_name or work_item_name,
     }
-    substitutions.update(template_values or {})
+    explicit_substitutions = dict(template_values or {})
+    substitutions.update(explicit_substitutions)
     task_ids = tuple(
         f"{task_prefix}task-{index + 1:03d}"
         for index in range(len(template.task_templates))
@@ -244,7 +245,10 @@ def instantiate_workflow_template(
             ),
             llm_type=task_template.llm_type,
             uses_skills=task_template.uses_skills,
-            tool_invocations=task_template.tool_invocations,
+            tool_invocations=tuple(
+                _substitute_tool_invocation(invocation, explicit_substitutions)
+                for invocation in task_template.tool_invocations
+            ),
             output_state_type=task_template.output_state_type,
             upstream_task_ids=tuple(
                 task_ids[upstream_index]
@@ -298,6 +302,31 @@ def _substitute_workflow_placeholders(
             _substitute_workflow_placeholders(item, substitutions) for item in value
         ]
     return value
+
+
+def _substitute_tool_invocation(
+    invocation: SkillToolInvocation,
+    substitutions: Mapping[str, str],
+) -> SkillToolInvocation:
+    return SkillToolInvocation(
+        tool=invocation.tool,
+        command=tuple(
+            _substitute_workflow_placeholders(item, substitutions)
+            for item in invocation.command
+        ),
+        cwd=(
+            _substitute_workflow_placeholders(invocation.cwd, substitutions)
+            if invocation.cwd is not None
+            else None
+        ),
+        env=tuple(
+            (
+                key,
+                _substitute_workflow_placeholders(value, substitutions),
+            )
+            for key, value in invocation.env
+        ),
+    )
 
 
 def _add_instantiation_context(

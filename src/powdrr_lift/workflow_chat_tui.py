@@ -495,8 +495,11 @@ class WorkflowChatApp(App[None]):
             self.call_from_thread(self._set_message, line)
 
     def _set_status(self, status: str) -> None:
-        self._current_status = status.strip()
-        self._render_status()
+        # Status updates are history, too.  Keeping the latest value in a
+        # separate transient slot caused diagnostics (including the full
+        # empty-response prompt) to disappear as soon as the next status was
+        # emitted.
+        self._set_message(status)
 
     def _render_status(self) -> None:
         status_container = self.query_one("#status-container", ScrollableContainer)

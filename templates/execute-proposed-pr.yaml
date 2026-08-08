@@ -27,27 +27,23 @@ task_templates:
     repository_status: []
   details: >-
     First resolve proposed_pr to the exact proposed PR specification. Use the
-    fuzzy-match tool to search docs/specs for the proposed PR id and related
-    implementation-specification files. Use the shell tool to inspect the
-    matching specification, its referenced feature documents, repository status,
-    and relevant existing source and test files. Do not guess a path when the
-    tool results provide the path. Record the exact specification path, feature
-    name, goal, scope, acceptance criteria, files to change, test plan,
-    validation commands, dependencies, risks, and any unresolved ambiguity in
-    output_state. If the proposed PR cannot be identified unambiguously, use
-    get-human-input with one precise question instead of proceeding.
+    gather-context tool with the proposed_prs context type and the proposed PR
+    id as a keyword to discover the proposed PR and its specification context.
+    Use the shell tool to inspect the matching specification, its referenced
+    feature documents, repository status, and relevant existing source and test
+    files. Do not guess a path when the tool results provide the path. Record
+    the exact specification path, feature name, goal, scope, acceptance
+    criteria, files to change, test plan, validation commands, dependencies,
+    risks, and any unresolved ambiguity in output_state. If the proposed PR
+    cannot be identified unambiguously, use get-human-input with one precise
+    question instead of proceeding.
   tool_invocations:
-  - tool: fuzzy-match
+  - tool: gather-context
     command:
-    - fuzzy-match
-    - docs/specs
-    - -name
+    - gather-context
+    - proposed_prs
+    - --keywords
     - <proposed-pr-id>
-    - -type
-    - f
-    - -maxdepth
-    - "4"
-    - -print
   - tool: shell
     command:
     - git

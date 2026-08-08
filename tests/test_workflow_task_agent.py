@@ -155,6 +155,47 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
     assert "available_tools" in client.messages[0][1]["content"]
 
 
+def test_process_workflow_task_supports_gather_context_tool(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    specs = tmp_path / "docs" / "specs" / "example"
+    specs.mkdir(parents=True)
+    (specs / "proposed-pr-specification.yaml").write_text(
+        "proposed_prs:\n- id: example-pr\n  state: proposed\n",
+        encoding="utf-8",
+    )
+    client = _FakeClient(
+        [
+            {
+                "kind": "invoke_tool",
+                "tool": "gather-context",
+                "parameters": {
+                    "command": [
+                        "gather-context",
+                        "proposed_prs",
+                        "--keywords",
+                        "example-pr",
+                    ]
+                },
+            },
+            {"kind": "complete", "output_state": {"found": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert "example-pr" in client.messages[1][1]["content"]
+    assert "gather-context" in client.messages[0][1]["content"]
+
+
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     tmp_path: Path,
 ) -> None:

@@ -15,6 +15,10 @@ from powdrr_lift.core import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    render_gather_context_report,
+)
 from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
     LocalLlamaChatClient,
@@ -161,10 +165,16 @@ def run_workflow_task(
                         action.parameters,
                         worktree_root=config.repo_root,
                     )
+                elif action.tool == "gather-context":
+                    result = _execute_gather_context_tool(
+                        action.parameters,
+                        worktree_root=config.repo_root,
+                    )
                 else:
                     raise RuntimeError(
                         f"Unsupported workflow task tool {action.tool!r}; "
-                        "supported tools are shell and fuzzy-match."
+                        "supported tools are shell, fuzzy-match, and "
+                        "gather-context."
                     )
             events.append(
                 {
@@ -249,6 +259,13 @@ def _build_task_messages(
                                 "fuzzy name matching."
                             ),
                         },
+                        {
+                            "name": "gather-context",
+                            "description": (
+                                "Find structured specification context by type and "
+                                "optional keywords."
+                            ),
+                        },
                     ],
                     "response_correction": response_correction,
                 },
@@ -289,7 +306,8 @@ def _task_system_prompt() -> str:
         "from your previous response. Correct that failure and return only the "
         "required JSON object.\n"
         "Choose exactly one outcome:\n"
-        "- invoke_tool: choose this when a shell or fuzzy-match command is needed "
+        "- invoke_tool: choose this when a shell, fuzzy-match, or gather-context "
+        "command is needed "
         "to inspect the worktree or perform work required to determine the "
         "output.\n"
         "- complete: choose this when the task can be safely finished now; put "
@@ -308,7 +326,8 @@ def _task_system_prompt() -> str:
         '"follow_up_task":{"description":"...","role":"coder",'
         '"input_state":{},"output_state_type":"state"}}}\n'
         "Use invoke_tool for work needed to determine the output. Set tool to "
-        "shell for repository commands or fuzzy-match for fuzzy path discovery. "
+        "shell for repository commands, fuzzy-match for fuzzy path discovery, or "
+        "gather-context for structured specification context. "
         "The fuzzy-match command starts with fuzzy-match and supports find-like "
         "options including -name, -path, -type, -maxdepth, -mindepth, "
         "-threshold, and -print. Use complete "
@@ -327,6 +346,45 @@ def _task_system_prompt() -> str:
 
 def _workflow_file_names(workflow_dir: Path) -> list[str]:
     return sorted(path.name for path in workflow_dir.glob("*.json") if path.is_file())
+
+
+def _execute_gather_context_tool(
+    parameters: dict[str, Any],
+    *,
+    worktree_root: Path,
+) -> dict[str, Any]:
+    command = parameters.get("command")
+    if not isinstance(command, (str, list, tuple)):
+        raise RuntimeError(
+            "Workflow gather-context tool parameters must include a command array."
+        )
+    command_items = command.split() if isinstance(command, str) else list(command)
+    if not command_items or command_items[0] != "gather-context":
+        raise RuntimeError("gather-context command must start with 'gather-context'.")
+
+    types: list[str] = []
+    keywords: list[str] = []
+    collecting_keywords = False
+    for item in command_items[1:]:
+        if not isinstance(item, str) or not item:
+            continue
+        if item in {"--keywords", "-keywords"}:
+            collecting_keywords = True
+            continue
+        if collecting_keywords:
+            keywords.append(item)
+        else:
+            types.append(item)
+    report = gather_specification_context(
+        worktree_root,
+        types=types,
+        keywords=keywords,
+    )
+    return {
+        "tool": "gather-context",
+        "command": command_items,
+        "result": json.loads(render_gather_context_report(report)),
+    }
 
 
 def _workflow_file_command_error(
@@ -419,8 +477,14 @@ def _parse_task_action(payload: dict[str, Any]) -> WorkflowTaskAction:
         if not isinstance(parameters, dict) or "command" not in parameters:
             raise RuntimeError("Invoke-tool action must include parameters.command.")
         tool = payload.get("tool", "shell")
-        if not isinstance(tool, str) or tool not in {"shell", "fuzzy-match"}:
-            raise RuntimeError("Invoke-tool action tool must be shell or fuzzy-match.")
+        if not isinstance(tool, str) or tool not in {
+            "shell",
+            "fuzzy-match",
+            "gather-context",
+        }:
+            raise RuntimeError(
+                "Invoke-tool action tool must be shell, fuzzy-match, or gather-context."
+            )
         return WorkflowTaskAction(
             kind=normalized_kind,
             tool=tool,

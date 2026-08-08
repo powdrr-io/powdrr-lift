@@ -310,9 +310,15 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert [
         invocation.tool for invocation in template.task_templates[0].tool_invocations
     ] == [
-        "fuzzy-match",
+        "gather-context",
         "shell",
     ]
+    assert template.task_templates[0].tool_invocations[0].command == (
+        "gather-context",
+        "proposed_prs",
+        "--keywords",
+        "<proposed-pr-id>",
+    )
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",
@@ -356,6 +362,7 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     )
 
     assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
+    assert tasks[0].tool_invocations[0].command[-1] == "interaction-file-log-pr-001"
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")
 

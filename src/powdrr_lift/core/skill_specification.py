@@ -432,13 +432,13 @@ def build_skill_validation_report(
                             path=_child_path(tool_path, "tool"),
                         )
                     )
-                elif tool not in {"shell", "fuzzy-match"}:
+                elif tool not in {"shell", "fuzzy-match", "gather-context"}:
                     issues.append(
                         SkillValidationIssue(
                             code="unsupported_tool",
                             message=(
-                                "Skill tool invocations currently support shell and "
-                                "fuzzy-match."
+                                "Skill tool invocations currently support shell, "
+                                "fuzzy-match, and gather-context."
                             ),
                             path=_child_path(tool_path, "tool"),
                         )

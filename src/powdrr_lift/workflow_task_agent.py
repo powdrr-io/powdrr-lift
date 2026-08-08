@@ -87,6 +87,20 @@ def run_workflow_task(
         response = client.complete_json(_build_task_messages(workflow, task, events))
         action = _parse_task_action(response)
         if action.kind == "invoke_tool":
+            repaired_parameters = _repair_workflow_file_command(
+                action.parameters,
+                workflow.directory,
+            )
+            if repaired_parameters is not None:
+                print(
+                    "Corrected malformed workflow filename suffix to the exact "
+                    ".json filename.",
+                    file=stderr,
+                )
+                action = WorkflowTaskAction(
+                    kind=action.kind,
+                    parameters=repaired_parameters,
+                )
             command_error = _workflow_file_command_error(
                 action.parameters,
                 workflow.directory,
@@ -261,6 +275,41 @@ def _workflow_file_command_error(
         f"filename(s): {', '.join(missing_references)}. Use the exact .json "
         f"filenames from workflow_files: {valid_paths}."
     )
+
+
+def _repair_workflow_file_command(
+    parameters: dict[str, Any],
+    workflow_dir: Path,
+) -> dict[str, Any] | None:
+    command = parameters.get("command")
+    valid_files = _workflow_file_names(workflow_dir)
+    if not valid_files:
+        return None
+
+    def repair_text(text: str) -> str:
+        repaired = text
+        for filename in valid_files:
+            exact_stem = str(workflow_dir.resolve() / filename.removesuffix(".json"))
+            repaired = re.sub(
+                re.escape(exact_stem) + r"\.+(?=[\s'\";&|()]|$)",
+                str(workflow_dir.resolve() / filename),
+                repaired,
+            )
+        return repaired
+
+    repaired_command: str | list[str]
+    if isinstance(command, str):
+        repaired_command = repair_text(command)
+    elif isinstance(command, list) and all(isinstance(item, str) for item in command):
+        repaired_command = [repair_text(item) for item in command]
+    else:
+        return None
+
+    if repaired_command == command:
+        return None
+    repaired_parameters = dict(parameters)
+    repaired_parameters["command"] = repaired_command
+    return repaired_parameters
 
 
 def _parse_task_action(payload: dict[str, Any]) -> WorkflowTaskAction:

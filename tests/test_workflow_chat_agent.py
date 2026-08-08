@@ -2927,7 +2927,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         for old_skill_path in (resolved / "skill-definitions").glob("*.json"):
             old_skill_path.unlink()
         relative_paths = (
-            Path("templates") / "implement-a-feature.yaml",
             Path("templates") / "execute-proposed-pr.yaml",
             Path("src") / "powdrr_lift" / "core" / "workflow_template_specification.py",
             Path("src") / "powdrr_lift" / "core" / "skill_specification.py",
@@ -3645,10 +3644,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "sed",
                         "-n",
                         "1,260p",
-                        "templates/implement-a-feature.yaml",
+                        "templates/execute-proposed-pr.yaml",
                     ]
                 },
-                "decisions_and_context": "The implement-a-feature template is selected.",
+                "decisions_and_context": "The execute-proposed-pr template is selected.",
             },
             {
                 "kind": "next_step",
@@ -3663,8 +3662,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "instantiate-workflow",
                         "--work-item-name",
                         "display-related-photos",
+                        "--template-value",
+                        "proposed-pr-id=display-related-photos-pr-001",
                         "--template",
-                        "templates/implement-a-feature.yaml",
+                        "templates/execute-proposed-pr.yaml",
                     ]
                 },
                 "decisions_and_context": "The durable implementation workflow is created.",
@@ -3806,19 +3807,29 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
-        "task-001",
-        "task-002",
-        "task-003",
+        f"task-{index:03d}" for index in range(1, 10)
     ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
-        "Review plan documents",
-        "Confirm requirements",
-        "Generate proposed PRs",
+        "Gather context about the proposed PR",
+        "Create a detailed execution plan",
+        "Generate tests that will validate the new functionality",
+        "Validate the tests do not pass",
+        "Generate product code changes",
+        "Validate all tests pass",
+        "Confirm functional completeness against the specification",
+        "Run lint, type checks, and cleanup",
+        "Create the pull request",
     ]
     assert [task.upstream_task_ids for task in tasks] == [
         (),
         ("task-001",),
         ("task-002",),
+        ("task-003",),
+        ("task-004",),
+        ("task-005",),
+        ("task-006",),
+        ("task-007",),
+        ("task-008",),
     ]
     assert all(task.status.value == "open" for task in tasks)
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
@@ -3880,9 +3891,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     assert assignment_batches == [
         ("agent", "architect"),
-        ("human", "decider"),
-        ("agent", "architect"),
-        ("agent", "architect"),
         ("agent", "architect"),
         ("agent", "coder"),
         ("agent", "reviewer"),
@@ -3894,11 +3902,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     ]
     assert load_ready_workflow_tasks(workflow_root) == ()
 
-    execute_tasks = [
-        task
-        for task in load_workflow_tasks(workflow_root / "display-related-photos")
-        if task.task_id.startswith("display-related-photos-pr-001-")
-    ]
+    execute_tasks = load_workflow_tasks(workflow_root / "display-related-photos")
     assert len(execute_tasks) == 9
     assert execute_tasks[0].input_state["proposed_pr"] == (
         "display-related-photos-pr-001"

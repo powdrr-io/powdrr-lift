@@ -201,79 +201,6 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
     assert load_workflow_template(output_path) == template
 
 
-def test_implement_feature_workflow_template_file_is_checked_in() -> None:
-    template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
-    )
-    template = load_workflow_template(template_path)
-
-    assert template.when_to_use == (
-        "When a feature has plan documents and is ready to become implementation work.",
-        "When the work should confirm requirements before splitting the plan into "
-        "proposed PRs.",
-    )
-    assert template.how_to_fill_this_out == (
-        "Review the existing plan documents before making implementation decisions.",
-        "Keep the confirmed requirements explicit in the task state.",
-        "For every task with upstream_task_template_indexes, read completed values "
-        "from input_state.upstream_task_outputs using the runtime task ID listed in "
-        "upstream_task_ids. Each entry contains output_state_type and output_state.",
-        "Generate one execute-proposed-pr workflow for each approved proposed PR.",
-    )
-    assert [task.description for task in template.task_templates] == [
-        "Review plan documents",
-        "Confirm requirements",
-        "Generate proposed PRs",
-    ]
-    assert [task.output_state_type for task in template.task_templates] == [
-        "reviewed-plan-documents-state",
-        "confirmed-requirements-state",
-        "proposed-prs-and-execution-workflows-state",
-    ]
-    assert template.task_templates[0].input_state == {
-        "plan_documents": [
-            "docs/specs/<feature-name>/system-specification.yaml",
-            "docs/specs/<feature-name>/architecture-specification.yaml",
-            "docs/specs/<feature-name>/implementation-specification.yaml",
-            "docs/specs/<feature-name>/proposed-pr-specification.yaml",
-        ]
-    }
-    assert [
-        (task.assignee_type.value, task.assignee_role.value)
-        for task in template.task_templates
-    ] == [
-        ("agent", "architect"),
-        ("human", "decider"),
-        ("agent", "architect"),
-    ]
-    assert [task.llm_type for task in template.task_templates] == [
-        "high_reasoning",
-        "standard_reasoning",
-        "high_reasoning",
-    ]
-    assert all(task.details for task in template.task_templates)
-    assert "workflow-instance context" in (template.task_templates[2].details or "")
-    assert "actual proposed PR" in (template.task_templates[2].details or "")
-    assert template.task_templates[2].tool_invocations[0].command == (
-        "powdrr-lift",
-        "instantiate-workflow",
-        "--work-item-name",
-        "<work-item-name>",
-        "--workflow-instance-name",
-        "<workflow-instance-name>",
-        "--template-value",
-        "proposed-pr-id=<workflow-instance-name>",
-        "--template",
-        "templates/execute-proposed-pr.yaml",
-    )
-    assert (
-        build_workflow_template_validation_report(
-            template.to_json()
-        ).validation_successful
-        is True
-    )
-
-
 def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     template_path = (
         Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
@@ -324,7 +251,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     }
     for index, output_state_type in expected_upstream_contracts.items():
         task = template.task_templates[index]
-        assert task.input_state["upstream_task_outputs"] == {}
         assert output_state_type in (task.details or "")
         assert "runtime task ID" in (task.details or "")
     assert template.task_templates[3].tool_invocations[0].command == (
@@ -336,21 +262,9 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ).validation_successful
 
 
-def test_implement_a_feature_template_declares_upstream_output_contracts() -> None:
-    template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
-    )
-    template = load_workflow_template(template_path)
-
-    assert template.task_templates[1].input_state["upstream_task_outputs"] == {}
-    assert "reviewed-plan-documents-state" in (template.task_templates[1].details or "")
-    assert template.task_templates[2].input_state["upstream_task_outputs"] == {}
-    assert "confirmed-requirements-state" in (template.task_templates[2].details or "")
-
-
 def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
     )
 
     output_directory, tasks = instantiate_workflow_template(
@@ -360,7 +274,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
-    assert len(tasks) == 3
+    assert len(tasks) == 9
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
@@ -382,6 +296,12 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     )
 
     assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
+    assert tasks[1].input_state["upstream_task_outputs"] == {
+        "interaction-file-log-pr-001-task-001": {
+            "output_state_type": "proposed-pr-context-state",
+            "output_state": None,
+        }
+    }
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")
 
@@ -427,7 +347,7 @@ def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
     tmp_path: Path,
 ) -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
     )
     output_root = tmp_path / "workflows"
 

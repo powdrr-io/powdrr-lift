@@ -2,22 +2,28 @@
 name: start-implementing-feature
 when_to_use:
 - When the user is ready to begin implementing a feature.
-- When the feature needs a durable implement-a-feature workflow instantiated from
-  the plan before implementation starts.
-- When the generated workflow and first task should be placed in a pull request for
-  user review.
+- When the feature needs implementation specifications and durable execution
+  workflows before implementation starts.
+- When the generated planning artifacts and first task should be placed in a
+  pull request for user review.
 steps:
-- description: Confirm the feature name, approved plan documents, and workflow template.
+- description: Discover the feature specification and execution workflows.
   llm_type: standard_reasoning
-  details: First inspect docs/specs/<feature-name>/ using the exact feature name
-    or naturally matched existing work-item name from the user's request. Reuse the canonical
-    name and existing specification documents when that directory contains them;
-    inspect for proposed PR specification files before asking whether any already
-    exist. The workflow template is fixed at templates/execute-proposed-pr.yaml;
-    use that path without asking the user; do not ask whether approved documents
-    exist until after checking the directory. Only ask a question if the inspection
-    shows that the required documents are missing or the feature name cannot be
-    matched.
+  details: >-
+    Invoke the fuzzy-match tool to discover candidates for the feature
+    specification and its execution workflows. Search docs/specs and
+    docs/workflows using the feature name from the user's request. Filter the
+    results to the best matching feature directory and workflow directories.
+    Treat an absent search root or an empty result as "no matches", not as a
+    tool failure. If exactly one feature specification is the best match, use
+    it. If exactly one workflow set is the best match, use it. If the best
+    match is uncertain, ask the user one specific question that identifies the
+    correct feature or workflow. Do not ask whether documents exist before
+    searching for them. If the matches are sufficiently certain, do not ask a
+    question: pass the selected specification documents, workflow documents,
+    canonical feature name, and any uncertainty or missing-document findings
+    as context to the next step. The workflow template is fixed at
+    templates/execute-proposed-pr.yaml; never ask the user to provide it.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -28,7 +34,7 @@ steps:
     - -type
     - d
     - -maxdepth
-    - "1"
+    - "2"
     - -print
   - tool: fuzzy-match
     command:
@@ -41,78 +47,86 @@ steps:
     - -maxdepth
     - "3"
     - -print
-  - tool: fuzzy-match
-    command:
-    - fuzzy-match
-    - docs/specs/<feature-name>
-    - -name
-    - proposed PR specification
-    - -type
-    - f
-    - -maxdepth
-    - "1"
-    - -print
-- description: Generate the proposed PR specification templates.
-  llm_type: simple_task
-  details: If the approved proposed PR specifications already exist under
-    docs/specs/<feature-name>/, inspect and reuse them and skip generation. Otherwise,
-    generate and fill the proposed PR specification templates for the approved
-    feature plan. For every proposed PR, capture the implementation files, tests,
-    acceptance criteria, validation commands, risks, and dependencies between PRs.
+- description: Create implementation specifications for the proposed PRs.
+  llm_type: high_reasoning
+  details: >-
+    If proposed PR specifications or implementation specifications already
+    exist in the selected feature context, inspect them, reuse them, and skip
+    this step. Otherwise analyze the feature specification to determine a set
+    of proposed PRs that implement the feature as ordered steps with
+    incremental validation, clear boundaries, and low risk. For each proposed
+    PR, define its goal, implementation scope, files, tests, acceptance
+    criteria, validation commands, dependencies, and risks. Then invoke the
+    implementation-specification tool once for each proposed PR and fill out
+    the generated template with that PR's implementation plan. Keep each PR's
+    specification separate and give each one a stable proposed-PR name. Pass
+    the complete set of proposed PRs and every created or reused
+    implementation-specification file as context to the next step.
   tool_invocations:
   - tool: shell
     command:
     - powdrr-lift
-    - pr-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-- description: Instantiate an execute-proposed-pr workflow for every approved PR.
+    - implementation-specification
+    - --work-item-name
+    - <feature-name>
+    - --output
+    - docs/specs/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
+- description: Instantiate an execution workflow for every proposed PR.
   llm_type: simple_task
-  details: For each approved proposed PR, first inspect docs/workflows for a
-    matching existing execute workflow. If one exists, reuse it; if none exists,
-    that is expected because this skill creates the workflow. Instantiate each PR
-    from templates/execute-proposed-pr.yaml in the shared
-    docs/workflows/<work-item-name>/ directory, using a distinct
-    <workflow-instance-name> for each PR so task IDs and files remain unique. This
-    is the required template; never ask the user to provide or choose a template
-    path. Preserve the proposed PR order and capture dependencies between PRs in
-    the generated workflows' task dependencies and input state. Do not overwrite
-    an existing workflow instance without user approval.
+  details: >-
+    If an execution workflow already exists for every proposed PR, inspect the
+    matching workflow directories, reuse them, and skip this step. Otherwise
+    invoke the workflow instantiation tool once for each proposed PR that does
+    not already have a workflow. Use the fixed
+    templates/execute-proposed-pr.yaml template, the canonical feature name as
+    the shared work-item name, and a distinct workflow instance name derived
+    from each proposed PR. Preserve the proposed-PR order and encode each
+    dependency in the workflow task dependencies and input state. Never ask
+    the user for a template path. Do not overwrite an existing workflow
+    instance without user approval. Pass every created or reused workflow file
+    and its proposed-PR relationship as context to the next step.
   tool_invocations:
   - tool: shell
     command:
     - powdrr-lift
     - instantiate-workflow
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--workflow-instance-name"
-    - "<workflow-instance-name>"
-    - "--template"
+    - --work-item-name
+    - <feature-name>
+    - --workflow-instance-name
+    - <proposed-pr-name>
+    - --template
     - templates/execute-proposed-pr.yaml
-- description: Validate the overall implementation approach with the user.
+- description: Review and approve the implementation plan and workflows.
   llm_type: high_reasoning
-  details: Review every generated proposed PR specification and execute-proposed-pr
-    workflow with the user. Confirm the PR boundaries, implementation files, tests,
-    acceptance criteria, validation commands, risks, and dependency ordering. Update
-    the artifacts when the user identifies a needed change, and do not create the
-    pull request until the overall approach is approved.
-- description: Commit all generated planning artifacts and open a draft pull request.
+  details: >-
+    Present the discovered feature documents, every proposed PR
+    implementation-specification, every execution workflow, and the dependency
+    order to the user. Ask the user to approve the complete implementation
+    plan or identify specific changes. If the user requests changes, update
+    the affected specifications or workflows and review them again. Do not
+    commit artifacts, create a pull request, or begin implementation until the
+    user explicitly approves the PR boundaries, implementation files, tests,
+    acceptance criteria, validation commands, risks, and dependency order.
+    Pass the approved artifact paths and approval decision to the next step.
+- description: Commit the approved artifacts and open a draft pull request.
   llm_type: simple_task
-  details: After the user approves the overall approach, inspect the worktree and
-    stage every generated proposed PR specification under docs/specs/<feature-name>/
-    and every generated execution workflow under docs/workflows/. Commit all of those
-    artifacts, push the current feature branch with its upstream set, and create or
-    update a draft pull request describing the proposed PRs and their execution
-    workflows. If a pull request already exists for the branch, update it instead of
-    attempting to create a second one. Do not report this step complete until the
-    GitHub command succeeds and its output includes the pull request URL. Do not
-    implement a proposed PR or merge the pull request.
+  details: >-
+    Only after explicit user approval, inspect the worktree and stage the
+    approved implementation specifications under docs/specs/<feature-name>/ and
+    execution workflows under docs/workflows/. Review the staged paths, commit
+    all approved planning artifacts, push the current feature branch with its
+    upstream set, and create or update a draft pull request describing the
+    feature, proposed PRs, execution workflows, dependencies, and validation
+    evidence. If a pull request already exists for the branch, update it rather
+    than creating a second one. Do not implement any proposed PR. Do not report
+    this step complete until the GitHub command succeeds and its output includes
+    the pull request URL.
   tool_invocations:
   - tool: shell
     command:
     - git
     - status
-    - "--short"
+    - --short
   - tool: shell
     command:
     - git
@@ -124,7 +138,7 @@ steps:
     - git
     - commit
     - -m
-    - "Add <feature-name> implementation workflow"
+    - Add <feature-name> implementation workflow
   - tool: shell
     command:
     - git
@@ -137,10 +151,12 @@ steps:
     - gh
     - pr
     - create
-    - "--draft"
-    - "--fill"
-- description: Hand the pull request to the user for review.
+    - --draft
+    - --fill
+- description: Hand the draft pull request to the user for review.
   llm_type: standard_reasoning
-  details: Show the pull request URL and summarize every proposed PR specification,
-    execution workflow, and dependency relationship. Wait for the user's approval
-    before beginning implementation.
+  details: >-
+    Show the pull request URL. Summarize the feature specification used, every
+    proposed PR implementation-specification, every execution workflow, and
+    their dependency relationships. State that implementation has not begun
+    and wait for the user's review and approval before any implementation work.

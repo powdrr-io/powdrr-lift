@@ -72,6 +72,7 @@ from powdrr_lift.workflow_chat_agent import (
     _complete_json_with_model_fallback,
     _execute_shell_tool,
     _handle_workflow_action_edit,
+    _handle_workflow_action_read_document,
     _match_work_item_names,
     _parse_action_response,
     _prompt_user,
@@ -1786,6 +1787,56 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "requirements" in prompt
     assert "entity-relationships" in prompt
     assert "proposed PRs" in prompt
+    assert "read_document" in prompt
+    assert "start_line" in prompt
+    assert "end_line" in prompt
+
+
+def test_read_document_action_returns_requested_lines_as_next_context(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "docs" / "specification.yaml"
+    document.parent.mkdir(parents=True)
+    document.write_text("one\ntwo\nthree\nfour\n", encoding="utf-8")
+    skill_path = tmp_path / "skill.yaml"
+    skill = SkillCatalogEntry(skill_path, _build_skill())
+    state = _WorkflowExecutionState(
+        selected_skill=skill,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "kind": "read_document",
+            "file_path": "docs/specification.yaml",
+            "start_line": 2,
+            "end_line": 3,
+        }
+    )
+
+    assert (
+        _handle_workflow_action_read_document(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    context = json.loads(state.transcript[-1]["content"])
+    assert context["document_context"]["path"] == "docs/specification.yaml"
+    assert context["document_context"]["start_line"] == 2
+    assert context["document_context"]["end_line"] == 3
+    assert [line["text"] for line in context["document_context"]["lines"]] == [
+        "two",
+        "three",
+    ]
+    assert state.execution_events[-1]["kind"] == "read_document"
 
 
 def test_run_workflow_chat_gathers_context_into_follow_up_step(

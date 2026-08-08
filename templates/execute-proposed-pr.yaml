@@ -6,6 +6,8 @@ when_to_use:
 how_to_fill_this_out:
 - Keep each task focused on one implementation or validation checkpoint.
 - Preserve the plan and requirements through every task.
+- The first task must resolve input_state.proposed_pr to the actual proposed PR
+  by using the instantiation context and inspecting the candidate specification.
 - Do not create the PR until completeness, goals, lint, and cleanup are confirmed.
 task_templates:
 - description: Review proposed PR plan
@@ -14,7 +16,21 @@ task_templates:
   assignee_role: architect
   llm_type: high_reasoning
   input_state:
-    proposed_pr: <workflow-instance-name>
+    proposed_pr:
+      instructions: >-
+        Find the actual proposed PR specification for this workflow. Use the
+        instantiation context as search context, inspect the candidate
+        document, and replace this instruction in the reviewed output with a concrete
+        reference containing the proposed PR id and specification path.
+  details: >-
+    Resolve input_state.proposed_pr before making implementation decisions.
+    Use the instantiation context included with this task to find the actual
+    proposed PR specification, inspect the candidate document, and record a
+    concrete reference containing the proposed PR id and specification path in
+    the reviewed output. Use that document as the source of truth for the PR's
+    intent, acceptance criteria, tests, scope, and risks. If the reference does
+    not resolve to the actual proposed PR, stop and report the missing or
+    mismatched reference instead of guessing.
   output_state_type: reviewed-proposed-pr-plan-state
   upstream_task_template_indexes: []
   dependent_state:

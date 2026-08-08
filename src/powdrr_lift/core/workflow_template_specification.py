@@ -237,7 +237,11 @@ def instantiate_workflow_template(
             ),
             assignee_type=task_template.assignee_type,
             assignee_role=task_template.assignee_role,
-            details=task_template.details,
+            details=_add_instantiation_context(
+                task_template.details,
+                work_item_name=work_item_name,
+                workflow_instance_name=workflow_instance_name,
+            ),
             llm_type=task_template.llm_type,
             uses_skills=task_template.uses_skills,
             tool_invocations=task_template.tool_invocations,
@@ -294,6 +298,25 @@ def _substitute_workflow_placeholders(
             _substitute_workflow_placeholders(item, substitutions) for item in value
         ]
     return value
+
+
+def _add_instantiation_context(
+    details: str | None,
+    *,
+    work_item_name: str,
+    workflow_instance_name: str | None,
+) -> str | None:
+    """Append dynamic workflow context as instructions for the task's LLM."""
+    context = (
+        "Instantiation context: work item name is "
+        f"{work_item_name.strip()!r}; workflow instance name is "
+        f"{(workflow_instance_name or work_item_name).strip()!r}. "
+        "Use these values as search context and verify repository documents "
+        "before deciding what they identify."
+    )
+    if details is None:
+        return context
+    return f"{details}\n\n{context}"
 
 
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:

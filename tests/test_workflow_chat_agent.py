@@ -73,6 +73,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_shell_tool,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
+    _long_context_backup_for,
     _match_work_item_names,
     _parse_action_response,
     _prompt_user,
@@ -1051,6 +1052,66 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
     )
     assert backup_mapping is not None
     assert backup_mapping.model == "glm-4.7"
+    long_context_mapping = _long_context_backup_for(
+        "Qwen/Qwen2.5-Coder-14B-Instruct",
+        tuple(ZAI_LLM_MAPPINGS.items()),
+    )
+    assert long_context_mapping is not None
+    assert long_context_mapping.model == "glm-5.2"
+
+
+def test_oversized_context_uses_long_context_backup_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {"ok": True}
+
+    clients: list[str] = []
+
+    def client_for(model: str, provider: str) -> _FakeClient:
+        _ = provider
+        clients.append(model)
+        return _FakeClient()
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._model_limits_for",
+        lambda provider, model: LLMModelLimits(
+            context_window=100,
+            max_output_tokens=50,
+        ),
+    )
+    result, model, provider = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[{"role": "user", "content": "x" * 1_000}],
+        context="large request",
+        model="normal-model",
+        provider="zai",
+        parser=lambda payload: payload,
+        repair_instructions="",
+        config=SkillChatConfig(skills_dir=Path("skills")),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        model_mappings=(
+            (
+                "standard_reasoning",
+                LLMModelMapping(
+                    "normal-model",
+                    provider="zai",
+                    long_context_backup_model=LLMModelMapping(
+                        "long-context-model",
+                        provider="zai",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert result == {"ok": True}
+    assert model == "long-context-model"
+    assert provider == "zai"
+    assert clients == ["long-context-model"]
 
 
 def test_llm_mapping_rejects_unsupported_provider() -> None:

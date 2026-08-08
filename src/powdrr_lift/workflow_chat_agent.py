@@ -59,7 +59,7 @@ _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
 _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
-_MAX_DOCUMENT_CONTEXT_LINES = 200
+_MAX_DOCUMENT_CONTEXT_LINES = 2000
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +73,7 @@ class LLMModelMapping:
     model: str
     provider: str
     backup_model: LLMModelMapping | None = None
+    long_context_backup_model: LLMModelMapping | None = None
 
 
 _DEFAULT_MODEL_LIMITS = LLMModelLimits(
@@ -126,8 +127,13 @@ ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
         _QWEN_2_5_CODER_MODEL,
         provider="local",
         backup_model=LLMModelMapping("glm-4.7", provider="zai"),
+        long_context_backup_model=LLMModelMapping("glm-5.2", provider="zai"),
     ),
-    "fast_iteration": LLMModelMapping(_QWEN_2_5_CODER_MODEL, provider="local"),
+    "fast_iteration": LLMModelMapping(
+        _QWEN_2_5_CODER_MODEL,
+        provider="local",
+        long_context_backup_model=LLMModelMapping("glm-5.2", provider="zai"),
+    ),
     "long_context": LLMModelMapping("glm-5.2", provider="zai"),
     "vision": LLMModelMapping("glm-4.6v", provider="zai"),
 }
@@ -140,10 +146,20 @@ DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
         "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
     ),
     "simple_task": LLMModelMapping(
-        "Qwen/Qwen3-Next-80B-A3B-Instruct", provider="deepinfra"
+        "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        provider="deepinfra",
+        long_context_backup_model=LLMModelMapping(
+            "deepseek-ai/DeepSeek-V4-Flash",
+            provider="deepinfra",
+        ),
     ),
     "fast_iteration": LLMModelMapping(
-        "Qwen/Qwen3-Next-80B-A3B-Instruct", provider="deepinfra"
+        "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        provider="deepinfra",
+        long_context_backup_model=LLMModelMapping(
+            "deepseek-ai/DeepSeek-V4-Flash",
+            provider="deepinfra",
+        ),
     ),
     "long_context": LLMModelMapping(
         "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
@@ -1592,7 +1608,7 @@ def _action_system_prompt() -> str:
         "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
         "parameters.command as a non-empty string or string array; next_step has "
         "no action-specific fields; read_document requires file_path, positive "
-        "start_line and positive end_line for a range of at most 200 lines; "
+        "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
         '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
@@ -2742,6 +2758,29 @@ def _complete_json_with_model_fallback(
     active_provider = provider
     attempted_models = {model.casefold()}
     while True:
+        long_context_backup = _long_context_backup_for(
+            active_model,
+            model_mappings,
+        )
+        estimated_input_tokens = _estimate_message_tokens(messages)
+        active_limits = _model_limits_for(active_provider, active_model)
+        if (
+            long_context_backup is not None
+            and estimated_input_tokens + _CONTEXT_SAFETY_MARGIN_TOKENS
+            >= active_limits.context_window
+            and long_context_backup.model.casefold() not in attempted_models
+        ):
+            print(
+                f"{context} estimated context is too large for model "
+                f"{active_model!r} ({estimated_input_tokens} input tokens; "
+                f"limit {active_limits.context_window}). Switching to long-"
+                f"context backup model {long_context_backup.model!r}.",
+                file=stderr,
+            )
+            attempted_models.add(long_context_backup.model.casefold())
+            active_model = long_context_backup.model
+            active_provider = long_context_backup.provider
+            continue
         try:
             result = _complete_json_with_repair(
                 client_for(active_model, active_provider),
@@ -2789,6 +2828,17 @@ def _backup_model_for(
     for _, mapping in model_mappings:
         if mapping.model.casefold() == normalized_model:
             return mapping.backup_model
+    return None
+
+
+def _long_context_backup_for(
+    model: str,
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
+) -> LLMModelMapping | None:
+    normalized_model = model.casefold()
+    for _, mapping in model_mappings:
+        if mapping.model.casefold() == normalized_model:
+            return mapping.long_context_backup_model
     return None
 
 
@@ -3759,6 +3809,11 @@ def _build_chat_client(
 
 
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
+    if provider == "local":
+        return LLMModelLimits(
+            context_window=_resolve_local_model_context(),
+            max_output_tokens=_MAX_COMPLETION_TOKENS,
+        )
     if provider == "zai":
         limits = ZAI_MODEL_LIMITS
     elif provider == "deepinfra":

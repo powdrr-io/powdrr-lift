@@ -954,6 +954,7 @@ def run_workflow_chat(
             provider=provider,
             model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
             + tuple((key, value) for key, value in config.llm_mappings),
+            empty_response_fallback_payload={"kind": "next_step"},
         )
         if action is None:
             return 1
@@ -2805,6 +2806,7 @@ def _complete_json_with_model_fallback(
     stderr: TextIO,
     model_mappings: Sequence[tuple[str, LLMModelMapping]],
     provider: str,
+    empty_response_fallback_payload: dict[str, Any] | None = None,
 ) -> tuple[Any | None, str, str]:
     active_model = model
     active_provider = provider
@@ -2848,6 +2850,7 @@ def _complete_json_with_model_fallback(
                 fallback_on_transient_exhaustion=(
                     _backup_model_for(active_model, model_mappings) is not None
                 ),
+                empty_response_fallback_payload=empty_response_fallback_payload,
             )
             return result, active_model, active_provider
         except _ModelUnavailableError as exc:
@@ -2907,6 +2910,7 @@ def _complete_json_with_repair(
     stdout: TextIO,
     stderr: TextIO,
     fallback_on_transient_exhaustion: bool = False,
+    empty_response_fallback_payload: dict[str, Any] | None = None,
 ) -> Any | None:
     empty_question_reprompts = 0
     empty_response_reprompts = 0
@@ -3015,6 +3019,13 @@ def _complete_json_with_repair(
                         stderr=stderr,
                     )
                     if empty_response_reprompts > 1:
+                        if empty_response_fallback_payload is not None:
+                            print(
+                                f"{context} corrective response was empty; "
+                                "interpreting it as next_step.",
+                                file=stderr,
+                            )
+                            return parser(empty_response_fallback_payload)
                         if not _ask_to_retry_empty_response(
                             context=context,
                             model=model,
@@ -3709,6 +3720,10 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "invoke_tool to run a shell or fuzzy-match command; read_document to "
         "request a bounded line range from a known document; next_step when the "
         "current step is complete; and complete when the skill is finished.\n"
+        "If the original action response was empty, choose next_step when the "
+        "current step is complete instead of returning an empty response. If "
+        "this corrective response is also empty, the system will interpret it "
+        "as next_step.\n"
         "Return exactly one JSON object with a kind and the fields required by "
         "that action. Use file_path and edits or file_edits for edit, tool and "
         "parameters.command for invoke_tool, file_path with positive start_line "

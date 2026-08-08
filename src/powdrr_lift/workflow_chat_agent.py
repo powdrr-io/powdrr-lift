@@ -283,6 +283,55 @@ class WorkflowChatCredentials:
     base_url_source: str
 
 
+class _LLMExchangeRecordingClient:
+    """Record every LLM request and response in the active repository root."""
+
+    def __init__(self, client: WorkflowChatClient, repo_root: Path) -> None:
+        self._client = client
+        self._repo_root = repo_root.expanduser().resolve()
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        try:
+            response = self._client.complete_json(messages)
+        except Exception as exc:
+            self._write_exchange(
+                messages,
+                {
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+            )
+            raise
+        self._write_exchange(messages, response)
+        return response
+
+    def _write_exchange(
+        self,
+        messages: list[dict[str, str]],
+        output: object,
+    ) -> None:
+        timestamp = datetime.now(UTC)
+        timestamp_text = timestamp.strftime("%Y%m%d-%H%M%S-%f")
+        output_path = self._repo_root / f"llm-{timestamp_text}.json"
+        suffix = 1
+        while output_path.exists():
+            output_path = self._repo_root / f"llm-{timestamp_text}-{suffix}.json"
+            suffix += 1
+        output_path.write_text(
+            json.dumps(
+                {
+                    "timestamp": timestamp.isoformat(),
+                    "input": messages,
+                    "output": output,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+
 class OpenAIChatClient:
     def __init__(
         self,
@@ -698,10 +747,13 @@ def run_workflow_chat(
     ) -> WorkflowChatClient:
         key = (selected_provider, selected_model)
         if key not in clients:
-            clients[key] = _build_chat_client(
-                selected_credentials,
-                model=selected_model,
-                model_cache_dir=project_root / ".powdrr" / "models",
+            clients[key] = _LLMExchangeRecordingClient(
+                _build_chat_client(
+                    selected_credentials,
+                    model=selected_model,
+                    model_cache_dir=project_root / ".powdrr" / "models",
+                ),
+                repo_root,
             )
         return clients[key]
 

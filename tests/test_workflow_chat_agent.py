@@ -73,6 +73,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_shell_tool,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
+    _LLMExchangeRecordingClient,
     _long_context_backup_for,
     _match_work_item_names,
     _parse_action_response,
@@ -1208,6 +1209,29 @@ def test_request_token_budget_rejects_exhausted_context() -> None:
             [{"role": "user", "content": "x" * 3_000}],
             LLMModelLimits(context_window=1_000, max_output_tokens=2_000),
         )
+
+
+def test_llm_exchange_recorder_writes_input_and_output_json(
+    tmp_path: Path,
+) -> None:
+    class _FakeClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            assert messages == [{"role": "user", "content": "request"}]
+            return {"kind": "complete", "text": "done"}
+
+    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+
+    assert recorder.complete_json([{"role": "user", "content": "request"}]) == {
+        "kind": "complete",
+        "text": "done",
+    }
+
+    dump_paths = sorted(tmp_path.glob("llm-*.json"))
+    assert len(dump_paths) == 1
+    exchange = json.loads(dump_paths[0].read_text(encoding="utf-8"))
+    assert exchange["input"] == [{"role": "user", "content": "request"}]
+    assert exchange["output"] == {"kind": "complete", "text": "done"}
+    assert exchange["timestamp"]
 
 
 def test_model_unavailable_uses_backup_model_without_prompting() -> None:

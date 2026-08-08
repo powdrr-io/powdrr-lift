@@ -237,6 +237,50 @@ def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) ->
     assert "gather-context" in client.messages[0][0]["content"]
 
 
+def test_process_workflow_task_repairs_read_document_range_error(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    (tmp_path / "specification.yaml").write_text("first\nsecond\n", encoding="utf-8")
+    client = _FakeClient(
+        [
+            {
+                "kind": "read_document",
+                "file_path": "specification.yaml",
+                "start_line": 1,
+                "end_line": 10,
+            },
+            {
+                "kind": "read_document",
+                "file_path": "specification.yaml",
+                "start_line": 1,
+                "end_line": 2,
+            },
+            {"kind": "complete", "output_state": {"read": True}},
+        ]
+    )
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 3
+    correction = client.messages[1][1]["content"]
+    assert "outside the document" in correction
+    assert "Request a range from 1 through 2" in correction
+    assert "corrected JSON action" in correction
+    assert "action_error" in correction
+    assert "needs correction" in stderr.getvalue()
+
+
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     tmp_path: Path,
 ) -> None:

@@ -248,8 +248,8 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
         "high_reasoning",
     ]
     assert all(task.details for task in template.task_templates)
-    assert "exact proposed PR id" in (template.task_templates[2].details or "")
-    assert "input_state.proposed_pr" in (template.task_templates[2].details or "")
+    assert "workflow-instance context" in (template.task_templates[2].details or "")
+    assert "actual proposed PR" in (template.task_templates[2].details or "")
     assert template.task_templates[2].tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
@@ -285,14 +285,13 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "Lint and cleanup",
         "Create PR",
     ]
-    assert template.task_templates[0].input_state == {
-        "proposed_pr": {
-            "id": "<workflow-instance-name>",
-            "specification_path": "<proposed-pr-specification-path>",
-        }
-    }
-    assert "exact proposed PR" in " ".join(template.how_to_fill_this_out)
-    assert "specification_path" in (template.task_templates[0].details or "")
+    proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
+    assert proposed_pr_input["workflow_context"] == {}
+    assert (
+        "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
+    )
+    assert "actual proposed PR" in " ".join(template.how_to_fill_this_out)
+    assert "specification path" in (template.task_templates[0].details or "")
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates
@@ -372,11 +371,11 @@ def test_instantiate_execute_proposed_pr_fills_proposed_pr_context(
         output_root=tmp_path / "workflows",
     )
 
-    assert tasks[0].input_state == {
-        "proposed_pr": {
-            "id": "interaction-file-log-pr",
-            "specification_path": (
-                "docs/specs/interaction-file-log/proposed-pr-specification.yaml"
-            ),
-        }
+    proposed_pr_input = tasks[0].input_state["proposed_pr"]
+    assert (
+        "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
+    )
+    assert proposed_pr_input["workflow_context"] == {
+        "work_item_name": "interaction-file-log",
+        "workflow_instance_name": "interaction-file-log-pr",
     }

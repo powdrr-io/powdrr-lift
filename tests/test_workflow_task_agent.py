@@ -155,7 +155,7 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
     assert "available_tools" in client.messages[0][1]["content"]
 
 
-def test_process_workflow_task_supports_gather_context_tool(tmp_path: Path) -> None:
+def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
     specs = tmp_path / "docs" / "specs" / "example"
     specs.mkdir(parents=True)
@@ -166,16 +166,9 @@ def test_process_workflow_task_supports_gather_context_tool(tmp_path: Path) -> N
     client = _FakeClient(
         [
             {
-                "kind": "invoke_tool",
-                "tool": "gather-context",
-                "parameters": {
-                    "command": [
-                        "gather-context",
-                        "proposed_prs",
-                        "--keywords",
-                        "example-pr",
-                    ]
-                },
+                "kind": "gather-context",
+                "types": ["proposed_prs"],
+                "keywords": ["example-pr"],
             },
             {"kind": "complete", "output_state": {"found": True}},
         ]
@@ -193,7 +186,7 @@ def test_process_workflow_task_supports_gather_context_tool(tmp_path: Path) -> N
 
     assert exit_code == 0
     assert "example-pr" in client.messages[1][1]["content"]
-    assert "gather-context" in client.messages[0][1]["content"]
+    assert "gather-context" in client.messages[0][0]["content"]
 
 
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(

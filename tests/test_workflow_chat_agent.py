@@ -41,7 +41,6 @@ from powdrr_lift.core.pr_specification import (
     _load_feature_catalog,
     validate_pr_specification_yaml,
 )
-from powdrr_lift.core.spec_context import gather_specification_context
 from powdrr_lift.core.system_specification import validate_system_specification_yaml
 from powdrr_lift.core.workflow_task_specification import (
     TaskStatus,
@@ -3857,16 +3856,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 if invocation.tool == "fuzzy-match":
                     result = execute_fuzzy_match(command, worktree_root=worktree_root)
                     assert result["matches"], f"command={command!r} result={result!r}"
-                elif invocation.tool == "gather-context":
-                    assert command[0] == "gather-context"
-                    assert command[1] == "proposed_prs"
-                    assert command[2] == "--keywords"
-                    report = gather_specification_context(
-                        worktree_root,
-                        types=[command[1]],
-                        keywords=command[3:],
-                    )
-                    assert report.types == ["proposed_prs"]
                 elif command[:1] == ["pytest"]:
                     # This integration test uses a clone whose committed tests
                     # predate the template under test. The workflow command is

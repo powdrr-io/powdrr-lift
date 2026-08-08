@@ -22,14 +22,18 @@ from powdrr_lift.core.spec_context import (
 from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
     LocalLlamaChatClient,
+    SkillChatAction,
+    _apply_file_edits,
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _LLMExchangeRecordingClient,
+    _parse_action_response,
     _print_waiting_for_model,
     _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
     _resolve_project_root,
+    _resolve_worktree_file_path,
 )
 
 
@@ -52,10 +56,18 @@ class WorkflowTaskAgentConfig:
 class WorkflowTaskAction:
     kind: str
     tool: str = "shell"
+    file_path: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
+    edits: tuple[Any, ...] = ()
+    file_edits: tuple[Any, ...] = ()
+    types: tuple[str, ...] = ()
+    keywords: tuple[str, ...] = ()
     output_state: Any = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
     human_input: dict[str, Any] | None = None
+    decisions_and_context: str | None = None
 
 
 def run_workflow_task(
@@ -122,6 +134,52 @@ def run_workflow_task(
             )
             continue
         response_correction = None
+        result: Any
+        if action.kind == "gather-context":
+            report = gather_specification_context(
+                config.repo_root,
+                types=list(action.types),
+                keywords=list(action.keywords),
+            )
+            events.append(
+                {
+                    "kind": action.kind,
+                    "types": list(action.types),
+                    "keywords": list(action.keywords),
+                    "result": json.loads(render_gather_context_report(report)),
+                }
+            )
+            continue
+        if action.kind == "next_step":
+            events.append(
+                {
+                    "kind": action.kind,
+                    "decisions_and_context": action.decisions_and_context,
+                }
+            )
+            continue
+        if action.kind == "read_document":
+            result = _read_task_document(action, config.repo_root)
+            events.append({"kind": action.kind, "result": result})
+            continue
+        if action.kind == "edit":
+            result = _apply_task_edits(action, config.repo_root)
+            events.append({"kind": action.kind, "result": result})
+            continue
+        if action.kind == "prompt_user":
+            human_input = _prompt_user_handoff(action, task)
+            human_task, follow_up_task = _insert_human_handoff(
+                workflow,
+                task,
+                human_input,
+            )
+            print(f"Workflow blocked on human task: {human_task.task_id}", file=stdout)
+            if follow_up_task is not None:
+                print(
+                    f"Inserted follow-up task: {follow_up_task.task_id}",
+                    file=stdout,
+                )
+            return 0
         if action.kind == "invoke_tool":
             repaired_parameters = _repair_workflow_file_command(
                 action.parameters,
@@ -165,16 +223,10 @@ def run_workflow_task(
                         action.parameters,
                         worktree_root=config.repo_root,
                     )
-                elif action.tool == "gather-context":
-                    result = _execute_gather_context_tool(
-                        action.parameters,
-                        worktree_root=config.repo_root,
-                    )
                 else:
                     raise RuntimeError(
                         f"Unsupported workflow task tool {action.tool!r}; "
-                        "supported tools are shell, fuzzy-match, and "
-                        "gather-context."
+                        "supported tools are shell and fuzzy-match."
                     )
             events.append(
                 {
@@ -259,13 +311,6 @@ def _build_task_messages(
                                 "fuzzy name matching."
                             ),
                         },
-                        {
-                            "name": "gather-context",
-                            "description": (
-                                "Find structured specification context by type and "
-                                "optional keywords."
-                            ),
-                        },
                     ],
                     "response_correction": response_correction,
                 },
@@ -306,85 +351,45 @@ def _task_system_prompt() -> str:
         "from your previous response. Correct that failure and return only the "
         "required JSON object.\n"
         "Choose exactly one outcome:\n"
-        "- invoke_tool: choose this when a shell, fuzzy-match, or gather-context "
-        "command is needed "
+        "- gather-context: choose this when structured specification context must "
+        "be discovered before deciding or acting.\n"
+        "- prompt_user: choose this when a human decision or review is required; "
+        "the execution agent will persist it as a human workflow task.\n"
+        "- edit: choose this for a known line-based file change.\n"
+        "- invoke_tool: choose this when a shell or fuzzy-match command is needed "
         "to inspect the worktree or perform work required to determine the "
         "output.\n"
+        "- read_document: choose this when specific lines from a known document "
+        "are needed.\n"
+        "- next_step: choose this when the current action is complete and the LLM "
+        "should decide the next action.\n"
         "- complete: choose this when the task can be safely finished now; put "
         "the produced state in output_state.\n"
-        "- get-human-input: choose this only when a human decision or review is "
-        "required for safe completion; describe the human task, its input, the "
-        "required role, and the expected output state. Do not use it for ordinary "
-        "chat clarification.\n"
         "Response: return exactly one JSON object matching exactly one outcome "
         "shape below. Do not include markdown or combine outcomes.\n"
+        '{"kind":"gather-context","types":["proposed_prs"],"keywords":["..."]}\n'
+        '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
+        '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
+        '{"kind":"read_document","file_path":"path","start_line":1,"end_line":20}\n'
+        '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
-        '{"kind":"get-human-input","human_input":{"human_task":{'
-        '"description":"...","role":"decider","input_state":{},'
-        '"output_state_type":"decision"},"incorporation_instructions":"...",'
-        '"follow_up_task":{"description":"...","role":"coder",'
-        '"input_state":{},"output_state_type":"state"}}}\n'
-        "Use invoke_tool for work needed to determine the output. Set tool to "
-        "shell for repository commands, fuzzy-match for fuzzy path discovery, or "
-        "gather-context for structured specification context. "
+        "Use gather-context with one or more supported context types and optional "
+        "keywords when repository specifications must be discovered. Use "
+        "prompt_user instead of get-human-input; the execution agent converts it "
+        "to a durable human task and follow-up task. Use invoke_tool for shell "
+        "commands or fuzzy-match searches. "
         "The fuzzy-match command starts with fuzzy-match and supports find-like "
         "options including -name, -path, -type, -maxdepth, -mindepth, "
         "-threshold, and -print. Use complete "
         "when the task can be finished and put the task's produced state in "
         "output_state. Use get-human-input when you cannot safely finish without "
-        "a human decision or review. It inserts the human task into this workflow "
-        "and may insert a follow-up agent task that depends on it, then blocks "
-        "this task. The human_task must specify what the human should do, the "
-        "required role (decider or reviewer), the context/input_state to provide, "
-        "and the output_state_type expected from the human. "
-        "incorporation_instructions must tell the follow-up agent how to use the "
-        "human output. Do not ask for ordinary chat clarification.\n"
         "Do not output markdown."
     )
 
 
 def _workflow_file_names(workflow_dir: Path) -> list[str]:
     return sorted(path.name for path in workflow_dir.glob("*.json") if path.is_file())
-
-
-def _execute_gather_context_tool(
-    parameters: dict[str, Any],
-    *,
-    worktree_root: Path,
-) -> dict[str, Any]:
-    command = parameters.get("command")
-    if not isinstance(command, (str, list, tuple)):
-        raise RuntimeError(
-            "Workflow gather-context tool parameters must include a command array."
-        )
-    command_items = command.split() if isinstance(command, str) else list(command)
-    if not command_items or command_items[0] != "gather-context":
-        raise RuntimeError("gather-context command must start with 'gather-context'.")
-
-    types: list[str] = []
-    keywords: list[str] = []
-    collecting_keywords = False
-    for item in command_items[1:]:
-        if not isinstance(item, str) or not item:
-            continue
-        if item in {"--keywords", "-keywords"}:
-            collecting_keywords = True
-            continue
-        if collecting_keywords:
-            keywords.append(item)
-        else:
-            types.append(item)
-    report = gather_specification_context(
-        worktree_root,
-        types=types,
-        keywords=keywords,
-    )
-    return {
-        "tool": "gather-context",
-        "command": command_items,
-        "result": json.loads(render_gather_context_report(report)),
-    }
 
 
 def _workflow_file_command_error(
@@ -461,41 +466,117 @@ def _parse_task_action(payload: dict[str, Any]) -> WorkflowTaskAction:
     if not isinstance(kind, str) or not kind.strip():
         raise RuntimeError("Workflow task action must include kind.")
     normalized_kind = kind.strip()
-    if normalized_kind == "complete":
-        if "output_state" not in payload:
-            raise RuntimeError("Complete action must include output_state.")
-        text = payload.get("text")
-        if text is not None and not isinstance(text, str):
-            raise RuntimeError("Complete action text must be a string.")
-        return WorkflowTaskAction(
-            kind=normalized_kind,
-            output_state=payload["output_state"],
-            text=text,
-        )
-    if normalized_kind == "invoke_tool":
-        parameters = payload.get("parameters")
-        if not isinstance(parameters, dict) or "command" not in parameters:
-            raise RuntimeError("Invoke-tool action must include parameters.command.")
-        tool = payload.get("tool", "shell")
-        if not isinstance(tool, str) or tool not in {
-            "shell",
-            "fuzzy-match",
-            "gather-context",
-        }:
-            raise RuntimeError(
-                "Invoke-tool action tool must be shell, fuzzy-match, or gather-context."
-            )
-        return WorkflowTaskAction(
-            kind=normalized_kind,
-            tool=tool,
-            parameters=parameters,
-        )
+    if normalized_kind == "complete" and "output_state" not in payload:
+        raise RuntimeError("Complete action must include output_state.")
     if normalized_kind == "get-human-input":
         return WorkflowTaskAction(
             kind=normalized_kind,
             human_input=_parse_human_input(payload.get("human_input")),
         )
-    raise RuntimeError(f"Unknown workflow task action kind: {normalized_kind!r}")
+    normalized_payload = dict(payload)
+    if normalized_kind == "invoke_tool" and "tool" not in normalized_payload:
+        normalized_payload["tool"] = "shell"
+    return _workflow_task_action_from_skill_action(
+        _parse_action_response(normalized_payload)
+    )
+
+
+def _read_task_document(
+    action: WorkflowTaskAction,
+    repo_root: Path,
+) -> dict[str, Any]:
+    if action.file_path is None or action.start_line is None or action.end_line is None:
+        raise RuntimeError("read_document action must include a file and line range.")
+    path = _resolve_worktree_file_path(action.file_path, repo_root)
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if action.start_line < 1 or action.end_line < action.start_line:
+        raise RuntimeError("read_document action line range is invalid.")
+    if action.end_line > len(lines):
+        raise RuntimeError("read_document action line range is outside the document.")
+    return {
+        "path": action.file_path,
+        "start_line": action.start_line,
+        "end_line": action.end_line,
+        "lines": [
+            {
+                "line_number": number,
+                "text": lines[number - 1],
+            }
+            for number in range(action.start_line, action.end_line + 1)
+        ],
+    }
+
+
+def _apply_task_edits(
+    action: WorkflowTaskAction,
+    repo_root: Path,
+) -> list[dict[str, Any]]:
+    groups = action.file_edits
+    if not groups:
+        if action.file_path is None:
+            raise RuntimeError("edit action must include a file path.")
+        groups = ((action.file_path, action.edits),)
+    results: list[dict[str, Any]] = []
+    for group in groups:
+        file_path = group[0] if isinstance(group, tuple) else group.file_path
+        edits = group[1] if isinstance(group, tuple) else group.edits
+        path = _resolve_worktree_file_path(file_path, repo_root)
+        current = path.read_text(encoding="utf-8") if path.exists() else ""
+        updated = _apply_file_edits(current, edits)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(updated, encoding="utf-8")
+        results.append(
+            {"file_path": file_path, "line_count": len(updated.splitlines())}
+        )
+    return results
+
+
+def _prompt_user_handoff(
+    action: WorkflowTaskAction,
+    task: WorkflowTask,
+) -> dict[str, Any]:
+    question = action.text or "Please review the current workflow task."
+    return {
+        "human_task": {
+            "description": question,
+            "role": "reviewer",
+            "input_state": {
+                "question": question,
+                "task": task.to_data(),
+            },
+            "output_state_type": "human-response-state",
+        },
+        "incorporation_instructions": (
+            action.decisions_and_context
+            or "Use the human response to continue the workflow task."
+        ),
+        "follow_up_task": {
+            "description": task.description,
+            "role": task.assignee_role.value,
+            "input_state": task.input_state,
+            "output_state_type": task.output_state_type,
+        },
+    }
+
+
+def _workflow_task_action_from_skill_action(
+    action: SkillChatAction,
+) -> WorkflowTaskAction:
+    return WorkflowTaskAction(
+        kind=action.kind,
+        tool=action.tool or "shell",
+        file_path=action.file_path,
+        start_line=action.start_line,
+        end_line=action.end_line,
+        edits=action.edits,
+        file_edits=action.file_edits,
+        types=action.types,
+        keywords=action.keywords,
+        output_state=action.output_state,
+        text=action.text,
+        parameters=action.parameters,
+        decisions_and_context=action.decisions_and_context,
+    )
 
 
 def _parse_human_input(value: object) -> dict[str, Any]:

@@ -27,8 +27,9 @@ task_templates:
     repository_status: []
   details: >-
     First resolve proposed_pr to the exact proposed PR specification. Use the
-    gather-context tool with the proposed_prs context type and the proposed PR
-    id as a keyword to discover the proposed PR and its specification context.
+    Choose the gather-context action with the proposed_prs context type and the
+    proposed PR id as a keyword to discover the proposed PR and its
+    specification context.
     Use the shell tool to inspect the matching specification, its referenced
     feature documents, repository status, and relevant existing source and test
     files. Do not guess a path when the tool results provide the path. Record
@@ -38,12 +39,6 @@ task_templates:
     cannot be identified unambiguously, use get-human-input with one precise
     question instead of proceeding.
   tool_invocations:
-  - tool: gather-context
-    command:
-    - gather-context
-    - proposed_prs
-    - --keywords
-    - <proposed-pr-id>
   - tool: shell
     command:
     - git

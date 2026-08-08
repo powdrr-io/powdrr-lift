@@ -215,6 +215,9 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
     assert template.how_to_fill_this_out == (
         "Review the existing plan documents before making implementation decisions.",
         "Keep the confirmed requirements explicit in the task state.",
+        "For every task with upstream_task_template_indexes, read completed values "
+        "from input_state.upstream_task_outputs using the runtime task ID listed in "
+        "upstream_task_ids. Each entry contains output_state_type and output_state.",
         "Generate one execute-proposed-pr workflow for each approved proposed PR.",
     )
     assert [task.description for task in template.task_templates] == [
@@ -309,6 +312,21 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ]
     assert template.task_templates[0].tool_invocations == ()
     assert all(task.tool_invocations for task in template.task_templates[1:-1])
+    expected_upstream_contracts = {
+        1: "proposed-pr-context-state",
+        2: "detailed-execution-plan-state",
+        3: "generated-test-diffs-state",
+        4: "tests-proven-failing-state",
+        5: "generated-product-code-state",
+        6: "all-tests-passing-state",
+        7: "specification-completeness-state",
+        8: "linted-and-cleaned-state",
+    }
+    for index, output_state_type in expected_upstream_contracts.items():
+        task = template.task_templates[index]
+        assert task.input_state["upstream_task_outputs"] == {}
+        assert output_state_type in (task.details or "")
+        assert "runtime task ID" in (task.details or "")
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",
@@ -316,6 +334,18 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert build_workflow_template_validation_report(
         template.to_json()
     ).validation_successful
+
+
+def test_implement_a_feature_template_declares_upstream_output_contracts() -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
+    )
+    template = load_workflow_template(template_path)
+
+    assert template.task_templates[1].input_state["upstream_task_outputs"] == {}
+    assert "reviewed-plan-documents-state" in (template.task_templates[1].details or "")
+    assert template.task_templates[2].input_state["upstream_task_outputs"] == {}
+    assert "confirmed-requirements-state" in (template.task_templates[2].details or "")
 
 
 def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) -> None:

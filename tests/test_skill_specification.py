@@ -377,7 +377,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--workflow-instance-name",
         "<proposed-pr-name>",
         "--template-value",
-        "<template-value-name>=<template-value>",
+        "proposed-pr-id=<proposed-pr-name>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )

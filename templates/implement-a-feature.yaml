@@ -62,6 +62,8 @@ task_templates:
           - <work-item-name>
           - --workflow-instance-name
           - <workflow-instance-name>
+          - --template-value
+          - proposed-pr-id=<workflow-instance-name>
           - --template
           - templates/execute-proposed-pr.yaml
     input_state:

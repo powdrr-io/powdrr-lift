@@ -100,7 +100,7 @@ steps:
     - --workflow-instance-name
     - <proposed-pr-name>
     - --template-value
-    - <template-value-name>=<template-value>
+    - proposed-pr-id=<proposed-pr-name>
     - --template
     - templates/execute-proposed-pr.yaml
 - description: Review and approve the implementation plan and workflows.

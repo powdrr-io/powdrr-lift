@@ -16,12 +16,7 @@ task_templates:
   assignee_role: architect
   llm_type: high_reasoning
   input_state:
-    proposed_pr:
-      instructions: >-
-        Find the actual proposed PR specification for this workflow. Use the
-        instantiation context as search context, inspect the candidate
-        document, and replace this instruction in the reviewed output with a concrete
-        reference containing the proposed PR id and specification path.
+    proposed_pr: <proposed-pr-id>
   details: >-
     Resolve input_state.proposed_pr before making implementation decisions.
     Use the instantiation context included with this task to find the actual

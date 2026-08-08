@@ -74,7 +74,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert '"execution_mode": "process_workflow_task"' in prompt
 
 
-def test_process_workflow_task_rejects_guessed_workflow_filename_and_repairs(
+def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     tmp_path: Path,
 ) -> None:
     workflow = _workflow(tmp_path)
@@ -104,8 +104,9 @@ def test_process_workflow_task_rejects_guessed_workflow_filename_and_repairs(
     )
 
     assert exit_code == 0
-    assert "Rejected workflow shell command" in stderr.getvalue()
-    assert "agent-task.json" in stderr.getvalue()
+    assert "Corrected malformed workflow filename suffix" in stderr.getvalue()
+    assert "Rejected workflow shell command" not in stderr.getvalue()
+    assert "agent-task.json" in stdout.getvalue()
     assert "workflow_files" in client.messages[0][1]["content"]
     assert "agent-task.json" in client.messages[0][1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (

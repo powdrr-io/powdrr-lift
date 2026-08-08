@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from powdrr_lift.core.skill_specification import SkillToolInvocation
 from powdrr_lift.core.workflow_task_specification import TaskComplexity
 from powdrr_lift.core.workflow_template_specification import (
     WorkflowTaskTemplate,
@@ -277,19 +278,19 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     template = load_workflow_template(template_path)
 
     assert [task.description for task in template.task_templates] == [
-        "Review proposed PR plan",
-        "Review overall plan",
-        "Confirm requirements",
-        "Generate test diffs",
-        "Generate functionality diffs",
-        "Confirm completeness",
-        "Confirm goals",
-        "Lint and cleanup",
-        "Create PR",
+        "Gather context about the proposed PR",
+        "Create a detailed execution plan",
+        "Generate tests that will validate the new functionality",
+        "Validate the tests do not pass",
+        "Generate product code changes",
+        "Validate all tests pass",
+        "Confirm functional completeness against the specification",
+        "Run lint, type checks, and cleanup",
+        "Create the pull request",
     ]
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
-    assert "actual proposed PR" in " ".join(template.how_to_fill_this_out)
+    assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
     assert "specification path" in (template.task_templates[0].details or "")
     assert [
         (task.assignee_type.value, task.assignee_role.value)
@@ -297,14 +298,25 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ] == [
         ("agent", "architect"),
         ("agent", "architect"),
-        ("human", "decider"),
         ("agent", "coder"),
+        ("agent", "reviewer"),
         ("agent", "coder"),
-        ("human", "reviewer"),
-        ("human", "decider"),
+        ("agent", "reviewer"),
+        ("agent", "architect"),
         ("agent", "reviewer"),
         ("human", "reviewer"),
     ]
+    assert all(task.tool_invocations for task in template.task_templates[:-1])
+    assert [
+        invocation.tool for invocation in template.task_templates[0].tool_invocations
+    ] == [
+        "fuzzy-match",
+        "shell",
+    ]
+    assert template.task_templates[3].tool_invocations[0].command == (
+        "pytest",
+        "-q",
+    )
     assert build_workflow_template_validation_report(
         template.to_json()
     ).validation_successful
@@ -359,6 +371,14 @@ def test_instantiate_workflow_template_accepts_generic_input_values(
                 description="Use the custom input.",
                 complexity=TaskComplexity.LOW,
                 input_state={"custom": "<custom-value>"},
+                tool_invocations=(
+                    SkillToolInvocation(
+                        tool="shell",
+                        command=("echo", "<custom-value>"),
+                        cwd="<custom-value>",
+                        env=(("VALUE", "<custom-value>"),),
+                    ),
+                ),
             ),
         ),
     )
@@ -372,6 +392,9 @@ def test_instantiate_workflow_template_accepts_generic_input_values(
     )
 
     assert tasks[0].input_state == {"custom": "provided-value"}
+    assert tasks[0].tool_invocations[0].command == ("echo", "provided-value")
+    assert tasks[0].tool_invocations[0].cwd == "provided-value"
+    assert tasks[0].tool_invocations[0].env == (("VALUE", "provided-value"),)
 
 
 def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(

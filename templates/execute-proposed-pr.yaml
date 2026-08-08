@@ -1,130 +1,287 @@
 ---
 when_to_use:
 - When an approved proposed PR is ready to execute.
-- When implementation must be validated against the full plan before creating the
-  PR.
+- When implementation must be validated against the proposed PR specification
+  before creating the PR.
 how_to_fill_this_out:
-- Keep each task focused on one implementation or validation checkpoint.
-- Preserve the plan and requirements through every task.
-- The first task must resolve input_state.proposed_pr to the actual proposed PR
-  by using the instantiation context and inspecting the candidate specification.
-- Do not create the PR until completeness, goals, lint, and cleanup are confirmed.
+- Keep the tasks in this order. Each task must complete before the next task
+  starts.
+- Resolve every input_state placeholder from the proposed PR and preserve the
+  resulting context in output_state for downstream tasks.
+- Use the listed tool invocations as the preferred commands. Use invoke_tool
+  with tool=shell for repository commands and tool=fuzzy-match for fuzzy path
+  discovery. A task may invoke another safe command when the listed command
+  needs a concrete path discovered from its context.
+- Do not modify product code before the test-generation and test-failure
+  validation tasks complete. Do not create a pull request before all validation
+  and review tasks complete.
 task_templates:
-- description: Review proposed PR plan
+- description: Gather context about the proposed PR
   complexity: high
   assignee_type: agent
   assignee_role: architect
-  llm_type: high_reasoning
+  llm_type: standard_reasoning
   input_state:
     proposed_pr: <proposed-pr-id>
+    specification_candidates: []
+    repository_status: []
   details: >-
-    Resolve input_state.proposed_pr before making implementation decisions.
-    Use the instantiation context included with this task to find the actual
-    proposed PR specification, inspect the candidate document, and record a
-    concrete reference containing the proposed PR id and specification path in
-    the reviewed output. Use that document as the source of truth for the PR's
-    intent, acceptance criteria, tests, scope, and risks. If the reference does
-    not resolve to the actual proposed PR, stop and report the missing or
-    mismatched reference instead of guessing.
-  output_state_type: reviewed-proposed-pr-plan-state
+    First resolve proposed_pr to the exact proposed PR specification. Use the
+    fuzzy-match tool to search docs/specs for the proposed PR id and related
+    implementation-specification files. Use the shell tool to inspect the
+    matching specification, its referenced feature documents, repository status,
+    and relevant existing source and test files. Do not guess a path when the
+    tool results provide the path. Record the exact specification path, feature
+    name, goal, scope, acceptance criteria, files to change, test plan,
+    validation commands, dependencies, risks, and any unresolved ambiguity in
+    output_state. If the proposed PR cannot be identified unambiguously, use
+    get-human-input with one precise question instead of proceeding.
+  tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs
+    - -name
+    - <proposed-pr-id>
+    - -type
+    - f
+    - -maxdepth
+    - "4"
+    - -print
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  output_state_type: proposed-pr-context-state
   upstream_task_template_indexes: []
   dependent_state:
-  - proposed-pr-plan-reviewed
-- description: Review overall plan
+  - proposed-pr-context-gathered
+- description: Create a detailed execution plan
   complexity: high
   assignee_type: agent
   assignee_role: architect
   llm_type: high_reasoning
   input_state:
-    overall_plan: 
-  output_state_type: reviewed-overall-plan-state
+    proposed_pr_context: {}
+    execution_plan: []
+  details: >-
+    Read the gathered proposed PR specification and all referenced documents.
+    Create a detailed, ordered execution plan before changing files. Map every
+    acceptance criterion to one or more tests, identify the exact test files
+    and product files to change, describe the expected initially failing test
+    command, define the implementation sequence, and define the final
+    validation commands. Detect missing requirements, conflicts, excessive
+    scope, or unsafe assumptions. If the plan is not implementable, use
+    get-human-input for a specific decision. Otherwise record the complete plan
+    in output_state and pass it to the next task.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --stat
+  output_state_type: detailed-execution-plan-state
   upstream_task_template_indexes:
   - 0
   dependent_state:
-  - overall-plan-reviewed
-- description: Confirm requirements
-  complexity: medium
-  assignee_type: human
-  assignee_role: decider
+  - execution-plan-created
+- description: Generate tests that will validate the new functionality
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    requirements: []
-    acceptance_criteria: []
-  output_state_type: confirmed-execution-requirements-state
+    proposed_pr_context: {}
+    execution_plan: []
+    test_plan: []
+  details: >-
+    Implement only the tests described by the execution plan. Add focused tests
+    for the required behavior, edge cases, and acceptance criteria. Keep the
+    tests deterministic and consistent with existing repository conventions.
+    Do not implement product behavior yet. Inspect the changed test files and
+    record the test paths, test names, and expected failure reasons in
+    output_state. Use the shell tool for repository inspection and edits.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  output_state_type: generated-test-diffs-state
   upstream_task_template_indexes:
   - 1
   dependent_state:
-  - execution-requirements-confirmed
-- description: Generate test diffs
-  complexity: high
-  assignee_type: agent
-  assignee_role: coder
-  llm_type: standard_reasoning
-  input_state:
-    test_plan: []
-  output_state_type: test-diffs-state
-  upstream_task_template_indexes:
-  - 2
-  dependent_state:
-  - test-diffs-generated
-- description: Generate functionality diffs
-  complexity: high
-  assignee_type: agent
-  assignee_role: coder
-  llm_type: standard_reasoning
-  input_state:
-    implementation_plan: []
-  output_state_type: functionality-diffs-state
-  upstream_task_template_indexes:
-  - 3
-  dependent_state:
-  - functionality-diffs-generated
-- description: Confirm completeness
-  complexity: medium
-  assignee_type: human
-  assignee_role: reviewer
-  llm_type: high_reasoning
-  input_state:
-    changed_files: []
-    test_results: []
-  output_state_type: confirmed-completeness-state
-  upstream_task_template_indexes:
-  - 4
-  dependent_state:
-  - completeness-confirmed
-- description: Confirm goals
-  complexity: medium
-  assignee_type: human
-  assignee_role: decider
-  llm_type: standard_reasoning
-  input_state:
-    goals: []
-    acceptance_results: []
-  output_state_type: confirmed-goals-state
-  upstream_task_template_indexes:
-  - 5
-  dependent_state:
-  - goals-confirmed
-- description: Lint and cleanup
+  - tests-generated
+- description: Validate the tests do not pass
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
   input_state:
+    test_plan: []
+    generated_test_diffs: {}
+    expected_failure_reasons: []
+  details: >-
+    Run the targeted tests generated by the previous task before writing any
+    product code. Use the pytest command below, or the narrower command from
+    the test plan when one is specified. Confirm that the tests fail because
+    the requested behavior is not implemented, not because of a syntax error,
+    broken fixture, malformed test, or unrelated environment failure. If the
+    tests pass, revise the tests to ensure they actually validate the new
+    functionality. Record the exact command and result in output_state.
+  tool_invocations:
+  - tool: shell
+    command:
+    - pytest
+    - -q
+  output_state_type: tests-proven-failing-state
+  upstream_task_template_indexes:
+  - 2
+  dependent_state:
+  - tests-proven-failing
+- description: Generate product code changes
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    proposed_pr_context: {}
+    execution_plan: []
+    generated_test_diffs: {}
+    tests_proven_failing: {}
+    implementation_diffs: {}
+  details: >-
+    Implement the smallest safe product-code change that satisfies the
+    proposed PR specification and the failing tests. Follow the execution plan
+    and existing architecture. Do not weaken, delete, or bypass tests. Inspect
+    the complete diff after editing, keep scope limited to the approved files,
+    and record the implementation files, key design decisions, and resulting
+    diff in output_state. Use shell for all repository inspection and edits.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - "--"
+    - tests
+  output_state_type: generated-product-code-state
+  upstream_task_template_indexes:
+  - 3
+  dependent_state:
+  - product-code-generated
+- description: Validate all tests pass
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  input_state:
+    implementation_diffs: {}
+    test_results: []
+  details: >-
+    Run the targeted tests first and then the full repository test suite. Use
+    pytest through the shell tool. Diagnose and fix failures caused by the
+    implementation or tests, rerunning the relevant tests after each fix.
+    Do not declare success from a partial run. Record every command, result,
+    failure diagnosis, and final passing result in output_state.
+  tool_invocations:
+  - tool: shell
+    command:
+    - pytest
+    - -q
+  output_state_type: all-tests-passing-state
+  upstream_task_template_indexes:
+  - 4
+  dependent_state:
+  - all-tests-passing
+- description: Confirm functional completeness against the specification
+  complexity: high
+  assignee_type: agent
+  assignee_role: architect
+  llm_type: high_reasoning
+  input_state:
+    proposed_pr_context: {}
+    execution_plan: []
+    implementation_diffs: {}
+    test_results: []
+    acceptance_criteria: []
+  details: >-
+    Re-read the proposed PR specification and compare it line by line with the
+    implementation diff and passing test results. Confirm that every goal,
+    acceptance criterion, required file change, error case, and validation
+    requirement is covered. Identify accidental scope, missing behavior,
+    untested behavior, and contradictions. If anything is incomplete, make the
+    required scoped correction and send it back through validation. Otherwise
+    record an explicit criterion-by-criterion completeness result in
+    output_state.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - "--check"
+  output_state_type: specification-completeness-state
+  upstream_task_template_indexes:
+  - 5
+  dependent_state:
+  - specification-complete
+- description: Run lint, type checks, and cleanup
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  input_state:
+    implementation_diffs: {}
+    test_results: []
+    completeness_review: {}
     lint_results: []
-    cleanup_items: []
+  details: >-
+    Run repository formatting checks, lint checks, and type checks using the
+    shell tool. Review the complete diff for debug code, generated artifacts,
+    unrelated edits, formatting issues, and accidental secrets. Fix only
+    issues within the approved scope, rerun all affected checks, and record
+    the final commands and results in output_state.
+  tool_invocations:
+  - tool: shell
+    command:
+    - ruff
+    - format
+    - "--check"
+    - .
+  - tool: shell
+    command:
+    - ruff
+    - check
+    - .
+  - tool: shell
+    command:
+    - mypy
+    - src
   output_state_type: linted-and-cleaned-state
   upstream_task_template_indexes:
   - 6
   dependent_state:
   - lint-and-cleanup-complete
-- description: Create PR
+- description: Create the pull request
   complexity: high
   assignee_type: human
   assignee_role: reviewer
   llm_type: standard_reasoning
   input_state:
-    pull_request: 
+    proposed_pr_context: {}
+    implementation_diffs: {}
+    test_results: []
+    completeness_review: {}
+    lint_results: []
+    pull_request: {}
+  details: >-
+    Present the proposed PR specification, implementation summary, changed
+    files, acceptance-criteria results, test commands and results, lint and
+    type-check results, risks, and remaining caveats. Ask the human reviewer to
+    confirm that the work is ready for a pull request. After approval, create
+    the pull request using the repository's normal Git workflow and record its
+    URL and final status in output_state. Do not create a pull request before
+    the human explicitly approves it.
   output_state_type: pull-request-created-state
   upstream_task_template_indexes:
   - 7

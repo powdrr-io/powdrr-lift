@@ -18,6 +18,7 @@ from powdrr_lift.core import (
 from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
     LocalLlamaChatClient,
+    _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _LLMExchangeRecordingClient,
     _print_waiting_for_model,
@@ -46,6 +47,7 @@ class WorkflowTaskAgentConfig:
 @dataclass(frozen=True, slots=True)
 class WorkflowTaskAction:
     kind: str
+    tool: str = "shell"
     output_state: Any = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
@@ -129,6 +131,7 @@ def run_workflow_task(
                 )
                 action = WorkflowTaskAction(
                     kind=action.kind,
+                    tool=action.tool,
                     parameters=repaired_parameters,
                 )
             command_error = _workflow_file_command_error(
@@ -145,16 +148,28 @@ def run_workflow_task(
                     "stderr": command_error,
                 }
             else:
-                result = _execute_shell_tool(
-                    action.parameters,
-                    worktree_root=config.repo_root,
-                    stdout=stdout,
-                    stderr=stderr,
-                    verbose=config.verbose,
-                )
+                if action.tool == "shell":
+                    result = _execute_shell_tool(
+                        action.parameters,
+                        worktree_root=config.repo_root,
+                        stdout=stdout,
+                        stderr=stderr,
+                        verbose=config.verbose,
+                    )
+                elif action.tool == "fuzzy-match":
+                    result = _execute_fuzzy_match_tool(
+                        action.parameters,
+                        worktree_root=config.repo_root,
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Unsupported workflow task tool {action.tool!r}; "
+                        "supported tools are shell and fuzzy-match."
+                    )
             events.append(
                 {
                     "kind": action.kind,
+                    "tool": action.tool,
                     "parameters": action.parameters,
                     "result": result,
                 }
@@ -220,6 +235,21 @@ def _build_task_messages(
                     "events": events,
                     "workflow_dir": str(workflow.directory),
                     "workflow_files": _workflow_file_names(workflow.directory),
+                    "available_tools": [
+                        {
+                            "name": "shell",
+                            "description": (
+                                "Execute a shell command in the current worktree."
+                            ),
+                        },
+                        {
+                            "name": "fuzzy-match",
+                            "description": (
+                                "Search worktree paths with find-like filters and "
+                                "fuzzy name matching."
+                            ),
+                        },
+                    ],
                     "response_correction": response_correction,
                 },
                 indent=2,
@@ -259,8 +289,9 @@ def _task_system_prompt() -> str:
         "from your previous response. Correct that failure and return only the "
         "required JSON object.\n"
         "Choose exactly one outcome:\n"
-        "- invoke_tool: choose this when a command is needed to inspect the "
-        "worktree or perform work required to determine the output.\n"
+        "- invoke_tool: choose this when a shell or fuzzy-match command is needed "
+        "to inspect the worktree or perform work required to determine the "
+        "output.\n"
         "- complete: choose this when the task can be safely finished now; put "
         "the produced state in output_state.\n"
         "- get-human-input: choose this only when a human decision or review is "
@@ -269,14 +300,18 @@ def _task_system_prompt() -> str:
         "chat clarification.\n"
         "Response: return exactly one JSON object matching exactly one outcome "
         "shape below. Do not include markdown or combine outcomes.\n"
-        '{"kind":"invoke_tool","parameters":{"command":["..."]}}\n'
+        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
         '{"kind":"get-human-input","human_input":{"human_task":{'
         '"description":"...","role":"decider","input_state":{},'
         '"output_state_type":"decision"},"incorporation_instructions":"...",'
         '"follow_up_task":{"description":"...","role":"coder",'
         '"input_state":{},"output_state_type":"state"}}}\n'
-        "Use invoke_tool for work needed to determine the output. Use complete "
+        "Use invoke_tool for work needed to determine the output. Set tool to "
+        "shell for repository commands or fuzzy-match for fuzzy path discovery. "
+        "The fuzzy-match command starts with fuzzy-match and supports find-like "
+        "options including -name, -path, -type, -maxdepth, -mindepth, "
+        "-threshold, and -print. Use complete "
         "when the task can be finished and put the task's produced state in "
         "output_state. Use get-human-input when you cannot safely finish without "
         "a human decision or review. It inserts the human task into this workflow "
@@ -383,7 +418,14 @@ def _parse_task_action(payload: dict[str, Any]) -> WorkflowTaskAction:
         parameters = payload.get("parameters")
         if not isinstance(parameters, dict) or "command" not in parameters:
             raise RuntimeError("Invoke-tool action must include parameters.command.")
-        return WorkflowTaskAction(kind=normalized_kind, parameters=parameters)
+        tool = payload.get("tool", "shell")
+        if not isinstance(tool, str) or tool not in {"shell", "fuzzy-match"}:
+            raise RuntimeError("Invoke-tool action tool must be shell or fuzzy-match.")
+        return WorkflowTaskAction(
+            kind=normalized_kind,
+            tool=tool,
+            parameters=parameters,
+        )
     if normalized_kind == "get-human-input":
         return WorkflowTaskAction(
             kind=normalized_kind,

@@ -1,6 +1,6 @@
 {
   "task_id": "interaction-file-log-pr-task-002",
-  "status": "locked",
+  "status": "completed",
   "upstream_task_ids": [
     "interaction-file-log-pr-task-001"
   ],
@@ -252,6 +252,388 @@
   "assignee_role": "architect",
   "output_state_type": "detailed-execution-plan-state",
   "description": "Create a detailed execution plan",
+  "output_state": {
+    "execution_plan_created": true,
+    "proposed_pr_id": "interaction-file-log-pr",
+    "feature_ids": [
+      "log-interactions"
+    ],
+    "summary": "Create an InteractionLogger module that records all human and LLM interactions (input and output) as JSONL entries in the .powdrr hidden directory with timestamped filenames for unique CLI sessions. Binary content is base64-encoded within JSONL entries.",
+    "log_entry_schema": {
+      "fields": {
+        "timestamp": "ISO 8601 UTC string (e.g., 2026-08-08T22:30:24.123456+00:00)",
+        "role": "human or llm",
+        "direction": "input or output",
+        "content_type": "text or binary",
+        "encoding": "utf-8 for text, base64 for binary",
+        "content": "string content (text or base64-encoded binary)"
+      }
+    },
+    "filename_pattern": "interactions-{YYYYMMDDTHHMMSSffffff}.l",
+    "log_directory": ".powdrr",
+    "acceptance_criteria_mapping": [
+      {
+        "acceptance_criterion_id": "ac-l-format",
+        "description": "Each log entry is a single valid JSON object on its own line in the log file.",
+        "test_ids": [
+          "test-l-validity"
+        ],
+        "test_case_ids": [
+          "tc-log-text-interaction",
+          "tc-log-llm-response"
+        ],
+        "test_functions": [
+          "test_l_validity",
+          "test_log_text_interaction",
+          "test_log_llm_response"
+        ]
+      },
+      {
+        "acceptance_criterion_id": "ac-append-behavior",
+        "description": "Every interaction (input and output) is appended to the log file without overwriting previous entries.",
+        "test_ids": [
+          "test-append-behavior"
+        ],
+        "test_case_ids": [
+          "tc-log-text-interaction",
+          "tc-log-llm-response"
+        ],
+        "test_functions": [
+          "test_append_behavior"
+        ]
+      },
+      {
+        "acceptance_criterion_id": "ac-hidden-directory",
+        "description": "The log file resides in the .powdrr hidden directory which is created if it does not exist.",
+        "test_ids": [
+          "test-directory-creation"
+        ],
+        "test_case_ids": [
+          "tc-create-hidden-directory"
+        ],
+        "test_functions": [
+          "test_directory_creation"
+        ]
+      },
+      {
+        "acceptance_criterion_id": "ac-binary-content",
+        "description": "Binary content in interactions is encoded (e.g., base64) within the JSONL entry to preserve data integrity.",
+        "test_ids": [
+          "test-binary-content-encoding"
+        ],
+        "test_case_ids": [
+          "tc-log-binary-interaction"
+        ],
+        "test_functions": [
+          "test_binary_content_encoding"
+        ]
+      },
+      {
+        "acceptance_criterion_id": "ac-timestamped-filename",
+        "description": "The log file name includes a timestamp so each CLI session gets a unique file.",
+        "test_ids": [
+          "test-timestamped-filename"
+        ],
+        "test_case_ids": [
+          "tc-unique-session-file"
+        ],
+        "test_functions": [
+          "test_timestamped_filename",
+          "test_unique_session_files"
+        ]
+      }
+    ],
+    "test_files": [
+      {
+        "path": "tests/test_interaction_log.py",
+        "action": "create",
+        "description": "Unit tests for InteractionLogger covering all acceptance criteria and required test cases",
+        "test_functions": [
+          {
+            "name": "test_l_validity",
+            "covers": [
+              "test-l-validity",
+              "tc-log-text-interaction",
+              "tc-log-llm-response"
+            ],
+            "description": "Log text and LLM interactions, verify each line is valid JSON with required fields (timestamp, role, direction, content_type, encoding, content)"
+          },
+          {
+            "name": "test_append_behavior",
+            "covers": [
+              "test-append-behavior"
+            ],
+            "description": "Log multiple interactions, verify they appear in order and file grows without overwriting"
+          },
+          {
+            "name": "test_binary_content_encoding",
+            "covers": [
+              "test-binary-content-encoding",
+              "tc-log-binary-interaction"
+            ],
+            "description": "Log binary content, verify base64 encoding in JSONL entry and round-trip decode without loss"
+          },
+          {
+            "name": "test_directory_creation",
+            "covers": [
+              "test-directory-creation",
+              "tc-create-hidden-directory"
+            ],
+            "description": "Start with no .powdrr directory, verify it is created on first log write"
+          },
+          {
+            "name": "test_timestamped_filename",
+            "covers": [
+              "test-timestamped-filename",
+              "tc-unique-session-file"
+            ],
+            "description": "Create two loggers with different timestamps, verify different filenames containing timestamp pattern"
+          },
+          {
+            "name": "test_log_text_interaction",
+            "covers": [
+              "tc-log-text-interaction"
+            ],
+            "description": "Log a text-based human interaction and verify it appears as a valid JSONL entry with role=human, direction=input"
+          },
+          {
+            "name": "test_log_llm_response",
+            "covers": [
+              "tc-log-llm-response"
+            ],
+            "description": "Log an LLM output interaction and verify it appears as a valid JSONL entry with role=llm, direction=output"
+          }
+        ]
+      }
+    ],
+    "product_files": [
+      {
+        "path": "src/powdrr_lift/interaction_log.py",
+        "action": "create",
+        "description": "Core InteractionLogger module",
+        "details": {
+          "class": "InteractionLogger",
+          "constructor_params": {
+            "log_dir": "Path = Path('.powdrr')",
+            "session_timestamp": "datetime | None = None (defaults to current UTC time)"
+          },
+          "methods": [
+            {
+              "name": "_ensure_directory",
+              "description": "Create .powdrr directory if it does not exist using mkdir(parents=True, exist_ok=True)"
+            },
+            {
+              "name": "log_file_path",
+              "description": "Property returning Path to timestamped JSONL log file (interactions-{timestamp}.l)"
+            },
+            {
+              "name": "log_interaction",
+              "params": {
+                "role": "str (human or llm)",
+                "direction": "str (input or output)",
+                "content": "str or bytes",
+                "content_type": "str (text or binary)",
+                "timestamp": "datetime | None = None"
+              },
+              "description": "Encode content if binary, build JSON entry dict, append as single JSON line to log file"
+            },
+            {
+              "name": "_encode_content",
+              "description": "Base64-encode binary content using base64.b64encode, return (encoded_string, encoding_type)"
+            },
+            {
+              "name": "_write_entry",
+              "description": "Open log file in append mode, write .dumps(entry) + newline, close file handle"
+            }
+          ]
+        }
+      }
+    ],
+    "product_files_to_modify": [
+      {
+        "path": "src/powdrr_lift/workflow_chat_agent.py",
+        "action": "modify",
+        "description": "Integrate InteractionLogger into chat agent",
+        "changes": [
+          "Import InteractionLogger from powdrr_lift.interaction_log",
+          "Add optional interaction_logger parameter to run_workflow_chat (default None, create new InteractionLogger if None)",
+          "Initialize InteractionLogger at start of run_workflow_chat if not provided",
+          "Log human input after _prompt_user returns with role=human, direction=input",
+          "Log LLM output after client.complete_ returns with role=llm, direction=output"
+        ]
+      },
+      {
+        "path": "src/powdrr_lift/workflow_task_agent.py",
+        "action": "modify",
+        "description": "Integrate InteractionLogger into task agent",
+        "changes": [
+          "Import InteractionLogger from powdrr_lift.interaction_log",
+          "Add optional interaction_logger parameter to run_workflow_task (default None, create new if None)",
+          "Initialize InteractionLogger at start of run_workflow_task if not provided",
+          "Log human input and LLM responses during task processing rounds"
+        ]
+      },
+      {
+        "path": "src/powdrr_lift/cli.py",
+        "action": "modify",
+        "description": "Pass interaction logger configuration to agent functions if needed",
+        "changes": [
+          "Import InteractionLogger if CLI-level initialization is needed",
+          "Ensure workflow-chat and workflow-task commands initialize or pass logger configuration"
+        ]
+      },
+      {
+        "path": ".gitignore",
+        "action": "modify",
+        "description": "Add .powdrr/ to prevent log files from being committed",
+        "changes": [
+          "Add .powdrr/ entry to .gitignore"
+        ]
+      }
+    ],
+    "implementation_sequence": [
+      {
+        "step": 1,
+        "name": "Create InteractionLogger module",
+        "file": "src/powdrr_lift/interaction_log.py",
+        "action": "create",
+        "description": "Create the core interaction logging module with InteractionLogger class that handles JSONL logging to .powdrr directory with timestamped filenames and binary content base64 encoding",
+        "acceptance_criteria_covered": [
+          "ac-l-format",
+          "ac-append-behavior",
+          "ac-hidden-directory",
+          "ac-binary-content",
+          "ac-timestamped-filename"
+        ]
+      },
+      {
+        "step": 2,
+        "name": "Create unit tests (RED phase)",
+        "file": "tests/test_interaction_log.py",
+        "action": "create",
+        "description": "Write unit tests for InteractionLogger covering all 5 acceptance criteria and 5 required test cases. Tests should initially fail because the module does not exist yet.",
+        "acceptance_criteria_covered": [
+          "ac-l-format",
+          "ac-append-behavior",
+          "ac-hidden-directory",
+          "ac-binary-content",
+          "ac-timestamped-filename"
+        ]
+      },
+      {
+        "step": 3,
+        "name": "Verify tests fail",
+        "command": "python -m pytest tests/test_interaction_log.py -v",
+        "description": "Run the new tests to confirm they fail with ImportError, establishing the RED phase of TDD"
+      },
+      {
+        "step": 4,
+        "name": "Implement InteractionLogger (GREEN phase)",
+        "file": "src/powdrr_lift/interaction_log.py",
+        "action": "implement",
+        "description": "Implement the InteractionLogger class to pass all unit tests: directory creation, timestamped filename, JSONL append writes, binary base64 encoding",
+        "acceptance_criteria_covered": [
+          "ac-l-format",
+          "ac-append-behavior",
+          "ac-hidden-directory",
+          "ac-binary-content",
+          "ac-timestamped-filename"
+        ]
+      },
+      {
+        "step": 5,
+        "name": "Verify tests pass",
+        "command": "python -m pytest tests/test_interaction_log.py -v",
+        "description": "Run the unit tests to confirm they all pass"
+      },
+      {
+        "step": 6,
+        "name": "Integrate into workflow_chat_agent.py",
+        "file": "src/powdrr_lift/workflow_chat_agent.py",
+        "action": "modify",
+        "description": "Import InteractionLogger, add optional parameter to run_workflow_chat, initialize logger, log human input after _prompt_user, log LLM output after complete_",
+        "acceptance_criteria_covered": [
+          "ac-append-behavior"
+        ]
+      },
+      {
+        "step": 7,
+        "name": "Integrate into workflow_task_agent.py",
+        "file": "src/powdrr_lift/workflow_task_agent.py",
+        "action": "modify",
+        "description": "Import InteractionLogger, add optional parameter to run_workflow_task, initialize logger, log interactions during task processing",
+        "acceptance_criteria_covered": [
+          "ac-append-behavior"
+        ]
+      },
+      {
+        "step": 8,
+        "name": "Update cli.py if needed",
+        "file": "src/powdrr_lift/cli.py",
+        "action": "modify",
+        "description": "Ensure CLI commands properly initialize or pass interaction logger to agent functions"
+      },
+      {
+        "step": 9,
+        "name": "Update .gitignore",
+        "file": ".gitignore",
+        "action": "modify",
+        "description": "Add .powdrr/ entry to prevent log files from being committed"
+      },
+      {
+        "step": 10,
+        "name": "Run full test suite",
+        "command": "python -m pytest tests/ -v",
+        "description": "Run all tests to ensure no regressions from integration changes"
+      },
+      {
+        "step": 11,
+        "name": "Run linter and type checker",
+        "commands": [
+          "ruff check src/ tests/",
+          "mypy src/"
+        ],
+        "description": "Ensure code quality standards are met"
+      }
+    ],
+    "initially_failing_test_command": "python -m pytest tests/test_interaction_log.py -v",
+    "final_validation_commands": [
+      "python -m pytest tests/ -v",
+      "ruff check src/ tests/",
+      "mypy src/"
+    ],
+    "risk_mitigations": [
+      {
+        "risk_id": "risk-large-file-growth",
+        "mitigation": "Documented as non-goal (no log rotation). No mitigation needed for this PR."
+      },
+      {
+        "risk_id": "risk-binary-encoding-overhead",
+        "mitigation": "Base64 encoding is required by spec. Accept the 33% overhead as documented."
+      },
+      {
+        "risk_id": "risk-timestamp-collision",
+        "mitigation": "Use microsecond precision in timestamp (YYYYMMDDTHHMMSSffffff) to minimize collision probability. Concurrent write handling is a non-goal."
+      }
+    ],
+    "missing_requirements": [],
+    "conflicts": [],
+    "excessive_scope": [],
+    "unsafe_assumptions": [
+      {
+        "assumption": "InteractionLogger is initialized inside agent functions (run_workflow_chat, run_workflow_task) rather than in cli.py, so each agent call creates a new session log.",
+        "justification": "This keeps integration simple and ensures logging works regardless of entry point. The CLI commands call these functions, so logging is always initialized."
+      },
+      {
+        "assumption": "The .powdrr directory is created relative to the current working directory.",
+        "justification": "The spec says hidden .powdrr directory without specifying an absolute path. Using cwd is consistent with how the CLI operates."
+      },
+      {
+        "assumption": "InteractionLogger accepts an optional log_dir parameter for testing with tmp_path.",
+        "justification": "This enables deterministic unit tests without writing to the real .powdrr directory."
+      }
+    ]
+  },
   "details": "Read the gathered proposed PR specification and all referenced documents. Create a detailed, ordered execution plan before changing files. Map every acceptance criterion to one or more tests, identify the exact test files and product files to change, describe the expected initially failing test command, define the implementation sequence, and define the final validation commands. Detect missing requirements, conflicts, excessive scope, or unsafe assumptions. If the plan is not implementable, use get-human-input for a specific decision. Otherwise record the complete plan in output_state and pass it to the next task.\n\nInstantiation context: work item name is 'interaction-file-log'; workflow instance name is 'interaction-file-log-pr'. Use these values as search context and verify repository documents before deciding what they identify.",
   "llm_type": "high_reasoning",
   "tool_invocations": [

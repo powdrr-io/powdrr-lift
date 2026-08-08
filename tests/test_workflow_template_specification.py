@@ -257,6 +257,8 @@ def test_implement_feature_workflow_template_file_is_checked_in() -> None:
         "<work-item-name>",
         "--workflow-instance-name",
         "<workflow-instance-name>",
+        "--template-value",
+        "proposed-pr-id=<workflow-instance-name>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
@@ -286,9 +288,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "Create PR",
     ]
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
-    assert (
-        "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
-    )
+    assert proposed_pr_input == "<proposed-pr-id>"
     assert "actual proposed PR" in " ".join(template.how_to_fill_this_out)
     assert "specification path" in (template.task_templates[0].details or "")
     assert [
@@ -339,10 +339,11 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
         template_path=template_path,
         work_item_name="Interaction File Log",
         workflow_instance_name="interaction-file-log-pr-001",
+        template_values={"proposed-pr-id": "interaction-file-log-pr-001"},
         output_root=tmp_path / "workflows",
     )
 
-    assert "instructions" in tasks[0].input_state["proposed_pr"]
+    assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")
 
@@ -412,13 +413,12 @@ def test_instantiate_execute_proposed_pr_fills_proposed_pr_context(
         template_path=template_path,
         work_item_name="interaction-file-log",
         workflow_instance_name="interaction-file-log-pr",
+        template_values={"proposed-pr-id": "interaction-file-log-pr"},
         output_root=tmp_path / "workflows",
     )
 
     proposed_pr_input = tasks[0].input_state["proposed_pr"]
-    assert (
-        "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
-    )
+    assert proposed_pr_input == "interaction-file-log-pr"
     assert "Instantiation context:" in (tasks[0].details or "")
     assert "interaction-file-log" in (tasks[0].details or "")
     assert "interaction-file-log-pr" in (tasks[0].details or "")

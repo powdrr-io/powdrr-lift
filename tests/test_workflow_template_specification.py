@@ -291,7 +291,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
     assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
-    assert "specification path" in (template.task_templates[0].details or "")
+    assert "gather-context action" in (template.task_templates[0].details or "")
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates
@@ -306,12 +306,8 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         ("agent", "reviewer"),
         ("human", "reviewer"),
     ]
-    assert all(task.tool_invocations for task in template.task_templates[:-1])
-    assert [
-        invocation.tool for invocation in template.task_templates[0].tool_invocations
-    ] == [
-        "shell",
-    ]
+    assert template.task_templates[0].tool_invocations == ()
+    assert all(task.tool_invocations for task in template.task_templates[1:-1])
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",

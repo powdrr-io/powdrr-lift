@@ -82,10 +82,40 @@ def run_workflow_task(
     client = _LLMExchangeRecordingClient(client, dump_root)
 
     events: list[dict[str, Any]] = []
+    response_correction: str | None = None
     for _roundtrip in range(max(1, config.max_roundtrips)):
         _print_waiting_for_model(stderr, model)
-        response = client.complete_json(_build_task_messages(workflow, task, events))
-        action = _parse_task_action(response)
+        messages = _build_task_messages(
+            workflow,
+            task,
+            events,
+            response_correction=response_correction,
+        )
+        try:
+            response = client.complete_json(messages)
+            action = _parse_task_action(response)
+        except RuntimeError as exc:
+            if not _is_repairable_task_response_error(exc):
+                raise
+            response_correction = (
+                "The previous response was invalid: "
+                f"{exc} Return exactly one complete JSON object matching one of "
+                "the documented action shapes. Do not return markdown, prose, "
+                "or an empty response."
+            )
+            print(
+                "Workflow task response needs repair; requesting a corrected "
+                "JSON response from the LLM.",
+                file=stderr,
+            )
+            events.append(
+                {
+                    "kind": "llm_response_error",
+                    "error": str(exc),
+                }
+            )
+            continue
+        response_correction = None
         if action.kind == "invoke_tool":
             repaired_parameters = _repair_workflow_file_command(
                 action.parameters,
@@ -175,6 +205,8 @@ def _build_task_messages(
     workflow: WorkflowInstance,
     task: WorkflowTask,
     events: list[dict[str, Any]],
+    *,
+    response_correction: str | None = None,
 ) -> list[dict[str, str]]:
     return [
         {"role": "system", "content": _task_system_prompt()},
@@ -188,12 +220,28 @@ def _build_task_messages(
                     "events": events,
                     "workflow_dir": str(workflow.directory),
                     "workflow_files": _workflow_file_names(workflow.directory),
+                    "response_correction": response_correction,
                 },
                 indent=2,
                 ensure_ascii=False,
             ),
         },
     ]
+
+
+def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
+    message = str(exc).casefold()
+    return any(
+        phrase in message
+        for phrase in (
+            "was not valid json",
+            "must be a json object",
+            "workflow task action must include",
+            "unknown workflow task action",
+            "must include parameters.command",
+            "must include output_state",
+        )
+    )
 
 
 def _task_system_prompt() -> str:
@@ -207,6 +255,9 @@ def _task_system_prompt() -> str:
         "those exact filenames, including the .json suffix. Never infer, shorten, "
         "or replace a filename with a trailing period. If a filename is not in "
         "workflow_files, list the directory before using it.\n"
+        "If response_correction is non-null, it describes a validation failure "
+        "from your previous response. Correct that failure and return only the "
+        "required JSON object.\n"
         "Choose exactly one outcome:\n"
         "- invoke_tool: choose this when a command is needed to inspect the "
         "worktree or perform work required to determine the output.\n"

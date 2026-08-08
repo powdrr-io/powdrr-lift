@@ -27,9 +27,12 @@ from powdrr_lift.workflow_chat_agent import (
     LocalLlamaChatClient,
     SkillChatAction,
     _apply_file_edits,
+    _estimate_message_tokens,
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _LLMExchangeRecordingClient,
+    _long_context_backup_for,
+    _model_limits_for,
     _parse_action_response,
     _print_waiting_for_model,
     _resolve_credentials,
@@ -110,6 +113,7 @@ def run_workflow_task(
     if mapping is None:
         raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
     model = mapping.model
+    client_was_provided = client is not None
     if client is None:
         client = _build_zai_client(config, task)
     dump_root = _resolve_project_root(
@@ -117,18 +121,71 @@ def run_workflow_task(
         repo_root,
     )
     client = _LLMExchangeRecordingClient(client, dump_root)
+    compaction_client = client
+    long_context_backup = _long_context_backup_for(
+        model,
+        tuple(ZAI_LLM_MAPPINGS.items()),
+    )
+    if not client_was_provided and long_context_backup is not None:
+        compaction_client = _LLMExchangeRecordingClient(
+            _build_zai_client_for_mapping(config, task, long_context_backup),
+            dump_root,
+        )
 
     events: list[dict[str, Any]] = []
     response_correction: str | None = None
+    compacted_context: dict[str, Any] | None = None
     for _roundtrip in range(max(1, config.max_roundtrips)):
-        _print_waiting_for_model(stderr, model)
-        response: dict[str, Any] | None = None
         messages = _build_task_messages(
             workflow,
             task,
             events,
             response_correction=response_correction,
+            compacted_context=compacted_context,
         )
+        limits = _model_limits_for(mapping.provider, model)
+        estimated_input_tokens = _estimate_message_tokens(messages)
+        print(
+            f"Workflow task context: {estimated_input_tokens} estimated input "
+            f"tokens of {limits.context_window} allowed.",
+            file=stderr,
+            flush=True,
+        )
+        if estimated_input_tokens + 1024 >= limits.context_window:
+            print(
+                "Compacting workflow task context before the next LLM call: "
+                f"{estimated_input_tokens} estimated input tokens would exceed "
+                f"the {limits.context_window}-token context window.",
+                file=stderr,
+                flush=True,
+            )
+            compacted_context, before_tokens, after_tokens = (
+                _compact_workflow_task_context(
+                    workflow,
+                    task,
+                    events,
+                    client=compaction_client,
+                    stderr=stderr,
+                )
+            )
+            events.append(
+                {
+                    "kind": "context_compaction",
+                    "before_estimated_input_tokens": before_tokens,
+                    "after_estimated_input_tokens": after_tokens,
+                }
+            )
+            print(
+                "Compacted workflow task context: "
+                f"{before_tokens} -> {after_tokens} estimated input tokens.",
+                file=stderr,
+                flush=True,
+            )
+            response_correction = None
+            continue
+
+        _print_waiting_for_model(stderr, model)
+        response: dict[str, Any] | None = None
         try:
             response = client.complete_json(messages)
             action = _parse_task_action(response)
@@ -567,7 +624,16 @@ def _build_task_messages(
     events: list[dict[str, Any]],
     *,
     response_correction: str | None = None,
+    compacted_context: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
+    context_data: dict[str, Any]
+    if compacted_context is None:
+        context_data = {
+            "task_context": workflow.task_context(task.task_id),
+            "events": events,
+        }
+    else:
+        context_data = {"compacted_context": compacted_context}
     return [
         {"role": "system", "content": _task_system_prompt()},
         {
@@ -576,8 +642,7 @@ def _build_task_messages(
                 {
                     "execution_mode": "process_workflow_task",
                     "task": task.to_data(),
-                    "task_context": workflow.task_context(task.task_id),
-                    "events": events,
+                    **context_data,
                     "workflow_dir": str(workflow.directory),
                     "workflow_files": _workflow_file_names(workflow.directory),
                     "available_tools": [
@@ -602,6 +667,75 @@ def _build_task_messages(
             ),
         },
     ]
+
+
+def _compact_workflow_task_context(
+    workflow: WorkflowInstance,
+    task: WorkflowTask,
+    events: list[dict[str, Any]],
+    *,
+    client: WorkflowTaskChatClient,
+    stderr: TextIO,
+) -> tuple[dict[str, Any], int, int]:
+    compaction_messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are compacting context for a workflow task. Review the full "
+                "task and all current context, then preserve only the information "
+                "necessary for another LLM to perform this exact task. Preserve "
+                "specific paths, commands, requirements, decisions, constraints, "
+                "errors, and outputs that remain actionable. Do not invent or "
+                "execute anything. Return exactly one JSON object with a single "
+                "compacted_context key whose value is the necessary context."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "task": task.to_data(),
+                    "task_description": task.description,
+                    "task_details": task.details,
+                    "current_context": {
+                        "task_context": workflow.task_context(task.task_id),
+                        "events": events,
+                    },
+                    "response_shape": {
+                        "compacted_context": (
+                            "Only context necessary to perform the full task"
+                        )
+                    },
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+        },
+    ]
+    before_tokens = _estimate_message_tokens(compaction_messages)
+    print(
+        "waiting for context compaction LLM response...",
+        file=stderr,
+        flush=True,
+    )
+    response = client.complete_json(compaction_messages)
+    compacted_context = response.get("compacted_context")
+    if not isinstance(compacted_context, dict):
+        raise RuntimeError(
+            "Context compaction response must include a compacted_context object."
+        )
+    after_tokens = _estimate_message_tokens(
+        [
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {"task": task.to_data(), "compacted_context": compacted_context},
+                    ensure_ascii=False,
+                ),
+            }
+        ]
+    )
+    return compacted_context, before_tokens, after_tokens
 
 
 def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
@@ -1001,8 +1135,6 @@ def _build_zai_client(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
 ) -> WorkflowTaskChatClient:
-    from powdrr_lift.workflow_chat_agent import OpenAIChatClient
-
     mapping = _resolve_llm_mapping(
         task.llm_type,
         mappings=tuple(ZAI_LLM_MAPPINGS.items()),
@@ -1010,6 +1142,16 @@ def _build_zai_client(
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
+    return _build_zai_client_for_mapping(config, task, mapping)
+
+
+def _build_zai_client_for_mapping(
+    config: WorkflowTaskAgentConfig,
+    task: WorkflowTask,
+    mapping: Any,
+) -> WorkflowTaskChatClient:
+    from powdrr_lift.workflow_chat_agent import OpenAIChatClient
+
     model = mapping.model
     if mapping.provider == "local":
         return LocalLlamaChatClient(
@@ -1017,9 +1159,14 @@ def _build_zai_client(
                 config.repo_root / ".powdrr" / "models"
             )
         )
-    credentials = _resolve_credentials("zai", config.api_key, config.base_url)
+    credentials = _resolve_credentials(
+        mapping.provider,
+        config.api_key,
+        config.base_url,
+    )
     return OpenAIChatClient(
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
+        limits=_model_limits_for(mapping.provider, model),
     )

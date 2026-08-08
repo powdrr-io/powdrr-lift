@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from powdrr_lift.core import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.workflow_chat_agent import LLMModelLimits
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_zai_client,
@@ -240,6 +242,66 @@ def test_process_workflow_task_repairs_invalid_json_response(
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED
     )
+
+
+def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"compacted_context": {"necessary": ["keep this"]}},
+            {"kind": "complete", "output_state": {"version": "v2"}},
+        ]
+    )
+
+    def _estimate(messages: list[dict[str, str]]) -> int:
+        if "compacting context" in messages[0]["content"]:
+            return 10
+        if len(messages) == 1:
+            return 10
+        payload = json.loads(messages[1]["content"])
+        return 10 if "compacted_context" in payload else 100
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._estimate_message_tokens",
+        _estimate,
+    )
+    limit_calls = 0
+
+    def _limits(*_args: object, **_kwargs: object) -> LLMModelLimits:
+        nonlocal limit_calls
+        limit_calls += 1
+        return LLMModelLimits(
+            context_window=50 if limit_calls == 1 else 50_000,
+            max_output_tokens=50,
+        )
+
+    monkeypatch.setattr("powdrr_lift.workflow_task_agent._model_limits_for", _limits)
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 2
+    compaction_prompt = json.loads(client.messages[0][1]["content"])
+    assert compaction_prompt["task_description"] == "Choose an API version."
+    assert compaction_prompt["task_details"] is None
+    compacted_prompt = json.loads(client.messages[1][1]["content"])
+    assert compacted_prompt["compacted_context"] == {"necessary": ["keep this"]}
+    status = stderr.getvalue()
+    assert "Compacting workflow task context" in status
+    assert "waiting for context compaction LLM response" in status
+    assert "Compacted workflow task context" in status
 
 
 def test_process_workflow_task_prints_invalid_response_before_repair(

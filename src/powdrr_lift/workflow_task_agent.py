@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -85,6 +86,7 @@ def run_workflow_task(
         return 1
     task = workflow.claim_task(task.task_id)
     print(f"Claimed workflow task: {task.task_id}", file=stdout)
+    print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
     _publish_workflow_progress(
         config.repo_root,
         workflow,
@@ -401,6 +403,8 @@ def _publish_workflow_progress(
         ["gh", "pr", "view", branch, "--json", "url", "--jq", ".url"],
         cwd=repo_root,
         capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
         text=True,
         check=False,
     )
@@ -432,6 +436,8 @@ def _publish_workflow_progress(
         ],
         cwd=repo_root,
         capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
         text=True,
         check=False,
     )
@@ -461,9 +467,18 @@ def _git_result(
         ["git", *arguments],
         cwd=repo_root,
         capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
         text=True,
         check=False,
     )
+
+
+def _noninteractive_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment["GIT_TERMINAL_PROMPT"] = "0"
+    environment["GH_PROMPT_DISABLED"] = "1"
+    return environment
 
 
 def _run_git(repo_root: Path, arguments: list[str]) -> str:

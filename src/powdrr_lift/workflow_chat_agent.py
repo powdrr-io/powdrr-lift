@@ -1175,7 +1175,20 @@ def _parse_selection_response(
             next_question,
             field_name="Skill selection response next_question",
         )
-    ready_to_execute = bool(payload.get("ready_to_execute"))
+    ready_to_execute_value = payload.get("ready_to_execute")
+    if not isinstance(ready_to_execute_value, bool):
+        raise RuntimeError(
+            "Skill selection response ready_to_execute must be a boolean."
+        )
+    ready_to_execute = ready_to_execute_value
+    if ready_to_execute and next_question is not None:
+        raise RuntimeError(
+            "Skill selection response must not include next_question when ready."
+        )
+    if not ready_to_execute and next_question is None:
+        raise RuntimeError(
+            "Skill selection response must include next_question when not ready."
+        )
     llm_type = _optional_llm_type(payload.get("llm_type"))
     return SkillChatSelection(
         selected_skill_path=selected_skill_path,
@@ -1406,16 +1419,33 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
 
 def _selection_system_prompt() -> str:
     return (
-        "You are an interactive skill router.\n"
-        "Choose the best skill for the user's request.\n"
-        "If the request is not fully specified, ask exactly one concise "
-        "follow-up question.\n"
+        "Task: route the user's request to the best available skill. Read the "
+        "catalog, conversation, and work-item context in the user message. "
+        "Decide whether the request is sufficiently specified to begin that "
+        "skill.\n"
+        "Choose exactly one outcome:\n"
+        "1. Ready: use this when one skill clearly matches and the available "
+        "context is sufficient to start it. Set ready_to_execute to true and "
+        "next_question to null.\n"
+        "2. Need-information: use this when the skill is identifiable but a "
+        "specific missing user decision or fact prevents starting. Set "
+        "ready_to_execute to false and put exactly one concise question in "
+        "next_question. Ask only for information not already present in the "
+        "conversation or work-item context.\n"
+        "3. Continue-clarification: use this only when the request is still "
+        "ambiguous enough that the best skill cannot be selected. Set "
+        "ready_to_execute to false and put exactly one concise question in "
+        "next_question.\n"
+        "Response: return exactly one JSON object with the keys "
+        "selected_skill_path, selected_skill_reason, next_question, and "
+        "ready_to_execute; llm_type is optional. For a ready response, "
+        "next_question must be null and ready_to_execute must be true. For "
+        "either clarification outcome, next_question must be a question and "
+        "ready_to_execute must be false.\n"
         "A user question must be a properly formed English question: it must "
         "contain meaningful words, cannot be empty or only whitespace, and "
         "must end with a question mark. Never return whitespace or an "
         "instruction as next_question.\n"
-        "Return JSON with keys: selected_skill_path, selected_skill_reason, "
-        "next_question, ready_to_execute, llm_type.\n"
         "llm_type describes the capability needed for the next roundtrip; use "
         "high_reasoning, standard_reasoning, simple_task, fast_iteration, "
         "long_context, or vision.\n"
@@ -1524,10 +1554,36 @@ def _action_system_prompt() -> str:
         f"- {name}: {description}" for name, description in _context_type_catalog()
     )
     return (
-        "You are executing a checked-in skill in a terminal workflow.\n"
-        "Use the current step, prior step context, transcript, and prior "
-        "execution events to determine the next action.\n"
-        "Return exactly one JSON object with one of these forms:\n"
+        "Task: execute the current checked-in skill step using the current step, "
+        "prior step context, transcript, execution events, available tools, and "
+        "current file context in the user message. Choose the single next action "
+        "that makes the most progress without asking for information already "
+        "available.\n"
+        "Choose exactly one outcome and use it for the following reason:\n"
+        "- gather-context: choose this when checked-in specifications or other "
+        "repository context must be discovered before deciding or acting.\n"
+        "- prompt_user: choose this only when a specific human decision or fact "
+        "is genuinely required to continue; ask exactly one clear question.\n"
+        "- edit: choose this when the current file context is sufficient and the "
+        "next action is a line-based file change.\n"
+        "- invoke_tool: choose this when a shell or fuzzy-match command is the "
+        "next action needed to inspect or modify the worktree.\n"
+        "- next_step: choose this when the current step is complete and the next "
+        "skill step should receive the accumulated context.\n"
+        "- complete: choose this when the skill has finished and no more action "
+        "is required.\n"
+        "Response: return exactly one JSON object matching exactly one of these "
+        "outcome shapes. Include decisions_and_context when there is information "
+        "a later step needs. Include llm_type only when the next roundtrip needs "
+        "a different capability; otherwise use null or omit it.\n"
+        "Response field requirements by outcome: gather-context requires a non-"
+        "empty types array and may include a keywords array; prompt_user requires "
+        "text containing exactly one clear English question ending in '?'; edit "
+        "requires either file_path plus a non-empty edits array or a non-empty "
+        "file_edits array, with each edit using add, remove, or replace and valid "
+        "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
+        "parameters.command as a non-empty string or string array; next_step has "
+        "no action-specific fields; complete may include a human-readable text.\n"
         '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
@@ -3370,9 +3426,16 @@ def _is_model_unavailable_error(exc: RuntimeError) -> bool:
 def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
     catalog_entries = ", ".join(str(entry.path) for entry in catalog)
     return (
-        "Fix the response so it matches the selection schema with keys "
-        "selected_skill_path, selected_skill_reason, next_question, and "
-        f"ready_to_execute. The selected_skill_path must be one of: {catalog_entries}. "
+        "Task: repair the previous skill-routing response so it answers the "
+        "routing task and obeys the response contract. Choose ready when one "
+        "skill is sufficiently specified, or clarification when one specific "
+        "missing fact or decision must be asked of the user.\n"
+        "Response: return exactly one JSON object with keys "
+        "selected_skill_path, selected_skill_reason, next_question, "
+        "ready_to_execute, and llm_type. Set ready_to_execute=true and "
+        "next_question=null for ready; set ready_to_execute=false and provide "
+        "exactly one English question ending in '?' for clarification. The "
+        f"selected_skill_path must be one of: {catalog_entries}. "
         "If next_question is present, it must be a concise, properly formed "
         "English question with meaningful words and a trailing question mark; "
         "it cannot be empty or only whitespace."
@@ -3382,7 +3445,15 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
 def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
-        "Fix the response so it matches the workflow action schema with keys "
+        "Task: repair the previous workflow action response so it selects the "
+        "single next action for the current skill step. Choose gather-context "
+        "when repository context is missing, prompt_user only for a genuinely "
+        "required human decision, edit for a known line-based file change, "
+        "invoke_tool for the next shell or fuzzy-match command, next_step when "
+        "the current step is complete, or complete when the skill is finished.\n"
+        "Response: return exactly one JSON object matching one allowed workflow "
+        "action schema shape. Fix all required fields for the selected action; "
+        "do not combine outcomes. The response schema has keys "
         "kind, tool, file_path, text, parameters, edits, file_edits, types, "
         "keywords, and "
         "decisions_and_context, and llm_type. "

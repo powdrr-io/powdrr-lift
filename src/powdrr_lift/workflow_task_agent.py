@@ -162,10 +162,21 @@ def _build_task_messages(
 
 def _task_system_prompt() -> str:
     return (
-        "You are a staff engineer processing one claimed task from a durable "
-        "workflow.\n"
-        "Use the task input, completed upstream outputs, task details, and prior "
-        "events to make progress. Return exactly one JSON object.\n"
+        "Task: act as a staff engineer processing one claimed task from a durable "
+        "workflow. Use the task "
+        "input, completed upstream outputs, task details, and prior events to "
+        "make safe progress toward the task's output.\n"
+        "Choose exactly one outcome:\n"
+        "- invoke_tool: choose this when a command is needed to inspect the "
+        "worktree or perform work required to determine the output.\n"
+        "- complete: choose this when the task can be safely finished now; put "
+        "the produced state in output_state.\n"
+        "- get-human-input: choose this only when a human decision or review is "
+        "required for safe completion; describe the human task, its input, the "
+        "required role, and the expected output state. Do not use it for ordinary "
+        "chat clarification.\n"
+        "Response: return exactly one JSON object matching exactly one outcome "
+        "shape below. Do not include markdown or combine outcomes.\n"
         '{"kind":"invoke_tool","parameters":{"command":["..."]}}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
         '{"kind":"get-human-input","human_input":{"human_task":{'

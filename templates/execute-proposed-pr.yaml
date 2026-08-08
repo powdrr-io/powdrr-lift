@@ -6,6 +6,11 @@ when_to_use:
 how_to_fill_this_out:
 - Keep each task focused on one implementation or validation checkpoint.
 - Preserve the plan and requirements through every task.
+- The first task must review the exact proposed PR identified by
+  input_state.proposed_pr. Use its id to select the PR and its
+  specification_path to read the source document before producing any plan.
+- The proposed_pr reference is populated when this template is instantiated;
+  do not replace it with a guessed PR, a feature name, or a null value.
 - Do not create the PR until completeness, goals, lint, and cleanup are confirmed.
 task_templates:
 - description: Review proposed PR plan
@@ -14,7 +19,17 @@ task_templates:
   assignee_role: architect
   llm_type: high_reasoning
   input_state:
-    proposed_pr: 
+    proposed_pr:
+      id: "<workflow-instance-name>"
+      specification_path: "<proposed-pr-specification-path>"
+  details: >-
+    Review the exact proposed PR identified by input_state.proposed_pr before
+    making implementation decisions. Read the file at
+    input_state.proposed_pr.specification_path and verify that its id matches
+    input_state.proposed_pr.id. Use that document as the source of truth for
+    the PR's intent, acceptance criteria, tests, scope, and risks. If the
+    reference does not resolve to the actual proposed PR, stop and report the
+    missing or mismatched reference instead of guessing.
   output_state_type: reviewed-proposed-pr-plan-state
   upstream_task_template_indexes: []
   dependent_state:

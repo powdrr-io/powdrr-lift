@@ -219,6 +219,16 @@ def instantiate_workflow_template(
         f"{task_prefix}task-{index + 1:03d}"
         for index in range(len(template.task_templates))
     )
+    template_context = {
+        "<work-item-name>": work_item_name.strip(),
+        "<workflow-instance-name>": (workflow_instance_name or work_item_name).strip(),
+        "<proposed-pr-specification-path>": (
+            Path("docs")
+            / "specs"
+            / work_item_name.strip()
+            / "proposed-pr-specification.yaml"
+        ).as_posix(),
+    }
     tasks: list[WorkflowTask] = []
     for index, task_template in enumerate(template.task_templates):
         task = WorkflowTask(
@@ -226,7 +236,9 @@ def instantiate_workflow_template(
             status=TaskStatus.OPEN,
             description=task_template.description,
             complexity=task_template.complexity,
-            input_state=task_template.input_state,
+            input_state=_instantiate_template_value(
+                task_template.input_state, template_context
+            ),
             assignee_type=task_template.assignee_type,
             assignee_role=task_template.assignee_role,
             details=task_template.details,
@@ -261,6 +273,25 @@ def instantiate_workflow_template(
             f"found {[task.task_id for task in ready_tasks]}"
         )
     return output_directory, tuple(tasks)
+
+
+def _instantiate_template_value(value: Any, context: Mapping[str, str]) -> Any:
+    """Resolve documented workflow placeholders in a task's input state."""
+    if isinstance(value, Mapping):
+        return {
+            key: _instantiate_template_value(item, context)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_instantiate_template_value(item, context) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_instantiate_template_value(item, context) for item in value)
+    if isinstance(value, str):
+        resolved = value
+        for placeholder, replacement in context.items():
+            resolved = resolved.replace(placeholder, replacement)
+        return resolved
+    return value
 
 
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:

@@ -47,7 +47,13 @@ task_templates:
     assignee_type: agent
     assignee_role: architect
     llm_type: high_reasoning
-    details: Turn the confirmed requirements into proposed PRs and generate an execute-proposed-pr workflow template for each approved PR.
+    details: >-
+      Turn the confirmed requirements into proposed PRs and generate an
+      execute-proposed-pr workflow template for each approved PR. For every
+      workflow, set --workflow-instance-name to the exact proposed PR id from
+      the proposed PR record, not an arbitrary display name. The instantiation
+      code uses that id, together with --work-item-name, to populate the
+      execute workflow's input_state.proposed_pr reference.
     tool_invocations:
       - tool: shell
         command:

@@ -16,6 +16,7 @@ from powdrr_lift.core import (
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_zai_client,
+    _workflow_file_command_error,
     run_workflow_task,
 )
 
@@ -71,6 +72,59 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     prompt = client.messages[0][1]["content"]
     assert "staff engineer" in client.messages[0][0]["content"]
     assert '"execution_mode": "process_workflow_task"' in prompt
+
+
+def test_process_workflow_task_rejects_guessed_workflow_filename_and_repairs(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    guessed_path = workflow.directory / "agent-task."
+    client = _FakeClient(
+        [
+            {
+                "kind": "invoke_tool",
+                "parameters": {
+                    "command": f"cat {guessed_path}",
+                },
+            },
+            {"kind": "complete", "output_state": {"version": "v2"}},
+        ]
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert "Rejected workflow shell command" in stderr.getvalue()
+    assert "agent-task.json" in stderr.getvalue()
+    assert "workflow_files" in client.messages[0][1]["content"]
+    assert "agent-task.json" in client.messages[0][1]["content"]
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
+        TaskStatus.COMPLETED
+    )
+
+
+def test_workflow_file_command_error_is_not_reported_for_exact_filename(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+
+    assert (
+        _workflow_file_command_error(
+            {"command": f"cat {workflow.directory / 'agent-task.json'}"},
+            workflow.directory,
+        )
+        is None
+    )
 
 
 def test_workflow_task_client_uses_task_llm_type_for_zai_model(

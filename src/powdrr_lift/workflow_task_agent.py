@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -86,13 +87,27 @@ def run_workflow_task(
         response = client.complete_json(_build_task_messages(workflow, task, events))
         action = _parse_task_action(response)
         if action.kind == "invoke_tool":
-            result = _execute_shell_tool(
+            command_error = _workflow_file_command_error(
                 action.parameters,
-                worktree_root=config.repo_root,
-                stdout=stdout,
-                stderr=stderr,
-                verbose=config.verbose,
+                workflow.directory,
             )
+            if command_error is not None:
+                print(command_error, file=stderr)
+                result = {
+                    "command": action.parameters.get("command"),
+                    "cwd": str(config.repo_root),
+                    "returncode": 2,
+                    "stdout": "",
+                    "stderr": command_error,
+                }
+            else:
+                result = _execute_shell_tool(
+                    action.parameters,
+                    worktree_root=config.repo_root,
+                    stdout=stdout,
+                    stderr=stderr,
+                    verbose=config.verbose,
+                )
             events.append(
                 {
                     "kind": action.kind,
@@ -158,6 +173,7 @@ def _build_task_messages(
                     "task_context": workflow.task_context(task.task_id),
                     "events": events,
                     "workflow_dir": str(workflow.directory),
+                    "workflow_files": _workflow_file_names(workflow.directory),
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -172,6 +188,11 @@ def _task_system_prompt() -> str:
         "workflow. Use the task "
         "input, completed upstream outputs, task details, and prior events to "
         "make safe progress toward the task's output.\n"
+        "The user message includes workflow_files, the exact JSON filenames "
+        "available in workflow_dir. When reading or writing workflow files, use "
+        "those exact filenames, including the .json suffix. Never infer, shorten, "
+        "or replace a filename with a trailing period. If a filename is not in "
+        "workflow_files, list the directory before using it.\n"
         "Choose exactly one outcome:\n"
         "- invoke_tool: choose this when a command is needed to inspect the "
         "worktree or perform work required to determine the output.\n"
@@ -201,6 +222,44 @@ def _task_system_prompt() -> str:
         "incorporation_instructions must tell the follow-up agent how to use the "
         "human output. Do not ask for ordinary chat clarification.\n"
         "Do not output markdown."
+    )
+
+
+def _workflow_file_names(workflow_dir: Path) -> list[str]:
+    return sorted(path.name for path in workflow_dir.glob("*.json") if path.is_file())
+
+
+def _workflow_file_command_error(
+    parameters: dict[str, Any],
+    workflow_dir: Path,
+) -> str | None:
+    command = parameters.get("command")
+    if isinstance(command, str):
+        command_text = command
+    elif isinstance(command, list) and all(isinstance(item, str) for item in command):
+        command_text = " ".join(command)
+    else:
+        return None
+
+    workflow_path = str(workflow_dir.resolve())
+    valid_files = _workflow_file_names(workflow_dir)
+    if not valid_files or workflow_path not in command_text:
+        return None
+
+    missing_references: list[str] = []
+    pattern = re.compile(re.escape(workflow_path) + r"/[^\s'\";&|()]+")
+    for match in pattern.finditer(command_text):
+        reference = match.group(0).rstrip(",")
+        if reference.endswith("."):
+            missing_references.append(reference)
+
+    if not missing_references:
+        return None
+    valid_paths = ", ".join(str(workflow_dir / name) for name in valid_files)
+    return (
+        "Rejected workflow shell command because it referenced nonexistent "
+        f"filename(s): {', '.join(missing_references)}. Use the exact .json "
+        f"filenames from workflow_files: {valid_paths}."
     )
 
 

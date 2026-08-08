@@ -34,7 +34,6 @@ def test_workflow_template_round_trips_through_json() -> None:
                 description="Generate one task per changed file.",
                 complexity=TaskComplexity.MEDIUM,
                 input_state={"files": []},
-                upstream_task_template_indexes=(),
                 dependent_state=("files-discovered",),
                 generation=WorkflowTaskTemplateGeneration(
                     for_each="each changed file",
@@ -44,8 +43,7 @@ def test_workflow_template_round_trips_through_json() -> None:
             WorkflowTaskTemplate(
                 description="Validate the aggregated results.",
                 complexity=TaskComplexity.HIGH,
-                input_state={"ready": True},
-                upstream_task_template_indexes=(0,),
+                input_state={"ready": "<upstream-task-0>.state"},
                 dependent_state=("validation-ready",),
             ),
         ),
@@ -72,7 +70,6 @@ def test_workflow_template_round_trips_through_json() -> None:
                 "assignee_type": "agent",
                 "assignee_role": "coder",
                 "output_state_type": "state",
-                "upstream_task_template_indexes": [],
                 "dependent_state": ["files-discovered"],
                 "generation": {
                     "for_each": "each changed file",
@@ -82,11 +79,10 @@ def test_workflow_template_round_trips_through_json() -> None:
             {
                 "description": "Validate the aggregated results.",
                 "complexity": "high",
-                "input_state": {"ready": True},
+                "input_state": {"ready": "<upstream-task-0>.state"},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
                 "output_state_type": "state",
-                "upstream_task_template_indexes": [0],
                 "dependent_state": ["validation-ready"],
             },
         ],
@@ -106,7 +102,6 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
                     "generation": {
                         "for_each": "each item",
@@ -116,11 +111,10 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                 {
                     "description": "Aggregate generated results.",
                     "complexity": "high",
-                    "input_state": {"ready": True},
+                    "input_state": {"ready": "<upstream-task-0>.state"},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
                 },
             ],
@@ -152,7 +146,6 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
                     "generation": {
                         "for_each": "each item",
@@ -162,11 +155,10 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                 {
                     "description": "Aggregate generated results.",
                     "complexity": "high",
-                    "input_state": {"ready": True},
+                    "input_state": {"ready": "<upstream-task-0>.state"},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
                 },
             ],
@@ -250,13 +242,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     )
     assert template.task_templates[8].input_state["lint_results"] == (
         "<upstream-task-7>.linted-and-cleaned-state"
-    )
-    assert template.task_templates[8].upstream_task_template_indexes == (
-        0,
-        4,
-        5,
-        6,
-        7,
     )
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",

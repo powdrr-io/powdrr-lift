@@ -6,8 +6,6 @@ when_to_use:
 how_to_fill_this_out:
 - Keep the tasks in this order. Each task must complete before the next task
   starts.
-- Resolve every input_state placeholder from the proposed PR and preserve the
-  resulting context in output_state for downstream tasks.
 - Use the listed tool invocations as the preferred commands. Use invoke_tool
   with tool=shell for repository commands and tool=fuzzy-match for fuzzy path
   discovery. A task may invoke another safe command when the listed command
@@ -37,7 +35,6 @@ task_templates:
     cannot be identified unambiguously, choose prompt_user with one precise
     question instead of proceeding.
   output_state_type: proposed-pr-context-state
-  upstream_task_template_indexes: []
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create a detailed execution plan
@@ -65,8 +62,6 @@ task_templates:
     - diff
     - --stat
   output_state_type: detailed-execution-plan-state
-  upstream_task_template_indexes:
-  - 0
   dependent_state:
   - execution-plan-created
 - description: Generate tests that will validate the new functionality
@@ -92,9 +87,6 @@ task_templates:
     - status
     - --short
   output_state_type: generated-test-diffs-state
-  upstream_task_template_indexes:
-  - 0
-  - 1
   dependent_state:
   - tests-generated
 - description: Validate the tests do not pass
@@ -120,8 +112,6 @@ task_templates:
     - pytest
     - -q
   output_state_type: tests-proven-failing-state
-  upstream_task_template_indexes:
-  - 2
   dependent_state:
   - tests-proven-failing
 - description: Generate product code changes
@@ -150,11 +140,6 @@ task_templates:
     - "--"
     - tests
   output_state_type: generated-product-code-state
-  upstream_task_template_indexes:
-  - 0
-  - 1
-  - 2
-  - 3
   dependent_state:
   - product-code-generated
 - description: Validate all tests pass
@@ -177,8 +162,6 @@ task_templates:
     - pytest
     - -q
   output_state_type: all-tests-passing-state
-  upstream_task_template_indexes:
-  - 4
   dependent_state:
   - all-tests-passing
 - description: Confirm functional completeness against the specification
@@ -208,11 +191,6 @@ task_templates:
     - diff
     - "--check"
   output_state_type: specification-completeness-state
-  upstream_task_template_indexes:
-  - 0
-  - 1
-  - 4
-  - 5
   dependent_state:
   - specification-complete
 - description: Run lint, type checks, and cleanup
@@ -248,10 +226,6 @@ task_templates:
     - mypy
     - src
   output_state_type: linted-and-cleaned-state
-  upstream_task_template_indexes:
-  - 4
-  - 5
-  - 6
   dependent_state:
   - lint-and-cleanup-complete
 - description: Create the pull request
@@ -275,11 +249,5 @@ task_templates:
     URL and final status in output_state. Do not create a pull request before
     the human explicitly approves it.
   output_state_type: pull-request-created-state
-  upstream_task_template_indexes:
-  - 0
-  - 4
-  - 5
-  - 6
-  - 7
   dependent_state:
   - pull-request-created

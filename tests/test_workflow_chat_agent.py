@@ -4368,7 +4368,10 @@ def test_run_workflow_chat_repairs_missing_action_fields(
                 }
             if call_index == 2:
                 repair_request = messages[-1]["content"]
-                assert "workflow action schema" in repair_request
+                assert "Generate a JSON document selecting the best action" in (
+                    repair_request
+                )
+                assert "The available actions are" in repair_request
                 assert "kind" in repair_request
                 return {
                     "kind": "complete",

@@ -3701,27 +3701,20 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
 
 
 def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
-    step_kinds = ", ".join([step.description for step in selected_skill.skill.steps])
     return (
-        "Task: repair the previous workflow action response so it selects the "
-        "single next action for the current skill step. Choose gather-context "
-        "when repository context is missing, prompt_user only for a genuinely "
-        "required human decision, edit for a known line-based file change, "
-        "invoke_tool for the next shell or fuzzy-match command, read_document "
-        "for a needed line range from a known document, next_step when "
-        "the current step is complete, or complete when the skill is finished.\n"
-        "Response: return exactly one JSON object matching one allowed workflow "
-        "action schema shape. Fix all required fields for the selected action; "
-        "do not combine outcomes. The response schema has keys "
-        "kind, tool, file_path, start_line, end_line, text, parameters, edits, "
-        "file_edits, types, "
-        "keywords, and "
-        "decisions_and_context, and llm_type. "
-        "Allowed kinds are gather-context, prompt_user, edit, invoke_tool, "
-        "read_document, next_step, and complete. "
-        f"The skill steps are: {step_kinds}. For prompt_user, text must be a "
-        "concise, properly formed English question with meaningful words and "
-        "a trailing question mark; it cannot be empty or only whitespace."
+        "Generate a JSON document selecting the best action based on this "
+        "context. The available actions are: gather-context to discover "
+        "repository specifications before deciding; prompt_user to ask one "
+        "necessary human question; edit to make a known line-based file change; "
+        "invoke_tool to run a shell or fuzzy-match command; read_document to "
+        "request a bounded line range from a known document; next_step when the "
+        "current step is complete; and complete when the skill is finished.\n"
+        "Return exactly one JSON object with a kind and the fields required by "
+        "that action. Use file_path and edits or file_edits for edit, tool and "
+        "parameters.command for invoke_tool, file_path with positive start_line "
+        "and end_line for read_document, non-empty types for gather-context, "
+        "and a clear English question ending in '?' for prompt_user. Do not "
+        "combine actions or output markdown."
     )
 
 

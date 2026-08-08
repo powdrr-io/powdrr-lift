@@ -20,7 +20,7 @@ task_templates:
   complexity: high
   assignee_type: agent
   assignee_role: architect
-  llm_type: standard_reasoning
+  llm_type: long_context
   input_state:
     proposed_pr: <proposed-pr-id>
   details: >-

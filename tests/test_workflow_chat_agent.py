@@ -3903,6 +3903,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert execute_tasks[0].input_state["proposed_pr"] == (
         "display-related-photos-pr-001"
     )
+    assert execute_tasks[0].llm_type == "long_context"
     assert [task.description for task in execute_tasks] == [
         "Gather context about the proposed PR",
         "Create a detailed execution plan",

@@ -1,6 +1,6 @@
 {
   "task_id": "interaction-file-log-pr-task-002",
-  "status": "open",
+  "status": "locked",
   "upstream_task_ids": [
     "interaction-file-log-pr-task-001"
   ],
@@ -9,7 +9,243 @@
   ],
   "complexity": "high",
   "input_state": {
-    "proposed_pr_context": "interaction-file-log-pr-task-001.proposed-pr-context-state",
+    "proposed_pr_context": {
+      "proposed_pr_id": "interaction-file-log-pr",
+      "specification_path": "docs/specs/interaction-file-log/proposed-pr-specification.yaml",
+      "feature_ids": [
+        "log-interactions"
+      ],
+      "intent": {
+        "problem": "There is no mechanism to record every human and LLM interaction for audit and debugging purposes.",
+        "goal": "Log all human and LLM interactions (input and output) to a JSONL file in the .powdrr hidden directory with timestamped file names for unique CLI sessions.",
+        "reasoning": "A persistent file log of all interactions provides an auditable record that can be reviewed later, and using JSONL format with binary encoding ensures both text and binary content are preserved."
+      },
+      "acceptance_criteria": [
+        {
+          "id": "ac-l-format",
+          "description": "Each log entry is a single valid JSON object on its own line in the log file."
+        },
+        {
+          "id": "ac-append-behavior",
+          "description": "Every interaction (input and output) is appended to the log file without overwriting previous entries."
+        },
+        {
+          "id": "ac-hidden-directory",
+          "description": "The log file resides in the .powdrr hidden directory which is created if it does not exist."
+        },
+        {
+          "id": "ac-binary-content",
+          "description": "Binary content in interactions is encoded (e.g., base64) within the JSONL entry to preserve data integrity."
+        },
+        {
+          "id": "ac-timestamped-filename",
+          "description": "The log file name includes a timestamp so each CLI session gets a unique file."
+        }
+      ],
+      "expected_tests": [
+        {
+          "id": "test-l-validity",
+          "description": "Verify that the log file contains valid JSONL with one JSON object per line."
+        },
+        {
+          "id": "test-append-behavior",
+          "description": "Verify that multiple interactions are appended to the log file in order."
+        },
+        {
+          "id": "test-binary-content-encoding",
+          "description": "Verify that binary content is correctly base64-encoded in the JSONL entry and can be decoded back."
+        },
+        {
+          "id": "test-directory-creation",
+          "description": "Verify that the .powdrr directory is created if it does not already exist."
+        },
+        {
+          "id": "test-timestamped-filename",
+          "description": "Verify that the log file name includes a timestamp and different CLI sessions produce different files."
+        }
+      ],
+      "required_test_cases": [
+        {
+          "id": "tc-log-text-interaction",
+          "description": "Log a text-based human interaction and verify it appears as a valid JSONL entry."
+        },
+        {
+          "id": "tc-log-llm-response",
+          "description": "Log an LLM output interaction and verify it appears as a valid JSONL entry."
+        },
+        {
+          "id": "tc-log-binary-interaction",
+          "description": "Log an interaction containing binary content and verify it is base64-encoded in the JSONL entry."
+        },
+        {
+          "id": "tc-create-hidden-directory",
+          "description": "Start with no .powdrr directory and verify it is created on first log write."
+        },
+        {
+          "id": "tc-unique-session-file",
+          "description": "Run two CLI sessions and verify each produces a uniquely named log file with a timestamp."
+        }
+      ],
+      "expected_outcomes": [
+        {
+          "id": "outcome-all-interactions-logged",
+          "description": "Every human and LLM interaction (input and output) is recorded in the log file."
+        },
+        {
+          "id": "outcome-l-readable",
+          "description": "The log file is readable as JSONL with one JSON object per line."
+        },
+        {
+          "id": "outcome-binary-preserved",
+          "description": "Binary content is preserved through base64 encoding and can be decoded without loss."
+        },
+        {
+          "id": "outcome-unique-session-files",
+          "description": "Each CLI session produces a unique log file with a timestamped name."
+        }
+      ],
+      "non_goals": [
+        {
+          "id": "non-goal-log-rotation",
+          "description": "Log rotation or file size management is not included in this feature."
+        },
+        {
+          "id": "non-goal-concurrent-write-handling",
+          "description": "Handling concurrent writes from multiple processes is not included in this feature."
+        },
+        {
+          "id": "non-goal-log-read-api",
+          "description": "A read or query API for the log file is not included in this feature."
+        }
+      ],
+      "risks": [
+        {
+          "id": "risk-large-file-growth",
+          "description": "Log files may grow unbounded without rotation, potentially consuming significant disk space over time."
+        },
+        {
+          "id": "risk-binary-encoding-overhead",
+          "description": "Base64 encoding of binary content increases storage size by approximately 33 percent."
+        },
+        {
+          "id": "risk-timestamp-collision",
+          "description": "If two CLI sessions start at the exact same timestamp, they may produce the same file name."
+        }
+      ],
+      "related_specifications": {
+        "system_specification": {
+          "path": "docs/specs/interaction-file-log/system-specification.yaml",
+          "id": "interaction-file-log-system-spec",
+          "requirements": [
+            {
+              "id": "log-interactions",
+              "description": "Log all human and LLM interactions (input and output) to a file.",
+              "state": "added"
+            },
+            {
+              "id": "l-format",
+              "description": "Use JSONL (JSON Lines) format for the log file.",
+              "state": "added"
+            },
+            {
+              "id": "hidden-directory",
+              "description": "Store the log file in a hidden .powdrr directory.",
+              "state": "added"
+            },
+            {
+              "id": "handle-binary-content",
+              "description": "Handle both JSON and binary content in interactions.",
+              "state": "added"
+            }
+          ],
+          "approach": [
+            {
+              "id": "append-interactions",
+              "description": "Append every interaction to the log file as a new line.",
+              "state": "added"
+            },
+            {
+              "id": "l-encoding",
+              "description": "Encode each interaction as a single JSON object per line in the log file.",
+              "state": "added"
+            },
+            {
+              "id": "binary-content-encoding",
+              "description": "Encode binary content within JSONL entries to preserve data integrity.",
+              "state": "added"
+            }
+          ]
+        },
+        "architecture_specification": {
+          "path": "docs/specs/interaction-file-log/architecture-specification.yaml",
+          "id": "2026-08-06",
+          "entities": [
+            {
+              "id": "log-entry",
+              "type": "log-entry",
+              "summary": "A single interaction record containing timestamp, role, and content (input or output) from human or LLM interactions."
+            }
+          ],
+          "invariants": [
+            {
+              "id": "l-format",
+              "description": "Each log entry must be a single valid JSON object on its own line in the log file."
+            },
+            {
+              "id": "binary-content-preservation",
+              "description": "Binary content in interactions must be encoded (e.g., base64) within the JSONL entry to preserve data integrity."
+            },
+            {
+              "id": "hidden-directory-location",
+              "description": "The log file must reside in the .powdrr hidden directory."
+            }
+          ],
+          "guidance": [
+            {
+              "id": "append-only-writes",
+              "description": "Writes to the log file should be append-only to prevent data corruption and ensure every interaction is recorded."
+            },
+            {
+              "id": "directory-creation",
+              "description": "The .powdrr directory should be created if it does not already exist when writing the first log entry."
+            }
+          ]
+        },
+        "implementation_specification": {
+          "path": "docs/specs/interaction-file-log/implementation-specification.yaml",
+          "architecture_id": "2026-08-06",
+          "entities": [
+            {
+              "id": "log-entry",
+              "action": "added",
+              "rationale": "Cites \"log-interactions\" and \"append-interactions\" - every interaction input and output must be logged as a discrete entry."
+            }
+          ],
+          "features": [
+            {
+              "id": "log-interactions",
+              "action": "added",
+              "description": "Log all human and LLM interactions (input and output) to a file.",
+              "functional_requirements": [
+                "Each log entry must be a single valid JSON object on its own line in the log file.",
+                "Binary content in interactions must be encoded (e.g., base64) within the JSONL entry to preserve data integrity.",
+                "The log file must reside in the .powdrr hidden directory.",
+                "Writes to the log file should be append-only to prevent data corruption and ensure every interaction is recorded.",
+                "The .powdrr directory should be created if it does not already exist when writing the first log entry.",
+                "Append a timestamp to the file name to make each CLI session get a unique file."
+              ]
+            }
+          ],
+          "decisions": [
+            {
+              "id": "-binary-support",
+              "action": "added",
+              "description": "Ensure JSON and binary field work."
+            }
+          ]
+        }
+      }
+    },
     "execution_plan": []
   },
   "assignee_type": "agent",

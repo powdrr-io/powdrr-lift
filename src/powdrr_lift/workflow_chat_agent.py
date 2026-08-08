@@ -3361,7 +3361,9 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
     try:
         parsed_content = json.loads(content)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"{context} was not valid JSON: {exc.msg}") from exc
+        raise RuntimeError(
+            f"{context} was not valid JSON: {exc.msg}\nResponse content:\n{content}"
+        ) from exc
     if not isinstance(parsed_content, dict):
         raise RuntimeError(f"{context} must be a JSON object.")
     return cast("dict[str, Any]", parsed_content)

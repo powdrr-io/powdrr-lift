@@ -122,6 +122,7 @@ def run_workflow_task(
     response_correction: str | None = None
     for _roundtrip in range(max(1, config.max_roundtrips)):
         _print_waiting_for_model(stderr, model)
+        response: dict[str, Any] | None = None
         messages = _build_task_messages(
             workflow,
             task,
@@ -134,6 +135,19 @@ def run_workflow_task(
         except RuntimeError as exc:
             if not _is_repairable_task_response_error(exc):
                 raise
+            if response is not None:
+                response_details = json.dumps(
+                    response,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            else:
+                response_details = f"<no parsed response; client error: {exc}>"
+            print(
+                f"Workflow task LLM response requiring repair:\n{response_details}",
+                file=stderr,
+                flush=True,
+            )
             response_correction = (
                 "The previous response was invalid: "
                 f"{exc} Return exactly one complete JSON object matching one of "
@@ -149,6 +163,7 @@ def run_workflow_task(
                 {
                     "kind": "llm_response_error",
                     "error": str(exc),
+                    "response": response,
                 }
             )
             continue

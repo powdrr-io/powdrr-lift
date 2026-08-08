@@ -239,20 +239,9 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ]
     assert template.task_templates[0].tool_invocations == ()
     assert all(task.tool_invocations for task in template.task_templates[1:-1])
-    expected_upstream_contracts = {
-        1: "proposed-pr-context-state",
-        2: "detailed-execution-plan-state",
-        3: "generated-test-diffs-state",
-        4: "tests-proven-failing-state",
-        5: "generated-product-code-state",
-        6: "all-tests-passing-state",
-        7: "specification-completeness-state",
-        8: "linted-and-cleaned-state",
-    }
-    for index, output_state_type in expected_upstream_contracts.items():
-        task = template.task_templates[index]
-        assert output_state_type in (task.details or "")
-        assert "runtime task ID" in (task.details or "")
+    for task in template.task_templates[1:]:
+        assert "upstream_task_outputs" not in (task.details or "")
+        assert "runtime task ID" not in (task.details or "")
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",

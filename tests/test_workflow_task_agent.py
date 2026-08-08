@@ -74,6 +74,73 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert '"execution_mode": "process_workflow_task"' in prompt
 
 
+def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    primary_root = tmp_path / "repo"
+    worktree_root = primary_root / ".worktrees" / "workflow-task"
+    workflow = WorkflowInstance.create(
+        worktree_root / "docs" / "workflows" / "feature",
+        (
+            WorkflowTask(
+                task_id="agent-task",
+                status=TaskStatus.OPEN,
+                upstream_task_ids=(),
+                dependent_state=(),
+                complexity=TaskComplexity.MEDIUM,
+                input_state={"request": "Choose an API version."},
+                description="Choose an API version.",
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                llm_type="simple_task",
+            ),
+        ),
+    )
+    published_roots: list[Path] = []
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._is_git_worktree",
+        lambda _: True,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._resolve_worktree_context",
+        lambda *_args, **_kwargs: worktree_root,
+    )
+
+    def _record_publish(
+        repo_root: Path,
+        published_workflow: WorkflowInstance,
+        *,
+        reason: str,
+        stdout: object,
+    ) -> None:
+        del reason, stdout
+        published_roots.append(repo_root)
+        assert published_workflow.directory == workflow.directory
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._publish_workflow_progress",
+        _record_publish,
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=primary_root / "docs" / "workflows" / "feature",
+            repo_root=primary_root,
+        ),
+        client=_FakeClient([{"kind": "complete", "output_state": {"ok": True}}]),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert published_roots == [worktree_root, worktree_root]
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
+        TaskStatus.COMPLETED
+    )
+
+
 def test_process_workflow_task_persists_output_for_downstream_claim(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

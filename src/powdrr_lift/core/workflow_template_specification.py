@@ -229,21 +229,14 @@ def instantiate_workflow_template(
     tasks: list[WorkflowTask] = []
     for index, task_template in enumerate(template.task_templates):
         upstream_task_indexes = task_template.upstream_task_template_indexes
-        input_state = _substitute_workflow_placeholders(
-            task_template.input_state, substitutions
-        )
-        input_state = _add_upstream_task_contract(
-            input_state,
-            upstream_task_indexes=upstream_task_indexes,
-            task_ids=task_ids,
-            task_templates=template.task_templates,
-        )
         task = WorkflowTask(
             task_id=task_ids[index],
             status=TaskStatus.OPEN,
             description=task_template.description,
             complexity=task_template.complexity,
-            input_state=input_state,
+            input_state=_substitute_workflow_placeholders(
+                task_template.input_state, substitutions
+            ),
             assignee_type=task_template.assignee_type,
             assignee_role=task_template.assignee_role,
             details=_add_instantiation_context(
@@ -307,29 +300,6 @@ def _substitute_workflow_placeholders(
             _substitute_workflow_placeholders(item, substitutions) for item in value
         ]
     return value
-
-
-def _add_upstream_task_contract(
-    input_state: Any,
-    *,
-    upstream_task_indexes: Sequence[int],
-    task_ids: Sequence[str],
-    task_templates: Sequence[WorkflowTaskTemplate],
-) -> Any:
-    if not upstream_task_indexes:
-        return input_state
-    if isinstance(input_state, Mapping):
-        updated_input = dict(input_state)
-    else:
-        updated_input = {"declared_input_state": input_state}
-    updated_input["upstream_task_outputs"] = {
-        task_ids[index]: {
-            "output_state_type": task_templates[index].output_state_type,
-            "output_state": None,
-        }
-        for index in upstream_task_indexes
-    }
-    return updated_input
 
 
 def _substitute_tool_invocation(

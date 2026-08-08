@@ -179,7 +179,7 @@ def test_workflow_pauses_for_human_input_then_resumes_agent_task(
     )
 
 
-def test_workflow_propagates_explicit_output_contract_to_downstream_input(
+def test_workflow_materializes_upstream_output_contract_when_task_is_claimed(
     tmp_path: Path,
 ) -> None:
     upstream = WorkflowTask(
@@ -209,9 +209,9 @@ def test_workflow_propagates_explicit_output_contract_to_downstream_input(
         "plan",
         output_state={"steps": ["add the behavior", "validate it"]},
     )
-    updated_tasks = workflow.propagate_task_output("plan")
+    claimed_task = workflow.claim_task("implement")
 
-    assert updated_tasks[0].input_state == {
+    assert claimed_task.input_state == {
         "plan": "provided by upstream_task_outputs",
         "upstream_task_outputs": {
             "plan": {
@@ -224,7 +224,7 @@ def test_workflow_propagates_explicit_output_contract_to_downstream_input(
     persisted_downstream = next(
         task for task in persisted if task.task_id == "implement"
     )
-    assert persisted_downstream.input_state == updated_tasks[0].input_state
+    assert persisted_downstream.input_state == claimed_task.input_state
 
 
 def test_workflow_task_directory_validation_accepts_known_dependencies(

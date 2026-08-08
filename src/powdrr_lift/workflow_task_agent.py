@@ -301,13 +301,6 @@ def run_workflow_task(
             continue
         if action.kind == "complete":
             completed = workflow.complete_task(task.task_id, action.output_state)
-            downstream_tasks = workflow.propagate_task_output(task.task_id)
-            if downstream_tasks:
-                print(
-                    "Persisted upstream output contract for: "
-                    + ", ".join(task.task_id for task in downstream_tasks),
-                    file=stdout,
-                )
             if action.text:
                 print(action.text, file=stdout)
             print(f"Completed workflow task: {completed.task_id}", file=stdout)

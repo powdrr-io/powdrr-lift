@@ -206,45 +206,6 @@ class WorkflowInstance:
         self._tasks[task_id] = completed_task
         return completed_task
 
-    def propagate_task_output(self, task_id: str) -> tuple[WorkflowTask, ...]:
-        """Persist completed output contracts into direct downstream inputs.
-
-        ``input_state`` remains the task's declared input.  The reserved
-        ``upstream_task_outputs`` member is the durable, generic contract that
-        tells the next assignee exactly which completed task produced each
-        value and what output-state type it satisfies.
-        """
-        completed_task = self._tasks.get(task_id)
-        if completed_task is None:
-            raise KeyError(f"Unknown workflow task: {task_id}")
-        if completed_task.status is not TaskStatus.COMPLETED:
-            raise ValueError(f"Workflow task is not completed: {task_id}")
-
-        updated_tasks: list[WorkflowTask] = []
-        for downstream_task in self.tasks:
-            if task_id not in downstream_task.upstream_task_ids:
-                continue
-            upstream_outputs = {
-                upstream_id: {
-                    "output_state_type": self._tasks[upstream_id].output_state_type,
-                    "output_state": self._tasks[upstream_id].output_state,
-                }
-                for upstream_id in downstream_task.upstream_task_ids
-                if self._tasks[upstream_id].status is TaskStatus.COMPLETED
-            }
-            input_state = _with_upstream_task_outputs(
-                downstream_task.input_state,
-                upstream_outputs,
-            )
-            updated_task = replace(downstream_task, input_state=input_state)
-            save_workflow_task(
-                updated_task,
-                self.directory / f"{downstream_task.task_id}.json",
-            )
-            self._tasks[downstream_task.task_id] = updated_task
-            updated_tasks.append(updated_task)
-        return tuple(updated_tasks)
-
     def claim_task(self, task_id: str) -> WorkflowTask:
         """Claim a ready task so another agent cannot pull it concurrently."""
         task = self._tasks.get(task_id)
@@ -252,7 +213,21 @@ class WorkflowInstance:
             raise KeyError(f"Unknown workflow task: {task_id}")
         if task not in self.ready_tasks():
             raise ValueError(f"Workflow task is not ready to claim: {task_id}")
-        claimed_task = replace(task, status=TaskStatus.LOCKED)
+        upstream_outputs = {
+            upstream_id: {
+                "output_state_type": self._tasks[upstream_id].output_state_type,
+                "output_state": self._tasks[upstream_id].output_state,
+            }
+            for upstream_id in task.upstream_task_ids
+        }
+        claimed_task = replace(
+            task,
+            status=TaskStatus.LOCKED,
+            input_state=_with_upstream_task_outputs(
+                task.input_state,
+                upstream_outputs,
+            ),
+        )
         save_workflow_task(claimed_task, self.directory / f"{task_id}.json")
         self._tasks[task_id] = claimed_task
         return claimed_task

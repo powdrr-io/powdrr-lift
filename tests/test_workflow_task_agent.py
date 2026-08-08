@@ -74,7 +74,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert '"execution_mode": "process_workflow_task"' in prompt
 
 
-def test_process_workflow_task_persists_downstream_contract_before_exit(
+def test_process_workflow_task_persists_output_for_downstream_claim(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -120,9 +120,16 @@ def test_process_workflow_task_persists_downstream_contract_before_exit(
     )
 
     persisted = WorkflowInstance.from_directory(workflow.directory)
+    completed_task = next(
+        task for task in persisted.tasks if task.task_id == "agent-task"
+    )
     next_task = next(task for task in persisted.tasks if task.task_id == "next-task")
     assert exit_code == 0
-    assert next_task.input_state["upstream_task_outputs"] == {
+    assert completed_task.output_state == {"plan": ["step"]}
+    assert "upstream_task_outputs" not in next_task.input_state
+
+    claimed_next_task = persisted.claim_task("next-task")
+    assert claimed_next_task.input_state["upstream_task_outputs"] == {
         "agent-task": {
             "output_state_type": "state",
             "output_state": {"plan": ["step"]},

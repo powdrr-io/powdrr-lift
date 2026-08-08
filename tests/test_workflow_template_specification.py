@@ -296,12 +296,7 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     )
 
     assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
-    assert tasks[1].input_state["upstream_task_outputs"] == {
-        "interaction-file-log-pr-001-task-001": {
-            "output_state_type": "proposed-pr-context-state",
-            "output_state": None,
-        }
-    }
+    assert "upstream_task_outputs" not in tasks[1].input_state
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")
 

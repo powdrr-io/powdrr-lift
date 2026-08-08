@@ -210,24 +210,41 @@ def run_workflow_task(
                     "stderr": command_error,
                 }
             else:
-                if action.tool == "shell":
-                    result = _execute_shell_tool(
-                        action.parameters,
-                        worktree_root=config.repo_root,
-                        stdout=stdout,
-                        stderr=stderr,
-                        verbose=config.verbose,
+                try:
+                    if action.tool == "shell":
+                        result = _execute_shell_tool(
+                            action.parameters,
+                            worktree_root=config.repo_root,
+                            stdout=stdout,
+                            stderr=stderr,
+                            verbose=config.verbose,
+                        )
+                    elif action.tool == "fuzzy-match":
+                        result = _execute_fuzzy_match_tool(
+                            action.parameters,
+                            worktree_root=config.repo_root,
+                        )
+                    else:
+                        raise RuntimeError(
+                            f"Unsupported workflow task tool {action.tool!r}; "
+                            "supported tools are shell and fuzzy-match."
+                        )
+                except (RuntimeError, ValueError) as exc:
+                    response_correction = _tool_response_correction(action, exc)
+                    events.append(
+                        {
+                            "kind": "tool_error",
+                            "tool": action.tool,
+                            "parameters": action.parameters,
+                            "error": str(exc),
+                        }
                     )
-                elif action.tool == "fuzzy-match":
-                    result = _execute_fuzzy_match_tool(
-                        action.parameters,
-                        worktree_root=config.repo_root,
+                    print(
+                        "Workflow task tool call needs correction; requesting a "
+                        "corrected action from the LLM.",
+                        file=stderr,
                     )
-                else:
-                    raise RuntimeError(
-                        f"Unsupported workflow task tool {action.tool!r}; "
-                        "supported tools are shell and fuzzy-match."
-                    )
+                    continue
             events.append(
                 {
                     "kind": action.kind,
@@ -334,6 +351,25 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "must include output_state",
         )
     )
+
+
+def _tool_response_correction(
+    action: WorkflowTaskAction,
+    error: Exception,
+) -> str:
+    correction = (
+        f"The previous {action.kind} action failed while executing "
+        f"tool={action.tool!r}: {error}. Return a corrected JSON action and "
+        "do not repeat the failed command unchanged."
+    )
+    if action.tool == "fuzzy-match":
+        correction += (
+            " A fuzzy-match command must be an array beginning with "
+            "['fuzzy-match', '<search-root>', '-name', '<query>']; add "
+            "-name and its non-empty query, then any optional -type, -path, "
+            "-maxdepth, -mindepth, -threshold, or -print options."
+        )
+    return correction
 
 
 def _task_system_prompt() -> str:

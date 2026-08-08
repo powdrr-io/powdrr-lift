@@ -213,7 +213,14 @@ class WorkflowInstance:
             raise KeyError(f"Unknown workflow task: {task_id}")
         if task not in self.ready_tasks():
             raise ValueError(f"Workflow task is not ready to claim: {task_id}")
-        claimed_task = replace(task, status=TaskStatus.LOCKED)
+        claimed_task = replace(
+            task,
+            status=TaskStatus.LOCKED,
+            input_state=_resolve_upstream_input_references(
+                task.input_state,
+                self._tasks,
+            ),
+        )
         save_workflow_task(claimed_task, self.directory / f"{task_id}.json")
         self._tasks[task_id] = claimed_task
         return claimed_task
@@ -296,6 +303,31 @@ def save_workflow_task(task: WorkflowTask, path: str | Path) -> Path:
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_path.write_text(workflow_task_to_json(task), encoding="utf-8")
     return resolved_path
+
+
+def _resolve_upstream_input_references(
+    value: Any,
+    tasks: Mapping[str, WorkflowTask],
+) -> Any:
+    if isinstance(value, str):
+        task_id, separator, output_state_type = value.partition(".")
+        upstream_task = tasks.get(task_id) if separator else None
+        if (
+            upstream_task is not None
+            and output_state_type == upstream_task.output_state_type
+        ):
+            return upstream_task.output_state
+        return value
+    if isinstance(value, Mapping):
+        return {
+            key: _resolve_upstream_input_references(item, tasks)
+            for key, item in value.items()
+        }
+    if isinstance(value, tuple):
+        return tuple(_resolve_upstream_input_references(item, tasks) for item in value)
+    if isinstance(value, list):
+        return [_resolve_upstream_input_references(item, tasks) for item in value]
+    return value
 
 
 def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:

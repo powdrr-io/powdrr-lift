@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -84,6 +85,12 @@ def run_workflow_task(
         return 1
     task = workflow.claim_task(task.task_id)
     print(f"Claimed workflow task: {task.task_id}", file=stdout)
+    _publish_workflow_progress(
+        config.repo_root,
+        workflow,
+        reason=f"claim {task.task_id}",
+        stdout=stdout,
+    )
     mapping = _resolve_llm_mapping(
         task.llm_type,
         mappings=tuple(ZAI_LLM_MAPPINGS.items()),
@@ -211,6 +218,12 @@ def run_workflow_task(
                     f"Inserted follow-up task: {follow_up_task.task_id}",
                     file=stdout,
                 )
+            _publish_workflow_progress(
+                config.repo_root,
+                workflow,
+                reason=f"handoff from {task.task_id}",
+                stdout=stdout,
+            )
             return 0
         if action.kind == "invoke_tool":
             repaired_parameters = _repair_workflow_file_command(
@@ -291,6 +304,12 @@ def run_workflow_task(
             if action.text:
                 print(action.text, file=stdout)
             print(f"Completed workflow task: {completed.task_id}", file=stdout)
+            _publish_workflow_progress(
+                config.repo_root,
+                workflow,
+                reason=f"complete {completed.task_id}",
+                stdout=stdout,
+            )
             return 0
         if action.kind == "get-human-input":
             human_task, follow_up_task = _insert_human_handoff(
@@ -304,12 +323,24 @@ def run_workflow_task(
                     f"Inserted follow-up task: {follow_up_task.task_id}",
                     file=stdout,
                 )
+            _publish_workflow_progress(
+                config.repo_root,
+                workflow,
+                reason=f"human input required by {task.task_id}",
+                stdout=stdout,
+            )
             return 0
         raise RuntimeError(f"Unsupported workflow task action: {action.kind}")
 
     print(
         f"Workflow task {task.task_id} blocked after reaching the roundtrip limit.",
         file=stderr,
+    )
+    _publish_workflow_progress(
+        config.repo_root,
+        workflow,
+        reason=f"roundtrip limit for {task.task_id}",
+        stdout=stdout,
     )
     return 2
 
@@ -325,6 +356,140 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _publish_workflow_progress(
+    repo_root: Path,
+    workflow: WorkflowInstance,
+    *,
+    reason: str,
+    stdout: TextIO,
+) -> None:
+    """Commit and publish durable workflow progress for execution tasks.
+
+    Unit tests and callers operating outside a git checkout can still use the
+    execution loop; in that case task JSON is durable locally and publishing is
+    skipped. A real workflow execution always runs from a git worktree and
+    creates or updates one draft PR for the branch.
+    """
+    if not _is_git_worktree(repo_root):
+        return
+
+    branch = _git_output(repo_root, ["branch", "--show-current"])
+    if branch in {"", "main", "master"}:
+        branch = _workflow_branch_name(workflow)
+        if _git_result(
+            repo_root, ["show-ref", "--verify", f"refs/heads/{branch}"]
+        ).returncode:
+            _run_git(repo_root, ["switch", "-c", branch])
+        else:
+            _run_git(repo_root, ["switch", branch])
+
+    _run_git(repo_root, ["add", "--all"])
+    status = _git_result(repo_root, ["status", "--porcelain"])
+    if not status.stdout.strip():
+        return
+
+    _run_git(
+        repo_root,
+        ["commit", "-m", f"Persist workflow progress: {reason}"],
+    )
+    _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
+
+    default_branch = _default_branch(repo_root)
+    existing_pr = subprocess.run(
+        ["gh", "pr", "view", branch, "--json", "url", "--jq", ".url"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if existing_pr.returncode == 0 and existing_pr.stdout.strip():
+        print(
+            f"Updated workflow progress PR: {existing_pr.stdout.strip()}", file=stdout
+        )
+        return
+
+    title = f"Workflow progress: {workflow.directory.name}"
+    body = (
+        "Automated durable workflow progress. This draft PR contains task state "
+        "and worktree changes so execution can resume from the next task."
+    )
+    created_pr = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--draft",
+            "--base",
+            default_branch,
+            "--head",
+            branch,
+            "--title",
+            title,
+            "--body",
+            body,
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if created_pr.returncode != 0:
+        raise RuntimeError(
+            "Could not create workflow progress pull request: "
+            f"{created_pr.stderr.strip()}"
+        )
+    print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
+
+
+def _is_git_worktree(repo_root: Path) -> bool:
+    result = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+def _git_result(
+    repo_root: Path, arguments: list[str]
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *arguments],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _run_git(repo_root: Path, arguments: list[str]) -> str:
+    result = _git_result(repo_root, arguments)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {' '.join(arguments)} failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def _git_output(repo_root: Path, arguments: list[str]) -> str:
+    return _run_git(repo_root, arguments)
+
+
+def _workflow_branch_name(workflow: WorkflowInstance) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", workflow.directory.name.casefold()).strip("-")
+    return f"workflow/{slug or 'execution'}"
+
+
+def _default_branch(repo_root: Path) -> str:
+    remote_head = _git_result(
+        repo_root,
+        ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    )
+    if remote_head.returncode == 0 and remote_head.stdout.strip():
+        return remote_head.stdout.strip().removeprefix("origin/")
+    return "main"
 
 
 def _build_task_messages(
@@ -424,6 +589,12 @@ def _task_system_prompt() -> str:
         "If response_correction is non-null, it describes a validation failure "
         "from your previous response. Correct that failure and return only the "
         "required JSON object.\n"
+        "Task input contract: input_state has been populated from the task's "
+        "declared inputs and any typed upstream references when the task was "
+        "claimed. Use the populated values as the source of truth. Your complete "
+        "action output_state must satisfy this task's output_state_type and be "
+        "sufficient for every downstream task that declares this task as an "
+        "upstream dependency.\n"
         "Choose exactly one outcome:\n"
         "- gather-context: choose this when structured specification context must "
         "be discovered before deciding or acting.\n"

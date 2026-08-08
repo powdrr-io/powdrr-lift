@@ -179,6 +179,48 @@ def test_workflow_pauses_for_human_input_then_resumes_agent_task(
     )
 
 
+def test_workflow_materializes_upstream_output_contract_when_task_is_claimed(
+    tmp_path: Path,
+) -> None:
+    upstream = WorkflowTask(
+        task_id="plan",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=("plan-created",),
+        complexity=TaskComplexity.HIGH,
+        input_state={"request": "Plan the change."},
+        description="Create a plan.",
+        output_state_type="execution-plan-state",
+    )
+    downstream = WorkflowTask(
+        task_id="implement",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("plan",),
+        dependent_state=("implementation-created",),
+        complexity=TaskComplexity.HIGH,
+        input_state={"plan": "plan.execution-plan-state"},
+        description="Implement the plan.",
+        output_state_type="implementation-state",
+    )
+    workflow = WorkflowInstance.create(tmp_path / "workflow", (upstream,))
+    workflow.add_task(downstream)
+
+    workflow.complete_task(
+        "plan",
+        output_state={"steps": ["add the behavior", "validate it"]},
+    )
+    claimed_task = workflow.claim_task("implement")
+
+    assert claimed_task.input_state == {
+        "plan": {"steps": ["add the behavior", "validate it"]},
+    }
+    persisted = WorkflowInstance.from_directory(tmp_path / "workflow").tasks
+    persisted_downstream = next(
+        task for task in persisted if task.task_id == "implement"
+    )
+    assert persisted_downstream.input_state == claimed_task.input_state
+
+
 def test_workflow_task_directory_validation_accepts_known_dependencies(
     tmp_path: Path,
 ) -> None:

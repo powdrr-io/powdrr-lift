@@ -74,6 +74,65 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert '"execution_mode": "process_workflow_task"' in prompt
 
 
+def test_process_workflow_task_persists_output_for_downstream_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    downstream = WorkflowTask(
+        task_id="next-task",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("agent-task",),
+        dependent_state=("next-input-ready",),
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"plan": "agent-task.state"},
+        description="Use the completed plan.",
+        output_state_type="implementation-state",
+    )
+    workflow.add_task(downstream)
+    published_reasons: list[str] = []
+
+    def _record_publish(
+        repo_root: Path,
+        published_workflow: WorkflowInstance,
+        *,
+        reason: str,
+        stdout: object,
+    ) -> None:
+        assert repo_root == tmp_path
+        assert published_workflow.directory == workflow.directory
+        published_reasons.append(reason)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._publish_workflow_progress",
+        _record_publish,
+    )
+    client = _FakeClient([{"kind": "complete", "output_state": {"plan": ["step"]}}])
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    persisted = WorkflowInstance.from_directory(workflow.directory)
+    completed_task = next(
+        task for task in persisted.tasks if task.task_id == "agent-task"
+    )
+    next_task = next(task for task in persisted.tasks if task.task_id == "next-task")
+    assert exit_code == 0
+    assert completed_task.output_state == {"plan": ["step"]}
+    assert next_task.input_state == {"plan": "agent-task.state"}
+
+    claimed_next_task = persisted.claim_task("next-task")
+    assert claimed_next_task.input_state == {"plan": {"plan": ["step"]}}
+    assert published_reasons == ["claim agent-task", "complete agent-task"]
+
+
 def test_process_workflow_task_repairs_invalid_json_response(
     tmp_path: Path,
 ) -> None:

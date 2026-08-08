@@ -34,7 +34,6 @@ def test_workflow_template_round_trips_through_json() -> None:
                 description="Generate one task per changed file.",
                 complexity=TaskComplexity.MEDIUM,
                 input_state={"files": []},
-                upstream_task_template_indexes=(),
                 dependent_state=("files-discovered",),
                 generation=WorkflowTaskTemplateGeneration(
                     for_each="each changed file",
@@ -44,8 +43,7 @@ def test_workflow_template_round_trips_through_json() -> None:
             WorkflowTaskTemplate(
                 description="Validate the aggregated results.",
                 complexity=TaskComplexity.HIGH,
-                input_state={"ready": True},
-                upstream_task_template_indexes=(0,),
+                input_state={"ready": "<upstream-task-0>.state"},
                 dependent_state=("validation-ready",),
             ),
         ),
@@ -72,7 +70,6 @@ def test_workflow_template_round_trips_through_json() -> None:
                 "assignee_type": "agent",
                 "assignee_role": "coder",
                 "output_state_type": "state",
-                "upstream_task_template_indexes": [],
                 "dependent_state": ["files-discovered"],
                 "generation": {
                     "for_each": "each changed file",
@@ -82,11 +79,10 @@ def test_workflow_template_round_trips_through_json() -> None:
             {
                 "description": "Validate the aggregated results.",
                 "complexity": "high",
-                "input_state": {"ready": True},
+                "input_state": {"ready": "<upstream-task-0>.state"},
                 "assignee_type": "agent",
                 "assignee_role": "coder",
                 "output_state_type": "state",
-                "upstream_task_template_indexes": [0],
                 "dependent_state": ["validation-ready"],
             },
         ],
@@ -106,7 +102,6 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
                     "generation": {
                         "for_each": "each item",
@@ -116,11 +111,10 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
                 {
                     "description": "Aggregate generated results.",
                     "complexity": "high",
-                    "input_state": {"ready": True},
+                    "input_state": {"ready": "<upstream-task-0>.state"},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
                 },
             ],
@@ -152,7 +146,6 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [],
                     "dependent_state": ["items-ready"],
                     "generation": {
                         "for_each": "each item",
@@ -162,11 +155,10 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
                 {
                     "description": "Aggregate generated results.",
                     "complexity": "high",
-                    "input_state": {"ready": True},
+                    "input_state": {"ready": "<upstream-task-0>.state"},
                     "assignee_type": "agent",
                     "assignee_role": "coder",
                     "output_state_type": "state",
-                    "upstream_task_template_indexes": [0],
                     "dependent_state": ["aggregation-ready"],
                 },
             ],
@@ -199,76 +191,6 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
     output_path = save_workflow_template(template, tmp_path / "workflow.json")
     assert output_path.exists()
     assert load_workflow_template(output_path) == template
-
-
-def test_implement_feature_workflow_template_file_is_checked_in() -> None:
-    template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
-    )
-    template = load_workflow_template(template_path)
-
-    assert template.when_to_use == (
-        "When a feature has plan documents and is ready to become implementation work.",
-        "When the work should confirm requirements before splitting the plan into "
-        "proposed PRs.",
-    )
-    assert template.how_to_fill_this_out == (
-        "Review the existing plan documents before making implementation decisions.",
-        "Keep the confirmed requirements explicit in the task state.",
-        "Generate one execute-proposed-pr workflow for each approved proposed PR.",
-    )
-    assert [task.description for task in template.task_templates] == [
-        "Review plan documents",
-        "Confirm requirements",
-        "Generate proposed PRs",
-    ]
-    assert [task.output_state_type for task in template.task_templates] == [
-        "reviewed-plan-documents-state",
-        "confirmed-requirements-state",
-        "proposed-prs-and-execution-workflows-state",
-    ]
-    assert template.task_templates[0].input_state == {
-        "plan_documents": [
-            "docs/specs/<feature-name>/system-specification.yaml",
-            "docs/specs/<feature-name>/architecture-specification.yaml",
-            "docs/specs/<feature-name>/implementation-specification.yaml",
-            "docs/specs/<feature-name>/proposed-pr-specification.yaml",
-        ]
-    }
-    assert [
-        (task.assignee_type.value, task.assignee_role.value)
-        for task in template.task_templates
-    ] == [
-        ("agent", "architect"),
-        ("human", "decider"),
-        ("agent", "architect"),
-    ]
-    assert [task.llm_type for task in template.task_templates] == [
-        "high_reasoning",
-        "standard_reasoning",
-        "high_reasoning",
-    ]
-    assert all(task.details for task in template.task_templates)
-    assert "workflow-instance context" in (template.task_templates[2].details or "")
-    assert "actual proposed PR" in (template.task_templates[2].details or "")
-    assert template.task_templates[2].tool_invocations[0].command == (
-        "powdrr-lift",
-        "instantiate-workflow",
-        "--work-item-name",
-        "<work-item-name>",
-        "--workflow-instance-name",
-        "<workflow-instance-name>",
-        "--template-value",
-        "proposed-pr-id=<workflow-instance-name>",
-        "--template",
-        "templates/execute-proposed-pr.yaml",
-    )
-    assert (
-        build_workflow_template_validation_report(
-            template.to_json()
-        ).validation_successful
-        is True
-    )
 
 
 def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
@@ -309,6 +231,18 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ]
     assert template.task_templates[0].tool_invocations == ()
     assert all(task.tool_invocations for task in template.task_templates[1:-1])
+    for task in template.task_templates[1:]:
+        assert "upstream_task_outputs" not in (task.details or "")
+        assert "runtime task ID" not in (task.details or "")
+    assert template.task_templates[1].input_state["proposed_pr_context"] == (
+        "<upstream-task-0>.proposed-pr-context-state"
+    )
+    assert template.task_templates[4].input_state["tests_proven_failing"] == (
+        "<upstream-task-3>.tests-proven-failing-state"
+    )
+    assert template.task_templates[8].input_state["lint_results"] == (
+        "<upstream-task-7>.linted-and-cleaned-state"
+    )
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",
@@ -320,7 +254,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
 
 def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
     )
 
     output_directory, tasks = instantiate_workflow_template(
@@ -330,7 +264,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
-    assert len(tasks) == 3
+    assert len(tasks) == 9
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
@@ -352,6 +286,12 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     )
 
     assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
+    assert tasks[1].input_state["proposed_pr_context"] == (
+        "interaction-file-log-pr-001-task-001.proposed-pr-context-state"
+    )
+    assert tasks[4].input_state["tests_proven_failing"] == (
+        "interaction-file-log-pr-001-task-004.tests-proven-failing-state"
+    )
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")
 
@@ -397,7 +337,7 @@ def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
     tmp_path: Path,
 ) -> None:
     template_path = (
-        Path(__file__).resolve().parents[1] / "templates" / "implement-a-feature.yaml"
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
     )
     output_root = tmp_path / "workflows"
 

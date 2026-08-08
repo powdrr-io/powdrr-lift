@@ -67,7 +67,6 @@ class WorkflowTaskTemplate:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
-    upstream_task_template_indexes: tuple[int, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
 
@@ -86,7 +85,6 @@ class WorkflowTaskTemplate:
             "assignee_type": self.assignee_type.value,
             "assignee_role": self.assignee_role.value,
             "output_state_type": self.output_state_type,
-            "upstream_task_template_indexes": list(self.upstream_task_template_indexes),
             "dependent_state": list(self.dependent_state),
         }
         step_data = {
@@ -226,8 +224,20 @@ def instantiate_workflow_template(
         f"{task_prefix}task-{index + 1:03d}"
         for index in range(len(template.task_templates))
     )
+    substitutions.update(
+        {f"upstream-task-{index}": task_id for index, task_id in enumerate(task_ids)}
+    )
     tasks: list[WorkflowTask] = []
     for index, task_template in enumerate(template.task_templates):
+        upstream_task_indexes = _upstream_task_template_indexes(
+            task_template.input_state
+        )
+        for upstream_index in upstream_task_indexes:
+            if upstream_index >= len(task_ids):
+                raise ValueError(
+                    f"Task template {index} references unknown upstream task "
+                    f"template index: {upstream_index}"
+                )
         task = WorkflowTask(
             task_id=task_ids[index],
             status=TaskStatus.OPEN,
@@ -251,8 +261,7 @@ def instantiate_workflow_template(
             ),
             output_state_type=task_template.output_state_type,
             upstream_task_ids=tuple(
-                task_ids[upstream_index]
-                for upstream_index in task_template.upstream_task_template_indexes
+                task_ids[upstream_index] for upstream_index in upstream_task_indexes
             ),
             dependent_state=task_template.dependent_state,
         )
@@ -477,7 +486,6 @@ def build_workflow_template_validation_report(
                 "uses_skills",
                 "tool_invocations",
                 "output_state_type",
-                "upstream_task_template_indexes",
                 "dependent_state",
                 "generation",
             },
@@ -579,28 +587,6 @@ def build_workflow_template_validation_report(
                     ),
                     path=_child_path(task_template_path, "output_state_type"),
                 )
-            )
-
-        upstream_indexes = _optional_int_sequence(
-            raw_task_template_mapping.get("upstream_task_template_indexes"),
-            path=_child_path(task_template_path, "upstream_task_template_indexes"),
-            issue_code="invalid_upstream_task_template_index",
-            issue_message=(
-                "Workflow task template upstream_task_template_indexes must be "
-                "an array of non-negative integers."
-            ),
-            issues=issues,
-        )
-        if upstream_indexes is not None:
-            _validate_unique_indexes(
-                upstream_indexes,
-                issues,
-                path=_child_path(task_template_path, "upstream_task_template_indexes"),
-                duplicate_code="duplicate_upstream_task_template_index",
-                duplicate_message=(
-                    "Workflow task template upstream_task_template_indexes must "
-                    "not contain duplicates."
-                ),
             )
 
         dependent_state = raw_task_template_mapping.get("dependent_state")
@@ -706,41 +692,39 @@ def build_workflow_template_validation_report(
     for index, raw_task_template in task_template_reports:
         if raw_task_template is None:
             continue
-        upstream_indexes = _normalize_int_sequence(
-            raw_task_template.get("upstream_task_template_indexes")
-        )
-        if upstream_indexes is not None:
-            for upstream_index in upstream_indexes:
-                if upstream_index < 0 or upstream_index >= task_template_count:
-                    issues.append(
-                        WorkflowTemplateValidationIssue(
-                            code="missing_upstream_task_template",
-                            message=(
-                                "Workflow task template references an unknown "
-                                "upstream task template index."
-                            ),
-                            path=_sequence_path(
-                                source_path,
-                                "task_templates",
-                                index,
-                            ),
-                        )
+        input_state = raw_task_template.get("input_state")
+        for upstream_index in _upstream_task_template_indexes(input_state):
+            if upstream_index >= task_template_count:
+                issues.append(
+                    WorkflowTemplateValidationIssue(
+                        code="missing_upstream_task_template",
+                        message=(
+                            "Workflow task input references an unknown upstream "
+                            "task template index."
+                        ),
+                        path=_sequence_path(
+                            source_path,
+                            "task_templates",
+                            index,
+                        ),
                     )
-                elif upstream_index == index:
-                    issues.append(
-                        WorkflowTemplateValidationIssue(
-                            code="self_dependency",
-                            message=(
-                                "A workflow task template cannot depend on itself."
-                            ),
-                            path=_sequence_path(
-                                source_path,
-                                "task_templates",
-                                index,
-                            ),
-                        )
+                )
+            elif upstream_index == index:
+                issues.append(
+                    WorkflowTemplateValidationIssue(
+                        code="self_dependency",
+                        message=("A workflow task template cannot depend on itself."),
+                        path=_sequence_path(
+                            source_path,
+                            "task_templates",
+                            index,
+                        ),
                     )
+                )
 
+    for index, raw_task_template in task_template_reports:
+        if raw_task_template is None:
+            continue
         generation = raw_task_template.get("generation")
         if not isinstance(generation, Mapping):
             continue
@@ -832,10 +816,6 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
     )
     step = skill_step_from_data(data)
     output_state_type = _required_string(data, "output_state_type")
-    upstream_task_template_indexes = _required_int_sequence(
-        data,
-        "upstream_task_template_indexes",
-    )
     dependent_state = _required_string_sequence(data, "dependent_state")
     generation = data.get("generation")
     parsed_generation = None
@@ -852,10 +832,32 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
         output_state_type=output_state_type,
-        upstream_task_template_indexes=upstream_task_template_indexes,
         dependent_state=dependent_state,
         generation=parsed_generation,
     )
+
+
+def _upstream_task_template_indexes(value: Any) -> tuple[int, ...]:
+    indexes: list[int] = []
+
+    def visit(item: Any) -> None:
+        if isinstance(item, str):
+            match = re.fullmatch(r"<upstream-task-(\d+)>\..+", item)
+            if match is not None:
+                index = int(match.group(1))
+                if index not in indexes:
+                    indexes.append(index)
+            return
+        if isinstance(item, Mapping):
+            for nested_item in item.values():
+                visit(nested_item)
+            return
+        if isinstance(item, (list, tuple)):
+            for nested_item in item:
+                visit(nested_item)
+
+    visit(value)
+    return tuple(indexes)
 
 
 def _parse_generation(

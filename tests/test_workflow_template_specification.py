@@ -286,7 +286,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "Create PR",
     ]
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
-    assert proposed_pr_input["workflow_context"] == {}
     assert (
         "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
     )
@@ -375,7 +374,6 @@ def test_instantiate_execute_proposed_pr_fills_proposed_pr_context(
     assert (
         "Find the actual proposed PR specification" in proposed_pr_input["instructions"]
     )
-    assert proposed_pr_input["workflow_context"] == {
-        "work_item_name": "interaction-file-log",
-        "workflow_instance_name": "interaction-file-log-pr",
-    }
+    assert "Instantiation context:" in (tasks[0].details or "")
+    assert "interaction-file-log" in (tasks[0].details or "")
+    assert "interaction-file-log-pr" in (tasks[0].details or "")

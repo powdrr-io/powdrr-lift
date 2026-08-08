@@ -226,14 +226,14 @@ def instantiate_workflow_template(
             status=TaskStatus.OPEN,
             description=task_template.description,
             complexity=task_template.complexity,
-            input_state=_add_workflow_context(
-                task_template.input_state,
+            input_state=task_template.input_state,
+            assignee_type=task_template.assignee_type,
+            assignee_role=task_template.assignee_role,
+            details=_add_instantiation_context(
+                task_template.details,
                 work_item_name=work_item_name,
                 workflow_instance_name=workflow_instance_name,
             ),
-            assignee_type=task_template.assignee_type,
-            assignee_role=task_template.assignee_role,
-            details=task_template.details,
             llm_type=task_template.llm_type,
             uses_skills=task_template.uses_skills,
             tool_invocations=task_template.tool_invocations,
@@ -267,26 +267,23 @@ def instantiate_workflow_template(
     return output_directory, tuple(tasks)
 
 
-def _add_workflow_context(
-    input_state: Any,
+def _add_instantiation_context(
+    details: str | None,
     *,
     work_item_name: str,
     workflow_instance_name: str | None,
-) -> Any:
-    """Give proposed-PR tasks search context without resolving their reference."""
-    if not isinstance(input_state, Mapping) or "proposed_pr" not in input_state:
-        return input_state
-    proposed_pr = input_state["proposed_pr"]
-    if not isinstance(proposed_pr, Mapping):
-        return input_state
-    updated_proposed_pr = dict(proposed_pr)
-    updated_proposed_pr["workflow_context"] = {
-        "work_item_name": work_item_name.strip(),
-        "workflow_instance_name": (workflow_instance_name or work_item_name).strip(),
-    }
-    updated_input_state = dict(input_state)
-    updated_input_state["proposed_pr"] = updated_proposed_pr
-    return updated_input_state
+) -> str | None:
+    """Append dynamic workflow context as instructions for the task's LLM."""
+    context = (
+        "Instantiation context: work item name is "
+        f"{work_item_name.strip()!r}; workflow instance name is "
+        f"{(workflow_instance_name or work_item_name).strip()!r}. "
+        "Use these values as search context and verify repository documents "
+        "before deciding what they identify."
+    )
+    if details is None:
+        return context
+    return f"{details}\n\n{context}"
 
 
 def save_workflow_template(template: WorkflowTemplate, path: str | Path) -> Path:

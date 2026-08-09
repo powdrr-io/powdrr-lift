@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
@@ -27,9 +28,12 @@ from powdrr_lift.workflow_chat_agent import (
     LocalLlamaChatClient,
     SkillChatAction,
     _apply_file_edits,
+    _estimate_message_tokens,
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _LLMExchangeRecordingClient,
+    _long_context_backup_for,
+    _model_limits_for,
     _parse_action_response,
     _print_waiting_for_model,
     _resolve_credentials,
@@ -53,6 +57,8 @@ class WorkflowTaskAgentConfig:
     api_key: str | None = None
     base_url: str | None = None
     max_roundtrips: int = 12
+    max_timeout_retries: int = 3
+    timeout_backoff_seconds: float = 2.0
     verbose: bool = False
 
 
@@ -110,6 +116,7 @@ def run_workflow_task(
     if mapping is None:
         raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
     model = mapping.model
+    client_was_provided = client is not None
     if client is None:
         client = _build_zai_client(config, task)
     dump_root = _resolve_project_root(
@@ -117,21 +124,100 @@ def run_workflow_task(
         repo_root,
     )
     client = _LLMExchangeRecordingClient(client, dump_root)
+    compaction_client = client
+    long_context_backup = _long_context_backup_for(
+        model,
+        tuple(ZAI_LLM_MAPPINGS.items()),
+    )
+    if not client_was_provided and long_context_backup is not None:
+        compaction_client = _LLMExchangeRecordingClient(
+            _build_zai_client_for_mapping(config, task, long_context_backup),
+            dump_root,
+        )
 
     events: list[dict[str, Any]] = []
     response_correction: str | None = None
+    compacted_context: dict[str, Any] | None = None
     for _roundtrip in range(max(1, config.max_roundtrips)):
-        _print_waiting_for_model(stderr, model)
-        response: dict[str, Any] | None = None
         messages = _build_task_messages(
             workflow,
             task,
             events,
             response_correction=response_correction,
+            compacted_context=compacted_context,
         )
+        limits = _model_limits_for(mapping.provider, model)
+        estimated_input_tokens = _estimate_message_tokens(messages)
+        print(
+            f"Workflow task context: {estimated_input_tokens} estimated input "
+            f"tokens of {limits.context_window} allowed.",
+            file=stderr,
+            flush=True,
+        )
+        if estimated_input_tokens + 1024 >= limits.context_window:
+            print(
+                "Compacting workflow task context before the next LLM call: "
+                f"{estimated_input_tokens} estimated input tokens would exceed "
+                f"the {limits.context_window}-token context window.",
+                file=stderr,
+                flush=True,
+            )
+            try:
+                compacted_context, before_tokens, after_tokens = (
+                    _compact_workflow_task_context(
+                        workflow,
+                        task,
+                        events,
+                        client=compaction_client,
+                        stderr=stderr,
+                        max_timeout_retries=config.max_timeout_retries,
+                        timeout_backoff_seconds=config.timeout_backoff_seconds,
+                    )
+                )
+            except _WorkflowTaskTimeoutExhausted as exc:
+                return _handle_exhausted_timeout(
+                    repo_root,
+                    task,
+                    stdout=stdout,
+                    stderr=stderr,
+                    error=exc,
+                )
+            events.append(
+                {
+                    "kind": "context_compaction",
+                    "before_estimated_input_tokens": before_tokens,
+                    "after_estimated_input_tokens": after_tokens,
+                }
+            )
+            print(
+                "Compacted workflow task context: "
+                f"{before_tokens} -> {after_tokens} estimated input tokens.",
+                file=stderr,
+                flush=True,
+            )
+            response_correction = None
+            continue
+
+        _print_waiting_for_model(stderr, model)
+        response: dict[str, Any] | None = None
         try:
-            response = client.complete_json(messages)
+            response = _complete_task_json_with_timeout_retry(
+                client,
+                messages,
+                model=model,
+                stderr=stderr,
+                max_timeout_retries=config.max_timeout_retries,
+                timeout_backoff_seconds=config.timeout_backoff_seconds,
+            )
             action = _parse_task_action(response)
+        except _WorkflowTaskTimeoutExhausted as exc:
+            return _handle_exhausted_timeout(
+                repo_root,
+                task,
+                stdout=stdout,
+                stderr=stderr,
+                error=exc,
+            )
         except RuntimeError as exc:
             if not _is_repairable_task_response_error(exc):
                 raise
@@ -561,13 +647,112 @@ def _default_branch(repo_root: Path) -> str:
     return "main"
 
 
+class _WorkflowTaskTimeoutExhausted(RuntimeError):
+    pass
+
+
+def _complete_task_json_with_timeout_retry(
+    client: WorkflowTaskChatClient,
+    messages: list[dict[str, str]],
+    *,
+    model: str,
+    stderr: TextIO,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+) -> dict[str, Any]:
+    timeout_retries = 0
+    while True:
+        try:
+            return client.complete_json(messages)
+        except RuntimeError as exc:
+            if not _is_timeout_error(exc):
+                raise
+            if timeout_retries >= max(0, max_timeout_retries):
+                raise _WorkflowTaskTimeoutExhausted(
+                    f"LLM request timed out after {timeout_retries} retries: {exc}"
+                ) from exc
+            timeout_retries += 1
+            delay_seconds = timeout_backoff_seconds * (2 ** (timeout_retries - 1))
+            print(
+                f"LLM request timed out for {model}; retrying in "
+                f"{delay_seconds:g} seconds "
+                f"(retry {timeout_retries}/{max_timeout_retries}).",
+                file=stderr,
+                flush=True,
+            )
+            time.sleep(delay_seconds)
+
+
+def _is_timeout_error(error: RuntimeError) -> bool:
+    message = str(error).casefold()
+    return "timed out" in message or "timeout" in message
+
+
+def _handle_exhausted_timeout(
+    repo_root: Path,
+    task: WorkflowTask,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+    error: Exception,
+) -> int:
+    print(
+        f"LLM request timed out after retries for workflow task {task.task_id}: "
+        f"{error}",
+        file=stderr,
+        flush=True,
+    )
+    if ".worktrees" in repo_root.parts:
+        print(
+            f"Deleting dedicated workflow worktree after timeout: {repo_root}",
+            file=stderr,
+            flush=True,
+        )
+        _delete_workflow_task_worktree(repo_root, stderr=stderr)
+    else:
+        print(
+            "Keeping the configured repository because it is not a dedicated worktree.",
+            file=stderr,
+            flush=True,
+        )
+    return 2
+
+
+def _delete_workflow_task_worktree(repo_root: Path, *, stderr: TextIO) -> None:
+    project_root = _resolve_project_root(repo_root, repo_root)
+    result = subprocess.run(
+        ["git", "worktree", "remove", "--force", str(repo_root)],
+        cwd=project_root,
+        capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(
+            f"Failed to delete dedicated workflow worktree: {result.stderr.strip()}",
+            file=stderr,
+            flush=True,
+        )
+
+
 def _build_task_messages(
     workflow: WorkflowInstance,
     task: WorkflowTask,
     events: list[dict[str, Any]],
     *,
     response_correction: str | None = None,
+    compacted_context: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
+    context_data: dict[str, Any]
+    if compacted_context is None:
+        context_data = {
+            "task_context": workflow.task_context(task.task_id),
+            "events": events,
+        }
+    else:
+        context_data = {"compacted_context": compacted_context}
     return [
         {"role": "system", "content": _task_system_prompt()},
         {
@@ -576,8 +761,7 @@ def _build_task_messages(
                 {
                     "execution_mode": "process_workflow_task",
                     "task": task.to_data(),
-                    "task_context": workflow.task_context(task.task_id),
-                    "events": events,
+                    **context_data,
                     "workflow_dir": str(workflow.directory),
                     "workflow_files": _workflow_file_names(workflow.directory),
                     "available_tools": [
@@ -602,6 +786,84 @@ def _build_task_messages(
             ),
         },
     ]
+
+
+def _compact_workflow_task_context(
+    workflow: WorkflowInstance,
+    task: WorkflowTask,
+    events: list[dict[str, Any]],
+    *,
+    client: WorkflowTaskChatClient,
+    stderr: TextIO,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+) -> tuple[dict[str, Any], int, int]:
+    compaction_messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are compacting context for a workflow task. Review the full "
+                "task and all current context, then preserve only the information "
+                "necessary for another LLM to perform this exact task. Preserve "
+                "specific paths, commands, requirements, decisions, constraints, "
+                "errors, and outputs that remain actionable. Do not invent or "
+                "execute anything. Return exactly one JSON object with a single "
+                "compacted_context key whose value is the necessary context."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "task": task.to_data(),
+                    "task_description": task.description,
+                    "task_details": task.details,
+                    "current_context": {
+                        "task_context": workflow.task_context(task.task_id),
+                        "events": events,
+                    },
+                    "response_shape": {
+                        "compacted_context": (
+                            "Only context necessary to perform the full task"
+                        )
+                    },
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+        },
+    ]
+    before_tokens = _estimate_message_tokens(compaction_messages)
+    print(
+        "waiting for context compaction LLM response...",
+        file=stderr,
+        flush=True,
+    )
+    response = _complete_task_json_with_timeout_retry(
+        client,
+        compaction_messages,
+        model="context-compaction",
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+    )
+    compacted_context = response.get("compacted_context")
+    if not isinstance(compacted_context, dict):
+        raise RuntimeError(
+            "Context compaction response must include a compacted_context object."
+        )
+    after_tokens = _estimate_message_tokens(
+        [
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {"task": task.to_data(), "compacted_context": compacted_context},
+                    ensure_ascii=False,
+                ),
+            }
+        ]
+    )
+    return compacted_context, before_tokens, after_tokens
 
 
 def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
@@ -1001,8 +1263,6 @@ def _build_zai_client(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
 ) -> WorkflowTaskChatClient:
-    from powdrr_lift.workflow_chat_agent import OpenAIChatClient
-
     mapping = _resolve_llm_mapping(
         task.llm_type,
         mappings=tuple(ZAI_LLM_MAPPINGS.items()),
@@ -1010,6 +1270,16 @@ def _build_zai_client(
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
+    return _build_zai_client_for_mapping(config, task, mapping)
+
+
+def _build_zai_client_for_mapping(
+    config: WorkflowTaskAgentConfig,
+    task: WorkflowTask,
+    mapping: Any,
+) -> WorkflowTaskChatClient:
+    from powdrr_lift.workflow_chat_agent import OpenAIChatClient
+
     model = mapping.model
     if mapping.provider == "local":
         return LocalLlamaChatClient(
@@ -1017,9 +1287,14 @@ def _build_zai_client(
                 config.repo_root / ".powdrr" / "models"
             )
         )
-    credentials = _resolve_credentials("zai", config.api_key, config.base_url)
+    credentials = _resolve_credentials(
+        mapping.provider,
+        config.api_key,
+        config.base_url,
+    )
     return OpenAIChatClient(
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
+        limits=_model_limits_for(mapping.provider, model),
     )

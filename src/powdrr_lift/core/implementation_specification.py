@@ -16,9 +16,8 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.spec_paths import (
     architecture_specification_path as _architecture_specification_path,
 )
+from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.validation_messages import instructional_validation_message
-
-_ALLOWED_ACTIONS = {"added", "removed", "changed"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -770,7 +769,7 @@ def _required_action(
     if value is None:
         return None
 
-    if value not in _ALLOWED_ACTIONS:
+    if value not in ENTITY_ACTIONS:
         issues.append(
             ImplementationSpecificationValidationIssue(
                 code="invalid_action",

@@ -15,10 +15,10 @@ from powdrr_lift.core.spec_paths import (
     architecture_specification_path,
     system_specification_path,
 )
+from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
-_MODULE_TOOL_ACTIONS = {"added", "removed", "changed"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +79,8 @@ def render_architecture_specification_template(
         "#   relationship listed in each item's related block.",
         "# - Keep every entity mentioned in a relationship, invariant, or",
         "#   guidance item present in the `entities` section.",
-        "# - Use `action: added`, `removed`, or `changed` for modules and tools.",
+        "# - Use `action: added`, `removed`, or `changed` for every entity,",
+        "#   module, and tool.",
         "# - Every module parent_module and related_modules reference must name",
         "#   an id declared in the modules section.",
         "# - Tool related_module and related_modules references must name a",
@@ -95,6 +96,7 @@ def render_architecture_specification_template(
         "entities:",
         "  - id: null",
         "    type: null",
+        "    action: null",
         "    summary: null",
         "    rationale: null",
         "modules:",
@@ -395,6 +397,11 @@ def _collect_entity_ids(
             issue_code="entity_type_missing",
             issue_message="Each entity must include a type.",
         )
+        _validate_entity_action(
+            entity.get("action"),
+            path=f"entities[{index}].action",
+            issues=issues,
+        )
         rationale = _optional_string(entity.get("rationale"))
         if entity_id is None or entity_type is None:
             continue
@@ -469,10 +476,11 @@ def _collect_module_ids(
             issue_code="module_id_missing",
             issue_message="Each module must include an id.",
         )
-        _validate_module_tool_action(
+        _validate_entity_action(
             module.get("action"),
             path=f"modules[{index}].action",
             issues=issues,
+            required=True,
         )
         if module_id is None:
             continue
@@ -530,10 +538,11 @@ def _collect_tool_ids(
             issue_code="tool_id_missing",
             issue_message="Each tool must include an id.",
         )
-        _validate_module_tool_action(
+        _validate_entity_action(
             tool.get("action"),
             path=f"tools[{index}].action",
             issues=issues,
+            required=True,
         )
         if tool_id is None:
             continue
@@ -564,25 +573,30 @@ def _collect_tool_ids(
     return tool_ids
 
 
-def _validate_module_tool_action(
+def _validate_entity_action(
     raw_action: object,
     *,
     path: str,
     issues: list[ArchitectureSpecificationValidationIssue],
+    required: bool = False,
 ) -> None:
-    action = _required_string(
-        raw_action,
-        path=path,
-        issues=issues,
-        issue_code="module_tool_action_missing",
-        issue_message="Each module and tool must include an action.",
+    action = (
+        _required_string(
+            raw_action,
+            path=path,
+            issues=issues,
+            issue_code="entity_action_missing",
+            issue_message="Each entity must include an action.",
+        )
+        if required
+        else _optional_string(raw_action)
     )
-    if action is not None and action not in _MODULE_TOOL_ACTIONS:
+    if action is not None and action not in ENTITY_ACTIONS:
         issues.append(
             ArchitectureSpecificationValidationIssue(
-                code="invalid_module_tool_action",
+                code="invalid_entity_action",
                 message=(
-                    "Each module and tool action must be one of "
+                    "Each entity action must be one of "
                     "'added', 'removed', or 'changed'."
                 ),
                 path=path,

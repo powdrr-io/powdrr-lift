@@ -5167,6 +5167,57 @@ def test_openai_chat_client_reports_malformed_json_content(
         client.complete_json([{"role": "user", "content": "hello"}])
 
 
+def test_openai_chat_client_consumes_sse_content_and_reports_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeResponse:
+        headers = {"Content-Type": "text/event-stream"}
+
+        def __enter__(self) -> _FakeResponse:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            tb: object,
+        ) -> None:
+            return None
+
+        def readline(self) -> bytes:
+            return next(self._lines)
+
+        _lines = iter(
+            [
+                b'data: {"choices":[{"delta":{"role":"assistant"}}]}\n',
+                b"\n",
+                b'data: {"choices":[{"delta":{"content":"{\\"ok\\": "}}]}\n',
+                b"\n",
+                b'data: {"choices":[{"delta":{"content":"true}"}}]}\n',
+                b"\n",
+                b"data: [DONE]\n",
+                b"\n",
+            ]
+        )
+
+    def _fake_urlopen(request: Request, timeout: float) -> _FakeResponse:
+        body = json.loads(cast(bytes, request.data).decode("utf-8"))
+        assert body["stream"] is True
+        return _FakeResponse()
+
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+    progress = io.StringIO()
+    client = OpenAIChatClient(
+        model="test-model",
+        api_key="test-key",
+        base_url="https://api.openai.com/v1",
+        progress_stream=progress,
+    )
+
+    assert client.complete_json([{"role": "user", "content": "hello"}]) == {"ok": True}
+    assert "received streamed LLM data" in progress.getvalue()
+
+
 def _build_skill() -> Skill:
     return Skill(
         name="specify-a-feature",

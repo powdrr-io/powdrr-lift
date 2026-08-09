@@ -383,12 +383,14 @@ class OpenAIChatClient:
         base_url: str,
         timeout: float = 120.0,
         limits: LLMModelLimits | None = None,
+        progress_stream: TextIO | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._limits = limits or _DEFAULT_MODEL_LIMITS
+        self._progress_stream = progress_stream
         self.last_usage: dict[str, Any] = {}
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
@@ -402,6 +404,7 @@ class OpenAIChatClient:
             "temperature": 0,
             "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
+            "stream": True,
         }
         request = Request(
             f"{self._base_url}/chat/completions",
@@ -415,7 +418,10 @@ class OpenAIChatClient:
         request_started = time.monotonic()
         try:
             with urlopen(request, timeout=self._timeout) as response:
-                raw_response = response.read().decode("utf-8")
+                raw_response = _read_openai_response(
+                    response,
+                    progress_stream=self._progress_stream,
+                )
         except HTTPError as exc:
             raise RuntimeError(
                 "OpenAI request failed with HTTP "
@@ -458,6 +464,83 @@ class OpenAIChatClient:
             raise RuntimeError("OpenAI response message content was empty.")
 
         return _parse_json_object(content, "OpenAI response content")
+
+
+def _read_openai_response(
+    response: Any,
+    *,
+    progress_stream: TextIO | None,
+) -> str:
+    """Read a streamed OpenAI response and return its normal response shape.
+
+    Providers sometimes ignore ``stream=true`` (and test doubles commonly do
+    too), so a regular JSON response is still accepted. ``readline`` is used
+    for SSE responses so each completed event is consumed as soon as it is
+    available; the socket timeout therefore applies to inactivity between
+    events rather than waiting for the entire generation to finish.
+    """
+    content_type = ""
+    headers = getattr(response, "headers", None)
+    if headers is not None:
+        content_type = str(headers.get("Content-Type", "")).casefold()
+    if "text/event-stream" not in content_type or not hasattr(response, "readline"):
+        return response.read().decode("utf-8")
+
+    content_parts: list[str] = []
+    response_metadata: dict[str, Any] | None = None
+    event_data: list[str] = []
+    chunk_count = 0
+    while True:
+        line = response.readline()
+        if not line:
+            break
+        decoded_line = line.decode("utf-8", errors="replace").rstrip("\r\n")
+        if decoded_line:
+            if decoded_line.startswith("data:"):
+                event_data.append(decoded_line[5:].lstrip())
+            continue
+        if not event_data:
+            continue
+        event_payload = "\n".join(event_data)
+        event_data.clear()
+        if event_payload == "[DONE]":
+            break
+        try:
+            event = json.loads(event_payload)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"OpenAI streaming response contained invalid JSON: {exc.msg}"
+            ) from exc
+        if not isinstance(event, dict):
+            continue
+        if response_metadata is None:
+            response_metadata = event
+        choices = event.get("choices")
+        if not isinstance(choices, list) or not choices:
+            continue
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            continue
+        delta = first_choice.get("delta")
+        if not isinstance(delta, dict):
+            continue
+        content = delta.get("content")
+        if isinstance(content, str):
+            content_parts.append(content)
+            chunk_count += 1
+            if progress_stream is not None:
+                print(
+                    f"received streamed LLM data ({chunk_count} chunks)...",
+                    file=progress_stream,
+                    flush=True,
+                )
+
+    if response_metadata is None:
+        raise RuntimeError("OpenAI streaming response did not include any events.")
+    if not content_parts:
+        raise RuntimeError("OpenAI streaming response content was empty.")
+    response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
+    return json.dumps(response_metadata)
 
 
 class LocalLlamaChatClient:
@@ -797,6 +880,7 @@ def run_workflow_chat(
                     selected_credentials,
                     model=selected_model,
                     model_cache_dir=project_root / ".powdrr" / "models",
+                    progress_stream=stderr,
                 ),
                 project_root,
             )
@@ -3887,6 +3971,7 @@ def _build_chat_client(
     *,
     model: str,
     model_cache_dir: Path,
+    progress_stream: TextIO | None = None,
 ) -> WorkflowChatClient:
     if credentials.provider == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
@@ -3914,6 +3999,7 @@ def _build_chat_client(
         api_key=credentials.api_key,
         base_url=credentials.base_url,
         limits=limits,
+        progress_stream=progress_stream,
     )
 
 

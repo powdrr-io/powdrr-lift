@@ -118,7 +118,7 @@ def run_workflow_task(
     model = mapping.model
     client_was_provided = client is not None
     if client is None:
-        client = _build_zai_client(config, task)
+        client = _build_zai_client(config, task, progress_stream=stderr)
     dump_root = _resolve_project_root(
         configured_repo_root,
         repo_root,
@@ -131,7 +131,12 @@ def run_workflow_task(
     )
     if not client_was_provided and long_context_backup is not None:
         compaction_client = _LLMExchangeRecordingClient(
-            _build_zai_client_for_mapping(config, task, long_context_backup),
+            _build_zai_client_for_mapping(
+                config,
+                task,
+                long_context_backup,
+                progress_stream=stderr,
+            ),
             dump_root,
         )
 
@@ -1262,6 +1267,8 @@ def _next_handoff_id(workflow: WorkflowInstance) -> str:
 def _build_zai_client(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
+    *,
+    progress_stream: TextIO | None = None,
 ) -> WorkflowTaskChatClient:
     mapping = _resolve_llm_mapping(
         task.llm_type,
@@ -1270,13 +1277,20 @@ def _build_zai_client(
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
-    return _build_zai_client_for_mapping(config, task, mapping)
+    return _build_zai_client_for_mapping(
+        config,
+        task,
+        mapping,
+        progress_stream=progress_stream,
+    )
 
 
 def _build_zai_client_for_mapping(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
     mapping: Any,
+    *,
+    progress_stream: TextIO | None = None,
 ) -> WorkflowTaskChatClient:
     from powdrr_lift.workflow_chat_agent import OpenAIChatClient
 
@@ -1297,4 +1311,5 @@ def _build_zai_client_for_mapping(
         api_key=credentials.api_key,
         base_url=credentials.base_url,
         limits=_model_limits_for(mapping.provider, model),
+        progress_stream=progress_stream,
     )

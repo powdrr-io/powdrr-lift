@@ -284,6 +284,41 @@ class WorkflowChatCredentials:
     base_url_source: str
 
 
+def _normalize_cache_usage(usage: Mapping[str, Any]) -> dict[str, int] | None:
+    """Normalize cache counters returned by OpenAI-compatible providers."""
+    prompt_tokens = usage.get("prompt_tokens")
+    prompt_details = usage.get("prompt_tokens_details")
+    if not isinstance(prompt_details, Mapping):
+        prompt_details = {}
+
+    cached_tokens = prompt_details.get("cached_tokens")
+    if not isinstance(cached_tokens, int):
+        cached_tokens = usage.get("prompt_cache_hit_tokens")
+    if not isinstance(cached_tokens, int):
+        cached_tokens = 0
+
+    cache_miss_tokens = usage.get("prompt_cache_miss_tokens")
+    if not isinstance(cache_miss_tokens, int):
+        cache_miss_tokens = (
+            prompt_tokens - cached_tokens if isinstance(prompt_tokens, int) else 0
+        )
+
+    cache_write_tokens = prompt_details.get("cache_write_tokens")
+    if not isinstance(cache_write_tokens, int):
+        cache_write_tokens = usage.get("cache_write_tokens")
+    if not isinstance(cache_write_tokens, int):
+        cache_write_tokens = 0
+
+    if not any((cached_tokens, cache_miss_tokens, cache_write_tokens)):
+        return None
+    return {
+        "prompt_tokens": prompt_tokens if isinstance(prompt_tokens, int) else 0,
+        "cached_tokens": cached_tokens,
+        "cache_miss_tokens": cache_miss_tokens,
+        "cache_write_tokens": cache_write_tokens,
+    }
+
+
 class _LLMExchangeRecordingClient:
     """Record every LLM request and response in the active repository root."""
 
@@ -318,13 +353,19 @@ class _LLMExchangeRecordingClient:
         while output_path.exists():
             output_path = self._repo_root / f"llm-{timestamp_text}-{suffix}.json"
             suffix += 1
+        exchange: dict[str, Any] = {
+            "timestamp": timestamp.isoformat(),
+            "input": messages,
+            "output": output,
+        }
+        usage = getattr(self._client, "last_usage", None)
+        if isinstance(usage, Mapping):
+            cache_usage = _normalize_cache_usage(usage)
+            if cache_usage is not None:
+                exchange["usage"] = cache_usage
         output_path.write_text(
             json.dumps(
-                {
-                    "timestamp": timestamp.isoformat(),
-                    "input": messages,
-                    "output": output,
-                },
+                exchange,
                 indent=2,
                 ensure_ascii=False,
             )
@@ -348,6 +389,7 @@ class OpenAIChatClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._limits = limits or _DEFAULT_MODEL_LIMITS
+        self.last_usage: dict[str, Any] = {}
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         max_tokens, estimated_input_tokens = _request_token_budget(
@@ -400,6 +442,8 @@ class OpenAIChatClient:
             raw_response,
             "OpenAI response",
         )
+        usage = loaded_response.get("usage")
+        self.last_usage = dict(usage) if isinstance(usage, dict) else {}
         choices = loaded_response.get("choices")
         if not isinstance(choices, list) or not choices:
             raise RuntimeError("OpenAI response did not include any choices.")

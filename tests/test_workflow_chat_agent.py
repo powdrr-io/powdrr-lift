@@ -76,6 +76,7 @@ from powdrr_lift.workflow_chat_agent import (
     _LLMExchangeRecordingClient,
     _long_context_backup_for,
     _match_work_item_names,
+    _normalize_cache_usage,
     _parse_action_response,
     _prompt_user,
     _request_token_budget,
@@ -1232,6 +1233,59 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     assert exchange["input"] == [{"role": "user", "content": "request"}]
     assert exchange["output"] == {"kind": "complete", "text": "done"}
     assert exchange["timestamp"]
+
+
+def test_normalize_cache_usage_supports_provider_formats() -> None:
+    assert _normalize_cache_usage(
+        {
+            "prompt_tokens": 2000,
+            "prompt_tokens_details": {
+                "cached_tokens": 1500,
+                "cache_write_tokens": 0,
+            },
+        }
+    ) == {
+        "prompt_tokens": 2000,
+        "cached_tokens": 1500,
+        "cache_miss_tokens": 500,
+        "cache_write_tokens": 0,
+    }
+    assert _normalize_cache_usage(
+        {
+            "prompt_tokens": 2000,
+            "prompt_cache_hit_tokens": 1800,
+            "prompt_cache_miss_tokens": 200,
+        }
+    ) == {
+        "prompt_tokens": 2000,
+        "cached_tokens": 1800,
+        "cache_miss_tokens": 200,
+        "cache_write_tokens": 0,
+    }
+
+
+def test_llm_exchange_recorder_includes_normalized_cache_usage(
+    tmp_path: Path,
+) -> None:
+    class _FakeClient:
+        last_usage = {
+            "prompt_tokens": 2000,
+            "prompt_tokens_details": {"cached_tokens": 1500},
+        }
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {"kind": "complete"}
+
+    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder.complete_json([{"role": "user", "content": "request"}])
+
+    exchange = json.loads(next(tmp_path.glob("llm-*.json")).read_text())
+    assert exchange["usage"] == {
+        "prompt_tokens": 2000,
+        "cached_tokens": 1500,
+        "cache_miss_tokens": 500,
+        "cache_write_tokens": 0,
+    }
 
 
 def test_model_unavailable_uses_backup_model_without_prompting() -> None:

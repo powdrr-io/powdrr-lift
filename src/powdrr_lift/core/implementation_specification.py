@@ -18,7 +18,7 @@ from powdrr_lift.core.spec_paths import (
 )
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
-_ALLOWED_ACTIONS = {"added", "removed"}
+_ALLOWED_ACTIONS = {"added", "removed", "changed"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +45,8 @@ class _ArchitectureSpecificationSummary:
     title: str | None
     entity_ids: list[str]
     relationship_ids: list[str]
+    module_ids: list[str]
+    tool_ids: list[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +102,12 @@ def render_implementation_specification_template(
         "#   specification listed below.",
         "# - Give every entity and entity relationship an `action` of `added`",
         "#   or `removed`.",
+        "# - Give every module and tool an `action` of `added`, `removed`,",
+        "#   or `changed`, and copy their ids from the architecture specification.",
+        "# - Module parent_module and related_modules values must reference",
+        "#   module ids from the architecture specification.",
+        "# - Tool related_module and related_modules values must reference",
+        "#   module ids; related_modules values are lists of ids.",
         "# - Include `supercedes` only when it lists one or more ids; omit the",
         "#   field when it would be empty.",
         "# - Treat entity relationships with the same item shape as entities:",
@@ -123,12 +131,31 @@ def render_implementation_specification_template(
             f"# - {relationship_id}"
             for relationship_id in architecture_summary.relationship_ids
         ],
+        "# Available modules:",
+        *[f"# - {module_id}" for module_id in architecture_summary.module_ids],
+        "# Available tools:",
+        *[f"# - {tool_id}" for tool_id in architecture_summary.tool_ids],
         "title: null",
         f"architecture_id: {json.dumps(architecture_id)}",
         "entities:",
         "  - id: null",
         "    action: null",
         "    rationale: null",
+        "modules:",
+        "  - id: null",
+        "    action: null",
+        "    parent_module: null",
+        "    relative_location: null",
+        "    related_modules: []",
+        "    purpose: null",
+        "tools:",
+        "  - id: null",
+        "    action: null",
+        "    related_module: null",
+        "    related_modules: []",
+        "    when_to_use: null",
+        "    template: null",
+        "    how_to_use: null",
         "entity_relationships:",
         "  - id: null",
         "    action: null",
@@ -288,6 +315,42 @@ def build_implementation_specification_validation_report(
         issues=issues,
         item_label="entity",
     )
+    module_ids, module_items = _collect_section_items(
+        _coerce_sequence(
+            raw_spec.get("modules"),
+            path="modules",
+            issues=issues,
+            issue_code="invalid_modules_section",
+            issue_message="modules must be a list of module mappings.",
+        ),
+        available_ids=set(architecture_summary.module_ids),
+        issues=issues,
+        section_name="modules",
+        item_label="module",
+    )
+    _validate_module_tool_references(
+        module_items,
+        module_ids=set(architecture_summary.module_ids),
+        issues=issues,
+    )
+    tool_ids, tool_items = _collect_section_items(
+        _coerce_sequence(
+            raw_spec.get("tools"),
+            path="tools",
+            issues=issues,
+            issue_code="invalid_tools_section",
+            issue_message="tools must be a list of tool mappings.",
+        ),
+        available_ids=set(architecture_summary.tool_ids),
+        issues=issues,
+        section_name="tools",
+        item_label="tool",
+    )
+    _validate_module_tool_references(
+        tool_items,
+        module_ids=set(architecture_summary.module_ids),
+        issues=issues,
+    )
     relationship_ids, relationship_items = _collect_section_items(
         _coerce_sequence(
             raw_spec.get("entity_relationships"),
@@ -432,12 +495,16 @@ def _load_architecture_specification_summary(
 
     entity_ids = _collect_architecture_ids(raw_spec.get("entities"))
     relationship_ids = _collect_architecture_ids(raw_spec.get("entity_relationships"))
+    module_ids = _collect_architecture_ids(raw_spec.get("modules"))
+    tool_ids = _collect_architecture_ids(raw_spec.get("tools"))
 
     return _ArchitectureSpecificationSummary(
         architecture_id=architecture_id,
         title=_optional_string(raw_spec.get("title")),
         entity_ids=entity_ids,
         relationship_ids=relationship_ids,
+        module_ids=module_ids,
+        tool_ids=tool_ids,
     )
 
 
@@ -583,6 +650,110 @@ def _validate_supercedes(
                 )
 
 
+def _validate_module_tool_references(
+    items: Sequence[_ImplementationSpecificationSectionItem],
+    *,
+    module_ids: set[str],
+    issues: list[ImplementationSpecificationValidationIssue],
+) -> None:
+    for item in items:
+        raw = item.raw
+        if item.path.startswith("modules["):
+            _validate_module_reference(
+                raw.get("parent_module"),
+                module_ids=module_ids,
+                path=f"{item.path}.parent_module",
+                issues=issues,
+            )
+            _validate_module_reference_list(
+                raw.get("related_modules"),
+                module_ids=module_ids,
+                path=f"{item.path}.related_modules",
+                issues=issues,
+            )
+            continue
+
+        _validate_module_reference(
+            raw.get("related_module"),
+            module_ids=module_ids,
+            path=f"{item.path}.related_module",
+            issues=issues,
+        )
+        _validate_module_reference_list(
+            raw.get("related_modules"),
+            module_ids=module_ids,
+            path=f"{item.path}.related_modules",
+            issues=issues,
+        )
+
+
+def _validate_module_reference(
+    raw_reference: object,
+    *,
+    module_ids: set[str],
+    path: str,
+    issues: list[ImplementationSpecificationValidationIssue],
+) -> None:
+    if raw_reference is None:
+        return
+    if isinstance(raw_reference, Sequence) and not isinstance(
+        raw_reference, (str, bytes)
+    ):
+        _validate_module_reference_list(
+            raw_reference,
+            module_ids=module_ids,
+            path=path,
+            issues=issues,
+        )
+        return
+    reference = _optional_string(raw_reference)
+    if reference is None:
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code="invalid_module_reference",
+                message="Module references must be module ids.",
+                path=path,
+            )
+        )
+    elif reference not in module_ids:
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code="unknown_module_reference",
+                message=f"Module id {reference!r} is not listed in modules.",
+                path=path,
+            )
+        )
+
+
+def _validate_module_reference_list(
+    raw_references: object,
+    *,
+    module_ids: set[str],
+    path: str,
+    issues: list[ImplementationSpecificationValidationIssue],
+) -> None:
+    if raw_references is None:
+        return
+    if not isinstance(raw_references, Sequence) or isinstance(
+        raw_references, (str, bytes)
+    ):
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code="invalid_module_reference_list",
+                message="related_modules must be a list of module ids.",
+                path=path,
+            )
+        )
+        return
+    for index, raw_reference in enumerate(raw_references):
+        _validate_module_reference(
+            raw_reference,
+            module_ids=module_ids,
+            path=f"{path}[{index}]",
+            issues=issues,
+        )
+
+
 def _required_action(
     raw_value: object,
     *,
@@ -603,7 +774,9 @@ def _required_action(
         issues.append(
             ImplementationSpecificationValidationIssue(
                 code="invalid_action",
-                message="Each item action must be one of 'added' or 'removed'.",
+                message=(
+                    "Each item action must be one of 'added', 'removed', or 'changed'."
+                ),
                 path=path,
             )
         )

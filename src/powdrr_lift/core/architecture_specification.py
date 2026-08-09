@@ -18,6 +18,7 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
+_MODULE_TOOL_ACTIONS = {"added", "removed", "changed"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +33,8 @@ class ArchitectureSpecificationValidationReport:
     validation_successful: bool
     title: str | None
     allowed_entity_types: list[str] = field(default_factory=list)
+    module_ids: list[str] = field(default_factory=list)
+    tool_ids: list[str] = field(default_factory=list)
     issues: list[ArchitectureSpecificationValidationIssue] = field(default_factory=list)
 
 
@@ -76,6 +79,11 @@ def render_architecture_specification_template(
         "#   relationship listed in each item's related block.",
         "# - Keep every entity mentioned in a relationship, invariant, or",
         "#   guidance item present in the `entities` section.",
+        "# - Use `action: added`, `removed`, or `changed` for modules and tools.",
+        "# - Every module parent_module and related_modules reference must name",
+        "#   an id declared in the modules section.",
+        "# - Tool related_module and related_modules references must name a",
+        "#   module id; related_modules values are lists of ids.",
         "# - Delete these instructions and replace them with this comment at the top:",
         '#   "# This file is read-only and should never be edited by a tool or agent."',
         "#",
@@ -89,6 +97,21 @@ def render_architecture_specification_template(
         "    type: null",
         "    summary: null",
         "    rationale: null",
+        "modules:",
+        "  - id: null",
+        "    action: null",
+        "    parent_module: null",
+        "    relative_location: null",
+        "    related_modules: []",
+        "    purpose: null",
+        "tools:",
+        "  - id: null",
+        "    action: null",
+        "    related_module: null",
+        "    related_modules: []",
+        "    when_to_use: null",
+        "    template: null",
+        "    how_to_use: null",
         "entity_relationships:",
         "  - id: null",
         "    source: null",
@@ -242,6 +265,27 @@ def build_architecture_specification_validation_report(
         system_reference_ids=system_reference_ids,
         issues=issues,
     )
+    module_ids = _collect_module_ids(
+        _coerce_sequence(
+            raw_spec.get("modules"),
+            path="modules",
+            issues=issues,
+            issue_code="invalid_modules_section",
+            issue_message="modules must be a list of module mappings.",
+        ),
+        issues=issues,
+    )
+    tool_ids = _collect_tool_ids(
+        _coerce_sequence(
+            raw_spec.get("tools"),
+            path="tools",
+            issues=issues,
+            issue_code="invalid_tools_section",
+            issue_message="tools must be a list of tool mappings.",
+        ),
+        module_ids=module_ids,
+        issues=issues,
+    )
     relationship_ids = _collect_relationship_ids(
         _coerce_sequence(
             raw_spec.get("entity_relationships"),
@@ -287,6 +331,8 @@ def build_architecture_specification_validation_report(
         validation_successful=not issues,
         title=title,
         allowed_entity_types=allowed_entity_types,
+        module_ids=sorted(module_ids),
+        tool_ids=sorted(tool_ids),
         issues=issues,
     )
 
@@ -396,6 +442,217 @@ def _collect_entity_ids(
         entity_ids.add(entity_id)
 
     return entity_ids
+
+
+def _collect_module_ids(
+    raw_modules: Sequence[object],
+    *,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    module_ids: set[str] = set()
+    module_items: list[tuple[int, Mapping[str, Any], str]] = []
+    for index, raw_module in enumerate(raw_modules):
+        module = _coerce_mapping(
+            raw_module,
+            path=f"modules[{index}]",
+            issues=issues,
+            issue_code="invalid_module_entry",
+            issue_message="Each module entry must be a mapping.",
+        )
+        if module is None:
+            continue
+
+        module_id = _required_string(
+            module.get("id"),
+            path=f"modules[{index}].id",
+            issues=issues,
+            issue_code="module_id_missing",
+            issue_message="Each module must include an id.",
+        )
+        _validate_module_tool_action(
+            module.get("action"),
+            path=f"modules[{index}].action",
+            issues=issues,
+        )
+        if module_id is None:
+            continue
+        if module_id in module_ids:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="duplicate_module_id",
+                    message=f"Module id {module_id!r} appears more than once.",
+                    path=f"modules[{index}].id",
+                )
+            )
+            continue
+        module_ids.add(module_id)
+        module_items.append((index, module, module_id))
+
+    for index, module, _ in module_items:
+        _validate_optional_module_reference(
+            module.get("parent_module"),
+            module_ids=module_ids,
+            path=f"modules[{index}].parent_module",
+            issues=issues,
+        )
+        _validate_module_reference_list(
+            module.get("related_modules"),
+            module_ids=module_ids,
+            path=f"modules[{index}].related_modules",
+            issues=issues,
+        )
+
+    return module_ids
+
+
+def _collect_tool_ids(
+    raw_tools: Sequence[object],
+    *,
+    module_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    tool_ids: set[str] = set()
+    for index, raw_tool in enumerate(raw_tools):
+        tool = _coerce_mapping(
+            raw_tool,
+            path=f"tools[{index}]",
+            issues=issues,
+            issue_code="invalid_tool_entry",
+            issue_message="Each tool entry must be a mapping.",
+        )
+        if tool is None:
+            continue
+
+        tool_id = _required_string(
+            tool.get("id"),
+            path=f"tools[{index}].id",
+            issues=issues,
+            issue_code="tool_id_missing",
+            issue_message="Each tool must include an id.",
+        )
+        _validate_module_tool_action(
+            tool.get("action"),
+            path=f"tools[{index}].action",
+            issues=issues,
+        )
+        if tool_id is None:
+            continue
+        if tool_id in tool_ids:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="duplicate_tool_id",
+                    message=f"Tool id {tool_id!r} appears more than once.",
+                    path=f"tools[{index}].id",
+                )
+            )
+            continue
+        tool_ids.add(tool_id)
+
+        _validate_optional_module_reference(
+            tool.get("related_module"),
+            module_ids=module_ids,
+            path=f"tools[{index}].related_module",
+            issues=issues,
+        )
+        _validate_module_reference_list(
+            tool.get("related_modules"),
+            module_ids=module_ids,
+            path=f"tools[{index}].related_modules",
+            issues=issues,
+        )
+
+    return tool_ids
+
+
+def _validate_module_tool_action(
+    raw_action: object,
+    *,
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    action = _required_string(
+        raw_action,
+        path=path,
+        issues=issues,
+        issue_code="module_tool_action_missing",
+        issue_message="Each module and tool must include an action.",
+    )
+    if action is not None and action not in _MODULE_TOOL_ACTIONS:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_module_tool_action",
+                message=(
+                    "Each module and tool action must be one of "
+                    "'added', 'removed', or 'changed'."
+                ),
+                path=path,
+            )
+        )
+
+
+def _validate_optional_module_reference(
+    raw_reference: object,
+    *,
+    module_ids: set[str],
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    if raw_reference is None:
+        return
+    if isinstance(raw_reference, Sequence) and not isinstance(
+        raw_reference, (str, bytes)
+    ):
+        _validate_module_reference_list(
+            raw_reference,
+            module_ids=module_ids,
+            path=path,
+            issues=issues,
+        )
+        return
+    reference = _required_string(
+        raw_reference,
+        path=path,
+        issues=issues,
+        issue_code="invalid_module_reference",
+        issue_message="Module references must be module ids.",
+    )
+    if reference is not None and reference not in module_ids:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="unknown_module_reference",
+                message=f"Module id {reference!r} is not listed in modules.",
+                path=path,
+            )
+        )
+
+
+def _validate_module_reference_list(
+    raw_references: object,
+    *,
+    module_ids: set[str],
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    if raw_references is None:
+        return
+    if not isinstance(raw_references, Sequence) or isinstance(
+        raw_references, (str, bytes)
+    ):
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_module_reference_list",
+                message="related_modules must be a list of module ids.",
+                path=path,
+            )
+        )
+        return
+    for index, raw_reference in enumerate(raw_references):
+        _validate_optional_module_reference(
+            raw_reference,
+            module_ids=module_ids,
+            path=f"{path}[{index}]",
+            issues=issues,
+        )
 
 
 def _collect_relationship_ids(

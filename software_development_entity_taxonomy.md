@@ -2,7 +2,7 @@
 
 First-cut taxonomy of software-development-related entity types for tagging, extraction, code review, agent workflows, repo analysis, infrastructure analysis, and documentation analysis.
 
-Total entries: 400
+Total entries: 402
 
 ## Product, org, and ownership entities
 
@@ -21,11 +21,12 @@ Total entries: 400
 13. Feature
 14. Component
 15. Module
-16. Library
-17. SDK
-18. Plugin
-19. Extension
-20. Service catalog entry
+16. Tool
+17. Library
+18. SDK
+19. Plugin
+20. Extension
+21. Service catalog entry
 
 ## Repository and source-control entities
 

@@ -50,6 +50,17 @@ steps:
     it. Otherwise generate the architecture template with module and tool entity
     types enabled, then pass its exact path to the next step.
   tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs/<feature-name>
+    - -name
+    - architecture-specification.yaml
+    - -type
+    - f
+    - -maxdepth
+    - "1"
+    - -print
   - tool: shell
     command:
     - powdrr-lift
@@ -70,8 +81,9 @@ steps:
     linting, and type-check commands, including related_module, when_to_use,
     template, and how_to_use. Preserve existing ids and descriptions when they
     remain accurate; do not invent entities unsupported by codebase evidence.
-    Keep lifecycle actions consistent with the v1 specification contract. Pass
-    the changed path and a summary of the edits to the next step.
+    Use the agent's edit action to write the entities and preserve the v1
+    lifecycle actions. Pass the changed path and a summary of the edits to the
+    next step.
 - description: Validate the bootstrapped architecture specification.
   llm_type: fast_iteration
   details: >-

@@ -190,14 +190,17 @@ continue to handle Command shortcuts itself.
 
 ### Skill flows
 
-Skills are synchronous TUI flows. They are checked in as JSON files under
-`skill-definitions/` and are intended to guide a user through a short sequence
-of plain-English steps.
+Skills are reusable workflow definitions. They are checked in as YAML or JSON
+files under `skill-definitions/` and can be selected by workflow chat, composed
+as nested skills by another skill, or used as the definition behind durable
+agent-workflow tasks. Every invocation resolves a worktree context first: it
+reuses the current dedicated worktree when one exists and creates one when the
+invocation starts from the primary checkout.
 
 - Use `when_to_use` to describe the situations where the skill applies.
 - Use `steps` to list the ordered actions to follow.
-- A step can reference other skills with `uses_skills` when the flow should
-  compose existing skills instead of duplicating them.
+- A step can reference other skills with `uses_skills`; referenced skills run in
+  the same worktree before the parent step continues.
 - The skill loader can validate a directory of skills and ensure every
   referenced skill exists.
 

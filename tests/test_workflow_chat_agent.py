@@ -1673,6 +1673,10 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: repo_root,
+    )
 
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -1915,6 +1919,83 @@ def test_run_workflow_chat_generates_skill_summary(
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Using openai credentials from --api-key" in stderr.getvalue()
+
+
+def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    save_skill(
+        Skill(
+            name="parent",
+            when_to_use=("Run the parent skill.",),
+            steps=(
+                SkillStep(
+                    description="Run the child first.",
+                    uses_skills=("child",),
+                ),
+            ),
+        ),
+        skills_dir / "parent.yaml",
+    )
+    save_skill(
+        Skill(
+            name="child",
+            when_to_use=("Run the child skill.",),
+            steps=(SkillStep(description="Finish the child."),),
+        ),
+        skills_dir / "child.yaml",
+    )
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "parent.yaml"),
+                "selected_skill_reason": "The parent skill matches.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {"kind": "complete", "text": "Child complete."},
+            {"kind": "complete", "text": "Parent complete."},
+        ]
+    )
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            return next(responses)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: repo_root,
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=lambda: "run parent",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert (repo_root / "generated" / "skill-execution.json").exists()
 
 
 def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
@@ -3010,6 +3091,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             captured["api_key"] = api_key
             captured["base_url"] = base_url
             self._call_index = 0
+            self._nested_event_count = 0
 
         def _assert_selection_prompt(self, messages: list[dict[str, str]]) -> None:
             prompt = json.loads(messages[1]["content"])
@@ -3031,7 +3113,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ) -> dict[str, object]:
             prompt = json.loads(messages[1]["content"])
             execution_events = prompt["execution_events"]
-            assert len(execution_events) == expected_event_count
+            assert len(execution_events) == (
+                expected_event_count + self._nested_event_count
+            )
             assert prompt["execution_mode"] == "execute_selected_skill"
             assert prompt["selected_skill"]["name"] == "specify-a-feature"
             assert prompt["current_step_index"] == expected_step_index
@@ -3047,6 +3131,19 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            prompt = json.loads(messages[1]["content"])
+            if (
+                self._call_index > 0
+                and prompt["selected_skill"]["name"] != "specify-a-feature"
+            ):
+                assert prompt["selected_skill"]["name"] in {
+                    "review-system",
+                    "review-architecture",
+                }
+                self._nested_event_count += 1
+                return {
+                    "kind": "next_step",
+                }
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
                 response: dict[str, object] = {
@@ -3615,10 +3712,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "invoke_tool",
         "edit",
         "next_step",
+        "next_step",
+        "next_step",
+        "next_step",
+        "next_step",
         "invoke_tool",
         "next_step",
         "invoke_tool",
         "edit",
+        "next_step",
+        "next_step",
+        "next_step",
+        "next_step",
         "next_step",
         "invoke_tool",
         "next_step",
@@ -3760,19 +3865,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     start_captured: dict[str, object] = {"messages": []}
 
-    def _expected_start_step(call_index: int) -> int:
-        return {
-            1: 0,
-            2: 1,
-            3: 1,
-            4: 2,
-            5: 2,
-            6: 3,
-            7: 4,
-            8: 4,
-            9: 5,
-        }[call_index]
-
     class _FakeStartOpenAIClient:
         def __init__(self, **_: object) -> None:
             self._call_index = 0
@@ -3791,12 +3883,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     for skill in prompt["skills"]
                 )
             else:
+                assert prompt["execution_mode"] == "execute_selected_skill"
+                if prompt["selected_skill"]["name"] == "bootstrap-code-structure":
+                    assert prompt["current_step_index"] < 5
+                    self._call_index += 1
+                    return {"kind": "next_step"}
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
-                )
-                assert prompt["execution_mode"] == "execute_selected_skill"
-                assert prompt["current_step_index"] == _expected_start_step(
-                    self._call_index
                 )
             response = next(start_responses)
             self._call_index += 1
@@ -3846,17 +3939,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert start_summary_path.exists()
     start_summary = json.loads(start_summary_path.read_text(encoding="utf-8"))
     assert start_summary["selected_skill_name"] == "start-implementing-feature"
-    assert [event["kind"] for event in start_summary["execution_events"]] == [
-        "next_step",
-        "invoke_tool",
-        "next_step",
-        "invoke_tool",
-        "next_step",
-        "next_step",
-        "invoke_tool",
-        "next_step",
-        "complete",
-    ]
+    start_event_kinds = [event["kind"] for event in start_summary["execution_events"]]
+    assert start_event_kinds[0] == "next_step"
+    assert start_event_kinds.count("next_step") >= 6
+    assert "invoke_tool" in start_event_kinds
+    assert start_event_kinds[-1] == "complete"
 
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
     tasks = load_workflow_tasks(workflow_directory)

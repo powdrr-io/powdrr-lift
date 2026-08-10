@@ -289,6 +289,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
     assert report.validation_successful is True
     assert report.skill_names == [
+        "bootstrap-code-structure",
         "review-architecture",
         "review-system",
         "specify-a-feature",
@@ -314,14 +315,20 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert first_step_details is not None
     assert "docs/specs" in first_step_details
     assert "canonical feature name" in first_step_details
-    assert "Invoke the fuzzy-match tool" in first_step_details
+    assert "fuzzy-match tool" in first_step_details
+    bootstrap_step_details = skill.steps[1].details
+    assert bootstrap_step_details is not None
+    assert "bootstrap-code-structure" in bootstrap_step_details
+    assert skill.steps[1].uses_skills == ("bootstrap-code-structure",)
     assert "Filter the results to the best matching" in first_step_details
     assert "If the best match is uncertain" in first_step_details
     assert "Do not ask whether documents exist before searching" in first_step_details
-    third_step_details = skill.steps[2].details
-    assert third_step_details is not None
-    assert "templates/execute-proposed-pr.yaml" in third_step_details
-    assert "already exist" in (skill.steps[1].details or "")
+    implementation_step_details = skill.steps[2].details
+    assert implementation_step_details is not None
+    assert "already exist" in implementation_step_details
+    workflow_step_details = skill.steps[3].details
+    assert workflow_step_details is not None
+    assert "templates/execute-proposed-pr.yaml" in workflow_step_details
     assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
     assert skill.steps[0].tool_invocations[0].command == (
         "fuzzy-match",
@@ -347,6 +354,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     )
     assert [step.description for step in skill.steps] == [
         "Discover the feature specification and execution workflows.",
+        "Bootstrap the target module and tool architecture from codebase evidence.",
         "Create implementation specifications for the proposed PRs.",
         "Instantiate an execution workflow for every proposed PR.",
         "Review and approve the implementation plan and workflows.",
@@ -355,13 +363,14 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     ]
     assert [step.llm_type for step in skill.steps] == [
         "standard_reasoning",
+        "standard_reasoning",
         "high_reasoning",
         "simple_task",
         "high_reasoning",
         "simple_task",
         "standard_reasoning",
     ]
-    assert skill.steps[1].tool_invocations[0].command == (
+    assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",
         "implementation-specification",
         "--work-item-name",
@@ -369,7 +378,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--output",
         "docs/specs/<feature-name>/<proposed-pr-name>-implementation-specification.yaml",
     )
-    assert skill.steps[2].tool_invocations[0].command == (
+    assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
         "--work-item-name",
@@ -381,12 +390,12 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
-    assert "dependencies" in (skill.steps[2].details or "")
+    assert "dependencies" in (skill.steps[3].details or "")
     assert "If an execution workflow already exists for every proposed PR" in (
-        skill.steps[2].details or ""
+        skill.steps[3].details or ""
     )
-    assert "invoke the workflow instantiation tool" in (skill.steps[2].details or "")
-    assert [invocation.command for invocation in skill.steps[4].tool_invocations] == [
+    assert "invoke the workflow instantiation tool" in (skill.steps[3].details or "")
+    assert [invocation.command for invocation in skill.steps[5].tool_invocations] == [
         ("git", "status", "--short"),
         ("git", "add", "docs/specs/<feature-name>", "docs/workflows"),
         (

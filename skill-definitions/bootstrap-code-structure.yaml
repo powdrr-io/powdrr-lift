@@ -1,0 +1,122 @@
+---
+name: bootstrap-code-structure
+when_to_use:
+- When implementation is about to begin and the target module's architecture needs
+  current codebase evidence.
+- When a feature needs architecture module and tool entities bootstrapped from the
+  existing source tree.
+- When an agent needs reliable application-code and test-code locations plus the
+  commands used to validate a module.
+steps:
+- description: Discover the target module, its tests, and its development commands.
+  llm_type: high_reasoning
+  details: >-
+    Start by identifying the selected feature's architecture and implementation
+    specifications and the target module or modules. Use the declared
+    fuzzy-match and shell tool calls to discover the repository context, then
+    use basedpyright-symbol to find the relevant public symbols by name and
+    basedpyright-structure on the target Python files to discover their classes,
+    functions, and nesting.
+    Locate the application/source files, test files, fixtures, and configuration
+    that govern the target module. Determine the exact commands used to run the
+    target tests and the applicable formatting, linting, and type-check commands.
+    Record paths, symbols, commands, and evidence in decisions_and_context before
+    continuing. If the target module cannot be identified, ask one specific
+    question rather than guessing.
+  tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs
+    - -name
+    - <feature-name>
+    - -type
+    - d
+    - -maxdepth
+    - "2"
+    - -print
+  - tool: shell
+    command:
+    - rg
+    - --files
+    - src
+    - tests
+    - docs/specs/<feature-name>
+- description: Generate the architecture template for modules and tools.
+  llm_type: simple_task
+  details: >-
+    Locate the selected feature architecture specification from the preceding
+    context. If it already exists, inspect and reuse it rather than overwriting
+    it. Otherwise generate the architecture template with module and tool entity
+    types enabled, then pass its exact path to the next step.
+  tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs/<feature-name>
+    - -name
+    - architecture-specification.yaml
+    - -type
+    - f
+    - -maxdepth
+    - "1"
+    - -print
+  - tool: shell
+    command:
+    - powdrr-lift
+    - architecture-specification
+    - --work-item-name
+    - <feature-name>
+    - --entity-type
+    - module
+    - --entity-type
+    - tool
+- description: Bootstrap missing module and tool entities in the architecture specification.
+  llm_type: standard_reasoning
+  details: >-
+    Compare the discovered code structure with the selected architecture
+    specification. Add or update module entities for the application and test
+    locations, including parent_module, relative_location, related_modules, and
+    purpose. Add or update tool entities for the target module's test, formatting,
+    linting, and type-check commands, including related_module, when_to_use,
+    template, and how_to_use. Preserve existing ids and descriptions when they
+    remain accurate; do not invent entities unsupported by codebase evidence.
+    Use the agent's edit action to write the entities and preserve the v1
+    lifecycle actions. Pass the changed path and a summary of the edits to the
+    next step.
+- description: Validate the bootstrapped architecture specification.
+  llm_type: fast_iteration
+  details: >-
+    Run the architecture validator against the selected feature specification
+    with module and tool entity types enabled. Fix any validation errors in the
+    specification, rerun the validator, and pass the successful validation result
+    to the next step.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - evaluate-architecture-specification
+    - --work-item-name
+    - <feature-name>
+    - --entity-type
+    - module
+    - --entity-type
+    - tool
+- description: Stage the validated architecture specification.
+  llm_type: simple_task
+  details: >-
+    Confirm that the validated architecture specification is the only intended
+    bootstrap artifact, inspect the diff, and stage the exact specification path
+    so the subsequent implementation workflow can include it. Do not stage
+    unrelated files or commit here.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  - tool: shell
+    command:
+    - git
+    - add
+    - docs/specs/<feature-name>/architecture-specification.yaml

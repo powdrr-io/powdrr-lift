@@ -9,10 +9,13 @@ import pytest
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
+    Skill,
+    SkillStep,
     TaskComplexity,
     TaskStatus,
     WorkflowInstance,
     WorkflowTask,
+    save_skill,
 )
 from powdrr_lift.workflow_chat_agent import LLMModelLimits
 from powdrr_lift.workflow_task_agent import (
@@ -75,6 +78,44 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     prompt = client.messages[0][1]["content"]
     assert "staff engineer" in client.messages[0][0]["content"]
     assert '"execution_mode": "process_workflow_task"' in prompt
+
+
+def test_process_workflow_task_runs_nested_skill_in_same_worktree(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="nested-skill",
+            when_to_use=("Run nested work.",),
+            steps=(SkillStep(description="Perform nested work."),),
+        ),
+        skills_dir / "nested-skill.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {"kind": "complete", "text": "Nested work complete."},
+            {"kind": "complete", "output_state": {"ok": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[
+        0
+    ].output_state == {"ok": True}
+    assert len(client.messages) == 3
 
 
 def test_process_workflow_task_relocates_execution_into_dedicated_worktree(

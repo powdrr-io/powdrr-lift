@@ -25,6 +25,15 @@ class SkillValidationReport:
 
 
 @dataclass(frozen=True, slots=True)
+class _SkillDirectoryContents:
+    skill_names: list[str]
+    skill_paths: list[str]
+    skills_by_name: dict[str, Skill]
+    skill_paths_by_name: dict[str, Path]
+    step_references: list[tuple[Path, Skill]]
+
+
+@dataclass(frozen=True, slots=True)
 class SkillToolInvocation:
     tool: str
     command: tuple[str, ...]
@@ -557,6 +566,21 @@ def build_skill_directory_validation_report(
             ],
         )
 
+    contents, issues = _load_skill_directory_contents(directory_path)
+    issues.extend(_validate_skill_references(contents))
+    issues.extend(_validate_skill_dependency_cycles(contents))
+
+    return SkillValidationReport(
+        validation_successful=not issues,
+        skill_names=contents.skill_names,
+        skill_paths=contents.skill_paths,
+        issues=issues,
+    )
+
+
+def _load_skill_directory_contents(
+    directory_path: Path,
+) -> tuple[_SkillDirectoryContents, list[SkillValidationIssue]]:
     issues: list[SkillValidationIssue] = []
     skill_names: list[str] = []
     skill_paths: list[str] = []
@@ -597,9 +621,32 @@ def build_skill_directory_validation_report(
             skill_paths_by_name[skill_name] = skill_path
             skill_names.append(skill_name)
 
-    for skill_path, skill in step_references:
+    return (
+        _SkillDirectoryContents(
+            skill_names=skill_names,
+            skill_paths=skill_paths,
+            skills_by_name=skills_by_name,
+            skill_paths_by_name=skill_paths_by_name,
+            step_references=step_references,
+        ),
+        issues,
+    )
+
+
+def _validate_skill_references(
+    contents: _SkillDirectoryContents,
+) -> list[SkillValidationIssue]:
+    issues: list[SkillValidationIssue] = []
+    for skill_path, skill in contents.step_references:
         for step_index, step in enumerate(skill.steps):
             for ref_index, referenced_skill in enumerate(step.uses_skills):
+                reference_path = _sequence_path(
+                    skill_path,
+                    "steps",
+                    step_index,
+                    "uses_skills",
+                    ref_index,
+                )
                 if referenced_skill == skill.name:
                     issues.append(
                         SkillValidationIssue(
@@ -608,14 +655,10 @@ def build_skill_directory_validation_report(
                                 f"Skill {skill.name!r} cannot reference itself "
                                 "from a step."
                             ),
-                            path=_sequence_path(
-                                skill_path,
-                                "steps",
-                                step_index,
-                            ),
+                            path=reference_path,
                         )
                     )
-                elif referenced_skill not in skills_by_name:
+                elif referenced_skill not in contents.skills_by_name:
                     issues.append(
                         SkillValidationIssue(
                             code="missing_skill_reference",
@@ -623,22 +666,54 @@ def build_skill_directory_validation_report(
                                 f"Skill {skill.name!r} references unknown skill "
                                 f"{referenced_skill!r}."
                             ),
-                            path=_sequence_path(
-                                skill_path,
-                                "steps",
-                                step_index,
-                                "uses_skills",
-                                ref_index,
-                            ),
+                            path=reference_path,
                         )
                     )
+    return issues
 
-    return SkillValidationReport(
-        validation_successful=not issues,
-        skill_names=skill_names,
-        skill_paths=skill_paths,
-        issues=issues,
-    )
+
+def _validate_skill_dependency_cycles(
+    contents: _SkillDirectoryContents,
+) -> list[SkillValidationIssue]:
+    dependency_graph = {
+        skill_name: {
+            referenced_skill
+            for step in skill.steps
+            for referenced_skill in step.uses_skills
+            if referenced_skill in contents.skills_by_name
+        }
+        for skill_name, skill in contents.skills_by_name.items()
+    }
+    cyclic_skills: set[str] = set()
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(skill_name: str) -> None:
+        if skill_name in visiting:
+            cyclic_skills.add(skill_name)
+            return
+        if skill_name in visited:
+            return
+        visiting.add(skill_name)
+        for dependency_name in dependency_graph.get(skill_name, set()):
+            visit(dependency_name)
+            if dependency_name in cyclic_skills:
+                cyclic_skills.add(skill_name)
+        visiting.remove(skill_name)
+        visited.add(skill_name)
+
+    for skill_name in dependency_graph:
+        visit(skill_name)
+    return [
+        SkillValidationIssue(
+            code="cyclic_skill_dependency",
+            message=(
+                f"Skill dependency graph contains a cycle involving {skill_name!r}."
+            ),
+            path=str(contents.skill_paths_by_name[skill_name]),
+        )
+        for skill_name in sorted(cyclic_skills)
+    ]
 
 
 def validate_skill_json(json_content: str) -> str:

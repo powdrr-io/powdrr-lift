@@ -242,6 +242,7 @@ WorkflowChatSelection = SkillChatSelection
 class SkillChatAction:
     kind: str
     tool: str | None = None
+    skill_name: str | None = None
     file_path: str | None = None
     start_line: int | None = None
     end_line: int | None = None
@@ -279,6 +280,13 @@ class _WorkflowExecutionState:
     step_index: int
     worktree_root: Path
     current_file_path: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _SkillExecutionFrame:
+    parent_skill: SkillCatalogEntry
+    resume_step_index: int
+    dependency_key: tuple[str, int, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1012,6 +1020,9 @@ def run_workflow_chat(
         step_index=0,
         worktree_root=worktree_root,
     )
+    root_skill = selected_skill
+    skill_stack: list[_SkillExecutionFrame] = []
+    completed_skill_dependencies: set[tuple[str, int, str]] = set()
     action_handlers = _workflow_action_handlers()
     step_roundtrips = 0
     stalled_roundtrips = 0
@@ -1020,6 +1031,28 @@ def run_workflow_chat(
     while execution_state.step_index < len(selected_skill.skill.steps):
         current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
+        dependency_name = _next_skill_dependency(
+            selected_skill,
+            current_step_index,
+            completed_skill_dependencies,
+        )
+        if dependency_name is not None:
+            nested_skill = _find_skill_by_name(catalog, dependency_name)
+            _push_nested_skill(
+                skill_stack,
+                current_skill=selected_skill,
+                nested_skill=nested_skill,
+                resume_step_index=current_step_index,
+                dependency_key=(
+                    str(selected_skill.path),
+                    current_step_index,
+                    dependency_name,
+                ),
+            )
+            selected_skill = nested_skill
+            execution_state.selected_skill = nested_skill
+            execution_state.step_index = 0
+            continue
         step_mapping = (
             _resolve_llm_mapping(
                 current_step.llm_type or selection.llm_type,
@@ -1074,6 +1107,7 @@ def run_workflow_chat(
                 execution_context=execution_state.execution_context,
                 current_file_path=execution_state.current_file_path,
                 worktree_root=worktree_root,
+                catalog=catalog,
             ),
             parser=_parse_action_response,
             context=(
@@ -1112,6 +1146,37 @@ def run_workflow_chat(
             f"Execution result: kind={action.kind}",
         )
         _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
+
+        if action.kind == "invoke_skill":
+            if action.skill_name is None:
+                raise RuntimeError("invoke_skill action must include a skill name.")
+            nested_skill = _find_skill_by_name(catalog, action.skill_name)
+            _push_nested_skill(
+                skill_stack,
+                current_skill=selected_skill,
+                nested_skill=nested_skill,
+                resume_step_index=current_step_index + 1,
+            )
+            execution_state.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "skill": action.skill_name,
+                    "step_index": current_step_index,
+                }
+            )
+            selected_skill = nested_skill
+            execution_state.selected_skill = nested_skill
+            execution_state.step_index = 0
+            continue
+
+        if action.kind == "complete" and skill_stack:
+            frame = skill_stack.pop()
+            if frame.dependency_key is not None:
+                completed_skill_dependencies.add(frame.dependency_key)
+            selected_skill = frame.parent_skill
+            execution_state.selected_skill = selected_skill
+            execution_state.step_index = frame.resume_step_index
+            continue
         progress.update(
             selected_skill,
             current_step_index=execution_state.step_index,
@@ -1216,6 +1281,15 @@ def run_workflow_chat(
             step_roundtrips = 0
             stalled_roundtrips = 0
             previous_action_signature = None
+        if execution_state.step_index >= len(selected_skill.skill.steps):
+            if skill_stack:
+                frame = skill_stack.pop()
+                if frame.dependency_key is not None:
+                    completed_skill_dependencies.add(frame.dependency_key)
+                selected_skill = frame.parent_skill
+                execution_state.selected_skill = selected_skill
+                execution_state.step_index = frame.resume_step_index
+                continue
         if not should_continue:
             progress.update(
                 selected_skill,
@@ -1225,7 +1299,7 @@ def run_workflow_chat(
             break
 
     summary = _build_skill_execution_summary(
-        selected_skill,
+        root_skill,
         selection,
         execution_state.transcript,
         execution_state.execution_events,
@@ -1617,6 +1691,53 @@ def _find_catalog_entry(
     raise RuntimeError(f"Could not find skill {template_path}.")
 
 
+def _find_skill_by_name(
+    catalog: Sequence[SkillCatalogEntry],
+    skill_name: str,
+) -> SkillCatalogEntry:
+    normalized_name = skill_name.strip().casefold()
+    for entry in catalog:
+        if entry.skill.name.casefold() == normalized_name:
+            return entry
+    raise RuntimeError(f"Could not find referenced skill {skill_name!r}.")
+
+
+def _next_skill_dependency(
+    skill: SkillCatalogEntry,
+    step_index: int,
+    completed_dependencies: set[tuple[str, int, str]],
+) -> str | None:
+    step = skill.skill.steps[step_index]
+    for dependency_name in step.uses_skills:
+        dependency_key = (str(skill.path), step_index, dependency_name)
+        if dependency_key not in completed_dependencies:
+            return dependency_name
+    return None
+
+
+def _push_nested_skill(
+    stack: list[_SkillExecutionFrame],
+    *,
+    current_skill: SkillCatalogEntry,
+    nested_skill: SkillCatalogEntry,
+    resume_step_index: int,
+    dependency_key: tuple[str, int, str] | None = None,
+) -> None:
+    active_skill_paths = {str(frame.parent_skill.path) for frame in stack}
+    active_skill_paths.add(str(current_skill.path))
+    if str(nested_skill.path) in active_skill_paths:
+        raise RuntimeError(
+            f"Recursive skill invocation is not allowed: {nested_skill.skill.name!r}."
+        )
+    stack.append(
+        _SkillExecutionFrame(
+            parent_skill=current_skill,
+            resume_step_index=resume_step_index,
+            dependency_key=dependency_key,
+        )
+    )
+
+
 def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     return {
         "file": str(entry.path),
@@ -1695,6 +1816,7 @@ def _build_step_execution_messages(
     execution_context: Sequence[str],
     current_file_path: Path | None,
     worktree_root: Path,
+    catalog: Sequence[SkillCatalogEntry],
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(worktree_root, current_file_path)
     available_work_items = _available_work_item_names(worktree_root)
@@ -1761,6 +1883,14 @@ def _build_step_execution_messages(
                         ),
                     },
                     "selected_skill": _catalog_entry_to_data(selected_skill),
+                    "available_skills": [
+                        {
+                            "name": entry.skill.name,
+                            "path": str(entry.path),
+                            "when_to_use": list(entry.skill.when_to_use),
+                        }
+                        for entry in catalog
+                    ],
                     "transcript": list(transcript),
                     "execution_events": list(execution_events),
                     "current_file": current_file_context,
@@ -1782,6 +1912,10 @@ def _action_system_prompt() -> str:
         "current file context in the user message. Choose the single next action "
         "that makes the most progress without asking for information already "
         "available.\n"
+        "When current_step.uses_skills is non-empty, those skills run automatically "
+        "in the same worktree before you continue the current step. Use invoke_skill "
+        "only for an additional listed skill that the current step discovers it "
+        "needs.\n"
         "Choose exactly one outcome and use it for the following reason:\n"
         "- gather-context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
@@ -1789,6 +1923,8 @@ def _action_system_prompt() -> str:
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
         "next action is a line-based file change.\n"
+        "- invoke_skill: choose this when a listed skill should run as a nested "
+        "workflow before continuing.\n"
         "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
         "query is the "
         "next action needed to inspect or modify the worktree.\n"
@@ -1811,7 +1947,8 @@ def _action_system_prompt() -> str:
         "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
-        "and basedpyright-structure takes parameters.path; next_step has "
+        "and basedpyright-structure takes parameters.path; invoke_skill takes "
+        "a skill name from available_skills; next_step has "
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
@@ -1827,6 +1964,8 @@ def _action_system_prompt() -> str:
         '"file_edits":[{"file_path":"...","edits":[...]}].\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
         '"llm_type":"simple_task"}\n'
+        '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
+        '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
         '{"kind":"read_document","file_path":"docs/specs/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
         '"llm_type":"long_context"}\n'
@@ -1861,7 +2000,9 @@ def _action_system_prompt() -> str:
         "replacements.\n"
         "When edit is available, current_file includes the file path and its "
         "current contents as context.\n"
-        "Use invoke_tool for shell commands, fuzzy-match searches, or basedpyright "
+        "Use invoke_skill for a listed nested skill; it runs in the same worktree "
+        "and returns here when complete. Use invoke_tool for shell commands, "
+        "fuzzy-match searches, or basedpyright "
         "symbol and structure queries.\n"
         "Use read_document instead of requesting or embedding an entire large "
         "document when only a section is needed. The returned line-numbered "
@@ -1971,6 +2112,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
         {
             "kind": action.kind,
             "tool": action.tool,
+            "skill_name": action.skill_name,
             "file_path": action.file_path,
             "start_line": action.start_line,
             "end_line": action.end_line,
@@ -2424,10 +2566,27 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "edit": _parse_workflow_action_edit,
         "gather-context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
+        "invoke_skill": _parse_workflow_action_invoke_skill,
         "read_document": _parse_workflow_action_read_document,
         "next_step": _parse_workflow_action_next_step,
         "prompt_user": _parse_workflow_action_prompt_user,
     }
+
+
+def _parse_workflow_action_invoke_skill(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    skill_name = payload.get("skill")
+    if not isinstance(skill_name, str) or not skill_name.strip():
+        raise RuntimeError("Workflow invoke_skill action must include skill.")
+    return SkillChatAction(
+        kind="invoke_skill",
+        skill_name=skill_name.strip(),
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
 
 
 def _parse_workflow_action_complete(
@@ -3890,7 +4049,8 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "context. The available actions are: gather-context to discover "
         "repository specifications before deciding; prompt_user to ask one "
         "necessary human question; edit to make a known line-based file change; "
-        "invoke_tool to run a shell or fuzzy-match command; read_document to "
+        "invoke_skill to run a listed nested skill; invoke_tool to run a shell, "
+        "fuzzy-match, or basedpyright query; read_document to "
         "request a bounded line range from a known document; next_step when the "
         "current step is complete; and complete when the skill is finished.\n"
         "If the original action response was empty, choose next_step when the "
@@ -3899,7 +4059,8 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "as next_step.\n"
         "Return exactly one JSON object with a kind and the fields required by "
         "that action. Use file_path and edits or file_edits for edit, tool and "
-        "parameters.command for invoke_tool, file_path with positive start_line "
+        "parameters.command for invoke_tool, skill for invoke_skill, file_path "
+        "with positive start_line "
         "and end_line for read_document, non-empty types for gather-context, "
         "and a clear English question ending in '?' for prompt_user. Do not "
         "combine actions or output markdown."

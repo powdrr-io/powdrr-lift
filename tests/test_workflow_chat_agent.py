@@ -2155,7 +2155,6 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
             captured["api_key"] = api_key
             captured["base_url"] = base_url
             self._call_index = 0
-            self._nested_event_count = 0
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
@@ -3092,6 +3091,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             captured["api_key"] = api_key
             captured["base_url"] = base_url
             self._call_index = 0
+            self._nested_event_count = 0
 
         def _assert_selection_prompt(self, messages: list[dict[str, str]]) -> None:
             prompt = json.loads(messages[1]["content"])

@@ -9,6 +9,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TextIO
 
+from powdrr_lift.basedpyright_tools import (
+    BASEDPYRIGHT_STRUCTURE_TOOL,
+    BASEDPYRIGHT_SYMBOL_TOOL,
+    execute_basedpyright_tool,
+    is_basedpyright_tool,
+)
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -387,10 +393,17 @@ def run_workflow_task(
                             action.parameters,
                             worktree_root=repo_root,
                         )
+                    elif is_basedpyright_tool(action.tool):
+                        result = execute_basedpyright_tool(
+                            action.tool,
+                            action.parameters,
+                            worktree_root=repo_root,
+                        )
                     else:
                         raise RuntimeError(
                             f"Unsupported workflow task tool {action.tool!r}; "
-                            "supported tools are shell and fuzzy-match."
+                            "supported tools are shell, fuzzy-match, "
+                            "basedpyright-symbol, and basedpyright-structure."
                         )
                 except (RuntimeError, ValueError) as exc:
                     response_correction = _action_response_correction(action, exc)
@@ -783,6 +796,20 @@ def _build_task_messages(
                                 "fuzzy name matching."
                             ),
                         },
+                        {
+                            "name": BASEDPYRIGHT_SYMBOL_TOOL,
+                            "description": (
+                                "Find Python symbols by name across the worktree. "
+                                "Parameters: query and optional limit."
+                            ),
+                        },
+                        {
+                            "name": BASEDPYRIGHT_STRUCTURE_TOOL,
+                            "description": (
+                                "Discover the classes, functions, methods, and "
+                                "variables in a Python file. Parameter: path."
+                            ),
+                        },
                     ],
                     "response_correction": response_correction,
                 },
@@ -937,7 +964,8 @@ def _task_system_prompt() -> str:
         "- prompt_user: choose this when a human decision or review is required; "
         "the execution agent will persist it as a human workflow task.\n"
         "- edit: choose this for a known line-based file change.\n"
-        "- invoke_tool: choose this when a shell or fuzzy-match command is needed "
+        "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
+        "query is needed "
         "to inspect the worktree or perform work required to determine the "
         "output.\n"
         "- read_document: choose this when specific lines from a known document "
@@ -959,7 +987,8 @@ def _task_system_prompt() -> str:
         "keywords when repository specifications must be discovered. Use "
         "prompt_user instead of get-human-input; the execution agent converts it "
         "to a durable human task and follow-up task. Use invoke_tool for shell "
-        "commands or fuzzy-match searches. "
+        "commands, fuzzy-match searches, or basedpyright symbol and structure "
+        "queries. "
         "The fuzzy-match command starts with fuzzy-match and supports find-like "
         "options including -name, -path, -type, -maxdepth, -mindepth, "
         "-threshold, and -print. Use complete "

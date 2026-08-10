@@ -27,6 +27,12 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
     termios = None  # type: ignore[assignment]
     tty = None  # type: ignore[assignment]
 
+from powdrr_lift.basedpyright_tools import (
+    BASEDPYRIGHT_STRUCTURE_TOOL,
+    BASEDPYRIGHT_SYMBOL_TOOL,
+    execute_basedpyright_tool,
+    is_basedpyright_tool,
+)
 from powdrr_lift.core import (
     Skill,
     architecture_specification_default_output_path,
@@ -1722,6 +1728,20 @@ def _build_step_execution_messages(
                                 "'<feature-name>', '-type', 'd', '-maxdepth', '2']."
                             ),
                         },
+                        {
+                            "name": BASEDPYRIGHT_SYMBOL_TOOL,
+                            "description": (
+                                "Find Python symbols by name across the worktree. "
+                                "Parameters: query and optional limit."
+                            ),
+                        },
+                        {
+                            "name": BASEDPYRIGHT_STRUCTURE_TOOL,
+                            "description": (
+                                "Discover the classes, functions, methods, and "
+                                "variables in a Python file. Parameter: path."
+                            ),
+                        },
                     ],
                     "available_context_types": [
                         {
@@ -1769,7 +1789,8 @@ def _action_system_prompt() -> str:
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
         "next action is a line-based file change.\n"
-        "- invoke_tool: choose this when a shell or fuzzy-match command is the "
+        "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
+        "query is the "
         "next action needed to inspect or modify the worktree.\n"
         "- read_document: choose this when you know the document path but need "
         "specific lines from that document before deciding the next action. "
@@ -1788,7 +1809,9 @@ def _action_system_prompt() -> str:
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
         "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
-        "parameters.command as a non-empty string or string array; next_step has "
+        "parameters.command as a non-empty string or string array, except that "
+        "basedpyright-symbol takes parameters.query and optional parameters.limit "
+        "and basedpyright-structure takes parameters.path; next_step has "
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
@@ -1838,7 +1861,8 @@ def _action_system_prompt() -> str:
         "replacements.\n"
         "When edit is available, current_file includes the file path and its "
         "current contents as context.\n"
-        "Use invoke_tool for shell commands or fuzzy-match searches.\n"
+        "Use invoke_tool for shell commands, fuzzy-match searches, or basedpyright "
+        "symbol and structure queries.\n"
         "Use read_document instead of requesting or embedding an entire large "
         "document when only a section is needed. The returned line-numbered "
         "excerpt will be included in the next roundtrip context.\n"
@@ -2269,10 +2293,17 @@ def _handle_workflow_action_invoke_tool(
             stderr=stderr,
             verbose=config.verbose,
         )
+    elif is_basedpyright_tool(action.tool or ""):
+        assert action.tool is not None
+        tool_result = execute_basedpyright_tool(
+            action.tool,
+            action.parameters,
+            worktree_root=state.worktree_root,
+        )
     else:
         raise RuntimeError(
-            f"Unsupported workflow tool {action.tool!r}; supported tools are shell "
-            "and fuzzy-match."
+            f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
+            "fuzzy-match, basedpyright-symbol, and basedpyright-structure."
         )
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
@@ -2478,6 +2509,15 @@ def _parse_workflow_action_invoke_tool(
     parameters = payload.get("parameters")
     if not isinstance(parameters, dict):
         raise RuntimeError("Workflow invoke_tool action must include parameters.")
+    normalized_tool = tool.strip()
+    if is_basedpyright_tool(normalized_tool):
+        return SkillChatAction(
+            kind="invoke_tool",
+            tool=normalized_tool,
+            parameters=dict(parameters),
+            decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
+        )
     command = parameters.get("command")
     if isinstance(command, str):
         normalized_parameters = dict(parameters)
@@ -2487,7 +2527,7 @@ def _parse_workflow_action_invoke_tool(
         normalized_parameters["command"] = normalized_command
         return SkillChatAction(
             kind="invoke_tool",
-            tool=tool.strip(),
+            tool=normalized_tool,
             parameters=normalized_parameters,
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
@@ -2505,7 +2545,7 @@ def _parse_workflow_action_invoke_tool(
         normalized_parameters["command"] = normalized_command_list
         return SkillChatAction(
             kind="invoke_tool",
-            tool=tool.strip(),
+            tool=normalized_tool,
             parameters=normalized_parameters,
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,

@@ -9,8 +9,12 @@ when_to_use:
 steps:
 - description: Discover the feature specification and execution workflows.
   llm_type: standard_reasoning
+  uses_skills:
+  - bootstrap-code-structure
   details: >-
-    Invoke the fuzzy-match tool to discover candidates for the feature
+    First invoke the bootstrap-code-structure skill in the current worktree. It
+    must complete before this step continues. Then invoke the fuzzy-match tool to
+    discover candidates for the feature
     specification and its execution workflows. Search docs/specs and
     docs/workflows using the feature name from the user's request. Filter the
     results to the best matching feature directory and workflow directories.

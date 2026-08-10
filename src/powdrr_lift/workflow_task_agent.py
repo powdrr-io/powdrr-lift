@@ -32,12 +32,16 @@ from powdrr_lift.core.spec_context import (
 from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
     LocalLlamaChatClient,
+    SkillCatalogEntry,
     SkillChatAction,
     _apply_file_edits,
+    _build_step_execution_messages,
     _estimate_message_tokens,
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
+    _find_skill_by_name,
     _LLMExchangeRecordingClient,
+    _load_skill_catalog,
     _long_context_backup_for,
     _model_limits_for,
     _parse_action_response,
@@ -72,6 +76,7 @@ class WorkflowTaskAgentConfig:
 class WorkflowTaskAction:
     kind: str
     tool: str = "shell"
+    skill_name: str | None = None
     file_path: str | None = None
     start_line: int | None = None
     end_line: int | None = None
@@ -98,6 +103,10 @@ def run_workflow_task(
         config,
         configured_repo_root=configured_repo_root,
         stdout=stdout,
+        stderr=stderr,
+    )
+    skill_catalog = _load_skill_catalog(
+        repo_root / "skill-definitions",
         stderr=stderr,
     )
     workflow = WorkflowInstance.from_directory(workflow_dir)
@@ -154,6 +163,7 @@ def run_workflow_task(
             workflow,
             task,
             events,
+            skill_catalog=skill_catalog,
             response_correction=response_correction,
             compacted_context=compacted_context,
         )
@@ -349,6 +359,28 @@ def run_workflow_task(
                 stdout=stdout,
             )
             return 0
+        if action.kind == "invoke_skill":
+            if action.skill_name is None:
+                raise RuntimeError("invoke_skill action must include a skill name.")
+            nested_result = _run_skill_for_agent(
+                action.skill_name,
+                catalog=skill_catalog,
+                client=client,
+                task=task,
+                repo_root=repo_root,
+                stdout=stdout,
+                stderr=stderr,
+                max_timeout_retries=config.max_timeout_retries,
+                timeout_backoff_seconds=config.timeout_backoff_seconds,
+            )
+            events.append(
+                {
+                    "kind": action.kind,
+                    "skill": action.skill_name,
+                    "result": nested_result,
+                }
+            )
+            continue
         if action.kind == "invoke_tool":
             repaired_parameters = _repair_workflow_file_command(
                 action.parameters,
@@ -762,6 +794,7 @@ def _build_task_messages(
     *,
     response_correction: str | None = None,
     compacted_context: dict[str, Any] | None = None,
+    skill_catalog: tuple[SkillCatalogEntry, ...] = (),
 ) -> list[dict[str, str]]:
     context_data: dict[str, Any]
     if compacted_context is None:
@@ -810,6 +843,14 @@ def _build_task_messages(
                                 "variables in a Python file. Parameter: path."
                             ),
                         },
+                    ],
+                    "available_skills": [
+                        {
+                            "name": entry.skill.name,
+                            "path": str(entry.path),
+                            "when_to_use": list(entry.skill.when_to_use),
+                        }
+                        for entry in skill_catalog
                     ],
                     "response_correction": response_correction,
                 },
@@ -964,6 +1005,8 @@ def _task_system_prompt() -> str:
         "- prompt_user: choose this when a human decision or review is required; "
         "the execution agent will persist it as a human workflow task.\n"
         "- edit: choose this for a known line-based file change.\n"
+        "- invoke_skill: choose this when a listed skill should run as a nested "
+        "workflow in the current worktree.\n"
         "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
         "query is needed "
         "to inspect the worktree or perform work required to determine the "
@@ -980,6 +1023,7 @@ def _task_system_prompt() -> str:
         '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
         '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
+        '{"kind":"invoke_skill","skill":"bootstrap-code-structure"}\n'
         '{"kind":"read_document","file_path":"path","start_line":1,"end_line":20}\n'
         '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
@@ -1091,6 +1135,136 @@ def _parse_task_action(payload: dict[str, Any]) -> WorkflowTaskAction:
     )
 
 
+def _run_skill_for_agent(
+    skill_name: str,
+    *,
+    catalog: tuple[SkillCatalogEntry, ...],
+    client: WorkflowTaskChatClient,
+    task: WorkflowTask,
+    repo_root: Path,
+    stdout: TextIO,
+    stderr: TextIO,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+) -> dict[str, Any]:
+    selected_skill = _find_skill_by_name(catalog, skill_name)
+    stack: list[tuple[SkillCatalogEntry, int]] = [(selected_skill, 0)]
+    transcript = [{"role": "user", "content": task.description}]
+    execution_events: list[dict[str, Any]] = []
+    execution_context = [
+        f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
+        task.details or "",
+    ]
+    while stack:
+        current_skill, step_index = stack[-1]
+        if step_index >= len(current_skill.skill.steps):
+            stack.pop()
+            continue
+        step = current_skill.skill.steps[step_index]
+        messages = _build_step_execution_messages(
+            selected_skill=current_skill,
+            current_step=step,
+            current_step_index=step_index,
+            transcript=transcript,
+            execution_events=execution_events,
+            execution_context=execution_context,
+            current_file_path=None,
+            worktree_root=repo_root,
+            catalog=catalog,
+        )
+        response = _complete_task_json_with_timeout_retry(
+            client,
+            messages,
+            model="nested-skill",
+            stderr=stderr,
+            max_timeout_retries=max_timeout_retries,
+            timeout_backoff_seconds=timeout_backoff_seconds,
+        )
+        action = _parse_action_response(response)
+        if action.kind == "complete":
+            stack.pop()
+            execution_events.append(
+                {"kind": action.kind, "skill": current_skill.skill.name}
+            )
+            continue
+        if action.kind == "next_step":
+            stack[-1] = (current_skill, step_index + 1)
+            execution_events.append(
+                {"kind": action.kind, "skill": current_skill.skill.name}
+            )
+            continue
+        if action.kind == "invoke_skill":
+            if action.skill_name is None:
+                raise RuntimeError("invoke_skill action must include a skill name.")
+            nested_skill = _find_skill_by_name(catalog, action.skill_name)
+            if any(entry.path == nested_skill.path for entry, _ in stack):
+                raise RuntimeError(
+                    f"Recursive skill invocation is not allowed: {action.skill_name!r}."
+                )
+            stack.append((nested_skill, 0))
+            execution_events.append({"kind": action.kind, "skill": action.skill_name})
+            continue
+        if action.kind == "gather-context":
+            report = gather_specification_context(
+                repo_root,
+                types=list(action.types),
+                keywords=list(action.keywords),
+            )
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": json.loads(render_gather_context_report(report)),
+                }
+            )
+            continue
+        if action.kind == "read_document":
+            task_action = _workflow_task_action_from_skill_action(action)
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": _read_task_document(task_action, repo_root),
+                }
+            )
+            continue
+        if action.kind == "edit":
+            task_action = _workflow_task_action_from_skill_action(action)
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": _apply_task_edits(task_action, repo_root),
+                }
+            )
+            continue
+        if action.kind == "invoke_tool":
+            if action.tool == "shell":
+                result = _execute_shell_tool(
+                    action.parameters,
+                    worktree_root=repo_root,
+                    stdout=stdout,
+                    stderr=stderr,
+                    verbose=False,
+                )
+            elif action.tool == "fuzzy-match":
+                result = _execute_fuzzy_match_tool(
+                    action.parameters,
+                    worktree_root=repo_root,
+                )
+            elif is_basedpyright_tool(action.tool or ""):
+                result = execute_basedpyright_tool(
+                    action.tool or "",
+                    action.parameters,
+                    worktree_root=repo_root,
+                )
+            else:
+                raise RuntimeError(f"Unsupported nested skill tool: {action.tool!r}")
+            execution_events.append({"kind": action.kind, "result": result})
+            continue
+        if action.kind == "prompt_user":
+            raise RuntimeError("Nested skills in agent workflows cannot prompt users.")
+        raise RuntimeError(f"Unsupported nested skill action: {action.kind!r}")
+    return {"skill": skill_name, "events": execution_events}
+
+
 def _read_task_document(
     action: WorkflowTaskAction,
     repo_root: Path,
@@ -1184,6 +1358,7 @@ def _workflow_task_action_from_skill_action(
     return WorkflowTaskAction(
         kind=action.kind,
         tool=action.tool or "shell",
+        skill_name=action.skill_name,
         file_path=action.file_path,
         start_line=action.start_line,
         end_line=action.end_line,

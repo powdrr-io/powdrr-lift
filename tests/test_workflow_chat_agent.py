@@ -1673,6 +1673,10 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: repo_root,
+    )
 
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -1915,6 +1919,83 @@ def test_run_workflow_chat_generates_skill_summary(
     assert "What feature are you specifying?" in stdout.getvalue()
     assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Using openai credentials from --api-key" in stderr.getvalue()
+
+
+def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir()
+    save_skill(
+        Skill(
+            name="parent",
+            when_to_use=("Run the parent skill.",),
+            steps=(
+                SkillStep(
+                    description="Run the child first.",
+                    uses_skills=("child",),
+                ),
+            ),
+        ),
+        skills_dir / "parent.yaml",
+    )
+    save_skill(
+        Skill(
+            name="child",
+            when_to_use=("Run the child skill.",),
+            steps=(SkillStep(description="Finish the child."),),
+        ),
+        skills_dir / "child.yaml",
+    )
+
+    responses: Iterator[dict[str, object]] = iter(
+        [
+            {
+                "selected_skill_path": str(skills_dir / "parent.yaml"),
+                "selected_skill_reason": "The parent skill matches.",
+                "next_question": None,
+                "ready_to_execute": True,
+            },
+            {"kind": "complete", "text": "Child complete."},
+            {"kind": "complete", "text": "Parent complete."},
+        ]
+    )
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            return next(responses)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: repo_root,
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=lambda: "run parent",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert (repo_root / "generated" / "skill-execution.json").exists()
 
 
 def test_workflow_chat_action_prompt_mentions_gather_context() -> None:

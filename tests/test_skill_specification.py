@@ -289,6 +289,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
     assert report.validation_successful is True
     assert report.skill_names == [
+        "bootstrap-code-structure",
         "review-architecture",
         "review-system",
         "specify-a-feature",
@@ -314,7 +315,9 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert first_step_details is not None
     assert "docs/specs" in first_step_details
     assert "canonical feature name" in first_step_details
-    assert "Invoke the fuzzy-match tool" in first_step_details
+    assert "bootstrap-code-structure" in first_step_details
+    assert "fuzzy-match tool" in first_step_details
+    assert skill.steps[0].uses_skills == ("bootstrap-code-structure",)
     assert "Filter the results to the best matching" in first_step_details
     assert "If the best match is uncertain" in first_step_details
     assert "Do not ask whether documents exist before searching" in first_step_details

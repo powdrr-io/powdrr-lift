@@ -633,6 +633,46 @@ def build_skill_directory_validation_report(
                         )
                     )
 
+    dependency_graph = {
+        skill_name: {
+            referenced_skill
+            for step in skill.steps
+            for referenced_skill in step.uses_skills
+            if referenced_skill in skills_by_name
+        }
+        for skill_name, skill in skills_by_name.items()
+    }
+    cyclic_skills: set[str] = set()
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(skill_name: str) -> None:
+        if skill_name in visiting:
+            cyclic_skills.add(skill_name)
+            return
+        if skill_name in visited:
+            return
+        visiting.add(skill_name)
+        for dependency_name in dependency_graph.get(skill_name, set()):
+            visit(dependency_name)
+            if dependency_name in cyclic_skills:
+                cyclic_skills.add(skill_name)
+        visiting.remove(skill_name)
+        visited.add(skill_name)
+
+    for skill_name in dependency_graph:
+        visit(skill_name)
+    for skill_name in sorted(cyclic_skills):
+        issues.append(
+            SkillValidationIssue(
+                code="cyclic_skill_dependency",
+                message=(
+                    f"Skill dependency graph contains a cycle involving {skill_name!r}."
+                ),
+                path=str(skill_paths_by_name[skill_name]),
+            )
+        )
+
     return SkillValidationReport(
         validation_successful=not issues,
         skill_names=skill_names,

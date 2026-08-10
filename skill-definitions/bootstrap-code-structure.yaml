@@ -1,0 +1,43 @@
+---
+name: bootstrap-code-structure
+when_to_use:
+- When implementation is about to begin and the target module's architecture needs
+  current codebase evidence.
+- When a feature needs architecture module and tool entities bootstrapped from the
+  existing source tree.
+- When an agent needs reliable application-code and test-code locations plus the
+  commands used to validate a module.
+steps:
+- description: Discover the target module, its tests, and its development commands.
+  llm_type: high_reasoning
+  details: >-
+    Work in the current worktree. Start by identifying the selected feature's
+    architecture and implementation specifications and the target module or
+    modules. Use basedpyright-symbol to find the relevant public symbols by name,
+    basedpyright-structure on the target Python files to discover their classes,
+    functions, and nesting, and fuzzy-match plus shell for repository exploration.
+    Locate the application/source files, test files, fixtures, and configuration
+    that govern the target module. Determine the exact commands used to run the
+    target tests and the applicable formatting, linting, and type-check commands.
+    Record paths, symbols, commands, and evidence in decisions_and_context before
+    continuing. If the target module cannot be identified, ask one specific
+    question rather than guessing.
+- description: Bootstrap missing module and tool entities in the architecture specification.
+  llm_type: standard_reasoning
+  details: >-
+    Compare the discovered code structure with the selected architecture
+    specification. Add or update module entities for the application and test
+    locations, including parent_module, relative_location, related_modules, and
+    purpose. Add or update tool entities for the target module's test, formatting,
+    linting, and type-check commands, including related_module, when_to_use,
+    template, and how_to_use. Preserve existing ids and descriptions when they
+    remain accurate; do not invent entities unsupported by codebase evidence.
+    Keep lifecycle actions consistent with the v1 specification contract. Validate
+    the architecture specification after editing and pass the changed path and
+    validation result to the next step.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --check

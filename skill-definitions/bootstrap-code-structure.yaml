@@ -22,6 +22,24 @@ steps:
     Record paths, symbols, commands, and evidence in decisions_and_context before
     continuing. If the target module cannot be identified, ask one specific
     question rather than guessing.
+- description: Generate the architecture template for modules and tools.
+  llm_type: simple_task
+  details: >-
+    Locate the selected feature architecture specification from the preceding
+    context. If it already exists, inspect and reuse it rather than overwriting
+    it. Otherwise generate the architecture template with module and tool entity
+    types enabled, then pass its exact path to the next step.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - architecture-specification
+    - --work-item-name
+    - <feature-name>
+    - --entity-type
+    - module
+    - --entity-type
+    - tool
 - description: Bootstrap missing module and tool entities in the architecture specification.
   llm_type: standard_reasoning
   details: >-
@@ -32,12 +50,41 @@ steps:
     linting, and type-check commands, including related_module, when_to_use,
     template, and how_to_use. Preserve existing ids and descriptions when they
     remain accurate; do not invent entities unsupported by codebase evidence.
-    Keep lifecycle actions consistent with the v1 specification contract. Validate
-    the architecture specification after editing and pass the changed path and
-    validation result to the next step.
+    Keep lifecycle actions consistent with the v1 specification contract. Pass
+    the changed path and a summary of the edits to the next step.
+- description: Validate the bootstrapped architecture specification.
+  llm_type: fast_iteration
+  details: >-
+    Run the architecture validator against the selected feature specification
+    with module and tool entity types enabled. Fix any validation errors in the
+    specification, rerun the validator, and pass the successful validation result
+    to the next step.
+  tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - evaluate-architecture-specification
+    - --work-item-name
+    - <feature-name>
+    - --entity-type
+    - module
+    - --entity-type
+    - tool
+- description: Stage the validated architecture specification.
+  llm_type: simple_task
+  details: >-
+    Confirm that the validated architecture specification is the only intended
+    bootstrap artifact, inspect the diff, and stage the exact specification path
+    so the subsequent implementation workflow can include it. Do not stage
+    unrelated files or commit here.
   tool_invocations:
   - tool: shell
     command:
     - git
-    - diff
-    - --check
+    - status
+    - --short
+  - tool: shell
+    command:
+    - git
+    - add
+    - docs/specs/<feature-name>/architecture-specification.yaml

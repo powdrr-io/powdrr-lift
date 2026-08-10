@@ -11,17 +11,37 @@ steps:
 - description: Discover the target module, its tests, and its development commands.
   llm_type: high_reasoning
   details: >-
-    Work in the current worktree. Start by identifying the selected feature's
-    architecture and implementation specifications and the target module or
-    modules. Use basedpyright-symbol to find the relevant public symbols by name,
+    Start by identifying the selected feature's architecture and implementation
+    specifications and the target module or modules. Use the declared
+    fuzzy-match and shell tool calls to discover the repository context, then
+    use basedpyright-symbol to find the relevant public symbols by name and
     basedpyright-structure on the target Python files to discover their classes,
-    functions, and nesting, and fuzzy-match plus shell for repository exploration.
+    functions, and nesting.
     Locate the application/source files, test files, fixtures, and configuration
     that govern the target module. Determine the exact commands used to run the
     target tests and the applicable formatting, linting, and type-check commands.
     Record paths, symbols, commands, and evidence in decisions_and_context before
     continuing. If the target module cannot be identified, ask one specific
     question rather than guessing.
+  tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/specs
+    - -name
+    - <feature-name>
+    - -type
+    - d
+    - -maxdepth
+    - "2"
+    - -print
+  - tool: shell
+    command:
+    - rg
+    - --files
+    - src
+    - tests
+    - docs/specs/<feature-name>
 - description: Generate the architecture template for modules and tools.
   llm_type: simple_task
   details: >-

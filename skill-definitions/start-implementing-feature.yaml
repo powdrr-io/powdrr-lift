@@ -23,8 +23,7 @@ steps:
     question: pass the selected specification documents, workflow documents,
     canonical feature name, and any uncertainty or missing-document findings
     as context to the next step. The next step invokes
-    bootstrap-code-structure with this feature context. The workflow template is
-    fixed at templates/execute-proposed-pr.yaml; never ask the user to provide it.
+    bootstrap-code-structure with this feature context.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -53,10 +52,17 @@ steps:
   uses_skills:
   - bootstrap-code-structure
   details: >-
-    Invoke bootstrap-code-structure in the current worktree using the feature,
-    specification, and workflow context from the preceding discovery step. Wait
-    for the nested skill to complete, then confirm that its staged architecture
-    specification is available before continuing.
+    Invoke bootstrap-code-structure using the feature, specification, and
+    workflow context from the preceding discovery step. Wait
+    for the nested skill to complete, then use the file-existence check to
+    confirm that its staged architecture specification is available before
+    continuing.
+  tool_invocations:
+  - tool: shell
+    command:
+    - test
+    - -f
+    - docs/specs/<feature-name>/architecture-specification.yaml
 - description: Create implementation specifications for the proposed PRs.
   llm_type: high_reasoning
   details: >-

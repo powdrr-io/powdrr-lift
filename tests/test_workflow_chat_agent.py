@@ -2155,6 +2155,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
             captured["api_key"] = api_key
             captured["base_url"] = base_url
             self._call_index = 0
+            self._nested_event_count = 0
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
@@ -3112,7 +3113,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ) -> dict[str, object]:
             prompt = json.loads(messages[1]["content"])
             execution_events = prompt["execution_events"]
-            assert len(execution_events) == expected_event_count
+            assert len(execution_events) == (
+                expected_event_count + self._nested_event_count
+            )
             assert prompt["execution_mode"] == "execute_selected_skill"
             assert prompt["selected_skill"]["name"] == "specify-a-feature"
             assert prompt["current_step_index"] == expected_step_index
@@ -3128,6 +3131,20 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
+            prompt = json.loads(messages[1]["content"])
+            if (
+                self._call_index > 0
+                and prompt["selected_skill"]["name"] != "specify-a-feature"
+            ):
+                assert prompt["selected_skill"]["name"] in {
+                    "review-system",
+                    "review-architecture",
+                }
+                self._nested_event_count += 1
+                return {
+                    "kind": "next_step",
+                    "decisions_and_context": "Nested review step complete.",
+                }
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
                 response: dict[str, object] = {
@@ -3696,10 +3713,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "invoke_tool",
         "edit",
         "next_step",
+        "next_step",
+        "next_step",
+        "next_step",
+        "next_step",
         "invoke_tool",
         "next_step",
         "invoke_tool",
         "edit",
+        "next_step",
+        "next_step",
+        "next_step",
+        "next_step",
         "next_step",
         "invoke_tool",
         "next_step",

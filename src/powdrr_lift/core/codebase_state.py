@@ -266,6 +266,12 @@ def build_current_state_specification_report(
     entities = _collect_current_specification_entities(
         state.source_index.specification_documents,
     )
+    modules = _collect_current_specification_modules(
+        state.source_index.specification_documents,
+    )
+    tools = _collect_current_specification_tools(
+        state.source_index.specification_documents,
+    )
     relationships = _collect_current_specification_relationships(
         state.source_index.specification_documents,
     )
@@ -284,6 +290,8 @@ def build_current_state_specification_report(
         "requirements": requirements,
         "approach": approach,
         "entities": entities,
+        "modules": modules,
+        "tools": tools,
         "entity_relationships": relationships,
         "invariants": [
             {
@@ -642,6 +650,79 @@ def _collect_current_specification_entities(
             entities_by_id[item_id] = entity_data
 
     return [entities_by_id[item_id] for item_id in sorted(entities_by_id)]
+
+
+def _collect_current_specification_modules(
+    specification_documents: list[Any],
+) -> list[dict[str, Any]]:
+    modules_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if _normalize_text(
+            getattr(specification_document, "specification_type", None)
+        ) not in {"architecture", "implementation"}:
+            continue
+        raw_content = getattr(specification_document, "content", {})
+        for raw_item in _ensure_sequence(raw_content.get("modules")):
+            item = _ensure_mapping(raw_item)
+            item_id = _normalize_text(item.get("id"))
+            if item_id is None:
+                continue
+            action = _normalize_text(item.get("action")) or "added"
+            if action == "removed":
+                modules_by_id.pop(item_id, None)
+                continue
+            modules_by_id[item_id] = {
+                "id": item_id,
+                "parent_module": _normalize_text(item.get("parent_module")),
+                "relative_location": _normalize_text(item.get("relative_location")),
+                "related_modules": _normalize_text_sequence(
+                    item.get("related_modules")
+                ),
+                "purpose": _normalize_text(item.get("purpose")),
+                "action": action,
+            }
+    return [modules_by_id[item_id] for item_id in sorted(modules_by_id)]
+
+
+def _collect_current_specification_tools(
+    specification_documents: list[Any],
+) -> list[dict[str, Any]]:
+    tools_by_id: dict[str, dict[str, Any]] = {}
+    for specification_document in sorted(
+        specification_documents,
+        key=_specification_document_sort_key,
+    ):
+        if _normalize_text(
+            getattr(specification_document, "specification_type", None)
+        ) not in {"architecture", "implementation"}:
+            continue
+        raw_content = getattr(specification_document, "content", {})
+        for raw_item in _ensure_sequence(raw_content.get("tools")):
+            item = _ensure_mapping(raw_item)
+            item_id = _normalize_text(item.get("id"))
+            if item_id is None:
+                continue
+            action = _normalize_text(item.get("action")) or "added"
+            if action == "removed":
+                tools_by_id.pop(item_id, None)
+                continue
+            related_module = _normalize_text(item.get("related_module"))
+            related_modules = _normalize_text_sequence(item.get("related_modules"))
+            tool_data: dict[str, Any] = {
+                "id": item_id,
+                "related_module": related_module,
+                "when_to_use": _normalize_text(item.get("when_to_use")),
+                "template": _normalize_text(item.get("template")),
+                "how_to_use": _normalize_text(item.get("how_to_use")),
+                "action": action,
+            }
+            if related_modules:
+                tool_data["related_modules"] = related_modules
+            tools_by_id[item_id] = tool_data
+    return [tools_by_id[item_id] for item_id in sorted(tools_by_id)]
 
 
 def _collect_current_specification_relationships(

@@ -135,9 +135,99 @@ def test_create_architecture_specification_template_writes_default_file(
         "id",
         "title",
         "entities",
+        "modules",
+        "tools",
         "entity_relationships",
         "invariants",
         "guidance",
+    ]
+
+
+def test_validate_architecture_specification_accepts_modules_and_tools(
+    tmp_path: Path,
+) -> None:
+    _write_system_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: 2026-06-19
+
+    entities: []
+    modules:
+      - id: core
+        action: added
+        relative_location: src/core
+        related_modules: []
+        purpose: Shared core behavior.
+      - id: cli
+        action: changed
+        parent_module: core
+        related_modules:
+          - core
+        purpose: Command line surface.
+    tools:
+      - id: formatter
+        action: added
+        related_module: core
+        related_modules:
+          - cli
+        when_to_use: Format source files.
+        template: ruff format
+        how_to_use: Run the formatter before review.
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = build_architecture_specification_validation_report(
+        proposed_spec,
+        entity_types=["Service"],
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is True
+    assert report.module_ids == ["cli", "core"]
+    assert report.tool_ids == ["formatter"]
+
+
+def test_validate_architecture_specification_rejects_unknown_module_references(
+    tmp_path: Path,
+) -> None:
+    _write_system_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: 2026-06-19
+    entities: []
+    modules:
+      - id: core
+        action: added
+        parent_module: missing
+        related_modules:
+          - also-missing
+    tools:
+      - id: formatter
+        action: added
+        related_module: missing
+        related_modules:
+          - also-missing
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = build_architecture_specification_validation_report(
+        proposed_spec,
+        entity_types=["Service"],
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "unknown_module_reference",
+        "unknown_module_reference",
+        "unknown_module_reference",
+        "unknown_module_reference",
     ]
 
 

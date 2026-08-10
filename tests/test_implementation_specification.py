@@ -32,6 +32,16 @@ def _write_architecture_specification(repo_root: Path) -> Path:
           - id: Beta
             type: Skill
 
+        modules:
+          - id: core
+            action: added
+          - id: cli
+            action: added
+
+        tools:
+          - id: formatter
+            action: added
+
         entity_relationships:
           - id: rel-1
             source: Alpha
@@ -91,6 +101,8 @@ def test_create_implementation_specification_template_writes_default_file(
         "title",
         "architecture_id",
         "entities",
+        "modules",
+        "tools",
         "entity_relationships",
         "features",
         "decisions",
@@ -158,6 +170,46 @@ def test_validate_implementation_specification_reports_errors(
         "unknown_architecture_relationship",
         "duplicate_specification_id",
     }
+
+
+def test_validate_implementation_specification_rejects_unknown_module_references(
+    tmp_path: Path,
+) -> None:
+    _write_architecture_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    architecture_id: 2026-06-19
+    entities: []
+    modules:
+      - id: core
+        action: changed
+        parent_module: missing
+        related_modules:
+          - missing
+    tools:
+      - id: formatter
+        action: added
+        related_module: missing
+        related_modules:
+          - missing
+    entity_relationships: []
+    features: []
+    decisions: []
+    """
+
+    report = build_implementation_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "unknown_module_reference",
+        "unknown_module_reference",
+        "unknown_module_reference",
+        "unknown_module_reference",
+    ]
 
 
 def test_validate_implementation_specification_rejects_template_boilerplate(

@@ -3143,7 +3143,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 self._nested_event_count += 1
                 return {
                     "kind": "next_step",
-                    "decisions_and_context": "Nested review step complete.",
                 }
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)

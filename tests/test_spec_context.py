@@ -33,11 +33,11 @@ def test_gather_context_filters_tools_by_entity_type_and_labels(
     report = gather_specification_context(
         tmp_path,
         types=["tools"],
-        filters={"entity_type": ["Tool"], "labels": ["python"]},
+        filters={"entity_type": ["Tool"], "labels": ["pr-prep", "python"]},
     )
 
     assert report.filters == {
         "entity_type": ["Tool"],
-        "labels": ["python"],
+        "labels": ["pr-prep", "python"],
     }
     assert [match.item["id"] for match in report.matches] == ["python-tests"]

@@ -320,11 +320,9 @@ def _item_matches(
             item_value = section.removesuffix("s").casefold()
         if isinstance(item_value, (list, tuple, set)):
             item_values = {str(value).casefold() for value in item_value}
-            if not any(value.casefold() in item_values for value in values):
+            if not all(value.casefold() in item_values for value in values):
                 return False
-        elif not any(
-            str(item_value).casefold() == value.casefold() for value in values
-        ):
+        elif len(values) != 1 or str(item_value).casefold() != values[0].casefold():
             return False
     return True
 

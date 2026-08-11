@@ -341,7 +341,7 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
     assert [
         (invocation.tool, invocation.label)
         for invocation in skill.steps[0].tool_invocations
-    ][:2] == [("ref", "pr-prep"), ("ref", "python")]
+    ][:1] == [("ref", "pr-prep")]
     assert skill.steps[1].tool_invocations == ()
 
 

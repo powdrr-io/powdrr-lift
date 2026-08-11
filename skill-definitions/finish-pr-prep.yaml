@@ -12,17 +12,18 @@ steps:
     Inspect the staged and unstaged diff before final validation. Confirm that
     the intended pull-request files are staged and remove unrelated files from
     the staged set. Use the gather-context action with type `tools` and filters
-    for label `pr-prep`; also filter by the programming-language label(s) that
-    match the changed code. Use the returned tool references and their
-    templates/how_to_use fields to determine the exact test, formatting, lint,
-    and type-check commands. Do not infer commands from convention or hard-code
+    for label `pr-prep` and for every programming-language label represented by
+    the changed code. Discover those language labels from the staged files and
+    repository context; do not hard-code a language. Use the returned tool
+    references and their templates/how_to_use fields to determine the exact
+    test, formatting, lint, and type-check commands. The label filters must be
+    combined so each selected tool has the `pr-prep` label and every touched
+    language label. Do not infer commands from convention or hard-code
     repository tooling. If the intended scope or applicable tool references are
     unclear, ask one precise question before continuing.
   tool_invocations:
   - tool: ref
     label: pr-prep
-  - tool: ref
-    label: python
   - tool: shell
     command:
     - git

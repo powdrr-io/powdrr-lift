@@ -1,4 +1,0 @@
-interface:
-  display_name: "Feature Functionality Review"
-  short_description: "Review a feature PR against its full plan"
-  default_prompt: "Use $feature-functionality-review to review the referenced PR against its feature definition and related proposed PRs, posting actionable findings as inline comments."

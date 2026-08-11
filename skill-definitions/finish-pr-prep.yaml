@@ -1,0 +1,71 @@
+---
+name: finish-pr-prep
+when_to_use:
+- When staged changes must be validated immediately before creating or updating a
+  pull request.
+- When tests, formatting, lint, and type checks must be rerun after the final
+  staged file set is known.
+steps:
+- description: Confirm the staged pull request scope and validation commands.
+  llm_type: high_reasoning
+  details: >-
+    Inspect the staged and unstaged diff before final validation. Confirm that
+    the intended pull-request files are staged, remove unrelated files from the
+    staged set, and determine the exact test, formatting, lint, and type-check
+    commands that apply to those changes. Reuse commands already recorded in the
+    active specifications or workflow context when available; otherwise infer
+    them from the repository configuration and changed files. If the intended
+    scope is unclear, ask one precise question before continuing.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+- description: Run the final formatting, lint, type-check, and test passes.
+  llm_type: fast_iteration
+  details: >-
+    Run the required formatting checks, lint checks, type checks, and tests for
+    the staged pull-request scope. If any formatter or cleanup step changes
+    files, inspect those edits, restage only the intended files, and rerun every
+    affected command until the final state is clean. Do not continue while any
+    required check is failing.
+  tool_invocations:
+  - tool: shell
+    command:
+    - ruff
+    - format
+    - --check
+    - .
+  - tool: shell
+    command:
+    - ruff
+    - check
+    - .
+  - tool: shell
+    command:
+    - mypy
+    - src
+  - tool: shell
+    command:
+    - pytest
+    - -q
+- description: Leave the branch ready for pull request creation.
+  llm_type: simple_task
+  details: >-
+    Confirm that the intended files remain staged, the worktree has no
+    unintended leftovers, and the final commands and results are recorded for
+    the upcoming pull request summary. Do not create or update the pull request
+    in this skill.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short

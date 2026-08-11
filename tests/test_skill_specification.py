@@ -198,6 +198,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
             "If any specification validation fails, fix it and return to the "
             "validation step."
         ),
+        "Stage the validated specification artifacts for pull request preparation.",
+        "Run finish-pr-prep before creating the pull request.",
         "Create or update the pull request for the validated feature.",
     ]
     for step in skill.steps:
@@ -272,6 +274,10 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
         ("git", "status", "--short"),
         ("git", "add", "docs/specs/<work-item-name>"),
+    ]
+    assert skill.steps[12].uses_skills == ("finish-pr-prep",)
+    assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
+        ("git", "status", "--short"),
         (
             "git",
             "commit",
@@ -290,6 +296,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     assert report.validation_successful is True
     assert report.skill_names == [
         "bootstrap-code-structure",
+        "finish-pr-prep",
         "review-architecture",
         "review-system",
         "specify-a-feature",
@@ -302,8 +309,44 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
 def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    assert (skills_dir / "finish-pr-prep.yaml").is_file()
     assert (skills_dir / "review-architecture.yaml").is_file()
     assert (skills_dir / "review-system.yaml").is_file()
+
+
+def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "finish-pr-prep.yaml"
+    )
+    skill = load_skill(skill_path)
+
+    assert skill.name == "finish-pr-prep"
+    assert skill.when_to_use == (
+        (
+            "When staged changes must be validated immediately before creating "
+            "or updating a pull request."
+        ),
+        (
+            "When tests, formatting, lint, and type checks must be rerun after "
+            "the final staged file set is known."
+        ),
+    )
+    assert [step.description for step in skill.steps] == [
+        "Confirm the staged pull request scope and validation commands.",
+        "Run the final formatting, lint, type-check, and test passes.",
+        "Leave the branch ready for pull request creation.",
+    ]
+    assert skill.steps[1].tool_invocations[0].command == (
+        "ruff",
+        "format",
+        "--check",
+        ".",
+    )
+    assert skill.steps[1].tool_invocations[1].command == ("ruff", "check", ".")
+    assert skill.steps[1].tool_invocations[2].command == ("mypy", "src")
+    assert skill.steps[1].tool_invocations[3].command == ("pytest", "-q")
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:
@@ -358,6 +401,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "Create implementation specifications for the proposed PRs.",
         "Instantiate an execution workflow for every proposed PR.",
         "Review and approve the implementation plan and workflows.",
+        "Stage the approved artifacts for pull request preparation.",
+        "Run finish-pr-prep before creating the draft pull request.",
         "Commit the approved artifacts and open a draft pull request.",
         "Hand the draft pull request to the user for review.",
     ]
@@ -367,6 +412,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "high_reasoning",
         "simple_task",
         "high_reasoning",
+        "simple_task",
+        "fast_iteration",
         "simple_task",
         "standard_reasoning",
     ]
@@ -398,6 +445,10 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert [invocation.command for invocation in skill.steps[5].tool_invocations] == [
         ("git", "status", "--short"),
         ("git", "add", "docs/specs/<feature-name>", "docs/workflows"),
+    ]
+    assert skill.steps[6].uses_skills == ("finish-pr-prep",)
+    assert [invocation.command for invocation in skill.steps[7].tool_invocations] == [
+        ("git", "status", "--short"),
         (
             "git",
             "commit",

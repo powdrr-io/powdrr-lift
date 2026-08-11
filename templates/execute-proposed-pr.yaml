@@ -228,6 +228,58 @@ task_templates:
   output_state_type: linted-and-cleaned-state
   dependent_state:
   - lint-and-cleanup-complete
+- description: Stage the pull request changes
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: simple_task
+  input_state:
+    implementation_diffs: <upstream-task-4>.generated-product-code-state
+    test_results: <upstream-task-5>.all-tests-passing-state
+    completeness_review: <upstream-task-6>.specification-completeness-state
+    lint_results: <upstream-task-7>.linted-and-cleaned-state
+    staged_changes: {}
+  details: >-
+    Inspect the final diff and stage only the intended pull-request files.
+    Ensure the staged set matches the approved scope and record the staged paths
+    in output_state before final pull-request preparation.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  output_state_type: staged-pull-request-state
+  dependent_state:
+  - staged-for-pull-request
+- description: Finish pull request preparation
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  uses_skills:
+  - finish-pr-prep
+  input_state:
+    proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
+    implementation_diffs: <upstream-task-4>.generated-product-code-state
+    test_results: <upstream-task-5>.all-tests-passing-state
+    completeness_review: <upstream-task-6>.specification-completeness-state
+    lint_results: <upstream-task-7>.linted-and-cleaned-state
+    staged_changes: <upstream-task-8>.staged-pull-request-state
+  details: >-
+    Run finish-pr-prep after the intended pull-request files are staged. If the
+    prep step changes files, restage only the approved files and rerun any
+    affected checks before continuing. Record the final validation evidence in
+    output_state for the pull-request handoff.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  output_state_type: pull-request-prep-state
+  dependent_state:
+  - pull-request-prep-complete
 - description: Create the pull request
   complexity: high
   assignee_type: human
@@ -238,7 +290,7 @@ task_templates:
     implementation_diffs: <upstream-task-4>.generated-product-code-state
     test_results: <upstream-task-5>.all-tests-passing-state
     completeness_review: <upstream-task-6>.specification-completeness-state
-    lint_results: <upstream-task-7>.linted-and-cleaned-state
+    lint_results: <upstream-task-9>.pull-request-prep-state
     pull_request: {}
   details: >-
     Present the proposed PR specification, implementation summary, changed

@@ -3838,6 +3838,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "The generated workflow looks correct.",
             },
             {
+                "kind": "next_step",
+                "decisions_and_context": "The approved planning artifacts are staged.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "Pull request preparation checks are complete.",
+            },
+            {
                 "kind": "invoke_tool",
                 "tool": "shell",
                 "parameters": {
@@ -3888,6 +3896,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     assert prompt["current_step_index"] < 5
                     self._call_index += 1
                     return {"kind": "next_step"}
+                if prompt["selected_skill"]["name"] == "finish-pr-prep":
+                    assert prompt["current_step_index"] < 3
+                    self._call_index += 1
+                    return {"kind": "next_step"}
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
                 )
@@ -3927,7 +3939,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             provider="openai",
             model="test-model",
             api_key="test-key",
-            max_turns=10,
+            max_turns=12,
         ),
         input_func=lambda: "Start implementing display related photos",
         stdout=start_stdout,
@@ -3948,7 +3960,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
-        f"task-{index:03d}" for index in range(1, 10)
+        f"task-{index:03d}" for index in range(1, 12)
     ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
         "Gather context about the proposed PR",
@@ -3959,6 +3971,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Validate all tests pass",
         "Confirm functional completeness against the specification",
         "Run lint, type checks, and cleanup",
+        "Stage the pull request changes",
+        "Finish pull request preparation",
         "Create the pull request",
     ]
     assert [task.upstream_task_ids for task in tasks] == [
@@ -3970,7 +3984,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ("task-005",),
         ("task-001", "task-002", "task-005", "task-006"),
         ("task-005", "task-006", "task-007"),
-        ("task-001", "task-005", "task-006", "task-007", "task-008"),
+        ("task-005", "task-006", "task-007", "task-008"),
+        ("task-001", "task-005", "task-006", "task-007", "task-008", "task-009"),
+        ("task-001", "task-005", "task-006", "task-007", "task-010"),
     ]
     assert all(task.status.value == "open" for task in tasks)
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
@@ -4039,12 +4055,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ("agent", "reviewer"),
         ("agent", "architect"),
         ("agent", "reviewer"),
+        ("agent", "reviewer"),
+        ("agent", "reviewer"),
         ("human", "reviewer"),
     ]
     assert load_ready_workflow_tasks(workflow_root) == ()
 
     execute_tasks = load_workflow_tasks(workflow_root / "display-related-photos")
-    assert len(execute_tasks) == 9
+    assert len(execute_tasks) == 11
     assert execute_tasks[0].input_state["proposed_pr"] == (
         "display-related-photos-pr-001"
     )
@@ -4058,6 +4076,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Validate all tests pass",
         "Confirm functional completeness against the specification",
         "Run lint, type checks, and cleanup",
+        "Stage the pull request changes",
+        "Finish pull request preparation",
         "Create the pull request",
     ]
     assert all(task.status is TaskStatus.COMPLETED for task in execute_tasks)

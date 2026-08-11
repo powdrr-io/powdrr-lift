@@ -711,6 +711,7 @@ def _collect_current_specification_tools(
                 continue
             related_module = _normalize_text(item.get("related_module"))
             related_modules = _normalize_text_sequence(item.get("related_modules"))
+            labels = _normalize_text_sequence(item.get("labels"))
             tool_data: dict[str, Any] = {
                 "id": item_id,
                 "related_module": related_module,
@@ -719,6 +720,8 @@ def _collect_current_specification_tools(
                 "how_to_use": _normalize_text(item.get("how_to_use")),
                 "action": action,
             }
+            if labels:
+                tool_data["labels"] = labels
             if related_modules:
                 tool_data["related_modules"] = related_modules
             tools_by_id[item_id] = tool_data

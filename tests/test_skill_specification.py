@@ -338,15 +338,11 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
         "Run the final formatting, lint, type-check, and test passes.",
         "Leave the branch ready for pull request creation.",
     ]
-    assert skill.steps[1].tool_invocations[0].command == (
-        "ruff",
-        "format",
-        "--check",
-        ".",
-    )
-    assert skill.steps[1].tool_invocations[1].command == ("ruff", "check", ".")
-    assert skill.steps[1].tool_invocations[2].command == ("mypy", "src")
-    assert skill.steps[1].tool_invocations[3].command == ("pytest", "-q")
+    assert [
+        (invocation.tool, invocation.label)
+        for invocation in skill.steps[0].tool_invocations
+    ][:2] == [("ref", "pr-prep"), ("ref", "python")]
+    assert skill.steps[1].tool_invocations == ()
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:

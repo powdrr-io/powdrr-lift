@@ -10,13 +10,19 @@ steps:
   llm_type: high_reasoning
   details: >-
     Inspect the staged and unstaged diff before final validation. Confirm that
-    the intended pull-request files are staged, remove unrelated files from the
-    staged set, and determine the exact test, formatting, lint, and type-check
-    commands that apply to those changes. Reuse commands already recorded in the
-    active specifications or workflow context when available; otherwise infer
-    them from the repository configuration and changed files. If the intended
-    scope is unclear, ask one precise question before continuing.
+    the intended pull-request files are staged and remove unrelated files from
+    the staged set. Use the gather-context action with type `tools` and filters
+    for label `pr-prep`; also filter by the programming-language label(s) that
+    match the changed code. Use the returned tool references and their
+    templates/how_to_use fields to determine the exact test, formatting, lint,
+    and type-check commands. Do not infer commands from convention or hard-code
+    repository tooling. If the intended scope or applicable tool references are
+    unclear, ask one precise question before continuing.
   tool_invocations:
+  - tool: ref
+    label: pr-prep
+  - tool: ref
+    label: python
   - tool: shell
     command:
     - git
@@ -31,31 +37,11 @@ steps:
 - description: Run the final formatting, lint, type-check, and test passes.
   llm_type: fast_iteration
   details: >-
-    Run the required formatting checks, lint checks, type checks, and tests for
+    Run every validation command returned by the matching tool references for
     the staged pull-request scope. If any formatter or cleanup step changes
     files, inspect those edits, restage only the intended files, and rerun every
     affected command until the final state is clean. Do not continue while any
     required check is failing.
-  tool_invocations:
-  - tool: shell
-    command:
-    - ruff
-    - format
-    - --check
-    - .
-  - tool: shell
-    command:
-    - ruff
-    - check
-    - .
-  - tool: shell
-    command:
-    - mypy
-    - src
-  - tool: shell
-    command:
-    - pytest
-    - -q
 - description: Leave the branch ready for pull request creation.
   llm_type: simple_task
   details: >-

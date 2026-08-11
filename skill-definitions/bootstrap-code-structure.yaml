@@ -78,9 +78,11 @@ steps:
     specification. Add or update module entities for the application and test
     locations, including parent_module, relative_location, related_modules, and
     purpose. Add or update tool entities for the target module's test, formatting,
-    linting, and type-check commands, including related_module, when_to_use,
-    template, and how_to_use. Preserve existing ids and descriptions when they
-    remain accurate; do not invent entities unsupported by codebase evidence.
+    linting, and type-check commands, including related_module, labels,
+    when_to_use, template, and how_to_use. Add labels describing each tool's
+    usage, such as `pr-prep`, and its target programming language, such as
+    `python`. Preserve existing ids and descriptions when they remain accurate;
+    do not invent entities unsupported by codebase evidence.
     Use the agent's edit action to write the entities and preserve the v1
     lifecycle actions. Pass the changed path and a summary of the edits to the
     next step.

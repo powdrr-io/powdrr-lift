@@ -36,15 +36,19 @@ class _SkillDirectoryContents:
 @dataclass(frozen=True, slots=True)
 class SkillToolInvocation:
     tool: str
-    command: tuple[str, ...]
+    command: tuple[str, ...] = field(default_factory=tuple)
+    label: str | None = None
     cwd: str | None = None
     env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "tool": self.tool,
-            "command": list(self.command),
         }
+        if self.command:
+            data["command"] = list(self.command)
+        if self.label is not None:
+            data["label"] = self.label
         if self.cwd is not None:
             data["cwd"] = self.cwd
         if self.env:
@@ -426,7 +430,7 @@ def build_skill_validation_report(
                 tool_mapping = cast("Mapping[str, Any]", tool_invocation)
                 _validate_unknown_keys(
                     tool_mapping,
-                    {"tool", "command", "cwd", "env"},
+                    {"tool", "command", "label", "cwd", "env"},
                     issues,
                     path=tool_path or "",
                     subject="skill tool invocation",
@@ -441,19 +445,38 @@ def build_skill_validation_report(
                             path=_child_path(tool_path, "tool"),
                         )
                     )
-                elif tool not in {"shell", "fuzzy-match"}:
+                elif tool not in {"shell", "fuzzy-match", "ref"}:
                     issues.append(
                         SkillValidationIssue(
                             code="unsupported_tool",
                             message=(
-                                "Skill tool invocations currently support shell and "
-                                "fuzzy-match."
+                                "Skill tool invocations currently support shell, "
+                                "fuzzy-match, and ref."
                             ),
                             path=_child_path(tool_path, "tool"),
                         )
                     )
 
                 command = tool_mapping.get("command")
+                label = tool_mapping.get("label")
+                if tool == "ref":
+                    if _optional_string(label) is None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="missing_tool_label",
+                                message="Tool references must include a label.",
+                                path=_child_path(tool_path, "label"),
+                            )
+                        )
+                    if command is not None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="unexpected_tool_command",
+                                message="Tool references must not include a command.",
+                                path=_child_path(tool_path, "command"),
+                            )
+                        )
+                    continue
                 if not isinstance(command, Sequence) or isinstance(
                     command,
                     (str, bytes, bytearray),
@@ -832,6 +855,13 @@ def _parse_tool_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
         raise ValueError("Skill tool invocations must be objects.")
     raw_mapping = cast("Mapping[str, Any]", raw_tool_invocation)
     tool = _required_string(raw_mapping, "tool")
+    label = _optional_string(raw_mapping.get("label"))
+    if tool == "ref":
+        if label is None:
+            raise ValueError("Tool references must include a label.")
+        if raw_mapping.get("command") is not None:
+            raise ValueError("Tool references must not include a command.")
+        return SkillToolInvocation(tool=tool, command=(), label=label)
     command_value = raw_mapping.get("command")
     if not isinstance(command_value, Sequence) or isinstance(
         command_value,
@@ -855,7 +885,13 @@ def _parse_tool_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
             )
             for key, value in env_value.items()
         )
-    return SkillToolInvocation(tool=tool, command=command, cwd=cwd, env=env)
+    return SkillToolInvocation(
+        tool=tool,
+        command=command,
+        label=label,
+        cwd=cwd,
+        env=env,
+    )
 
 
 def _optional_string(value: object) -> str | None:

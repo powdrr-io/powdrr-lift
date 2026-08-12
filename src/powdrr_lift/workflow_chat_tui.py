@@ -424,6 +424,14 @@ class WorkflowChatApp(App[None]):
         status: str,
     ) -> None:
         steps = self.query_one("#steps", ListView)
+        if current_step_index >= len(skill.skill.steps):
+            steps.clear()
+            steps.set_class(False, "has-content")
+            self._set_status(status)
+            if self._response is not None:
+                self._response.disabled = False
+                self._response.focus()
+            return
         items = list(steps.query(ListItem))
         if len(steps.children) != len(skill.skill.steps):
             steps.clear()

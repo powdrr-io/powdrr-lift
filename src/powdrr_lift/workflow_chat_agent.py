@@ -47,6 +47,7 @@ from powdrr_lift.core import (
     system_map_specification_default_output_path,
     system_specification_default_output_path,
 )
+from powdrr_lift.core.project_structure import create_project_structure_template
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     normalize_context_type,
@@ -66,6 +67,7 @@ _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
+_CREATE_TEMPLATE_TOOL = "create-template"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1865,6 +1867,14 @@ def _build_step_execution_messages(
                                 "variables in a Python file. Parameter: path."
                             ),
                         },
+                        {
+                            "name": _CREATE_TEMPLATE_TOOL,
+                            "description": (
+                                "Create a supported repository template, including "
+                                "its parent directories. Parameters: template and "
+                                "optional output_path."
+                            ),
+                        },
                     ],
                     "available_context_types": [
                         {
@@ -1926,7 +1936,8 @@ def _action_system_prompt() -> str:
         "next action is a line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
         "workflow before continuing.\n"
-        "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
+        "- invoke_tool: choose this when a shell, fuzzy-match, create-template, "
+        "or basedpyright "
         "query is the "
         "next action needed to inspect or modify the worktree.\n"
         "- read_document: choose this when you know the document path but need "
@@ -1946,7 +1957,8 @@ def _action_system_prompt() -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
+        "line numbers; invoke_tool requires tool=shell, tool=fuzzy-match, or "
+        "tool=create-template and parameters appropriate to that tool; "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; invoke_skill takes "
@@ -2005,7 +2017,7 @@ def _action_system_prompt() -> str:
         "current contents as context.\n"
         "Use invoke_skill for a listed nested skill; it runs in the same worktree "
         "and returns here when complete. Use invoke_tool for shell commands, "
-        "fuzzy-match searches, or basedpyright "
+        "fuzzy-match searches, create-template operations, or basedpyright "
         "symbol and structure queries.\n"
         "Use read_document instead of requesting or embedding an entire large "
         "document when only a section is needed. The returned line-numbered "
@@ -2427,7 +2439,12 @@ def _handle_workflow_action_invoke_tool(
     config: WorkflowChatConfig,
 ) -> bool:
     _ = input_func
-    if action.tool == "fuzzy-match":
+    if action.tool == _CREATE_TEMPLATE_TOOL:
+        tool_result = _execute_create_template_tool(
+            action.parameters,
+            worktree_root=state.worktree_root,
+        )
+    elif action.tool == "fuzzy-match":
         tool_result = _execute_fuzzy_match_tool(
             action.parameters,
             worktree_root=state.worktree_root,
@@ -2450,12 +2467,15 @@ def _handle_workflow_action_invoke_tool(
     else:
         raise RuntimeError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
-            "fuzzy-match, basedpyright-symbol, and basedpyright-structure."
+            "fuzzy-match, create-template, basedpyright-symbol, and "
+            "basedpyright-structure."
         )
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
         worktree_root=state.worktree_root,
     )
+    if action.tool == _CREATE_TEMPLATE_TOOL:
+        inferred_path = Path(tool_result["path"])
     if inferred_path is not None:
         state.current_file_path = inferred_path
     state.transcript.append(
@@ -2491,6 +2511,40 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     return True
+
+
+def _execute_create_template_tool(
+    parameters: dict[str, Any],
+    *,
+    worktree_root: Path,
+) -> dict[str, Any]:
+    template = parameters.get("template")
+    if template != "project-structure":
+        raise RuntimeError(
+            "Workflow create-template tool template must be 'project-structure'."
+        )
+    output_path = parameters.get(
+        "output_path",
+        "docs/project_structure/project-structure.yaml",
+    )
+    if not isinstance(output_path, str) or not output_path.strip():
+        raise RuntimeError(
+            "Workflow create-template tool output_path must be a non-empty string."
+        )
+    resolved_output_path = _resolve_worktree_file_path(
+        output_path,
+        worktree_root,
+    )
+    rendered_path = create_project_structure_template(
+        output_path=resolved_output_path,
+        repo_root=worktree_root,
+    )
+    return {
+        "tool": _CREATE_TEMPLATE_TOOL,
+        "template": template,
+        "path": str(rendered_path),
+        "created": rendered_path.is_file(),
+    }
 
 
 def _execute_fuzzy_match_tool(
@@ -2678,6 +2732,14 @@ def _parse_workflow_action_invoke_tool(
     if not isinstance(parameters, dict):
         raise RuntimeError("Workflow invoke_tool action must include parameters.")
     normalized_tool = tool.strip()
+    if normalized_tool == _CREATE_TEMPLATE_TOOL:
+        return SkillChatAction(
+            kind="invoke_tool",
+            tool=normalized_tool,
+            parameters=dict(parameters),
+            decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
+        )
     if is_basedpyright_tool(normalized_tool):
         return SkillChatAction(
             kind="invoke_tool",
@@ -4086,7 +4148,7 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "repository specifications before deciding; prompt_user to ask one "
         "necessary human question; edit to make a known line-based file change; "
         "invoke_skill to run a listed nested skill; invoke_tool to run a shell, "
-        "fuzzy-match, or basedpyright query; read_document to "
+        "fuzzy-match, create-template, or basedpyright query; read_document to "
         "request a bounded line range from a known document; next_step when the "
         "current step is complete; and complete when the skill is finished.\n"
         "If the original action response was empty, choose next_step when the "
@@ -4095,7 +4157,8 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "as next_step.\n"
         "Return exactly one JSON object with a kind and the fields required by "
         "that action. Use file_path and edits or file_edits for edit, tool and "
-        "parameters.command for invoke_tool, skill for invoke_skill, file_path "
+        "parameters.command for shell/fuzzy-match, template and optional "
+        "output_path for create-template, skill for invoke_skill, file_path "
         "with positive start_line "
         "and end_line for read_document, non-empty types for gather-context, "
         "and a clear English question ending in '?' for prompt_user. Do not "

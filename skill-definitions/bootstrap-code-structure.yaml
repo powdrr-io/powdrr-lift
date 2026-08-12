@@ -45,26 +45,16 @@ steps:
   llm_type: simple_task
   details: >-
     If docs/project_structure contains an existing project-structure document,
-    inspect and reuse it without overwriting it. If it does not exist, create
-    the directory and the template at
-    docs/project_structure/project-structure.yaml. The template must contain
-    a clear schema marker, project-wide modules, tools, relationships, and
-    evidence sections, with empty lists where discovery will fill details. Do
-    not create a feature-specific architecture specification and do not ask a
-    question merely because the project-structure document is absent. Pass the
-    exact artifact path to the next step. Use the prior gather-context result
-    to decide whether the artifact exists.
-  tool_invocations:
-  - tool: shell
-    command:
-    - test
-    - -f
-    - docs/project_structure/project-structure.yaml
-  - tool: shell
-    command:
-    - mkdir
-    - -p
-    - docs/project_structure
+    inspect and reuse it without overwriting it. If it does not exist, invoke
+    the create-template tool with template=project-structure and output_path=
+    docs/project_structure/project-structure.yaml. The tool creates both the
+    parent directory and the template. The template must contain a clear schema
+    marker, project-wide modules, tools, relationships, and evidence sections,
+    with empty lists where discovery will fill details. Do not create a
+    feature-specific architecture specification and do not ask a question
+    merely because the project-structure document is absent. Pass the exact
+    artifact path to the next step. Use the prior gather-context result to
+    decide whether the artifact exists.
 - description: Populate the project-structure artifact from codebase evidence.
   llm_type: high_reasoning
   details: >-

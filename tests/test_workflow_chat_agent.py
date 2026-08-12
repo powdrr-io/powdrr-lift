@@ -518,6 +518,33 @@ def test_textual_panels_place_green_output_above_orange_steps() -> None:
     assert populated_height > 0
 
 
+def test_textual_completed_skill_removes_orange_step_list() -> None:
+    async def exercise() -> tuple[int, int, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+            steps = app.query_one("#steps", ListView)
+            app._apply_progress(skill, current_step_index=0, status="running")
+            await pilot.pause()
+            app._apply_progress(
+                skill,
+                current_step_index=len(skill.skill.steps),
+                status="skill complete",
+            )
+            await pilot.pause()
+            return (
+                len(steps.children),
+                steps.region.height,
+                str(app.query_one("#status", Static).render()),
+            )
+
+    child_count, height, status = asyncio.run(exercise())
+    assert child_count == 0
+    assert height == 0
+    assert status.endswith("skill complete")
+
+
 def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
     async def exercise() -> tuple[str, float, int, int]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

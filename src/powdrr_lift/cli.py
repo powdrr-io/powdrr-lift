@@ -57,6 +57,7 @@ from powdrr_lift.core import (
     validate_pr_specification_yaml,
     validate_system_specification_yaml,
 )
+from powdrr_lift.core.project_structure import create_project_structure_template
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
@@ -511,6 +512,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional title to embed in the template.",
     )
     system_specification_parser.set_defaults(func=_run_system_specification)
+
+    project_structure_parser = subparsers.add_parser(
+        "project-structure",
+        aliases=["project_structure"],
+        help="Create the project structure template.",
+    )
+    project_structure_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Write the template to this path instead of "
+            "docs/project_structure/project-structure.yaml."
+        ),
+    )
+    project_structure_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when creating the template.",
+    )
+    project_structure_parser.set_defaults(func=_run_project_structure)
 
     system_map_specification_parser = subparsers.add_parser(
         "system-map-specification",
@@ -1373,6 +1394,20 @@ def _run_system_specification(args: argparse.Namespace) -> int:
     else:
         print(f"Wrote system specification template to {output_path}")
 
+    return 0
+
+
+def _run_project_structure(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_project_structure_template(
+        output_path=(
+            args.output
+            if args.output is not None
+            else "docs/project_structure/project-structure.yaml"
+        ),
+        repo_root=repo_root,
+    )
+    print(f"Wrote project structure template to {output_path}")
     return 0
 
 

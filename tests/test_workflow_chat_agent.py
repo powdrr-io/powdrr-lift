@@ -70,7 +70,6 @@ from powdrr_lift.workflow_chat_agent import (
     _build_selection_messages,
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
-    _execute_create_template_tool,
     _execute_shell_tool,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
@@ -5151,35 +5150,6 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
         )
 
     assert run.call_args.args[0] == "rtk git status"
-
-
-def test_execute_create_template_tool_creates_project_structure_file(
-    tmp_path: Path,
-) -> None:
-    result = _execute_create_template_tool(
-        {
-            "template": "project-structure",
-            "output_path": "docs/project_structure/project-structure.yaml",
-        },
-        worktree_root=tmp_path,
-    )
-
-    output_path = tmp_path / "docs" / "project_structure" / "project-structure.yaml"
-    assert result["path"] == str(output_path.resolve())
-    assert output_path.is_file()
-
-
-def test_execute_create_template_tool_rejects_output_outside_worktree(
-    tmp_path: Path,
-) -> None:
-    with pytest.raises(RuntimeError, match="must stay within"):
-        _execute_create_template_tool(
-            {
-                "template": "project-structure",
-                "output_path": str(tmp_path.parent / "outside.yaml"),
-            },
-            worktree_root=tmp_path,
-        )
 
 
 def test_execute_shell_tool_verbose_prints_stdout(

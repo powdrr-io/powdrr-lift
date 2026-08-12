@@ -113,16 +113,11 @@ steps:
   llm_type: fast_iteration
   details: Do not begin implementation or create a pull request while any required
     specification remains invalid.
-- description: Create or update the pull request for the validated feature.
+- description: Stage the validated specification artifacts for pull request preparation.
   llm_type: simple_task
-  details: Before creating or updating the pull request, inspect the worktree, stage
-    only the validated specification artifacts under docs/specs/<work-item-name>/,
-    commit them, and push the current feature branch with its upstream set. Then
-    create the draft pull request with the validated specification documents, feature
-    intent, proposed PR scope, and validation evidence. If a pull request already
-    exists for the branch, update it instead of attempting to create a second one.
-    Do not report this step complete until the GitHub command succeeds and its output
-    includes the pull request URL. Do not begin implementation in this skill.
+  details: Inspect the worktree and stage only the validated specification
+    artifacts under docs/specs/<work-item-name>/. Do not commit or create the
+    pull request yet.
   tool_invocations:
   - tool: shell
     command:
@@ -134,6 +129,28 @@ steps:
     - git
     - add
     - docs/specs/<work-item-name>
+- description: Run finish-pr-prep before creating the pull request.
+  llm_type: fast_iteration
+  details: Run finish-pr-prep after the intended specification artifacts are staged.
+    If cleanup changes files, restage only the validated specification artifacts
+    before continuing. Do not begin implementation in this skill.
+  uses_skills:
+  - finish-pr-prep
+- description: Create or update the pull request for the validated feature.
+  llm_type: simple_task
+  details: Review the staged specification artifacts, commit them, and push the
+    current feature branch with its upstream set. Then create or update the draft
+    pull request with the validated specification documents, feature intent,
+    proposed PR scope, and validation evidence. If a pull request already exists
+    for the branch, update it instead of attempting to create a second one. Do
+    not report this step complete until the GitHub command succeeds and its output
+    includes the pull request URL. Do not begin implementation in this skill.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - "--short"
   - tool: shell
     command:
     - git

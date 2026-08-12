@@ -111,6 +111,7 @@ def render_architecture_specification_template(
         "    action: null",
         "    related_module: null",
         "    related_modules: []",
+        "    labels: []",
         "    when_to_use: null",
         "    template: null",
         "    how_to_use: null",
@@ -544,6 +545,11 @@ def _collect_tool_ids(
             issues=issues,
             required=True,
         )
+        _validate_tool_labels(
+            tool.get("labels"),
+            path=f"tools[{index}].labels",
+            issues=issues,
+        )
         if tool_id is None:
             continue
         if tool_id in tool_ids:
@@ -571,6 +577,34 @@ def _collect_tool_ids(
         )
 
     return tool_ids
+
+
+def _validate_tool_labels(
+    raw_labels: object,
+    *,
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    if raw_labels is None:
+        return
+    if not isinstance(raw_labels, Sequence) or isinstance(raw_labels, (str, bytes)):
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_tool_labels",
+                message="Tool labels must be a list of non-empty strings.",
+                path=path,
+            )
+        )
+        return
+    for index, raw_label in enumerate(raw_labels):
+        if not isinstance(raw_label, str) or not raw_label.strip():
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="invalid_tool_label",
+                    message="Each tool label must be a non-empty string.",
+                    path=f"{path}[{index}]",
+                )
+            )
 
 
 def _validate_entity_action(

@@ -84,6 +84,7 @@ class WorkflowTaskAction:
     file_edits: tuple[Any, ...] = ()
     types: tuple[str, ...] = ()
     keywords: tuple[str, ...] = ()
+    filters: dict[str, object] = field(default_factory=dict)
     output_state: Any = None
     text: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
@@ -281,12 +282,14 @@ def run_workflow_task(
                 repo_root,
                 types=list(action.types),
                 keywords=list(action.keywords),
+                filters=action.filters,
             )
             events.append(
                 {
                     "kind": action.kind,
                     "types": list(action.types),
                     "keywords": list(action.keywords),
+                    "filters": action.filters,
                     "result": json.loads(render_gather_context_report(report)),
                 }
             )
@@ -1019,7 +1022,7 @@ def _task_system_prompt() -> str:
         "the produced state in output_state.\n"
         "Response: return exactly one JSON object matching exactly one outcome "
         "shape below. Do not include markdown or combine outcomes.\n"
-        '{"kind":"gather-context","types":["proposed_prs"],"keywords":["..."]}\n'
+        '{"kind":"gather-context","types":["tools"],"filters":{"labels":["pr-prep"],"language":["python"]}}\n'
         '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
         '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
@@ -1028,7 +1031,8 @@ def _task_system_prompt() -> str:
         '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
         "Use gather-context with one or more supported context types and optional "
-        "keywords when repository specifications must be discovered. Use "
+        "keywords and filters when repository specifications must be discovered. "
+        "Filters match exact fields and list values such as labels. Use "
         "prompt_user instead of get-human-input; the execution agent converts it "
         "to a durable human task and follow-up task. Use invoke_tool for shell "
         "commands, fuzzy-match searches, or basedpyright symbol and structure "
@@ -1366,6 +1370,7 @@ def _workflow_task_action_from_skill_action(
         file_edits=action.file_edits,
         types=action.types,
         keywords=action.keywords,
+        filters=action.filters,
         output_state=action.output_state,
         text=action.text,
         parameters=action.parameters,

@@ -170,6 +170,9 @@ def test_validate_architecture_specification_accepts_modules_and_tools(
         related_module: core
         related_modules:
           - cli
+        labels:
+          - pr-prep
+          - python
         when_to_use: Format source files.
         template: ruff format
         how_to_use: Run the formatter before review.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Bootstrap Changelog"
   short_description: "Draft validated changelog v2 docs"
-  default_prompt: "Use $bootstrap to analyze the repo, generate the PR changelog template with `powdrr-lift init --pr-number <num>`, map entities to the taxonomy, validate the changelog v2, and commit it."
+  default_prompt: "Use $bootstrap to analyze the repo, reuse or create a draft pull request to obtain its number, generate the PR changelog template with `powdrr-lift init --pr-number <num>`, map entities to the taxonomy, validate the changelog v2, commit and push it, and report the pull request URL. Never merge it."

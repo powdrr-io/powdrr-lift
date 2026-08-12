@@ -418,6 +418,11 @@ def test_fully_review_pr_template_runs_reviews_sequentially(
         ("feature-test-coverage-review",),
         ("security-review",),
     ]
+    assert [task.llm_type for task in template.task_templates] == [
+        "fast_iteration",
+        "fast_iteration",
+        "fast_iteration",
+    ]
     assert [task.input_state["pull_request"] for task in template.task_templates] == [
         "<pull-request-id>",
         "<pull-request-id>",

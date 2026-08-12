@@ -11,7 +11,7 @@ task_templates:
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
-  llm_type: long_context
+  llm_type: fast_iteration
   uses_skills:
   - feature-functionality-review
   input_state:
@@ -31,7 +31,7 @@ task_templates:
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
-  llm_type: long_context
+  llm_type: fast_iteration
   uses_skills:
   - feature-test-coverage-review
   input_state:
@@ -52,7 +52,7 @@ task_templates:
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
-  llm_type: long_context
+  llm_type: fast_iteration
   uses_skills:
   - security-review
   input_state:

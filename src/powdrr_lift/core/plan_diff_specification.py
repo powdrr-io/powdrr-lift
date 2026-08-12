@@ -14,6 +14,7 @@ from powdrr_lift.core.spec_paths import (
     normalize_work_item_name,
     plan_diff_specification_path,
 )
+from powdrr_lift.core.template_generation import merge_existing_template_content
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,8 +78,16 @@ def create_plan_diff_specification(
         )
     )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content = (
+        resolved_output_path.read_text(encoding="utf-8")
+        if resolved_output_path.is_file()
+        else None
+    )
     resolved_output_path.write_text(
-        render_plan_diff_specification(report),
+        merge_existing_template_content(
+            render_plan_diff_specification(report),
+            existing_content,
+        ),
         encoding="utf-8",
     )
     return resolved_output_path

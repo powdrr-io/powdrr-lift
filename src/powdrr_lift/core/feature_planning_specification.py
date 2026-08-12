@@ -16,6 +16,7 @@ from powdrr_lift.core.spec_paths import (
     feature_pr_specification_path,
     system_map_specification_path,
 )
+from powdrr_lift.core.template_generation import merge_existing_template_content
 
 
 def system_map_specification_default_output_path(
@@ -211,11 +212,19 @@ def create_system_map_specification_template(
         else system_map_specification_path(repo_root_path, work_item_name)
     )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content = (
+        resolved_output_path.read_text(encoding="utf-8")
+        if resolved_output_path.is_file()
+        else None
+    )
     resolved_output_path.write_text(
-        render_system_map_specification_template(
-            work_item_name=work_item_name,
-            title=title,
-            repo_root=repo_root_path,
+        merge_existing_template_content(
+            render_system_map_specification_template(
+                work_item_name=work_item_name,
+                title=title,
+                repo_root=repo_root_path,
+            ),
+            existing_content,
         ),
         encoding="utf-8",
     )
@@ -236,10 +245,18 @@ def create_feature_pr_specification_template(
         else feature_pr_specification_path(repo_root_path, work_item_name)
     )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content = (
+        resolved_output_path.read_text(encoding="utf-8")
+        if resolved_output_path.is_file()
+        else None
+    )
     resolved_output_path.write_text(
-        render_feature_pr_specification_template(
-            work_item_name=work_item_name,
-            title=title,
+        merge_existing_template_content(
+            render_feature_pr_specification_template(
+                work_item_name=work_item_name,
+                title=title,
+            ),
+            existing_content,
         ),
         encoding="utf-8",
     )

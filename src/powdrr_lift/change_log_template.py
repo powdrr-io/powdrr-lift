@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.core.template_generation import merge_existing_template_content
+
 
 @dataclass(frozen=True, slots=True)
 class BranchDiffEntry:
@@ -84,7 +86,13 @@ def create_change_log_template(
         related_sections_by_entry=related_sections_by_entry,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(template, encoding="utf-8")
+    existing_content = (
+        output_path.read_text(encoding="utf-8") if output_path.is_file() else None
+    )
+    output_path.write_text(
+        merge_existing_template_content(template, existing_content),
+        encoding="utf-8",
+    )
     return output_path
 
 
@@ -123,7 +131,13 @@ def create_change_log_template_from_plan_diff(
         related_sections_by_entry=related_sections_by_entry,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(template, encoding="utf-8")
+    existing_content = (
+        output_path.read_text(encoding="utf-8") if output_path.is_file() else None
+    )
+    output_path.write_text(
+        merge_existing_template_content(template, existing_content),
+        encoding="utf-8",
+    )
     return output_path
 
 

@@ -10,6 +10,7 @@ import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.codebase_state import build_codebase_state_report
+from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
 _DEFAULT_OUTPUT_PATH = Path("docs") / "specs"
@@ -160,8 +161,16 @@ def create_pr_specification_template(
         output_path,
     )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content = (
+        resolved_output_path.read_text(encoding="utf-8")
+        if resolved_output_path.is_file()
+        else None
+    )
     resolved_output_path.write_text(
-        render_pr_specification_template(repo_root=repo_root_path),
+        merge_existing_template_content(
+            render_pr_specification_template(repo_root=repo_root_path),
+            existing_content,
+        ),
         encoding="utf-8",
     )
     return resolved_output_path

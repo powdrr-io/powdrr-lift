@@ -51,8 +51,7 @@ steps:
     use the repository's `https://powdrr.io/schemas/specification-v1` schema.
     Generate the template with the CLI and follow its instructions. Use only
     the specification sections needed by the project structure; all sections
-    are optional. Relationships belong in `entity_relationships`, and there
-    is no standalone `relationships` or `evidence` section.
+    are optional.
     Do not create a feature-specific architecture specification and do not ask
     a question merely because the project-structure document is absent. Pass
     the exact artifact path to the next step. Use the prior gather-context
@@ -68,8 +67,7 @@ steps:
     Compare the discovered repository structure with the existing artifact or
     template. Add or update project-wide module entries for application,
     test, tooling, configuration, and integration areas, including stable ids,
-    paths, parent/related modules, and purpose. Do not add an evidence field to
-    module entries. Add or update tool
+    paths, parent/related modules, and purpose. Add or update tool
     entries for test, formatting, linting, type-check, build, and relevant
     development commands, including stable ids, related modules, labels,
     when_to_use, template, how_to_use, and evidence. By default, include the

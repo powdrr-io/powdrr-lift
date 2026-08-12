@@ -55,13 +55,8 @@ steps:
     Invoke bootstrap-code-structure using the repository context from the
     preceding discovery step. The nested skill is project-wide and must not
     ask for a feature or target module. Wait for it to complete, then confirm
-    that its staged project-structure artifact is available before continuing.
-  tool_invocations:
-  - tool: shell
-    command:
-    - test
-    - -f
-    - docs/project_structure/project-structure.yaml
+    from its returned context that the staged project-structure artifact is
+    available before continuing.
 - description: Create implementation specifications for the proposed PRs.
   llm_type: high_reasoning
   details: >-

@@ -20,6 +20,22 @@ steps:
     authoritative. If the relationship is ambiguous, prepare one inline
     finding on the nearest relevant changed line explaining the missing
     linkage and do not continue with an assumed feature.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - pr
+    - view
+    - <pr-reference>
+    - --json
+    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
+  - tool: shell
+    command:
+    - gh
+    - pr
+    - diff
+    - <pr-reference>
+    - --patch
 - description: Decide whether the referenced PR is the final proposed PR.
   llm_type: high_reasoning
   details: >-
@@ -31,7 +47,11 @@ steps:
     its contractual dependencies as the review scope. For a final PR, select
     the full feature definition, every related previous proposed-PR
     specification, every related closed or merged PR, and the current proposed
-    PR as the review scope.
+    PR as the review scope. After identifying the feature id, invoke the
+    gather_context workflow action with the proposed-PR entity type filtered by
+    that feature id: {"kind":"gather-context","types":["proposed_prs"],"keywords":["<feature-id>"]}.
+    Use the returned records to determine the ordered proposed-PR set and
+    status rather than relying only on PR prose.
 - description: Review the current PR against the selected functionality scope.
   llm_type: high_reasoning
   details: >-
@@ -48,7 +68,14 @@ steps:
     observability, and documentation whenever the feature contract requires
     them. Mark each item satisfied, partially satisfied, missing, contradicted,
     or not applicable with a reason. Report only findings caused by the current
-    PR and avoid duplicate findings for one root cause.
+    PR and avoid duplicate findings for one root cause. Construct a coverage
+    matrix with one row per requirement and acceptance criterion and require
+    every row to have a source, implementation evidence, validation evidence,
+    and a status. Treat a missing row, missing evidence, or unexplained partial
+    status as a review finding candidate. For a final PR, separately mark
+    every earlier proposed PR as reviewed and link its landed diff or an
+    explicit gap. This deterministic matrix is the basis for deciding whether
+    the feature is complete.
 - description: Post every actionable finding as an inline pull-request comment.
   llm_type: simple_task
   details: >-
@@ -66,6 +93,30 @@ steps:
     rejected, use a valid nearby changed line and preserve the file and line
     reference in the comment text. Do not approve, merge, close, label, or
     modify code as part of this skill.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --paginate
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --method
+    - POST
+    - -f
+    - body=<finding>
+    - -f
+    - commit_id=<current-head-sha>
+    - -f
+    - path=<changed-file>
+    - -F
+    - line=<changed-line>
+    - -f
+    - side=RIGHT
 - description: Verify the posted review and report the audit result.
   llm_type: standard_reasoning
   details: >-
@@ -75,4 +126,14 @@ steps:
     or final review depth, checklist coverage, evidence examined, and comments
     posted. Report the PR, review depth, and count of inline findings. If
     GitHub write access is unavailable, do not claim completion: report the
-    exact prepared findings and the posting failure.
+    exact prepared findings and the posting failure. Verify posted comments
+    with `gh api repos/<owner>/<repo>/pulls/<number>/comments --paginate` and
+    confirm each finding's path, line, commit id, and body before reporting
+    completion.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --paginate

@@ -295,6 +295,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
     assert report.validation_successful is True
     assert report.skill_names == [
+        "address-review-comments",
         "bootstrap-code-structure",
         "feature-functionality-review",
         "feature-test-coverage-review",
@@ -313,10 +314,35 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 
 def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    assert (skills_dir / "address-review-comments.yaml").is_file()
     assert (skills_dir / "finish-pr-prep.yaml").is_file()
     assert (skills_dir / "feature-test-coverage-review.yaml").is_file()
     assert (skills_dir / "review-architecture.yaml").is_file()
     assert (skills_dir / "review-system.yaml").is_file()
+
+
+def test_checked_in_address_review_comments_skill_matches_flow() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "address-review-comments.yaml"
+    )
+    skill = load_skill(skill_path)
+
+    assert skill.name == "address-review-comments"
+    assert [step.description for step in skill.steps] == [
+        "Inspect the pull request and collect its review comments.",
+        "Classify each comment against the feature contract.",
+        "Update the v1 specification for design-level feedback.",
+        "Implement and test every actionable review correction.",
+        "Run finish-pr-prep on the final staged changes.",
+        "Commit and push the addressed changes to the existing pull request.",
+    ]
+    assert "resolved, outdated, and current comments" in (skill.steps[0].details or "")
+    assert "design, entities, relationships" in (skill.steps[1].details or "")
+    assert "system-specification" in (skill.steps[2].details or "")
+    assert skill.steps[4].uses_skills == ("finish-pr-prep",)
+    assert skill.steps[5].tool_invocations[-1].command == ("git", "push")
 
 
 def test_checked_in_feature_test_coverage_review_skill_matches_review_flow() -> None:

@@ -80,15 +80,19 @@ steps:
 - description: Reproduce every root failure locally using the CI command.
   llm_type: fast_iteration
   details: >-
-    Run the same test, formatter, linter, type check, or build command that CI
-    ran, using the same relevant options and working-tree commit whenever
-    possible. Prefer the narrowest command that reproduces each root failure,
+    First use the returned `pr-prep` tool references and their `templates` and
+    `how_to_use` fields to select the repository's canonical command for the
+    failed test or check. Run that command with the same relevant options and
+    working-tree commit whenever possible. Prefer the narrowest command that reproduces each root failure,
     then run the complete failing CI step after a fix. Record whether each
     failure reproduces locally. If it reproduces, treat the local output as
     the primary debugging evidence before researching solutions. If it does
     not reproduce, compare Python/runtime, dependency lock, OS, environment,
     generated files, and repository state before changing code; do not weaken
     a test merely because the local run is green.
+  tool_invocations:
+  - tool: ref
+    label: pr-prep
 - description: Search Stack Overflow for evidence-backed solutions.
   llm_type: standard_reasoning
   details: >-
@@ -132,12 +136,16 @@ steps:
 - description: Iterate until the failures are fixed and regression checks pass.
   llm_type: fast_iteration
   details: >-
-    Rerun the previously failing local commands after each edit. When they pass,
+    Use the returned `pr-prep` tool references to rerun the canonical commands
+    for the previously failing checks after each edit. When they pass,
     rerun the complete affected CI steps and the repository checks required by
     the final PR-preparation workflow. If a new failure appears, add it to the
     failure matrix, reproduce it, and repeat the diagnosis-to-fix loop. Do not
     continue while a root failure remains unexplained, a required check fails,
     or the proposed fix only masks the original behavior.
+  tool_invocations:
+  - tool: ref
+    label: pr-prep
 - description: Run the PR-preparation workflow on the final change set.
   llm_type: simple_task
   uses_skills:

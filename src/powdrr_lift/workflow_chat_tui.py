@@ -352,6 +352,8 @@ class WorkflowChatApp(App[None]):
         if self._response is None or self._response.disabled:
             return
         answer = self._response.text.strip()
+        if not answer:
+            return
         if self._initial_prompt_visible:
             self._initial_prompt_visible = False
         self._set_message(self._format_user_response(answer))

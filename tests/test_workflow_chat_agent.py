@@ -414,6 +414,30 @@ def test_textual_submit_shows_user_response_before_calling_llm() -> None:
     )
 
 
+def test_textual_submit_ignores_empty_response() -> None:
+    async def exercise() -> tuple[str, str, bool, bool]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "  \n  "
+            app._submit_response()
+            await pilot.pause()
+            return (
+                str(app.query_one("#status", Static).render()),
+                response.text,
+                response.disabled,
+                app._request_submitted.is_set(),
+            )
+
+    assert asyncio.run(exercise()) == (
+        "starting workflow...",
+        "  \n  ",
+        False,
+        False,
+    )
+
+
 def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

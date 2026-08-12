@@ -17,8 +17,7 @@ steps:
     validation. Use basedpyright-symbol and basedpyright-structure for Python
     source when available. Record paths, symbols, commands, and evidence in
     decisions_and_context before continuing. Use the gather-context workflow
-    action to look for an existing project-structure artifact rather than
-    fuzzy-match:
+    action to look for an existing project-structure artifact:
     {"kind":"gather-context","types":["modules","tools"],"keywords":[]}
     Inspect returned match paths for docs/project_structure and carry the
     result into the next step.
@@ -54,8 +53,7 @@ steps:
     not create a feature-specific architecture specification and do not ask a
     question merely because the project-structure document is absent. Pass the
     exact artifact path to the next step. Use the prior gather-context result
-    to decide whether the artifact exists; do not use fuzzy-match for this
-    lookup.
+    to decide whether the artifact exists.
   tool_invocations:
   - tool: shell
     command:

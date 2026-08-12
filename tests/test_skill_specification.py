@@ -297,6 +297,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     assert report.skill_names == [
         "bootstrap-code-structure",
         "feature-functionality-review",
+        "feature-test-coverage-review",
         "finish-pr-prep",
         "fix-ci-failures",
         "review-architecture",
@@ -313,8 +314,35 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
 def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     assert (skills_dir / "finish-pr-prep.yaml").is_file()
+    assert (skills_dir / "feature-test-coverage-review.yaml").is_file()
     assert (skills_dir / "review-architecture.yaml").is_file()
     assert (skills_dir / "review-system.yaml").is_file()
+
+
+def test_checked_in_feature_test_coverage_review_skill_matches_review_flow() -> None:
+    skill_path = (
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "feature-test-coverage-review.yaml"
+    )
+    skill = load_skill(skill_path)
+
+    assert skill.name == "feature-test-coverage-review"
+    assert [step.description for step in skill.steps] == [
+        "Discover the referenced pull request and its feature relationship.",
+        "Select the feature test scope for the current pull request.",
+        "Build the requested-test coverage matrix.",
+        "Post every actionable test coverage finding inline.",
+        "Verify the posted coverage review and report the audit result.",
+    ]
+    assert "every requested test" in (skill.steps[2].details or "")
+    assert "unjustified scope finding" in (skill.steps[2].details or "")
+    assert skill.steps[3].tool_invocations[0].command == (
+        "gh",
+        "api",
+        "repos/<owner>/<repo>/pulls/<number>/comments",
+        "--paginate",
+    )
 
 
 def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:

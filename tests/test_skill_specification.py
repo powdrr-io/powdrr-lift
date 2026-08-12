@@ -290,6 +290,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     assert report.validation_successful is True
     assert report.skill_names == [
         "bootstrap-code-structure",
+        "feature-functionality-review",
         "review-architecture",
         "review-system",
         "specify-a-feature",

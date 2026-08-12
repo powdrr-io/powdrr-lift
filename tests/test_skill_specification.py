@@ -451,7 +451,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     )
     assert [step.description for step in skill.steps] == [
         "Discover the feature specification and execution workflows.",
-        "Bootstrap the target module and tool architecture from codebase evidence.",
+        "Bootstrap the project-wide module and tool structure from codebase evidence.",
         "Create implementation specifications for the proposed PRs.",
         "Instantiate an execution workflow for every proposed PR.",
         "Review and approve the implementation plan and workflows.",

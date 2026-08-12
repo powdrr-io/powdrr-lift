@@ -1,116 +1,121 @@
 ---
 name: bootstrap-code-structure
 when_to_use:
-- When implementation is about to begin and the target module's architecture needs
-  current codebase evidence.
-- When a feature needs architecture module and tool entities bootstrapped from the
-  existing source tree.
-- When an agent needs reliable application-code and test-code locations plus the
-  commands used to validate a module.
+- When implementation is about to begin and the project's code structure needs current codebase evidence.
+- When the workflow needs reliable application modules, test modules, tools, and validation commands for the whole repository.
+- When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
-- description: Discover the target module, its tests, and its development commands.
-  llm_type: high_reasoning
+- description: Discover the project-wide modules, tools, tests, and development commands.
+  llm_type: long_context
   details: >-
-    Start by identifying the selected feature's architecture and implementation
-    specifications and the target module or modules. Use the declared
-    fuzzy-match and shell tool calls to discover the repository context, then
-    use basedpyright-symbol to find the relevant public symbols by name and
-    basedpyright-structure on the target Python files to discover their classes,
-    functions, and nesting.
-    Locate the application/source files, test files, fixtures, and configuration
-    that govern the target module. Determine the exact commands used to run the
-    target tests and the applicable formatting, linting, and type-check commands.
-    Record paths, symbols, commands, and evidence in decisions_and_context before
-    continuing. If the target module cannot be identified, ask one specific
-    question rather than guessing.
+    Treat the repository as the scope. Do not ask the user to identify a
+    feature, work item, or target module. Inspect the complete source and test
+    layout, existing project-structure documents, configuration, build files,
+    CI workflows, scripts, and documentation. Identify application modules,
+    test modules, their relationships and locations, and the commands used for
+    tests, formatting, linting, type checking, packaging, and other repository
+    validation. Use basedpyright-symbol and basedpyright-structure for Python
+    source when available. Record paths, symbols, commands, and evidence in
+    decisions_and_context before continuing.
   tool_invocations:
-  - tool: fuzzy-match
-    command:
-    - fuzzy-match
-    - docs/specs
-    - -name
-    - <feature-name>
-    - -type
-    - d
-    - -maxdepth
-    - "2"
-    - -print
   - tool: shell
     command:
     - rg
     - --files
     - src
     - tests
-    - docs/specs/<feature-name>
-- description: Generate the architecture template for modules and tools.
-  llm_type: simple_task
-  details: >-
-    Locate the selected feature architecture specification from the preceding
-    context. If it already exists, inspect and reuse it rather than overwriting
-    it. Otherwise generate the architecture template with module and tool entity
-    types enabled, then pass its exact path to the next step.
-  tool_invocations:
+    - scripts
+    - .github
+    - docs/project_structure
+  - tool: shell
+    command:
+    - rg
+    - -n
+    - "pytest|ruff|mypy|pyright|basedpyright|uv run|make |npm test|cargo test|go test"
+    - pyproject.toml
+    - Makefile
+    - .github
+    - scripts
+    - README.md
   - tool: fuzzy-match
     command:
     - fuzzy-match
-    - docs/specs/<feature-name>
-    - -name
-    - architecture-specification.yaml
+    - docs/project_structure
     - -type
     - f
     - -maxdepth
-    - "1"
+    - "2"
     - -print
-  - tool: shell
-    command:
-    - powdrr-lift
-    - architecture-specification
-    - --work-item-name
-    - <feature-name>
-    - --entity-type
-    - module
-    - --entity-type
-    - tool
-- description: Bootstrap missing module and tool entities in the architecture specification.
-  llm_type: standard_reasoning
+- description: Reuse an existing project-structure artifact or create its template.
+  llm_type: simple_task
   details: >-
-    Compare the discovered code structure with the selected architecture
-    specification. Add or update module entities for the application and test
-    locations, including parent_module, relative_location, related_modules, and
-    purpose. Add or update tool entities for the target module's test, formatting,
-    linting, and type-check commands, including related_module, labels,
-    when_to_use, template, and how_to_use. Add labels describing each tool's
-    usage, such as `pr-prep`, and its target programming language, such as
-    `python`. Preserve existing ids and descriptions when they remain accurate;
-    do not invent entities unsupported by codebase evidence.
-    Use the agent's edit action to write the entities and preserve the v1
-    lifecycle actions. Pass the changed path and a summary of the edits to the
-    next step.
-- description: Validate the bootstrapped architecture specification.
-  llm_type: fast_iteration
-  details: >-
-    Run the architecture validator against the selected feature specification
-    with module and tool entity types enabled. Fix any validation errors in the
-    specification, rerun the validator, and pass the successful validation result
-    to the next step.
+    If docs/project_structure contains an existing project-structure document,
+    inspect and reuse it without overwriting it. If it does not exist, create
+    the directory and the template at
+    docs/project_structure/project-structure.yaml. The template must contain
+    a clear schema marker, project-wide modules, tools, relationships, and
+    evidence sections, with empty lists where discovery will fill details. Do
+    not create a feature-specific architecture specification and do not ask a
+    question merely because the project-structure document is absent. Pass the
+    exact artifact path to the next step.
   tool_invocations:
   - tool: shell
     command:
-    - powdrr-lift
-    - evaluate-architecture-specification
-    - --work-item-name
-    - <feature-name>
-    - --entity-type
-    - module
-    - --entity-type
-    - tool
-- description: Stage the validated architecture specification.
+    - test
+    - -f
+    - docs/project_structure/project-structure.yaml
+  - tool: shell
+    command:
+    - mkdir
+    - -p
+    - docs/project_structure
+- description: Populate the project-structure artifact from codebase evidence.
+  llm_type: high_reasoning
+  details: >-
+    Compare the discovered repository structure with the existing artifact or
+    template. Add or update project-wide module entries for application,
+    test, tooling, configuration, and integration areas, including stable ids,
+    paths, parent/related modules, purpose, and evidence. Add or update tool
+    entries for test, formatting, linting, type-check, build, and relevant
+    development commands, including stable ids, related modules, labels,
+    when_to_use, template, how_to_use, and evidence. Preserve accurate
+    existing ids and descriptions. Do not invent modules or tools unsupported
+    by repository evidence. Use the edit action to write the artifact and pass
+    the changed path and edit summary onward.
+- description: Validate the project-structure artifact and discovery evidence.
+  llm_type: fast_iteration
+  details: >-
+    Confirm that the project-structure artifact is valid YAML, contains the
+    discovered project-wide module and tool records, uses paths that exist or
+    are explicitly documented as generated, and has no conflict markers. Check
+    that every listed tool has a command and every module has a purpose and
+    location. Fix any omissions or inconsistencies and repeat validation until
+    the artifact is internally consistent. Do not run a feature-specific
+    architecture validator or require a feature/work-item name.
+  tool_invocations:
+  - tool: shell
+    command:
+    - rg
+    - -n
+    - "^(<<<<<<<|=======|>>>>>>>)"
+    - docs/project_structure/project-structure.yaml
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --check
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+- description: Stage the validated project-structure artifact.
   llm_type: simple_task
   details: >-
-    Confirm that the validated architecture specification is the only intended
-    bootstrap artifact, inspect the diff, and stage the exact specification path
-    so the subsequent implementation workflow can include it. Do not stage
-    unrelated files or commit here.
+    Confirm that the validated project-structure artifact is the only intended
+    bootstrap output, inspect its diff, and stage the exact path under
+    docs/project_structure. Do not stage unrelated files, feature-specific
+    specifications, or generated caches. Do not commit here.
   tool_invocations:
   - tool: shell
     command:
@@ -121,4 +126,4 @@ steps:
     command:
     - git
     - add
-    - docs/specs/<feature-name>/architecture-specification.yaml
+    - docs/project_structure/project-structure.yaml

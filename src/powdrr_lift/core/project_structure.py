@@ -8,18 +8,37 @@ import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
 
-PROJECT_STRUCTURE_TEMPLATE = """schema: https://powdrr.io/schemas/specification-v1
-id: project-structure
-title: Project structure
-entities: []
-modules: []
-tools: []
-entity_relationships: []
-invariants: []
-guidance: []
-features: []
-decisions: []
-intent: {}
+PROJECT_STRUCTURE_TEMPLATE = """# Project structure specification template.
+#
+# Instructions:
+# - Describe the project-wide modules and tools discovered from repository evidence.
+# - Use only sections needed by the project structure; all specification
+#   sections are optional.
+# - Add `pr-prep` to testing, linting, and formatting tools unless repository
+#   evidence shows the tool is ad hoc.
+# - Delete these instructions and replace them with this comment at the top:
+#   "# This file is read-only and should never be edited by a tool or agent."
+#
+schema: https://powdrr.io/schemas/specification-v1
+id: null
+title: null
+modules:
+  - id: null
+    action: null
+    parent_module: null
+    relative_location: null
+    related_modules: []
+    purpose: null
+tools:
+  - id: null
+    action: null
+    related_module: null
+    related_modules: []
+    labels: []
+    when_to_use: null
+    template: null
+    how_to_use: null
+    evidence: null
 """
 
 
@@ -53,19 +72,6 @@ _ROOT_FIELDS = {
     "approach",
     "architecture_id",
     "human-decisions",
-}
-_REQUIRED_ROOT_FIELDS = {
-    "schema",
-    "id",
-    "entities",
-    "modules",
-    "tools",
-    "entity_relationships",
-    "invariants",
-    "guidance",
-    "features",
-    "decisions",
-    "intent",
 }
 _MODULE_FIELDS = {
     "id",
@@ -109,8 +115,22 @@ def validate_project_structure_yaml(
             ProjectStructureValidationIssue("invalid_root", "Root must be a mapping.")
         )
         return ProjectStructureValidationReport(False, issues)
-    _check_required_fields(data, _REQUIRED_ROOT_FIELDS, "", issues)
     _check_unknown_fields(data, _ROOT_FIELDS, "", issues)
+    if any(
+        marker in path.read_text(encoding="utf-8")
+        for marker in (
+            "# Project structure specification template.",
+            "# - Delete these instructions and replace them with this comment "
+            "at the top:",
+        )
+    ):
+        issues.append(
+            ProjectStructureValidationIssue(
+                "template_boilerplate_not_removed",
+                "Remove the template instructions before validating the "
+                "project structure.",
+            )
+        )
     if data.get("schema") != "https://powdrr.io/schemas/specification-v1":
         issues.append(
             ProjectStructureValidationIssue(
@@ -135,6 +155,8 @@ def validate_project_structure_yaml(
         "features",
         "decisions",
     ):
+        if section not in data:
+            continue
         if not isinstance(data.get(section), list):
             issues.append(
                 ProjectStructureValidationIssue(
@@ -142,6 +164,8 @@ def validate_project_structure_yaml(
                 )
             )
     for section in ("modules", "tools"):
+        if section not in data:
+            continue
         entries = data.get(section)
         if not isinstance(entries, list):
             issues.append(

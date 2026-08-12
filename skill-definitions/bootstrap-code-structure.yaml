@@ -48,12 +48,11 @@ steps:
     inspect and reuse it without overwriting it. If it does not exist, invoke
     the shell tool with command [powdrr-lift, project-structure]. The CLI
     creates both the parent directory and the template. The template must
-    use the repository's `https://powdrr.io/schemas/specification-v1` schema
-    and contain the standard specification sections, including entities,
-    modules, tools, entity_relationships, invariants, guidance, features,
-    decisions, and intent. Relationships belong in
-    `entity_relationships`; do not add a standalone `relationships` section.
-    Do not add a standalone `evidence` section.
+    use the repository's `https://powdrr.io/schemas/specification-v1` schema.
+    Generate the template with the CLI and follow its instructions. Use only
+    the specification sections needed by the project structure; all sections
+    are optional. Relationships belong in `entity_relationships`, and there
+    is no standalone `relationships` or `evidence` section.
     Do not create a feature-specific architecture specification and do not ask
     a question merely because the project-structure document is absent. Pass
     the exact artifact path to the next step. Use the prior gather-context

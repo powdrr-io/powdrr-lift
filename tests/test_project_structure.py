@@ -31,7 +31,27 @@ def test_create_project_structure_template_creates_parent_directories(
     assert "evidence:" not in template_lines
 
 
-def test_project_structure_template_validates_as_specification_v1(
+def test_project_structure_validator_accepts_completed_specification_v1(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "project-structure.yaml"
+    output_path.write_text(
+        """# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: project-structure
+modules: []
+tools: []
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_project_structure_yaml(output_path)
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
+def test_project_structure_validator_rejects_unremoved_template_instructions(
     tmp_path: Path,
 ) -> None:
     output_path = tmp_path / "project-structure.yaml"
@@ -39,8 +59,10 @@ def test_project_structure_template_validates_as_specification_v1(
 
     report = validate_project_structure_yaml(output_path)
 
-    assert report.validation_successful is True
-    assert report.issues == []
+    assert report.validation_successful is False
+    assert any(
+        issue.code == "template_boilerplate_not_removed" for issue in report.issues
+    )
 
 
 def test_project_structure_validator_rejects_removed_sections_and_module_evidence(
@@ -82,7 +104,15 @@ evidence: []
 
 def test_project_structure_cli_validates_template(tmp_path: Path) -> None:
     output_path = tmp_path / "project-structure.yaml"
-    create_project_structure_template(output_path=output_path, repo_root=tmp_path)
+    output_path.write_text(
+        """# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: project-structure
+modules: []
+tools: []
+""",
+        encoding="utf-8",
+    )
 
     assert main(["validate-project-structure", "--input", str(output_path)]) == 0
 

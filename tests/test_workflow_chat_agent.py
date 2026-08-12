@@ -2736,6 +2736,88 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
     assert len(captured_messages) == 5
 
 
+def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    worktree_root = repo_root / ".worktrees" / "skill-chat-test"
+    skills_dir = worktree_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+    captured_messages: list[dict[str, str]] = []
+
+    class _FakeOpenAIClient:
+        def __init__(self, **_: object) -> None:
+            self.call_index = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            captured_messages.append(messages[1])
+            call_index = self.call_index
+            self.call_index += 1
+            if call_index == 0:
+                return {
+                    "selected_skill_path": str(skills_dir / "specify-a-feature.json"),
+                    "selected_skill_reason": "The request needs the guided workflow.",
+                    "next_question": None,
+                    "ready_to_execute": True,
+                }
+            if call_index == 1:
+                return {
+                    "kind": "invoke_tool",
+                    "tool": "fuzzy-match",
+                    "parameters": {"command": ["fuzzy-match", "."]},
+                }
+            if call_index == 2:
+                assert "fuzzy-match requires -name <query>" in messages[1]["content"]
+                return {
+                    "kind": "invoke_tool",
+                    "tool": "fuzzy-match",
+                    "parameters": {
+                        "command": [
+                            "fuzzy-match",
+                            ".",
+                            "-name",
+                            "project-structure.yaml",
+                            "-type",
+                            "f",
+                        ]
+                    },
+                }
+            if call_index == 3:
+                return {"kind": "complete", "text": "Done."}
+            raise AssertionError(f"Unexpected call index: {call_index}")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: worktree_root,
+    )
+
+    stderr = io.StringIO()
+    exit_code = run_workflow_chat(
+        SkillChatConfig(
+            skills_dir=skills_dir,
+            repo_root=repo_root,
+            output_dir=Path("generated"),
+            api_key="test-key",
+            model="test-model",
+        ),
+        input_func=iter(["Find the project structure"]).__next__,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert "Workflow invoke_tool action failed" in stderr.getvalue()
+    assert len(captured_messages) == 4
+
+
 def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_calls(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -1196,7 +1196,7 @@ def run_workflow_chat(
                 input_func,
                 config,
             )
-        except RuntimeError as exc:
+        except (RuntimeError, ValueError) as exc:
             action_signature = _workflow_action_signature(action)
             current_file_context = _current_file_context(
                 worktree_root,
@@ -2070,6 +2070,8 @@ def _context_type_catalog() -> tuple[tuple[str, str], ...]:
         ("risks", "discover open risks or concerns"),
         ("decisions", "discover recorded decisions or tradeoffs"),
         ("proposed_prs", "discover proposed PR records and their status"),
+        ("modules", "discover project modules and their locations"),
+        ("tools", "discover project tools and validation commands"),
     )
 
 

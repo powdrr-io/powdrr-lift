@@ -209,6 +209,14 @@ def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
             path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
         )
 
+    project_structure_root = repo_root / "docs" / "project_structure"
+    if project_structure_root.exists():
+        paths.extend(
+            path
+            for path in sorted(project_structure_root.rglob("*.yaml"))
+            if path.is_file()
+        )
+
     current_state_path = repo_root / ".powdrr-lift" / "state" / "current-state.yaml"
     if current_state_path.is_file():
         paths.append(current_state_path)
@@ -245,6 +253,9 @@ def _describe_specification_path(
 
     if path_parts == (".powdrr-lift", "state", "current-state.yaml"):
         return "current-state", "current-state"
+
+    if len(path_parts) >= 3 and path_parts[:2] == ("docs", "project_structure"):
+        return "project-structure", path.stem
 
     return None, None
 

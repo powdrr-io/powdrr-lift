@@ -16,7 +16,11 @@ steps:
     tests, formatting, linting, type checking, packaging, and other repository
     validation. Use basedpyright-symbol and basedpyright-structure for Python
     source when available. Record paths, symbols, commands, and evidence in
-    decisions_and_context before continuing.
+    decisions_and_context before continuing. Use the gather-context workflow
+    action to look for an existing project-structure artifact:
+    {"kind":"gather-context","types":["modules","tools"],"keywords":[]}
+    Inspect returned match paths for docs/project_structure and carry the
+    result into the next step.
   tool_invocations:
   - tool: shell
     command:
@@ -37,15 +41,6 @@ steps:
     - .github
     - scripts
     - README.md
-  - tool: fuzzy-match
-    command:
-    - fuzzy-match
-    - docs/project_structure
-    - -type
-    - f
-    - -maxdepth
-    - "2"
-    - -print
 - description: Reuse an existing project-structure artifact or create its template.
   llm_type: simple_task
   details: >-
@@ -57,7 +52,8 @@ steps:
     evidence sections, with empty lists where discovery will fill details. Do
     not create a feature-specific architecture specification and do not ask a
     question merely because the project-structure document is absent. Pass the
-    exact artifact path to the next step.
+    exact artifact path to the next step. Use the prior gather-context result
+    to decide whether the artifact exists.
   tool_invocations:
   - tool: shell
     command:

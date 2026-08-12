@@ -87,7 +87,7 @@ def render_feature_pr_specification_template(
         "# Feature and PR specification template.",
         "#",
         "# Instructions:",
-        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
+        f"# - Use the proposal folder `docs/proposals/{normalized_work_item_name}`.",
         "# - Start from the filled system map template and the requested feature.",
         "# - Fill out one section at a time in this order:",
         "#   requirements, approach, entities, entity_relationships,",
@@ -299,7 +299,7 @@ def _system_map_instruction_lines(
         ]
 
     return [
-        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
+        f"# - Use the current-state folder `docs/current/{normalized_work_item_name}`.",
         "# - Analyze the full codebase deeply before writing anything.",
         "# - Fill out one section at a time in this order:",
         "#   requirements, approach, entities, entity_relationships,",

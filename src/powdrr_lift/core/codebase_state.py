@@ -13,7 +13,10 @@ from powdrr_lift.core.code_index import (
     _current_branch,
 )
 from powdrr_lift.core.index import ChangelogDocument, SourceIndex
-from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
+from powdrr_lift.core.spec_paths import (
+    SPECIFICATION_SCHEMA_URL,
+    is_current_specification_path,
+)
 
 _DEFAULT_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "codebase-state.yaml"
 _CURRENT_STATE_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "current-state.yaml"
@@ -260,23 +263,26 @@ def build_current_state_specification_report(
         branch_name=resolved_branch,
         parent_branch=resolved_parent_branch,
     )
+    current_specifications = _current_specification_documents(
+        state.source_index.specification_documents
+    )
     requirements, approach = _collect_current_specification_sections(
-        state.source_index.specification_documents,
+        current_specifications,
     )
     entities = _collect_current_specification_entities(
-        state.source_index.specification_documents,
+        current_specifications,
     )
     modules = _collect_current_specification_modules(
-        state.source_index.specification_documents,
+        current_specifications,
     )
     tools = _collect_current_specification_tools(
-        state.source_index.specification_documents,
+        current_specifications,
     )
     relationships = _collect_current_specification_relationships(
-        state.source_index.specification_documents,
+        current_specifications,
     )
     features = _collect_current_specification_features(
-        state.source_index.specification_documents,
+        current_specifications,
     )
     decisions = _collect_current_specification_decisions(
         state.source_index.specification_documents,
@@ -324,6 +330,16 @@ def build_current_state_specification_report(
 
 def render_current_state_specification_report(report: dict[str, Any]) -> str:
     return yaml.safe_dump(report, sort_keys=False)
+
+
+def _current_specification_documents(
+    specification_documents: list[Any],
+) -> list[Any]:
+    return [
+        document
+        for document in specification_documents
+        if is_current_specification_path(document.path)
+    ]
 
 
 def create_current_state_specification(

@@ -208,6 +208,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "Validate all tests pass",
         "Confirm functional completeness against the specification",
         "Run lint, type checks, and cleanup",
+        "Promote the implemented feature documents to current state",
         "Stage the pull request changes",
         "Finish pull request preparation",
         "Create the pull request",
@@ -231,6 +232,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         ("agent", "reviewer"),
         ("agent", "reviewer"),
         ("agent", "reviewer"),
+        ("agent", "reviewer"),
         ("human", "reviewer"),
     ]
     assert template.task_templates[0].tool_invocations == ()
@@ -244,15 +246,21 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[4].input_state["tests_proven_failing"] == (
         "<upstream-task-3>.tests-proven-failing-state"
     )
-    assert template.task_templates[8].input_state["lint_results"] == (
+    assert template.task_templates[9].input_state["lint_results"] == (
         "<upstream-task-7>.linted-and-cleaned-state"
     )
-    assert template.task_templates[9].uses_skills == ("finish-pr-prep",)
-    assert template.task_templates[9].input_state["staged_changes"] == (
-        "<upstream-task-8>.staged-pull-request-state"
+    assert template.task_templates[8].description == (
+        "Promote the implemented feature documents to current state"
     )
-    assert template.task_templates[10].input_state["lint_results"] == (
-        "<upstream-task-9>.pull-request-prep-state"
+    assert template.task_templates[9].input_state["promoted_documents"] == (
+        "<upstream-task-8>.promoted-current-state-documents"
+    )
+    assert template.task_templates[10].uses_skills == ("finish-pr-prep",)
+    assert template.task_templates[10].input_state["staged_changes"] == (
+        "<upstream-task-9>.staged-pull-request-state"
+    )
+    assert template.task_templates[11].input_state["lint_results"] == (
+        "<upstream-task-10>.pull-request-prep-state"
     )
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
@@ -275,7 +283,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
-    assert len(tasks) == 11
+    assert len(tasks) == 12
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
@@ -303,8 +311,8 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     assert tasks[4].input_state["tests_proven_failing"] == (
         "interaction-file-log-pr-001-task-004.tests-proven-failing-state"
     )
-    assert tasks[9].input_state["staged_changes"] == (
-        "interaction-file-log-pr-001-task-009.staged-pull-request-state"
+    assert tasks[10].input_state["staged_changes"] == (
+        "interaction-file-log-pr-001-task-010.staged-pull-request-state"
     )
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")

@@ -228,6 +228,35 @@ task_templates:
   output_state_type: linted-and-cleaned-state
   dependent_state:
   - lint-and-cleanup-complete
+- description: Promote the implemented feature documents to current state
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: simple_task
+  input_state:
+    proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
+    implementation_diffs: <upstream-task-4>.generated-product-code-state
+    completeness_review: <upstream-task-6>.specification-completeness-state
+    promoted_documents: {}
+  details: >-
+    After implementation and validation are complete, move the feature's
+    specification directory from docs/proposals/<work-item-name>/ to
+    docs/current/<work-item-name>/. Use git mv so the committed implementation
+    records the transition and preserves history. Move only the documents for
+    the completed feature; leave unrelated proposals in place. If the proposal
+    directory does not exist or the current directory already exists, inspect
+    the exact contents and resolve the situation before continuing. Record the
+    moved paths in output_state.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - mv
+    - docs/proposals/<work-item-name>
+    - docs/current/<work-item-name>
+  output_state_type: promoted-current-state-documents
+  dependent_state:
+  - current-state-documents-promoted
 - description: Stage the pull request changes
   complexity: medium
   assignee_type: agent
@@ -238,6 +267,7 @@ task_templates:
     test_results: <upstream-task-5>.all-tests-passing-state
     completeness_review: <upstream-task-6>.specification-completeness-state
     lint_results: <upstream-task-7>.linted-and-cleaned-state
+    promoted_documents: <upstream-task-8>.promoted-current-state-documents
     staged_changes: {}
   details: >-
     Inspect the final diff and stage only the intended pull-request files.
@@ -265,7 +295,8 @@ task_templates:
     test_results: <upstream-task-5>.all-tests-passing-state
     completeness_review: <upstream-task-6>.specification-completeness-state
     lint_results: <upstream-task-7>.linted-and-cleaned-state
-    staged_changes: <upstream-task-8>.staged-pull-request-state
+    promoted_documents: <upstream-task-8>.promoted-current-state-documents
+    staged_changes: <upstream-task-9>.staged-pull-request-state
   details: >-
     Run finish-pr-prep after the intended pull-request files are staged. If the
     prep step changes files, restage only the approved files and rerun any
@@ -290,7 +321,7 @@ task_templates:
     implementation_diffs: <upstream-task-4>.generated-product-code-state
     test_results: <upstream-task-5>.all-tests-passing-state
     completeness_review: <upstream-task-6>.specification-completeness-state
-    lint_results: <upstream-task-9>.pull-request-prep-state
+    lint_results: <upstream-task-10>.pull-request-prep-state
     pull_request: {}
   details: >-
     Present the proposed PR specification, implementation summary, changed

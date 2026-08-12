@@ -22,6 +22,9 @@ def test_create_system_map_specification_template_prepopulates_current_index(
 ) -> None:
     repo_root = _create_repo_with_structured_specs_and_changelogs(tmp_path)
     output_path = system_map_specification_default_output_path("powdrr-lift", repo_root)
+    assert output_path == (
+        repo_root / "docs" / "current" / "powdrr-lift" / "system-map-specification.yaml"
+    )
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):

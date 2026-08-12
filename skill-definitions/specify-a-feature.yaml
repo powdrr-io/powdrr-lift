@@ -116,7 +116,7 @@ steps:
 - description: Stage the validated specification artifacts for pull request preparation.
   llm_type: simple_task
   details: Inspect the worktree and stage only the validated specification
-    artifacts under docs/specs/<work-item-name>/. Do not commit or create the
+    artifacts under docs/proposals/<work-item-name>/. Do not commit or create the
     pull request yet.
   tool_invocations:
   - tool: shell
@@ -128,7 +128,7 @@ steps:
     command:
     - git
     - add
-    - docs/specs/<work-item-name>
+    - docs/proposals/<work-item-name>
 - description: Run finish-pr-prep before creating the pull request.
   llm_type: fast_iteration
   details: Run finish-pr-prep after the intended specification artifacts are staged.

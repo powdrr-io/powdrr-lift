@@ -120,6 +120,9 @@ def _write_proposed_pr_specification(
 def test_create_pr_specification_template_writes_default_file(tmp_path: Path) -> None:
     _write_implementation_specification(tmp_path)
     output_path = pr_specification_default_output_path("PR-456", tmp_path)
+    assert output_path == (
+        tmp_path / "docs" / "proposals" / "PR-456" / "proposed-pr-specification.yaml"
+    )
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):

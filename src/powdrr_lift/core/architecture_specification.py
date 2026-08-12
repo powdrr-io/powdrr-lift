@@ -13,7 +13,7 @@ from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.spec_paths import (
     SPECIFICATION_SCHEMA_URL,
     architecture_specification_path,
-    system_specification_path,
+    existing_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.template_generation import merge_existing_template_content
@@ -64,7 +64,7 @@ def render_architecture_specification_template(
         "# Architecture specification template.",
         "#",
         "# Instructions:",
-        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
+        f"# - Use the proposal folder `docs/proposals/{normalized_work_item_name}`.",
         "# - Fill in the sections below with the intended architecture.",
         "# - Set `id` to a date-based identifier, for example 2026-06-19.",
         "# - Choose each entity type from the allowed entity types listed here.",
@@ -1007,7 +1007,11 @@ def _load_current_system_reference_ids(
     work_item_name: str,
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
-    system_spec_path = system_specification_path(repo_root, work_item_name)
+    system_spec_path = existing_specification_path(
+        repo_root,
+        work_item_name,
+        "system-specification.yaml",
+    )
     if not system_spec_path.exists():
         issues.append(
             ArchitectureSpecificationValidationIssue(

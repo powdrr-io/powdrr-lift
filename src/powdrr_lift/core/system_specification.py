@@ -67,7 +67,7 @@ def render_system_specification_template(
         "# System specification template.",
         "#",
         "# Instructions:",
-        f"# - Use the work item folder `docs/specs/{normalized_work_item_name}`.",
+        f"# - Use the proposal folder `docs/proposals/{normalized_work_item_name}`.",
         "# - Fill in the requirements and approach sections.",
         "# - Delete these instructions and replace them with this comment at the top:",
         '#   "# This file is read-only and should never be edited by a tool or agent."',

@@ -10,11 +10,16 @@ import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.codebase_state import build_codebase_state_report
+from powdrr_lift.core.spec_paths import CURRENT_ROOT, PROPOSALS_ROOT
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
-_DEFAULT_OUTPUT_PATH = Path("docs") / "specs"
-_IMPLEMENTATION_SPECIFICATION_DIR = Path("docs") / "specs"
+_DEFAULT_OUTPUT_PATH = PROPOSALS_ROOT
+_IMPLEMENTATION_SPECIFICATION_DIRS = (
+    CURRENT_ROOT,
+    PROPOSALS_ROOT,
+    Path("docs") / "specs",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +191,14 @@ def proposed_pr_specification_path(
         if _parse_proposed_pr_number(specification_path) == pr_number:
             return specification_path
 
+    proposal_path = (
+        repo_root_path
+        / PROPOSALS_ROOT
+        / f"PR-{pr_number}"
+        / "proposed-pr-specification.yaml"
+    )
+    if proposal_path.exists():
+        return proposal_path
     return (
         repo_root_path
         / "docs"
@@ -416,13 +429,15 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
         if catalog:
             return catalog
 
-    implementation_dir = repo_root / _IMPLEMENTATION_SPECIFICATION_DIR
-    if not implementation_dir.exists():
-        return catalog
-
-    for specification_path in sorted(
-        implementation_dir.rglob("implementation-specification.yaml")
-    ):
+    implementation_paths = [
+        specification_path
+        for implementation_dir in _IMPLEMENTATION_SPECIFICATION_DIRS
+        if (repo_root / implementation_dir).exists()
+        for specification_path in (repo_root / implementation_dir).rglob(
+            "implementation-specification.yaml"
+        )
+    ]
+    for specification_path in sorted(implementation_paths):
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -549,25 +564,20 @@ def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
 
 
 def _iter_proposed_pr_specification_paths(repo_root: Path) -> list[Path]:
-    spec_root = repo_root / "docs" / "specs"
-    if not spec_root.exists():
-        specification_paths = []
-    else:
-        specification_paths = [
-            specification_path
-            for specification_path in spec_root.rglob("proposed-pr-specification.yaml")
-            if specification_path.is_file()
-        ]
-
-    proposal_root = repo_root / "docs" / "proposals"
-    if proposal_root.exists():
-        specification_paths.extend(
-            specification_path
-            for specification_path in proposal_root.glob(
-                "PR-*-proposed-pr-specification.yaml"
-            )
-            if specification_path.is_file()
+    specification_paths = [
+        specification_path
+        for proposal_root in (
+            repo_root / PROPOSALS_ROOT,
+            repo_root / "docs" / "specs",
         )
+        if proposal_root.exists()
+        for specification_path in proposal_root.rglob("*.yaml")
+        if specification_path.is_file()
+        and (
+            specification_path.name == "proposed-pr-specification.yaml"
+            or specification_path.name.endswith("-proposed-pr-specification.yaml")
+        )
+    ]
 
     seen_paths: set[Path] = set()
     ordered_paths: list[Path] = []

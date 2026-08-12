@@ -11,10 +11,8 @@ import yaml
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.spec_paths import (
     SPECIFICATION_SCHEMA_URL,
+    existing_specification_path,
     implementation_specification_path,
-)
-from powdrr_lift.core.spec_paths import (
-    architecture_specification_path as _architecture_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.template_generation import merge_existing_template_content
@@ -96,7 +94,7 @@ def render_implementation_specification_template(
         "# Implementation specification template.",
         "#",
         "# Instructions:",
-        f"# - Use the work item folder `docs/specs/{work_item_name.strip()}`.",
+        f"# - Use the proposal folder `docs/proposals/{work_item_name.strip()}`.",
         "# - Keep `architecture_id` aligned with the architecture specification.",
         "# - Copy entity ids and relationship ids only from the architecture",
         "#   specification listed below.",
@@ -459,7 +457,11 @@ def _load_architecture_specification_summary(
     resolved_path = _resolve_input_path(
         repo_root,
         architecture_specification_path,
-        default_path=_architecture_specification_path(repo_root, work_item_name),
+        default_path=existing_specification_path(
+            repo_root,
+            work_item_name,
+            "architecture-specification.yaml",
+        ),
     )
     try:
         raw_yaml = resolved_path.read_text(encoding="utf-8")

@@ -335,7 +335,14 @@ def _build_source_index(
 
 
 def load_specification_documents(repo_root: Path) -> list[SpecificationDocument]:
-    output = _git_output(repo_root, "ls-files", "docs/specs")
+    output = _git_output(
+        repo_root,
+        "ls-files",
+        "--",
+        "docs/current",
+        "docs/proposals",
+        "docs/specs",
+    )
     specification_documents: list[SpecificationDocument] = []
     for path_text in sorted(output.splitlines()):
         if not path_text or not is_specification_path(path_text):
@@ -354,7 +361,7 @@ def load_specification_documents(repo_root: Path) -> list[SpecificationDocument]
             continue
 
         path_parts = Path(path_text).parts
-        if len(path_parts) < 4:
+        if len(path_parts) < 4 or path_parts[0] != "docs":
             continue
 
         work_item_name = path_parts[2]

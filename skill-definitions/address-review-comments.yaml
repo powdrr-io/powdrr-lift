@@ -58,7 +58,7 @@ steps:
   llm_type: standard_reasoning
   details: >-
     For each comment classified as a design-level change, generate or reuse the
-    appropriate v1 specification template in docs/specs/<work-item-name>/ using
+    appropriate v1 specification template in docs/proposals/<work-item-name>/ using
     the repository's powdrr-lift template command, then fill the template with
     the approved change while preserving the existing specification content.
     Use system-specification for system entities and intent, architecture-

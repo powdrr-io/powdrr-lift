@@ -22,6 +22,7 @@ from powdrr_lift.workflow_chat_agent import (
 )
 
 _EMPTY_HUMAN_INPUT_WARNING = "WARNING: received empty response but need human input"
+_USER_RESPONSE_SEPARATOR = "-" * 40
 
 
 class _TextualOutput:
@@ -351,20 +352,36 @@ class WorkflowChatApp(App[None]):
         if self._response is None or self._response.disabled:
             return
         answer = self._response.text.strip()
+        if not answer:
+            return
         if self._initial_prompt_visible:
             self._initial_prompt_visible = False
-        self._set_message(f"User: {answer or '<empty response>'}")
-        self._set_status("calling LLM...")
-        self.query_one("#status", Label).refresh(repaint=True)
+        self._set_message(self._format_user_response(answer))
         self._response.text = ""
         self._response.disabled = True
-        self.call_after_refresh(self._release_submitted_response, answer)
+        # Let Textual paint the echoed response before changing the status or
+        # waking the worker. This makes Return visibly acknowledge the input
+        # even when the next workflow operation is slow to start.
+        self.call_after_refresh(self._begin_submitted_response, answer)
+
+    def _begin_submitted_response(self, answer: str) -> None:
+        self._set_status("calling LLM...")
+        self._release_submitted_response(answer)
 
     def _release_submitted_response(self, answer: str) -> None:
         if self._stop_requested.is_set():
             return
         self._answers.put(answer)
         self._request_submitted.set()
+
+    @staticmethod
+    def _format_user_response(answer: str) -> str:
+        response = answer or "<empty response>"
+        lines = response.splitlines() or [""]
+        echoed_response = "\n".join(f"> {line}" for line in lines)
+        return (
+            f"{_USER_RESPONSE_SEPARATOR}\n{echoed_response}\n{_USER_RESPONSE_SEPARATOR}"
+        )
 
     def _run_workflow(self) -> None:
         first_workflow = True

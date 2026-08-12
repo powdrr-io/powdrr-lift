@@ -406,7 +406,11 @@ def test_textual_submit_shows_user_response_before_calling_llm() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\nUser: Build the feature\n\ncalling LLM..."
+        "starting workflow...\n\n"
+        "----------------------------------------\n"
+        "> Build the feature\n"
+        "----------------------------------------\n\n"
+        "calling LLM..."
     )
 
 
@@ -425,7 +429,11 @@ def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> Non
 
     assert asyncio.run(exercise()) == (
         "starting workflow...\n\n"
-        "What do you want to do?\n\nUser: Build the feature\n\ncalling LLM..."
+        "What do you want to do?\n\n"
+        "----------------------------------------\n"
+        "> Build the feature\n"
+        "----------------------------------------\n\n"
+        "calling LLM..."
     )
 
 
@@ -449,9 +457,13 @@ def test_textual_status_retains_multiple_user_responses() -> None:
     assert asyncio.run(exercise()) == (
         "starting workflow...\n\n"
         "What do you want to do?\n\n"
-        "User: First answer\n\n"
+        "----------------------------------------\n"
+        "> First answer\n"
+        "----------------------------------------\n\n"
         "calling LLM...\n\n"
-        "User: Second answer\n\n"
+        "----------------------------------------\n"
+        "> Second answer\n"
+        "----------------------------------------\n\n"
         "calling LLM..."
     )
 
@@ -881,6 +893,7 @@ def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> No
             response = app.query_one("#response", TextArea)
             response.text = "Specify the feature"
             app._submit_response()
+            await pilot.pause()
 
             def write_matched_skill() -> None:
                 output.write("Matched skill: specify-a-feature\n")
@@ -897,7 +910,9 @@ def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> No
     assert rendered == (
         "starting workflow...\n\n"
         "What do you want to do?\n\n"
-        "User: Specify the feature\n\n"
+        "----------------------------------------\n"
+        "> Specify the feature\n"
+        "----------------------------------------\n\n"
         "calling LLM...\n\n"
         "Matched skill: specify-a-feature"
     )

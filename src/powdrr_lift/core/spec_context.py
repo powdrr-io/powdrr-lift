@@ -72,6 +72,7 @@ class GatherContextMatch:
 @dataclass(frozen=True, slots=True)
 class GatherContextReport:
     repo_root: str
+    scope: str = "current"
     types: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
     filters: dict[str, list[str]] = field(default_factory=dict)
@@ -98,14 +99,19 @@ def gather_specification_context(
     types: list[str],
     keywords: list[str] | None = None,
     filters: dict[str, object] | None = None,
+    scope: str = "current",
 ) -> GatherContextReport:
     repo_root_path = _resolve_repo_root(repo_root)
     normalized_types = _normalize_context_types(types)
     normalized_keywords = _normalize_keywords(keywords)
     normalized_filters = _normalize_filters(filters)
+    normalized_scope = _normalize_scope(scope)
     matches: list[GatherContextMatch] = []
 
-    for spec_path in _iter_context_specification_paths(repo_root_path):
+    for spec_path in _iter_context_specification_paths(
+        repo_root_path,
+        scope=normalized_scope,
+    ):
         raw_spec = _load_yaml_mapping(spec_path)
         if raw_spec is None:
             continue
@@ -136,10 +142,27 @@ def gather_specification_context(
 
     return GatherContextReport(
         repo_root=str(repo_root_path),
+        scope=normalized_scope,
         types=normalized_types,
         keywords=normalized_keywords,
         filters=normalized_filters,
         matches=matches,
+    )
+
+
+def gather_proposal_context(
+    repo_root: str | Path | None,
+    *,
+    types: list[str],
+    keywords: list[str] | None = None,
+    filters: dict[str, object] | None = None,
+) -> GatherContextReport:
+    return gather_specification_context(
+        repo_root,
+        types=types,
+        keywords=keywords,
+        filters=filters,
+        scope="proposal",
     )
 
 
@@ -201,20 +224,32 @@ def _normalize_filters(filters: dict[str, object] | None) -> dict[str, list[str]
     return normalized
 
 
-def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
+def _normalize_scope(scope: str) -> str:
+    normalized_scope = scope.strip().lower()
+    if normalized_scope not in {"current", "proposal"}:
+        raise ValueError("Context scope must be 'current' or 'proposal'.")
+    return normalized_scope
+
+
+def _iter_context_specification_paths(
+    repo_root: Path,
+    *,
+    scope: str,
+) -> list[Path]:
     paths: list[Path] = []
-    for docs_root in (
-        repo_root / "docs" / "current",
-        repo_root / "docs" / "proposals",
-        repo_root / "docs" / "specs",
-    ):
+    docs_roots = (
+        (repo_root / "docs" / "current",)
+        if scope == "current"
+        else (repo_root / "docs" / "proposals",)
+    )
+    for docs_root in docs_roots:
         if docs_root.exists():
             paths.extend(
                 path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
             )
 
     current_state_path = repo_root / ".powdrr-lift" / "state" / "current-state.yaml"
-    if current_state_path.is_file():
+    if scope == "current" and current_state_path.is_file():
         paths.append(current_state_path)
 
     return paths
@@ -338,6 +373,7 @@ def _item_matches(
 def _gather_context_report_to_data(report: GatherContextReport) -> dict[str, Any]:
     return {
         "repo_root": report.repo_root,
+        "scope": report.scope,
         "types": report.types,
         "keywords": report.keywords,
         "filters": report.filters,

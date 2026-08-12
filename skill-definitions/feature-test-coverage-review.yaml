@@ -46,7 +46,7 @@ steps:
     specification, and the landed implementation and test diffs. Use the
     invoke the gather_context workflow action with the proposed-PR entity type
     filtered by the canonical feature id:
-    {"kind":"gather-context","types":["proposed_prs"],"keywords":["<feature-id>"]}.
+    {"kind":"gather-proposal","types":["features","proposed_prs"],"keywords":["<feature-id>"]}.
     Use the returned records to confirm scope and ordering rather than relying
     only on PR prose. Record the exact requested
     test cases, acceptance criteria that require tests, and validation commands.

@@ -48,6 +48,7 @@ from powdrr_lift.core import (
     system_specification_default_output_path,
 )
 from powdrr_lift.core.spec_context import (
+    gather_proposal_context,
     gather_specification_context,
     normalize_context_type,
     render_gather_context_report,
@@ -1918,8 +1919,12 @@ def _action_system_prompt() -> str:
         "only for an additional listed skill that the current step discovers it "
         "needs.\n"
         "Choose exactly one outcome and use it for the following reason:\n"
-        "- gather-context: choose this when checked-in specifications or other "
-        "repository context must be discovered before deciding or acting.\n"
+        "- gather-context: choose this when current-state specifications or other "
+        "repository context must be discovered before deciding or acting. It "
+        "never reads proposal documents.\n"
+        "- gather-proposal: choose this when a proposed feature specification or "
+        "proposed PR must be discovered. It reads only docs/proposals and never "
+        "current-state documents.\n"
         "- prompt_user: choose this only when a specific human decision or fact "
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
@@ -1940,8 +1945,9 @@ def _action_system_prompt() -> str:
         "outcome shapes. Include decisions_and_context when there is information "
         "a later step needs. Include llm_type only when the next roundtrip needs "
         "a different capability; otherwise use null or omit it.\n"
-        "Response field requirements by outcome: gather-context requires a non-"
-        "empty types array and may include keywords and filters mappings; "
+        "Response field requirements by outcome: gather-context and "
+        "gather-proposal require a non-empty types array and may include keywords "
+        "and filters mappings; "
         "prompt_user requires "
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
@@ -1975,11 +1981,12 @@ def _action_system_prompt() -> str:
         '"llm_type":"standard_reasoning"}\n'
         '{"kind":"complete","text":"...","decisions_and_context":"...",'
         '"llm_type":"high_reasoning"}\n'
-        "Use gather-context when you need to discover information already "
-        "specified in checked-in specs before deciding the next action.\n"
-        "Use gather-context to discover what requirements are already "
-        "specified, find related entities, inspect approach notes, or gather "
-        "current features, decisions, risks, or proposed PRs.\n"
+        "Use gather-context when you need information already specified in "
+        "current-state specs before deciding the next action. It can discover "
+        "current requirements, entities, decisions, risks, modules, and tools.\n"
+        "Use gather-proposal when you need a proposed feature specification or "
+        "proposed PRs and their requirements, acceptance criteria, tests, risks, "
+        "decisions, or planning context.\n"
         "The supported context types are:\n"
         f"{context_type_lines}\n"
         "Use keywords to narrow results to items that mention one or more "
@@ -2095,6 +2102,7 @@ def _workflow_action_handlers() -> dict[
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
         "gather-context": _handle_workflow_action_gather_context,
+        "gather-proposal": _handle_workflow_action_gather_proposal,
     }
 
 
@@ -2550,6 +2558,50 @@ def _handle_workflow_action_gather_context(
     return True
 
 
+def _handle_workflow_action_gather_proposal(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    gathered_context = gather_proposal_context(
+        state.worktree_root,
+        types=list(action.types),
+        keywords=list(action.keywords) if action.keywords else None,
+        filters=action.filters,
+    )
+    gathered_context_text = render_gather_context_report(gathered_context)
+    _verbose_print(
+        stderr,
+        config.verbose,
+        (
+            "Gathered proposal context for "
+            f"types={list(action.types)} keywords={list(action.keywords)}"
+        ),
+    )
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    state.execution_context.append(
+        f"Gathered proposal context:\n{gathered_context_text}"
+    )
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "types": list(action.types),
+            "keywords": list(action.keywords),
+            "filters": action.filters,
+            "result": json.loads(gathered_context_text),
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    _ = stdout
+    return True
+
+
 def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     kind = payload.get("kind")
     if not isinstance(kind, str):
@@ -2570,6 +2622,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "complete": _parse_workflow_action_complete,
         "edit": _parse_workflow_action_edit,
         "gather-context": _parse_workflow_action_gather_context,
+        "gather-proposal": _parse_workflow_action_gather_proposal,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
         "read_document": _parse_workflow_action_read_document,
@@ -2661,6 +2714,26 @@ def _parse_workflow_action_gather_context(
         filters=filters,
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
+    )
+
+
+def _parse_workflow_action_gather_proposal(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    action = _parse_workflow_action_gather_context(
+        payload,
+        decisions_and_context,
+        llm_type,
+    )
+    return SkillChatAction(
+        kind="gather-proposal",
+        types=action.types,
+        keywords=action.keywords,
+        filters=action.filters,
+        decisions_and_context=action.decisions_and_context,
+        llm_type=action.llm_type,
     )
 
 
@@ -4081,7 +4154,8 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     return (
         "Generate a JSON document selecting the best action based on this "
         "context. The available actions are: gather-context to discover "
-        "repository specifications before deciding; prompt_user to ask one "
+        "current-state specifications, gather-proposal to discover proposal "
+        "specifications; prompt_user to ask one "
         "necessary human question; edit to make a known line-based file change; "
         "invoke_skill to run a listed nested skill; invoke_tool to run a shell, "
         "fuzzy-match, or basedpyright query; read_document to "

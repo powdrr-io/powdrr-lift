@@ -2148,11 +2148,11 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 "ready_to_execute": True,
             },
             {
-                "kind": "gather-context",
+                "kind": "gather-proposal",
                 "types": ["requirements"],
                 "keywords": ["related photos"],
                 "decisions_and_context": (
-                    "Need the existing requirements before summarizing."
+                    "Need the proposed requirements before summarizing."
                 ),
             },
             {
@@ -2200,10 +2200,11 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 assert prompt["current_step"]["description"] == (
                     "Discover what requirements are already specified."
                 )
-                assert "Gathered context:" in prompt["step_context"][-1]
+                assert "Gathered proposal context:" in prompt["step_context"][-1]
                 assert "Show related photos in the UI." in prompt["step_context"][-1]
-                assert prompt["execution_events"][-1]["kind"] == "gather-context"
+                assert prompt["execution_events"][-1]["kind"] == "gather-proposal"
                 assert prompt["execution_events"][-1]["types"] == ["requirements"]
+                assert prompt["execution_events"][-1]["result"]["scope"] == "proposal"
                 assert (
                     prompt["execution_events"][-1]["result"]["matches"][0]["item"][
                         "description"
@@ -2255,7 +2256,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
     assert summary_path.exists()
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert [event["kind"] for event in summary["execution_events"]] == [
-        "gather-context",
+        "gather-proposal",
         "next_step",
         "complete",
     ]

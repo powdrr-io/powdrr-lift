@@ -298,6 +298,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "bootstrap-code-structure",
         "feature-functionality-review",
         "finish-pr-prep",
+        "fix-ci-failures",
         "review-architecture",
         "review-system",
         "specify-a-feature",

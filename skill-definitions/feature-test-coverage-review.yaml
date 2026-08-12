@@ -44,9 +44,11 @@ steps:
     assigned to that proposed PR and its explicit dependencies. For a final PR,
     review the complete feature definition, every related proposed-PR
     specification, and the landed implementation and test diffs. Use the
-    gather-context workflow action with the proposed-PR entity type filtered by
-    the canonical feature id, then use the returned records to confirm scope and
-    ordering rather than relying only on PR prose. Record the exact requested
+    invoke the gather_context workflow action with the proposed-PR entity type
+    filtered by the canonical feature id:
+    {"kind":"gather-context","types":["proposed_prs"],"keywords":["<feature-id>"]}.
+    Use the returned records to confirm scope and ordering rather than relying
+    only on PR prose. Record the exact requested
     test cases, acceptance criteria that require tests, and validation commands.
 - description: Build the requested-test coverage matrix.
   llm_type: high_reasoning

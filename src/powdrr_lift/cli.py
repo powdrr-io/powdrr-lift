@@ -57,7 +57,10 @@ from powdrr_lift.core import (
     validate_pr_specification_yaml,
     validate_system_specification_yaml,
 )
-from powdrr_lift.core.project_structure import create_project_structure_template
+from powdrr_lift.core.project_structure import (
+    create_project_structure_template,
+    validate_project_structure_yaml,
+)
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
@@ -532,6 +535,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to use when creating the template.",
     )
     project_structure_parser.set_defaults(func=_run_project_structure)
+
+    validate_project_structure_parser = subparsers.add_parser(
+        "validate-project-structure",
+        aliases=["validate_project_structure"],
+        help="Validate a project-structure specification-v1 YAML file.",
+    )
+    validate_project_structure_parser.add_argument(
+        "--input",
+        type=Path,
+        default=Path("docs/project_structure/project-structure.yaml"),
+        help="Project-structure YAML file to validate.",
+    )
+    validate_project_structure_parser.set_defaults(
+        func=_run_validate_project_structure,
+    )
 
     system_map_specification_parser = subparsers.add_parser(
         "system-map-specification",
@@ -1409,6 +1427,23 @@ def _run_project_structure(args: argparse.Namespace) -> int:
     )
     print(f"Wrote project structure template to {output_path}")
     return 0
+
+
+def _run_validate_project_structure(args: argparse.Namespace) -> int:
+    report = validate_project_structure_yaml(args.input)
+    report_data = {
+        "validation_successful": report.validation_successful,
+        "issues": [
+            {
+                "code": issue.code,
+                "message": issue.message,
+                "path": issue.path,
+            }
+            for issue in report.issues
+        ],
+    }
+    sys.stdout.write(json.dumps(report_data, indent=2) + "\n")
+    return 0 if report.validation_successful else 1
 
 
 def _run_system_map_specification(args: argparse.Namespace) -> int:

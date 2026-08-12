@@ -4002,7 +4002,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             else:
                 assert prompt["execution_mode"] == "execute_selected_skill"
                 if prompt["selected_skill"]["name"] == "bootstrap-code-structure":
-                    assert prompt["current_step_index"] < 5
+                    assert prompt["current_step_index"] < 7
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":

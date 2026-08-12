@@ -48,10 +48,12 @@ steps:
     inspect and reuse it without overwriting it. If it does not exist, invoke
     the shell tool with command [powdrr-lift, project-structure]. The CLI
     creates both the parent directory and the template. The template must
-    contain a clear schema marker and project-wide modules and tools sections,
-    with empty lists where discovery will fill details. Relationships and
-    evidence belong on the relevant module or tool entries rather than in
-    standalone top-level sections.
+    use the repository's `https://powdrr.io/schemas/specification-v1` schema
+    and contain the standard specification sections, including entities,
+    modules, tools, entity_relationships, invariants, guidance, features,
+    decisions, and intent. Relationships belong in
+    `entity_relationships`; do not add a standalone `relationships` section.
+    Do not add a standalone `evidence` section.
     Do not create a feature-specific architecture specification and do not ask
     a question merely because the project-structure document is absent. Pass
     the exact artifact path to the next step. Use the prior gather-context
@@ -82,16 +84,25 @@ steps:
 - description: Validate the project-structure artifact and discovery evidence.
   llm_type: fast_iteration
   details: >-
-    Confirm that the project-structure artifact is valid YAML, contains the
+    Run [powdrr-lift, validate-project-structure, --input,
+    docs/project_structure/project-structure.yaml] and require a successful
+    specification-v1 schema report. Confirm that the artifact contains the
     discovered project-wide module and tool records, uses paths that exist or
     are explicitly documented as generated, and has no conflict markers. Check
     that every listed tool has a command and every module has a purpose and
     location. Confirm that testing, linting, and formatting tools have the
     `pr-prep` label unless their evidence explicitly supports ad hoc or
-    one-off use. Fix any omissions or inconsistencies and repeat validation
-    until the artifact is internally consistent. Do not run a feature-specific
-    architecture validator or require a feature/work-item name.
+    one-off use. Fix any validator failures or inconsistencies and repeat
+    validation until the schema validator succeeds. Do not run a
+    feature-specific architecture validator or require a feature/work-item
+    name.
   tool_invocations:
+  - tool: shell
+    command:
+    - powdrr-lift
+    - validate-project-structure
+    - --input
+    - docs/project_structure/project-structure.yaml
   - tool: shell
     command:
     - rg

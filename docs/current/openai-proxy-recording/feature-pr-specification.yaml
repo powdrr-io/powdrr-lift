@@ -1,7 +1,7 @@
 # Feature and PR specification template.
 #
 # Instructions:
-# - Use the work item folder `docs/specs/openai-proxy-recording`.
+# - Use the proposal folder `docs/proposals/openai-proxy-recording`.
 # - Start from the filled system map template and the requested feature.
 # - Fill out one section at a time in this order:
 #   requirements, approach, entities, entity_relationships,

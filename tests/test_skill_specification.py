@@ -273,7 +273,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     ]
     assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
         ("git", "status", "--short"),
-        ("git", "add", "docs/specs/<work-item-name>"),
+        ("git", "add", "docs/proposals/<work-item-name>"),
     ]
     assert skill.steps[12].uses_skills == ("finish-pr-prep",)
     assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
@@ -410,7 +410,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert skill.name == "start-implementing-feature"
     first_step_details = skill.steps[0].details
     assert first_step_details is not None
-    assert "docs/specs" in first_step_details
+    assert "docs/proposals" in first_step_details
     assert "canonical feature name" in first_step_details
     assert "fuzzy-match tool" in first_step_details
     bootstrap_step_details = skill.steps[1].details
@@ -429,7 +429,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
     assert skill.steps[0].tool_invocations[0].command == (
         "fuzzy-match",
-        "docs/specs",
+        "docs/proposals",
         "-name",
         "<feature-name>",
         "-type",
@@ -439,6 +439,17 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "-print",
     )
     assert skill.steps[0].tool_invocations[1].command == (
+        "fuzzy-match",
+        "docs/current",
+        "-name",
+        "<feature-name>",
+        "-type",
+        "d",
+        "-maxdepth",
+        "2",
+        "-print",
+    )
+    assert skill.steps[0].tool_invocations[2].command == (
         "fuzzy-match",
         "docs/workflows",
         "-name",
@@ -477,7 +488,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--work-item-name",
         "<feature-name>",
         "--output",
-        "docs/specs/<feature-name>/<proposed-pr-name>-implementation-specification.yaml",
+        "docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml",
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
@@ -498,7 +509,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert "invoke the workflow instantiation tool" in (skill.steps[3].details or "")
     assert [invocation.command for invocation in skill.steps[5].tool_invocations] == [
         ("git", "status", "--short"),
-        ("git", "add", "docs/specs/<feature-name>", "docs/workflows"),
+        ("git", "add", "docs/proposals/<feature-name>", "docs/workflows"),
     ]
     assert skill.steps[6].uses_skills == ("finish-pr-prep",)
     assert [invocation.command for invocation in skill.steps[7].tool_invocations] == [

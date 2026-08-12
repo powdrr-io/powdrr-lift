@@ -643,7 +643,7 @@ def build_validation_report(
                             f"Structured file {structured_file_path} was already "
                             "merged into main. Do not edit merged structured "
                             "files; create a new work item folder under "
-                            "`docs/specs/` instead."
+                            "`docs/proposals/` or `docs/current/` instead."
                         ),
                         path=structured_file_path,
                     )
@@ -1849,6 +1849,8 @@ def _load_merged_structured_file_paths(
                 "-r",
                 "--name-only",
                 default_branch_name,
+                "docs/proposals",
+                "docs/current",
                 "docs/specs",
             ],
             check=True,

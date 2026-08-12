@@ -416,7 +416,7 @@ def build_parser() -> argparse.ArgumentParser:
     architecture_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     architecture_specification_parser.add_argument(
         "--entity-type",
@@ -430,7 +430,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/specs/<work-item-name>/architecture-specification.yaml."
+            "docs/proposals/<work-item-name>/architecture-specification.yaml."
         ),
     )
     architecture_specification_parser.add_argument(
@@ -452,14 +452,14 @@ def build_parser() -> argparse.ArgumentParser:
     implementation_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     implementation_specification_parser.add_argument(
         "--architecture-specification",
         type=Path,
         help=(
             "Read the source architecture specification from this path instead "
-            "of docs/specs/<work-item-name>/architecture-specification.yaml."
+            "of docs/proposals/<work-item-name>/architecture-specification.yaml."
         ),
     )
     implementation_specification_parser.add_argument(
@@ -467,7 +467,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/specs/<work-item-name>/implementation-specification.yaml."
+            "docs/proposals/<work-item-name>/implementation-specification.yaml."
         ),
     )
     implementation_specification_parser.add_argument(
@@ -491,14 +491,14 @@ def build_parser() -> argparse.ArgumentParser:
     system_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     system_specification_parser.add_argument(
         "--output",
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/specs/<work-item-name>/system-specification.yaml."
+            "docs/proposals/<work-item-name>/system-specification.yaml."
         ),
     )
     system_specification_parser.add_argument(
@@ -520,14 +520,14 @@ def build_parser() -> argparse.ArgumentParser:
     system_map_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/current subfolder for the spec.",
     )
     system_map_specification_parser.add_argument(
         "--output",
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/specs/<work-item-name>/system-map-specification.yaml."
+            "docs/current/<work-item-name>/system-map-specification.yaml."
         ),
     )
     system_map_specification_parser.add_argument(
@@ -549,14 +549,14 @@ def build_parser() -> argparse.ArgumentParser:
     feature_pr_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     feature_pr_specification_parser.add_argument(
         "--output",
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/specs/<work-item-name>/feature-pr-specification.yaml."
+            "docs/proposals/<work-item-name>/feature-pr-specification.yaml."
         ),
     )
     feature_pr_specification_parser.add_argument(
@@ -632,14 +632,14 @@ def build_parser() -> argparse.ArgumentParser:
     pr_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     pr_specification_parser.add_argument(
         "--output",
         type=Path,
         help=(
             "Write the template to this path instead of "
-            "docs/specs/<work-item-name>/proposed-pr-specification.yaml."
+            "docs/proposals/<work-item-name>/proposed-pr-specification.yaml."
         ),
     )
     pr_specification_parser.add_argument(
@@ -696,7 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_architecture_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     evaluate_architecture_specification_parser.add_argument(
         "--entity-type",
@@ -710,7 +710,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Read the proposed architecture specification YAML from this file "
-            "instead of docs/specs/<work-item-name>/architecture-specification.yaml."
+            "instead of "
+            "docs/proposals/<work-item-name>/architecture-specification.yaml."
         ),
     )
     evaluate_architecture_specification_parser.add_argument(
@@ -733,14 +734,14 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_implementation_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     evaluate_implementation_specification_parser.add_argument(
         "--architecture-specification",
         type=Path,
         help=(
             "Read the source architecture specification from this path instead "
-            "of docs/specs/<work-item-name>/architecture-specification.yaml."
+            "of docs/proposals/<work-item-name>/architecture-specification.yaml."
         ),
     )
     evaluate_implementation_specification_parser.add_argument(
@@ -748,7 +749,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Read the proposed implementation specification YAML from this file "
-            "instead of docs/specs/<work-item-name>/implementation-specification.yaml."
+            "instead of "
+            "docs/proposals/<work-item-name>/implementation-specification.yaml."
         ),
     )
     evaluate_implementation_specification_parser.add_argument(
@@ -768,14 +770,14 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_system_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     evaluate_system_specification_parser.add_argument(
         "--input",
         type=Path,
         help=(
             "Read the proposed system specification YAML from this file instead "
-            "of docs/specs/<work-item-name>/system-specification.yaml."
+            "of docs/proposals/<work-item-name>/system-specification.yaml."
         ),
     )
     evaluate_system_specification_parser.add_argument(
@@ -795,7 +797,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_pr_specification_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used as the docs/specs subfolder for the spec.",
+        help="Work item name used as the docs/proposals subfolder for the spec.",
     )
     evaluate_pr_specification_parser.add_argument(
         "--input",

@@ -2118,7 +2118,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
     system_spec_path = (
         worktree_root
         / "docs"
-        / "specs"
+        / "proposals"
         / "display-related-photos"
         / "system-specification.yaml"
     )
@@ -2307,7 +2307,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
     system_spec_path = (
         worktree_root
         / "docs"
-        / "specs"
+        / "proposals"
         / "display-related-photos"
         / "system-specification.yaml"
     )
@@ -2336,7 +2336,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
             {
                 "kind": "edit",
                 "file_path": (
-                    "docs/specs/display-related-photos/system-specification.yaml"
+                    "docs/proposals/display-related-photos/system-specification.yaml"
                 ),
                 "edits": [
                     {
@@ -2851,7 +2851,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     ):
         shutil.copy2(source_skill_path, skills_dir / source_skill_path.name)
     worktree_root_holder: dict[str, Path] = {}
-    system_spec_dir = "docs/specs/display-related-photos"
+    system_spec_dir = "docs/proposals/display-related-photos"
     system_spec_filename = "system-specification.yaml"
     architecture_spec_filename = "architecture-specification.yaml"
     implementation_spec_filename = "implementation-specification.yaml"
@@ -4069,7 +4069,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
-        f"task-{index:03d}" for index in range(1, 12)
+        f"task-{index:03d}" for index in range(1, 13)
     ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
         "Gather context about the proposed PR",
@@ -4080,6 +4080,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Validate all tests pass",
         "Confirm functional completeness against the specification",
         "Run lint, type checks, and cleanup",
+        "Promote the implemented feature documents to current state",
         "Stage the pull request changes",
         "Finish pull request preparation",
         "Create the pull request",
@@ -4093,9 +4094,24 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ("task-005",),
         ("task-001", "task-002", "task-005", "task-006"),
         ("task-005", "task-006", "task-007"),
-        ("task-005", "task-006", "task-007", "task-008"),
-        ("task-001", "task-005", "task-006", "task-007", "task-008", "task-009"),
-        ("task-001", "task-005", "task-006", "task-007", "task-010"),
+        ("task-001", "task-005", "task-007"),
+        ("task-005", "task-006", "task-007", "task-008", "task-009"),
+        (
+            "task-001",
+            "task-005",
+            "task-006",
+            "task-007",
+            "task-008",
+            "task-009",
+            "task-010",
+        ),
+        (
+            "task-001",
+            "task-005",
+            "task-006",
+            "task-007",
+            "task-011",
+        ),
     ]
     assert all(task.status.value == "open" for task in tasks)
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
@@ -4139,6 +4155,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     # asserted here; pytest execution is covered by the suite
                     # running in this worktree.
                     result = {"command": command, "returncode": 0}
+                elif command[:2] == ["git", "mv"]:
+                    # The generated execution worktree does not contain the
+                    # separately committed proposal artifacts in this test.
+                    result = {"command": command, "returncode": 0}
                 else:
                     result = _execute_shell_tool(
                         {"command": command},
@@ -4171,7 +4191,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert load_ready_workflow_tasks(workflow_root) == ()
 
     execute_tasks = load_workflow_tasks(workflow_root / "display-related-photos")
-    assert len(execute_tasks) == 11
+    assert len(execute_tasks) == 12
     assert execute_tasks[0].input_state["proposed_pr"] == (
         "display-related-photos-pr-001"
     )
@@ -4185,6 +4205,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Validate all tests pass",
         "Confirm functional completeness against the specification",
         "Run lint, type checks, and cleanup",
+        "Promote the implemented feature documents to current state",
         "Stage the pull request changes",
         "Finish pull request preparation",
         "Create the pull request",

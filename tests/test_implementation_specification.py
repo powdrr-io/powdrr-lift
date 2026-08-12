@@ -305,7 +305,7 @@ def test_cli_validate_implementation_specification_reports_yaml(
     spec_path = (
         tmp_path
         / "docs"
-        / "specs"
+        / "proposals"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )

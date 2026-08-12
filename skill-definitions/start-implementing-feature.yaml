@@ -11,7 +11,8 @@ steps:
   llm_type: standard_reasoning
   details: >-
     Invoke the fuzzy-match tool first to discover candidates for the feature
-    specification and its execution workflows. Search docs/specs and
+    specification and its execution workflows. Search docs/proposals and
+    docs/current and
     docs/workflows using the feature name from the user's request. Filter the
     results to the best matching feature directory and workflow directories.
     Treat an absent search root or an empty result as "no matches", not as a
@@ -28,7 +29,18 @@ steps:
   - tool: fuzzy-match
     command:
     - fuzzy-match
-    - docs/specs
+    - docs/proposals
+    - -name
+    - <feature-name>
+    - -type
+    - d
+    - -maxdepth
+    - "2"
+    - -print
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - docs/current
     - -name
     - <feature-name>
     - -type
@@ -80,7 +92,7 @@ steps:
     - --work-item-name
     - <feature-name>
     - --output
-    - docs/specs/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
+    - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
 - description: Instantiate an execution workflow for every proposed PR.
   llm_type: simple_task
   details: >-
@@ -129,7 +141,7 @@ steps:
   llm_type: simple_task
   details: >-
     Only after explicit user approval, inspect the worktree and stage the
-    approved implementation specifications under docs/specs/<feature-name>/ and
+    approved implementation specifications under docs/proposals/<feature-name>/ and
     execution workflows under docs/workflows/. Review the staged paths and do
     not commit or create a pull request yet.
   tool_invocations:
@@ -142,7 +154,7 @@ steps:
     command:
     - git
     - add
-    - docs/specs/<feature-name>
+    - docs/proposals/<feature-name>
     - docs/workflows
 - description: Run finish-pr-prep before creating the draft pull request.
   llm_type: fast_iteration

@@ -195,7 +195,8 @@ def _render_template_body(
         "    id: null",
         "    # Short summary of the decision.",
         "    summary: null",
-        "# Structured YAML files under `docs/specs/` go in `structured_files` as",
+        "# Structured YAML files under `docs/proposals/` or `docs/current/` go in",
+        "# `structured_files` as",
         "# paths only.",
         "# Structured YAML files must include a `schema` key of",
         "# `https://powdrr.io/schemas/specification-v1`.",
@@ -1260,9 +1261,9 @@ def _is_changelog_artifact_path(path: str) -> bool:
 
 def _is_structured_document_path(path: str) -> bool:
     normalized_path = path.strip().replace("\\", "/")
-    return normalized_path.startswith("docs/specs/") and normalized_path.endswith(
-        ".yaml"
-    )
+    return normalized_path.startswith(
+        ("docs/proposals/", "docs/current/", "docs/specs/")
+    ) and normalized_path.endswith(".yaml")
 
 
 def _normalize_change_type(status: str) -> str:

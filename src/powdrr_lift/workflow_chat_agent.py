@@ -1847,7 +1847,7 @@ def _build_step_execution_messages(
                             "description": (
                                 "Search worktree paths with find-like filters and "
                                 "fuzzy name matching. Use command arrays such as "
-                                "['fuzzy-match', 'docs/specs', '-name', "
+                                "['fuzzy-match', 'docs/proposals', '-name', "
                                 "'<feature-name>', '-type', 'd', '-maxdepth', '2']."
                             ),
                         },
@@ -1958,7 +1958,7 @@ def _action_system_prompt() -> str:
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
-        '{"kind":"edit","file_path":"docs/specs/example/system-specification.yaml",'
+        '{"kind":"edit","file_path":"docs/proposals/example/system-specification.yaml",'
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
@@ -1968,7 +1968,7 @@ def _action_system_prompt() -> str:
         '"llm_type":"simple_task"}\n'
         '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
         '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
-        '{"kind":"read_document","file_path":"docs/specs/example/system-specification.yaml",'
+        '{"kind":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
         '"llm_type":"long_context"}\n'
         '{"kind":"next_step","decisions_and_context":"...",'

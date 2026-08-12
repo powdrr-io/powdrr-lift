@@ -203,11 +203,15 @@ def _normalize_filters(filters: dict[str, object] | None) -> dict[str, list[str]
 
 def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
     paths: list[Path] = []
-    docs_root = repo_root / "docs" / "specs"
-    if docs_root.exists():
-        paths.extend(
-            path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
-        )
+    for docs_root in (
+        repo_root / "docs" / "current",
+        repo_root / "docs" / "proposals",
+        repo_root / "docs" / "specs",
+    ):
+        if docs_root.exists():
+            paths.extend(
+                path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
+            )
 
     project_structure_root = repo_root / "docs" / "project_structure"
     if project_structure_root.exists():
@@ -246,7 +250,11 @@ def _describe_specification_path(
         return None, None
 
     path_parts = relative_path.parts
-    if len(path_parts) >= 4 and path_parts[0] == "docs" and path_parts[1] == "specs":
+    if (
+        len(path_parts) >= 4
+        and path_parts[0] == "docs"
+        and path_parts[1] in {"current", "proposals", "specs"}
+    ):
         work_item_name = path_parts[2]
         specification_type = path.stem.removesuffix("-specification")
         return work_item_name, specification_type

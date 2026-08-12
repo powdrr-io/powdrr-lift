@@ -7,8 +7,6 @@ from powdrr_lift.change_log_template import _resolve_repo_root
 PROJECT_STRUCTURE_TEMPLATE = """schema: project-structure-v1
 modules: []
 tools: []
-relationships: []
-evidence: []
 """
 
 

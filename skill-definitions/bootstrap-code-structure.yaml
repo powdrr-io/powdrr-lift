@@ -48,8 +48,10 @@ steps:
     inspect and reuse it without overwriting it. If it does not exist, invoke
     the shell tool with command [powdrr-lift, project-structure]. The CLI
     creates both the parent directory and the template. The template must
-    contain a clear schema marker, project-wide modules, tools, relationships,
-    and evidence sections, with empty lists where discovery will fill details.
+    contain a clear schema marker and project-wide modules and tools sections,
+    with empty lists where discovery will fill details. Relationships and
+    evidence belong on the relevant module or tool entries rather than in
+    standalone top-level sections.
     Do not create a feature-specific architecture specification and do not ask
     a question merely because the project-structure document is absent. Pass
     the exact artifact path to the next step. Use the prior gather-context
@@ -65,7 +67,8 @@ steps:
     Compare the discovered repository structure with the existing artifact or
     template. Add or update project-wide module entries for application,
     test, tooling, configuration, and integration areas, including stable ids,
-    paths, parent/related modules, purpose, and evidence. Add or update tool
+    paths, parent/related modules, and purpose. Do not add an evidence field to
+    module entries. Add or update tool
     entries for test, formatting, linting, type-check, build, and relevant
     development commands, including stable ids, related modules, labels,
     when_to_use, template, how_to_use, and evidence. Preserve accurate

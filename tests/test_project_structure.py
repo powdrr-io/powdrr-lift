@@ -21,6 +21,8 @@ def test_create_project_structure_template_creates_parent_directories(
 
     assert rendered_path == output_path.resolve()
     assert output_path.read_text(encoding="utf-8") == PROJECT_STRUCTURE_TEMPLATE
+    assert "relationships:" not in PROJECT_STRUCTURE_TEMPLATE
+    assert "evidence:" not in PROJECT_STRUCTURE_TEMPLATE
 
 
 def test_create_project_structure_template_preserves_existing_file(

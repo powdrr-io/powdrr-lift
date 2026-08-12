@@ -301,6 +301,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "fix-ci-failures",
         "review-architecture",
         "review-system",
+        "security-review",
         "specify-a-feature",
         "specify-architecture",
         "specify-implementation",

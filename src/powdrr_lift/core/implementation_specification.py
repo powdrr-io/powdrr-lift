@@ -17,6 +17,7 @@ from powdrr_lift.core.spec_paths import (
     architecture_specification_path as _architecture_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
+from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
 
@@ -196,12 +197,20 @@ def create_implementation_specification_template(
         output_path=output_path,
     )
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content = (
+        resolved_output_path.read_text(encoding="utf-8")
+        if resolved_output_path.is_file()
+        else None
+    )
     resolved_output_path.write_text(
-        render_implementation_specification_template(
-            work_item_name=work_item_name,
-            architecture_specification_path=architecture_specification_path,
-            title=title,
-            repo_root=repo_root_path,
+        merge_existing_template_content(
+            render_implementation_specification_template(
+                work_item_name=work_item_name,
+                architecture_specification_path=architecture_specification_path,
+                title=title,
+                repo_root=repo_root_path,
+            ),
+            existing_content,
         ),
         encoding="utf-8",
     )

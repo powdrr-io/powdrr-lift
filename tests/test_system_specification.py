@@ -9,6 +9,7 @@ import yaml
 from powdrr_lift import build_system_specification_validation_report
 from powdrr_lift.cli import main
 from powdrr_lift.core import system_specification_default_output_path
+from powdrr_lift.core.system_specification import create_system_specification_template
 
 
 def test_create_system_specification_template_writes_default_file(
@@ -33,6 +34,35 @@ def test_create_system_specification_template_writes_default_file(
     assert str(output_path) in stdout.getvalue()
     template_text = output_path.read_text(encoding="utf-8")
     assert "# System specification template." in template_text
+
+
+def test_create_system_specification_template_restores_instructions_and_content(
+    tmp_path: Path,
+) -> None:
+    output_path = system_specification_default_output_path("powdrr-lift", tmp_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        """# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: existing-system
+title: Existing system
+requirements: []
+approach: []
+""",
+        encoding="utf-8",
+    )
+
+    create_system_specification_template(
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    template_text = output_path.read_text(encoding="utf-8")
+    assert "# System specification template." in template_text
+    assert "id: existing-system" in template_text
+    assert (
+        template_text.count("schema: https://powdrr.io/schemas/specification-v1") == 1
+    )
     assert "# - Set `id` to a unique identifier" in template_text
     assert (
         "# - Delete these instructions and replace them with this comment at the top:"

@@ -47,22 +47,16 @@ steps:
     - -maxdepth
     - "3"
     - -print
-- description: Bootstrap the target module and tool architecture from codebase evidence.
+- description: Bootstrap the project-wide module and tool structure from codebase evidence.
   llm_type: standard_reasoning
   uses_skills:
   - bootstrap-code-structure
   details: >-
-    Invoke bootstrap-code-structure using the feature, specification, and
-    workflow context from the preceding discovery step. Wait
-    for the nested skill to complete, then use the file-existence check to
-    confirm that its staged architecture specification is available before
-    continuing.
-  tool_invocations:
-  - tool: shell
-    command:
-    - test
-    - -f
-    - docs/specs/<feature-name>/architecture-specification.yaml
+    Invoke bootstrap-code-structure using the repository context from the
+    preceding discovery step. The nested skill is project-wide and must not
+    ask for a feature or target module. Wait for it to complete, then confirm
+    from its returned context that the staged project-structure artifact is
+    available before continuing.
 - description: Create implementation specifications for the proposed PRs.
   llm_type: high_reasoning
   details: >-

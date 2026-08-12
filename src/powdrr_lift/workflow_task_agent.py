@@ -26,6 +26,7 @@ from powdrr_lift.core import (
     resolve_repo_root,
 )
 from powdrr_lift.core.spec_context import (
+    gather_proposal_context,
     gather_specification_context,
     render_gather_context_report,
 )
@@ -279,6 +280,23 @@ def run_workflow_task(
         result: Any
         if action.kind == "gather-context":
             report = gather_specification_context(
+                repo_root,
+                types=list(action.types),
+                keywords=list(action.keywords),
+                filters=action.filters,
+            )
+            events.append(
+                {
+                    "kind": action.kind,
+                    "types": list(action.types),
+                    "keywords": list(action.keywords),
+                    "filters": action.filters,
+                    "result": json.loads(render_gather_context_report(report)),
+                }
+            )
+            continue
+        if action.kind == "gather-proposal":
+            report = gather_proposal_context(
                 repo_root,
                 types=list(action.types),
                 keywords=list(action.keywords),
@@ -1003,8 +1021,10 @@ def _task_system_prompt() -> str:
         "sufficient for every downstream task that declares this task as an "
         "upstream dependency.\n"
         "Choose exactly one outcome:\n"
-        "- gather-context: choose this when structured specification context must "
-        "be discovered before deciding or acting.\n"
+        "- gather-context: choose this for current-state specification context; "
+        "it never reads proposals.\n"
+        "- gather-proposal: choose this for proposed feature specifications and "
+        "proposed PRs; it reads only docs/proposals.\n"
         "- prompt_user: choose this when a human decision or review is required; "
         "the execution agent will persist it as a human workflow task.\n"
         "- edit: choose this for a known line-based file change.\n"
@@ -1023,6 +1043,7 @@ def _task_system_prompt() -> str:
         "Response: return exactly one JSON object matching exactly one outcome "
         "shape below. Do not include markdown or combine outcomes.\n"
         '{"kind":"gather-context","types":["tools"],"filters":{"labels":["pr-prep"],"language":["python"]}}\n'
+        '{"kind":"gather-proposal","types":["features","proposed_prs"],"keywords":["feature-id"]}\n'
         '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
         '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
@@ -1031,7 +1052,9 @@ def _task_system_prompt() -> str:
         '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
         "Use gather-context with one or more supported context types and optional "
-        "keywords and filters when repository specifications must be discovered. "
+        "keywords and filters when current-state repository specifications must be "
+        "discovered. Use gather-proposal with the same fields when proposed feature "
+        "or proposed PR documents must be discovered. "
         "Filters match exact fields and list values such as labels. Use "
         "prompt_user instead of get-human-input; the execution agent converts it "
         "to a durable human task and follow-up task. Use invoke_tool for shell "
@@ -1213,6 +1236,20 @@ def _run_skill_for_agent(
                 repo_root,
                 types=list(action.types),
                 keywords=list(action.keywords),
+            )
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": json.loads(render_gather_context_report(report)),
+                }
+            )
+            continue
+        if action.kind == "gather-proposal":
+            report = gather_proposal_context(
+                repo_root,
+                types=list(action.types),
+                keywords=list(action.keywords),
+                filters=action.filters,
             )
             execution_events.append(
                 {

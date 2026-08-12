@@ -23,7 +23,7 @@ task_templates:
     proposed_pr: <proposed-pr-id>
   details: >-
     First resolve proposed_pr to the exact proposed PR specification. Choose
-    the gather-context action with these context types: proposed_prs,
+    the gather-proposal action with these context types: proposed_prs,
     requirements, approach, invariants, guidance, features, acceptance_criteria,
     expected_tests, required_test_cases, risks, and decisions. Include the
     proposed PR id as a keyword. Use the gathered context to identify the

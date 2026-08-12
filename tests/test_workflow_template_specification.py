@@ -217,7 +217,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert proposed_pr_input == "<proposed-pr-id>"
     assert template.task_templates[0].llm_type == "long_context"
     assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
-    assert "gather-context action" in (template.task_templates[0].details or "")
+    assert "gather-proposal action" in (template.task_templates[0].details or "")
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates

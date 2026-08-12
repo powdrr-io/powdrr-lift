@@ -300,6 +300,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "feature-test-coverage-review",
         "finish-pr-prep",
         "fix-ci-failures",
+        "fix-merge-conflicts",
         "review-architecture",
         "review-system",
         "security-review",

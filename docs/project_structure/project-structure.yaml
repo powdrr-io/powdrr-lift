@@ -1,0 +1,235 @@
+schema: project-structure-v1
+modules:
+  - id: powdrr-lift-package
+    path: src/powdrr_lift/__init__.py
+    parent_module: null
+    related_modules: [cli, mcp-server, core, change-log-parser]
+    purpose: "Root package for the powdrr-lift application."
+    evidence: "rg --files src"
+  - id: cli
+    path: src/powdrr_lift/cli.py
+    parent_module: powdrr-lift-package
+    related_modules: [core, workflow-chat-agent]
+    purpose: "Command-line interface entry point dispatching powdrr-lift subcommands."
+    evidence: "rg --files src"
+  - id: mcp-server
+    path: src/powdrr_lift/mcp_server.py
+    parent_module: powdrr-lift-package
+    related_modules: [core]
+    purpose: "MCP server exposing powdrr-lift specification and workflow tools."
+    evidence: "rg --files src"
+  - id: workflow-chat-agent
+    path: src/powdrr_lift/workflow_chat_agent.py
+    parent_module: powdrr-lift-package
+    related_modules: [workflow-chat-tui, workflow-task-agent, openai-proxy, core]
+    purpose: "Agent orchestrating workflow chat sessions and tool invocations."
+    evidence: "rg --files src"
+  - id: workflow-chat-tui
+    path: src/powdrr_lift/workflow_chat_tui.py
+    parent_module: powdrr-lift-package
+    related_modules: [workflow-chat-agent]
+    purpose: "Terminal user interface for interactive workflow chat."
+    evidence: "rg --files src"
+  - id: fuzzy-match
+    path: src/powdrr_lift/fuzzy_match.py
+    parent_module: powdrr-lift-package
+    related_modules: []
+    purpose: "Fuzzy file and path matching utilities for repository searches."
+    evidence: "rg --files src"
+  - id: openai-proxy
+    path: src/powdrr_lift/openai_proxy.py
+    parent_module: powdrr-lift-package
+    related_modules: [workflow-chat-agent]
+    purpose: "Proxy layer for OpenAI API interactions."
+    evidence: "rg --files src"
+  - id: blame-ui
+    path: src/powdrr_lift/blame_ui.py
+    parent_module: powdrr-lift-package
+    related_modules: [core]
+    purpose: "UI components for displaying git blame information."
+    evidence: "rg --files src"
+  - id: basedpyright-tools
+    path: src/powdrr_lift/basedpyright_tools.py
+    parent_module: powdrr-lift-package
+    related_modules: []
+    purpose: "Integration utilities for basedpyright symbol and structure queries."
+    evidence: "rg --files src"
+  - id: change-log-template
+    path: src/powdrr_lift/change_log_template.py
+    parent_module: powdrr-lift-package
+    related_modules: [change-log-validation, change-log-parser]
+    purpose: "Template generation for change log entries."
+    evidence: "rg --files src"
+  - id: change-log-validation
+    path: src/powdrr_lift/change_log_validation.py
+    parent_module: powdrr-lift-package
+    related_modules: [change-log-template, change-log-parser]
+    purpose: "Validation logic for change log entries."
+    evidence: "rg --files src"
+  - id: workflow-task-agent
+    path: src/powdrr_lift/workflow_task_agent.py
+    parent_module: powdrr-lift-package
+    related_modules: [workflow-chat-agent, core]
+    purpose: "Agent executing individual workflow tasks within a chat session."
+    evidence: "rg --files src"
+  - id: core
+    path: src/powdrr_lift/core/
+    parent_module: powdrr-lift-package
+    related_modules: [cli, mcp-server, workflow-chat-agent, workflow-task-agent]
+    purpose: >
+      Core subpackage containing specification modules: template_generation,
+      entity_context, entity_taxonomy, spec_paths, spec_context,
+      specification_actions, workflow_template_specification,
+      workflow_task_specification, edit_context, template, schemas, validate,
+      validation_messages, project_structure, pr_specification, pr_analysis,
+      architecture_specification, system_specification, index, code_index,
+      codebase_state, skill_specification, plan_diff_specification, blame_view,
+      feature_planning_specification, and implementation_specification.
+    evidence: "rg --files src"
+  - id: change-log-parser
+    path: src/powdrr_lift/change_log_parser/
+    parent_module: powdrr-lift-package
+    related_modules: [change-log-template, change-log-validation]
+    purpose: "Parser subpackage for reading and parsing change log files."
+    evidence: "rg --files src"
+  - id: test-suite
+    path: tests/
+    parent_module: null
+    related_modules: [powdrr-lift-package]
+    purpose: >
+      Pytest test suite with 31 test files covering CLI, MCP server, workflow
+      agents, core specifications, change log, entity context, and other
+      application modules.
+    evidence: "rg --files tests"
+  - id: scripts
+    path: scripts/
+    parent_module: null
+    related_modules: []
+    purpose: >
+      Shell scripts for repository tooling: create-worktree.sh for git worktree
+      creation and install-skills.sh for skill installation.
+    evidence: "rg --files scripts"
+  - id: ci-workflow
+    path: .github/workflows/ci.yml
+    parent_module: null
+    related_modules: []
+    purpose: >
+      GitHub Actions CI workflow running format check, lint, type check, and
+      tests.
+    evidence: "rg --files .github"
+  - id: project-config
+    path: pyproject.toml
+    parent_module: null
+    related_modules: []
+    purpose: >
+      Project configuration including dependencies (basedpyright, mypy, pytest,
+      ruff), pytest options, ruff format/lint settings, and mypy configuration.
+    evidence: "rg -n pytest|ruff|mypy pyproject.toml"
+  - id: makefile
+    path: Makefile
+    parent_module: null
+    related_modules: [ci-workflow]
+    purpose: >
+      Make targets for format, format-check, lint, test, and type-check
+      commands.
+    evidence: "rg -n 'uv run' Makefile"
+tools:
+  - id: ruff-format
+    related_modules: [project-config, makefile]
+    labels: [formatting, python]
+    when_to_use: "Format Python code before committing."
+    template: "uv run ruff format ."
+    how_to_use: "Run from the repository root to auto-format all Python files."
+    evidence: "Makefile:4, .github/workflows/ci.yml:50"
+  - id: ruff-format-check
+    related_modules: [project-config, ci-workflow]
+    labels: [formatting, ci, python]
+    when_to_use: "Verify formatting in CI without modifying files."
+    template: "uv run ruff format --check ."
+    how_to_use: "Run from the repository root; exits non-zero if formatting is needed."
+    evidence: "Makefile:7, .github/workflows/ci.yml:50"
+  - id: ruff-lint
+    related_modules: [project-config, makefile]
+    labels: [linting, python]
+    when_to_use: "Lint Python code for style and error detection."
+    template: "uv run ruff check ."
+    how_to_use: "Run from the repository root to lint all Python files."
+    evidence: "Makefile:10, .github/workflows/ci.yml:53"
+  - id: mypy-type-check
+    related_modules: [project-config, makefile]
+    labels: [type-checking, python]
+    when_to_use: "Static type-check source and test code."
+    template: "uv run mypy src tests"
+    how_to_use: "Run from the repository root to type-check src/ and tests/."
+    evidence: "Makefile:16, .github/workflows/ci.yml:56"
+  - id: pytest
+    related_modules: [test-suite, project-config]
+    labels: [testing, python]
+    when_to_use: "Run the test suite."
+    template: "uv run pytest"
+    how_to_use: "Run from the repository root to execute all tests."
+    evidence: "Makefile:13, .github/workflows/ci.yml:59"
+relationships:
+  - from: cli
+    to: core
+    type: depends-on
+    evidence: "CLI dispatches to core specification modules."
+  - from: mcp-server
+    to: core
+    type: depends-on
+    evidence: "MCP server exposes core specification tools."
+  - from: workflow-chat-agent
+    to: workflow-chat-tui
+    type: depends-on
+    evidence: "Agent drives the TUI for interactive chat."
+  - from: workflow-chat-agent
+    to: workflow-task-agent
+    type: depends-on
+    evidence: "Agent delegates tasks to the task agent."
+  - from: workflow-chat-agent
+    to: openai-proxy
+    type: depends-on
+    evidence: "Agent uses OpenAI proxy for LLM interactions."
+  - from: change-log-template
+    to: change-log-parser
+    type: related-to
+    evidence: "Template and parser share change log domain."
+  - from: change-log-validation
+    to: change-log-parser
+    type: related-to
+    evidence: "Validation and parser share change log domain."
+  - from: test-suite
+    to: powdrr-lift-package
+    type: tests
+    evidence: "Test files cover application modules."
+  - from: ci-workflow
+    to: ruff-format-check
+    type: invokes
+    evidence: "CI runs ruff format --check."
+  - from: ci-workflow
+    to: ruff-lint
+    type: invokes
+    evidence: "CI runs ruff check."
+  - from: ci-workflow
+    to: mypy-type-check
+    type: invokes
+    evidence: "CI runs mypy."
+  - from: ci-workflow
+    to: pytest
+    type: invokes
+    evidence: "CI runs pytest."
+evidence:
+  - source: "rg --files src tests scripts .github"
+    finding: >
+      Discovered application modules in src/powdrr_lift/ (top-level, core/
+      subpackage with 27 modules, change_log_parser/ subpackage), 31 test files
+      in tests/, 2 scripts in scripts/, and CI workflow in .github/workflows/.
+  - source: "rg -n 'pytest|ruff|mypy|pyright|basedpyright|uv run' pyproject.toml Makefile .github scripts README.md"
+    finding: >
+      Discovered validation commands: ruff format, ruff format --check, ruff
+      check, mypy src tests, pytest; dependencies: basedpyright>=1.33.0,
+      mypy>=1.10, pytest>=8.3, ruff>=0.8.
+  - source: "powdrr-lift project-structure"
+    finding: >
+      Created template at docs/project_structure/project-structure.yaml with
+      schema project-structure-v1.

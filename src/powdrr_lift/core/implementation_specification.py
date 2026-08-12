@@ -152,6 +152,7 @@ def render_implementation_specification_template(
         "    action: null",
         "    related_module: null",
         "    related_modules: []",
+        "    labels: []",
         "    when_to_use: null",
         "    template: null",
         "    how_to_use: null",

@@ -253,6 +253,7 @@ class SkillChatAction:
     file_edits: tuple[SkillChatFileEdits, ...] = field(default_factory=tuple)
     types: tuple[str, ...] = field(default_factory=tuple)
     keywords: tuple[str, ...] = field(default_factory=tuple)
+    filters: dict[str, object] = field(default_factory=dict)
     decisions_and_context: str | None = None
     llm_type: str | None = None
 
@@ -1940,7 +1941,8 @@ def _action_system_prompt() -> str:
         "a later step needs. Include llm_type only when the next roundtrip needs "
         "a different capability; otherwise use null or omit it.\n"
         "Response field requirements by outcome: gather-context requires a non-"
-        "empty types array and may include a keywords array; prompt_user requires "
+        "empty types array and may include keywords and filters mappings; "
+        "prompt_user requires "
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
@@ -1952,7 +1954,7 @@ def _action_system_prompt() -> str:
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
-        '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],'
+        '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
@@ -1981,7 +1983,8 @@ def _action_system_prompt() -> str:
         "The supported context types are:\n"
         f"{context_type_lines}\n"
         "Use keywords to narrow results to items that mention one or more "
-        "words.\n"
+        "words. Use filters for exact field matching, such as "
+        '{"entity_type":["Tool"],"labels":["python"]}.\n'
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
         "When work_item_context contains matches, treat those names as the "
@@ -2518,6 +2521,7 @@ def _handle_workflow_action_gather_context(
         state.worktree_root,
         types=list(action.types),
         keywords=list(action.keywords) if action.keywords else None,
+        filters=action.filters,
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(
@@ -2536,6 +2540,7 @@ def _handle_workflow_action_gather_context(
             "kind": action.kind,
             "types": list(action.types),
             "keywords": list(action.keywords),
+            "filters": action.filters,
             "result": json.loads(gathered_context_text),
             "decisions_and_context": action.decisions_and_context,
             "step_index": state.step_index,
@@ -2645,6 +2650,7 @@ def _parse_workflow_action_gather_context(
         payload.get("keywords"),
         field_name="keywords",
     )
+    filters = _optional_action_filters(payload.get("filters"))
     normalized_types = tuple(
         normalize_context_type(context_type) for context_type in types
     )
@@ -2652,6 +2658,7 @@ def _parse_workflow_action_gather_context(
         kind="gather-context",
         types=normalized_types,
         keywords=keywords,
+        filters=filters,
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
@@ -2964,6 +2971,33 @@ def _optional_action_string_sequence(
     return tuple(
         _required_action_string_item(item, field_name=field_name) for item in value
     )
+
+
+def _optional_action_filters(value: object) -> dict[str, object]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise RuntimeError("Workflow gather-context action filters must be an object.")
+    filters: dict[str, object] = {}
+    for raw_field, raw_values in value.items():
+        field = _required_action_string_item(raw_field, field_name="filters")
+        if isinstance(raw_values, (str, bytes, bytearray)):
+            values: object = (raw_values,)
+        elif isinstance(raw_values, Sequence):
+            values = tuple(
+                _required_action_string_item(item, field_name=f"filters.{field}")
+                for item in raw_values
+            )
+        else:
+            raise RuntimeError(
+                f"Workflow gather-context action filters.{field} must be an array."
+            )
+        if not values:
+            raise RuntimeError(
+                f"Workflow gather-context action filters.{field} must not be empty."
+            )
+        filters[field] = values
+    return filters
 
 
 def _required_edit_operations(value: object) -> tuple[SkillChatEdit, ...]:

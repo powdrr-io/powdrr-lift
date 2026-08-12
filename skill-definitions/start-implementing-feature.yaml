@@ -131,19 +131,13 @@ steps:
     user explicitly approves the PR boundaries, implementation files, tests,
     acceptance criteria, validation commands, risks, and dependency order.
     Pass the approved artifact paths and approval decision to the next step.
-- description: Commit the approved artifacts and open a draft pull request.
+- description: Stage the approved artifacts for pull request preparation.
   llm_type: simple_task
   details: >-
     Only after explicit user approval, inspect the worktree and stage the
     approved implementation specifications under docs/specs/<feature-name>/ and
-    execution workflows under docs/workflows/. Review the staged paths, commit
-    all approved planning artifacts, push the current feature branch with its
-    upstream set, and create or update a draft pull request describing the
-    feature, proposed PRs, execution workflows, dependencies, and validation
-    evidence. If a pull request already exists for the branch, update it rather
-    than creating a second one. Do not implement any proposed PR. Do not report
-    this step complete until the GitHub command succeeds and its output includes
-    the pull request URL.
+    execution workflows under docs/workflows/. Review the staged paths and do
+    not commit or create a pull request yet.
   tool_invocations:
   - tool: shell
     command:
@@ -156,6 +150,30 @@ steps:
     - add
     - docs/specs/<feature-name>
     - docs/workflows
+- description: Run finish-pr-prep before creating the draft pull request.
+  llm_type: fast_iteration
+  details: >-
+    Run finish-pr-prep after the approved planning artifacts are staged. If
+    cleanup changes files, restage only the approved planning artifacts before
+    continuing. Do not implement any proposed PR in this skill.
+  uses_skills:
+  - finish-pr-prep
+- description: Commit the approved artifacts and open a draft pull request.
+  llm_type: simple_task
+  details: >-
+    Review the staged planning artifacts, commit them, and push the current
+    feature branch with its upstream set. Then create or update a draft pull
+    request describing the feature, proposed PRs, execution workflows,
+    dependencies, and validation evidence. If a pull request already exists for
+    the branch, update it rather than creating a second one. Do not implement
+    any proposed PR. Do not report this step complete until the GitHub command
+    succeeds and its output includes the pull request URL.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
   - tool: shell
     command:
     - git

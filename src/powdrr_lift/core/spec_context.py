@@ -31,6 +31,8 @@ _CONTEXT_TYPE_ALIASES: dict[str, str] = {
     "decisions": "decisions",
     "proposed_prs": "proposed_prs",
     "proposed-prs": "proposed_prs",
+    "modules": "modules",
+    "tools": "tools",
 }
 
 _SUPPORTED_CONTEXT_TYPES: tuple[str, ...] = (
@@ -52,6 +54,8 @@ _SUPPORTED_CONTEXT_TYPES: tuple[str, ...] = (
     "risks",
     "decisions",
     "proposed_prs",
+    "modules",
+    "tools",
 )
 
 
@@ -70,6 +74,7 @@ class GatherContextReport:
     repo_root: str
     types: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
+    filters: dict[str, list[str]] = field(default_factory=dict)
     matches: list[GatherContextMatch] = field(default_factory=list)
 
 
@@ -92,10 +97,12 @@ def gather_specification_context(
     *,
     types: list[str],
     keywords: list[str] | None = None,
+    filters: dict[str, object] | None = None,
 ) -> GatherContextReport:
     repo_root_path = _resolve_repo_root(repo_root)
     normalized_types = _normalize_context_types(types)
     normalized_keywords = _normalize_keywords(keywords)
+    normalized_filters = _normalize_filters(filters)
     matches: list[GatherContextMatch] = []
 
     for spec_path in _iter_context_specification_paths(repo_root_path):
@@ -123,6 +130,7 @@ def gather_specification_context(
                     work_item_name=work_item_name,
                     specification_type=specification_type,
                     keywords=normalized_keywords,
+                    filters=normalized_filters,
                 )
             )
 
@@ -130,6 +138,7 @@ def gather_specification_context(
         repo_root=str(repo_root_path),
         types=normalized_types,
         keywords=normalized_keywords,
+        filters=normalized_filters,
         matches=matches,
     )
 
@@ -172,6 +181,24 @@ def _normalize_keywords(keywords: list[str] | None) -> list[str]:
         seen.add(normalized_key)
         normalized_keywords.append(normalized_keyword)
     return normalized_keywords
+
+
+def _normalize_filters(filters: dict[str, object] | None) -> dict[str, list[str]]:
+    if filters is None:
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for raw_field, raw_values in filters.items():
+        field = str(raw_field).strip()
+        if not field:
+            raise ValueError("Context filter fields must not be empty.")
+        values = (
+            raw_values if isinstance(raw_values, (list, tuple, set)) else [raw_values]
+        )
+        normalized_values = _normalize_keywords([str(value) for value in values])
+        if not normalized_values:
+            raise ValueError(f"Context filter {field!r} must have a value.")
+        normalized[field] = normalized_values
+    return normalized
 
 
 def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
@@ -230,11 +257,12 @@ def _collect_section_matches(
     work_item_name: str | None,
     specification_type: str | None,
     keywords: list[str],
+    filters: dict[str, list[str]],
 ) -> list[GatherContextMatch]:
     matches: list[GatherContextMatch] = []
     if isinstance(section_value, list):
         for index, item in enumerate(section_value):
-            if not _item_matches_keywords(item, keywords):
+            if not _item_matches(item, keywords, filters, section=section):
                 continue
             matches.append(
                 GatherContextMatch(
@@ -248,7 +276,7 @@ def _collect_section_matches(
             )
         return matches
 
-    if not _item_matches_keywords(section_value, keywords):
+    if not _item_matches(section_value, keywords, filters, section=section):
         return matches
 
     matches.append(
@@ -272,11 +300,39 @@ def _item_matches_keywords(item: Any, keywords: list[str]) -> bool:
     return any(keyword.casefold() in haystack for keyword in keywords)
 
 
+def _item_matches(
+    item: Any,
+    keywords: list[str],
+    filters: dict[str, list[str]],
+    *,
+    section: str,
+) -> bool:
+    if not _item_matches_keywords(item, keywords):
+        return False
+    if not filters:
+        return True
+    if not isinstance(item, dict):
+        return False
+    for raw_field, values in filters.items():
+        field = "type" if raw_field == "entity_type" else raw_field
+        item_value = item.get(field)
+        if raw_field == "entity_type" and item_value is None:
+            item_value = section.removesuffix("s").casefold()
+        if isinstance(item_value, (list, tuple, set)):
+            item_values = {str(value).casefold() for value in item_value}
+            if not all(value.casefold() in item_values for value in values):
+                return False
+        elif len(values) != 1 or str(item_value).casefold() != values[0].casefold():
+            return False
+    return True
+
+
 def _gather_context_report_to_data(report: GatherContextReport) -> dict[str, Any]:
     return {
         "repo_root": report.repo_root,
         "types": report.types,
         "keywords": report.keywords,
+        "filters": report.filters,
         "matches": [
             {
                 "path": match.path,

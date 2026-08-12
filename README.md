@@ -213,7 +213,7 @@ brew install powdrr-lift
 
 This repository includes 10 installable skills for OpenCode:
 
-1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated PR changelog, commit it, and open a draft pull request for review.
+1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated system specification document from the analysis and commit it.
 
 2. **code-edit-context** - Use when you are about to edit code and need index-backed context for a file and line ranges.
 

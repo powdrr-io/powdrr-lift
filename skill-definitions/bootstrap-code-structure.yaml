@@ -117,3 +117,48 @@ steps:
     - git
     - add
     - docs/project_structure/project-structure.yaml
+- description: Run finish-pr-prep on the validated project-structure artifact.
+  llm_type: fast_iteration
+  details: >-
+    Run finish-pr-prep after the validated project-structure artifact is
+    staged. If cleanup changes files, restage only
+    docs/project_structure/project-structure.yaml before continuing. Do not
+    include unrelated files or begin feature implementation.
+  uses_skills:
+  - finish-pr-prep
+- description: Commit the project-structure artifact and open a draft pull request.
+  llm_type: simple_task
+  details: >-
+    Review the staged project-structure artifact, commit it, and push the
+    current feature branch with its upstream set. Then create or update a
+    draft pull request describing the project-structure artifact and the
+    discovery and validation evidence. If a pull request already exists for
+    the branch, update it instead of creating a second one. Do not report
+    completion until the GitHub command succeeds and its output includes the
+    pull request URL.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - status
+    - --short
+  - tool: shell
+    command:
+    - git
+    - commit
+    - -m
+    - Add project structure artifact
+  - tool: shell
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
+  - tool: shell
+    command:
+    - gh
+    - pr
+    - create
+    - --draft
+    - --fill

@@ -41,3 +41,22 @@ def test_gather_context_filters_tools_by_entity_type_and_labels(
         "labels": ["pr-prep", "python"],
     }
     assert [match.item["id"] for match in report.matches] == ["python-tests"]
+
+
+def test_gather_context_discovers_project_structure_artifact(tmp_path: Path) -> None:
+    project_structure_path = tmp_path / "docs" / "project_structure"
+    project_structure_path.mkdir(parents=True)
+    (project_structure_path / "project-structure.yaml").write_text(
+        "modules:\n- id: app\ntools:\n- id: tests\n",
+        encoding="utf-8",
+    )
+
+    report = gather_specification_context(
+        tmp_path,
+        types=["modules", "tools"],
+    )
+
+    assert {match.path for match in report.matches} == {
+        str(project_structure_path / "project-structure.yaml")
+    }
+    assert {match.section for match in report.matches} == {"modules", "tools"}

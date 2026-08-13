@@ -64,6 +64,7 @@ from powdrr_lift.workflow_chat_agent import (
     SkillCatalogEntry,
     SkillChatConfig,
     SkillChatEdit,
+    WorkflowContext,
     _action_system_prompt,
     _apply_file_edits,
     _available_work_item_documents,
@@ -76,6 +77,7 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
     _LLMExchangeRecordingClient,
+    _load_workflow_context,
     _long_context_backup_for,
     _match_work_item_names,
     _normalize_cache_usage,
@@ -96,6 +98,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_action_for_step,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
+    _worktree_reuse_decision,
     download_local_qwen_model,
     run_workflow_chat,
 )
@@ -373,6 +376,8 @@ def test_textual_response_grows_and_submits_on_return(
                 skill,
                 len(skill.skill.steps),
                 "bootstrap-code-structure skill completed",
+                None,
+                None,
             )
         return 0 if len(received) == 1 else 1
 
@@ -5509,6 +5514,60 @@ def test_resolve_worktree_context_uses_existing_dedicated_worktree(
 
     assert resolved == worktree_root.resolve()
     assert "Using existing worktree context" in stderr.getvalue()
+
+
+def test_workflow_context_is_loaded_and_ad_hoc_reuses_previous_worktree(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    worktree_root = repo_root / ".worktrees" / "previous"
+    worktree_root.mkdir(parents=True)
+    context_path = repo_root / ".powdrr" / "workflow-context.json"
+    context_path.parent.mkdir()
+    context_path.write_text(
+        json.dumps(
+            {
+                "worktree_root": str(worktree_root),
+                "branch_name": "feature/previous",
+                "pr_number": 215,
+                "pr_url": "https://github.com/example/repo/pull/215",
+                "skill_name": "start-implementing-feature",
+                "request": "Build the feature",
+            }
+        ),
+        encoding="utf-8",
+    )
+    context = _load_workflow_context(repo_root)
+    skill = SkillCatalogEntry(
+        repo_root / "handle-ad-hoc.yaml",
+        Skill(
+            name="handle-ad-hoc",
+            when_to_use=("Handle follow-ups.",),
+            steps=(),
+        ),
+    )
+
+    assert context is not None
+    assert context.pr_number == 215
+    assert _worktree_reuse_decision("Check the typo", skill, context) is True
+
+
+def test_worktree_reuse_decision_is_ambiguous_for_unrelated_new_skill(
+    tmp_path: Path,
+) -> None:
+    worktree_root = tmp_path / ".worktrees" / "previous"
+    worktree_root.mkdir(parents=True)
+    context = WorkflowContext(worktree_root=worktree_root)
+    skill = SkillCatalogEntry(
+        tmp_path / "new.yaml",
+        Skill(
+            name="specify-a-feature",
+            when_to_use=("Specify a feature.",),
+            steps=(),
+        ),
+    )
+
+    assert _worktree_reuse_decision("Build a different feature", skill, context) is None
 
 
 def test_local_model_cache_uses_primary_project_root_for_worktree() -> None:

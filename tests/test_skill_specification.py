@@ -302,6 +302,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "finish-pr-prep",
         "fix-ci-failures",
         "fix-merge-conflicts",
+        "handle-ad-hoc",
         "review-architecture",
         "review-system",
         "security-review",
@@ -320,6 +321,18 @@ def test_checked_in_review_skill_definitions_exist() -> None:
     assert (skills_dir / "feature-test-coverage-review.yaml").is_file()
     assert (skills_dir / "review-architecture.yaml").is_file()
     assert (skills_dir / "review-system.yaml").is_file()
+
+
+def test_checked_in_handle_ad_hoc_skill_matches_flow() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    skill = load_skill(skills_dir / "handle-ad-hoc.yaml")
+
+    assert skill.name == "handle-ad-hoc"
+    assert [step.description for step in skill.steps] == [
+        "Handle what the user asked for.",
+        "Run finish-pr-prep when files changed.",
+    ]
+    assert "invoke finish-pr-prep" in (skill.steps[1].details or "")
 
 
 def test_checked_in_address_review_comments_skill_matches_flow() -> None:

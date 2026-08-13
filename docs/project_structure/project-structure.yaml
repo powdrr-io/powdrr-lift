@@ -1,0 +1,65 @@
+# This file is read-only and should never be edited by a tool or agent.
+#
+schema: https://powdrr.io/schemas/specification-v1
+id: powdrr-lift-project-structure
+title: powdrr-lift Project Structure
+modules:
+  - id: powdrr-lift-core
+    action: added
+    relative_location: src/powdrr_lift/core/
+    purpose: Core library package containing specification, validation, indexing, and project-structure logic.
+  - id: powdrr-lift-cli
+    action: added
+    relative_location: src/powdrr_lift/cli.py
+    purpose: CLI entry point for powdrr-lift commands.
+  - id: powdrr-lift-mcp-server
+    action: added
+    relative_location: src/powdrr_lift/mcp_server.py
+    purpose: MCP server implementation for tool integration.
+  - id: powdrr-lift-workflow-chat-agent
+    action: added
+    relative_location: src/powdrr_lift/workflow_chat_agent.py
+    purpose: Workflow chat agent for executing skill steps.
+  - id: powdrr-lift-workflow-chat-tui
+    action: added
+    relative_location: src/powdrr_lift/workflow_chat_tui.py
+    purpose: TUI for interactive workflow chat.
+  - id: powdrr-lift-change-log-parser
+    action: added
+    relative_location: src/powdrr_lift/change_log_parser/
+    purpose: Change log parsing utilities.
+  - id: powdrr-lift-tests
+    action: added
+    relative_location: tests/
+    purpose: Test suite for all powdrr-lift modules.
+tools:
+  - id: ruff-format
+    action: added
+    when_to_use: Format Python source files with ruff.
+    template: uv run ruff format .
+    how_to_use: Run from repository root.
+    evidence: pyproject.toml, Makefile, .github/workflows/ci.yml
+  - id: ruff-format-check
+    action: added
+    when_to_use: Check Python source formatting without modifying files.
+    template: uv run ruff format --check .
+    how_to_use: Run from repository root.
+    evidence: pyproject.toml, Makefile, .github/workflows/ci.yml
+  - id: ruff-check
+    action: added
+    when_to_use: Lint Python source files with ruff.
+    template: uv run ruff check .
+    how_to_use: Run from repository root.
+    evidence: pyproject.toml, Makefile, .github/workflows/ci.yml
+  - id: mypy
+    action: added
+    when_to_use: Type-check Python source and tests with mypy.
+    template: uv run mypy src tests
+    how_to_use: Run from repository root.
+    evidence: pyproject.toml, Makefile, .github/workflows/ci.yml
+  - id: pytest
+    action: added
+    when_to_use: Run the test suite with pytest.
+    template: uv run pytest
+    how_to_use: Run from repository root.
+    evidence: pyproject.toml, Makefile, .github/workflows/ci.yml

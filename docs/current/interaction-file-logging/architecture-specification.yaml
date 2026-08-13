@@ -21,25 +21,20 @@ entities:
 modules:
   - id: interaction-log-writer
     action: added
-    parent_module: null
     relative_location: src/powdrr_lift/interaction_logging/writer.py
     related_modules:
       - binary-data-handler
     purpose: Write interaction records to per-session timestamped JSON log files in the .powdrr directory per "interaction-file-logging-timestamped-files" and "interaction-file-logging-hidden-directory".
   - id: interaction-log-reader
     action: added
-    parent_module: null
     relative_location: src/powdrr_lift/interaction_logging/reader.py
     related_modules:
       - binary-data-handler
     purpose: Read and retrieve interaction records from JSON log files, handling binary and zero-size data per "interaction-file-logging-binary-data" and "interaction-file-logging-zero-size-data".
   - id: binary-data-handler
     action: added
-    parent_module: null
     relative_location: src/powdrr_lift/interaction_logging/binary_handler.py
-    related_modules: []
     purpose: Encode binary data as JSON-safe strings on write and decode back to binary on read per "interaction-file-logging-binary-data".
-tools: []
 entity_relationships:
   - id: writer-uses-binary-handler
     source: interaction-log-writer

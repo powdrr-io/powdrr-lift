@@ -183,13 +183,11 @@ def test_validate_implementation_specification_rejects_unknown_module_references
     modules:
       - id: core
         action: changed
-        parent_module: missing
         related_modules:
           - missing
     tools:
       - id: formatter
         action: added
-        related_module: missing
         related_modules:
           - missing
     entity_relationships: []
@@ -205,8 +203,6 @@ def test_validate_implementation_specification_rejects_unknown_module_references
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == [
-        "unknown_module_reference",
-        "unknown_module_reference",
         "unknown_module_reference",
         "unknown_module_reference",
     ]

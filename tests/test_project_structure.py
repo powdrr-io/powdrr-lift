@@ -39,8 +39,6 @@ def test_project_structure_validator_accepts_completed_specification_v1(
         """# This file is read-only and should never be edited by a tool or agent.
 schema: https://powdrr.io/schemas/specification-v1
 id: project-structure
-modules: []
-tools: []
 """,
         encoding="utf-8",
     )
@@ -108,13 +106,42 @@ def test_project_structure_cli_validates_template(tmp_path: Path) -> None:
         """# This file is read-only and should never be edited by a tool or agent.
 schema: https://powdrr.io/schemas/specification-v1
 id: project-structure
-modules: []
-tools: []
 """,
         encoding="utf-8",
     )
 
     assert main(["validate-project-structure", "--input", str(output_path)]) == 0
+
+
+def test_project_structure_validator_rejects_explicit_empty_values(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "project-structure.yaml"
+    output_path.write_text(
+        """schema: https://powdrr.io/schemas/specification-v1
+id: project-structure
+modules: []
+tools:
+  - id: tools
+    action: added
+    when_to_use: null
+    parent_module: root
+    related_module: root
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_project_structure_yaml(output_path)
+
+    assert report.validation_successful is False
+    assert {(issue.code, issue.path) for issue in report.issues} >= {
+        ("explicit_empty_value", "modules"),
+        ("explicit_empty_value", "tools[0].when_to_use"),
+    }
+    assert {issue.path for issue in report.issues} >= {
+        "tools[0].parent_module",
+        "tools[0].related_module",
+    }
 
 
 def test_create_project_structure_template_preserves_existing_file(

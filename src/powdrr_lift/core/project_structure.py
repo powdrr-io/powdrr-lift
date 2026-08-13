@@ -7,7 +7,10 @@ from typing import Any
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
-from powdrr_lift.core.specification_v1 import validate_module_tool_sections
+from powdrr_lift.core.specification_v1 import (
+    validate_module_tool_sections,
+    validate_no_explicit_empty_values,
+)
 
 PROJECT_STRUCTURE_TEMPLATE = """# Project structure specification template.
 #
@@ -26,16 +29,11 @@ title: null
 modules:
   - id: null
     action: null
-    parent_module: null
     relative_location: null
-    related_modules: []
     purpose: null
 tools:
   - id: null
     action: null
-    related_module: null
-    related_modules: []
-    labels: []
     when_to_use: null
     template: null
     how_to_use: null
@@ -77,7 +75,6 @@ _ROOT_FIELDS = {
 _MODULE_FIELDS = {
     "id",
     "action",
-    "parent_module",
     "relative_location",
     "related_modules",
     "purpose",
@@ -86,7 +83,6 @@ _REQUIRED_MODULE_FIELDS = {"id", "action", "relative_location", "purpose"}
 _TOOL_FIELDS = {
     "id",
     "action",
-    "related_module",
     "related_modules",
     "labels",
     "when_to_use",
@@ -117,6 +113,10 @@ def validate_project_structure_yaml(
         )
         return ProjectStructureValidationReport(False, issues)
     _check_unknown_fields(data, _ROOT_FIELDS, "", issues)
+    issues.extend(
+        ProjectStructureValidationIssue(issue.code, issue.message, issue.path)
+        for issue in validate_no_explicit_empty_values(data)
+    )
     if any(
         marker in path.read_text(encoding="utf-8")
         for marker in (

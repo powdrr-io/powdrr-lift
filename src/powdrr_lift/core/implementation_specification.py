@@ -15,6 +15,7 @@ from powdrr_lift.core.spec_paths import (
     implementation_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
+from powdrr_lift.core.specification_v1 import validate_module_tool_references
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
@@ -667,102 +668,21 @@ def _validate_module_tool_references(
     module_ids: set[str],
     issues: list[ImplementationSpecificationValidationIssue],
 ) -> None:
-    for item in items:
-        raw = item.raw
-        if item.path.startswith("modules["):
-            _validate_module_reference(
-                raw.get("parent_module"),
-                module_ids=module_ids,
-                path=f"{item.path}.parent_module",
-                issues=issues,
-            )
-            _validate_module_reference_list(
-                raw.get("related_modules"),
-                module_ids=module_ids,
-                path=f"{item.path}.related_modules",
-                issues=issues,
-            )
-            continue
-
-        _validate_module_reference(
-            raw.get("related_module"),
-            module_ids=module_ids,
-            path=f"{item.path}.related_module",
-            issues=issues,
-        )
-        _validate_module_reference_list(
-            raw.get("related_modules"),
-            module_ids=module_ids,
-            path=f"{item.path}.related_modules",
-            issues=issues,
-        )
-
-
-def _validate_module_reference(
-    raw_reference: object,
-    *,
-    module_ids: set[str],
-    path: str,
-    issues: list[ImplementationSpecificationValidationIssue],
-) -> None:
-    if raw_reference is None:
-        return
-    if isinstance(raw_reference, Sequence) and not isinstance(
-        raw_reference, (str, bytes)
-    ):
-        _validate_module_reference_list(
-            raw_reference,
-            module_ids=module_ids,
-            path=path,
-            issues=issues,
-        )
-        return
-    reference = _optional_string(raw_reference)
-    if reference is None:
-        issues.append(
-            ImplementationSpecificationValidationIssue(
-                code="invalid_module_reference",
-                message="Module references must be module ids.",
-                path=path,
-            )
-        )
-    elif reference not in module_ids:
-        issues.append(
-            ImplementationSpecificationValidationIssue(
-                code="unknown_module_reference",
-                message=f"Module id {reference!r} is not listed in modules.",
-                path=path,
-            )
-        )
-
-
-def _validate_module_reference_list(
-    raw_references: object,
-    *,
-    module_ids: set[str],
-    path: str,
-    issues: list[ImplementationSpecificationValidationIssue],
-) -> None:
-    if raw_references is None:
-        return
-    if not isinstance(raw_references, Sequence) or isinstance(
-        raw_references, (str, bytes)
+    modules = [item.raw for item in items if item.path.startswith("modules[")]
+    tools = [item.raw for item in items if item.path.startswith("tools[")]
+    for issue in validate_module_tool_references(
+        modules,
+        tools,
+        module_ids=module_ids,
     ):
         issues.append(
             ImplementationSpecificationValidationIssue(
-                code="invalid_module_reference_list",
-                message="related_modules must be a list of module ids.",
-                path=path,
+                code=issue.code,
+                message=issue.message,
+                path=issue.path,
             )
         )
-        return
-    for index, raw_reference in enumerate(raw_references):
-        _validate_module_reference(
-            raw_reference,
-            module_ids=module_ids,
-            path=f"{path}[{index}]",
-            issues=issues,
-        )
+    return
 
 
 def _required_action(

@@ -16,6 +16,7 @@ from powdrr_lift.core.spec_paths import (
     existing_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
+from powdrr_lift.core.specification_v1 import validate_module_tool_sections
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
@@ -466,61 +467,14 @@ def _collect_module_ids(
     *,
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
-    module_ids: set[str] = set()
-    module_items: list[tuple[int, Mapping[str, Any], str]] = []
-    for index, raw_module in enumerate(raw_modules):
-        module = _coerce_mapping(
-            raw_module,
-            path=f"modules[{index}]",
-            issues=issues,
-            issue_code="invalid_module_entry",
-            issue_message="Each module entry must be a mapping.",
+    shared = validate_module_tool_sections(raw_modules, [])
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
         )
-        if module is None:
-            continue
-
-        module_id = _required_string(
-            module.get("id"),
-            path=f"modules[{index}].id",
-            issues=issues,
-            issue_code="module_id_missing",
-            issue_message="Each module must include an id.",
-        )
-        _validate_entity_action(
-            module.get("action"),
-            path=f"modules[{index}].action",
-            issues=issues,
-            required=True,
-        )
-        if module_id is None:
-            continue
-        if module_id in module_ids:
-            issues.append(
-                ArchitectureSpecificationValidationIssue(
-                    code="duplicate_module_id",
-                    message=f"Module id {module_id!r} appears more than once.",
-                    path=f"modules[{index}].id",
-                )
-            )
-            continue
-        module_ids.add(module_id)
-        module_items.append((index, module, module_id))
-
-    for index, module, _ in module_items:
-        _validate_optional_module_reference(
-            module.get("parent_module"),
-            module_ids=module_ids,
-            path=f"modules[{index}].parent_module",
-            issues=issues,
-        )
-        _validate_module_reference_list(
-            module.get("related_modules"),
-            module_ids=module_ids,
-            path=f"modules[{index}].related_modules",
-            issues=issues,
-        )
-
-    return module_ids
+        for issue in shared.issues
+    )
+    return shared.module_ids
 
 
 def _collect_tool_ids(
@@ -529,91 +483,14 @@ def _collect_tool_ids(
     module_ids: set[str],
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
-    tool_ids: set[str] = set()
-    for index, raw_tool in enumerate(raw_tools):
-        tool = _coerce_mapping(
-            raw_tool,
-            path=f"tools[{index}]",
-            issues=issues,
-            issue_code="invalid_tool_entry",
-            issue_message="Each tool entry must be a mapping.",
+    shared = validate_module_tool_sections([], raw_tools, module_ids=module_ids)
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
         )
-        if tool is None:
-            continue
-
-        tool_id = _required_string(
-            tool.get("id"),
-            path=f"tools[{index}].id",
-            issues=issues,
-            issue_code="tool_id_missing",
-            issue_message="Each tool must include an id.",
-        )
-        _validate_entity_action(
-            tool.get("action"),
-            path=f"tools[{index}].action",
-            issues=issues,
-            required=True,
-        )
-        _validate_tool_labels(
-            tool.get("labels"),
-            path=f"tools[{index}].labels",
-            issues=issues,
-        )
-        if tool_id is None:
-            continue
-        if tool_id in tool_ids:
-            issues.append(
-                ArchitectureSpecificationValidationIssue(
-                    code="duplicate_tool_id",
-                    message=f"Tool id {tool_id!r} appears more than once.",
-                    path=f"tools[{index}].id",
-                )
-            )
-            continue
-        tool_ids.add(tool_id)
-
-        _validate_optional_module_reference(
-            tool.get("related_module"),
-            module_ids=module_ids,
-            path=f"tools[{index}].related_module",
-            issues=issues,
-        )
-        _validate_module_reference_list(
-            tool.get("related_modules"),
-            module_ids=module_ids,
-            path=f"tools[{index}].related_modules",
-            issues=issues,
-        )
-
-    return tool_ids
-
-
-def _validate_tool_labels(
-    raw_labels: object,
-    *,
-    path: str,
-    issues: list[ArchitectureSpecificationValidationIssue],
-) -> None:
-    if raw_labels is None:
-        return
-    if not isinstance(raw_labels, Sequence) or isinstance(raw_labels, (str, bytes)):
-        issues.append(
-            ArchitectureSpecificationValidationIssue(
-                code="invalid_tool_labels",
-                message="Tool labels must be a list of non-empty strings.",
-                path=path,
-            )
-        )
-        return
-    for index, raw_label in enumerate(raw_labels):
-        if not isinstance(raw_label, str) or not raw_label.strip():
-            issues.append(
-                ArchitectureSpecificationValidationIssue(
-                    code="invalid_tool_label",
-                    message="Each tool label must be a non-empty string.",
-                    path=f"{path}[{index}]",
-                )
-            )
+        for issue in shared.issues
+    )
+    return shared.tool_ids
 
 
 def _validate_entity_action(
@@ -644,71 +521,6 @@ def _validate_entity_action(
                 ),
                 path=path,
             )
-        )
-
-
-def _validate_optional_module_reference(
-    raw_reference: object,
-    *,
-    module_ids: set[str],
-    path: str,
-    issues: list[ArchitectureSpecificationValidationIssue],
-) -> None:
-    if raw_reference is None:
-        return
-    if isinstance(raw_reference, Sequence) and not isinstance(
-        raw_reference, (str, bytes)
-    ):
-        _validate_module_reference_list(
-            raw_reference,
-            module_ids=module_ids,
-            path=path,
-            issues=issues,
-        )
-        return
-    reference = _required_string(
-        raw_reference,
-        path=path,
-        issues=issues,
-        issue_code="invalid_module_reference",
-        issue_message="Module references must be module ids.",
-    )
-    if reference is not None and reference not in module_ids:
-        issues.append(
-            ArchitectureSpecificationValidationIssue(
-                code="unknown_module_reference",
-                message=f"Module id {reference!r} is not listed in modules.",
-                path=path,
-            )
-        )
-
-
-def _validate_module_reference_list(
-    raw_references: object,
-    *,
-    module_ids: set[str],
-    path: str,
-    issues: list[ArchitectureSpecificationValidationIssue],
-) -> None:
-    if raw_references is None:
-        return
-    if not isinstance(raw_references, Sequence) or isinstance(
-        raw_references, (str, bytes)
-    ):
-        issues.append(
-            ArchitectureSpecificationValidationIssue(
-                code="invalid_module_reference_list",
-                message="related_modules must be a list of module ids.",
-                path=path,
-            )
-        )
-        return
-    for index, raw_reference in enumerate(raw_references):
-        _validate_optional_module_reference(
-            raw_reference,
-            module_ids=module_ids,
-            path=f"{path}[{index}]",
-            issues=issues,
         )
 
 

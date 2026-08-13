@@ -23,6 +23,7 @@ from powdrr_lift.workflow_chat_agent import (
 
 _EMPTY_HUMAN_INPUT_WARNING = "WARNING: received empty response but need human input"
 _USER_RESPONSE_SEPARATOR = "-" * 40
+_POWDRR_AGENT_BANNER = "Powdrr Agent v0.0.1"
 
 
 class _TextualOutput:
@@ -211,12 +212,12 @@ class WorkflowChatApp(App[None]):
         self._request_submitted = Event()
         self._workflow_active = False
         self._message_history: list[str] = []
-        self._current_status = "starting workflow..."
+        self._current_status = _POWDRR_AGENT_BANNER
         self._initial_prompt_visible = False
 
     def compose(self) -> ComposeResult:
         yield ScrollableContainer(
-            Label(self._status_text("starting workflow..."), markup=False, id="status"),
+            Label(self._status_text(_POWDRR_AGENT_BANNER), markup=False, id="status"),
             id="status-container",
         )
         yield ListView(id="steps")
@@ -233,7 +234,7 @@ class WorkflowChatApp(App[None]):
         # Paint the initial state before starting any repository or LLM work.
         # The worker can block during setup, so this must not be the first
         # operation that establishes visible state.
-        self._set_status("starting workflow...")
+        self._set_status(_POWDRR_AGENT_BANNER)
         self._response.focus()
         Thread(target=self._run_workflow, daemon=True).start()
 
@@ -426,8 +427,8 @@ class WorkflowChatApp(App[None]):
         skill: SkillCatalogEntry,
         current_step_index: int,
         status: str,
-        parent_skill: SkillCatalogEntry | None,
-        parent_step_index: int | None,
+        parent_skill: SkillCatalogEntry | None = None,
+        parent_step_index: int | None = None,
     ) -> None:
         self.call_from_thread(
             self._apply_progress,

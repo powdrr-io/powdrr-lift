@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import os
@@ -907,10 +908,7 @@ class _WorkflowProgressDisplay:
     def __init__(
         self,
         stream: TextIO,
-        on_update: Callable[
-            [SkillCatalogEntry, int, str, SkillCatalogEntry | None, int | None], None
-        ]
-        | None = None,
+        on_update: Callable[..., None] | None = None,
     ) -> None:
         self._stream = stream
         self._on_update = on_update
@@ -928,13 +926,16 @@ class _WorkflowProgressDisplay:
         parent_step_index: int | None = None,
     ) -> None:
         if self._on_update is not None:
-            self._on_update(
-                skill,
-                current_step_index,
-                status,
-                parent_skill,
-                parent_step_index,
-            )
+            if len(inspect.signature(self._on_update).parameters) >= 5:
+                self._on_update(
+                    skill,
+                    current_step_index,
+                    status,
+                    parent_skill,
+                    parent_step_index,
+                )
+            else:
+                self._on_update(skill, current_step_index, status)
             self._last_step_index = current_step_index
             return
         if not self._dynamic and self._last_step_index == current_step_index:

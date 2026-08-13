@@ -919,11 +919,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["auto", *ALL_PROVIDERS],
         default="auto",
         help=(
-            "LLM provider to use. Auto picks Anthropic when Claude models or "
-            "Anthropic credentials are provided, DeepInfra Cheap when DeepInfra "
-            "credentials are provided, z.ai when GLM models or z.ai credentials "
-            "are provided, and local when a local model is selected."
+            "Normal LLM provider to use. Auto assigns the highest-priority "
+            "configured provider to normal and the next one to adversarial."
         ),
+    )
+    workflow_chat_parser.add_argument(
+        "--adversarial-provider",
+        choices=ALL_PROVIDERS,
+        help="Provider used for nested adversarial review skills.",
     )
     workflow_chat_parser.add_argument(
         "--skills-dir",
@@ -1694,6 +1697,7 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         output_dir=args.output_dir,
         provider=args.provider,
+        adversarial_provider=args.adversarial_provider,
         model=args.model,
         api_key=args.api_key,
         base_url=args.base_url,

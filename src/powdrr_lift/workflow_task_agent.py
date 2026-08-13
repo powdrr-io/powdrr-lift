@@ -7,7 +7,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol, TextIO
+from typing import Any, Literal, Protocol, TextIO
 
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -90,6 +90,9 @@ class WorkflowTaskAction:
     parameters: dict[str, Any] = field(default_factory=dict)
     human_input: dict[str, Any] | None = None
     decisions_and_context: str | None = None
+    provider_role: Literal["normal", "adversarial"] | None = None
+    clean: bool = False
+    context: tuple[str, ...] = ()
 
 
 def run_workflow_task(
@@ -1009,7 +1012,10 @@ def _task_system_prompt() -> str:
         "the execution agent will persist it as a human workflow task.\n"
         "- edit: choose this for a known line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
-        "workflow in the current worktree.\n"
+        "workflow in the current worktree. It inherits context and bindings by "
+        "default; provider_role=adversarial selects the adversarial provider, and "
+        "clean=true limits the child to the explicit context list and isolates "
+        "its gathered context.\n"
         "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
         "query is needed "
         "to inspect the worktree or perform work required to determine the "
@@ -1026,7 +1032,9 @@ def _task_system_prompt() -> str:
         '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
         '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
-        '{"kind":"invoke_skill","skill":"bootstrap-code-structure"}\n'
+        '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
+        '"provider_role":"adversarial","clean":true,'
+        '"context":["Review only this explicitly supplied context."]}\n'
         '{"kind":"read_document","file_path":"path","start_line":1,"end_line":20}\n'
         '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
@@ -1375,6 +1383,9 @@ def _workflow_task_action_from_skill_action(
         text=action.text,
         parameters=action.parameters,
         decisions_and_context=action.decisions_and_context,
+        provider_role=action.provider_role,
+        clean=action.clean,
+        context=action.context,
     )
 
 

@@ -5437,6 +5437,8 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
         )
 
     assert run.call_args.args[0] == "rtk git status"
+    assert "Invoking" not in stdout.getvalue()
+    assert "Invoking" not in stderr.getvalue()
 
 
 def test_execute_shell_tool_verbose_prints_stdout(

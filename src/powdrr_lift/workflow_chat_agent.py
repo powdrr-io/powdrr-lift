@@ -3307,8 +3307,6 @@ def _execute_shell_tool(
                 )
             env[key] = value
 
-    print(f"Invoking shell tool: {command_display}", file=stdout)
-    _verbose_print(stderr, verbose, f"Invoking shell tool: {command_display}")
     process = subprocess.run(
         run_command,
         shell=use_shell,

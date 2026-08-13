@@ -138,7 +138,7 @@ ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     "fast_iteration": LLMModelMapping(
         _QWEN_2_5_CODER_MODEL,
         provider="local",
-        long_context_backup_model=LLMModelMapping("glm-5.2", provider="zai"),
+        long_context_backup_model=LLMModelMapping("glm-4.7-flash", provider="zai"),
     ),
     "long_context": LLMModelMapping("glm-5.2", provider="zai"),
     "vision": LLMModelMapping("glm-4.6v", provider="zai"),

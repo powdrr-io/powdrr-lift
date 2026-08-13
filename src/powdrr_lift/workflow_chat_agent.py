@@ -2402,6 +2402,24 @@ def _build_skill_execution_summary(
     }
 
 
+def _execution_events_for_prompt(
+    execution_events: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return the event metadata needed for the next action decision.
+
+    Event results are retained in the full execution summary, but are also
+    copied into the transcript or execution context as they are produced.
+    Sending both copies on every roundtrip needlessly grows prompts and makes
+    large tool results increasingly expensive to serialize. Keep the prompt
+    event stream as metadata while leaving the complete event stream intact
+    for persistence and diagnostics.
+    """
+    return [
+        {key: value for key, value in event.items() if key != "result"}
+        for event in execution_events
+    ]
+
+
 def _build_step_execution_messages(
     *,
     selected_skill: SkillCatalogEntry,
@@ -2485,7 +2503,7 @@ def _build_step_execution_messages(
                         for entry in catalog
                     ],
                     "transcript": list(transcript),
-                    "execution_events": list(execution_events),
+                    "execution_events": _execution_events_for_prompt(execution_events),
                     "current_file": current_file_context,
                 },
                 indent=2,

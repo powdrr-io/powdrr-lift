@@ -15,7 +15,7 @@ steps:
     proposed PRs. If a feature specification exists, resolve its ordered
     proposed-PR list and use the feature definition, architecture, system,
     implementation, and relevant previous PRs to establish scope. Invoke the
-    gather-context action for requirements, entities, entity-relationships,
+    gather_context action for requirements, entities, entity-relationships,
     features, decisions, risks, and proposed_prs filtered by the feature id
     when one is known. Treat structured repository specifications as
     authoritative and record missing security context as a review gap.

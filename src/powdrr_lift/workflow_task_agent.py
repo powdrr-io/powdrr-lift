@@ -277,7 +277,7 @@ def run_workflow_task(
             continue
         response_correction = None
         result: Any
-        if action.kind == "gather-context":
+        if action.kind == "gather_context":
             report = gather_specification_context(
                 repo_root,
                 types=list(action.types),
@@ -1003,7 +1003,7 @@ def _task_system_prompt() -> str:
         "sufficient for every downstream task that declares this task as an "
         "upstream dependency.\n"
         "Choose exactly one outcome:\n"
-        "- gather-context: choose this when structured specification context must "
+        "- gather_context: choose this when structured specification context must "
         "be discovered before deciding or acting.\n"
         "- prompt_user: choose this when a human decision or review is required; "
         "the execution agent will persist it as a human workflow task.\n"
@@ -1022,7 +1022,7 @@ def _task_system_prompt() -> str:
         "the produced state in output_state.\n"
         "Response: return exactly one JSON object matching exactly one outcome "
         "shape below. Do not include markdown or combine outcomes.\n"
-        '{"kind":"gather-context","types":["tools"],"filters":{"labels":["pr-prep"],"language":["python"]}}\n'
+        '{"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep"],"language":["python"]}}\n'
         '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
         '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
@@ -1030,7 +1030,7 @@ def _task_system_prompt() -> str:
         '{"kind":"read_document","file_path":"path","start_line":1,"end_line":20}\n'
         '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
-        "Use gather-context with one or more supported context types and optional "
+        "Use gather_context with one or more supported context types and optional "
         "keywords and filters when repository specifications must be discovered. "
         "Filters match exact fields and list values such as labels. Use "
         "prompt_user instead of get-human-input; the execution agent converts it "
@@ -1208,7 +1208,7 @@ def _run_skill_for_agent(
             stack.append((nested_skill, 0))
             execution_events.append({"kind": action.kind, "skill": action.skill_name})
             continue
-        if action.kind == "gather-context":
+        if action.kind == "gather_context":
             report = gather_specification_context(
                 repo_root,
                 types=list(action.types),

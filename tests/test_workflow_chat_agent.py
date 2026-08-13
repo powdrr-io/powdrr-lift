@@ -96,6 +96,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _workflow_action_progress_status,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     _worktree_reuse_decision,
@@ -1212,7 +1213,7 @@ def test_workflow_progress_lists_steps_and_updates_status() -> None:
     progress.update(
         skill,
         current_step_index=0,
-        status="performing local action...",
+        status="Edited file",
     )
     progress.update(
         skill,
@@ -1224,7 +1225,69 @@ def test_workflow_progress_lists_steps_and_updates_status() -> None:
     assert "1. Capture the feature goal." in output
     assert "2. Summarize the result." in output
     assert "waiting on LLM response..." in output
-    assert "performing local action..." in output
+    assert "Edited file" in output
+    assert "performing local action..." not in output
+
+
+def test_workflow_action_progress_status_uses_action_specific_messages() -> None:
+    assert (
+        _workflow_action_progress_status(
+            _parse_action_response(
+                {
+                    "kind": "edit",
+                    "file_path": "README.md",
+                    "edits": [{"kind": "replace", "start_line": 1, "text": "Updated"}],
+                }
+            )
+        )
+        == "Edited file"
+    )
+    assert (
+        _workflow_action_progress_status(
+            _parse_action_response(
+                {
+                    "kind": "read_document",
+                    "file_path": "README.md",
+                    "start_line": 1,
+                    "end_line": 2,
+                }
+            )
+        )
+        == "Reading file"
+    )
+    assert (
+        _workflow_action_progress_status(
+            _parse_action_response(
+                {
+                    "kind": "gather_context",
+                    "types": ["requirements"],
+                }
+            )
+        )
+        == "Gathering structured context"
+    )
+    assert (
+        _workflow_action_progress_status(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["git", "status", "--short"]},
+                }
+            )
+        )
+        == "Invoking git status --short"
+    )
+    assert (
+        _workflow_action_progress_status(
+            _parse_action_response(
+                {
+                    "kind": "next_step",
+                }
+            )
+        )
+        is None
+    )
 
 
 def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
@@ -2250,7 +2313,7 @@ def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
 def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     prompt = _action_system_prompt()
 
-    assert "gather-context" in prompt
+    assert "gather_context" in prompt
     assert "edit" in prompt
     assert "file_path" in prompt
     assert "requirements" in prompt
@@ -2325,7 +2388,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 SkillStep(
                     description="Discover what requirements are already specified.",
                     details=(
-                        "Use gather-context to retrieve existing requirement notes."
+                        "Use gather_context to retrieve existing requirement notes."
                     ),
                 ),
                 SkillStep(
@@ -2370,7 +2433,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 "ready_to_execute": True,
             },
             {
-                "kind": "gather-context",
+                "kind": "gather_context",
                 "types": ["requirements"],
                 "keywords": ["related photos"],
                 "decisions_and_context": (
@@ -2424,7 +2487,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 )
                 assert "Gathered context:" in prompt["step_context"][-1]
                 assert "Show related photos in the UI." in prompt["step_context"][-1]
-                assert prompt["execution_events"][-1]["kind"] == "gather-context"
+                assert prompt["execution_events"][-1]["kind"] == "gather_context"
                 assert prompt["execution_events"][-1]["types"] == ["requirements"]
                 assert (
                     prompt["execution_events"][-1]["result"]["matches"][0]["item"][
@@ -2477,7 +2540,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
     assert summary_path.exists()
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert [event["kind"] for event in summary["execution_events"]] == [
-        "gather-context",
+        "gather_context",
         "next_step",
         "complete",
     ]
@@ -5371,9 +5434,12 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
             stdout=stdout,
             stderr=stderr,
             verbose=False,
+            announce=False,
         )
 
     assert run.call_args.args[0] == "rtk git status"
+    assert "Invoking" not in stdout.getvalue()
+    assert "Invoking" not in stderr.getvalue()
 
 
 def test_execute_shell_tool_verbose_prints_stdout(

@@ -125,9 +125,9 @@ steps:
     constraints, and follow-up work that the merged result must retain. If a
     commit has no PR, use its commit message, author, date, and diff as the
     source of intent. Before querying GitHub for related PRs, invoke the
-    gather-context workflow action with the conflict ledger's known feature or
+    gather_context workflow action with the conflict ledger's known feature or
     proposed-PR identifiers as keywords:
-    {"kind":"gather-context","types":["features","proposed_prs","decisions","risks"],"keywords":["<feature-or-proposed-pr-id>"]}.
+    {"kind":"gather_context","types":["features","proposed_prs","decisions","risks"],"keywords":["<feature-or-proposed-pr-id>"]}.
     Use the returned structured records to discover related proposed PRs,
     recorded decisions, risks, and feature intent, then use GitHub history to
     fill in the commit-level details. Do not rely on line ownership alone to

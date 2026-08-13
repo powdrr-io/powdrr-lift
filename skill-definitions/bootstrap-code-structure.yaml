@@ -16,9 +16,9 @@ steps:
     tests, formatting, linting, type checking, packaging, and other repository
     validation. Use basedpyright-symbol and basedpyright-structure for Python
     source when available. Record paths, symbols, commands, and evidence in
-    decisions_and_context before continuing. Use the gather-context workflow
+    decisions_and_context before continuing. Use the gather_context workflow
     action to look for an existing project-structure artifact:
-    {"kind":"gather-context","types":["modules","tools"],"keywords":[]}
+    {"kind":"gather_context","types":["modules","tools"],"keywords":[]}
     Inspect returned match paths for docs/project_structure and carry the
     result into the next step. After discovering each tool, try its command
     with the smallest safe invocation that exercises its syntax and working
@@ -62,7 +62,7 @@ steps:
     are optional.
     Do not create a feature-specific architecture specification and do not ask
     a question merely because the project-structure document is absent. Pass
-    the exact artifact path to the next step. Use the prior gather-context
+    the exact artifact path to the next step. Use the prior gather_context
     result to decide whether the artifact exists.
   tool_invocations:
   - tool: shell

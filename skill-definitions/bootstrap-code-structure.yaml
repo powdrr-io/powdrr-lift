@@ -20,7 +20,15 @@ steps:
     action to look for an existing project-structure artifact:
     {"kind":"gather-context","types":["modules","tools"],"keywords":[]}
     Inspect returned match paths for docs/project_structure and carry the
-    result into the next step.
+    result into the next step. After discovering each tool, try its command
+    with the smallest safe invocation that exercises its syntax and working
+    directory. For commands that require project inputs, use a read-only,
+    help, dry-run, or otherwise non-destructive invocation. If a discovered
+    tool fails because of command syntax, flags, paths, working directory, or
+    invocation shape, inspect the error, correct the command, and retry it
+    before recording the tool. Do not pass an untested or failing command to
+    the next step; record the successful command, required inputs, and
+    validation evidence in decisions_and_context.
   tool_invocations:
   - tool: shell
     command:
@@ -76,8 +84,12 @@ steps:
     evidence shows the tool is intended for ad hoc or one-off use, and record
     that rationale in the tool entry's evidence. Preserve accurate existing
     ids and descriptions. Do not invent modules or tools unsupported by
-    repository evidence. Use the edit action to write the artifact and pass
-    the changed path and edit summary onward.
+    repository evidence. Verify every tool command against the successful
+    invocation evidence from the discovery step, including its working
+    directory and required arguments. If a command cannot be run safely,
+    document the exact reason and the safest verified syntax instead of
+    guessing. Use the edit action to write the artifact and pass the changed
+    path and edit summary onward.
 - description: Validate the project-structure artifact and discovery evidence.
   llm_type: fast_iteration
   details: >-

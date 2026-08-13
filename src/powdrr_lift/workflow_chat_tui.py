@@ -25,6 +25,9 @@ from powdrr_lift.workflow_chat_agent import (
 _EMPTY_HUMAN_INPUT_WARNING = "WARNING: received empty response but need human input"
 _USER_RESPONSE_SEPARATOR = "-" * 40
 _POWDRR_AGENT_BANNER = "Powdrr Agent v0.0.1"
+_MAX_STATUS_HISTORY_ENTRIES = 80
+_MAX_STATUS_HISTORY_CHARS = 24_000
+_MAX_STATUS_MESSAGE_CHARS = 8_000
 
 
 class _TextualOutput:
@@ -215,6 +218,7 @@ class WorkflowChatApp(App[None]):
         self._request_submitted = Event()
         self._workflow_active = False
         self._message_history: list[str] = []
+        self._message_history_chars = 0
         self._current_status = _POWDRR_AGENT_BANNER
         self._initial_prompt_visible = False
 
@@ -603,8 +607,24 @@ class WorkflowChatApp(App[None]):
         message = message.strip()
         if not message:
             return
+        if message == self._current_status and self._message_history:
+            return
+        if len(message) > _MAX_STATUS_MESSAGE_CHARS:
+            half_limit = _MAX_STATUS_MESSAGE_CHARS // 2
+            message = (
+                message[:half_limit]
+                + "\n... [status message truncated] ...\n"
+                + message[-half_limit:]
+            )
         if not self._message_history or self._message_history[-1] != message:
             self._message_history.append(message)
+            self._message_history_chars += len(message)
+        while (
+            len(self._message_history) > _MAX_STATUS_HISTORY_ENTRIES
+            or self._message_history_chars > _MAX_STATUS_HISTORY_CHARS
+        ):
+            removed_message = self._message_history.pop(0)
+            self._message_history_chars -= len(removed_message)
         self._current_status = message
         self._render_status()
 

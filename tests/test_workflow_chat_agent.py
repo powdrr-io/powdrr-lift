@@ -732,6 +732,41 @@ def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
     assert scroll_y > 0
 
 
+def test_textual_status_history_is_bounded() -> None:
+    async def exercise() -> tuple[int, int, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            for number in range(200):
+                app._set_message(f"output-{number}-" + ("x" * 500))
+            await pilot.pause()
+            return (
+                len(app._message_history),
+                app._message_history_chars,
+                str(app.query_one("#status", Static).render()),
+            )
+
+    history_count, history_chars, rendered = asyncio.run(exercise())
+    assert history_count <= 80
+    assert history_chars <= 24_000
+    assert "output-199" in rendered
+    assert "output-0" not in rendered
+
+
+def test_textual_status_truncates_large_messages() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            app._set_message("start-" + ("x" * 20_000) + "-end")
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert "status message truncated" in rendered
+    assert len(rendered) < 9_000
+
+
 def test_textual_failure_retains_diagnostics_instead_of_unknown_error() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

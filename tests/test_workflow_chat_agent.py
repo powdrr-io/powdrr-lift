@@ -97,6 +97,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_provider_roles,
     _resolve_skill_path,
     _resolve_worktree_context,
+    _serialize_messages,
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
@@ -1556,6 +1557,93 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     assert exchange["input"] == [{"role": "user", "content": "request"}]
     assert exchange["output"] == {"kind": "complete", "text": "done"}
     assert exchange["timestamp"]
+
+
+def test_llm_exchange_recorder_reuses_client_serialized_messages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    serialization_calls = 0
+
+    def _track_serialization(messages: object) -> str:
+        nonlocal serialization_calls
+        serialization_calls += 1
+        return _serialize_messages(cast(list[dict[str, str]], messages))
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._serialize_messages",
+        _track_serialization,
+    )
+
+    class _FakeClient:
+        last_serialized_messages = '[{"role":"user","content":"request"}]'
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            assert messages == [{"role": "user", "content": "request"}]
+            return {"kind": "complete"}
+
+    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder.complete_json([{"role": "user", "content": "request"}])
+
+    exchange = json.loads(next(tmp_path.glob("llm-*.json")).read_text())
+    assert exchange["input"] == [{"role": "user", "content": "request"}]
+    assert serialization_calls == 0
+
+
+def test_openai_client_serializes_messages_once_for_budget_and_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    serialization_calls = 0
+
+    def _track_serialization(messages: object) -> str:
+        nonlocal serialization_calls
+        serialization_calls += 1
+        return _serialize_messages(cast(list[dict[str, str]], messages))
+
+    class _FakeResponse:
+        def __enter__(self) -> _FakeResponse:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            tb: object,
+        ) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "choices": [
+                        {"message": {"content": '{"kind":"complete"}'}},
+                    ]
+                }
+            ).encode("utf-8")
+
+    request_bodies: list[dict[str, Any]] = []
+
+    def _fake_urlopen(request: Request, timeout: float) -> _FakeResponse:
+        request_bodies.append(json.loads(cast(bytes, request.data).decode("utf-8")))
+        return _FakeResponse()
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._serialize_messages",
+        _track_serialization,
+    )
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+
+    client = OpenAIChatClient(
+        model="test-model",
+        api_key="test-key",
+        base_url="https://api.openai.com/v1",
+    )
+
+    assert client.complete_json([{"role": "user", "content": "request"}]) == {
+        "kind": "complete"
+    }
+    assert serialization_calls == 1
+    assert request_bodies[0]["messages"] == [{"role": "user", "content": "request"}]
 
 
 def test_normalize_cache_usage_supports_provider_formats() -> None:

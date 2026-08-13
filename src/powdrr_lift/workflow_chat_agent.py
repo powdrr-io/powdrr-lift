@@ -19,6 +19,8 @@ from typing import Any, Literal, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import yaml
+
 try:
     import readline
     import termios
@@ -2715,6 +2717,7 @@ def _handle_workflow_action_edit(
             raise RuntimeError("Workflow edit action must include file_path.")
         file_edits = (SkillChatFileEdits(action.file_path, action.edits),)
 
+    pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
     for file_edit in file_edits:
         target_path = _resolve_worktree_file_path(
@@ -2726,14 +2729,19 @@ def _handle_workflow_action_edit(
             current_text = target_path.read_text(encoding="utf-8")
         state.current_file_path = target_path
         updated_text = _apply_file_edits(current_text, file_edit.edits)
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(updated_text, encoding="utf-8")
+        updated_text = _normalize_structured_document_text(target_path, updated_text)
+        _validate_structured_document_text(target_path, updated_text)
+        pending_writes.append((target_path, updated_text))
         results.append(
             {
                 "file_path": str(target_path),
                 "line_count": len(updated_text.splitlines()),
             }
         )
+
+    for target_path, updated_text in pending_writes:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(updated_text, encoding="utf-8")
 
     if action.decisions_and_context:
         state.execution_context.append(action.decisions_and_context)
@@ -4343,15 +4351,83 @@ def _print_empty_response_exchange(
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:
+    normalized_content = content.strip()
     try:
-        parsed_content = json.loads(content)
+        parsed_content = json.loads(normalized_content)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            f"{context} was not valid JSON: {exc.msg}\nResponse content:\n{content}"
-        ) from exc
+        parsed_content = _extract_embedded_json_object(normalized_content)
+        if parsed_content is None:
+            raise RuntimeError(
+                f"{context} was not valid JSON: {exc.msg} at line "
+                f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}"
+            ) from exc
     if not isinstance(parsed_content, dict):
         raise RuntimeError(f"{context} must be a JSON object.")
     return cast("dict[str, Any]", parsed_content)
+
+
+def _extract_embedded_json_object(content: str) -> dict[str, Any] | None:
+    """Accept JSON objects surrounded by common LLM presentation noise."""
+    fenced_blocks = re.findall(
+        r"```(?:json|JSON)?\s*\n?(.*?)```",
+        content,
+        flags=re.DOTALL,
+    )
+    candidates = [*fenced_blocks, content]
+    decoder = json.JSONDecoder()
+    for candidate in candidates:
+        for index, character in enumerate(candidate):
+            if character != "{":
+                continue
+            try:
+                parsed, _ = decoder.raw_decode(candidate, index)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return cast("dict[str, Any]", parsed)
+    return None
+
+
+def _normalize_structured_document_text(path: Path, text: str) -> str:
+    """Remove a single Markdown fence when an LLM wraps a structured file."""
+    if path.suffix.lower() not in {".json", ".yaml", ".yml"}:
+        return text
+    match = re.fullmatch(
+        r"\s*```(?:json|yaml|yml)?\s*\n(.*?)\n?```\s*",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    return match.group(1) + "\n" if match is not None else text
+
+
+def _validate_structured_document_text(path: Path, text: str) -> None:
+    """Reject malformed JSON/YAML before an edit is persisted."""
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        try:
+            json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Edited JSON file {path} is invalid at line {exc.lineno}, "
+                f"column {exc.colno}: {exc.msg}. Correct the JSON before "
+                "continuing."
+            ) from exc
+    elif suffix in {".yaml", ".yml"}:
+        try:
+            yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            problem_mark = getattr(exc, "problem_mark", None)
+            if problem_mark is not None:
+                location = (
+                    f"line {problem_mark.line + 1}, column {problem_mark.column + 1}"
+                )
+            else:
+                location = "an unknown location"
+            problem = getattr(exc, "problem", None) or str(exc)
+            raise RuntimeError(
+                f"Edited YAML file {path} is invalid at {location}: {problem}. "
+                "Correct the YAML before continuing."
+            ) from exc
 
 
 def _edit_to_data(edit: SkillChatEdit) -> dict[str, Any]:

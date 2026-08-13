@@ -541,6 +541,8 @@ class WorkflowChatApp(App[None]):
                 # Surface them so the UI cannot remain on a stale "thinking..."
                 # label after a local tool such as git add completes.
                 self.call_from_thread(self._set_status, line)
+            elif line.startswith("WARNING:"):
+                self.call_from_thread(self._set_status, line)
             elif any(word in line.lower() for word in ("error", "failed", "stopping")):
                 self.call_from_thread(self._set_message, line)
         elif channel == "stdout":

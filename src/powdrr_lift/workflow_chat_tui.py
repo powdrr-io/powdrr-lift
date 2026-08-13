@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import traceback
 from collections.abc import Callable
 from math import ceil
 from queue import Queue
@@ -207,6 +208,8 @@ class WorkflowChatApp(App[None]):
         self._answers: Queue[str] = Queue()
         self._exit_code = 1
         self._failure_message: str | None = None
+        self._failure_traceback: str | None = None
+        self._recent_output: list[str] = []
         self._response: TextArea | None = None
         self._stop_requested = Event()
         self._request_submitted = Event()
@@ -395,6 +398,8 @@ class WorkflowChatApp(App[None]):
             stdout = _TextualStdoutOutput(self)
             stderr = _TextualOutput(self, channel="stderr")
             self._failure_message = None
+            self._failure_traceback = None
+            self._recent_output.clear()
             self._exit_code = 1
             self._workflow_active = True
             try:
@@ -406,8 +411,13 @@ class WorkflowChatApp(App[None]):
                     progress_callback=self._progress_update,
                 )
             except Exception as exc:  # pragma: no cover - defensive UI boundary
-                self._failure_message = str(exc)
-                self.call_from_thread(self._set_failure, str(exc))
+                message = str(exc).strip() or "<exception had no message>"
+                self._failure_message = f"{type(exc).__name__}: {message}"
+                self._failure_traceback = "".join(
+                    traceback.format_exception(type(exc), exc, exc.__traceback__)
+                ).strip()
+                self._record_output("exception", self._failure_message)
+                self.call_from_thread(self._set_failure, self._failure_message)
                 self._exit_code = 1
             self._workflow_active = False
             if self._stop_requested.is_set():
@@ -430,6 +440,7 @@ class WorkflowChatApp(App[None]):
         parent_skill: SkillCatalogEntry | None = None,
         parent_step_index: int | None = None,
     ) -> None:
+        self._record_output("progress", status)
         self.call_from_thread(
             self._apply_progress,
             skill,
@@ -529,6 +540,7 @@ class WorkflowChatApp(App[None]):
             self._response.focus()
 
     def _output_line(self, channel: str, line: str) -> None:
+        self._record_output(channel, line)
         if channel == "stderr":
             if line.startswith("[workflow] "):
                 self.call_from_thread(
@@ -543,10 +555,20 @@ class WorkflowChatApp(App[None]):
                 self.call_from_thread(self._set_status, line)
             elif line.startswith("WARNING:"):
                 self.call_from_thread(self._set_status, line)
-            elif any(word in line.lower() for word in ("error", "failed", "stopping")):
+            elif any(
+                word in line.lower()
+                for word in ("error", "failed", "stopping", "yaml", "parser")
+            ):
                 self.call_from_thread(self._set_message, line)
         elif channel == "stdout":
             self.call_from_thread(self._set_message, line)
+
+    def _record_output(self, channel: str, line: str) -> None:
+        normalized_line = line.strip()
+        if not normalized_line:
+            return
+        self._recent_output.append(f"{channel}: {normalized_line}")
+        del self._recent_output[:-40]
 
     def _set_status(self, status: str) -> None:
         # Status updates are history, too.  Keeping the latest value in a
@@ -599,9 +621,27 @@ class WorkflowChatApp(App[None]):
                 self._response.focus()
         else:
             self._set_status("workflow stopped")
+            failure_message = self._failure_message
+            if failure_message is None:
+                failure_message = (
+                    f"workflow exited with status {self._exit_code} without a "
+                    "reported exception"
+                )
+            failure_details = [failure_message]
+            if self._failure_traceback:
+                traceback_lines = self._failure_traceback.splitlines()
+                failure_details.append(
+                    "Traceback (most recent call last):\n"
+                    + "\n".join(traceback_lines[-8:])
+                )
+            if self._recent_output:
+                failure_details.append(
+                    "Recent workflow context:\n" + "\n".join(self._recent_output[-12:])
+                )
             self._set_message(
-                "Workflow error: "
-                f"{self._failure_message or 'unknown error'}. Press Ctrl+C to exit."
+                "Workflow error:\n"
+                + "\n".join(failure_details)
+                + "\nPress Ctrl+C to exit."
             )
 
     def on_unmount(self) -> None:

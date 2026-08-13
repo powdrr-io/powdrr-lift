@@ -72,6 +72,7 @@ from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
 from powdrr_lift.workflow_chat_agent import (
+    ALL_PROVIDERS,
     WorkflowChatConfig,
     download_local_qwen_model,
     run_workflow_chat,
@@ -915,13 +916,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workflow_chat_parser.add_argument(
         "--provider",
-        choices=["auto", "openai", "anthropic", "zai", "deepinfra", "local"],
+        choices=["auto", *ALL_PROVIDERS],
         default="auto",
         help=(
             "LLM provider to use. Auto picks Anthropic when Claude models or "
-            "Anthropic credentials are provided, z.ai when GLM models or z.ai "
-            "credentials are provided, DeepInfra when DeepInfra credentials are "
-            "provided, and local when a local model is selected."
+            "Anthropic credentials are provided, DeepInfra Cheap when DeepInfra "
+            "credentials are provided, z.ai when GLM models or z.ai credentials "
+            "are provided, and local when a local model is selected."
         ),
     )
     workflow_chat_parser.add_argument(

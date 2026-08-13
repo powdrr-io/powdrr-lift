@@ -164,6 +164,10 @@ continue to handle Command shortcuts itself.
   `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
+- Use `--provider deepinfra-cheap` with `DEEPINFRA_API_TOKEN` to use
+  `deepseek-ai/DeepSeek-V4-Flash` for every workflow capability. In `auto`
+  mode, this provider is selected for non-Claude models whenever DeepInfra
+  credentials are available.
 - The default mapping combines remote GLM models with local Qwen execution.
   Before starting a workflow that selects Qwen, download the Q5_K_M GGUF
   shards with `powdrr-lift download-qwen-model`. The command caches them from

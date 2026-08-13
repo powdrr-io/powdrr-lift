@@ -51,6 +51,8 @@ from powdrr_lift.core.workflow_task_specification import (
 )
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.workflow_chat_agent import (
+    ALL_PROVIDERS,
+    DEEPINFRA_CHEAP_LLM_MAPPINGS,
     DEEPINFRA_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
@@ -1698,6 +1700,44 @@ def test_llm_type_mapping_selects_deepinfra_model() -> None:
     )
 
 
+def test_auto_provider_prefers_deepinfra_cheap_when_credentials_are_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_API_KEY",
+        "ZAI_API_KEY",
+        "ZAI_BASE_URL",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+
+    assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
+
+
+def test_explicit_provider_selection_is_not_overridden() -> None:
+    assert _resolve_provider("local", "glm-5.2") == "local"
+    assert "deepinfra-cheap" in ALL_PROVIDERS
+    with pytest.raises(RuntimeError, match="Unsupported LLM provider 'unknown'"):
+        _resolve_provider("unknown", "test-model")
+
+
+def test_deepinfra_cheap_maps_every_llm_type_to_flash() -> None:
+    expected_model = "deepseek-ai/DeepSeek-V4-Flash"
+    for llm_type in DEEPINFRA_CHEAP_LLM_MAPPINGS:
+        assert (
+            _resolve_llm_model(
+                llm_type,
+                fallback_model="fallback-model",
+                mappings=tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
+                provider="deepinfra-cheap",
+            )
+            == expected_model
+        )
+
+
 def _assert_validation_success(
     report: dict[str, object],
     *,
@@ -2066,6 +2106,7 @@ def test_run_workflow_chat_generates_skill_summary(
             output_dir=output_dir,
             api_key="test-key",
             model="test-model",
+            provider="openai",
         ),
         input_func=lambda: next(answers),
         stdout=stdout,
@@ -4410,6 +4451,7 @@ def test_run_workflow_chat_verbose_prints_progress(
             output_dir=output_dir,
             api_key="test-key",
             model="test-model",
+            provider="openai",
             verbose=True,
         ),
         input_func=lambda: "Build exports",
@@ -4657,6 +4699,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
             repo_root=repo_root,
             output_dir=output_dir,
             model="glm-5.2",
+            provider="zai",
         ),
         input_func=lambda: "Build exports",
         stdout=stdout,
@@ -4748,6 +4791,7 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
             output_dir=Path("generated"),
             api_key="test-key",
             model="test-model",
+            provider="openai",
             provider_retry_delay_seconds=0,
         ),
         input_func=iter(["Build exports"]).__next__,

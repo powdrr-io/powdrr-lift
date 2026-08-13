@@ -90,6 +90,9 @@ class WorkflowTaskAction:
     parameters: dict[str, Any] = field(default_factory=dict)
     human_input: dict[str, Any] | None = None
     decisions_and_context: str | None = None
+    use_alternate_llm_bindings: bool | None = None
+    clean: bool = False
+    context: tuple[str, ...] = ()
 
 
 def run_workflow_task(
@@ -1009,7 +1012,10 @@ def _task_system_prompt() -> str:
         "the execution agent will persist it as a human workflow task.\n"
         "- edit: choose this for a known line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
-        "workflow in the current worktree.\n"
+        "workflow in the current worktree. It inherits context and bindings by "
+        "default; alternate_llm_bindings selects the alternate binding set, and "
+        "clean=true limits the child to the explicit context list and isolates "
+        "its gathered context.\n"
         "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
         "query is needed "
         "to inspect the worktree or perform work required to determine the "
@@ -1026,7 +1032,9 @@ def _task_system_prompt() -> str:
         '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
         '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
-        '{"kind":"invoke_skill","skill":"bootstrap-code-structure"}\n'
+        '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
+        '"alternate_llm_bindings":true,"clean":true,'
+        '"context":["Review only this explicitly supplied context."]}\n'
         '{"kind":"read_document","file_path":"path","start_line":1,"end_line":20}\n'
         '{"kind":"next_step"}\n'
         '{"kind":"complete","output_state":{},"text":"..."}\n'
@@ -1375,6 +1383,9 @@ def _workflow_task_action_from_skill_action(
         text=action.text,
         parameters=action.parameters,
         decisions_and_context=action.decisions_and_context,
+        use_alternate_llm_bindings=action.use_alternate_llm_bindings,
+        clean=action.clean,
+        context=action.context,
     )
 
 

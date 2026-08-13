@@ -2256,6 +2256,25 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "end_line" in prompt
 
 
+def test_invoke_skill_supports_alternate_bindings_clean_context() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "invoke_skill",
+            "skill": "adversarial-review",
+            "alternate_llm_bindings": True,
+            "clean": True,
+            "context": ["Review only this diff."],
+            "decisions_and_context": "The change is intentionally narrow.",
+        }
+    )
+
+    assert action.skill_name == "adversarial-review"
+    assert action.use_alternate_llm_bindings is True
+    assert action.clean is True
+    assert action.context == ("Review only this diff.",)
+    assert action.decisions_and_context == "The change is intentionally narrow."
+
+
 def test_read_document_action_returns_requested_lines_as_next_context(
     tmp_path: Path,
 ) -> None:

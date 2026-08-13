@@ -5434,6 +5434,7 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
             stdout=stdout,
             stderr=stderr,
             verbose=False,
+            announce=False,
         )
 
     assert run.call_args.args[0] == "rtk git status"

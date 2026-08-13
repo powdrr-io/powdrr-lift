@@ -505,21 +505,32 @@ class _LLMExchangeRecordingClient:
         try:
             response = self._client.complete_json(messages)
         except Exception as exc:
+            serialized_messages = _client_serialized_messages(
+                self._client,
+                messages,
+            )
             self._write_exchange(
                 messages,
                 {
                     "error": str(exc),
                     "error_type": type(exc).__name__,
                 },
+                serialized_messages=serialized_messages,
             )
             raise
-        self._write_exchange(messages, response)
+        self._write_exchange(
+            messages,
+            response,
+            serialized_messages=_client_serialized_messages(self._client, messages),
+        )
         return response
 
     def _write_exchange(
         self,
         messages: list[dict[str, str]],
         output: object,
+        *,
+        serialized_messages: str | None = None,
     ) -> None:
         timestamp = datetime.now(UTC)
         timestamp_text = timestamp.strftime("%Y%m%d-%H%M%S-%f")
@@ -528,9 +539,9 @@ class _LLMExchangeRecordingClient:
         while output_path.exists():
             output_path = self._repo_root / f"llm-{timestamp_text}-{suffix}.json"
             suffix += 1
+        serialized_messages = serialized_messages or _serialize_messages(messages)
         exchange: dict[str, Any] = {
             "timestamp": timestamp.isoformat(),
-            "input": messages,
             "output": output,
         }
         usage = getattr(self._client, "last_usage", None)
@@ -539,14 +550,43 @@ class _LLMExchangeRecordingClient:
             if cache_usage is not None:
                 exchange["usage"] = cache_usage
         output_path.write_text(
-            json.dumps(
+            _serialize_exchange(
                 exchange,
-                indent=2,
-                ensure_ascii=False,
-            )
-            + "\n",
+                serialized_messages=serialized_messages,
+            ),
             encoding="utf-8",
         )
+
+
+def _serialize_exchange(
+    exchange: Mapping[str, Any],
+    *,
+    serialized_messages: str,
+) -> str:
+    """Serialize an exchange without encoding the large input twice."""
+    lines = [
+        "{",
+        f'  "timestamp": {json.dumps(exchange["timestamp"], ensure_ascii=False)},',
+        f'  "input": {serialized_messages},',
+        '  "output": ' + json.dumps(exchange["output"], indent=2, ensure_ascii=False),
+    ]
+    if "usage" in exchange:
+        lines[-1] += ","
+        lines.append(
+            '  "usage": ' + json.dumps(exchange["usage"], indent=2, ensure_ascii=False)
+        )
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def _client_serialized_messages(
+    client: object,
+    messages: list[dict[str, str]],
+) -> str:
+    serialized_messages = getattr(client, "last_serialized_messages", None)
+    if isinstance(serialized_messages, str):
+        return serialized_messages
+    return _serialize_messages(messages)
 
 
 class OpenAIChatClient:
@@ -567,11 +607,15 @@ class OpenAIChatClient:
         self._limits = limits or _DEFAULT_MODEL_LIMITS
         self._progress_stream = progress_stream
         self.last_usage: dict[str, Any] = {}
+        self.last_serialized_messages: str | None = None
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        serialized_messages = _serialize_messages(messages)
+        self.last_serialized_messages = serialized_messages
         max_tokens, estimated_input_tokens = _request_token_budget(
             messages,
             self._limits,
+            serialized_messages=serialized_messages,
         )
         payload = {
             "model": self._model,
@@ -583,7 +627,10 @@ class OpenAIChatClient:
         }
         request = Request(
             f"{self._base_url}/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
+            data=_serialize_openai_payload(
+                payload,
+                serialized_messages=serialized_messages,
+            ).encode("utf-8"),
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
@@ -810,26 +857,29 @@ class AnthropicChatClient:
         self._timeout = timeout
         self._api_version = api_version
         self._limits = limits or _DEFAULT_MODEL_LIMITS
+        self.last_serialized_messages: str | None = None
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        serialized_messages = _serialize_messages(messages)
+        self.last_serialized_messages = serialized_messages
+        system_prompt, conversation_messages = _split_system_message(messages)
+        conversation_messages = [
+            _anthropic_message(message) for message in conversation_messages
+        ]
+        serialized_conversation_messages = _serialize_messages(conversation_messages)
         max_tokens, estimated_input_tokens = _request_token_budget(
             messages,
             self._limits,
+            serialized_messages=serialized_messages,
         )
-        system_prompt, conversation_messages = _split_system_message(messages)
-        payload: dict[str, Any] = {
-            "model": self._model,
-            "max_tokens": max_tokens,
-            "messages": [
-                _anthropic_message(message) for message in conversation_messages
-            ],
-        }
-        if system_prompt is not None:
-            payload["system"] = system_prompt
-
         request = Request(
             f"{self._base_url}/v1/messages",
-            data=json.dumps(payload).encode("utf-8"),
+            data=_serialize_anthropic_payload(
+                model=self._model,
+                max_tokens=max_tokens,
+                serialized_messages=serialized_conversation_messages,
+                system_prompt=system_prompt,
+            ).encode("utf-8"),
             headers={
                 "x-api-key": self._api_key,
                 "anthropic-version": self._api_version,
@@ -909,11 +959,64 @@ def _provider_timeout_message(
     )
 
 
+def _serialize_messages(messages: Sequence[Mapping[str, str]]) -> str:
+    return json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
+
+
+def _serialize_openai_payload(
+    payload: Mapping[str, Any],
+    *,
+    serialized_messages: str,
+) -> str:
+    return (
+        "{"
+        + '"model":'
+        + json.dumps(payload["model"], ensure_ascii=False)
+        + ',"messages":'
+        + serialized_messages
+        + ',"temperature":'
+        + json.dumps(payload["temperature"])
+        + ',"max_tokens":'
+        + json.dumps(payload["max_tokens"])
+        + ',"response_format":'
+        + json.dumps(payload["response_format"], separators=(",", ":"))
+        + ',"stream":'
+        + json.dumps(payload["stream"])
+        + "}"
+    )
+
+
+def _serialize_anthropic_payload(
+    *,
+    model: str,
+    max_tokens: int,
+    serialized_messages: str,
+    system_prompt: str | None,
+) -> str:
+    serialized = (
+        "{"
+        + '"model":'
+        + json.dumps(model, ensure_ascii=False)
+        + ',"max_tokens":'
+        + json.dumps(max_tokens)
+        + ',"messages":'
+        + serialized_messages
+    )
+    if system_prompt is not None:
+        serialized += ',"system":' + json.dumps(system_prompt, ensure_ascii=False)
+    return serialized + "}"
+
+
 def _request_token_budget(
     messages: list[dict[str, str]],
     limits: LLMModelLimits,
+    *,
+    serialized_messages: str | None = None,
 ) -> tuple[int, int]:
-    estimated_input_tokens = _estimate_message_tokens(messages)
+    estimated_input_tokens = _estimate_message_tokens(
+        messages,
+        serialized_messages=serialized_messages,
+    )
     available_output_tokens = (
         limits.context_window - estimated_input_tokens - _CONTEXT_SAFETY_MARGIN_TOKENS
     )
@@ -929,8 +1032,12 @@ def _request_token_budget(
     )
 
 
-def _estimate_message_tokens(messages: list[dict[str, str]]) -> int:
-    serialized = json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
+def _estimate_message_tokens(
+    messages: list[dict[str, str]],
+    *,
+    serialized_messages: str | None = None,
+) -> int:
+    serialized = serialized_messages or _serialize_messages(messages)
     return max(
         1,
         math.ceil(len(serialized) / _TOKEN_ESTIMATE_CHARS_PER_TOKEN),

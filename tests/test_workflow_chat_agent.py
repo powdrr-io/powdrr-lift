@@ -905,6 +905,25 @@ def test_textual_execution_transition_retains_output_history() -> None:
     )
 
 
+def test_textual_status_surfaces_provider_warning() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            writer = Thread(
+                target=app._output_line,
+                args=("stderr", "WARNING: reviews might be limited"),
+            )
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == (
+        "Powdrr Agent v0.0.1\n\nWARNING: reviews might be limited"
+    )
+
+
 def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

@@ -426,6 +426,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     workflow_step_details = skill.steps[3].details
     assert workflow_step_details is not None
     assert "templates/execute-proposed-pr.yaml" in workflow_step_details
+
     assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
     assert skill.steps[0].tool_invocations[0].command == (
         "fuzzy-match",
@@ -523,6 +524,22 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         ("git", "push", "-u", "origin", "HEAD"),
         ("gh", "pr", "create", "--draft", "--fill"),
     ]
+
+
+def test_checked_in_bootstrap_skill_verifies_discovered_tools() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    skill = load_skill(skills_dir / "bootstrap-code-structure.yaml")
+
+    discovery_details = skill.steps[0].details
+    assert discovery_details is not None
+    assert "try its command with the smallest safe invocation" in discovery_details
+    assert "correct the command, and retry it" in discovery_details
+    assert "Do not pass an untested or failing command" in discovery_details
+    populate_details = skill.steps[2].details
+    assert populate_details is not None
+    assert "Verify every tool command against the successful invocation evidence" in (
+        populate_details
+    )
 
 
 def test_checked_in_review_system_skill_definition_matches_review_flow() -> None:

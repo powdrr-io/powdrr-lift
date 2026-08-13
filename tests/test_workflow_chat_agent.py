@@ -728,6 +728,27 @@ def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
     assert scroll_y > 0
 
 
+def test_textual_failure_retains_diagnostics_instead_of_unknown_error() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            app._record_output("stderr", "yaml.parser.ParserError: invalid syntax")
+            app._record_output("stderr", "  line 12, column 7")
+            app._record_output("progress", "Editing project-structure.yaml")
+            app._exit_code = 1
+            app._finish()
+            await pilot.pause()
+            return str(app.query_one("#status", Static).render())
+
+    rendered = asyncio.run(exercise())
+    assert "unknown error" not in rendered
+    assert "workflow exited with status 1" in rendered
+    assert "yaml.parser.ParserError: invalid syntax" in rendered
+    assert "line 12, column 7" in rendered
+    assert "Editing project-structure.yaml" in rendered
+
+
 def test_textual_status_shows_latest_output() -> None:
     async def exercise() -> str:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

@@ -75,6 +75,7 @@ from powdrr_lift.workflow_chat_agent import (
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
     _execute_shell_tool,
+    _execution_events_for_prompt,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
     _LLMExchangeRecordingClient,
@@ -114,6 +115,30 @@ from powdrr_lift.workflow_chat_tui import (
 )
 
 # ruff: noqa: E501
+
+
+def test_execution_events_for_prompt_compacts_results_without_mutating_summary_data() -> (
+    None
+):
+    events = [
+        {
+            "kind": "invoke_tool",
+            "parameters": {"command": "git diff"},
+            "result": {"stdout": "a large result"},
+            "step_index": 2,
+        }
+    ]
+
+    prompt_events = _execution_events_for_prompt(events)
+
+    assert prompt_events == [
+        {
+            "kind": "invoke_tool",
+            "parameters": {"command": "git diff"},
+            "step_index": 2,
+        }
+    ]
+    assert events[0]["result"] == {"stdout": "a large result"}
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(
@@ -2729,12 +2754,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 assert "Show related photos in the UI." in prompt["step_context"][-1]
                 assert prompt["execution_events"][-1]["kind"] == "gather_context"
                 assert prompt["execution_events"][-1]["types"] == ["requirements"]
-                assert (
-                    prompt["execution_events"][-1]["result"]["matches"][0]["item"][
-                        "description"
-                    ]
-                    == "Show related photos in the UI."
-                )
+                assert "result" not in prompt["execution_events"][-1]
             elif self._call_index == 3:
                 assert prompt["current_step"]["description"] == (
                     "Summarize the gathered context."

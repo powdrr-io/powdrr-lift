@@ -61,6 +61,15 @@ _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
+_DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
+ALL_LLM_TYPES = (
+    "high_reasoning",
+    "standard_reasoning",
+    "simple_task",
+    "fast_iteration",
+    "long_context",
+    "vision",
+)
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
 _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
@@ -172,6 +181,99 @@ DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     ),
     "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct", provider="deepinfra"),
 }
+
+DEEPINFRA_CHEAP_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
+    llm_type: LLMModelMapping(_DEEPINFRA_CHEAP_MODEL, provider="deepinfra-cheap")
+    for llm_type in ALL_LLM_TYPES
+}
+
+
+@dataclass(frozen=True, slots=True)
+class LLMProviderDefinition:
+    name: str
+    display_name: str
+    llm_mappings: Mapping[str, LLMModelMapping]
+    model_limits: Mapping[str, LLMModelLimits]
+    api_key_env_names: tuple[str, ...] = ()
+    base_url_env_names: tuple[str, ...] = ()
+    default_base_url: str = "https://api.openai.com/v1"
+    client_kind: str = "openai"
+    forced_model: str | None = None
+
+
+LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
+    "openai": LLMProviderDefinition(
+        name="openai",
+        display_name="OpenAI",
+        llm_mappings={},
+        model_limits={},
+        api_key_env_names=("OPENAI_API_KEY", "CODEX_API_KEY"),
+        base_url_env_names=("OPENAI_BASE_URL", "CODEX_BASE_URL"),
+    ),
+    "anthropic": LLMProviderDefinition(
+        name="anthropic",
+        display_name="Anthropic",
+        llm_mappings={},
+        model_limits={},
+        api_key_env_names=("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"),
+        base_url_env_names=("ANTHROPIC_BASE_URL",),
+        default_base_url="https://api.anthropic.com",
+        client_kind="anthropic",
+    ),
+    "zai": LLMProviderDefinition(
+        name="zai",
+        display_name="z.ai",
+        llm_mappings=ZAI_LLM_MAPPINGS,
+        model_limits=ZAI_MODEL_LIMITS,
+        api_key_env_names=("ZAI_API_KEY", "GLM_API_KEY"),
+        base_url_env_names=("ZAI_BASE_URL",),
+        default_base_url="https://api.z.ai/api/paas/v4/",
+    ),
+    "deepinfra": LLMProviderDefinition(
+        name="deepinfra",
+        display_name="DeepInfra",
+        llm_mappings=DEEPINFRA_LLM_MAPPINGS,
+        model_limits=DEEPINFRA_MODEL_LIMITS,
+        api_key_env_names=("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"),
+        base_url_env_names=("DEEPINFRA_BASE_URL",),
+        default_base_url="https://api.deepinfra.com/v1/openai",
+    ),
+    "deepinfra-cheap": LLMProviderDefinition(
+        name="deepinfra-cheap",
+        display_name="DeepInfra",
+        llm_mappings=DEEPINFRA_CHEAP_LLM_MAPPINGS,
+        model_limits=DEEPINFRA_MODEL_LIMITS,
+        api_key_env_names=("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"),
+        base_url_env_names=("DEEPINFRA_BASE_URL",),
+        default_base_url="https://api.deepinfra.com/v1/openai",
+        forced_model=_DEEPINFRA_CHEAP_MODEL,
+    ),
+    "local": LLMProviderDefinition(
+        name="local",
+        display_name="local",
+        llm_mappings=ZAI_LLM_MAPPINGS,
+        model_limits={},
+        default_base_url="local",
+        client_kind="local",
+    ),
+}
+ALL_PROVIDERS = tuple(LLM_PROVIDERS)
+
+
+def _provider_definition(provider: str) -> LLMProviderDefinition:
+    try:
+        return LLM_PROVIDERS[provider]
+    except KeyError as exc:
+        raise RuntimeError(f"Unsupported LLM provider {provider!r}.") from exc
+
+
+def _default_llm_mappings(provider: str) -> Mapping[str, LLMModelMapping]:
+    return _provider_definition(provider).llm_mappings
+
+
+def _provider_supports_llm_mappings(provider: str) -> bool:
+    return bool(_provider_definition(provider).llm_mappings)
+
 
 WorkflowActionParser = Callable[
     [dict[str, Any], str | None, str | None], "SkillChatAction"
@@ -880,6 +982,7 @@ def run_workflow_chat(
 
     current_model = config.model
     provider = _resolve_provider(config.provider, current_model)
+    current_model = _provider_definition(provider).forced_model or current_model
     credentials = _resolve_credentials(provider, config.api_key, config.base_url)
     clients: dict[tuple[str, str], WorkflowChatClient] = {}
 
@@ -950,7 +1053,7 @@ def run_workflow_chat(
             stdout=stdout,
             stderr=stderr,
             provider=provider,
-            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            model_mappings=tuple(_default_llm_mappings(provider).items())
             + tuple((key, value) for key, value in config.llm_mappings),
         )
         if selection is None:
@@ -971,7 +1074,7 @@ def run_workflow_chat(
                 mappings=config.llm_mappings,
                 provider=provider,
             )
-            if provider in {"zai", "deepinfra", "local"}
+            if _provider_supports_llm_mappings(provider)
             else None
         )
         if selection_mapping is not None:
@@ -1060,11 +1163,11 @@ def run_workflow_chat(
                 mappings=config.llm_mappings,
                 provider=provider,
             )
-            if provider in {"zai", "deepinfra", "local"}
+            if _provider_supports_llm_mappings(provider)
             else None
         )
         if step_mapping is None:
-            if provider in {"zai", "deepinfra", "local"} and (
+            if _provider_supports_llm_mappings(provider) and (
                 current_step.llm_type is not None or selection.llm_type is not None
             ):
                 raise RuntimeError(
@@ -1122,7 +1225,7 @@ def run_workflow_chat(
             stdout=stdout,
             stderr=stderr,
             provider=provider,
-            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            model_mappings=tuple(_default_llm_mappings(provider).items())
             + tuple((key, value) for key, value in config.llm_mappings),
             empty_response_fallback_payload={"kind": "next_step"},
         )
@@ -1135,7 +1238,7 @@ def run_workflow_chat(
                     mappings=config.llm_mappings,
                     provider=provider,
                 )
-                if provider in {"zai", "deepinfra", "local"}
+                if _provider_supports_llm_mappings(provider)
                 else None
             )
             assert action_mapping is not None
@@ -3208,7 +3311,7 @@ def _resolve_llm_model(
     mappings: Sequence[tuple[str, LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
-    if llm_type is None or provider not in {"zai", "deepinfra", "local"}:
+    if llm_type is None or not _provider_supports_llm_mappings(provider):
         return fallback_model
     resolved_mapping = _resolve_llm_mapping(
         llm_type,
@@ -3226,12 +3329,10 @@ def _resolve_llm_mapping(
 ) -> LLMModelMapping | None:
     if llm_type is None:
         return None
-    if provider not in {"zai", "deepinfra", "local"}:
+    if not _provider_supports_llm_mappings(provider):
         raise RuntimeError(f"LLM mappings are not supported for provider {provider!r}.")
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
-    mapping = dict(
-        ZAI_LLM_MAPPINGS if provider in {"zai", "local"} else DEEPINFRA_LLM_MAPPINGS
-    )
+    mapping = dict(_default_llm_mappings(provider))
     mapping.update(
         {key.strip().lower().replace("-", "_"): value for key, value in mappings}
     )
@@ -4296,22 +4397,16 @@ def _build_chat_client(
     model_cache_dir: Path,
     progress_stream: TextIO | None = None,
 ) -> WorkflowChatClient:
-    if credentials.provider == "local":
+    provider = _provider_definition(credentials.provider)
+    if provider.client_kind == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
         return LocalLlamaChatClient(
             model_path=resolved_model_path,
             n_ctx=_resolve_local_model_context(),
         )
     limits = _model_limits_for(credentials.provider, model)
-    if credentials.provider == "anthropic":
+    if provider.client_kind == "anthropic":
         return AnthropicChatClient(
-            model=model,
-            api_key=credentials.api_key,
-            base_url=credentials.base_url,
-            limits=limits,
-        )
-    if credentials.provider == "zai":
-        return OpenAIChatClient(
             model=model,
             api_key=credentials.api_key,
             base_url=credentials.base_url,
@@ -4327,18 +4422,13 @@ def _build_chat_client(
 
 
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
-    if provider == "local":
+    definition = _provider_definition(provider)
+    if definition.client_kind == "local":
         return LLMModelLimits(
             context_window=_resolve_local_model_context(),
             max_output_tokens=_MAX_COMPLETION_TOKENS,
         )
-    if provider == "zai":
-        limits = ZAI_MODEL_LIMITS
-    elif provider == "deepinfra":
-        limits = DEEPINFRA_MODEL_LIMITS
-    else:
-        return _DEFAULT_MODEL_LIMITS
-    return limits.get(model.casefold(), _DEFAULT_MODEL_LIMITS)
+    return definition.model_limits.get(model.casefold(), _DEFAULT_MODEL_LIMITS)
 
 
 def _resolve_credentials(
@@ -4364,23 +4454,25 @@ def _resolve_provider(
     mapping: LLMModelMapping | None = None,
 ) -> str:
     if mapping is not None:
+        _provider_definition(mapping.provider)
         return mapping.provider
-    if provider_override == "local":
-        provider_override = "auto"
     if provider_override != "auto":
+        _provider_definition(provider_override)
         return provider_override
     if model.startswith("claude-"):
         return "anthropic"
+    if _provider_has_credentials("deepinfra-cheap"):
+        return "deepinfra-cheap"
     if model.startswith("glm-"):
         return "zai"
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY"):
+    if _provider_has_credentials("anthropic"):
         if not (
             os.environ.get("OPENAI_API_KEY")
             or os.environ.get("CODEX_API_KEY")
             or _resolve_codex_access_token() is not None
         ):
             return "anthropic"
-    if os.environ.get("ZAI_API_KEY") or os.environ.get("ZAI_BASE_URL"):
+    if _provider_has_credentials("zai"):
         if not (
             os.environ.get("OPENAI_API_KEY")
             or os.environ.get("CODEX_API_KEY")
@@ -4389,66 +4481,40 @@ def _resolve_provider(
             or _resolve_codex_access_token() is not None
         ):
             return "zai"
-    if (
-        os.environ.get("DEEPINFRA_API_TOKEN")
-        or os.environ.get("DEEPINFRA_API_KEY")
-        or os.environ.get("DEEPINFRA_BASE_URL")
-    ):
-        if not (
-            os.environ.get("OPENAI_API_KEY")
-            or os.environ.get("CODEX_API_KEY")
-            or os.environ.get("ANTHROPIC_API_KEY")
-            or os.environ.get("CLAUDE_API_KEY")
-            or os.environ.get("ZAI_API_KEY")
-            or os.environ.get("ZAI_BASE_URL")
-            or _resolve_codex_access_token() is not None
-        ):
-            return "deepinfra"
     return "openai"
+
+
+def _provider_has_credentials(provider: str) -> bool:
+    definition = _provider_definition(provider)
+    return any(
+        os.environ.get(env_name)
+        for env_name in definition.api_key_env_names + definition.base_url_env_names
+    )
 
 
 def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--api-key"
-    if provider == "local":
+    definition = _provider_definition(provider)
+    if definition.client_kind == "local":
         return "local", "local"
-    if provider == "anthropic":
-        for env_name in ("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"):
-            value = os.environ.get(env_name)
-            if value:
-                return value, env_name
-        raise RuntimeError(
-            "No Anthropic credentials found. Set ANTHROPIC_API_KEY or "
-            "CLAUDE_API_KEY, or pass --api-key."
-        )
-    if provider == "zai":
-        for env_name in ("ZAI_API_KEY", "GLM_API_KEY"):
-            value = os.environ.get(env_name)
-            if value:
-                return value, env_name
-        raise RuntimeError(
-            "No z.ai credentials found. Set ZAI_API_KEY or GLM_API_KEY, or "
-            "pass --api-key."
-        )
-    if provider == "deepinfra":
-        for env_name in ("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"):
-            value = os.environ.get(env_name)
-            if value:
-                return value, env_name
-        raise RuntimeError(
-            "No DeepInfra credentials found. Set DEEPINFRA_API_TOKEN or "
-            "DEEPINFRA_API_KEY, or pass --api-key."
-        )
-    for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
+    for env_name in definition.api_key_env_names:
         value = os.environ.get(env_name)
         if value:
             return value, env_name
-    codex_token = _resolve_codex_access_token()
-    if codex_token is not None:
-        return codex_token, _codex_auth_path_description()
+    if provider == "openai":
+        codex_token = _resolve_codex_access_token()
+        if codex_token is not None:
+            return codex_token, _codex_auth_path_description()
+    if provider == "openai":
+        raise RuntimeError(
+            "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
+            "sign in with Codex so ~/.codex/auth.json is available."
+        )
+    credential_names = " or ".join(definition.api_key_env_names)
     raise RuntimeError(
-        "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
-        "sign in with Codex so ~/.codex/auth.json is available."
+        f"No {definition.display_name} credentials found. Set {credential_names}, "
+        "or pass --api-key."
     )
 
 
@@ -4527,30 +4593,14 @@ def _resolve_local_model_context() -> int:
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--base-url"
-    if provider == "local":
+    definition = _provider_definition(provider)
+    if definition.client_kind == "local":
         return "local", "local"
-    if provider == "anthropic":
-        for env_name in ("ANTHROPIC_BASE_URL",):
-            value = os.environ.get(env_name)
-            if value:
-                return value, env_name
-        return "https://api.anthropic.com", "default"
-    if provider == "zai":
-        for env_name in ("ZAI_BASE_URL",):
-            value = os.environ.get(env_name)
-            if value:
-                return value, env_name
-        return "https://api.z.ai/api/paas/v4/", "default"
-    if provider == "deepinfra":
-        value = os.environ.get("DEEPINFRA_BASE_URL")
-        if value:
-            return value, "DEEPINFRA_BASE_URL"
-        return "https://api.deepinfra.com/v1/openai", "default"
-    for env_name in ("OPENAI_BASE_URL", "CODEX_BASE_URL"):
+    for env_name in definition.base_url_env_names:
         value = os.environ.get(env_name)
         if value:
             return value, env_name
-    return "https://api.openai.com/v1", "default"
+    return definition.default_base_url, "default"
 
 
 def _resolve_codex_access_token() -> str | None:

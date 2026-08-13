@@ -1344,15 +1344,17 @@ def run_workflow_chat(
             execution_state.selected_skill = selected_skill
             execution_state.step_index = frame.resume_step_index
             continue
-        progress.update(
-            selected_skill,
-            current_step_index=execution_state.step_index,
-            status="performing local action...",
-            parent_skill=skill_stack[-1].parent_skill if skill_stack else None,
-            parent_step_index=skill_stack[-1].parent_step_index
-            if skill_stack
-            else None,
-        )
+        action_status = _workflow_action_progress_status(action)
+        if action_status is not None:
+            progress.update(
+                selected_skill,
+                current_step_index=execution_state.step_index,
+                status=action_status,
+                parent_skill=skill_stack[-1].parent_skill if skill_stack else None,
+                parent_step_index=skill_stack[-1].parent_step_index
+                if skill_stack
+                else None,
+            )
 
         handler = action_handlers.get(action.kind)
         if handler is None:
@@ -2269,7 +2271,7 @@ def _action_system_prompt() -> str:
         "only for an additional listed skill that the current step discovers it "
         "needs.\n"
         "Choose exactly one outcome and use it for the following reason:\n"
-        "- gather-context: choose this when checked-in specifications or other "
+        "- gather_context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
         "- prompt_user: choose this only when a specific human decision or fact "
         "is genuinely required to continue; ask exactly one clear question.\n"
@@ -2290,7 +2292,7 @@ def _action_system_prompt() -> str:
         "outcome shapes. Include decisions_and_context when there is information "
         "a later step needs. Include llm_type only when the next roundtrip needs "
         "a different capability; otherwise use null or omit it.\n"
-        "Response field requirements by outcome: gather-context requires a non-"
+        "Response field requirements by outcome: gather_context requires a non-"
         "empty types array and may include keywords and filters mappings; "
         "prompt_user requires "
         "text containing exactly one clear English question ending in '?'; edit "
@@ -2305,7 +2307,7 @@ def _action_system_prompt() -> str:
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
-        '{"kind":"gather-context","types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
+        '{"kind":"gather_context","types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
@@ -2326,9 +2328,9 @@ def _action_system_prompt() -> str:
         '"llm_type":"standard_reasoning"}\n'
         '{"kind":"complete","text":"...","decisions_and_context":"...",'
         '"llm_type":"high_reasoning"}\n'
-        "Use gather-context when you need to discover information already "
+        "Use gather_context when you need to discover information already "
         "specified in checked-in specs before deciding the next action.\n"
-        "Use gather-context to discover what requirements are already "
+        "Use gather_context to discover what requirements are already "
         "specified, find related entities, inspect approach notes, or gather "
         "current features, decisions, risks, or proposed PRs.\n"
         "The supported context types are:\n"
@@ -2448,7 +2450,7 @@ def _workflow_action_handlers() -> dict[
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
-        "gather-context": _handle_workflow_action_gather_context,
+        "gather_context": _handle_workflow_action_gather_context,
     }
 
 
@@ -2486,6 +2488,27 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
         sort_keys=True,
         ensure_ascii=False,
     )
+
+
+def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
+    if action.kind == "edit":
+        return "Edited file"
+    if action.kind == "read_document":
+        return "Reading file"
+    if action.kind == "gather_context":
+        return "Gathering structured context"
+    if action.kind == "invoke_tool":
+        command = action.parameters.get("command")
+        if isinstance(command, str):
+            command_line = command
+        elif isinstance(command, Sequence) and not isinstance(
+            command, (str, bytes, bytearray)
+        ):
+            command_line = shlex.join(str(item) for item in command)
+        else:
+            command_line = action.tool or "tool"
+        return f"Invoking {command_line}"
+    return None
 
 
 def _workflow_action_made_progress(
@@ -3014,7 +3037,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
     return {
         "complete": _parse_workflow_action_complete,
         "edit": _parse_workflow_action_edit,
-        "gather-context": _parse_workflow_action_gather_context,
+        "gather_context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
         "read_document": _parse_workflow_action_read_document,
@@ -3100,7 +3123,7 @@ def _parse_workflow_action_gather_context(
         normalize_context_type(context_type) for context_type in types
     )
     return SkillChatAction(
-        kind="gather-context",
+        kind="gather_context",
         types=normalized_types,
         keywords=keywords,
         filters=filters,
@@ -3370,7 +3393,7 @@ def _shell_command_starts_with_rtk(command: str) -> bool:
 def _required_action_string_item(value: object, *, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise RuntimeError(
-            "Workflow gather-context action "
+            "Workflow gather_context action "
             f"{field_name} must contain non-empty strings."
         )
     return value.strip()
@@ -3386,7 +3409,7 @@ def _required_action_string_sequence(
         (str, bytes, bytearray),
     ):
         raise RuntimeError(
-            f"Workflow gather-context action {field_name} must be an array."
+            f"Workflow gather_context action {field_name} must be an array."
         )
 
     normalized_values = tuple(
@@ -3394,7 +3417,7 @@ def _required_action_string_sequence(
     )
     if not normalized_values:
         raise RuntimeError(
-            f"Workflow gather-context action {field_name} must not be empty."
+            f"Workflow gather_context action {field_name} must not be empty."
         )
     return normalized_values
 
@@ -3411,7 +3434,7 @@ def _optional_action_string_sequence(
         (str, bytes, bytearray),
     ):
         raise RuntimeError(
-            f"Workflow gather-context action {field_name} must be an array."
+            f"Workflow gather_context action {field_name} must be an array."
         )
     return tuple(
         _required_action_string_item(item, field_name=field_name) for item in value
@@ -3422,7 +3445,7 @@ def _optional_action_filters(value: object) -> dict[str, object]:
     if value is None:
         return {}
     if not isinstance(value, dict):
-        raise RuntimeError("Workflow gather-context action filters must be an object.")
+        raise RuntimeError("Workflow gather_context action filters must be an object.")
     filters: dict[str, object] = {}
     for raw_field, raw_values in value.items():
         field = _required_action_string_item(raw_field, field_name="filters")
@@ -3435,11 +3458,11 @@ def _optional_action_filters(value: object) -> dict[str, object]:
             )
         else:
             raise RuntimeError(
-                f"Workflow gather-context action filters.{field} must be an array."
+                f"Workflow gather_context action filters.{field} must be an array."
             )
         if not values:
             raise RuntimeError(
-                f"Workflow gather-context action filters.{field} must not be empty."
+                f"Workflow gather_context action filters.{field} must not be empty."
             )
         filters[field] = values
     return filters
@@ -4523,7 +4546,7 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
 def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
     return (
         "Generate a JSON document selecting the best action based on this "
-        "context. The available actions are: gather-context to discover "
+        "context. The available actions are: gather_context to discover "
         "repository specifications before deciding; prompt_user to ask one "
         "necessary human question; edit to make a known line-based file change; "
         "invoke_skill to run a listed nested skill; invoke_tool to run a shell, "
@@ -4538,7 +4561,7 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "that action. Use file_path and edits or file_edits for edit, tool and "
         "parameters.command for invoke_tool, skill for invoke_skill, file_path "
         "with positive start_line "
-        "and end_line for read_document, non-empty types for gather-context, "
+        "and end_line for read_document, non-empty types for gather_context, "
         "and a clear English question ending in '?' for prompt_user. Do not "
         "combine actions or output markdown."
     )

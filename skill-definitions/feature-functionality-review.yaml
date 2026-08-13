@@ -49,7 +49,7 @@ steps:
     specification, every related closed or merged PR, and the current proposed
     PR as the review scope. After identifying the feature id, invoke the
     gather_context workflow action with the proposed-PR entity type filtered by
-    that feature id: {"kind":"gather-context","types":["proposed_prs"],"keywords":["<feature-id>"]}.
+    that feature id: {"kind":"gather_context","types":["proposed_prs"],"keywords":["<feature-id>"]}.
     Use the returned records to determine the ordered proposed-PR set and
     status rather than relying only on PR prose.
 - description: Review the current PR against the selected functionality scope.

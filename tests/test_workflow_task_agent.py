@@ -535,7 +535,7 @@ def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) ->
     client = _FakeClient(
         [
             {
-                "kind": "gather-context",
+                "kind": "gather_context",
                 "types": ["proposed_prs"],
                 "keywords": ["example-pr"],
             },
@@ -555,7 +555,7 @@ def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) ->
 
     assert exit_code == 0
     assert "example-pr" in client.messages[1][1]["content"]
-    assert "gather-context" in client.messages[0][0]["content"]
+    assert "gather_context" in client.messages[0][0]["content"]
 
 
 def test_process_workflow_task_repairs_read_document_range_error(

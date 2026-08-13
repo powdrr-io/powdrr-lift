@@ -11,7 +11,7 @@ steps:
   details: >-
     Inspect the staged and unstaged diff before final validation. Confirm that
     the intended pull-request files are staged and remove unrelated files from
-    the staged set. Use the gather-context action with type `tools` and filters
+    the staged set. Use the gather_context action with type `tools` and filters
     for label `pr-prep` and for every programming-language label represented by
     the changed code. Discover those language labels from the staged files and
     repository context; do not hard-code a language. Use the returned tool

@@ -426,12 +426,16 @@ class WorkflowChatApp(App[None]):
         skill: SkillCatalogEntry,
         current_step_index: int,
         status: str,
+        parent_skill: SkillCatalogEntry | None,
+        parent_step_index: int | None,
     ) -> None:
         self.call_from_thread(
             self._apply_progress,
             skill,
             current_step_index,
             status,
+            parent_skill,
+            parent_step_index,
         )
 
     def _apply_progress(
@@ -439,6 +443,8 @@ class WorkflowChatApp(App[None]):
         skill: SkillCatalogEntry,
         current_step_index: int,
         status: str,
+        parent_skill: SkillCatalogEntry | None = None,
+        parent_step_index: int | None = None,
     ) -> None:
         steps = self.query_one("#steps", ListView)
         if current_step_index >= len(skill.skill.steps):
@@ -449,14 +455,34 @@ class WorkflowChatApp(App[None]):
                 self._response.disabled = False
                 self._response.focus()
             return
+        nested_parent_skill = parent_skill
+        nested_parent_step_index = parent_step_index
+        nested = (
+            nested_parent_skill is not None and nested_parent_step_index is not None
+        )
+        expected_item_count = len(skill.skill.steps) + (2 if nested else 0)
         items = list(steps.query(ListItem))
-        if len(steps.children) != len(skill.skill.steps):
+        if len(steps.children) != expected_item_count:
             steps.clear()
+            if nested:
+                assert nested_parent_skill is not None
+                assert nested_parent_step_index is not None
+                parent_step = nested_parent_skill.skill.steps[nested_parent_step_index]
+                steps.mount(
+                    ListItem(
+                        Label(
+                            f"{nested_parent_step_index + 1}. {parent_step.description}"
+                        )
+                    ),
+                    ListItem(Label("-------")),
+                )
             items = [
                 ListItem(Label(f"{step_index + 1}. {step.description}"))
                 for step_index, step in enumerate(skill.skill.steps)
             ]
             steps.mount(*items)
+        if nested:
+            items = list(steps.query(ListItem))[2:]
         steps.set_class(bool(items), "has-content")
         for step_index, item in enumerate(items):
             item.remove_class("completed", "current")

@@ -21,7 +21,7 @@ import pytest
 import yaml
 from textual.containers import ScrollableContainer
 from textual.events import Key
-from textual.widgets import ListView, Static, TextArea
+from textual.widgets import Label, ListView, Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -656,6 +656,40 @@ def test_textual_completed_skill_removes_orange_step_list() -> None:
     assert child_count == 0
     assert height == 0
     assert status.endswith("skill complete")
+
+
+def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> None:
+    async def exercise() -> list[str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            parent_skill = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
+            nested_skill = SkillCatalogEntry(
+                Path("nested.yaml"),
+                Skill(
+                    name="nested",
+                    when_to_use=("Run nested work.",),
+                    steps=(SkillStep(description="Nested step."),),
+                ),
+            )
+            app._apply_progress(
+                nested_skill,
+                current_step_index=0,
+                status="running nested skill",
+                parent_skill=parent_skill,
+                parent_step_index=0,
+            )
+            await pilot.pause()
+            return [
+                str(label.render())
+                for label in app.query_one("#steps", ListView).query(Label)
+            ]
+
+    assert asyncio.run(exercise()) == [
+        "1. Capture the feature goal.",
+        "-------",
+        "1. Nested step.",
+    ]
 
 
 def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:

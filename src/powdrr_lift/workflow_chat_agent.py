@@ -388,6 +388,7 @@ class _WorkflowExecutionState:
 @dataclass(frozen=True, slots=True)
 class _SkillExecutionFrame:
     parent_skill: SkillCatalogEntry
+    parent_step_index: int
     resume_step_index: int
     dependency_key: tuple[str, int, str] | None = None
 
@@ -906,7 +907,10 @@ class _WorkflowProgressDisplay:
     def __init__(
         self,
         stream: TextIO,
-        on_update: Callable[[SkillCatalogEntry, int, str], None] | None = None,
+        on_update: Callable[
+            [SkillCatalogEntry, int, str, SkillCatalogEntry | None, int | None], None
+        ]
+        | None = None,
     ) -> None:
         self._stream = stream
         self._on_update = on_update
@@ -920,9 +924,17 @@ class _WorkflowProgressDisplay:
         *,
         current_step_index: int,
         status: str,
+        parent_skill: SkillCatalogEntry | None = None,
+        parent_step_index: int | None = None,
     ) -> None:
         if self._on_update is not None:
-            self._on_update(skill, current_step_index, status)
+            self._on_update(
+                skill,
+                current_step_index,
+                status,
+                parent_skill,
+                parent_step_index,
+            )
             self._last_step_index = current_step_index
             return
         if not self._dynamic and self._last_step_index == current_step_index:
@@ -930,6 +942,12 @@ class _WorkflowProgressDisplay:
             return
 
         lines = ["Workflow progress:"]
+        if parent_skill is not None and parent_step_index is not None:
+            lines.append(
+                f"  ▶ {parent_step_index + 1}. "
+                f"{parent_skill.skill.steps[parent_step_index].description}"
+            )
+            lines.append("  -------")
         for step_index, step in enumerate(skill.skill.steps):
             if step_index < current_step_index:
                 marker = "✓"
@@ -958,7 +976,10 @@ def run_workflow_chat(
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
-    progress_callback: Callable[[SkillCatalogEntry, int, str], None] | None = None,
+    progress_callback: Callable[
+        [SkillCatalogEntry, int, str, SkillCatalogEntry | None, int | None], None
+    ]
+    | None = None,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
     worktree_root = _resolve_worktree_context(
@@ -1146,6 +1167,7 @@ def run_workflow_chat(
                 skill_stack,
                 current_skill=selected_skill,
                 nested_skill=nested_skill,
+                parent_step_index=current_step_index,
                 resume_step_index=current_step_index,
                 dependency_key=(
                     str(selected_skill.path),
@@ -1199,6 +1221,10 @@ def run_workflow_chat(
             selected_skill,
             current_step_index=execution_state.step_index,
             status=f"waiting for {current_model} LLM response...",
+            parent_skill=skill_stack[-1].parent_skill if skill_stack else None,
+            parent_step_index=skill_stack[-1].parent_step_index
+            if skill_stack
+            else None,
         )
         action, current_model, provider = _complete_json_with_model_fallback(
             client_for=client_for_model,
@@ -1259,6 +1285,7 @@ def run_workflow_chat(
                 skill_stack,
                 current_skill=selected_skill,
                 nested_skill=nested_skill,
+                parent_step_index=current_step_index,
                 resume_step_index=current_step_index + 1,
             )
             execution_state.execution_events.append(
@@ -1285,6 +1312,10 @@ def run_workflow_chat(
             selected_skill,
             current_step_index=execution_state.step_index,
             status="performing local action...",
+            parent_skill=skill_stack[-1].parent_skill if skill_stack else None,
+            parent_step_index=skill_stack[-1].parent_step_index
+            if skill_stack
+            else None,
         )
 
         handler = action_handlers.get(action.kind)
@@ -1825,6 +1856,7 @@ def _push_nested_skill(
     *,
     current_skill: SkillCatalogEntry,
     nested_skill: SkillCatalogEntry,
+    parent_step_index: int,
     resume_step_index: int,
     dependency_key: tuple[str, int, str] | None = None,
 ) -> None:
@@ -1837,6 +1869,7 @@ def _push_nested_skill(
     stack.append(
         _SkillExecutionFrame(
             parent_skill=current_skill,
+            parent_step_index=parent_step_index,
             resume_step_index=resume_step_index,
             dependency_key=dependency_key,
         )

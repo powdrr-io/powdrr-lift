@@ -692,7 +692,6 @@ def _collect_current_specification_modules(
                 continue
             modules_by_id[item_id] = {
                 "id": item_id,
-                "parent_module": _normalize_text(item.get("parent_module")),
                 "relative_location": _normalize_text(item.get("relative_location")),
                 "related_modules": _normalize_text_sequence(
                     item.get("related_modules")
@@ -725,12 +724,10 @@ def _collect_current_specification_tools(
             if action == "removed":
                 tools_by_id.pop(item_id, None)
                 continue
-            related_module = _normalize_text(item.get("related_module"))
             related_modules = _normalize_text_sequence(item.get("related_modules"))
             labels = _normalize_text_sequence(item.get("labels"))
             tool_data: dict[str, Any] = {
                 "id": item_id,
-                "related_module": related_module,
                 "when_to_use": _normalize_text(item.get("when_to_use")),
                 "template": _normalize_text(item.get("template")),
                 "how_to_use": _normalize_text(item.get("how_to_use")),

@@ -156,18 +156,15 @@ def test_validate_architecture_specification_accepts_modules_and_tools(
       - id: core
         action: added
         relative_location: src/core
-        related_modules: []
         purpose: Shared core behavior.
       - id: cli
         action: changed
-        parent_module: core
         related_modules:
           - core
         purpose: Command line surface.
     tools:
       - id: formatter
         action: added
-        related_module: core
         related_modules:
           - cli
         labels:
@@ -204,13 +201,11 @@ def test_validate_architecture_specification_rejects_unknown_module_references(
     modules:
       - id: core
         action: added
-        parent_module: missing
         related_modules:
           - also-missing
     tools:
       - id: formatter
         action: added
-        related_module: missing
         related_modules:
           - also-missing
     entity_relationships: []
@@ -227,8 +222,6 @@ def test_validate_architecture_specification_rejects_unknown_module_references(
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == [
-        "unknown_module_reference",
-        "unknown_module_reference",
         "unknown_module_reference",
         "unknown_module_reference",
     ]

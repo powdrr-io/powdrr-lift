@@ -11,7 +11,6 @@ from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 _MODULE_FIELDS = {
     "id",
     "action",
-    "parent_module",
     "relative_location",
     "related_modules",
     "purpose",
@@ -19,7 +18,6 @@ _MODULE_FIELDS = {
 _TOOL_FIELDS = {
     "id",
     "action",
-    "related_module",
     "related_modules",
     "labels",
     "when_to_use",
@@ -65,6 +63,7 @@ def validate_module_tool_sections(
             )
             continue
         _check_unknown_fields(raw_module, _MODULE_FIELDS, f"modules[{index}]", issues)
+        issues.extend(validate_no_explicit_empty_values(raw_module, path=path))
         module_id = _required_string(
             raw_module.get("id"),
             f"{path}.id",
@@ -88,12 +87,6 @@ def validate_module_tool_sections(
         module_items.append((index, raw_module, module_id))
 
     for index, module, _ in module_items:
-        _validate_optional_reference(
-            module.get("parent_module"),
-            discovered_module_ids,
-            f"modules[{index}].parent_module",
-            issues,
-        )
         _validate_reference_list(
             module.get("related_modules"),
             discovered_module_ids,
@@ -111,6 +104,7 @@ def validate_module_tool_sections(
             )
             continue
         _check_unknown_fields(raw_tool, _TOOL_FIELDS, f"tools[{index}]", issues)
+        issues.extend(validate_no_explicit_empty_values(raw_tool, path=path))
         tool_id = _required_string(
             raw_tool.get("id"),
             f"{path}.id",
@@ -132,12 +126,6 @@ def validate_module_tool_sections(
             )
             continue
         discovered_tool_ids.add(tool_id)
-        _validate_optional_reference(
-            raw_tool.get("related_module"),
-            discovered_module_ids,
-            f"{path}.related_module",
-            issues,
-        )
         _validate_reference_list(
             raw_tool.get("related_modules"),
             discovered_module_ids,
@@ -159,12 +147,6 @@ def validate_module_tool_references(
     """Validate module/tool references against the canonical module id set."""
     issues: list[SpecificationV1Issue] = []
     for index, module in enumerate(raw_modules):
-        _validate_optional_reference(
-            module.get("parent_module"),
-            module_ids,
-            f"modules[{index}].parent_module",
-            issues,
-        )
         _validate_reference_list(
             module.get("related_modules"),
             module_ids,
@@ -172,12 +154,6 @@ def validate_module_tool_references(
             issues,
         )
     for index, tool in enumerate(raw_tools):
-        _validate_optional_reference(
-            tool.get("related_module"),
-            module_ids,
-            f"tools[{index}].related_module",
-            issues,
-        )
         _validate_reference_list(
             tool.get("related_modules"),
             module_ids,
@@ -296,3 +272,43 @@ def _validate_reference_list(
         return
     for index, reference in enumerate(value):
         _validate_optional_reference(reference, module_ids, f"{path}[{index}]", issues)
+
+
+def validate_no_explicit_empty_values(
+    value: object,
+    *,
+    path: str = "",
+) -> list[SpecificationV1Issue]:
+    """Reject explicit nulls and empty lists; omission represents defaults."""
+    issues: list[SpecificationV1Issue] = []
+
+    def visit(current: object, current_path: str) -> None:
+        if current is None:
+            issues.append(
+                SpecificationV1Issue(
+                    "explicit_empty_value",
+                    "Remove this null value; omit the field when it is not needed.",
+                    current_path,
+                )
+            )
+            return
+        if isinstance(current, Mapping):
+            for key, child in current.items():
+                child_path = f"{current_path}.{key}" if current_path else str(key)
+                visit(child, child_path)
+            return
+        if isinstance(current, Sequence) and not isinstance(current, (str, bytes)):
+            if not current:
+                issues.append(
+                    SpecificationV1Issue(
+                        "explicit_empty_value",
+                        "Remove this empty list; omit the field when it is not needed.",
+                        current_path,
+                    )
+                )
+                return
+            for index, child in enumerate(current):
+                visit(child, f"{current_path}[{index}]")
+
+    visit(value, path)
+    return issues

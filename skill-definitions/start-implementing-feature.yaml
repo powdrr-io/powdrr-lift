@@ -84,6 +84,9 @@ steps:
     specification separate and give each one a stable proposed-PR name. Pass
     the complete set of proposed PRs and every created or reused
     implementation-specification file as context to the next step.
+    Use the always-available read_document action to inspect
+    templates/execute-proposed-pr.yaml; do not invoke sed or another shell
+    command to read the file.
   tool_invocations:
   - tool: shell
     command:
@@ -121,6 +124,16 @@ steps:
     - <feature-name>
     - --workflow-instance-name
     - <proposed-pr-name>
+    - --template-value
+    - proposed-pr-id=<proposed-pr-name>
+    - --template
+    - templates/execute-proposed-pr.yaml
+  - tool: shell
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - <feature-name>
     - --template-value
     - proposed-pr-id=<proposed-pr-name>
     - --template

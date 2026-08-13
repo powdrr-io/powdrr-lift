@@ -91,6 +91,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_skill_path,
     _resolve_worktree_context,
     _validate_user_question,
+    _validate_workflow_action_for_step,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     download_local_qwen_model,
@@ -113,10 +114,84 @@ def test_local_llama_client_errors_without_gpu_offload_support(
         Llama=lambda **_: pytest.fail("Llama must not load without GPU support"),
         llama_supports_gpu_offload=lambda: False,
     )
+
     monkeypatch.setitem(sys.modules, "llama_cpp", llama_module)
 
     with pytest.raises(RuntimeError, match="requires GPU offload support"):
         LocalLlamaChatClient(model_path=model_path)
+
+
+def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
+    step = SkillStep(
+        description="Inspect the repository.",
+        tool_invocations=(
+            SkillToolInvocation(tool="shell", command=("rg", "--files")),
+        ),
+    )
+
+    _validate_workflow_action_for_step(
+        _parse_action_response(
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["rg", "--files"]},
+            }
+        ),
+        step,
+    )
+
+    with pytest.raises(RuntimeError, match="command.*does not match"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files", "extra"]},
+                }
+            ),
+            step,
+        )
+
+    wildcard_step = replace(
+        step,
+        tool_invocations=(
+            SkillToolInvocation(tool="shell", command=("rg", "--path=<path>")),
+        ),
+    )
+    _validate_workflow_action_for_step(
+        _parse_action_response(
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["rg", "--path=src"]},
+            }
+        ),
+        wildcard_step,
+    )
+
+    with pytest.raises(RuntimeError, match="fuzzy-match.*not supported"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "fuzzy-match",
+                    "parameters": {"command": ["fuzzy-match", ".", "-name", "src"]},
+                }
+            ),
+            step,
+        )
+
+    with pytest.raises(RuntimeError, match="explicitly supports: none"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                }
+            ),
+            SkillStep(description="Report the result."),
+        )
 
 
 def test_local_llama_client_requests_full_gpu_offload(
@@ -1777,7 +1852,15 @@ def test_workflow_execution_stops_after_repeated_no_progress(
         Skill(
             name="one-step",
             when_to_use=("For testing stalled workflow execution.",),
-            steps=(SkillStep(description="Do the work.", details="Do it."),),
+            steps=(
+                SkillStep(
+                    description="Do the work.",
+                    details="Do it.",
+                    tool_invocations=(
+                        SkillToolInvocation(tool="shell", command=("printf", "same")),
+                    ),
+                ),
+            ),
         ),
         skill_path,
     )
@@ -2828,7 +2911,8 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
                     "parameters": {"command": ["fuzzy-match", "."]},
                 }
             if call_index == 2:
-                assert "fuzzy-match requires -name <query>" in messages[1]["content"]
+                assert "command" in messages[1]["content"]
+                assert "does not match" in messages[1]["content"]
                 return {
                     "kind": "invoke_tool",
                     "tool": "fuzzy-match",
@@ -3963,16 +4047,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "The feature and work item are confirmed.",
             },
             {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "sed",
-                        "-n",
-                        "1,260p",
-                        "templates/execute-proposed-pr.yaml",
-                    ]
-                },
+                "kind": "next_step",
+                "decisions_and_context": "The project structure bootstrap is complete.",
+            },
+            {
+                "kind": "read_document",
+                "file_path": "templates/execute-proposed-pr.yaml",
+                "start_line": 1,
+                "end_line": 260,
                 "decisions_and_context": "The execute-proposed-pr template is selected.",
             },
             {
@@ -4121,7 +4203,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     start_event_kinds = [event["kind"] for event in start_summary["execution_events"]]
     assert start_event_kinds[0] == "next_step"
     assert start_event_kinds.count("next_step") >= 6
-    assert "invoke_tool" in start_event_kinds
+    assert "read_document" in start_event_kinds
     assert start_event_kinds[-1] == "complete"
 
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
@@ -5578,10 +5660,36 @@ def _build_skill() -> Skill:
             SkillStep(
                 description="Capture the feature goal.",
                 details="Record the user-visible outcome first.",
+                tool_invocations=(
+                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
+                    SkillToolInvocation(
+                        tool="fuzzy-match",
+                        command=(
+                            "fuzzy-match",
+                            ".",
+                            "-name",
+                            "<query>",
+                            "-type",
+                            "<type>",
+                        ),
+                    ),
+                    SkillToolInvocation(
+                        tool="shell",
+                        command=(
+                            "powdrr-lift",
+                            "system-specification",
+                            "--work-item-name",
+                            "<work-item-name>",
+                        ),
+                    ),
+                ),
             ),
             SkillStep(
                 description="Summarize the result.",
                 details="Leave the user with a concise handoff.",
+                tool_invocations=(
+                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
+                ),
             ),
         ),
     )

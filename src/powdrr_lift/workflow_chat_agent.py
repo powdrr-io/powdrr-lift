@@ -1248,6 +1248,7 @@ def run_workflow_chat(
         if handler is None:
             raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
         try:
+            _validate_workflow_action_for_step(action, current_step)
             should_continue = handler(
                 action,
                 execution_state,
@@ -1924,6 +1925,23 @@ def _build_step_execution_messages(
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(worktree_root, current_file_path)
     available_work_items = _available_work_item_names(worktree_root)
+    available_tools = sorted(
+        {
+            invocation.tool
+            for invocation in current_step.tool_invocations
+            if invocation.tool != "ref"
+        }
+    )
+    tool_descriptions = {
+        "shell": "Execute a shell command in the current worktree.",
+        "fuzzy-match": (
+            "Search worktree paths with find-like filters and fuzzy name matching."
+        ),
+        BASEDPYRIGHT_SYMBOL_TOOL: "Find Python symbols by name across the worktree.",
+        BASEDPYRIGHT_STRUCTURE_TOOL: (
+            "Discover the classes, functions, methods, and variables in a Python file."
+        ),
+    }
     return [
         {
             "role": "system",
@@ -1940,34 +1958,10 @@ def _build_step_execution_messages(
                     "step_context": list(execution_context),
                     "available_tools": [
                         {
-                            "name": "shell",
-                            "description": (
-                                "Execute a shell command in the current worktree."
-                            ),
-                        },
-                        {
-                            "name": "fuzzy-match",
-                            "description": (
-                                "Search worktree paths with find-like filters and "
-                                "fuzzy name matching. Use command arrays such as "
-                                "['fuzzy-match', 'docs/proposals', '-name', "
-                                "'<feature-name>', '-type', 'd', '-maxdepth', '2']."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_SYMBOL_TOOL,
-                            "description": (
-                                "Find Python symbols by name across the worktree. "
-                                "Parameters: query and optional limit."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_STRUCTURE_TOOL,
-                            "description": (
-                                "Discover the classes, functions, methods, and "
-                                "variables in a Python file. Parameter: path."
-                            ),
-                        },
+                            "name": tool,
+                            "description": tool_descriptions.get(tool, tool),
+                        }
+                        for tool in available_tools
                     ],
                     "available_context_types": [
                         {
@@ -2036,7 +2030,8 @@ def _action_system_prompt() -> str:
         "its gathered context to the caller.\n"
         "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
         "query is the "
-        "next action needed to inspect or modify the worktree.\n"
+        "next action needed, provided the current step's explicitly listed "
+        "tool_invocations support the tool.\n"
         "- read_document: choose this when you know the document path but need "
         "specific lines from that document before deciding the next action. "
         "Request only the smallest useful contiguous range.\n"
@@ -2054,7 +2049,8 @@ def _action_system_prompt() -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
+        "line numbers; invoke_tool requires a tool listed in the current step's "
+        "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; invoke_skill takes "
@@ -2137,7 +2133,8 @@ def _action_system_prompt() -> str:
         "this skill creates it. If fuzzy-match finds no matching workflow, invoke "
         "instantiate-workflow immediately rather than asking the user for one.\n"
         "When the current step includes tool_invocations, choose one of those "
-        "structured invocations and fill in its parameters.\n"
+        "structured invocations and fill in its parameters. When it does not, "
+        "do not return invoke_tool.\n"
         "Use next_step when the current step is complete and the next step "
         "should receive the accumulated context.\n"
         "Use complete when the skill is finished.\n"
@@ -2602,6 +2599,97 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     return True
+
+
+def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
+    """Reject tool actions that do not match a current-step invocation."""
+    if action.kind != "invoke_tool":
+        return
+    supported_invocations = tuple(
+        invocation for invocation in step.tool_invocations if invocation.tool != "ref"
+    )
+    matching_invocations = tuple(
+        invocation
+        for invocation in supported_invocations
+        if invocation.tool == action.tool
+    )
+    if not matching_invocations:
+        supported_tools = sorted(
+            {invocation.tool for invocation in supported_invocations}
+        )
+        supported_tools_text = ", ".join(supported_tools) or "none"
+        raise RuntimeError(
+            f"Tool {action.tool!r} is not supported by the current workflow step. "
+            f"The step explicitly supports: {supported_tools_text}."
+        )
+    command = action.parameters.get("command")
+    command_items = _command_items_for_validation(command)
+    if any(
+        _command_matches_invocation(command_items, invocation.command)
+        for invocation in matching_invocations
+    ):
+        return
+    expected_commands = "; ".join(
+        " ".join(invocation.command) for invocation in matching_invocations
+    )
+    raise RuntimeError(
+        f"Tool {action.tool!r} command {' '.join(command_items)!r} does not match "
+        f"the command shape explicitly supported by the current workflow step: "
+        f"{expected_commands}."
+    )
+
+
+def _command_items_for_validation(command: object) -> list[str]:
+    if isinstance(command, str):
+        try:
+            command_items = shlex.split(command)
+        except ValueError as exc:
+            raise RuntimeError(
+                "Workflow tool command is not valid shell syntax."
+            ) from exc
+    elif isinstance(command, Sequence) and not isinstance(
+        command, (str, bytes, bytearray)
+    ):
+        command_items = list(command)
+    else:
+        raise RuntimeError("Workflow tool action must include a command.")
+    if not command_items or any(
+        not isinstance(item, str) or not item for item in command_items
+    ):
+        raise RuntimeError(
+            "Workflow tool action command must contain non-empty strings."
+        )
+    return command_items
+
+
+def _command_matches_invocation(
+    command: Sequence[str],
+    expected_command: Sequence[str],
+) -> bool:
+    if len(command) != len(expected_command):
+        return False
+    return all(
+        _command_token_matches(actual, expected)
+        for actual, expected in zip(command, expected_command, strict=True)
+    )
+
+
+def _command_token_matches(actual: str, expected: str) -> bool:
+    if actual == expected:
+        return True
+    placeholder_matches = list(re.finditer(r"<[^<>]+>", expected))
+    if not placeholder_matches:
+        return False
+    pattern_parts: list[str] = []
+    previous_end = 0
+    for placeholder_match in placeholder_matches:
+        pattern_parts.append(
+            re.escape(expected[previous_end : placeholder_match.start()])
+        )
+        pattern_parts.append(r"[^\s]+")
+        previous_end = placeholder_match.end()
+    pattern_parts.append(re.escape(expected[previous_end:]))
+    return re.fullmatch("".join(pattern_parts), actual) is not None
 
 
 def _execute_fuzzy_match_tool(

@@ -1399,7 +1399,7 @@ def run_workflow_chat(
             progress.update(
                 selected_skill,
                 current_step_index=len(selected_skill.skill.steps),
-                status="workflow complete",
+                status=f"{selected_skill.skill.name} skill completed",
             )
             break
 

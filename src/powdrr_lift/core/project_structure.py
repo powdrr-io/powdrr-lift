@@ -18,6 +18,8 @@ PROJECT_STRUCTURE_TEMPLATE = """# Project structure specification template.
 # - Describe the project-wide modules and tools discovered from repository evidence.
 # - Use only sections needed by the project structure; all specification
 #   sections are optional.
+# - Every tool must have a non-empty `labels` list with at least one meaningful
+#   category label; never omit `labels` or use `labels: []`.
 # - Add `pr-prep` to testing, linting, and formatting tools unless repository
 #   evidence shows the tool is ad hoc.
 # - Delete these instructions and replace them with this comment at the top:
@@ -172,6 +174,19 @@ def validate_project_structure_yaml(
             ProjectStructureValidationIssue(issue.code, issue.message, issue.path)
             for issue in shared_result.issues
         )
+        for index, tool in enumerate(tools):
+            if not isinstance(tool, dict):
+                continue
+            labels = tool.get("labels")
+            if not isinstance(labels, list) or not labels:
+                issues.append(
+                    ProjectStructureValidationIssue(
+                        "missing_tool_labels",
+                        "Every project-structure tool must include a non-empty "
+                        "labels list.",
+                        f"tools[{index}].labels",
+                    )
+                )
     return ProjectStructureValidationReport(not issues, issues)
 
 

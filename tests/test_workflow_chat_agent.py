@@ -366,6 +366,14 @@ def test_textual_response_grows_and_submits_on_return(
     def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
         kwargs["stdout"].write("What do you want to do? ")
         received.append(kwargs["input_func"]())
+        if len(received) == 1:
+            skill_path = Path("skill-definitions/bootstrap-code-structure.yaml")
+            skill = SkillCatalogEntry(skill_path, load_skill(skill_path))
+            kwargs["progress_callback"](
+                skill,
+                len(skill.skill.steps),
+                "bootstrap-code-structure skill completed",
+            )
         return 0 if len(received) == 1 else 1
 
     monkeypatch.setattr(
@@ -391,7 +399,7 @@ def test_textual_response_grows_and_submits_on_return(
                 await pilot.pause(0.05)
                 if received:
                     break
-            assert "Workflow complete" in str(app.query_one("#status", Static).render())
+            assert "skill completed" in str(app.query_one("#status", Static).render())
             response.text = "follow-up request"
             await pilot.press("enter")
             await pilot.pause(0.1)

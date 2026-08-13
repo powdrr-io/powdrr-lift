@@ -561,14 +561,15 @@ class WorkflowChatApp(App[None]):
         self._set_status(f"failed — {message}")
 
     def _finish(self) -> None:
-        status = "workflow complete" if self._exit_code == 0 else "workflow stopped"
-        self._set_status(status)
         if self._exit_code == 0:
-            self._set_message("Workflow complete. What would you like to do next?")
+            # The agent emits the skill-specific completion status through the
+            # progress callback; preserve that wording in the final UI state.
+            self._set_status(self._current_status)
             if self._response is not None:
                 self._response.disabled = False
                 self._response.focus()
         else:
+            self._set_status("workflow stopped")
             self._set_message(
                 "Workflow error: "
                 f"{self._failure_message or 'unknown error'}. Press Ctrl+C to exit."

@@ -1,0 +1,73 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: powdrr-lift
+modules:
+  - id: powdrr-lift-core
+    action: added
+    relative_location: src/powdrr_lift/core/
+    purpose: Core domain logic for specification management, validation, and project structure.
+  - id: powdrr-lift-cli
+    action: added
+    relative_location: src/powdrr_lift/cli.py
+    purpose: CLI entry point for powdrr-lift commands.
+  - id: powdrr-lift-workflow-chat-agent
+    action: added
+    relative_location: src/powdrr_lift/workflow_chat_agent.py
+    purpose: Agent that drives workflow execution and skill orchestration.
+  - id: powdrr-lift-workflow-chat-tui
+    action: added
+    relative_location: src/powdrr_lift/workflow_chat_tui.py
+    purpose: Terminal UI for interactive workflow chat sessions.
+  - id: powdrr-lift-mcp-server
+    action: added
+    relative_location: src/powdrr_lift/mcp_server.py
+    purpose: MCP server exposing powdrr-lift tools to external clients.
+  - id: powdrr-lift-change-log-parser
+    action: added
+    relative_location: src/powdrr_lift/change_log_parser/
+    purpose: Parse and validate change log entries.
+  - id: powdrr-lift-tests
+    action: added
+    relative_location: tests/
+    purpose: Test suite for all powdrr-lift modules.
+tools:
+  - id: ruff-format
+    action: added
+    when_to_use: Format Python source files with ruff.
+    template: uv run ruff format .
+    how_to_use: Run from repository root.
+    labels:
+      - format
+      - pr-prep
+  - id: ruff-format-check
+    action: added
+    when_to_use: Check Python source formatting without modifying files.
+    template: uv run ruff format --check .
+    how_to_use: Run from repository root.
+    labels:
+      - format
+      - pr-prep
+  - id: ruff-lint
+    action: added
+    when_to_use: Lint Python source files with ruff.
+    template: uv run ruff check .
+    how_to_use: Run from repository root.
+    labels:
+      - lint
+      - pr-prep
+  - id: pytest
+    action: added
+    when_to_use: Run the test suite.
+    template: uv run pytest
+    how_to_use: Run from repository root.
+    labels:
+      - test
+      - pr-prep
+  - id: mypy
+    action: added
+    when_to_use: Type-check Python source and test files.
+    template: uv run mypy src tests
+    how_to_use: Run from repository root.
+    labels:
+      - type-check
+      - pr-prep

@@ -76,6 +76,7 @@ _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
+_WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,6 +334,26 @@ class SkillChatSelection:
     @property
     def ready_to_generate(self) -> bool:
         return self.ready_to_execute
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowContext:
+    worktree_root: Path
+    branch_name: str | None = None
+    pr_number: int | None = None
+    pr_url: str | None = None
+    skill_name: str | None = None
+    request: str | None = None
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "worktree_root": str(self.worktree_root),
+            "branch_name": self.branch_name,
+            "pr_number": self.pr_number,
+            "pr_url": self.pr_url,
+            "skill_name": self.skill_name,
+            "request": self.request,
+        }
 
 
 WorkflowTemplateCatalogEntry = SkillCatalogEntry
@@ -983,19 +1004,11 @@ def run_workflow_chat(
     | None = None,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
-    worktree_root = _resolve_worktree_context(
-        config.repo_root,
-        stderr=stderr,
-        verbose=config.verbose,
-    )
-    repo_root = worktree_root
-    project_root = _resolve_project_root(configured_repo_root, worktree_root)
+    project_root = configured_repo_root
+    workflow_context = _load_workflow_context(project_root)
     skills_dir = config.skills_dir
     if not skills_dir.is_absolute():
-        skills_dir = repo_root / skills_dir
-    output_dir = config.output_dir
-    if output_dir is not None and not output_dir.is_absolute():
-        output_dir = repo_root / output_dir
+        skills_dir = configured_repo_root / skills_dir
 
     catalog = _load_skill_catalog(skills_dir, stderr=stderr)
     if not catalog:
@@ -1065,7 +1078,12 @@ def run_workflow_chat(
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
         selection, current_model, provider = _complete_json_with_model_fallback(
             client_for=client_for_model,
-            messages=_build_selection_messages(catalog, transcript, repo_root),
+            messages=_build_selection_messages(
+                catalog,
+                transcript,
+                configured_repo_root,
+                workflow_context,
+            ),
             parser=lambda payload: _parse_selection_response(payload, catalog),
             context="skill selection",
             model=current_model,
@@ -1136,6 +1154,22 @@ def run_workflow_chat(
     if selected_skill is None or selection is None:
         print("Could not select a skill.", file=stderr)
         return 1
+
+    worktree_root = _resolve_worktree_for_request(
+        configured_repo_root,
+        request=user_request,
+        selected_skill=selected_skill,
+        context=workflow_context,
+        input_func=input_func,
+        stdout=stdout,
+        stderr=stderr,
+        verbose=config.verbose,
+    )
+    repo_root = worktree_root
+    project_root = _resolve_project_root(configured_repo_root, worktree_root)
+    output_dir = config.output_dir
+    if output_dir is not None and not output_dir.is_absolute():
+        output_dir = repo_root / output_dir
 
     progress = _WorkflowProgressDisplay(stderr, on_update=progress_callback)
     execution_state = _WorkflowExecutionState(
@@ -1239,6 +1273,7 @@ def run_workflow_chat(
                 current_file_path=execution_state.current_file_path,
                 worktree_root=worktree_root,
                 catalog=catalog,
+                workflow_context=workflow_context,
             ),
             parser=_parse_action_response,
             context=(
@@ -1459,6 +1494,12 @@ def run_workflow_chat(
         config.verbose,
         f"Summary written to {summary_path}",
     )
+    _persist_workflow_context(
+        project_root,
+        worktree_root,
+        skill_name=root_skill.skill.name,
+        request=user_request,
+    )
 
     if config.output_dir is None:
         print(
@@ -1525,6 +1566,7 @@ def _build_selection_messages(
     catalog: Sequence[SkillCatalogEntry],
     transcript: Sequence[dict[str, str]],
     worktree_root: Path,
+    workflow_context: WorkflowContext | None = None,
 ) -> list[dict[str, str]]:
     available_work_items = _available_work_item_names(worktree_root)
     return [
@@ -1538,6 +1580,9 @@ def _build_selection_messages(
                 {
                     "skills": [_catalog_entry_to_data(entry) for entry in catalog],
                     "conversation": list(transcript),
+                    "previous_workflow_context": (
+                        workflow_context.to_data() if workflow_context else None
+                    ),
                     "work_item_context": {
                         "available": list(available_work_items),
                         "matches": list(
@@ -1749,6 +1794,169 @@ def _verbose_json(
         _verbose_print(stderr, verbose, f"{prefix}{line}")
 
 
+def _workflow_context_path(project_root: Path) -> Path:
+    return project_root / _WORKFLOW_CONTEXT_PATH
+
+
+def _load_workflow_context(project_root: Path) -> WorkflowContext | None:
+    path = _workflow_context_path(project_root)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    worktree_value = payload.get("worktree_root")
+    if not isinstance(worktree_value, str) or not worktree_value:
+        return None
+    pr_number = payload.get("pr_number")
+    if not isinstance(pr_number, int):
+        pr_number = None
+    return WorkflowContext(
+        worktree_root=Path(worktree_value).expanduser().resolve(),
+        branch_name=payload.get("branch_name")
+        if isinstance(payload.get("branch_name"), str)
+        else None,
+        pr_number=pr_number,
+        pr_url=payload.get("pr_url")
+        if isinstance(payload.get("pr_url"), str)
+        else None,
+        skill_name=payload.get("skill_name")
+        if isinstance(payload.get("skill_name"), str)
+        else None,
+        request=payload.get("request")
+        if isinstance(payload.get("request"), str)
+        else None,
+    )
+
+
+def _persist_workflow_context(
+    project_root: Path,
+    worktree_root: Path,
+    *,
+    skill_name: str,
+    request: str,
+) -> None:
+    if not (worktree_root / ".git").exists():
+        return
+    branch_name: str | None = None
+    pr_number: int | None = None
+    pr_url: str | None = None
+    try:
+        branch_result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=worktree_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        branch_name = branch_result.stdout.strip() or None
+        pr_result = subprocess.run(
+            ["gh", "pr", "view", "--json", "number,url"],
+            cwd=worktree_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if pr_result.returncode == 0:
+            pr_payload = json.loads(pr_result.stdout)
+            if isinstance(pr_payload, dict):
+                value = pr_payload.get("number")
+                pr_number = value if isinstance(value, int) else None
+                url = pr_payload.get("url")
+                pr_url = url if isinstance(url, str) else None
+    except (OSError, json.JSONDecodeError):
+        pass
+    context = WorkflowContext(
+        worktree_root=worktree_root,
+        branch_name=branch_name,
+        pr_number=pr_number,
+        pr_url=pr_url,
+        skill_name=skill_name,
+        request=request,
+    )
+    path = _workflow_context_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(context.to_data(), indent=2) + "\n", encoding="utf-8")
+
+
+def _can_reuse_workflow_context(context: WorkflowContext | None) -> bool:
+    return bool(
+        context
+        and context.worktree_root.exists()
+        and _is_dedicated_worktree(context.worktree_root)
+    )
+
+
+def _worktree_reuse_decision(
+    request: str,
+    selected_skill: SkillCatalogEntry,
+    context: WorkflowContext | None,
+) -> bool | None:
+    if not _can_reuse_workflow_context(context):
+        return False
+    normalized = request.casefold()
+    if any(
+        phrase in normalized
+        for phrase in ("new worktree", "new branch", "new feature", "start over")
+    ):
+        return False
+    if selected_skill.skill.name in {"handle-ad-hoc", "address-review-comments"}:
+        return True
+    if any(
+        phrase in normalized
+        for phrase in (
+            "reuse",
+            "same worktree",
+            "same branch",
+            "previous skill",
+            "the pr",
+            "pull request",
+            "review comment",
+            "pr comment",
+            "continue",
+        )
+    ):
+        return True
+    return None
+
+
+def _resolve_worktree_for_request(
+    configured_repo_root: Path,
+    *,
+    request: str,
+    selected_skill: SkillCatalogEntry,
+    context: WorkflowContext | None,
+    input_func: Callable[[], str],
+    stdout: TextIO,
+    stderr: TextIO,
+    verbose: bool,
+) -> Path:
+    if _is_dedicated_worktree(configured_repo_root):
+        return configured_repo_root
+    decision = _worktree_reuse_decision(request, selected_skill, context)
+    if decision is None:
+        answer = _prompt_user(
+            "A previous workflow worktree is available. Do you want to reuse it? ",
+            input_func=input_func,
+            stdout=stdout,
+            status_stream=stderr,
+        )
+        decision = answer.casefold() in {"y", "yes", "reuse", "same", "continue"}
+    if decision and context is not None:
+        _verbose_print(
+            stderr,
+            verbose,
+            f"Reusing previous workflow worktree at {context.worktree_root}",
+        )
+        return context.worktree_root
+    return _resolve_worktree_context(
+        configured_repo_root,
+        stderr=stderr,
+        verbose=verbose,
+    )
+
+
 def _resolve_worktree_context(
     repo_root: Path | None,
     *,
@@ -1920,6 +2128,14 @@ def _selection_system_prompt() -> str:
         "long_context, or vision.\n"
         "selected_skill_path must match one of the catalog entries.\n"
         "Use the skill when_to_use and step descriptions to decide.\n"
+        "When previous_workflow_context is present, treat it as the last skill's "
+        "worktree and pull-request context. Select handle-ad-hoc for a small "
+        "follow-up that does not match a more specific skill. Select "
+        "address-review-comments for requests to check or fix pull-request "
+        "comments. Follow-up requests about that worktree, branch, or PR should "
+        "continue there. If the request could reasonably be either a continuation "
+        "or a new task, ask exactly whether the user wants to reuse the previous "
+        "worktree or start a new one.\n"
         "The user may refer to an existing work item using natural language. "
         "Before asking whether approved specification documents exist, inspect "
         "work_item_context. When matches contains a reasonable canonical name "
@@ -1956,6 +2172,7 @@ def _build_step_execution_messages(
     current_file_path: Path | None,
     worktree_root: Path,
     catalog: Sequence[SkillCatalogEntry],
+    workflow_context: WorkflowContext | None = None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(worktree_root, current_file_path)
     available_work_items = _available_work_item_names(worktree_root)
@@ -2005,6 +2222,9 @@ def _build_step_execution_messages(
                         for context_type, description in _context_type_catalog()
                     ],
                     "worktree_root": str(worktree_root),
+                    "previous_workflow_context": (
+                        workflow_context.to_data() if workflow_context else None
+                    ),
                     "work_item_context": {
                         "available": list(available_work_items),
                         "matches": list(

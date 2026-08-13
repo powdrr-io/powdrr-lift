@@ -1,0 +1,138 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: powdrr-lift-project-structure
+title: powdrr-lift Project Structure
+modules:
+  - id: powdrr-lift-core
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/core/
+    related_modules: []
+    purpose: Core domain logic including specifications, validation, templates, indexing, and project structure management.
+  - id: powdrr-lift-change-log-parser
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/change_log_parser/
+    related_modules: []
+    purpose: Parse and validate changelog entries from commit messages.
+  - id: powdrr-lift-cli
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/cli.py
+    related_modules: [powdrr-lift-core]
+    purpose: Command-line interface entry point for powdrr-lift commands.
+  - id: powdrr-lift-mcp-server
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/mcp_server.py
+    related_modules: [powdrr-lift-core]
+    purpose: MCP server exposing powdrr-lift tools to AI agents.
+  - id: powdrr-lift-workflow-chat-agent
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/workflow_chat_agent.py
+    related_modules: [powdrr-lift-core]
+    purpose: Workflow chat agent that orchestrates skill execution.
+  - id: powdrr-lift-workflow-chat-tui
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/workflow_chat_tui.py
+    related_modules: [powdrr-lift-workflow-chat-agent]
+    purpose: Terminal UI for the workflow chat agent.
+  - id: powdrr-lift-openai-proxy
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/openai_proxy.py
+    related_modules: []
+    purpose: OpenAI-compatible proxy for LLM API calls.
+  - id: powdrr-lift-fuzzy-match
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/fuzzy_match.py
+    related_modules: []
+    purpose: Fuzzy file and content matching utility.
+  - id: powdrr-lift-blame-ui
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/blame_ui.py
+    related_modules: [powdrr-lift-core]
+    purpose: Git blame visualization UI.
+  - id: powdrr-lift-change-log-template
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/change_log_template.py
+    related_modules: [powdrr-lift-change-log-parser]
+    purpose: Changelog template generation.
+  - id: powdrr-lift-change-log-validation
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/change_log_validation.py
+    related_modules: [powdrr-lift-change-log-parser]
+    purpose: Changelog validation logic.
+  - id: powdrr-lift-basedpyright-tools
+    action: added
+    parent_module: null
+    relative_location: src/powdrr_lift/basedpyright_tools.py
+    related_modules: [powdrr-lift-core]
+    purpose: Basedpyright integration tools for symbol and structure queries.
+  - id: powdrr-lift-tests
+    action: added
+    parent_module: null
+    relative_location: tests/
+    related_modules: [powdrr-lift-core, powdrr-lift-cli, powdrr-lift-mcp-server, powdrr-lift-workflow-chat-agent]
+    purpose: Test suite for all powdrr-lift modules.
+tools:
+  - id: ruff-format
+    action: added
+    related_module: null
+    related_modules: []
+    labels: [pr-prep]
+    when_to_use: Format Python source code with Ruff.
+    template: uv run ruff format .
+    how_to_use: Run `uv run ruff format .` from the repository root to auto-format all Python files.
+    evidence: Confirmed in Makefile line 4 and CI workflow .github/workflows/ci.yml line 50.
+  - id: ruff-format-check
+    action: added
+    related_module: null
+    related_modules: []
+    labels: [pr-prep]
+    when_to_use: Check Python source code formatting with Ruff without modifying files.
+    template: uv run ruff format --check .
+    how_to_use: Run `uv run ruff format --check .` from the repository root to verify formatting.
+    evidence: Confirmed in Makefile line 7 and CI workflow .github/workflows/ci.yml line 50.
+  - id: ruff-lint
+    action: added
+    related_module: null
+    related_modules: []
+    labels: [pr-prep]
+    when_to_use: Lint Python source code with Ruff.
+    template: uv run ruff check .
+    how_to_use: Run `uv run ruff check .` from the repository root to lint all Python files.
+    evidence: Confirmed in Makefile line 10 and CI workflow .github/workflows/ci.yml line 53.
+  - id: mypy
+    action: added
+    related_module: null
+    related_modules: []
+    labels: [pr-prep]
+    when_to_use: Type-check Python source code with mypy.
+    template: uv run mypy src tests
+    how_to_use: Run `uv run mypy src tests` from the repository root to type-check the source and test directories.
+    evidence: Confirmed in Makefile line 16 and CI workflow .github/workflows/ci.yml line 56.
+  - id: pytest
+    action: added
+    related_module: null
+    related_modules: [powdrr-lift-tests]
+    labels: [pr-prep]
+    when_to_use: Run the project test suite.
+    template: uv run pytest
+    how_to_use: Run `uv run pytest` from the repository root to execute all tests.
+    evidence: Confirmed in Makefile line 13 and CI workflow .github/workflows/ci.yml line 59.
+  - id: basedpyright
+    action: added
+    related_module: null
+    related_modules: []
+    labels: [pr-prep]
+    when_to_use: Type-check Python source code with basedpyright.
+    template: uv run basedpyright
+    how_to_use: Run `uv run basedpyright` from the repository root to type-check the project.
+    evidence: Listed as dev dependency in pyproject.toml line 14.

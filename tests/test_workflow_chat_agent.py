@@ -1203,6 +1203,19 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
     assert long_context_mapping.model == "glm-5.2"
 
 
+def test_fast_iteration_uses_flash_model_for_long_context_fallback() -> None:
+    mapping = _resolve_llm_mapping(
+        "fast_iteration",
+        mappings=(),
+        provider="zai",
+    )
+
+    assert mapping is not None
+    assert mapping.model == "Qwen/Qwen2.5-Coder-14B-Instruct"
+    assert mapping.long_context_backup_model is not None
+    assert mapping.long_context_backup_model.model == "glm-4.7-flash"
+
+
 def test_oversized_context_uses_long_context_backup_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

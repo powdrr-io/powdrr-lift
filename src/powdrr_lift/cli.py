@@ -1710,8 +1710,7 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
             return exit_code
         try:
             next_action = input(
-                "Workflow complete. Press Enter for another request or type "
-                "'exit' to quit: "
+                "Press Enter for another request or type 'exit' to quit: "
             )
         except EOFError:
             return 0

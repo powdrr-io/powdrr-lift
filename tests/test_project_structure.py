@@ -144,6 +144,32 @@ tools:
     }
 
 
+def test_project_structure_validator_requires_labels_on_every_tool(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "project-structure.yaml"
+    output_path.write_text(
+        """schema: https://powdrr.io/schemas/specification-v1
+id: project-structure
+tools:
+  - id: test
+    action: added
+    when_to_use: Run tests.
+    template: pytest
+    how_to_use: Run pytest.
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_project_structure_yaml(output_path)
+
+    assert report.validation_successful is False
+    assert any(
+        issue.code == "missing_tool_labels" and issue.path == "tools[0].labels"
+        for issue in report.issues
+    )
+
+
 def test_create_project_structure_template_preserves_existing_file(
     tmp_path: Path,
 ) -> None:

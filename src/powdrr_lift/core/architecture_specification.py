@@ -16,6 +16,7 @@ from powdrr_lift.core.spec_paths import (
     existing_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
+from powdrr_lift.core.specification_v1 import validate_module_tool_sections
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
@@ -466,6 +467,17 @@ def _collect_module_ids(
     *,
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
+    shared = validate_module_tool_sections(raw_modules, [])
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in shared.issues
+    )
+    return shared.module_ids
+    # Kept below only as historical context; shared specification-v1 validation
+    # above is the canonical implementation.
+    # pragma: no cover
     module_ids: set[str] = set()
     module_items: list[tuple[int, Mapping[str, Any], str]] = []
     for index, raw_module in enumerate(raw_modules):
@@ -529,6 +541,14 @@ def _collect_tool_ids(
     module_ids: set[str],
     issues: list[ArchitectureSpecificationValidationIssue],
 ) -> set[str]:
+    shared = validate_module_tool_sections([], raw_tools, module_ids=module_ids)
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in shared.issues
+    )
+    return shared.tool_ids
     tool_ids: set[str] = set()
     for index, raw_tool in enumerate(raw_tools):
         tool = _coerce_mapping(

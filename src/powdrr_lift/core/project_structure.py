@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.specification_v1 import validate_module_tool_sections
 
 PROJECT_STRUCTURE_TEMPLATE = """# Project structure specification template.
 #
@@ -163,54 +164,14 @@ def validate_project_structure_yaml(
                     "invalid_section", f"{section} must be a list.", section
                 )
             )
-    for section in ("modules", "tools"):
-        if section not in data:
-            continue
-        entries = data.get(section)
-        if not isinstance(entries, list):
-            issues.append(
-                ProjectStructureValidationIssue(
-                    "invalid_section", f"{section} must be a list.", section
-                )
-            )
-            continue
-        allowed = _MODULE_FIELDS if section == "modules" else _TOOL_FIELDS
-        for index, entry in enumerate(entries):
-            entry_path = f"{section}[{index}]"
-            if not isinstance(entry, dict):
-                issues.append(
-                    ProjectStructureValidationIssue(
-                        "invalid_entry", "Entry must be a mapping.", entry_path
-                    )
-                )
-                continue
-            required = (
-                _REQUIRED_MODULE_FIELDS
-                if section == "modules"
-                else _REQUIRED_TOOL_FIELDS
-            )
-            _check_required_fields(entry, required, entry_path, issues)
-            _check_unknown_fields(entry, allowed, entry_path, issues)
-            for field_name in ("id", "action"):
-                if (
-                    not isinstance(entry.get(field_name), str)
-                    or not entry[field_name].strip()
-                ):
-                    issues.append(
-                        ProjectStructureValidationIssue(
-                            "missing_field",
-                            f"{field_name} must be a non-empty string.",
-                            f"{entry_path}.{field_name}",
-                        )
-                    )
-            if not isinstance(entry.get("related_modules", []), list):
-                issues.append(
-                    ProjectStructureValidationIssue(
-                        "invalid_field",
-                        "related_modules must be a list.",
-                        f"{entry_path}.related_modules",
-                    )
-                )
+    modules = data.get("modules", [])
+    tools = data.get("tools", [])
+    if isinstance(modules, list) and isinstance(tools, list):
+        shared_result = validate_module_tool_sections(modules, tools)
+        issues.extend(
+            ProjectStructureValidationIssue(issue.code, issue.message, issue.path)
+            for issue in shared_result.issues
+        )
     return ProjectStructureValidationReport(not issues, issues)
 
 

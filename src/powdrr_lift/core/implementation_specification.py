@@ -15,6 +15,7 @@ from powdrr_lift.core.spec_paths import (
     implementation_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
+from powdrr_lift.core.specification_v1 import validate_module_tool_references
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import instructional_validation_message
 
@@ -667,6 +668,21 @@ def _validate_module_tool_references(
     module_ids: set[str],
     issues: list[ImplementationSpecificationValidationIssue],
 ) -> None:
+    modules = [item.raw for item in items if item.path.startswith("modules[")]
+    tools = [item.raw for item in items if item.path.startswith("tools[")]
+    for issue in validate_module_tool_references(
+        modules,
+        tools,
+        module_ids=module_ids,
+    ):
+        issues.append(
+            ImplementationSpecificationValidationIssue(
+                code=issue.code,
+                message=issue.message,
+                path=issue.path,
+            )
+        )
+    return
     for item in items:
         raw = item.raw
         if item.path.startswith("modules["):

@@ -140,6 +140,35 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         step,
     )
 
+    with pytest.raises(RuntimeError, match="command.*does not match"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files", "extra"]},
+                }
+            ),
+            step,
+        )
+
+    wildcard_step = replace(
+        step,
+        tool_invocations=(
+            SkillToolInvocation(tool="shell", command=("rg", "--path=<path>")),
+        ),
+    )
+    _validate_workflow_action_for_step(
+        _parse_action_response(
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["rg", "--path=src"]},
+            }
+        ),
+        wildcard_step,
+    )
+
     with pytest.raises(RuntimeError, match="fuzzy-match.*not supported"):
         _validate_workflow_action_for_step(
             _parse_action_response(
@@ -2863,7 +2892,8 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
                     "parameters": {"command": ["fuzzy-match", "."]},
                 }
             if call_index == 2:
-                assert "fuzzy-match requires -name <query>" in messages[1]["content"]
+                assert "command" in messages[1]["content"]
+                assert "does not match" in messages[1]["content"]
                 return {
                     "kind": "invoke_tool",
                     "tool": "fuzzy-match",
@@ -3996,6 +4026,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             {
                 "kind": "next_step",
                 "decisions_and_context": "The feature and work item are confirmed.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The project structure bootstrap is complete.",
             },
             {
                 "kind": "invoke_tool",
@@ -5617,7 +5651,23 @@ def _build_skill() -> Skill:
                     SkillToolInvocation(tool="shell", command=("printf", "progress")),
                     SkillToolInvocation(
                         tool="fuzzy-match",
-                        command=("fuzzy-match", ".", "-name", "<query>"),
+                        command=(
+                            "fuzzy-match",
+                            ".",
+                            "-name",
+                            "<query>",
+                            "-type",
+                            "<type>",
+                        ),
+                    ),
+                    SkillToolInvocation(
+                        tool="shell",
+                        command=(
+                            "powdrr-lift",
+                            "system-specification",
+                            "--work-item-name",
+                            "<work-item-name>",
+                        ),
                     ),
                 ),
             ),

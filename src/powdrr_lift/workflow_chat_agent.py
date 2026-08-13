@@ -2489,25 +2489,94 @@ def _handle_workflow_action_invoke_tool(
 
 
 def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
-    """Reject tool actions that the current checked-in step did not declare."""
+    """Reject tool actions that do not match a current-step invocation."""
     if action.kind != "invoke_tool":
         return
-    supported_tools = tuple(
-        sorted(
-            {
-                invocation.tool
-                for invocation in step.tool_invocations
-                if invocation.tool != "ref"
-            }
+    supported_invocations = tuple(
+        invocation for invocation in step.tool_invocations if invocation.tool != "ref"
+    )
+    matching_invocations = tuple(
+        invocation
+        for invocation in supported_invocations
+        if invocation.tool == action.tool
+    )
+    if not matching_invocations:
+        supported_tools = sorted(
+            {invocation.tool for invocation in supported_invocations}
         )
-    )
-    if action.tool in supported_tools:
+        supported_tools_text = ", ".join(supported_tools) or "none"
+        raise RuntimeError(
+            f"Tool {action.tool!r} is not supported by the current workflow step. "
+            f"The step explicitly supports: {supported_tools_text}."
+        )
+    command = action.parameters.get("command")
+    command_items = _command_items_for_validation(command)
+    if any(
+        _command_matches_invocation(command_items, invocation.command)
+        for invocation in matching_invocations
+    ):
         return
-    supported_tools_text = ", ".join(supported_tools) or "none"
-    raise RuntimeError(
-        f"Tool {action.tool!r} is not supported by the current workflow step. "
-        f"The step explicitly supports: {supported_tools_text}."
+    expected_commands = "; ".join(
+        " ".join(invocation.command) for invocation in matching_invocations
     )
+    raise RuntimeError(
+        f"Tool {action.tool!r} command {' '.join(command_items)!r} does not match "
+        f"the command shape explicitly supported by the current workflow step: "
+        f"{expected_commands}."
+    )
+
+
+def _command_items_for_validation(command: object) -> list[str]:
+    if isinstance(command, str):
+        try:
+            command_items = shlex.split(command)
+        except ValueError as exc:
+            raise RuntimeError(
+                "Workflow tool command is not valid shell syntax."
+            ) from exc
+    elif isinstance(command, Sequence) and not isinstance(
+        command, (str, bytes, bytearray)
+    ):
+        command_items = list(command)
+    else:
+        raise RuntimeError("Workflow tool action must include a command.")
+    if not command_items or any(
+        not isinstance(item, str) or not item for item in command_items
+    ):
+        raise RuntimeError(
+            "Workflow tool action command must contain non-empty strings."
+        )
+    return command_items
+
+
+def _command_matches_invocation(
+    command: Sequence[str],
+    expected_command: Sequence[str],
+) -> bool:
+    if len(command) != len(expected_command):
+        return False
+    return all(
+        _command_token_matches(actual, expected)
+        for actual, expected in zip(command, expected_command, strict=True)
+    )
+
+
+def _command_token_matches(actual: str, expected: str) -> bool:
+    if actual == expected:
+        return True
+    placeholder_matches = list(re.finditer(r"<[^<>]+>", expected))
+    if not placeholder_matches:
+        return False
+    pattern_parts: list[str] = []
+    previous_end = 0
+    for placeholder_match in placeholder_matches:
+        pattern_parts.append(
+            re.escape(expected[previous_end : placeholder_match.start()])
+        )
+        pattern_parts.append(r"[^\s]+")
+        previous_end = placeholder_match.end()
+    pattern_parts.append(re.escape(expected[previous_end:]))
+    return re.fullmatch("".join(pattern_parts), actual) is not None
 
 
 def _execute_fuzzy_match_tool(

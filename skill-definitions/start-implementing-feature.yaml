@@ -93,6 +93,12 @@ steps:
     - <feature-name>
     - --output
     - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
+  - tool: shell
+    command:
+    - sed
+    - -n
+    - 1,260p
+    - templates/execute-proposed-pr.yaml
 - description: Instantiate an execution workflow for every proposed PR.
   llm_type: simple_task
   details: >-
@@ -121,6 +127,16 @@ steps:
     - <feature-name>
     - --workflow-instance-name
     - <proposed-pr-name>
+    - --template-value
+    - proposed-pr-id=<proposed-pr-name>
+    - --template
+    - templates/execute-proposed-pr.yaml
+  - tool: shell
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - <feature-name>
     - --template-value
     - proposed-pr-id=<proposed-pr-name>
     - --template

@@ -65,6 +65,12 @@ steps:
     - implementation-specification
     - "--work-item-name"
     - "<work-item-name>"
+  - tool: shell
+    command:
+    - powdrr-lift
+    - evaluate-implementation-specification
+    - "--work-item-name"
+    - "<work-item-name>"
 - description: Decide on proposed PRs and fill each template.
   llm_type: high_reasoning
   details: Fill PR templates with intent, criteria, tests, and risks.

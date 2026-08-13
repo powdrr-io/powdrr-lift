@@ -79,6 +79,8 @@ _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
+_INTERNAL_TOOL = "internal"
+_INTERNAL_BINARY = "powdrr-lift"
 
 
 @dataclass(frozen=True, slots=True)
@@ -2423,9 +2425,14 @@ def _build_step_execution_messages(
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
         }
+        | {_INTERNAL_TOOL}
     )
     tool_descriptions = {
         "shell": "Execute a shell command in the current worktree.",
+        _INTERNAL_TOOL: (
+            "Execute a powdrr-lift CLI command. This tool is always available, "
+            "but its command must invoke only the powdrr-lift binary."
+        ),
         "fuzzy-match": (
             "Search worktree paths with find-like filters and fuzzy name matching."
         ),
@@ -3061,7 +3068,9 @@ def _handle_workflow_action_invoke_tool(
             action.parameters,
             worktree_root=state.worktree_root,
         )
-    elif action.tool == "shell":
+    elif action.tool in {"shell", _INTERNAL_TOOL}:
+        if action.tool == _INTERNAL_TOOL:
+            _validate_internal_command(action.parameters.get("command"))
         tool_result = _execute_shell_tool(
             action.parameters,
             worktree_root=state.worktree_root,
@@ -3080,7 +3089,7 @@ def _handle_workflow_action_invoke_tool(
     else:
         raise RuntimeError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
-            "fuzzy-match, basedpyright-symbol, and basedpyright-structure."
+            "internal, fuzzy-match, basedpyright-symbol, and basedpyright-structure."
         )
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
@@ -3130,6 +3139,9 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
     supported_invocations = tuple(
         invocation for invocation in step.tool_invocations if invocation.tool != "ref"
     )
+    if action.tool == _INTERNAL_TOOL:
+        _validate_internal_command(action.parameters.get("command"))
+        return
     matching_invocations = tuple(
         invocation
         for invocation in supported_invocations
@@ -3610,6 +3622,12 @@ def _execute_shell_tool(
         "stdout": process.stdout,
         "stderr": process.stderr,
     }
+
+
+def _validate_internal_command(command: object) -> None:
+    command_items = _command_items_for_validation(command)
+    if command_items[0] != _INTERNAL_BINARY:
+        raise RuntimeError("The internal tool may invoke only the powdrr-lift binary.")
 
 
 def _skill_step_to_data(step: Any) -> dict[str, Any]:

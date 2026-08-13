@@ -98,6 +98,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_skill_path,
     _resolve_worktree_context,
     _serialize_messages,
+    _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
     _workflow_action_progress_status,
@@ -202,6 +203,20 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
             ),
             SkillStep(description="Report the result."),
         )
+
+
+def test_internal_tool_is_always_allowed_but_only_runs_powdrr_lift() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "invoke_tool",
+            "tool": "internal",
+            "parameters": {"command": ["powdrr-lift", "--help"]},
+        }
+    )
+    _validate_workflow_action_for_step(action, SkillStep(description="Report."))
+
+    with pytest.raises(RuntimeError, match="only the powdrr-lift binary"):
+        _validate_internal_command(["git", "status"])
 
 
 def test_local_llama_client_requests_full_gpu_offload(
@@ -2832,7 +2847,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
             },
             {
                 "kind": "invoke_tool",
-                "tool": "shell",
+                "tool": "internal",
                 "parameters": {
                     "command": [
                         "powdrr-lift",
@@ -3957,7 +3972,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ]
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4032,7 +4047,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ]
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4087,7 +4102,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ]
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4166,7 +4181,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ]
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4221,7 +4236,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ]
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4269,7 +4284,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 )
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4322,7 +4337,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ]
                 response = {
                     "kind": "invoke_tool",
-                    "tool": "shell",
+                    "tool": "internal",
                     "parameters": {
                         "command": [
                             "powdrr-lift",
@@ -4558,7 +4573,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             },
             {
                 "kind": "invoke_tool",
-                "tool": "shell",
+                "tool": "internal",
                 "parameters": {
                     "command": [
                         "powdrr-lift",
@@ -5632,7 +5647,7 @@ def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
 
     assert tool_invocations == [
         {
-            "tool": "shell",
+            "tool": "internal",
             "command": [
                 "powdrr-lift",
                 "system-specification",
@@ -5641,7 +5656,7 @@ def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
             ],
         },
         {
-            "tool": "shell",
+            "tool": "internal",
             "command": [
                 "powdrr-lift",
                 "evaluate-system-specification",
@@ -5673,7 +5688,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
             },
             {
                 "kind": "invoke_tool",
-                "tool": "shell",
+                "tool": "internal",
                 "parameters": {
                     "command": [
                         "powdrr-lift",

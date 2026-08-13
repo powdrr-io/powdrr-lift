@@ -16,7 +16,7 @@ steps:
   details: Generate the architecture template with the full allowed entity type set
     so validation can enforce the schema.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - architecture-specification
@@ -33,7 +33,7 @@ steps:
   llm_type: fast_iteration
   details: Re-run validation until there are no unknown types or broken references.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-architecture-specification

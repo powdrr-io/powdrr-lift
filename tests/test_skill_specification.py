@@ -38,7 +38,7 @@ def test_skill_round_trips_through_json() -> None:
                 uses_skills=("specify-system",),
                 tool_invocations=(
                     SkillToolInvocation(
-                        tool="shell",
+                        tool="internal",
                         command=(
                             "powdrr-lift",
                             "system-specification",
@@ -76,7 +76,7 @@ def test_skill_round_trips_through_json() -> None:
                 "uses_skills": ["specify-system"],
                 "tool_invocations": [
                     {
-                        "tool": "shell",
+                        "tool": "internal",
                         "command": [
                             "powdrr-lift",
                             "system-specification",

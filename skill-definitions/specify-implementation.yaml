@@ -16,7 +16,7 @@ steps:
   details: Use the generated implementation template as the canonical place to capture
     feature and decision detail.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - implementation-specification
@@ -33,7 +33,7 @@ steps:
   details: Resolve architecture mismatches and duplicate ids before considering the
     document complete.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-implementation-specification

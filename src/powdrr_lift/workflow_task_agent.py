@@ -52,6 +52,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_project_root,
     _resolve_worktree_context,
     _resolve_worktree_file_path,
+    _validate_internal_command,
 )
 
 
@@ -418,7 +419,9 @@ def run_workflow_task(
                 }
             else:
                 try:
-                    if action.tool == "shell":
+                    if action.tool in {"shell", "internal"}:
+                        if action.tool == "internal":
+                            _validate_internal_command(action.parameters.get("command"))
                         result = _execute_shell_tool(
                             action.parameters,
                             worktree_root=repo_root,
@@ -440,7 +443,7 @@ def run_workflow_task(
                     else:
                         raise RuntimeError(
                             f"Unsupported workflow task tool {action.tool!r}; "
-                            "supported tools are shell, fuzzy-match, "
+                            "supported tools are shell, internal, fuzzy-match, "
                             "basedpyright-symbol, and basedpyright-structure."
                         )
                 except (RuntimeError, ValueError) as exc:
@@ -826,6 +829,13 @@ def _build_task_messages(
                             "name": "shell",
                             "description": (
                                 "Execute a shell command in the current worktree."
+                            ),
+                        },
+                        {
+                            "name": "internal",
+                            "description": (
+                                "Execute a powdrr-lift CLI command. This tool is "
+                                "always available, but may invoke only powdrr-lift."
                             ),
                         },
                         {
@@ -1248,7 +1258,9 @@ def _run_skill_for_agent(
             )
             continue
         if action.kind == "invoke_tool":
-            if action.tool == "shell":
+            if action.tool in {"shell", "internal"}:
+                if action.tool == "internal":
+                    _validate_internal_command(action.parameters.get("command"))
                 result = _execute_shell_tool(
                     action.parameters,
                     worktree_root=repo_root,

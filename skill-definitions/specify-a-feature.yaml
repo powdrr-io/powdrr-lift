@@ -11,7 +11,7 @@ steps:
   llm_type: simple_task
   details: Fill the system template before review.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - system-specification
@@ -23,7 +23,7 @@ steps:
   uses_skills:
   - review-system
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-system-specification
@@ -33,7 +33,7 @@ steps:
   llm_type: simple_task
   details: Capture the entity model before review.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - architecture-specification
@@ -47,7 +47,7 @@ steps:
   uses_skills:
   - review-architecture
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-architecture-specification
@@ -59,13 +59,13 @@ steps:
   llm_type: simple_task
   details: Complete the template with decisions and reasoning.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - implementation-specification
     - "--work-item-name"
     - "<work-item-name>"
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-implementation-specification
@@ -75,7 +75,7 @@ steps:
   llm_type: high_reasoning
   details: Fill PR templates with intent, criteria, tests, and risks.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - pr-specification
@@ -94,13 +94,13 @@ steps:
     the reported issue and restart this validation step; advance only when all three
     validated documents agree.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-system-specification
     - "--work-item-name"
     - "<work-item-name>"
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-architecture-specification
@@ -108,7 +108,7 @@ steps:
     - "<work-item-name>"
     - "--entity-type"
     - "<type>"
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-implementation-specification

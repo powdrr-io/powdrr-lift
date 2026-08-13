@@ -450,7 +450,7 @@ def test_textual_startup_shows_initial_question(
             return str(app.query_one("#status", Static).render()), response.disabled
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\nWhat do you want to do?",
+        "Powdrr Agent v0.0.1\n\nWhat do you want to do?",
         False,
     )
 
@@ -475,7 +475,7 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\nWhich requirements should this feature satisfy?"
+        "Powdrr Agent v0.0.1\n\nWhich requirements should this feature satisfy?"
     )
 
 
@@ -491,7 +491,7 @@ def test_textual_submit_shows_user_response_before_calling_llm() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "----------------------------------------\n"
         "> Build the feature\n"
         "----------------------------------------\n\n"
@@ -516,7 +516,7 @@ def test_textual_submit_ignores_empty_response() -> None:
             )
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...",
+        "Powdrr Agent v0.0.1",
         "  \n  ",
         False,
         False,
@@ -537,7 +537,7 @@ def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> Non
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "What do you want to do?\n\n"
         "----------------------------------------\n"
         "> Build the feature\n"
@@ -564,7 +564,7 @@ def test_textual_status_retains_multiple_user_responses() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "What do you want to do?\n\n"
         "----------------------------------------\n"
         "> First answer\n"
@@ -733,7 +733,7 @@ def test_textual_status_shows_latest_output() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\nfirst\n\nsecond\n\nthird\n\nfourth"
+        "Powdrr Agent v0.0.1\n\nfirst\n\nsecond\n\nthird\n\nfourth"
     )
 
 
@@ -753,7 +753,7 @@ def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "calling LLM...\n\nwaiting for test-model LLM response..."
     )
 
@@ -831,9 +831,9 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
             return str(status.render()), str(status.render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
     )
 
@@ -866,7 +866,7 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "What do you want to do?\n\n"
         "Matched skill: specify-a-feature\n\n"
         "1. What is the feature goal?\n"
@@ -896,7 +896,7 @@ def test_textual_execution_transition_retains_output_history() -> None:
 
     rendered = asyncio.run(exercise())
     assert rendered == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "Matched skill: specify-a-feature\n\n"
         "waiting on LLM response...\n\n"
         "What is the feature goal?"
@@ -915,7 +915,7 @@ def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> N
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "waiting for model LLM response...\n\n"
         "WARNING: received empty response but need human input"
     )
@@ -936,7 +936,7 @@ def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> 
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\nwaiting for model LLM response..."
+        "Powdrr Agent v0.0.1\n\nwaiting for model LLM response..."
     )
 
 
@@ -961,7 +961,7 @@ def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> N
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\ncalling LLM...\n\nWhat do you want to do?"
+        "Powdrr Agent v0.0.1\n\ncalling LLM...\n\nWhat do you want to do?"
     )
 
 
@@ -984,8 +984,7 @@ def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() ->
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
-        "The LLM returned an empty response. Retry this request?"
+        "Powdrr Agent v0.0.1\n\nThe LLM returned an empty response. Retry this request?"
     )
 
 
@@ -1011,7 +1010,7 @@ def test_textual_each_execution_step_retains_status_history() -> None:
             return str(app.query_one("#status", Static).render())
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "first step is running\n\n"
         "first step output\n\n"
         "second step is running"
@@ -1051,7 +1050,7 @@ def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> No
 
     rendered = asyncio.run(exercise())
     assert rendered == (
-        "starting workflow...\n\n"
+        "Powdrr Agent v0.0.1\n\n"
         "What do you want to do?\n\n"
         "----------------------------------------\n"
         "> Specify the feature\n"
@@ -1190,7 +1189,7 @@ def test_textual_read_only_panels_support_copy_and_cut() -> None:
             return green_clipboard, app.clipboard
 
     assert asyncio.run(exercise()) == (
-        "starting workflow...\n\nrunning\n\ngreen output",
+        "Powdrr Agent v0.0.1\n\nrunning\n\ngreen output",
         "1. Capture the feature goal.\n2. Summarize the result.",
     )
 

@@ -91,6 +91,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_skill_path,
     _resolve_worktree_context,
     _validate_user_question,
+    _validate_workflow_action_for_step,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     download_local_qwen_model,
@@ -113,10 +114,55 @@ def test_local_llama_client_errors_without_gpu_offload_support(
         Llama=lambda **_: pytest.fail("Llama must not load without GPU support"),
         llama_supports_gpu_offload=lambda: False,
     )
+
     monkeypatch.setitem(sys.modules, "llama_cpp", llama_module)
 
     with pytest.raises(RuntimeError, match="requires GPU offload support"):
         LocalLlamaChatClient(model_path=model_path)
+
+
+def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
+    step = SkillStep(
+        description="Inspect the repository.",
+        tool_invocations=(
+            SkillToolInvocation(tool="shell", command=("rg", "--files")),
+        ),
+    )
+
+    _validate_workflow_action_for_step(
+        _parse_action_response(
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["rg", "--files"]},
+            }
+        ),
+        step,
+    )
+
+    with pytest.raises(RuntimeError, match="fuzzy-match.*not supported"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "fuzzy-match",
+                    "parameters": {"command": ["fuzzy-match", ".", "-name", "src"]},
+                }
+            ),
+            step,
+        )
+
+    with pytest.raises(RuntimeError, match="explicitly supports: none"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                }
+            ),
+            SkillStep(description="Report the result."),
+        )
 
 
 def test_local_llama_client_requests_full_gpu_offload(
@@ -1777,7 +1823,15 @@ def test_workflow_execution_stops_after_repeated_no_progress(
         Skill(
             name="one-step",
             when_to_use=("For testing stalled workflow execution.",),
-            steps=(SkillStep(description="Do the work.", details="Do it."),),
+            steps=(
+                SkillStep(
+                    description="Do the work.",
+                    details="Do it.",
+                    tool_invocations=(
+                        SkillToolInvocation(tool="shell", command=("printf", "same")),
+                    ),
+                ),
+            ),
         ),
         skill_path,
     )
@@ -5559,10 +5613,20 @@ def _build_skill() -> Skill:
             SkillStep(
                 description="Capture the feature goal.",
                 details="Record the user-visible outcome first.",
+                tool_invocations=(
+                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
+                    SkillToolInvocation(
+                        tool="fuzzy-match",
+                        command=("fuzzy-match", ".", "-name", "<query>"),
+                    ),
+                ),
             ),
             SkillStep(
                 description="Summarize the result.",
                 details="Leave the user with a concise handoff.",
+                tool_invocations=(
+                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
+                ),
             ),
         ),
     )

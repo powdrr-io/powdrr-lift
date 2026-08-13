@@ -1188,6 +1188,7 @@ def run_workflow_chat(
         if handler is None:
             raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
         try:
+            _validate_workflow_action_for_step(action, current_step)
             should_continue = handler(
                 action,
                 execution_state,
@@ -1821,6 +1822,23 @@ def _build_step_execution_messages(
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(worktree_root, current_file_path)
     available_work_items = _available_work_item_names(worktree_root)
+    available_tools = sorted(
+        {
+            invocation.tool
+            for invocation in current_step.tool_invocations
+            if invocation.tool != "ref"
+        }
+    )
+    tool_descriptions = {
+        "shell": "Execute a shell command in the current worktree.",
+        "fuzzy-match": (
+            "Search worktree paths with find-like filters and fuzzy name matching."
+        ),
+        BASEDPYRIGHT_SYMBOL_TOOL: "Find Python symbols by name across the worktree.",
+        BASEDPYRIGHT_STRUCTURE_TOOL: (
+            "Discover the classes, functions, methods, and variables in a Python file."
+        ),
+    }
     return [
         {
             "role": "system",
@@ -1837,34 +1855,10 @@ def _build_step_execution_messages(
                     "step_context": list(execution_context),
                     "available_tools": [
                         {
-                            "name": "shell",
-                            "description": (
-                                "Execute a shell command in the current worktree."
-                            ),
-                        },
-                        {
-                            "name": "fuzzy-match",
-                            "description": (
-                                "Search worktree paths with find-like filters and "
-                                "fuzzy name matching. Use command arrays such as "
-                                "['fuzzy-match', 'docs/proposals', '-name', "
-                                "'<feature-name>', '-type', 'd', '-maxdepth', '2']."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_SYMBOL_TOOL,
-                            "description": (
-                                "Find Python symbols by name across the worktree. "
-                                "Parameters: query and optional limit."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_STRUCTURE_TOOL,
-                            "description": (
-                                "Discover the classes, functions, methods, and "
-                                "variables in a Python file. Parameter: path."
-                            ),
-                        },
+                            "name": tool,
+                            "description": tool_descriptions.get(tool, tool),
+                        }
+                        for tool in available_tools
                     ],
                     "available_context_types": [
                         {
@@ -1926,9 +1920,8 @@ def _action_system_prompt() -> str:
         "next action is a line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
         "workflow before continuing.\n"
-        "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
-        "query is the "
-        "next action needed to inspect or modify the worktree.\n"
+        "- invoke_tool: choose this only when the current step's explicitly "
+        "listed tool_invocations support the tool needed for the next action.\n"
         "- read_document: choose this when you know the document path but need "
         "specific lines from that document before deciding the next action. "
         "Request only the smallest useful contiguous range.\n"
@@ -1946,7 +1939,8 @@ def _action_system_prompt() -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; invoke_tool requires tool=shell or tool=fuzzy-match and "
+        "line numbers; invoke_tool requires a tool listed in the current step's "
+        "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; invoke_skill takes "
@@ -2026,7 +2020,8 @@ def _action_system_prompt() -> str:
         "this skill creates it. If fuzzy-match finds no matching workflow, invoke "
         "instantiate-workflow immediately rather than asking the user for one.\n"
         "When the current step includes tool_invocations, choose one of those "
-        "structured invocations and fill in its parameters.\n"
+        "structured invocations and fill in its parameters. When it does not, "
+        "do not return invoke_tool.\n"
         "Use next_step when the current step is complete and the next step "
         "should receive the accumulated context.\n"
         "Use complete when the skill is finished.\n"
@@ -2491,6 +2486,28 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     return True
+
+
+def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
+    """Reject tool actions that the current checked-in step did not declare."""
+    if action.kind != "invoke_tool":
+        return
+    supported_tools = tuple(
+        sorted(
+            {
+                invocation.tool
+                for invocation in step.tool_invocations
+                if invocation.tool != "ref"
+            }
+        )
+    )
+    if action.tool in supported_tools:
+        return
+    supported_tools_text = ", ".join(supported_tools) or "none"
+    raise RuntimeError(
+        f"Tool {action.tool!r} is not supported by the current workflow step. "
+        f"The step explicitly supports: {supported_tools_text}."
+    )
 
 
 def _execute_fuzzy_match_tool(

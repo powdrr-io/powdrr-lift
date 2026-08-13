@@ -192,6 +192,7 @@ class SkillChatConfig:
     provider: str = "auto"
     model: str = _DEFAULT_MODEL
     llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
+    alternate_llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -256,6 +257,9 @@ class SkillChatAction:
     filters: dict[str, object] = field(default_factory=dict)
     decisions_and_context: str | None = None
     llm_type: str | None = None
+    use_alternate_llm_bindings: bool | None = None
+    clean: bool = False
+    context: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,6 +292,14 @@ class _SkillExecutionFrame:
     parent_skill: SkillCatalogEntry
     resume_step_index: int
     dependency_key: tuple[str, int, str] | None = None
+    parent_model: str = ""
+    parent_provider: str = ""
+    parent_alternate_llm_bindings: bool = False
+    clean_context: bool = False
+    parent_transcript: tuple[dict[str, str], ...] | None = None
+    parent_execution_events: tuple[dict[str, Any], ...] | None = None
+    parent_execution_context: tuple[str, ...] | None = None
+    parent_current_file_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1023,6 +1035,7 @@ def run_workflow_chat(
     )
     root_skill = selected_skill
     skill_stack: list[_SkillExecutionFrame] = []
+    alternate_llm_bindings = False
     completed_skill_dependencies: set[tuple[str, int, str]] = set()
     action_handlers = _workflow_action_handlers()
     step_roundtrips = 0
@@ -1049,6 +1062,9 @@ def run_workflow_chat(
                     current_step_index,
                     dependency_name,
                 ),
+                parent_model=current_model,
+                parent_provider=provider,
+                parent_alternate_llm_bindings=alternate_llm_bindings,
             )
             selected_skill = nested_skill
             execution_state.selected_skill = nested_skill
@@ -1057,7 +1073,7 @@ def run_workflow_chat(
         step_mapping = (
             _resolve_llm_mapping(
                 current_step.llm_type or selection.llm_type,
-                mappings=config.llm_mappings,
+                mappings=_active_llm_mappings(config, alternate_llm_bindings),
                 provider=provider,
             )
             if provider in {"zai", "deepinfra", "local"}
@@ -1123,7 +1139,7 @@ def run_workflow_chat(
             stderr=stderr,
             provider=provider,
             model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
-            + tuple((key, value) for key, value in config.llm_mappings),
+            + tuple(_active_llm_mappings(config, alternate_llm_bindings)),
             empty_response_fallback_payload={"kind": "next_step"},
         )
         if action is None:
@@ -1132,7 +1148,7 @@ def run_workflow_chat(
             action_mapping = (
                 _resolve_llm_mapping(
                     action.llm_type,
-                    mappings=config.llm_mappings,
+                    mappings=_active_llm_mappings(config, alternate_llm_bindings),
                     provider=provider,
                 )
                 if provider in {"zai", "deepinfra", "local"}
@@ -1152,11 +1168,35 @@ def run_workflow_chat(
             if action.skill_name is None:
                 raise RuntimeError("invoke_skill action must include a skill name.")
             nested_skill = _find_skill_by_name(catalog, action.skill_name)
+            explicit_context = list(action.context)
+            if action.decisions_and_context is not None:
+                explicit_context.append(action.decisions_and_context)
+            nested_alternate = (
+                alternate_llm_bindings
+                if action.use_alternate_llm_bindings is None
+                else action.use_alternate_llm_bindings
+            )
             _push_nested_skill(
                 skill_stack,
                 current_skill=selected_skill,
                 nested_skill=nested_skill,
                 resume_step_index=current_step_index + 1,
+                parent_model=current_model,
+                parent_provider=provider,
+                parent_alternate_llm_bindings=alternate_llm_bindings,
+                clean_context=action.clean,
+                parent_transcript=tuple(execution_state.transcript)
+                if action.clean
+                else None,
+                parent_execution_events=tuple(execution_state.execution_events)
+                if action.clean
+                else None,
+                parent_execution_context=tuple(execution_state.execution_context)
+                if action.clean
+                else None,
+                parent_current_file_path=execution_state.current_file_path
+                if action.clean
+                else None,
             )
             execution_state.execution_events.append(
                 {
@@ -1165,6 +1205,14 @@ def run_workflow_chat(
                     "step_index": current_step_index,
                 }
             )
+            if action.clean:
+                execution_state.transcript = []
+                execution_state.execution_events = []
+                execution_state.execution_context = explicit_context
+                execution_state.current_file_path = None
+            else:
+                execution_state.execution_context.extend(explicit_context)
+            alternate_llm_bindings = nested_alternate
             selected_skill = nested_skill
             execution_state.selected_skill = nested_skill
             execution_state.step_index = 0
@@ -1177,6 +1225,18 @@ def run_workflow_chat(
             selected_skill = frame.parent_skill
             execution_state.selected_skill = selected_skill
             execution_state.step_index = frame.resume_step_index
+            if frame.clean_context:
+                execution_state.transcript = list(frame.parent_transcript or ())
+                execution_state.execution_events = list(
+                    frame.parent_execution_events or ()
+                )
+                execution_state.execution_context = list(
+                    frame.parent_execution_context or ()
+                )
+                execution_state.current_file_path = frame.parent_current_file_path
+            current_model = frame.parent_model
+            provider = frame.parent_provider
+            alternate_llm_bindings = frame.parent_alternate_llm_bindings
             continue
         progress.update(
             selected_skill,
@@ -1290,6 +1350,18 @@ def run_workflow_chat(
                 selected_skill = frame.parent_skill
                 execution_state.selected_skill = selected_skill
                 execution_state.step_index = frame.resume_step_index
+                if frame.clean_context:
+                    execution_state.transcript = list(frame.parent_transcript or ())
+                    execution_state.execution_events = list(
+                        frame.parent_execution_events or ()
+                    )
+                    execution_state.execution_context = list(
+                        frame.parent_execution_context or ()
+                    )
+                    execution_state.current_file_path = frame.parent_current_file_path
+                current_model = frame.parent_model
+                provider = frame.parent_provider
+                alternate_llm_bindings = frame.parent_alternate_llm_bindings
                 continue
         if not should_continue:
             progress.update(
@@ -1723,6 +1795,14 @@ def _push_nested_skill(
     nested_skill: SkillCatalogEntry,
     resume_step_index: int,
     dependency_key: tuple[str, int, str] | None = None,
+    parent_model: str = "",
+    parent_provider: str = "",
+    parent_alternate_llm_bindings: bool = False,
+    clean_context: bool = False,
+    parent_transcript: tuple[dict[str, str], ...] | None = None,
+    parent_execution_events: tuple[dict[str, Any], ...] | None = None,
+    parent_execution_context: tuple[str, ...] | None = None,
+    parent_current_file_path: Path | None = None,
 ) -> None:
     active_skill_paths = {str(frame.parent_skill.path) for frame in stack}
     active_skill_paths.add(str(current_skill.path))
@@ -1735,8 +1815,31 @@ def _push_nested_skill(
             parent_skill=current_skill,
             resume_step_index=resume_step_index,
             dependency_key=dependency_key,
+            parent_model=parent_model,
+            parent_provider=parent_provider,
+            parent_alternate_llm_bindings=parent_alternate_llm_bindings,
+            clean_context=clean_context,
+            parent_transcript=parent_transcript,
+            parent_execution_events=parent_execution_events,
+            parent_execution_context=parent_execution_context,
+            parent_current_file_path=parent_current_file_path,
         )
     )
+
+
+def _active_llm_mappings(
+    config: SkillChatConfig,
+    alternate: bool,
+) -> tuple[tuple[str, LLMModelMapping], ...]:
+    """Return the custom binding set active for the current skill subtree.
+
+    An omitted alternate set deliberately aliases the default set so callers
+    can opt into alternate binding propagation without requiring a second
+    configuration everywhere.
+    """
+    if alternate and config.alternate_llm_mappings:
+        return config.alternate_llm_mappings
+    return config.llm_mappings
 
 
 def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
@@ -1925,7 +2028,12 @@ def _action_system_prompt() -> str:
         "- edit: choose this when the current file context is sufficient and the "
         "next action is a line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
-        "workflow before continuing.\n"
+        "workflow before continuing. It inherits the current context and LLM "
+        "bindings by default. Set alternate_llm_bindings=true or false to "
+        "select the alternate or default binding set for this skill and all of "
+        "its descendants. Set clean=true when the skill must receive only the "
+        "explicit context list (and decisions_and_context) and must not return "
+        "its gathered context to the caller.\n"
         "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
         "query is the "
         "next action needed to inspect or modify the worktree.\n"
@@ -1968,6 +2076,9 @@ def _action_system_prompt() -> str:
         '"llm_type":"simple_task"}\n'
         '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
         '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
+        '{"kind":"invoke_skill","skill":"adversarial-review",'
+        '"alternate_llm_bindings":true,"clean":true,'
+        '"context":["Review only this diff."],"decisions_and_context":"..."}\n'
         '{"kind":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
         '"llm_type":"long_context"}\n'
@@ -2588,11 +2699,25 @@ def _parse_workflow_action_invoke_skill(
     skill_name = payload.get("skill")
     if not isinstance(skill_name, str) or not skill_name.strip():
         raise RuntimeError("Workflow invoke_skill action must include skill.")
+    alternate = payload.get("alternate_llm_bindings")
+    if alternate is not None and not isinstance(alternate, bool):
+        raise RuntimeError("alternate_llm_bindings must be a boolean when provided.")
+    clean = payload.get("clean", False)
+    if not isinstance(clean, bool):
+        raise RuntimeError("clean must be a boolean when provided.")
+    raw_context = payload.get("context", [])
+    if not isinstance(raw_context, list) or not all(
+        isinstance(value, str) and value.strip() for value in raw_context
+    ):
+        raise RuntimeError("context must be a list of non-empty strings.")
     return SkillChatAction(
         kind="invoke_skill",
         skill_name=skill_name.strip(),
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
+        use_alternate_llm_bindings=alternate,
+        clean=clean,
+        context=tuple(value.strip() for value in raw_context),
     )
 
 

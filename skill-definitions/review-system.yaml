@@ -19,7 +19,7 @@ steps:
   details: Run the system specification command, then fill the generated template
     with the required updates.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - system-specification
@@ -29,7 +29,7 @@ steps:
   llm_type: fast_iteration
   details: Re-run system validation after edits and report any remaining inconsistencies.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-system-specification

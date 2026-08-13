@@ -453,13 +453,13 @@ def build_skill_validation_report(
                             path=_child_path(tool_path, "tool"),
                         )
                     )
-                elif tool not in {"shell", "fuzzy-match", "ref"}:
+                elif tool not in {"shell", "internal", "fuzzy-match", "ref"}:
                     issues.append(
                         SkillValidationIssue(
                             code="unsupported_tool",
                             message=(
                                 "Skill tool invocations currently support shell, "
-                                "fuzzy-match, and ref."
+                                "internal, fuzzy-match, and ref."
                             ),
                             path=_child_path(tool_path, "tool"),
                         )
@@ -513,6 +513,22 @@ def build_skill_validation_report(
                                     ),
                                 )
                             )
+                if tool == "internal" and (
+                    not isinstance(command, Sequence)
+                    or isinstance(command, (str, bytes, bytearray))
+                    or not command
+                    or command[0] != "powdrr-lift"
+                ):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_internal_command",
+                            message=(
+                                "Internal tool commands must invoke the "
+                                "powdrr-lift binary."
+                            ),
+                            path=_child_path(tool_path, "command"),
+                        )
+                    )
 
                 cwd = tool_mapping.get("cwd")
                 if cwd is not None and _optional_string(cwd) is None:

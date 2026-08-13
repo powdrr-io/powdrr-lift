@@ -16,7 +16,7 @@ steps:
   details: Use the generated file as the canonical place to capture system requirements
     and approach statements.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - system-specification
@@ -32,7 +32,7 @@ steps:
   details: The user should leave with a coherent system spec that captures requirements
     and approach in a form that can be validated immediately.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - evaluate-system-specification

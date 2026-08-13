@@ -65,7 +65,7 @@ steps:
     the exact artifact path to the next step. Use the prior gather_context
     result to decide whether the artifact exists.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - project-structure
@@ -111,7 +111,7 @@ steps:
     feature-specific architecture validator or require a feature/work-item
     name.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - validate-project-structure

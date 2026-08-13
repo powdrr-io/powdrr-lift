@@ -88,7 +88,7 @@ steps:
     templates/execute-proposed-pr.yaml; do not invoke sed or another shell
     command to read the file.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - implementation-specification
@@ -116,7 +116,7 @@ steps:
     Pass every created or reused workflow file and its proposed-PR relationship
     as context to the next step.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - instantiate-workflow
@@ -128,7 +128,7 @@ steps:
     - proposed-pr-id=<proposed-pr-name>
     - --template
     - templates/execute-proposed-pr.yaml
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - instantiate-workflow

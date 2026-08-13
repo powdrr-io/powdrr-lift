@@ -69,13 +69,13 @@ steps:
     the comment as addressed. Do not create a specification for an
     implementation-only or test-only correction.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - <specification-template-command>
     - --work-item-name
     - <work-item-name>
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - <evaluate-specification-command>

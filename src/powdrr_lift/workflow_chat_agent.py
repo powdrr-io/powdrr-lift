@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, TextIO, cast
+from typing import Any, Literal, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -90,6 +90,20 @@ class LLMModelMapping:
     provider: str
     backup_model: LLMModelMapping | None = None
     long_context_backup_model: LLMModelMapping | None = None
+
+
+LLMProviderRole = Literal["normal", "adversarial"]
+
+
+@dataclass(frozen=True, slots=True)
+class LLMProviderRoles:
+    normal: str
+    adversarial: str | None = None
+
+    def provider_for(self, role: LLMProviderRole) -> str:
+        if role == "adversarial" and self.adversarial is not None:
+            return self.adversarial
+        return self.normal
 
 
 _DEFAULT_MODEL_LIMITS = LLMModelLimits(
@@ -200,6 +214,7 @@ class LLMProviderDefinition:
     default_base_url: str = "https://api.openai.com/v1"
     client_kind: str = "openai"
     forced_model: str | None = None
+    auto_priority: int | None = None
 
 
 LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
@@ -210,6 +225,7 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         model_limits={},
         api_key_env_names=("OPENAI_API_KEY", "CODEX_API_KEY"),
         base_url_env_names=("OPENAI_BASE_URL", "CODEX_BASE_URL"),
+        auto_priority=40,
     ),
     "anthropic": LLMProviderDefinition(
         name="anthropic",
@@ -220,6 +236,7 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         base_url_env_names=("ANTHROPIC_BASE_URL",),
         default_base_url="https://api.anthropic.com",
         client_kind="anthropic",
+        auto_priority=20,
     ),
     "zai": LLMProviderDefinition(
         name="zai",
@@ -229,6 +246,7 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         api_key_env_names=("ZAI_API_KEY", "GLM_API_KEY"),
         base_url_env_names=("ZAI_BASE_URL",),
         default_base_url="https://api.z.ai/api/paas/v4/",
+        auto_priority=30,
     ),
     "deepinfra": LLMProviderDefinition(
         name="deepinfra",
@@ -238,6 +256,7 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         api_key_env_names=("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"),
         base_url_env_names=("DEEPINFRA_BASE_URL",),
         default_base_url="https://api.deepinfra.com/v1/openai",
+        auto_priority=None,
     ),
     "deepinfra-cheap": LLMProviderDefinition(
         name="deepinfra-cheap",
@@ -248,6 +267,7 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         base_url_env_names=("DEEPINFRA_BASE_URL",),
         default_base_url="https://api.deepinfra.com/v1/openai",
         forced_model=_DEEPINFRA_CHEAP_MODEL,
+        auto_priority=10,
     ),
     "local": LLMProviderDefinition(
         name="local",
@@ -293,9 +313,10 @@ class SkillChatConfig:
     repo_root: Path | None = None
     output_dir: Path | None = None
     provider: str = "auto"
+    normal_provider: str | None = None
+    adversarial_provider: str | None = None
     model: str = _DEFAULT_MODEL
     llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
-    alternate_llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
     max_turns: int = 8
@@ -360,7 +381,7 @@ class SkillChatAction:
     filters: dict[str, object] = field(default_factory=dict)
     decisions_and_context: str | None = None
     llm_type: str | None = None
-    use_alternate_llm_bindings: bool | None = None
+    provider_role: LLMProviderRole | None = None
     clean: bool = False
     context: tuple[str, ...] = field(default_factory=tuple)
 
@@ -398,7 +419,7 @@ class _SkillExecutionFrame:
     dependency_key: tuple[str, int, str] | None = None
     parent_model: str = ""
     parent_provider: str = ""
-    parent_alternate_llm_bindings: bool = False
+    parent_provider_role: LLMProviderRole = "normal"
     clean_context: bool = False
     parent_transcript: tuple[dict[str, str], ...] | None = None
     parent_execution_events: tuple[dict[str, Any], ...] | None = None
@@ -1014,8 +1035,10 @@ def run_workflow_chat(
         print(f"No skills found in {skills_dir}.", file=stderr)
         return 1
 
+    provider_roles = _resolve_provider_roles(config)
+    provider_role: LLMProviderRole = "normal"
     current_model = config.model
-    provider = _resolve_provider(config.provider, current_model)
+    provider = provider_roles.provider_for(provider_role)
     current_model = _provider_definition(provider).forced_model or current_model
     credentials = _resolve_credentials(provider, config.api_key, config.base_url)
     clients: dict[tuple[str, str], WorkflowChatClient] = {}
@@ -1053,6 +1076,12 @@ def run_workflow_chat(
         f"with base URL from {credentials.base_url_source}: {credentials.base_url}",
         file=stderr,
     )
+    if config.provider == "auto" and provider_roles.adversarial is None:
+        print(
+            "WARNING: only one LLM provider is configured; reviews might be "
+            "limited because adversarial work will use the normal provider.",
+            file=stderr,
+        )
     _verbose_print(
         stderr,
         config.verbose,
@@ -1087,8 +1116,7 @@ def run_workflow_chat(
             stdout=stdout,
             stderr=stderr,
             provider=provider,
-            model_mappings=tuple(_default_llm_mappings(provider).items())
-            + tuple((key, value) for key, value in config.llm_mappings),
+            model_mappings=_active_llm_mappings(config, provider_roles, provider_role),
         )
         if selection is None:
             return 1
@@ -1105,7 +1133,7 @@ def run_workflow_chat(
         selection_mapping = (
             _resolve_llm_mapping(
                 selection.llm_type,
-                mappings=config.llm_mappings,
+                mappings=_active_llm_mappings(config, provider_roles, provider_role),
                 provider=provider,
             )
             if _provider_supports_llm_mappings(provider)
@@ -1160,7 +1188,6 @@ def run_workflow_chat(
     )
     root_skill = selected_skill
     skill_stack: list[_SkillExecutionFrame] = []
-    alternate_llm_bindings = False
     completed_skill_dependencies: set[tuple[str, int, str]] = set()
     action_handlers = _workflow_action_handlers()
     step_roundtrips = 0
@@ -1168,6 +1195,8 @@ def run_workflow_chat(
     previous_action_signature: str | None = None
     failed_action_signature: str | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
+        provider = provider_roles.provider_for(provider_role)
+        current_model = _provider_definition(provider).forced_model or current_model
         current_step_index = execution_state.step_index
         current_step = selected_skill.skill.steps[execution_state.step_index]
         dependency_name = _next_skill_dependency(
@@ -1190,7 +1219,7 @@ def run_workflow_chat(
                 ),
                 parent_model=current_model,
                 parent_provider=provider,
-                parent_alternate_llm_bindings=alternate_llm_bindings,
+                parent_provider_role=provider_role,
             )
             selected_skill = nested_skill
             execution_state.selected_skill = nested_skill
@@ -1199,7 +1228,7 @@ def run_workflow_chat(
         step_mapping = (
             _resolve_llm_mapping(
                 current_step.llm_type or selection.llm_type,
-                mappings=_active_llm_mappings(config, alternate_llm_bindings),
+                mappings=_active_llm_mappings(config, provider_roles, provider_role),
                 provider=provider,
             )
             if _provider_supports_llm_mappings(provider)
@@ -1269,7 +1298,7 @@ def run_workflow_chat(
             stderr=stderr,
             provider=provider,
             model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
-            + tuple(_active_llm_mappings(config, alternate_llm_bindings)),
+            + tuple(_active_llm_mappings(config, provider_roles, provider_role)),
             empty_response_fallback_payload={"kind": "next_step"},
         )
         if action is None:
@@ -1278,7 +1307,9 @@ def run_workflow_chat(
             action_mapping = (
                 _resolve_llm_mapping(
                     action.llm_type,
-                    mappings=_active_llm_mappings(config, alternate_llm_bindings),
+                    mappings=_active_llm_mappings(
+                        config, provider_roles, provider_role
+                    ),
                     provider=provider,
                 )
                 if _provider_supports_llm_mappings(provider)
@@ -1301,10 +1332,8 @@ def run_workflow_chat(
             explicit_context = list(action.context)
             if action.decisions_and_context is not None:
                 explicit_context.append(action.decisions_and_context)
-            nested_alternate = (
-                alternate_llm_bindings
-                if action.use_alternate_llm_bindings is None
-                else action.use_alternate_llm_bindings
+            nested_provider_role = (
+                provider_role if action.provider_role is None else action.provider_role
             )
             _push_nested_skill(
                 skill_stack,
@@ -1314,7 +1343,7 @@ def run_workflow_chat(
                 resume_step_index=current_step_index + 1,
                 parent_model=current_model,
                 parent_provider=provider,
-                parent_alternate_llm_bindings=alternate_llm_bindings,
+                parent_provider_role=provider_role,
                 clean_context=action.clean,
                 parent_transcript=tuple(execution_state.transcript)
                 if action.clean
@@ -1343,7 +1372,7 @@ def run_workflow_chat(
                 execution_state.current_file_path = None
             else:
                 execution_state.execution_context.extend(explicit_context)
-            alternate_llm_bindings = nested_alternate
+            provider_role = nested_provider_role
             selected_skill = nested_skill
             execution_state.selected_skill = nested_skill
             execution_state.step_index = 0
@@ -1367,7 +1396,7 @@ def run_workflow_chat(
                 execution_state.current_file_path = frame.parent_current_file_path
             current_model = frame.parent_model
             provider = frame.parent_provider
-            alternate_llm_bindings = frame.parent_alternate_llm_bindings
+            provider_role = frame.parent_provider_role
             continue
         progress.update(
             selected_skill,
@@ -1497,7 +1526,7 @@ def run_workflow_chat(
                     execution_state.current_file_path = frame.parent_current_file_path
                 current_model = frame.parent_model
                 provider = frame.parent_provider
-                alternate_llm_bindings = frame.parent_alternate_llm_bindings
+                provider_role = frame.parent_provider_role
                 continue
         if not should_continue:
             progress.update(
@@ -1934,7 +1963,7 @@ def _push_nested_skill(
     dependency_key: tuple[str, int, str] | None = None,
     parent_model: str = "",
     parent_provider: str = "",
-    parent_alternate_llm_bindings: bool = False,
+    parent_provider_role: LLMProviderRole = "normal",
     clean_context: bool = False,
     parent_transcript: tuple[dict[str, str], ...] | None = None,
     parent_execution_events: tuple[dict[str, Any], ...] | None = None,
@@ -1955,7 +1984,7 @@ def _push_nested_skill(
             dependency_key=dependency_key,
             parent_model=parent_model,
             parent_provider=parent_provider,
-            parent_alternate_llm_bindings=parent_alternate_llm_bindings,
+            parent_provider_role=parent_provider_role,
             clean_context=clean_context,
             parent_transcript=parent_transcript,
             parent_execution_events=parent_execution_events,
@@ -1967,17 +1996,15 @@ def _push_nested_skill(
 
 def _active_llm_mappings(
     config: SkillChatConfig,
-    alternate: bool,
+    provider_roles: LLMProviderRoles,
+    role: LLMProviderRole,
 ) -> tuple[tuple[str, LLMModelMapping], ...]:
-    """Return the custom binding set active for the current skill subtree.
-
-    An omitted alternate set deliberately aliases the default set so callers
-    can opt into alternate binding propagation without requiring a second
-    configuration everywhere.
-    """
-    if alternate and config.alternate_llm_mappings:
-        return config.alternate_llm_mappings
-    return config.llm_mappings
+    """Return mappings for a role without exposing provider details to callers."""
+    provider = provider_roles.provider_for(role)
+    mappings = tuple(_default_llm_mappings(provider).items())
+    if role == "normal":
+        mappings += config.llm_mappings
+    return mappings
 
 
 def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
@@ -2160,8 +2187,9 @@ def _action_system_prompt() -> str:
         "next action is a line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
         "workflow before continuing. It inherits the current context and LLM "
-        "bindings by default. Set alternate_llm_bindings=true or false to "
-        "select the alternate or default binding set for this skill and all of "
+        'provider role by default. Set provider_role="adversarial" to '
+        "run this skill and its descendants with the adversarial provider, or "
+        'provider_role="normal" to return to the normal provider. '
         "its descendants. Set clean=true when the skill must receive only the "
         "explicit context list (and decisions_and_context) and must not return "
         "its gathered context to the caller.\n"
@@ -2208,7 +2236,7 @@ def _action_system_prompt() -> str:
         '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
         '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
         '{"kind":"invoke_skill","skill":"adversarial-review",'
-        '"alternate_llm_bindings":true,"clean":true,'
+        '"provider_role":"adversarial","clean":true,'
         '"context":["Review only this diff."],"decisions_and_context":"..."}\n'
         '{"kind":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
@@ -2922,9 +2950,11 @@ def _parse_workflow_action_invoke_skill(
     skill_name = payload.get("skill")
     if not isinstance(skill_name, str) or not skill_name.strip():
         raise RuntimeError("Workflow invoke_skill action must include skill.")
-    alternate = payload.get("alternate_llm_bindings")
-    if alternate is not None and not isinstance(alternate, bool):
-        raise RuntimeError("alternate_llm_bindings must be a boolean when provided.")
+    provider_role = payload.get("provider_role")
+    if provider_role is not None and provider_role not in {"normal", "adversarial"}:
+        raise RuntimeError(
+            'provider_role must be "normal" or "adversarial" when provided.'
+        )
     clean = payload.get("clean", False)
     if not isinstance(clean, bool):
         raise RuntimeError("clean must be a boolean when provided.")
@@ -2938,7 +2968,7 @@ def _parse_workflow_action_invoke_skill(
         skill_name=skill_name.strip(),
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
-        use_alternate_llm_bindings=alternate,
+        provider_role=provider_role,
         clean=clean,
         context=tuple(value.strip() for value in raw_context),
     )
@@ -4618,33 +4648,53 @@ def _resolve_provider(
     if provider_override != "auto":
         _provider_definition(provider_override)
         return provider_override
+    candidates = _auto_provider_candidates()
+    if candidates:
+        return candidates[0]
     if model.startswith("claude-"):
         return "anthropic"
-    if _provider_has_credentials("deepinfra-cheap"):
-        return "deepinfra-cheap"
-    if model.startswith("glm-"):
-        return "zai"
-    if _provider_has_credentials("anthropic"):
-        if not (
-            os.environ.get("OPENAI_API_KEY")
-            or os.environ.get("CODEX_API_KEY")
-            or _resolve_codex_access_token() is not None
-        ):
-            return "anthropic"
-    if _provider_has_credentials("zai"):
-        if not (
-            os.environ.get("OPENAI_API_KEY")
-            or os.environ.get("CODEX_API_KEY")
-            or os.environ.get("ANTHROPIC_API_KEY")
-            or os.environ.get("CLAUDE_API_KEY")
-            or _resolve_codex_access_token() is not None
-        ):
-            return "zai"
     return "openai"
+
+
+def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
+    """Resolve the two opaque provider roles used by workflow execution."""
+    if config.normal_provider is not None:
+        normal = config.normal_provider
+    elif config.provider == "auto":
+        candidates = _auto_provider_candidates()
+        normal = candidates[0] if candidates else "openai"
+    else:
+        normal = config.provider
+    _provider_definition(normal)
+
+    adversarial = config.adversarial_provider
+    if adversarial is None and config.provider == "auto":
+        candidates = _auto_provider_candidates()
+        adversarial = next(
+            (candidate for candidate in candidates if candidate != normal),
+            None,
+        )
+    if adversarial is not None:
+        _provider_definition(adversarial)
+    return LLMProviderRoles(normal=normal, adversarial=adversarial)
+
+
+def _auto_provider_candidates() -> tuple[str, ...]:
+    """Return configured providers in their declared automatic priority order."""
+    candidates: list[tuple[int, str]] = []
+    for name, definition in LLM_PROVIDERS.items():
+        if definition.auto_priority is None or not _provider_has_credentials(name):
+            continue
+        # DeepInfra Cheap is the automatic mode for a DeepInfra credential;
+        # standard DeepInfra remains available through explicit selection.
+        candidates.append((definition.auto_priority, name))
+    return tuple(name for _, name in sorted(candidates))
 
 
 def _provider_has_credentials(provider: str) -> bool:
     definition = _provider_definition(provider)
+    if provider == "openai" and _resolve_codex_access_token() is not None:
+        return True
     return any(
         os.environ.get(env_name)
         for env_name in definition.api_key_env_names + definition.base_url_env_names

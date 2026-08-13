@@ -58,6 +58,7 @@ from powdrr_lift.workflow_chat_agent import (
     AnthropicChatClient,
     LLMModelLimits,
     LLMModelMapping,
+    LLMProviderRoles,
     LocalLlamaChatClient,
     LocalModelRuntimeError,
     OpenAIChatClient,
@@ -90,6 +91,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_local_model_path,
     _resolve_project_root,
     _resolve_provider,
+    _resolve_provider_roles,
     _resolve_skill_path,
     _resolve_worktree_context,
     _validate_user_question,
@@ -1758,6 +1760,46 @@ def test_auto_provider_prefers_deepinfra_cheap_when_credentials_are_available(
     assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
 
 
+def test_auto_provider_roles_use_the_top_two_configured_providers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_API_KEY",
+        "ZAI_API_KEY",
+        "ZAI_BASE_URL",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_BASE_URL",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+    monkeypatch.setenv("ZAI_API_KEY", "zai-token")
+
+    roles = _resolve_provider_roles(SkillChatConfig(skills_dir=Path("skills")))
+
+    assert isinstance(roles, LLMProviderRoles)
+    assert roles.normal == "deepinfra-cheap"
+    assert roles.adversarial == "zai"
+
+
+def test_auto_provider_roles_return_no_adversarial_provider_when_only_one_is_configured(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY", "ZAI_API_KEY"):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+
+    roles = _resolve_provider_roles(SkillChatConfig(skills_dir=Path("skills")))
+
+    assert roles.normal == "deepinfra-cheap"
+    assert roles.adversarial is None
+
+
 def test_explicit_provider_selection_is_not_overridden() -> None:
     assert _resolve_provider("local", "glm-5.2") == "local"
     assert "deepinfra-cheap" in ALL_PROVIDERS
@@ -2256,12 +2298,12 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "end_line" in prompt
 
 
-def test_invoke_skill_supports_alternate_bindings_clean_context() -> None:
+def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
     action = _parse_action_response(
         {
             "kind": "invoke_skill",
             "skill": "adversarial-review",
-            "alternate_llm_bindings": True,
+            "provider_role": "adversarial",
             "clean": True,
             "context": ["Review only this diff."],
             "decisions_and_context": "The change is intentionally narrow.",
@@ -2269,7 +2311,7 @@ def test_invoke_skill_supports_alternate_bindings_clean_context() -> None:
     )
 
     assert action.skill_name == "adversarial-review"
-    assert action.use_alternate_llm_bindings is True
+    assert action.provider_role == "adversarial"
     assert action.clean is True
     assert action.context == ("Review only this diff.",)
     assert action.decisions_and_context == "The change is intentionally narrow."

@@ -84,6 +84,9 @@ steps:
     specification separate and give each one a stable proposed-PR name. Pass
     the complete set of proposed PRs and every created or reused
     implementation-specification file as context to the next step.
+    Use the always-available read_document action to inspect
+    templates/execute-proposed-pr.yaml; do not invoke sed or another shell
+    command to read the file.
   tool_invocations:
   - tool: shell
     command:
@@ -93,12 +96,6 @@ steps:
     - <feature-name>
     - --output
     - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
-  - tool: shell
-    command:
-    - sed
-    - -n
-    - 1,260p
-    - templates/execute-proposed-pr.yaml
 - description: Instantiate an execution workflow for every proposed PR.
   llm_type: simple_task
   details: >-

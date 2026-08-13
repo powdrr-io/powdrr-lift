@@ -4032,16 +4032,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "The project structure bootstrap is complete.",
             },
             {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "sed",
-                        "-n",
-                        "1,260p",
-                        "templates/execute-proposed-pr.yaml",
-                    ]
-                },
+                "kind": "read_document",
+                "file_path": "templates/execute-proposed-pr.yaml",
+                "start_line": 1,
+                "end_line": 260,
                 "decisions_and_context": "The execute-proposed-pr template is selected.",
             },
             {
@@ -4190,7 +4184,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     start_event_kinds = [event["kind"] for event in start_summary["execution_events"]]
     assert start_event_kinds[0] == "next_step"
     assert start_event_kinds.count("next_step") >= 6
-    assert "invoke_tool" in start_event_kinds
+    assert "read_document" in start_event_kinds
     assert start_event_kinds[-1] == "complete"
 
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"

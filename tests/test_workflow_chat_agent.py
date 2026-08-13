@@ -83,6 +83,7 @@ from powdrr_lift.workflow_chat_agent import (
     _match_work_item_names,
     _normalize_cache_usage,
     _parse_action_response,
+    _parse_json_object,
     _prompt_user,
     _request_token_budget,
     _resolve_api_key,
@@ -3011,6 +3012,132 @@ def test_edit_action_can_update_multiple_files_in_one_response(
     assert first_path.read_text(encoding="utf-8") == "updated first\n"
     assert second_path.read_text(encoding="utf-8") == "updated second\n"
     assert len(state.execution_events[0]["result"]) == 2
+
+
+def test_edit_action_rejects_invalid_yaml_before_writing(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "project-structure.yaml"
+    yaml_path.write_text("name: original\n", encoding="utf-8")
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": yaml_path.name,
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 1,
+                    "text": "name: [",
+                }
+            ],
+        }
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.json", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+
+    with pytest.raises(RuntimeError, match="Edited YAML file .*line [12]"):
+        _handle_workflow_action_edit(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=tmp_path),
+        )
+
+    assert yaml_path.read_text(encoding="utf-8") == "name: original\n"
+
+
+def test_edit_action_normalizes_fenced_yaml_before_validation(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "project-structure.yaml"
+    yaml_path.write_text("name: original\n", encoding="utf-8")
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": yaml_path.name,
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 1,
+                    "text": "```yaml\nname: corrected\n```",
+                }
+            ],
+        }
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.json", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+
+    _handle_workflow_action_edit(
+        action,
+        state,
+        io.StringIO(),
+        io.StringIO(),
+        lambda: "",
+        SkillChatConfig(skills_dir=tmp_path),
+    )
+
+    assert yaml.safe_load(yaml_path.read_text(encoding="utf-8")) == {
+        "name": "corrected"
+    }
+
+
+def test_edit_action_rejects_invalid_json_before_writing(tmp_path: Path) -> None:
+    json_path = tmp_path / "settings.json"
+    json_path.write_text('{"name": "original"}\n', encoding="utf-8")
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": json_path.name,
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 1,
+                    "text": '{"name": }',
+                }
+            ],
+        }
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.json", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+
+    with pytest.raises(RuntimeError, match="Edited JSON file .*column"):
+        _handle_workflow_action_edit(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=tmp_path),
+        )
+
+    assert json_path.read_text(encoding="utf-8") == '{"name": "original"}\n'
+
+
+def test_parse_json_object_accepts_fenced_json_and_surrounding_prose() -> None:
+    assert _parse_json_object(
+        'Here is the response:\n```json\n{"kind": "next_step"}\n```',
+        "workflow response",
+    ) == {"kind": "next_step"}
+    assert _parse_json_object(
+        'I chose this action: {"kind": "complete", "text": "done"}',
+        "workflow response",
+    ) == {"kind": "complete", "text": "done"}
 
 
 def test_prompt_user_action_requires_nonempty_text() -> None:

@@ -188,12 +188,20 @@ def build_skill_validation_report(
         else:
             loaded_content = json.loads(json_content)
     except Exception as exc:  # noqa: BLE001
+        document_type = (
+            "YAML"
+            if source_path is not None
+            and Path(source_path).suffix.lower() in {".yaml", ".yml"}
+            else "JSON"
+        )
         return SkillValidationReport(
             validation_successful=False,
             issues=[
                 SkillValidationIssue(
-                    code="invalid_json",
-                    message=f"Could not parse skill document: {exc}",
+                    code=(
+                        "invalid_yaml" if document_type == "YAML" else "invalid_json"
+                    ),
+                    message=f"Could not parse {document_type} skill document: {exc}",
                     path=_path_prefix(source_path),
                 )
             ],

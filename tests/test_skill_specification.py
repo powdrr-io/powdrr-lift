@@ -8,6 +8,7 @@ from powdrr_lift.core import (
     SkillStep,
     SkillToolInvocation,
     build_skill_directory_validation_report,
+    build_skill_validation_report,
     load_skill,
     save_skill,
     skill_from_json,
@@ -140,6 +141,18 @@ def test_skill_directory_validation_accepts_references(tmp_path: Path) -> None:
         ],
         "issues": [],
     }
+
+
+def test_skill_validation_reports_yaml_parse_errors_as_yaml(tmp_path: Path) -> None:
+    skill_path = tmp_path / "broken.yaml"
+    report = build_skill_validation_report(
+        "name: [\n",
+        source_path=skill_path,
+    )
+
+    assert report.validation_successful is False
+    assert report.issues[0].code == "invalid_yaml"
+    assert "Could not parse YAML skill document" in report.issues[0].message
 
 
 def test_skill_directory_validation_rejects_unknown_reference(

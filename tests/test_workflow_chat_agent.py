@@ -105,6 +105,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
     _WorkflowEditRangeError,
@@ -1603,6 +1604,32 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
     )
 
 
+def test_repeated_document_reads_do_not_count_as_material_progress(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "README.md"
+    document.write_text("line one\nline two\n", encoding="utf-8")
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        current_file_path=document,
+    )
+    action = _parse_action_response(
+        {
+            "kind": "read_document",
+            "file_path": "README.md",
+            "start_line": 1,
+            "end_line": 2,
+        }
+    )
+
+    assert _workflow_action_material_state(action, state) is None
+
+
 def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
     assert (
         _resolve_llm_model(
@@ -2498,6 +2525,16 @@ def test_workflow_execution_skips_repeated_no_progress_tool_step(
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        lambda *_args, **_kwargs: {
+            "command": "rtk printf same",
+            "cwd": str(repo_root),
+            "returncode": 0,
+            "stdout": "same",
+            "stderr": "",
+        },
     )
 
     stderr = io.StringIO()

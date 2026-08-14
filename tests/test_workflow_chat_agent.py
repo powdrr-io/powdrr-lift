@@ -940,6 +940,8 @@ def test_textual_failure_retains_diagnostics_instead_of_unknown_error(
     assert "yaml.parser.ParserError: invalid syntax" in rendered
     assert "line 12, column 7" in rendered
     assert "Editing project-structure.yaml" in rendered
+    assert "Press Ctrl+Q to exit." in rendered
+    assert "Press Ctrl+C to exit." not in rendered
     error_log = (tmp_path / "agent_error.txt").read_text(encoding="utf-8")
     assert "Workflow error:" in error_log
     assert "Editing project-structure.yaml" in error_log

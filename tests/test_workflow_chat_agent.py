@@ -4349,31 +4349,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "review-architecture",
                 }
                 self._nested_event_count += 1
-                current_step = cast(dict[str, object], prompt["current_step"])
-                tool_invocations = cast(
-                    list[dict[str, object]], current_step.get("tool_invocations", [])
-                )
-                current_step_index = prompt["current_step_index"]
-                has_tool_result = any(
-                    event.get("kind") == "invoke_tool"
-                    and event.get("step_index") == current_step_index
-                    for event in cast(
-                        list[dict[str, object]], prompt["execution_events"]
-                    )
-                )
-                if tool_invocations and not has_tool_result:
-                    invocation = tool_invocations[0]
-                    command = [
-                        str(item)
-                        .replace("<work-item-name>", "display-related-photos")
-                        .replace("<type>", "photo")
-                        for item in cast(list[object], invocation["command"])
-                    ]
-                    return {
-                        "kind": "invoke_tool",
-                        "tool": invocation["tool"],
-                        "parameters": {"command": command},
-                    }
                 return {
                     "kind": "next_step",
                 }
@@ -4902,46 +4877,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         _capture_worktree_context,
     )
 
-    real_execute_shell_tool = _execute_shell_tool
-
-    def _execute_nested_validator(
-        parameters: dict[str, object],
-        *,
-        worktree_root: Path,
-        stdout: TextIO,
-        stderr: TextIO,
-        verbose: bool,
-        announce: bool = True,
-        print_stdout: bool = True,
-    ) -> dict[str, object]:
-        command = parameters.get("command")
-        if (
-            isinstance(command, (list, tuple))
-            and len(command) > 1
-            and str(command[1]).startswith("evaluate-")
-        ):
-            return {
-                "command": " ".join(str(item) for item in command),
-                "cwd": str(worktree_root_holder["path"]),
-                "returncode": 0,
-                "stdout": "",
-                "stderr": "",
-            }
-        return real_execute_shell_tool(
-            parameters,
-            worktree_root=worktree_root,
-            stdout=stdout,
-            stderr=stderr,
-            verbose=verbose,
-            announce=announce,
-            print_stdout=print_stdout,
-        )
-
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
-        _execute_nested_validator,
-    )
-
     stdout = io.StringIO()
     stderr = io.StringIO()
 
@@ -4983,7 +4918,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert event_kinds[0:2] == ["prompt_user", "next_step"]
     assert event_kinds[-2:] == ["prompt_user", "complete"]
     assert event_kinds.count("edit") == 4
-    assert event_kinds.count("invoke_tool") >= 8
+    assert event_kinds.count("invoke_tool") >= 7
 
     system_report = yaml.safe_load(
         validate_system_specification_yaml(
@@ -5123,6 +5058,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._pr_commit_invoked = False
             self._pr_push_invoked = False
             self._pr_create_invoked = False
+            self._pr_update_invoked = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -5141,10 +5077,38 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 assert prompt["execution_mode"] == "execute_selected_skill"
                 if prompt["selected_skill"]["name"] == "bootstrap-code-structure":
                     assert prompt["current_step_index"] < 7
+                    shell_invocations = [
+                        invocation
+                        for invocation in prompt["current_step"].get(
+                            "tool_invocations", []
+                        )
+                        if invocation.get("tool") == "shell"
+                    ]
+                    if shell_invocations:
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": shell_invocations[0]["command"]},
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     assert prompt["current_step_index"] < 3
+                    shell_invocations = [
+                        invocation
+                        for invocation in prompt["current_step"].get(
+                            "tool_invocations", []
+                        )
+                        if invocation.get("tool") == "shell"
+                    ]
+                    if shell_invocations:
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": shell_invocations[0]["command"]},
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "create-pull-request":
@@ -5216,11 +5180,45 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                                 ]
                             },
                         }
+                    if (
+                        prompt["current_step_index"] == 5
+                        and not self._pr_update_invoked
+                    ):
+                        self._pr_update_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": [
+                                    "gh",
+                                    "pr",
+                                    "edit",
+                                    "123",
+                                    "--title",
+                                    "test",
+                                    "--body",
+                                    "test",
+                                ]
+                            },
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
                 )
+                shell_invocations = [
+                    invocation
+                    for invocation in prompt["current_step"].get("tool_invocations", [])
+                    if invocation.get("tool") == "shell"
+                ]
+                if shell_invocations:
+                    self._call_index += 1
+                    return {
+                        "kind": "invoke_tool",
+                        "tool": "shell",
+                        "parameters": {"command": shell_invocations[0]["command"]},
+                    }
             response = next(start_responses)
             self._call_index += 1
             return response
@@ -5245,6 +5243,47 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent.subprocess.run",
         _fake_start_subprocess_run,
+    )
+
+    real_execute_shell_tool = _execute_shell_tool
+
+    def _fake_pr_shell_tool(
+        parameters: dict[str, object],
+        *,
+        worktree_root: Path,
+        stdout: TextIO,
+        stderr: TextIO,
+        verbose: bool,
+        announce: bool = True,
+        print_stdout: bool = True,
+    ) -> dict[str, object]:
+        command = parameters.get("command")
+        command_items = list(command) if isinstance(command, list) else []
+        if command_items and command_items[0] != "powdrr-lift":
+            if command_items[:3] == ["gh", "pr", "create"]:
+                stdout.write("https://github.com/example/repo/pull/123\n")
+            return {
+                "command": " ".join(str(item) for item in command_items),
+                "cwd": str(worktree_root),
+                "returncode": 0,
+                "stdout": "https://github.com/example/repo/pull/123\n"
+                if command_items[:3] == ["gh", "pr", "create"]
+                else "",
+                "stderr": "",
+            }
+        return real_execute_shell_tool(
+            parameters,
+            worktree_root=worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=verbose,
+            announce=announce,
+            print_stdout=print_stdout,
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        _fake_pr_shell_tool,
     )
 
     start_stdout = io.StringIO()

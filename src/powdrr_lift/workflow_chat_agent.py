@@ -3518,8 +3518,9 @@ def _validate_workflow_step_transition(
             code="workflow_step_tool_required",
             message=(
                 f"The current step requires a successful tool invocation before "
-                f"{action.kind}: {expected}. Invoke the declared tool and wait "
-                "for its result before advancing."
+                f"{action.kind}: {expected}. Current step index: "
+                f"{current_step_index}. Invoke the declared tool and wait for its "
+                "result before advancing."
             ),
             path="kind",
         )

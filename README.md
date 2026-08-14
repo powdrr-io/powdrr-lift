@@ -14,7 +14,7 @@ a long conversation, and permission to act, and familiar failure modes appear qu
 * An autonomous run reports “done” without proving that the change matches the request,
   the repository's rules, or the decisions made earlier.
 
-Powdrr Lift is built for the other outcome.
+**Powdrr Lift is built for the other outcome.**
 
 It is a software factory: a human-facing workflow chat client for directing work, plus
 fully autonomous agents that can keep a task moving through planning, implementation,
@@ -24,7 +24,7 @@ step has a purpose, and every action is checked against the step that authorized
 
 That is the fundamental difference. A generic agent can lose the plot and improvise a
 new one. Powdrr Lift cannot silently turn a focused workflow into free-form work: the
-agent operates inside a checked-in skill, receives targeted context, uses declared
+agent operates inside a well-formulated plan, receives targeted context, uses declared
 actions, works in a dedicated worktree, and stops when it cannot make validated progress.
 The result is autonomy with a contract.
 
@@ -33,7 +33,7 @@ The result is autonomy with a contract.
 ### Direct the work in chat—or let it run
 
 Start with a conversation when the problem is still ambiguous. The workflow chat client
-matches the request to a checked-in skill, asks the questions that matter, and shows the
+matches the request to a well-formulated plan, asks the questions that matter, and shows the
 agent's current step and context. Once the work is specified, autonomous workflows can
 continue driving it forward without requiring a human to translate every decision into
 the next prompt.
@@ -108,10 +108,10 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 
 ## How It Works
 
-1. Install `powdrrlift` skills to your favorite coding agent
-2. Prompt and use your agent; it will pick up the skills automatically
-3. Explicitly use the skills for even better planning, coding output, and code reviews
-4. Explore the `powdrrlift` UI to get insights into the reasons and relationships in your code
+1. Install Powdrr Lift in the repository where you want work done
+2. Start workflow chat and describe the outcome you want
+3. Answer the questions that shape the plan, or let an autonomous workflow continue
+4. Review the validated artifacts, execution summary, and proposed code changes
 
 ## What You Will Notice
 
@@ -121,35 +121,6 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 * Less tokens spent with more output generated
 
 ## Get Started
-
-### For OpenCode
-
-1. **Clone this repository**
-   ```bash
-   git clone <repository-url>
-   cd powdrr-lift
-   ```
-
-2. **Install RTK**
-
-   Install the `rtk` command and make sure it is available on your `PATH`.
-   Powdrr-Lift requires RTK because every workflow shell tool invocation runs
-   through it.
-
-3. **Install the skills**
-   ```bash
-   ./scripts/install-skills.sh
-   ```
-
-4. **OpenCode will automatically load the skills**
-   - Skills are installed to `~/.config/opencode/skills/`
-   - Configuration is installed to `~/.config/opencode/opencode.json`
-   - Skills are enabled for default agents
-
-5. **Start using the skills**
-   - Run `opencode` in your project
-   - The skills will be available automatically
-   - Use the `skill` tool to invoke specific skills
 
 ### For Codex Proxy Recording
 
@@ -256,7 +227,8 @@ brew install powdrr-lift
 
 ### Available Skills
 
-This repository includes 10 installable skills for OpenCode:
+This repository includes 10 reusable skills for planning, implementation, validation,
+review, and repository-state management:
 
 1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated system specification document from the analysis and commit it.
 
@@ -277,17 +249,6 @@ This repository includes 10 installable skills for OpenCode:
 9. **specify-system** - Create, fill, and validate system specification templates with the repository's system-specification CLI or MCP endpoints.
 
 10. **synchronize-code-and-state** - Generate the current codebase-state snapshot, compare it to the source tree and changelog index, and reconcile mismatches by changing code and/or the changelog while preserving the repo's intent.
-
-**Usage:**
-```bash
-# In OpenCode, you can invoke skills manually:
-skill({ name: "prepare-pr-changelog" })
-skill({ name: "review-pr-changelog" })
-skill({ name: "specify-system" })
-```
-
-OpenCode will automatically load skills and display them in the available skills list.
-
 
 ## Background
 

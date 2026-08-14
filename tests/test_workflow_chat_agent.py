@@ -2759,6 +2759,7 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "requirements" in prompt
     assert "entity-relationships" in prompt
     assert "proposed PRs" in prompt
+    assert "Do not use filters.work_item_name" in prompt
     assert "read_document" in prompt
     assert "start_line" in prompt
     assert "end_line" in prompt

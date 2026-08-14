@@ -3,9 +3,12 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 import yaml
 
+import powdrr_lift.core.pr_specification as pr_specification_module
 from powdrr_lift import (
     build_pr_specification_validation_report,
     validate_pr_specification_yaml,
@@ -275,6 +278,49 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
         repo_root=tmp_path,
     )
 
+    assert report.validation_successful is True
+
+
+def test_pr_specification_feature_catalog_includes_local_features(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    monkeypatch.setattr(
+        pr_specification_module,
+        "build_codebase_state_report",
+        lambda repo_root: SimpleNamespace(
+            entities=[
+                SimpleNamespace(
+                    id="checked-in-feature",
+                    type="Feature",
+                    source=SimpleNamespace(changelog_path="docs/changelogs/PR-1.yaml"),
+                )
+            ]
+        ),
+    )
+
+    report = build_pr_specification_validation_report(
+        """
+        schema: https://powdrr.io/schemas/specification-v1
+        id: pr-local
+        feature_ids:
+          - checked-in-feature
+          - feature-a
+        intent:
+          problem: Add a local feature.
+          goal: Add a local feature.
+          reasoning: Validate against checked-in and local context.
+        """,
+        work_item_name="local-feature",
+        repo_root=tmp_path,
+    )
+
+    assert report.available_feature_ids == [
+        "checked-in-feature",
+        "feature-a",
+        "feature-b",
+    ]
     assert report.validation_successful is True
     assert report.issues == []
 

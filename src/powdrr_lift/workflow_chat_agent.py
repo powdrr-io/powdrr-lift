@@ -745,6 +745,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_step_index=parent_step_index,
             )
         self.failure_kind = "validation_error"
+        _validate_workflow_step_transition(
+            action,
+            self.current_step,
+            self.state.execution_events,
+            self.state.step_index,
+        )
         _validate_workflow_action_for_step(action, self.current_step)
         self.failure_kind = "action_error"
         handler = _workflow_action_handlers().get(action.kind)
@@ -1823,6 +1829,11 @@ def run_workflow_chat(
     if exit_code != 0:
         return exit_code
     selected_skill = execution_strategy.selected_skill
+    progress.update(
+        root_skill,
+        current_step_index=len(root_skill.skill.steps),
+        status=f"{root_skill.skill.name} skill completed",
+    )
 
     summary = _build_skill_execution_summary(
         root_skill,
@@ -2919,10 +2930,18 @@ def _action_system_prompt() -> str:
         "this skill creates it. If fuzzy-match finds no matching workflow, invoke "
         "instantiate-workflow immediately rather than asking the user for one.\n"
         "When the current step includes tool_invocations, choose one of those "
-        "structured invocations and fill in its parameters. When it does not, "
+        "structured invocations and fill in its parameters unless the task "
+        "description explicitly says otherwise. When it does not, "
         "do not return invoke_tool.\n"
+        "Never return next_step or complete from a step with tool_invocations "
+        "until you have invoked a declared tool for that step and received a "
+        "successful result. A prose summary of the intended command is not a "
+        "tool invocation; emit invoke_tool and wait for its result.\n"
         "Use next_step when the current step is complete and the next step "
         "should receive the accumulated context.\n"
+        "When a step declares tool_invocations, next_step and complete are "
+        "invalid until a declared tool has been invoked successfully for that "
+        "step.\n"
         "Use complete when the skill is finished.\n"
         "Always include decisions_and_context with the concise information "
         "future steps will need.\n"
@@ -3443,6 +3462,69 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
                 path="parameters.command",
             )
         ) from exc
+
+
+def _validate_workflow_step_transition(
+    action: SkillChatAction,
+    step: Any,
+    execution_events: Sequence[Mapping[str, Any]],
+    current_step_index: int,
+) -> None:
+    """Prevent the LLM from skipping a step's required tool invocation."""
+    if action.kind not in {"next_step", "complete"}:
+        return
+    invocations = tuple(
+        invocation for invocation in step.tool_invocations if invocation.tool != "ref"
+    )
+    if not invocations:
+        return
+    # Shell invocations are the externally visible commands that can mutate
+    # the branch. Internal inspection and validator actions retain their
+    # existing corrective-action behavior; a shell command in the same step
+    # remains the transition gate.
+    required_invocations = tuple(
+        invocation for invocation in invocations if invocation.tool == "shell"
+    )
+    if not required_invocations:
+        return
+
+    def successful_event_matches(invocation: Any, event: Mapping[str, Any]) -> bool:
+        if event.get("kind") != "invoke_tool":
+            return False
+        if event.get("tool") not in {None, invocation.tool}:
+            return False
+        if event.get("step_index") != current_step_index:
+            return False
+        result = event.get("result")
+        if isinstance(result, Mapping) and result.get("returncode") not in (None, 0):
+            return False
+        parameters = event.get("parameters")
+        if not isinstance(parameters, Mapping) or parameters.get("command") is None:
+            return True
+        try:
+            command_items = _command_items_for_validation(parameters["command"])
+        except RuntimeError:
+            return False
+        return _command_matches_invocation(command_items, invocation.command)
+
+    if any(
+        any(successful_event_matches(invocation, event) for event in execution_events)
+        for invocation in required_invocations
+    ):
+        return
+    expected = ", ".join(invocation.tool for invocation in required_invocations)
+    raise _WorkflowToolValidationError(
+        ValidationError(
+            code="workflow_step_tool_required",
+            message=(
+                f"The current step requires a successful tool invocation before "
+                f"{action.kind}: {expected}. Current step index: "
+                f"{current_step_index}. Invoke the declared tool and wait for its "
+                "result before advancing."
+            ),
+            path="kind",
+        )
+    )
 
 
 def _validate_workflow_action_for_step_unwrapped(

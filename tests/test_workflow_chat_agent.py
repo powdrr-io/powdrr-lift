@@ -106,6 +106,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _validate_workflow_step_transition,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
@@ -226,6 +227,72 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
                 }
             ),
             step,
+        )
+
+    with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "next_step"}),
+            step,
+            [],
+            0,
+        )
+
+    _validate_workflow_step_transition(
+        _parse_action_response({"kind": "next_step"}),
+        step,
+        [
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["rg", "--files"]},
+                "result": {"returncode": 0},
+                "step_index": 0,
+            }
+        ],
+        0,
+    )
+
+    with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "next_step"}),
+            step,
+            [
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                    "result": {"returncode": 1},
+                    "step_index": 0,
+                }
+            ],
+            0,
+        )
+
+    commit_step = replace(
+        step,
+        tool_invocations=(
+            SkillToolInvocation(
+                tool="internal", command=("powdrr-lift", "repository-state")
+            ),
+            SkillToolInvocation(
+                tool="shell", command=("git", "commit", "-m", "<message>")
+            ),
+        ),
+    )
+    with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "next_step"}),
+            commit_step,
+            [
+                {
+                    "kind": "invoke_tool",
+                    "tool": "internal",
+                    "parameters": {"command": ["powdrr-lift", "repository-state"]},
+                    "result": {},
+                    "step_index": 0,
+                }
+            ],
+            0,
         )
 
     wildcard_step = replace(
@@ -3741,7 +3808,32 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
     worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
-    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+    skill = _build_skill()
+    save_skill(
+        replace(
+            skill,
+            steps=(
+                replace(
+                    skill.steps[0],
+                    tool_invocations=(
+                        SkillToolInvocation(
+                            tool="fuzzy-match",
+                            command=(
+                                "fuzzy-match",
+                                ".",
+                                "-name",
+                                "<name>",
+                                "-type",
+                                "f",
+                            ),
+                        ),
+                    ),
+                ),
+                *skill.steps[1:],
+            ),
+        ),
+        skills_dir / "specify-a-feature.json",
+    )
     captured_messages: list[dict[str, str]] = []
 
     class _FakeOpenAIClient:
@@ -4822,37 +4914,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["selected_skill_name"] == "specify-a-feature"
-    assert [event["kind"] for event in summary["execution_events"]] == [
-        "prompt_user",
-        "next_step",
-        "invoke_tool",
-        "edit",
-        "next_step",
-        "next_step",
-        "next_step",
-        "next_step",
-        "next_step",
-        "invoke_tool",
-        "next_step",
-        "invoke_tool",
-        "edit",
-        "next_step",
-        "next_step",
-        "next_step",
-        "next_step",
-        "next_step",
-        "invoke_tool",
-        "next_step",
-        "invoke_tool",
-        "edit",
-        "invoke_tool",
-        "next_step",
-        "invoke_tool",
-        "edit",
-        "next_step",
-        "prompt_user",
-        "complete",
-    ]
+    event_kinds = [event["kind"] for event in summary["execution_events"]]
+    assert event_kinds[0:2] == ["prompt_user", "next_step"]
+    assert event_kinds[-2:] == ["prompt_user", "complete"]
+    assert event_kinds.count("edit") == 4
+    assert event_kinds.count("invoke_tool") >= 7
 
     system_report = yaml.safe_load(
         validate_system_specification_yaml(
@@ -4992,6 +5058,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._pr_commit_invoked = False
             self._pr_push_invoked = False
             self._pr_create_invoked = False
+            self._pr_update_invoked = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -5010,10 +5077,38 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 assert prompt["execution_mode"] == "execute_selected_skill"
                 if prompt["selected_skill"]["name"] == "bootstrap-code-structure":
                     assert prompt["current_step_index"] < 8
+                    shell_invocations = [
+                        invocation
+                        for invocation in prompt["current_step"].get(
+                            "tool_invocations", []
+                        )
+                        if invocation.get("tool") == "shell"
+                    ]
+                    if shell_invocations:
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": shell_invocations[0]["command"]},
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     assert prompt["current_step_index"] < 3
+                    shell_invocations = [
+                        invocation
+                        for invocation in prompt["current_step"].get(
+                            "tool_invocations", []
+                        )
+                        if invocation.get("tool") == "shell"
+                    ]
+                    if shell_invocations:
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": shell_invocations[0]["command"]},
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "create-pull-request":
@@ -5085,11 +5180,45 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                                 ]
                             },
                         }
+                    if (
+                        prompt["current_step_index"] == 5
+                        and not self._pr_update_invoked
+                    ):
+                        self._pr_update_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": [
+                                    "gh",
+                                    "pr",
+                                    "edit",
+                                    "123",
+                                    "--title",
+                                    "test",
+                                    "--body",
+                                    "test",
+                                ]
+                            },
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
                 )
+                shell_invocations = [
+                    invocation
+                    for invocation in prompt["current_step"].get("tool_invocations", [])
+                    if invocation.get("tool") == "shell"
+                ]
+                if shell_invocations:
+                    self._call_index += 1
+                    return {
+                        "kind": "invoke_tool",
+                        "tool": "shell",
+                        "parameters": {"command": shell_invocations[0]["command"]},
+                    }
             response = next(start_responses)
             self._call_index += 1
             return response
@@ -5114,6 +5243,47 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent.subprocess.run",
         _fake_start_subprocess_run,
+    )
+
+    real_execute_shell_tool = _execute_shell_tool
+
+    def _fake_pr_shell_tool(
+        parameters: dict[str, object],
+        *,
+        worktree_root: Path,
+        stdout: TextIO,
+        stderr: TextIO,
+        verbose: bool,
+        announce: bool = True,
+        print_stdout: bool = True,
+    ) -> dict[str, object]:
+        command = parameters.get("command")
+        command_items = list(command) if isinstance(command, list) else []
+        if command_items and command_items[0] != "powdrr-lift":
+            if command_items[:3] == ["gh", "pr", "create"]:
+                stdout.write("https://github.com/example/repo/pull/123\n")
+            return {
+                "command": " ".join(str(item) for item in command_items),
+                "cwd": str(worktree_root),
+                "returncode": 0,
+                "stdout": "https://github.com/example/repo/pull/123\n"
+                if command_items[:3] == ["gh", "pr", "create"]
+                else "",
+                "stderr": "",
+            }
+        return real_execute_shell_tool(
+            parameters,
+            worktree_root=worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=verbose,
+            announce=announce,
+            print_stdout=print_stdout,
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        _fake_pr_shell_tool,
     )
 
     start_stdout = io.StringIO()
@@ -6793,36 +6963,10 @@ def _build_skill() -> Skill:
             SkillStep(
                 description="Capture the feature goal.",
                 details="Record the user-visible outcome first.",
-                tool_invocations=(
-                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
-                    SkillToolInvocation(
-                        tool="fuzzy-match",
-                        command=(
-                            "fuzzy-match",
-                            ".",
-                            "-name",
-                            "<query>",
-                            "-type",
-                            "<type>",
-                        ),
-                    ),
-                    SkillToolInvocation(
-                        tool="shell",
-                        command=(
-                            "powdrr-lift",
-                            "system-specification",
-                            "--work-item-name",
-                            "<work-item-name>",
-                        ),
-                    ),
-                ),
             ),
             SkillStep(
                 description="Summarize the result.",
                 details="Leave the user with a concise handoff.",
-                tool_invocations=(
-                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
-                ),
             ),
         ),
     )

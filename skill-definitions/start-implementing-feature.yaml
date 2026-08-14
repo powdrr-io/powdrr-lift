@@ -179,10 +179,14 @@ steps:
 - description: Commit the approved artifacts and open a draft pull request.
   llm_type: simple_task
   details: >-
-    Invoke create-pull-request with pr-kind `feature`, commit message `Add
-    <feature-name> implementation workflow`, and pull-request title
+    You must invoke create-pull-request with pr-kind `feature`, commit message
+    `Add <feature-name> implementation workflow`, and pull-request title
     `<pull-request-title>`. Pass the approved planning artifacts and the
-    Feature Plan context. Do not implement any proposed PR.
+    Feature Plan context. Do not summarize or print a proposed PR description,
+    and do not advance to the handoff step until the nested skill has actually
+    committed, pushed, and created or updated a pull request successfully. If
+    the nested skill reports an error, continue its corrective steps or stop
+    with the error; never claim that a PR is ready without a returned PR URL.
   uses_skills:
   - create-pull-request
 - description: Hand the draft pull request to the user for review.

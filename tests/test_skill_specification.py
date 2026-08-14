@@ -324,6 +324,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     assert report.validation_successful is True
     assert report.skill_names == [
         "address-review-comments",
+        "adversarial-pr-review",
         "bootstrap-code-structure",
         "dead-code-review",
         "feature-functionality-review",
@@ -360,6 +361,7 @@ def test_checked_in_review_skill_definitions_exist() -> None:
     assert (skills_dir / "finish-pr-prep.yaml").is_file()
     assert (skills_dir / "feature-test-coverage-review.yaml").is_file()
     assert (skills_dir / "dead-code-review.yaml").is_file()
+    assert (skills_dir / "adversarial-pr-review.yaml").is_file()
     assert (skills_dir / "review-architecture.yaml").is_file()
     assert (skills_dir / "review-system.yaml").is_file()
 

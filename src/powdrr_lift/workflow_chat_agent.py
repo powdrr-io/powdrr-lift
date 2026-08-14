@@ -2696,6 +2696,10 @@ def _action_system_prompt() -> str:
         "Use keywords to narrow results to items that mention one or more "
         "words. Use filters for exact field matching, such as "
         '{"entity_type":["Tool"],"labels":["python"]}.\n'
+        "Do not use filters.work_item_name. Work-item scope comes from the "
+        "document path and the current work-item context; gather_context "
+        "already searches the relevant local and checked-in documents. Use "
+        "keywords or item fields to narrow results within that scope.\n"
         "Use prompt_user only when you need more information to continue "
         "executing the current step.\n"
         "When work_item_context contains matches, treat those names as the "

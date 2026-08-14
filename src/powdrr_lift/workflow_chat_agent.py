@@ -1718,6 +1718,18 @@ def run_workflow_chat(
             failed_action_signature = None
         else:
             stalled_roundtrips += 1
+            no_progress_feedback = (
+                "The previous workflow action made no progress because it repeated "
+                "the same action without changing the file, staging state, or "
+                "workflow step. Do not invoke this action unchanged again. If its "
+                "result satisfies the current step, choose `next_step` immediately; "
+                "otherwise make a real edit or choose a different action. Repeated "
+                f"action: {action_signature}"
+            )
+            execution_state.transcript.append(
+                {"role": "user", "content": no_progress_feedback}
+            )
+            execution_state.execution_context.append(no_progress_feedback)
             _verbose_print(
                 stderr,
                 config.verbose,
@@ -1727,6 +1739,13 @@ def run_workflow_chat(
                 ),
             )
             if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
+                stalled_action_context = (
+                    "Workflow stopped after repeated roundtrips without progress. "
+                    f"Step {execution_state.step_index + 1} "
+                    f"({current_step.description}) repeatedly returned the "
+                    f"unchanged action: {action_signature}"
+                )
+                print(stalled_action_context, file=stderr)
                 print(
                     "Workflow stopped after repeated roundtrips without progress.",
                     file=stderr,

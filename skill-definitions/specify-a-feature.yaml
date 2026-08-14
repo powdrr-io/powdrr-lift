@@ -189,5 +189,7 @@ steps:
     - pr
     - create
     - "--draft"
+    - "--title"
+    - <pull-request-title>
     - "--body"
     - <populated-pr-description>

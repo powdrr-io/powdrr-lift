@@ -1,0 +1,102 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+# Allowed entity types:
+# - Module
+id: interaction-file-logging-architecture
+title: Interaction File Logging Architecture
+entities:
+  - id: interaction-log-writer
+    type: Module
+    action: added
+    summary: Captures and writes all human and LLM interaction inputs and outputs to JSON log files.
+    rationale: Ensure every interaction is persisted in JSON format per "req-1" and "app-1".
+  - id: interaction-log-reader
+    type: Module
+    action: added
+    summary: Reads and retrieves interaction records from JSON log files.
+    rationale: Support retrieval and verification of stored interactions per "req-1".
+  - id: binary-data-handler
+    type: Module
+    action: added
+    summary: Encodes and decodes binary data for JSON-safe storage and retrieval.
+    rationale: Ensure binary data can be stored and retrieved properly per "req-1".
+modules:
+  - id: interaction-log-writer
+    action: added
+    relative_location: src/interaction_logging/writer.py
+    purpose: Write interaction records to JSON log files.
+  - id: interaction-log-reader
+    action: added
+    relative_location: src/interaction_logging/reader.py
+    purpose: Read interaction records from JSON log files.
+  - id: binary-data-handler
+    action: added
+    relative_location: src/interaction_logging/binary_handler.py
+    purpose: Encode and decode binary data for JSON-safe storage.
+tools:
+  - id: interaction-log-writer
+    action: added
+    when_to_use: When an interaction needs to be persisted to the log file.
+    how_to_use: Call the write method with the interaction data.
+    how_to_use: Call the write method with the interaction data.
+  - id: interaction-log-reader
+    action: added
+    when_to_use: When stored interactions need to be retrieved or inspected.
+    how_to_use: Call the read method with optional filters.
+    how_to_use: Call the read method with optional filters.
+  - id: binary-data-handler
+    action: added
+    when_to_use: When binary data is part of an interaction that must be stored or retrieved.
+    how_to_use: Use encode before writing and decode after reading.
+    how_to_use: Use encode before writing and decode after reading.
+entity_relationships:
+  - id: writer-uses-binary-handler
+    source: interaction-log-writer
+    target: binary-data-handler
+    relationship: uses
+    description: The writer uses the binary data handler to encode binary data before writing.
+    rationale: Ensure binary data is JSON-safe per "req-1".
+  - id: reader-uses-binary-handler
+    source: interaction-log-reader
+    target: binary-data-handler
+    relationship: uses
+    description: The reader uses the binary data handler to decode binary data after reading.
+    rationale: Ensure binary data round-trips correctly per "req-1".
+invariants:
+  - id: invariant-log-file-integrity
+    description: Every written interaction must be readable back without data loss.
+    rationale: The log file must preserve all interaction data per "req-1".
+    related:
+      entities:
+        - interaction-log-writer
+        - interaction-log-reader
+      entity_relationships:
+        - writer-uses-binary-handler
+        - reader-uses-binary-handler
+guidance:
+  - id: guide-use-binary-handler-for-binary-data
+    description: Route all binary data through the binary data handler before writing to or reading from the log.
+    rationale: Consistent encoding ensures binary data round-trips correctly per "req-1".
+    related:
+      entities:
+        - binary-data-handler
+        - interaction-log-writer
+        - interaction-log-reader
+      entity_relationships:
+        - writer-uses-binary-handler
+        - reader-uses-binary-handler
+  - id: guide-handle-zero-size-explicitly
+    description: Add explicit checks for zero-size data in both the writer and reader to avoid silent failures.
+    rationale: Zero-size data must be handled correctly per "req-1".
+    related:
+      entities:
+        - interaction-log-writer
+        - interaction-log-reader
+      entity_relationships: []
+  - id: guide-timestamp-format
+    description: Use a consistent timestamp format in log file names to ensure each CLI session gets a unique file.
+    rationale: Per-session files require unambiguous timestamps per "app-1".
+    related:
+      entities:
+        - interaction-log-writer
+      entity_relationships: []

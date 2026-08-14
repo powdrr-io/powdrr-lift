@@ -1,0 +1,53 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: pr-interaction-log-writer
+feature_ids:
+  - feature-interaction-capture
+  - feature-binary-data-handling
+intent:
+  goal: Add a log writer module that captures all human and LLM interaction inputs and outputs and persists them to per-session JSON log files in the .powdrr hidden directory.
+  reasoning: The interaction-file-logging feature requires a dedicated writer module that handles JSON formatting, binary data encoding, and per-session file creation. This PR implements the core writing capability.
+acceptance_criteria:
+  - id: ac-writes-json
+    description: Every interaction must be written as a valid JSON record to the log file.
+  - id: ac-per-session-files
+    description: Each CLI session must produce a separate timestamped log file.
+  - id: ac-hidden-directory
+    description: Log files must be stored in the .powdrr hidden directory.
+  - id: ac-binary-encoding
+    description: Binary data in interactions must be encoded as JSON-safe strings before writing.
+expected_tests:
+  - id: test-writes-json-format
+    description: Verify that written log files contain valid JSON records.
+  - id: test-per-session-isolation
+    description: Verify that different sessions write to different files.
+  - id: test-binary-data-roundtrip
+    description: Verify that binary data is encoded correctly and can be decoded back.
+  - id: test-zero-size-data
+    description: Verify that zero-size interaction data is handled without errors.
+required_test_cases:
+  - id: rtc-json-format
+    description: The log file must be parseable as JSON and contain the expected interaction fields.
+  - id: rtc-per-session-files
+    description: Each session must produce a unique file with a timestamp in the name.
+  - id: rtc-binary-encoding
+    description: Binary data must survive a write-then-read round trip without data loss.
+expected_outcomes:
+  - id: outcome-interactions-logged
+    description: All human and LLM interactions during a CLI session are written to a JSON log file.
+  - id: outcome-binary-safe
+    description: Binary data in interactions is stored safely and can be retrieved intact.
+non_goals:
+  - id: ng-log-rotation
+    description: Log file rotation or retention policies are not part of this PR.
+  - id: ng-log-querying
+    description: Querying or searching log files is not part of this PR.
+  - id: ng-ui
+    description: No user interface for viewing logs is included in this PR.
+risks:
+  - id: risk-file-permissions
+    description: The .powdrr directory may not exist or may have incorrect permissions, causing write failures.
+  - id: risk-disk-space
+    description: Large interactions could consume significant disk space over time.
+  - id: risk-binary-size
+    description: Binary data encoded as base64 can increase log file size significantly.

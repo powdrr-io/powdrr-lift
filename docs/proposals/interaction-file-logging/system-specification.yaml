@@ -1,0 +1,13 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: interaction-file-logging
+# A human-readable summary of the feature
+title: Interaction File Logging
+requirements:
+  - id: req-1
+    description: All human and LLM interactions (input and output) must be logged to a JSON file at .powdrr/interaction-log.json.
+    state: added
+approach:
+  - id: app-1
+    description: Capture every interaction with the user or with the LLM, recording both input and output in JSON format, and store the log file in the hidden directory .powdrr with the filename interaction-log.json.
+    state: added

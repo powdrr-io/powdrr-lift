@@ -1333,6 +1333,8 @@ def run_workflow_chat(
         print("Could not select a skill.", file=stderr)
         return 1
 
+    provider_role = "adversarial" if selected_skill.skill.adversarial else "normal"
+
     worktree_root = _resolve_worktree_for_request(
         configured_repo_root,
         request=user_request,
@@ -1380,6 +1382,11 @@ def run_workflow_chat(
         )
         if dependency_name is not None:
             nested_skill = _find_skill_by_name(catalog, dependency_name)
+            nested_provider_role: LLMProviderRole = (
+                "adversarial"
+                if provider_role == "adversarial" or nested_skill.skill.adversarial
+                else "normal"
+            )
             _push_nested_skill(
                 skill_stack,
                 current_skill=selected_skill,
@@ -1398,6 +1405,7 @@ def run_workflow_chat(
             selected_skill = nested_skill
             execution_state.selected_skill = nested_skill
             execution_state.step_index = 0
+            provider_role = nested_provider_role
             continue
         step_mapping = (
             _resolve_llm_mapping(
@@ -1513,7 +1521,13 @@ def run_workflow_chat(
             if action.decisions_and_context is not None:
                 explicit_context.append(action.decisions_and_context)
             nested_provider_role = (
-                provider_role if action.provider_role is None else action.provider_role
+                (
+                    "adversarial"
+                    if provider_role == "adversarial" or nested_skill.skill.adversarial
+                    else "normal"
+                )
+                if action.provider_role is None
+                else action.provider_role
             )
             _push_nested_skill(
                 skill_stack,
@@ -2407,6 +2421,7 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     return {
         "file": str(entry.path),
         "name": entry.skill.name,
+        "adversarial": entry.skill.adversarial,
         "when_to_use": list(entry.skill.when_to_use),
         "steps": [_skill_step_to_data(step) for step in entry.skill.steps],
     }
@@ -2634,6 +2649,7 @@ def _build_step_execution_messages(
                         {
                             "name": entry.skill.name,
                             "path": str(entry.path),
+                            "adversarial": entry.skill.adversarial,
                             "when_to_use": list(entry.skill.when_to_use),
                         }
                         for entry in catalog
@@ -2672,10 +2688,12 @@ def _action_system_prompt() -> str:
         "next action is a line-based file change.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
         "workflow before continuing. It inherits the current context and LLM "
-        'provider role by default. Set provider_role="adversarial" to '
+        "provider role by default, including the current skill's adversarial "
+        "role. Pass the current decisions and context to the nested skill; "
+        'set provider_role="adversarial" to '
         "run this skill and its descendants with the adversarial provider, or "
         'provider_role="normal" to return to the normal provider. '
-        "its descendants. Set clean=true when the skill must receive only the "
+        "its descendants. Set clean=true only when the skill must receive only the "
         "explicit context list (and decisions_and_context) and must not return "
         "its gathered context to the caller.\n"
         "- invoke_tool: choose this only when the current step's explicitly "

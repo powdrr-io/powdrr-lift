@@ -1,5 +1,6 @@
 ---
 name: adversarial-pr-review
+adversarial: true
 when_to_use:
 - When the user asks for an adversarial engineering review of a pull request.
 - When a pull request should be challenged for unnecessary frameworks, reduced
@@ -10,10 +11,9 @@ steps:
 - description: Discover the pull request and establish the exact change surface.
   llm_type: long_context
   details: >-
-    This is an adversarial review. Select the adversarial LLM provider before
-    reasoning and preserve `provider_role: adversarial` on every subsequent
-    workflow action unless the workflow explicitly cannot do so. Inspect the
-    referenced pull request's title, body, labels, commits, complete diff,
+    This is an adversarial review; the workflow selects its provider from the
+    top-level adversarial option. Inspect the referenced pull request's title,
+    body, labels, commits, complete diff,
     changed files, base and head branches, head SHA, review history, and current
     state. Read the complete diff and the surrounding implementations, callers,
     tests, configuration, and documentation. Establish the PR's intended

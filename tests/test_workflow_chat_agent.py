@@ -2467,11 +2467,14 @@ def test_workflow_execution_stops_after_repeated_no_progress(
         skill_path,
     )
 
+    captured_messages: list[list[dict[str, str]]] = []
+
     class _FakeOpenAIClient:
         def __init__(self, **_: object) -> None:
             self.call_index = 0
 
-        def complete_json(self, _: list[dict[str, str]]) -> dict[str, object]:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            captured_messages.append(messages)
             self.call_index += 1
             if self.call_index == 1:
                 return {
@@ -2513,6 +2516,12 @@ def test_workflow_execution_stops_after_repeated_no_progress(
 
     assert exit_code == 1
     assert "without progress" in stderr.getvalue()
+    assert "made no progress" in "\n".join(
+        message["content"]
+        for exchange in captured_messages
+        for message in exchange
+        if message["role"] == "user"
+    )
 
 
 def test_cli_workflow_chat_defaults_to_glm_5_2(

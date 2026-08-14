@@ -1,0 +1,57 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+id: pr-interaction-capture-16
+feature_ids:
+  - feature-interaction-capture
+intent:
+  goal: 'Capture and persist all human and LLM interaction inputs and outputs to per-session JSON log files in the .powdrr directory.'
+  problem: 'Human and LLM interactions are not currently persisted to a file, making it impossible to audit, replay, or analyze past interactions.'
+  reasoning: 'The system specification requires all human and LLM interactions to be captured (req-1) in JSON format (req-2) without blocking the interaction flow (req-3). The architecture defines interaction-log-entry as the core entity and logging-module as the implementation module. This PR implements the logging module, the log file writer, and the interaction capture hooks.'
+acceptance_criteria:
+  - id: ac-log-file-created
+    description: 'A JSON log file is created in .powdrr/interaction-log.json after the first interaction.'
+  - id: ac-all-interactions-captured
+    description: 'Every human and LLM input and output is written to the log file.'
+  - id: ac-valid-json
+    description: 'The log file contains valid JSON entries.'
+  - id: ac-non-blocking
+    description: 'Logging does not block or delay the interaction flow.'
+expected_tests:
+  - id: test-log-file-created
+    description: 'Verify that a log file is created in .powdrr/interaction-log.json after an interaction.'
+  - id: test-log-content-valid-json
+    description: 'Verify that the log file content is valid JSON.'
+  - id: test-all-interactions-captured
+    description: 'Verify that all human and LLM inputs and outputs appear in the log.'
+  - id: test-directory-creation
+    description: 'Verify that the .powdrr directory is created automatically if it does not exist.'
+  - id: test-append-behavior
+    description: 'Verify that new entries are appended to the log file without overwriting existing entries.'
+required_test_cases:
+  - id: rtc-log-file-created
+    description: 'The test must prove that a log file is created in .powdrr/interaction-log.json.'
+  - id: rtc-log-content-valid
+    description: 'The test must prove that the log file contains valid JSON entries.'
+  - id: rtc-all-interactions
+    description: 'The test must prove that all human and LLM interactions are captured.'
+expected_outcomes:
+  - id: out-log-file-exists
+    description: 'A .powdrr/interaction-log.json file exists after the first interaction.'
+  - id: out-log-entries-valid
+    description: 'Each log entry is valid JSON with input, output, and timestamp fields.'
+  - id: out-no-blocking
+    description: 'Interaction latency is not noticeably affected by logging.'
+non_goals:
+  - id: ng-log-rotation
+    description: 'File rotation and size management are not part of this PR; they will be addressed in a follow-up.'
+  - id: ng-sensitive-data-redaction
+    description: 'Sensitive data redaction is not part of this PR; it will be addressed in a follow-up.'
+  - id: ng-binary-data
+    description: 'Binary data handling is not part of this PR; it will be addressed in a follow-up.'
+risks:
+  - id: risk-performance-impact
+    description: 'Synchronous file I/O could block interactions; mitigated by using asynchronous I/O or a background queue (app-4).'
+  - id: risk-file-permissions
+    description: 'The .powdrr directory may not be writable; mitigated by graceful error handling (req-4).'
+  - id: risk-concurrent-access
+    description: 'Concurrent interactions could cause interleaved writes; mitigated by using a queue or lock.'

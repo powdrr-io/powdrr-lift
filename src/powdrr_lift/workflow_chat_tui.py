@@ -358,8 +358,7 @@ class WorkflowChatApp(App[None]):
         """Keep entered text visible, including wrapped long lines."""
         width = max(text_area.size.width - 4, 20)
         line_count = sum(
-            max(1, ceil(len(line) / width))
-            for line in (text_area.text.splitlines() or [""])
+            max(1, ceil(len(line) / width)) for line in text_area.text.split("\n")
         )
         text_area.styles.height = max(3, line_count + 2)
 

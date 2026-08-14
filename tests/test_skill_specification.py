@@ -347,6 +347,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert "Do not report this step complete until the GitHub command succeeds" in (
         skill.steps[13].details or ""
     )
+    assert "value for the `gh pr create` command" in (skill.steps[13].details or "")
     assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
         (
             "powdrr-lift",

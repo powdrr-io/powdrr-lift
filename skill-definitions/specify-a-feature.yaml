@@ -166,7 +166,7 @@ steps:
     --kind feature`. Keep the generated template in workflow context; do not
     print the template or completed PR body as a chat/status response. Fill every
     section returned by that command and pass the completed text as the `--body`
-    value. Populate every
+    value for the `gh pr create` command. Populate every
     core section with the validated specification documents, feature intent,
     behavior before and after, explicit scope and non-goals, implementation
     details, compatibility considerations, exact validation commands and

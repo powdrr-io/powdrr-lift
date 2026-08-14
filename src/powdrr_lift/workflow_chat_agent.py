@@ -3334,9 +3334,7 @@ def _handle_workflow_action_invoke_tool(
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL:
             _validate_internal_command(action.parameters.get("command"))
-        command_items = _command_items_for_validation(
-            action.parameters.get("command")
-        )
+        command_items = _command_items_for_validation(action.parameters.get("command"))
         tool_result = _execute_shell_tool(
             action.parameters,
             worktree_root=state.worktree_root,

@@ -3478,13 +3478,15 @@ def _validate_workflow_step_transition(
     )
     if not invocations:
         return
-    # Prefer the mutating shell command when a step also exposes an internal
-    # inspection command. Otherwise inspection alone could unlock the next
-    # step without a commit, push, or pull-request command.
-    required_invocations = (
-        tuple(invocation for invocation in invocations if invocation.tool == "shell")
-        or invocations
+    # Shell invocations are the externally visible commands that can mutate
+    # the branch. Internal inspection and validator actions retain their
+    # existing corrective-action behavior; a shell command in the same step
+    # remains the transition gate.
+    required_invocations = tuple(
+        invocation for invocation in invocations if invocation.tool == "shell"
     )
+    if not required_invocations:
+        return
 
     def successful_event_matches(invocation: Any, event: Mapping[str, Any]) -> bool:
         if event.get("kind") != "invoke_tool":

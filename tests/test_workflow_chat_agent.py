@@ -4902,6 +4902,46 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         _capture_worktree_context,
     )
 
+    real_execute_shell_tool = _execute_shell_tool
+
+    def _execute_nested_validator(
+        parameters: dict[str, object],
+        *,
+        worktree_root: Path,
+        stdout: TextIO,
+        stderr: TextIO,
+        verbose: bool,
+        announce: bool = True,
+        print_stdout: bool = True,
+    ) -> dict[str, object]:
+        command = parameters.get("command")
+        if (
+            isinstance(command, (list, tuple))
+            and len(command) > 1
+            and str(command[1]).startswith("evaluate-")
+        ):
+            return {
+                "command": " ".join(str(item) for item in command),
+                "cwd": str(worktree_root_holder["path"]),
+                "returncode": 0,
+                "stdout": "",
+                "stderr": "",
+            }
+        return real_execute_shell_tool(
+            parameters,
+            worktree_root=worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=verbose,
+            announce=announce,
+            print_stdout=print_stdout,
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        _execute_nested_validator,
+    )
+
     stdout = io.StringIO()
     stderr = io.StringIO()
 
@@ -4947,25 +4987,26 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "next_step",
         "next_step",
         "next_step",
+        "invoke_tool",
+        "next_step",
+        "invoke_tool",
+        "next_step",
+        "invoke_tool",
+        "edit",
+        "next_step",
+        "next_step",
+        "next_step",
         "next_step",
         "next_step",
         "invoke_tool",
         "next_step",
         "invoke_tool",
         "edit",
-        "next_step",
-        "next_step",
-        "next_step",
-        "next_step",
-        "next_step",
         "invoke_tool",
         "next_step",
         "invoke_tool",
         "edit",
         "invoke_tool",
-        "next_step",
-        "invoke_tool",
-        "edit",
         "next_step",
         "prompt_user",
         "complete",

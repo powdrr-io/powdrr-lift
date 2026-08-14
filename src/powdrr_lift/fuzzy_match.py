@@ -7,15 +7,27 @@ import fnmatch
 import json
 import os
 import re
-from collections.abc import Sequence
+from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 from typing import Any
+
+_PRUNED_DIRECTORIES = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    "target",
+}
 
 
 def execute_fuzzy_match(
     command: str | Sequence[str],
     *,
     worktree_root: Path,
+    path_cache: MutableMapping[tuple[str, int, int | None], tuple[Path, ...]]
+    | None = None,
 ) -> dict[str, Any]:
     """Execute a structured fuzzy-match command and return JSON-compatible data."""
     command_items = _command_items(command)
@@ -33,7 +45,15 @@ def execute_fuzzy_match(
         raise ValueError(f"fuzzy-match search root must be a directory: {root}")
 
     matches: list[dict[str, Any]] = []
-    for path in _walk_paths(search_root, options["mindepth"], options["maxdepth"]):
+    paths = _cached_walk_paths(
+        search_root,
+        options["mindepth"],
+        options["maxdepth"],
+        cache=path_cache,
+    )
+    query = options["query"]
+    normalized_query = _normalized(query)
+    for path in paths:
         if options["type"] == "f" and not path.is_file():
             continue
         if options["type"] == "d" and not path.is_dir():
@@ -45,7 +65,13 @@ def execute_fuzzy_match(
             options["path_pattern"],
         ):
             continue
-        score = _fuzzy_score(options["query"], name, relative_path)
+        score = _fuzzy_score(
+            normalized_query,
+            name,
+            relative_path,
+            minimum_score=options["threshold"],
+            query_tokens=_tokens(query),
+        )
         if score < options["threshold"]:
             continue
         matches.append(
@@ -143,9 +169,14 @@ def _resolve_root(root: str, worktree_root: Path) -> Path:
     return root_path if root_path.is_absolute() else worktree_root / root_path
 
 
-def _walk_paths(root: Path, mindepth: int, maxdepth: int | None) -> list[Path]:
+def _walk_paths(root: Path, mindepth: int, maxdepth: int | None) -> tuple[Path, ...]:
     paths: list[Path] = []
     for current_root, directories, files in os.walk(root):
+        directories[:] = sorted(
+            directory
+            for directory in directories
+            if directory not in _PRUNED_DIRECTORIES
+        )
         current = Path(current_root)
         depth = len(current.relative_to(root).parts)
         if depth >= mindepth:
@@ -154,24 +185,54 @@ def _walk_paths(root: Path, mindepth: int, maxdepth: int | None) -> list[Path]:
             directories[:] = []
             continue
         paths.extend(sorted(current / filename for filename in files))
-    return sorted(paths)
+    return tuple(sorted(paths))
 
 
-def _fuzzy_score(query: str, name: str, relative_path: str) -> float:
-    query_tokens = _tokens(query)
-    candidates = (name, Path(relative_path).stem, relative_path)
-    scores = [
-        difflib.SequenceMatcher(
-            None, _normalized(query), _normalized(candidate)
-        ).ratio()
-        for candidate in candidates
-    ]
+def _cached_walk_paths(
+    root: Path,
+    mindepth: int,
+    maxdepth: int | None,
+    *,
+    cache: MutableMapping[tuple[str, int, int | None], tuple[Path, ...]] | None,
+) -> tuple[Path, ...]:
+    if cache is None:
+        return _walk_paths(root, mindepth, maxdepth)
+    key = (str(root), mindepth, maxdepth)
+    paths = cache.get(key)
+    if paths is None:
+        paths = _walk_paths(root, mindepth, maxdepth)
+        cache[key] = paths
+    return paths
+
+
+def _fuzzy_score(
+    query: str,
+    name: str,
+    relative_path: str,
+    *,
+    minimum_score: float,
+    query_tokens: Sequence[str],
+) -> float:
+    name_score = _sequence_score(query, name, minimum_score)
+    scores = [name_score]
+    if name_score < minimum_score:
+        scores.extend(
+            _sequence_score(query, candidate, minimum_score)
+            for candidate in (Path(relative_path).stem, relative_path)
+        )
     candidate_tokens = set(_tokens(name))
     if query_tokens and candidate_tokens:
         scores.append(
             len(set(query_tokens) & candidate_tokens) / len(set(query_tokens))
         )
     return max(scores)
+
+
+def _sequence_score(query: str, candidate: str, minimum_score: float) -> float:
+    matcher = difflib.SequenceMatcher(None, query, _normalized(candidate))
+    if matcher.quick_ratio() < minimum_score:
+        return 0.0
+    return matcher.ratio()
 
 
 def _normalized(value: str) -> str:
@@ -182,10 +243,20 @@ def _tokens(value: str) -> tuple[str, ...]:
     return tuple(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
-def fuzzy_match_json(command: str | Sequence[str], *, worktree_root: Path) -> str:
+def fuzzy_match_json(
+    command: str | Sequence[str],
+    *,
+    worktree_root: Path,
+    path_cache: MutableMapping[tuple[str, int, int | None], tuple[Path, ...]]
+    | None = None,
+) -> str:
     """Return a stable JSON report for logging and LLM consumption."""
     return json.dumps(
-        execute_fuzzy_match(command, worktree_root=worktree_root),
+        execute_fuzzy_match(
+            command,
+            worktree_root=worktree_root,
+            path_cache=path_cache,
+        ),
         indent=2,
         ensure_ascii=False,
     )

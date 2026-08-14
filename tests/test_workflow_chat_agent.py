@@ -74,6 +74,7 @@ from powdrr_lift.workflow_chat_agent import (
     _build_selection_messages,
     _catalog_entry_to_data,
     _complete_json_with_model_fallback,
+    _current_file_context,
     _execute_shell_tool,
     _execution_events_for_prompt,
     _handle_workflow_action_edit,
@@ -85,6 +86,7 @@ from powdrr_lift.workflow_chat_agent import (
     _normalize_cache_usage,
     _parse_action_response,
     _parse_json_object,
+    _prompt_transcript,
     _prompt_user,
     _request_token_budget,
     _resolve_api_key,
@@ -142,6 +144,38 @@ def test_execution_events_for_prompt_compacts_results_without_mutating_summary_d
         }
     ]
     assert events[0]["result"] == {"stdout": "a large result"}
+
+
+def test_prompt_transcript_keeps_request_and_bounds_history() -> None:
+    transcript = [
+        {"role": "user", "content": "Initial request"},
+        *({"role": "user", "content": "x" * 9000} for _ in range(40)),
+    ]
+
+    prompt_transcript = _prompt_transcript(transcript)
+
+    assert prompt_transcript[0]["content"] == "Initial request"
+    assert len(prompt_transcript) <= 32
+    assert sum(len(message["content"]) for message in prompt_transcript) <= 24000
+    assert "Earlier workflow transcript omitted" in prompt_transcript[1]["content"]
+
+
+def test_current_file_context_cache_reuses_unchanged_file(tmp_path: Path) -> None:
+    path = tmp_path / "example.txt"
+    path.write_text("one\ntwo\n", encoding="utf-8")
+    cache: dict[tuple[str, int, int], dict[str, object]] = {}
+
+    first = _current_file_context(tmp_path, path, cache=cache)
+    second = _current_file_context(tmp_path, path, cache=cache)
+
+    assert first is second
+    assert len(cache) == 1
+
+    path.write_text("one\ntwo\nthree\n", encoding="utf-8")
+    updated = _current_file_context(tmp_path, path, cache=cache)
+    assert updated is not None
+    assert updated is not first
+    assert updated["line_count"] == 3
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(
@@ -5618,6 +5652,7 @@ def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
     specifications_root.mkdir(parents=True)
     (specifications_root / "proposed-pr-specification.yaml").touch()
 
+    path_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] = {}
     result = execute_fuzzy_match(
         [
             "fuzzy-match",
@@ -5631,12 +5666,30 @@ def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
             "-print",
         ],
         worktree_root=tmp_path,
+        path_cache=path_cache,
+    )
+    cached_result = execute_fuzzy_match(
+        [
+            "fuzzy-match",
+            "docs/specs/interaction-file-log",
+            "-name",
+            "proposed PR specification",
+            "-type",
+            "f",
+            "-maxdepth",
+            "1",
+            "-print",
+        ],
+        worktree_root=tmp_path,
+        path_cache=path_cache,
     )
 
     assert [match["path"] for match in result["matches"]] == [
         "docs/specs/interaction-file-log/proposed-pr-specification.yaml"
     ]
     assert result["matches"][0]["score"] == 1.0
+    assert cached_result == result
+    assert len(path_cache) == 1
 
 
 def test_fuzzy_match_missing_root_is_a_successful_empty_result(

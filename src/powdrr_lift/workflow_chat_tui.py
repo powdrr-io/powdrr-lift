@@ -700,7 +700,7 @@ class WorkflowChatApp(App[None]):
                 )
             except OSError:
                 pass
-            self._set_message(failure_report + "\nPress Ctrl+C to exit.")
+            self._set_message(failure_report + "\nPress Ctrl+Q to exit.")
 
     def on_unmount(self) -> None:
         self._stop_requested.set()

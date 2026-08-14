@@ -2760,6 +2760,8 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "entity-relationships" in prompt
     assert "proposed PRs" in prompt
     assert "Do not use filters.work_item_name" in prompt
+    assert "do not invoke the same validation command again unchanged" in prompt
+    assert "reported corrective_action" in prompt
     assert "read_document" in prompt
     assert "start_line" in prompt
     assert "end_line" in prompt

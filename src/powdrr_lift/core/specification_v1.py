@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.validation_messages import ValidationError
@@ -38,6 +42,101 @@ class ModuleToolValidationResult:
     module_ids: set[str] = field(default_factory=set)
     tool_ids: set[str] = field(default_factory=set)
     issues: list[SpecificationV1Issue] = field(default_factory=list)
+
+
+_MAPPING_EMPTY_VALUE_LINE = re.compile(
+    r"^(?P<indent>\s*)(?P<key>[^#:\n][^:\n]*):\s*(?P<value>null|~|\[\s*\])"
+    r"\s*(?:#.*)?(?:\r?\n)?$"
+)
+_MAPPING_EMPTY_BLOCK_LINE = re.compile(
+    r"^(?P<indent>\s*)(?P<key>[^#:\n][^:\n]*):\s*(?:#.*)?(?:\r?\n)?$"
+)
+_SEQUENCE_NULL_LINE = re.compile(r"^\s*-\s*(?:null|~)?\s*(?:#.*)?(?:\r?\n)?$")
+
+
+def normalize_specification_v1_file(path: str | Path) -> bool:
+    """Remove safe explicit empty values from a specification-v1 YAML file.
+
+    The normalizer only removes complete YAML lines that represent a null or an
+    empty list. It preserves comments and all remaining source text. Returning
+    whether the file changed lets callers validate the rewritten content in a
+    separate pass, keeping validation locations aligned with the file on disk.
+    """
+    resolved_path = Path(path)
+    original = resolved_path.read_text(encoding="utf-8")
+    normalized = normalize_specification_v1_yaml(original)
+    if normalized == original:
+        return False
+    resolved_path.write_text(normalized, encoding="utf-8")
+    return True
+
+
+def normalize_specification_v1_yaml(content: str) -> str:
+    """Return content with explicit null and empty-list values omitted.
+
+    Parsing each intermediate result means that removing the only item in a
+    block list also removes its now-null parent on the next iteration. If the
+    input is malformed, leave it untouched so the normal validator can report
+    the original YAML parse error.
+    """
+    normalized = content
+    while True:
+        try:
+            node = yaml.compose(normalized)
+        except yaml.YAMLError:
+            return content
+        if node is None:
+            return normalized
+
+        lines = normalized.splitlines(keepends=True)
+        lines_to_remove: set[int] = set()
+
+        def mark_node(
+            node_to_remove: yaml.Node,
+            source_lines: list[str] = lines,
+            removed_lines: set[int] = lines_to_remove,
+        ) -> None:
+            line_number = node_to_remove.start_mark.line
+            if line_number >= len(source_lines):
+                return
+            line = source_lines[line_number]
+            if (
+                _MAPPING_EMPTY_VALUE_LINE.match(line)
+                or _MAPPING_EMPTY_BLOCK_LINE.match(line)
+                or _SEQUENCE_NULL_LINE.match(line)
+            ):
+                removed_lines.add(line_number)
+
+        def visit(current: yaml.Node) -> None:
+            if isinstance(current, yaml.ScalarNode):
+                if current.tag == "tag:yaml.org,2002:null":
+                    mark_node(current)
+                return
+            if isinstance(current, yaml.SequenceNode):
+                if not current.value:
+                    mark_node(current)
+                for child in current.value:
+                    visit(child)
+                return
+            if isinstance(current, yaml.MappingNode):
+                for key_node, value_node in current.value:
+                    if isinstance(value_node, yaml.ScalarNode) and value_node.tag == (
+                        "tag:yaml.org,2002:null"
+                    ):
+                        mark_node(key_node)
+                    elif (
+                        isinstance(value_node, yaml.SequenceNode)
+                        and not value_node.value
+                    ):
+                        mark_node(key_node)
+                    visit(value_node)
+
+        visit(node)
+        if not lines_to_remove:
+            return normalized
+        normalized = "".join(
+            line for index, line in enumerate(lines) if index not in lines_to_remove
+        )
 
 
 def validate_module_tool_sections(

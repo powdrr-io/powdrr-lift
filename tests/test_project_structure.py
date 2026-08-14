@@ -93,11 +93,7 @@ evidence: []
     report = validate_project_structure_yaml(output_path)
 
     assert report.validation_successful is False
-    assert {issue.path for issue in report.issues} >= {
-        "modules[0].evidence",
-        "relationships",
-        "evidence",
-    }
+    assert {issue.path for issue in report.issues} >= {"modules[0].evidence"}
 
 
 def test_project_structure_cli_validates_template(tmp_path: Path) -> None:
@@ -113,12 +109,13 @@ id: project-structure
     assert main(["validate-project-structure", "--input", str(output_path)]) == 0
 
 
-def test_project_structure_validator_rejects_explicit_empty_values(
+def test_project_structure_validator_normalizes_explicit_empty_values(
     tmp_path: Path,
 ) -> None:
     output_path = tmp_path / "project-structure.yaml"
     output_path.write_text(
-        """schema: https://powdrr.io/schemas/specification-v1
+        """# keep this comment
+schema: https://powdrr.io/schemas/specification-v1
 id: project-structure
 modules: []
 tools:
@@ -134,14 +131,42 @@ tools:
     report = validate_project_structure_yaml(output_path)
 
     assert report.validation_successful is False
-    assert {(issue.code, issue.path) for issue in report.issues} >= {
-        ("explicit_empty_value", "modules"),
-        ("explicit_empty_value", "tools[0].when_to_use"),
-    }
+    rewritten = output_path.read_text(encoding="utf-8")
+    assert "modules: []" not in rewritten
+    assert "when_to_use: null" not in rewritten
+    assert "# keep this comment" in rewritten
     assert {issue.path for issue in report.issues} >= {
         "tools[0].parent_module",
         "tools[0].related_module",
     }
+
+
+def test_project_structure_normalization_preserves_comments_and_reindexes_errors(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "project-structure.yaml"
+    output_path.write_text(
+        """# Keep this comment.
+schema: https://powdrr.io/schemas/specification-v1
+id: project-structure
+tools:
+  - id: first
+    action: added
+    when_to_use: null
+  - id: second
+    action: added
+    when_to_use: Run it.
+    labels: []
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_project_structure_yaml(output_path)
+
+    assert output_path.read_text(encoding="utf-8").startswith("# Keep this comment.")
+    assert [
+        issue.path for issue in report.issues if issue.code == "missing_tool_labels"
+    ] == ["tools[0].labels", "tools[1].labels"]
 
 
 def test_project_structure_validator_requires_labels_on_every_tool(

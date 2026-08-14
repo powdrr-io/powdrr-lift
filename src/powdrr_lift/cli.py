@@ -61,6 +61,7 @@ from powdrr_lift.core.project_structure import (
     create_project_structure_template,
     validate_project_structure_yaml,
 )
+from powdrr_lift.core.specification_v1 import normalize_specification_v1_file
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
@@ -1633,6 +1634,8 @@ def _run_evaluate_architecture_specification(args: argparse.Namespace) -> int:
         args.work_item_name,
         repo_root,
     )
+    if input_path is not None:
+        normalize_specification_v1_file(input_path)
     proposed_yaml = _read_input(input_path)
     report = build_architecture_specification_validation_report(
         proposed_yaml,
@@ -1657,6 +1660,8 @@ def _run_evaluate_implementation_specification(args: argparse.Namespace) -> int:
     input_path = args.input or implementation_specification_default_output_path(
         args.work_item_name, repo_root
     )
+    if input_path is not None:
+        normalize_specification_v1_file(input_path)
     proposed_yaml = _read_input(input_path)
     report = build_implementation_specification_validation_report(
         proposed_yaml,
@@ -1682,6 +1687,8 @@ def _run_evaluate_system_specification(args: argparse.Namespace) -> int:
         args.work_item_name,
         repo_root,
     )
+    if input_path is not None:
+        normalize_specification_v1_file(input_path)
     proposed_yaml = _read_input(input_path)
     report = build_system_specification_validation_report(
         proposed_yaml,
@@ -1705,6 +1712,8 @@ def _run_evaluate_pr_specification(args: argparse.Namespace) -> int:
         args.work_item_name,
         repo_root,
     )
+    if input_path is not None:
+        normalize_specification_v1_file(input_path)
     proposed_yaml = _read_input(input_path)
     report = build_pr_specification_validation_report(
         proposed_yaml,

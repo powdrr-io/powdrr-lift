@@ -1,0 +1,176 @@
+---
+name: dead-code-review
+when_to_use:
+- When the user asks whether a pull request leaves dead, obsolete, or unreachable code behind.
+- When a pull request may duplicate existing behavior, helpers, configuration, tests, or
+  documentation and the redundant path should be identified.
+- When the review must report actionable dead-code or duplication findings directly on GitHub
+  as inline pull-request comments.
+steps:
+- description: Discover the pull request and establish the exact change surface.
+  llm_type: long_context
+  details: >-
+    Inspect the referenced pull request's title, body, labels, commits, complete
+    diff, changed files, base and head branches, head SHA, review history, and
+    current state. Resolve the repository owner and name, the base revision, and
+    the current PR revision. Read the complete diff rather than only the changed
+    hunks, then inspect surrounding implementations, callers, tests, configuration,
+    generated files, and documentation. Fetch or compare the base revision when
+    needed so that code introduced, removed, renamed, or made unreachable by this
+    PR is distinguished from pre-existing code. Build a ledger of changed symbols,
+    behavior paths, and candidate obsolete or duplicate artifacts. Do not begin
+    posting findings until the candidate ledger has evidence from both the diff and
+    the current repository.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - pr
+    - view
+    - <pr-reference>
+    - --json
+    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
+  - tool: shell
+    command:
+    - gh
+    - pr
+    - diff
+    - <pr-reference>
+    - --patch
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --name-status
+    - <base-sha>
+    - <head-sha>
+- description: Identify code made dead or duplicative by the pull request.
+  llm_type: high_reasoning
+  details: >-
+    For every candidate, trace definitions to all call sites, imports, registrations,
+    routes, handlers, configuration keys, fixtures, tests, generated outputs, and
+    documentation references using repository search and the language's available
+    static-analysis conventions. For Python files, use the typed
+    `basedpyright-symbol` and `basedpyright-structure` tools to resolve symbols
+    and module structure before relying on text matches. Check both sides of the
+    diff and relevant history
+    when intent or compatibility is unclear. Report a dead-code finding only when
+    the PR makes the code unreachable, leaves an obsolete implementation after
+    replacing it, removes its last consumer, or strands a test/configuration path.
+    Report a duplication finding only when the PR creates or preserves a second
+    implementation of the same behavior and the overlap is evidenced by matching
+    callers, inputs, outputs, or invariants. Distinguish intentional compatibility
+    shims, public extension points, migrations, feature flags, generated code,
+    fallback paths, and test fixtures from accidental leftovers. Do not report
+    pre-existing cleanup opportunities, stylistic similarity, speculative future
+    maintenance, or a finding that cannot be tied to the current PR. Rank each
+    candidate by confidence and impact, and collapse comments that share one root
+    cause.
+  tool_invocations:
+  - tool: shell
+    command:
+    - rg
+    - -n
+    - <symbol-or-behavior-search-pattern>
+    - <repository-paths>
+  - tool: shell
+    command:
+    - git
+    - log
+    - --oneline
+    - --follow
+    - --
+    - <candidate-path>
+  - tool: basedpyright-symbol
+    command:
+    - query=<candidate-symbol>
+  - tool: basedpyright-structure
+    command:
+    - path=<candidate-python-file>
+- description: Validate each candidate and prepare precise inline findings.
+  llm_type: high_reasoning
+  details: >-
+    Validate the candidate with the narrowest useful checks: inspect call-graph or
+    reference results, run the relevant tests or static checks, and compare the
+    base and head behavior when a duplicate path is alleged. Require concrete
+    evidence such as zero reachable consumers, an old branch left beside its new
+    replacement, two active implementations serving the same caller, or a test and
+    configuration path that no longer participates in execution. For each retained
+    finding record the changed file and smallest changed line to anchor, the exact
+    dead or duplicate symbol/path, evidence, user or maintenance impact, confidence,
+    and a concise removal or consolidation direction. If the obsolete code is not
+    itself changed, select the nearest relevant changed line and explain the actual
+    location in the comment. Keep findings scoped to the PR and do not propose
+    unrelated cleanup.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - <base-sha>
+    - <head-sha>
+    - --check
+  - tool: shell
+    command:
+    - rg
+    - --files-with-matches
+    - <candidate-symbol>
+    - <repository-paths>
+- description: Post every actionable dead-code or duplication finding inline.
+  llm_type: simple_task
+  details: >-
+    Check the target PR's existing review threads and inline comments before
+    posting. Do not repeat an unresolved finding, a resolved finding with the same
+    root cause, or an informational observation. Post each retained finding
+    directly to the PR as an inline comment anchored to the smallest relevant
+    changed line on the RIGHT side of the current head SHA. Start the body with
+    `Dead code:` or `Duplicate implementation:` and include the exact symbol or
+    path, concrete evidence, why the PR makes it obsolete or redundant, the impact,
+    and a concise fix direction. Use a nearby changed line only when the obsolete
+    code is not changed, and include its actual path and line in the comment. Do
+    not post speculative cleanup, broad review summaries, praise, or duplicate
+    comments. Do not approve, merge, close, label, or modify the pull request's
+    code as part of this skill.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --paginate
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --method
+    - POST
+    - -f
+    - body=<finding>
+    - -f
+    - commit_id=<current-head-sha>
+    - -f
+    - path=<changed-file>
+    - -F
+    - line=<changed-line>
+    - -f
+    - side=RIGHT
+- description: Verify the posted review and report the audit result.
+  llm_type: standard_reasoning
+  details: >-
+    Re-read the target PR's inline comments after posting and verify every intended
+    finding is attached to the current head SHA, changed file, and intended line.
+    Report the PR, base and head revisions, files and symbols examined, candidate
+    count, rejected speculative candidates, dead-code findings, duplication
+    findings, and comments posted. If no actionable findings remain, report that
+    the review completed with zero findings and summarize the evidence checked. If
+    GitHub write access or inline anchoring fails, report the exact prepared finding
+    and the posting failure; never claim it was posted. Never merge the PR or
+    resolve review threads as part of this skill.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --paginate

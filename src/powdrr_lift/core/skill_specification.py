@@ -8,9 +8,14 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_lift.basedpyright_tools import BASEDPYRIGHT_TOOLS
 from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
+)
+
+SUPPORTED_SKILL_TOOL_TYPES = (
+    frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
 )
 
 
@@ -456,13 +461,13 @@ def build_skill_validation_report(
                             path=_child_path(tool_path, "tool"),
                         )
                     )
-                elif tool not in {"shell", "internal", "fuzzy-match", "ref"}:
+                elif tool not in SUPPORTED_SKILL_TOOL_TYPES:
                     issues.append(
                         SkillValidationIssue(
                             code="unsupported_tool",
                             message=(
-                                "Skill tool invocations currently support shell, "
-                                "internal, fuzzy-match, and ref."
+                                "Skill tool invocations currently support "
+                                f"{', '.join(sorted(SUPPORTED_SKILL_TOOL_TYPES))}."
                             ),
                             path=_child_path(tool_path, "tool"),
                         )

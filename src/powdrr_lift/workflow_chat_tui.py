@@ -221,6 +221,7 @@ class WorkflowChatApp(App[None]):
         self._message_history_chars = 0
         self._current_status = _POWDRR_AGENT_BANNER
         self._initial_prompt_visible = False
+        self._active_skill_path: tuple[str, ...] = ()
 
     def compose(self) -> ComposeResult:
         yield ScrollableContainer(
@@ -472,6 +473,8 @@ class WorkflowChatApp(App[None]):
         if current_step_index >= len(skill.skill.steps):
             steps.clear()
             steps.set_class(False, "has-content")
+            steps.border_title = ""
+            self._active_skill_path = ()
             self._set_status(status)
             if self._response is not None:
                 self._response.disabled = False
@@ -482,6 +485,8 @@ class WorkflowChatApp(App[None]):
         nested = (
             nested_parent_skill is not None and nested_parent_step_index is not None
         )
+        skill_path = self._resolve_skill_path(skill, parent_skill)
+        steps.border_title = " > ".join(skill_path)
         expected_item_count = len(skill.skill.steps) + (2 if nested else 0)
         items = list(steps.query(ListItem))
         if len(steps.children) != expected_item_count:
@@ -503,8 +508,9 @@ class WorkflowChatApp(App[None]):
                 for step_index, step in enumerate(skill.skill.steps)
             ]
             steps.mount(*items)
+        items = list(steps.query(ListItem))
         if nested:
-            items = list(steps.query(ListItem))[2:]
+            items = items[2:]
         steps.set_class(bool(items), "has-content")
         for step_index, item in enumerate(items):
             item.remove_class("completed", "current")
@@ -516,6 +522,29 @@ class WorkflowChatApp(App[None]):
         if self._response is not None:
             self._response.disabled = False
             self._response.focus()
+
+    def _resolve_skill_path(
+        self,
+        skill: SkillCatalogEntry,
+        parent_skill: SkillCatalogEntry | None,
+    ) -> tuple[str, ...]:
+        skill_name = skill.skill.name
+        if skill_name in self._active_skill_path:
+            path = self._active_skill_path[
+                : self._active_skill_path.index(skill_name) + 1
+            ]
+        elif parent_skill is not None:
+            parent_name = parent_skill.skill.name
+            if parent_name in self._active_skill_path:
+                path = self._active_skill_path[
+                    : self._active_skill_path.index(parent_name) + 1
+                ] + (skill_name,)
+            else:
+                path = (parent_name, skill_name)
+        else:
+            path = (skill_name,)
+        self._active_skill_path = path
+        return path
 
     def _output_prompt(self, prompt: str) -> None:
         self.call_from_thread(self._show_prompt, prompt)

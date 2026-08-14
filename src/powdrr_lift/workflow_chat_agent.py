@@ -1356,6 +1356,7 @@ def run_workflow_chat(
     stalled_roundtrips = 0
     previous_action_signature: str | None = None
     failed_action_signature: str | None = None
+    last_failed_action: SkillChatAction | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
         provider = provider_roles.provider_for(provider_role)
         current_model = _provider_definition(provider).forced_model or current_model
@@ -1455,7 +1456,10 @@ def run_workflow_chat(
                 f"{len(selected_skill.skill.steps)}"
             ),
             model=current_model,
-            repair_instructions=_action_repair_prompt(selected_skill),
+            repair_instructions=_action_repair_prompt(
+                selected_skill,
+                failed_action=last_failed_action,
+            ),
             config=config,
             input_func=input_func,
             stdout=stdout,
@@ -1599,7 +1603,11 @@ def run_workflow_chat(
                 current_file_context,
             )
             print(feedback, file=stderr)
-            _write_agent_error(worktree_root, feedback)
+            _write_agent_error(
+                worktree_root,
+                feedback + _rejected_edit_guidance(action),
+            )
+            last_failed_action = action
             execution_state.transcript.append(
                 {
                     "role": "assistant",
@@ -1635,6 +1643,7 @@ def run_workflow_chat(
             previous_action_signature = None
             continue
         action_signature = _workflow_action_signature(action)
+        last_failed_action = None
         made_progress = _workflow_action_made_progress(
             action,
             previous_action_signature=previous_action_signature,
@@ -4805,6 +4814,17 @@ def _workflow_edit_failure_feedback(
     return feedback
 
 
+def _rejected_edit_guidance(action: SkillChatAction) -> str:
+    if action.kind != "edit":
+        return ""
+    return (
+        "\n\nLast proposed edit (NOT APPLIED):\n"
+        f"{_workflow_action_signature(action)}\n"
+        "don't do this again; return a corrected edit after rereading the "
+        "current file."
+    )
+
+
 def _edit_sort_key(edit: SkillChatEdit) -> tuple[int, int]:
     end_line = edit.end_line if edit.end_line is not None else edit.start_line
     return edit.start_line, end_line
@@ -5061,8 +5081,12 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
     )
 
 
-def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
-    return (
+def _action_repair_prompt(
+    selected_skill: SkillCatalogEntry,
+    *,
+    failed_action: SkillChatAction | None = None,
+) -> str:
+    prompt = (
         "Generate a JSON document selecting the best action based on this "
         "context. The available actions are: gather_context to discover "
         "repository specifications before deciding; prompt_user to ask one "
@@ -5083,6 +5107,14 @@ def _action_repair_prompt(selected_skill: SkillCatalogEntry) -> str:
         "and a clear English question ending in '?' for prompt_user. Do not "
         "combine actions or output markdown."
     )
+    if failed_action is not None:
+        prompt += (
+            "\nThe previous edit action failed and was not applied. don't do this "
+            "again; reread the current file and return a corrected edit. The "
+            "rejected edit was:\n"
+            f"{_workflow_action_signature(failed_action)}"
+        )
+    return prompt
 
 
 def _prompt_user(

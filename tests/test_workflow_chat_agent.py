@@ -3712,6 +3712,14 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
                 assert "does not match" in messages[1]["content"]
                 prompt = json.loads(messages[1]["content"])
                 assert '"validation_error"' in prompt["transcript"][-1]["content"]
+                assert (
+                    "workflow_tool_action_invalid"
+                    in prompt["transcript"][-1]["content"]
+                )
+                assert (
+                    "Return a corrected invoke_tool action"
+                    in (prompt["transcript"][-1]["content"])
+                )
                 return {
                     "kind": "invoke_tool",
                     "tool": "fuzzy-match",

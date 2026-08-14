@@ -55,6 +55,10 @@ from powdrr_lift.core.spec_context import (
     normalize_context_type,
     render_gather_context_report,
 )
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 from powdrr_lift.fuzzy_match import fuzzy_match_json
 
 _DEFAULT_MODEL = "glm-5.2"
@@ -1086,6 +1090,12 @@ class _WorkflowStructuredDocumentError(RuntimeError):
     """Raised when an edit produces invalid structured document text."""
 
 
+class _WorkflowToolValidationError(RuntimeError):
+    def __init__(self, validation_error: ValidationError) -> None:
+        self.validation_error = validation_error
+        super().__init__(validation_error.message)
+
+
 class _WorkflowProgressDisplay:
     def __init__(
         self,
@@ -1625,6 +1635,11 @@ def run_workflow_chat(
                 }
             )
             execution_state.execution_context.append(feedback)
+            validator_data = (
+                validation_error_to_data(exc.validation_error)
+                if isinstance(exc, _WorkflowToolValidationError)
+                else None
+            )
             failure_result_key = (
                 "validation_error"
                 if failure_kind == "validation_error"
@@ -1635,6 +1650,7 @@ def run_workflow_chat(
                     "action": json.loads(_workflow_action_signature(action)),
                     "message": str(exc),
                     "corrective_instructions": feedback,
+                    **({"validator": validator_data} if validator_data else {}),
                 }
             }
             if failure_kind == "validation_error":
@@ -1654,7 +1670,7 @@ def run_workflow_chat(
                 }
             )
             last_validation_error = (
-                str(exc) if failure_kind == "validation_error" else None
+                validator_data["message"] if validator_data is not None else None
             )
             if action_signature == failed_action_signature:
                 stalled_roundtrips += 1
@@ -3284,6 +3300,24 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
     """Reject tool actions that do not match a current-step invocation."""
     if action.kind != "invoke_tool":
         return
+    try:
+        _validate_workflow_action_for_step_unwrapped(action, step)
+    except RuntimeError as exc:
+        if isinstance(exc, _WorkflowToolValidationError):
+            raise
+        raise _WorkflowToolValidationError(
+            ValidationError(
+                code="workflow_tool_action_invalid",
+                message=str(exc),
+                path="parameters.command",
+            )
+        ) from exc
+
+
+def _validate_workflow_action_for_step_unwrapped(
+    action: SkillChatAction, step: Any
+) -> None:
+    """Validate a tool action while preserving the original error wording."""
     supported_invocations = tuple(
         invocation for invocation in step.tool_invocations if invocation.tool != "ref"
     )

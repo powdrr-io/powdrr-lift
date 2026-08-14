@@ -66,6 +66,7 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatConfig,
     SkillChatEdit,
     WorkflowContext,
+    _action_repair_prompt,
     _action_system_prompt,
     _apply_file_edits,
     _available_work_item_documents,
@@ -3336,9 +3337,6 @@ def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
     )
     assert "Preserve surrounding mapping keys" in yaml_feedback
     assert "unescaped double quotes" in yaml_feedback
-    assert "Last proposed edit (NOT APPLIED)" in yaml_feedback
-    assert '"file_path": "implementation-specification.yaml"' in yaml_feedback
-    assert "don't do this again" in yaml_feedback
     assert "current file has 70 lines" not in yaml_feedback
 
     range_feedback = _workflow_edit_failure_feedback(
@@ -3347,6 +3345,32 @@ def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
         file_context,
     )
     assert "current file has 70 lines" in range_feedback
+
+
+def test_action_repair_prompt_includes_the_rejected_edit() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": "implementation-specification.yaml",
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 21,
+                    "end_line": 24,
+                    "text": "entities:\n - id: invalid",
+                }
+            ],
+        }
+    )
+
+    prompt = _action_repair_prompt(
+        SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
+        failed_action=action,
+    )
+
+    assert "previous edit action failed and was not applied" in prompt
+    assert '"file_path": "implementation-specification.yaml"' in prompt
+    assert "don't do this again" in prompt
 
 
 def test_edit_action_normalizes_fenced_yaml_before_validation(tmp_path: Path) -> None:

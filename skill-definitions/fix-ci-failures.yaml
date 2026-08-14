@@ -167,7 +167,7 @@ steps:
     matrix, local reproduction results, Stack Overflow references, edits, and
     validation results in the PR update or handoff context.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state

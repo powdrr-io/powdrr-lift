@@ -97,7 +97,7 @@ steps:
     - git
     - diff
     - --check
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state
@@ -122,7 +122,7 @@ steps:
     pushed, and report any comment that remains open or blocked. Never merge the
     pull request or push directly to main.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state

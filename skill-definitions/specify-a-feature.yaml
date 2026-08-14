@@ -125,7 +125,7 @@ steps:
     artifacts under docs/proposals/<work-item-name>/. Do not commit or create the
     pull request yet.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state
@@ -151,7 +151,7 @@ steps:
     not report this step complete until the GitHub command succeeds and its output
     includes the pull request URL. Do not begin implementation in this skill.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state

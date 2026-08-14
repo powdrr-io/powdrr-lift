@@ -128,7 +128,7 @@ steps:
     - git
     - diff
     - --check
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state
@@ -140,7 +140,7 @@ steps:
     docs/project_structure. Do not stage unrelated files, feature-specific
     specifications, or generated caches. Do not commit here.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state
@@ -169,7 +169,7 @@ steps:
     completion until the GitHub command succeeds and its output includes the
     pull request URL.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state

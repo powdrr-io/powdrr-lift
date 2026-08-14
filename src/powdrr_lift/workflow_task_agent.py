@@ -34,6 +34,7 @@ from powdrr_lift.workflow_chat_agent import (
     LocalLlamaChatClient,
     SkillCatalogEntry,
     SkillChatAction,
+    _action_system_prompt,
     _apply_file_edits,
     _build_step_execution_messages,
     _estimate_message_tokens,
@@ -53,6 +54,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _resolve_worktree_file_path,
     _validate_internal_command,
+    _workflow_action_signature,
 )
 from powdrr_lift.workflow_execution import (
     ProgressDecision,
@@ -872,6 +874,9 @@ def _build_task_messages(
                     "execution_mode": "process_workflow_task",
                     "task": task.to_data(),
                     **context_data,
+                    "step_context": (
+                        [response_correction] if response_correction is not None else []
+                    ),
                     "workflow_dir": str(workflow.directory),
                     "workflow_files": _workflow_file_names(workflow.directory),
                     "available_tools": [
@@ -918,7 +923,6 @@ def _build_task_messages(
                         }
                         for entry in skill_catalog
                     ],
-                    "response_correction": response_correction,
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -1080,72 +1084,7 @@ def _task_action_failure_reached(
 
 
 def _task_system_prompt() -> str:
-    return (
-        "Task: act as a staff engineer processing one claimed task from a durable "
-        "workflow. Use the task "
-        "input, completed upstream outputs, task details, and prior events to "
-        "make safe progress toward the task's output.\n"
-        "The user message includes workflow_files, the exact JSON filenames "
-        "available in workflow_dir. When reading or writing workflow files, use "
-        "those exact filenames, including the .json suffix. Never infer, shorten, "
-        "or replace a filename with a trailing period. If a filename is not in "
-        "workflow_files, list the directory before using it.\n"
-        "If response_correction is non-null, it describes a validation failure "
-        "from your previous response. Correct that failure and return only the "
-        "required JSON object.\n"
-        "Task input contract: input_state has been populated from the task's "
-        "declared inputs and any typed upstream references when the task was "
-        "claimed. Use the populated values as the source of truth. Your complete "
-        "action output_state must satisfy this task's output_state_type and be "
-        "sufficient for every downstream task that declares this task as an "
-        "upstream dependency.\n"
-        "Choose exactly one outcome:\n"
-        "- gather_context: choose this when structured specification context must "
-        "be discovered before deciding or acting.\n"
-        "- prompt_user: choose this when a human decision or review is required; "
-        "the execution agent will persist it as a human workflow task.\n"
-        "- edit: choose this for a known line-based file change.\n"
-        "- invoke_skill: choose this when a listed skill should run as a nested "
-        "workflow in the current worktree. It inherits context and bindings by "
-        "default; provider_role=adversarial selects the adversarial provider, and "
-        "clean=true limits the child to the explicit context list and isolates "
-        "its gathered context.\n"
-        "- invoke_tool: choose this when a shell, fuzzy-match, or basedpyright "
-        "query is needed "
-        "to inspect the worktree or perform work required to determine the "
-        "output.\n"
-        "- read_document: choose this when specific lines from a known document "
-        "are needed.\n"
-        "- next_step: choose this when the current action is complete and the LLM "
-        "should decide the next action.\n"
-        "- complete: choose this when the task can be safely finished now; put "
-        "the produced state in output_state.\n"
-        "Response: return exactly one JSON object matching exactly one outcome "
-        "shape below. Do not include markdown or combine outcomes.\n"
-        '{"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep"],"language":["python"]}}\n'
-        '{"kind":"prompt_user","text":"Is this plan approved?"}\n'
-        '{"kind":"edit","file_path":"path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}\n'
-        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."]}}\n'
-        '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
-        '"provider_role":"adversarial","clean":true,'
-        '"context":["Review only this explicitly supplied context."]}\n'
-        '{"kind":"read_document","file_path":"path","start_line":1,"end_line":20}\n'
-        '{"kind":"next_step"}\n'
-        '{"kind":"complete","output_state":{},"text":"..."}\n'
-        "Use gather_context with one or more supported context types and optional "
-        "keywords and filters when repository specifications must be discovered. "
-        "Filters match exact fields and list values such as labels. Use "
-        "prompt_user instead of get-human-input; the execution agent converts it "
-        "to a durable human task and follow-up task. Use invoke_tool for shell "
-        "commands, fuzzy-match searches, or basedpyright symbol and structure "
-        "queries. "
-        "The fuzzy-match command starts with fuzzy-match and supports find-like "
-        "options including -name, -path, -type, -maxdepth, -mindepth, "
-        "-threshold, and -print. Use complete "
-        "when the task can be finished and put the task's produced state in "
-        "output_state. Use get-human-input when you cannot safely finish without "
-        "Do not output markdown."
-    )
+    return _action_system_prompt()
 
 
 def _workflow_file_names(workflow_dir: Path) -> list[str]:
@@ -1261,6 +1200,7 @@ def _run_skill_for_agent(
         f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
         task.details or "",
     ]
+    progress_controller = WorkflowExecutionController(3)
     while stack:
         current_skill, step_index = stack[-1]
         if step_index >= len(current_skill.skill.steps):
@@ -1287,6 +1227,27 @@ def _run_skill_for_agent(
             timeout_backoff_seconds=timeout_backoff_seconds,
         )
         action = _parse_action_response(response)
+        action_signature = _workflow_action_signature(action)
+        progress_decision = progress_controller.observe(
+            action_signature,
+            made_progress=action.kind in {"complete", "next_step", "gather_context"}
+            or progress_controller.previous_action_signature is None
+            or action_signature != progress_controller.previous_action_signature,
+        )
+        if progress_decision == ProgressDecision.THRESHOLD:
+            execution_events.append(
+                {
+                    "kind": "no_progress",
+                    "action_kind": action.kind,
+                    "message": "Repeated nested workflow action made no progress.",
+                }
+            )
+            execution_context.append(
+                "The previous nested workflow action made no progress; choose "
+                "a different action or next_step."
+            )
+            progress_controller.reset()
+            continue
         if action.kind == "complete":
             stack.pop()
             execution_events.append(

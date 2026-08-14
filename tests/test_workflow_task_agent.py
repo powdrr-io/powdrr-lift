@@ -17,7 +17,7 @@ from powdrr_lift.core import (
     WorkflowTask,
     save_skill,
 )
-from powdrr_lift.workflow_chat_agent import LLMModelLimits
+from powdrr_lift.workflow_chat_agent import LLMModelLimits, _action_system_prompt
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_zai_client,
@@ -76,7 +76,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert completed.status is TaskStatus.COMPLETED
     assert completed.output_state == {"version": "v2"}
     prompt = client.messages[0][1]["content"]
-    assert "staff engineer" in client.messages[0][0]["content"]
+    assert client.messages[0][0]["content"] == _action_system_prompt()
     assert '"execution_mode": "process_workflow_task"' in prompt
 
 
@@ -279,7 +279,8 @@ def test_process_workflow_task_repairs_invalid_json_response(
     assert client.calls == 2
     assert "response needs repair" in stderr.getvalue()
     assert "<no parsed response; client error:" in stderr.getvalue()
-    assert "response_correction" in client.messages[1][1]["content"]
+    assert "response_correction" not in client.messages[1][1]["content"]
+    assert "Expecting value" in client.messages[1][1]["content"]
     assert "not valid JSON" in client.messages[1][1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED

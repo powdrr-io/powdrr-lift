@@ -792,16 +792,53 @@ def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> No
                 parent_step_index=0,
             )
             await pilot.pause()
-            return [
-                str(label.render())
-                for label in app.query_one("#steps", ListView).query(Label)
+            steps = app.query_one("#steps", ListView)
+            return [str(label.render()) for label in steps.query(Label)] + [
+                steps.border_title
             ]
 
     assert asyncio.run(exercise()) == [
         "1. Capture the feature goal.",
         "-------",
         "1. Nested step.",
+        "specify-a-feature > nested",
     ]
+
+
+def test_textual_skill_path_tracks_deep_nesting_and_parent_resume() -> None:
+    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+    parent = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
+    child = SkillCatalogEntry(
+        Path("child.yaml"),
+        Skill(
+            name="child",
+            when_to_use=("Run child work.",),
+            steps=(SkillStep(description="Child step."),),
+        ),
+    )
+    grandchild = SkillCatalogEntry(
+        Path("grandchild.yaml"),
+        Skill(
+            name="grandchild",
+            when_to_use=("Run grandchild work.",),
+            steps=(SkillStep(description="Grandchild step."),),
+        ),
+    )
+
+    assert app._resolve_skill_path(parent, None) == ("specify-a-feature",)
+    assert app._resolve_skill_path(child, parent) == (
+        "specify-a-feature",
+        "child",
+    )
+    assert app._resolve_skill_path(grandchild, child) == (
+        "specify-a-feature",
+        "child",
+        "grandchild",
+    )
+    assert app._resolve_skill_path(child, parent) == (
+        "specify-a-feature",
+        "child",
+    )
 
 
 def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:

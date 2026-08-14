@@ -793,8 +793,10 @@ def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> No
             )
             await pilot.pause()
             steps = app.query_one("#steps", ListView)
+            border_title = steps.border_title
+            assert border_title is not None
             return [str(label.render()) for label in steps.query(Label)] + [
-                steps.border_title
+                border_title
             ]
 
     assert asyncio.run(exercise()) == [

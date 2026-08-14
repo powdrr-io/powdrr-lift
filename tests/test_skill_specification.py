@@ -675,15 +675,32 @@ def test_checked_in_bootstrap_skill_verifies_discovered_tools() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     skill = load_skill(skills_dir / "bootstrap-code-structure.yaml")
 
-    discovery_details = skill.steps[0].details
+    discovery_details = skill.steps[1].details
     assert discovery_details is not None
     assert "try its command with the smallest safe invocation" in discovery_details
     assert "correct the command, and retry it" in discovery_details
     assert "Do not pass an untested or failing command" in discovery_details
-    populate_details = skill.steps[2].details
+    populate_details = skill.steps[3].details
     assert populate_details is not None
     assert "Verify every tool command against the successful invocation evidence" in (
         populate_details
+    )
+
+
+def test_checked_in_bootstrap_skill_reuses_existing_artifact_before_discovery() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    skill = load_skill(skills_dir / "bootstrap-code-structure.yaml")
+
+    existence_check = skill.steps[0]
+    assert existence_check.description == (
+        "Check whether the project-structure artifact already exists."
+    )
+    assert existence_check.details is not None
+    assert "choose complete immediately" in existence_check.details
+    assert "choose next_step" in existence_check.details
+    assert "docs/project_structure/project-structure.yaml" in existence_check.details
+    assert skill.steps[1].description == (
+        "Discover the project-wide modules, tools, tests, and development commands."
     )
 
 

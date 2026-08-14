@@ -5076,7 +5076,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             else:
                 assert prompt["execution_mode"] == "execute_selected_skill"
                 if prompt["selected_skill"]["name"] == "bootstrap-code-structure":
-                    assert prompt["current_step_index"] < 7
+                    assert prompt["current_step_index"] < 8
                     shell_invocations = [
                         invocation
                         for invocation in prompt["current_step"].get(

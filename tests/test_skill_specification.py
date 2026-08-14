@@ -327,6 +327,17 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     ]
 
 
+def test_repository_state_invocations_use_internal_tool() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+
+    for skill_path in sorted(skills_dir.glob("*.yaml")):
+        skill = load_skill(skill_path)
+        for step in skill.steps:
+            for invocation in step.tool_invocations:
+                if invocation.command == ("powdrr-lift", "repository-state"):
+                    assert invocation.tool == "internal", skill_path
+
+
 def test_checked_in_review_skill_definitions_exist() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     assert (skills_dir / "address-review-comments.yaml").is_file()

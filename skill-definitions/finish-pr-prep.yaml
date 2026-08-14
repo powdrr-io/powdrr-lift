@@ -24,7 +24,7 @@ steps:
   tool_invocations:
   - tool: ref
     label: pr-prep
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state
@@ -50,7 +50,7 @@ steps:
     the upcoming pull request summary. Do not create or update the pull request
     in this skill.
   tool_invocations:
-  - tool: shell
+  - tool: internal
     command:
     - powdrr-lift
     - repository-state

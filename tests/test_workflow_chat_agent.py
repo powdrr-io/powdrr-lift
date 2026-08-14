@@ -102,8 +102,11 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_user_question,
     _validate_workflow_action_for_step,
     _workflow_action_progress_status,
+    _workflow_edit_failure_feedback,
+    _WorkflowEditRangeError,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
+    _WorkflowStructuredDocumentError,
     _worktree_reuse_decision,
     download_local_qwen_model,
     run_workflow_chat,
@@ -3188,6 +3191,41 @@ def test_edit_action_rejects_invalid_yaml_before_writing(tmp_path: Path) -> None
         )
 
     assert yaml_path.read_text(encoding="utf-8") == "name: original\n"
+
+
+def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": "implementation-specification.yaml",
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 40,
+                    "end_line": 43,
+                    "text": "  - id: corrected",
+                }
+            ],
+        }
+    )
+    file_context = {"exists": True, "line_count": 70}
+
+    yaml_feedback = _workflow_edit_failure_feedback(
+        action,
+        _WorkflowStructuredDocumentError(
+            "Edited YAML file is invalid at line 14, column 3"
+        ),
+        file_context,
+    )
+    assert "Preserve surrounding mapping keys" in yaml_feedback
+    assert "current file has 70 lines" not in yaml_feedback
+
+    range_feedback = _workflow_edit_failure_feedback(
+        action,
+        _WorkflowEditRangeError("range ends at line 74, but the file has 70 lines"),
+        file_context,
+    )
+    assert "current file has 70 lines" in range_feedback
 
 
 def test_edit_action_normalizes_fenced_yaml_before_validation(tmp_path: Path) -> None:

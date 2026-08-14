@@ -4802,6 +4802,13 @@ def _workflow_edit_failure_feedback(
             "unescaped double quotes inside a double-quoted value. Correct the "
             "document before retrying."
         )
+    if action.kind == "edit":
+        feedback += (
+            "\n\nLast proposed edit (NOT APPLIED):\n"
+            f"{_workflow_action_signature(action)}\n"
+            "don't do this again; return a corrected edit after rereading the "
+            "current file."
+        )
     return feedback
 
 

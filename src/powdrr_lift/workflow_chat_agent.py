@@ -2691,6 +2691,10 @@ def _action_system_prompt() -> str:
         "For YAML or JSON edits, preserve the surrounding document structure. "
         "When replacing a list item, start at the list item rather than its "
         "mapping key (for example, preserve `entities:` above `- id: ...`). "
+        "For prose values containing embedded double quotes, colons, or other "
+        "YAML-sensitive punctuation, use a single-quoted scalar or a `>-` "
+        "block scalar; never place unescaped double quotes inside a double-"
+        "quoted YAML value. "
         "After composing all line edits, ensure the complete resulting document "
         "remains valid before returning the action.\n"
         "When edit is available, current_file includes the file path and its "
@@ -4769,7 +4773,10 @@ def _workflow_edit_failure_feedback(
         feedback += (
             " The edit range was within the file, but the resulting structured "
             "document is invalid. Preserve surrounding mapping keys and YAML "
-            "indentation, such as section headers like `entities:`; correct the "
+            "indentation, such as section headers like `entities:`. If a prose "
+            "value contains embedded double quotes, colons, or YAML punctuation, "
+            "use a single-quoted scalar or a `>-` block scalar; do not use "
+            "unescaped double quotes inside a double-quoted value. Correct the "
             "document before retrying."
         )
     return feedback

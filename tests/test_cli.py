@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -36,6 +37,26 @@ def test_cli_init_writes_template(tmp_path: Path) -> None:
         "src/app.py",
         "tests/test_app.py",
     ]
+
+
+def test_cli_repository_state_reports_staged_unstaged_and_untracked_files(
+    tmp_path: Path,
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    (repo_root / "src" / "app.py").write_text("print('changed')\n", encoding="utf-8")
+    (repo_root / "new.txt").write_text("new\n", encoding="utf-8")
+    _git(repo_root, "add", "src/app.py")
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert main(["repository-state", "--repo-root", str(repo_root)]) == 0
+
+    state = json.loads(stdout.getvalue())
+    assert state["branch"] == "feature/change-log"
+    assert state["clean"] is False
+    files = {item["path"]: item for item in state["files"]}
+    assert files["src/app.py"]["staged"] is True
+    assert files["new.txt"]["untracked"] is True
 
 
 def test_cli_process_workflow_task_wires_configuration(

@@ -71,6 +71,7 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
+from powdrr_lift.repository_state import render_repository_state
 from powdrr_lift.workflow_chat_agent import (
     ALL_PROVIDERS,
     WorkflowChatConfig,
@@ -87,6 +88,18 @@ from powdrr_lift.workflow_task_agent import (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="powdrr-lift")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    repository_state_parser = subparsers.add_parser(
+        "repository-state",
+        aliases=["repository_state"],
+        help="Print structured Git branch and worktree state as JSON.",
+    )
+    repository_state_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to inspect; defaults to the current worktree.",
+    )
+    repository_state_parser.set_defaults(func=_run_repository_state)
 
     init_parser = subparsers.add_parser(
         "init",
@@ -1113,6 +1126,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return args.func(args)
+
+
+def _run_repository_state(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    sys.stdout.write(render_repository_state(repo_root))
+    return 0
 
 
 def _run_init(args: argparse.Namespace) -> int:

@@ -48,10 +48,8 @@ steps:
   tool_invocations:
   - tool: shell
     command:
-    - git
-    - status
-    - --short
-    - --branch
+    - powdrr-lift
+    - repository-state
   - tool: shell
     command:
     - git
@@ -67,9 +65,8 @@ steps:
     - origin/<base-branch>
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
 - description: Inventory each conflict and attribute the competing changes.
   llm_type: high_reasoning
   details: >-
@@ -233,9 +230,8 @@ steps:
   tool_invocations:
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
   - tool: shell
     command:
     - git

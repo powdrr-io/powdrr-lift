@@ -285,12 +285,12 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ),
     ]
     assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
-        ("git", "status", "--short"),
+        ("powdrr-lift", "repository-state"),
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
     assert skill.steps[12].uses_skills == ("finish-pr-prep",)
     assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
-        ("git", "status", "--short"),
+        ("powdrr-lift", "repository-state"),
         (
             "git",
             "commit",
@@ -535,12 +535,12 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     )
     assert "invoke the workflow instantiation tool" in (skill.steps[3].details or "")
     assert [invocation.command for invocation in skill.steps[5].tool_invocations] == [
-        ("git", "status", "--short"),
+        ("powdrr-lift", "repository-state"),
         ("git", "add", "docs/proposals/<feature-name>", "docs/workflows"),
     ]
     assert skill.steps[6].uses_skills == ("finish-pr-prep",)
     assert [invocation.command for invocation in skill.steps[7].tool_invocations] == [
-        ("git", "status", "--short"),
+        ("powdrr-lift", "repository-state"),
         (
             "git",
             "commit",

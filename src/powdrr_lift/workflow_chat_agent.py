@@ -2507,10 +2507,14 @@ def _build_step_execution_messages(
         | {_INTERNAL_TOOL}
     )
     tool_descriptions = {
-        "shell": "Execute a shell command in the current worktree.",
+        "shell": (
+            "Execute a shell command in the current worktree. Commands run with "
+            "the worktree as cwd; any explicit cwd must remain inside it."
+        ),
         _INTERNAL_TOOL: (
             "Execute a powdrr-lift CLI command. This tool is always available, "
-            "but its command must invoke only the powdrr-lift binary."
+            "but its command must invoke only the powdrr-lift binary and runs "
+            "with the current worktree as cwd."
         ),
         "fuzzy-match": (
             "Search worktree paths with find-like filters and fuzzy name matching."
@@ -3668,7 +3672,15 @@ def _execute_shell_tool(
         resolved_cwd = worktree_root
     elif isinstance(cwd_value, str) and cwd_value.strip():
         cwd_path = Path(cwd_value.strip())
-        resolved_cwd = cwd_path if cwd_path.is_absolute() else worktree_root / cwd_path
+        resolved_cwd = (
+            cwd_path if cwd_path.is_absolute() else worktree_root / cwd_path
+        ).resolve(strict=False)
+        resolved_worktree_root = worktree_root.resolve(strict=False)
+        if not resolved_cwd.is_relative_to(resolved_worktree_root):
+            raise RuntimeError(
+                "Workflow shell tool cwd must stay within the current worktree: "
+                f"{resolved_worktree_root}"
+            )
     else:
         raise RuntimeError("Workflow invoke_tool action cwd must be a string.")
 

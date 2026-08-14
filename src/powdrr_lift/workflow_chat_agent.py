@@ -63,6 +63,7 @@ from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.workflow_execution import (
     ProgressDecision,
     WorkflowExecutionController,
+    no_progress_feedback,
 )
 
 _DEFAULT_MODEL = "glm-5.2"
@@ -1721,18 +1722,11 @@ def run_workflow_chat(
                 action_signature,
                 made_progress=False,
             )
-            no_progress_feedback = (
-                "The previous workflow action made no progress because it repeated "
-                "the same action without changing the file, staging state, or "
-                "workflow step. Do not invoke this action unchanged again. If its "
-                "result satisfies the current step, choose `next_step` immediately; "
-                "otherwise make a real edit or choose a different action. Repeated "
-                f"action: {action_signature}"
-            )
+            no_progress_message = no_progress_feedback(action_signature)
             execution_state.transcript.append(
-                {"role": "user", "content": no_progress_feedback}
+                {"role": "user", "content": no_progress_message}
             )
-            execution_state.execution_context.append(no_progress_feedback)
+            execution_state.execution_context.append(no_progress_message)
             _verbose_print(
                 stderr,
                 config.verbose,

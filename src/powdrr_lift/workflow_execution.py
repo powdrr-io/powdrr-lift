@@ -16,6 +16,18 @@ class ProgressDecision(Enum):
     THRESHOLD = "threshold"
 
 
+def no_progress_feedback(action_signature: str) -> str:
+    """Return the canonical correction sent after a repeated action."""
+    return (
+        "The previous workflow action made no progress because it repeated the "
+        "same action without changing the file, staging state, or workflow step. "
+        "Do not invoke this action unchanged again. If its result satisfies the "
+        "current step, choose `next_step` immediately; otherwise make a real edit "
+        "or choose a different action. Repeated action: "
+        f"{action_signature}"
+    )
+
+
 @dataclass(slots=True)
 class WorkflowExecutionController:
     """Track repeated actions and failures for either workflow execution path."""

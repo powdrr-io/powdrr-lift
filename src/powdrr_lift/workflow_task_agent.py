@@ -59,6 +59,7 @@ from powdrr_lift.workflow_chat_agent import (
 from powdrr_lift.workflow_execution import (
     ProgressDecision,
     WorkflowExecutionController,
+    no_progress_feedback,
 )
 
 
@@ -298,18 +299,12 @@ def run_workflow_task(
             made_progress=action_progress,
         )
         if progress_decision == ProgressDecision.THRESHOLD:
-            no_progress_feedback = (
-                "The previous workflow task action made no progress because it "
-                "repeated the same action. Do not repeat it unchanged. Choose a "
-                "different action, make a real edit, or choose next_step if the "
-                "current task is satisfied. Repeated action: "
-                f"{action_signature}"
-            )
+            no_progress_message = no_progress_feedback(action_signature)
             events.append(
                 {
                     "kind": "no_progress",
                     "action_kind": action.kind,
-                    "message": no_progress_feedback,
+                    "message": no_progress_message,
                 }
             )
             print(
@@ -317,7 +312,7 @@ def run_workflow_task(
                 "action from the LLM.",
                 file=stderr,
             )
-            response_correction = no_progress_feedback
+            response_correction = no_progress_message
             progress_controller.reset()
             continue
         result: Any

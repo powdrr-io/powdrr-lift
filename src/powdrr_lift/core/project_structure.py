@@ -8,6 +8,7 @@ import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.specification_v1 import (
+    normalize_specification_v1_file,
     validate_module_tool_sections,
     validate_no_explicit_empty_values,
 )
@@ -101,7 +102,9 @@ def validate_project_structure_yaml(
     path = Path(input_path)
     issues: list[ProjectStructureValidationIssue] = []
     try:
-        data: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
+        normalize_specification_v1_file(path)
+        content = path.read_text(encoding="utf-8")
+        data: Any = yaml.safe_load(content)
     except (OSError, yaml.YAMLError) as error:
         return ProjectStructureValidationReport(
             validation_successful=False,

@@ -2441,7 +2441,7 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
     assert "Done." in stdout.getvalue()
 
 
-def test_workflow_execution_stops_after_repeated_no_progress(
+def test_workflow_execution_skips_repeated_no_progress_tool_step(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2468,6 +2468,7 @@ def test_workflow_execution_stops_after_repeated_no_progress(
     )
 
     captured_messages: list[list[dict[str, str]]] = []
+    progress_statuses: list[str] = []
 
     class _FakeOpenAIClient:
         def __init__(self, **_: object) -> None:
@@ -2512,10 +2513,18 @@ def test_workflow_execution_stops_after_repeated_no_progress(
         input_func=lambda: "Build the feature",
         stdout=io.StringIO(),
         stderr=stderr,
+        progress_callback=lambda _skill, _step, status, _parent, _parent_step: (
+            progress_statuses.append(status)
+        ),
     )
 
-    assert exit_code == 1
-    assert "without progress" in stderr.getvalue()
+    assert exit_code == 0
+    assert "skipping to the next workflow step" in stderr.getvalue()
+    assert any(
+        status == "Warning: repeated tool action made no progress; "
+        "skipping to the next workflow step."
+        for status in progress_statuses
+    )
     assert "made no progress" in "\n".join(
         message["content"]
         for exchange in captured_messages

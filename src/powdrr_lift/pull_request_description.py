@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+from pathlib import Path
 from typing import Final
 
 _COMMON_TEMPLATE: Final[str] = """# Pull Request Description
@@ -10,6 +13,13 @@ Fill every section below with evidence from the current worktree, diff, skill
 context, and validation results. Do not leave placeholders. If a section does
 not apply, write `Not applicable` and explain why. Never claim a check passed
 unless it actually ran.
+
+If an existing PR body is included below, treat it as source content that must
+be preserved. Carry forward every informative section, validation result,
+review decision, reference, and follow-up unless it is explicitly superseded.
+Reconcile stale statements with the current diff and append or revise content
+without silently deleting history. The completed output must be one coherent
+PR description, not a template plus a separate discarded old body.
 
 ## Summary
 
@@ -118,10 +128,66 @@ _KIND_SECTIONS: Final[dict[str, str]] = {
 }
 
 
-def render_pull_request_description_template(kind: str = "general") -> str:
-    """Return the common template plus the requested workflow-specific section."""
+def find_existing_pull_request(
+    repo_root: Path | None = None,
+) -> tuple[str, str] | None:
+    """Return the current branch's PR URL and body when one exists."""
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", "--json", "url,body"],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "Cannot inspect pull requests because gh is not installed"
+        ) from None
+
+    if result.returncode != 0:
+        error = result.stderr.strip()
+        normalized_error = error.lower()
+        if (
+            "no pull request" in normalized_error
+            or "no pull requests" in normalized_error
+        ):
+            return None
+        raise RuntimeError(
+            f"Cannot determine whether this branch has a pull request: {error}"
+        )
+
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(
+            "gh returned invalid JSON while inspecting the pull request"
+        ) from None
+    url = payload.get("url")
+    body = payload.get("body")
+    if not isinstance(url, str) or not isinstance(body, str):
+        raise RuntimeError("gh returned incomplete pull-request metadata")
+    return url, body
+
+
+def render_pull_request_description_template(
+    kind: str = "general",
+    *,
+    existing_pull_request: tuple[str, str] | None = None,
+) -> str:
+    """Return a create or update-safe pull-request description template."""
     normalized_kind = kind.strip().lower()
     if normalized_kind not in {"general", *_KIND_SECTIONS}:
         allowed = ", ".join(("general", *_KIND_SECTIONS))
         raise ValueError(f"Unsupported pull-request description kind; use: {allowed}")
-    return _COMMON_TEMPLATE + _KIND_SECTIONS.get(normalized_kind, "")
+    existing_content = ""
+    if existing_pull_request is not None:
+        url, body = existing_pull_request
+        existing_content = (
+            "\n## Existing PR Body (preserve and reconcile)\n\n"
+            f"Current PR: {url}\n\n"
+            "<!-- BEGIN EXISTING PR BODY: retain all informative content -->\n"
+            f"{body}\n"
+            "<!-- END EXISTING PR BODY -->\n"
+        )
+    return existing_content + _COMMON_TEMPLATE + _KIND_SECTIONS.get(normalized_kind, "")

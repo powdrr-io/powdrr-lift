@@ -59,7 +59,15 @@ def test_cli_repository_state_reports_staged_unstaged_and_untracked_files(
     assert files["new.txt"]["untracked"] is True
 
 
-def test_cli_pull_request_description_generates_instructed_feature_template() -> None:
+def test_cli_pull_request_description_generates_instructed_feature_template(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "powdrr_lift.pull_request_description.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args, 1, stdout="", stderr="no pull request"
+        ),
+    )
     stdout = io.StringIO()
 
     with redirect_stdout(stdout):
@@ -81,6 +89,49 @@ def test_cli_pull_request_description_generates_instructed_feature_template() ->
     ):
         assert heading in template
     assert "Do not leave placeholders" in template
+
+
+def test_cli_pull_request_description_preserves_existing_pr_body(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    existing_body = "## Historical Validation\n\nPassed on the previous update."
+    monkeypatch.setattr(
+        "powdrr_lift.pull_request_description.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=json.dumps(
+                {
+                    "url": "https://github.com/example/repo/pull/42",
+                    "body": existing_body,
+                }
+            ),
+            stderr="",
+        ),
+    )
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "pull-request-description",
+                    "--kind",
+                    "ci-fix",
+                    "--repo-root",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+
+    template = stdout.getvalue()
+    assert "## Existing PR Body (preserve and reconcile)" in template
+    assert "https://github.com/example/repo/pull/42" in template
+    assert existing_body in template
+    assert "Carry forward every informative section" in template
+    assert "## CI Failure" in template
 
 
 def test_cli_process_workflow_task_wires_configuration(

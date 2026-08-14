@@ -72,6 +72,7 @@ from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
 from powdrr_lift.pull_request_description import (
+    find_existing_pull_request,
     render_pull_request_description_template,
 )
 from powdrr_lift.repository_state import render_repository_state
@@ -121,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         default="general",
         help="Workflow-specific section to append to the common template.",
+    )
+    pull_request_description_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Worktree to inspect for an existing pull request; defaults to cwd.",
     )
     pull_request_description_parser.set_defaults(func=_run_pull_request_description)
 
@@ -1158,7 +1164,13 @@ def _run_repository_state(args: argparse.Namespace) -> int:
 
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:
-    sys.stdout.write(render_pull_request_description_template(args.kind))
+    existing_pull_request = find_existing_pull_request(args.repo_root)
+    sys.stdout.write(
+        render_pull_request_description_template(
+            args.kind,
+            existing_pull_request=existing_pull_request,
+        )
+    )
     return 0
 
 

@@ -577,6 +577,10 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     workflow_step_details = skill.steps[3].details
     assert workflow_step_details is not None
     assert "templates/execute-proposed-pr.yaml" in workflow_step_details
+    pr_step_details = skill.steps[7].details
+    assert pr_step_details is not None
+    assert "must invoke create-pull-request" in pr_step_details
+    assert "returned PR URL" in pr_step_details
 
     assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
     assert skill.steps[0].tool_invocations[0].command == (

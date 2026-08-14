@@ -106,6 +106,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _validate_workflow_step_transition,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
@@ -226,6 +227,72 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
                 }
             ),
             step,
+        )
+
+    with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "next_step"}),
+            step,
+            [],
+            0,
+        )
+
+    _validate_workflow_step_transition(
+        _parse_action_response({"kind": "next_step"}),
+        step,
+        [
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["rg", "--files"]},
+                "result": {"returncode": 0},
+                "step_index": 0,
+            }
+        ],
+        0,
+    )
+
+    with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "next_step"}),
+            step,
+            [
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                    "result": {"returncode": 1},
+                    "step_index": 0,
+                }
+            ],
+            0,
+        )
+
+    commit_step = replace(
+        step,
+        tool_invocations=(
+            SkillToolInvocation(
+                tool="internal", command=("powdrr-lift", "repository-state")
+            ),
+            SkillToolInvocation(
+                tool="shell", command=("git", "commit", "-m", "<message>")
+            ),
+        ),
+    )
+    with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "next_step"}),
+            commit_step,
+            [
+                {
+                    "kind": "invoke_tool",
+                    "tool": "internal",
+                    "parameters": {"command": ["powdrr-lift", "repository-state"]},
+                    "result": {},
+                    "step_index": 0,
+                }
+            ],
+            0,
         )
 
     wildcard_step = replace(
@@ -3741,7 +3808,32 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
     worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
-    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+    skill = _build_skill()
+    save_skill(
+        replace(
+            skill,
+            steps=(
+                replace(
+                    skill.steps[0],
+                    tool_invocations=(
+                        SkillToolInvocation(
+                            tool="fuzzy-match",
+                            command=(
+                                "fuzzy-match",
+                                ".",
+                                "-name",
+                                "<name>",
+                                "-type",
+                                "f",
+                            ),
+                        ),
+                    ),
+                ),
+                *skill.steps[1:],
+            ),
+        ),
+        skills_dir / "specify-a-feature.json",
+    )
     captured_messages: list[dict[str, str]] = []
 
     class _FakeOpenAIClient:
@@ -4257,6 +4349,31 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "review-architecture",
                 }
                 self._nested_event_count += 1
+                current_step = cast(dict[str, object], prompt["current_step"])
+                tool_invocations = cast(
+                    list[dict[str, object]], current_step.get("tool_invocations", [])
+                )
+                current_step_index = prompt["current_step_index"]
+                has_tool_result = any(
+                    event.get("kind") == "invoke_tool"
+                    and event.get("step_index") == current_step_index
+                    for event in cast(
+                        list[dict[str, object]], prompt["execution_events"]
+                    )
+                )
+                if tool_invocations and not has_tool_result:
+                    invocation = tool_invocations[0]
+                    command = [
+                        str(item)
+                        .replace("<work-item-name>", "display-related-photos")
+                        .replace("<type>", "photo")
+                        for item in cast(list[object], invocation["command"])
+                    ]
+                    return {
+                        "kind": "invoke_tool",
+                        "tool": invocation["tool"],
+                        "parameters": {"command": command},
+                    }
                 return {
                     "kind": "next_step",
                 }
@@ -6793,36 +6910,10 @@ def _build_skill() -> Skill:
             SkillStep(
                 description="Capture the feature goal.",
                 details="Record the user-visible outcome first.",
-                tool_invocations=(
-                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
-                    SkillToolInvocation(
-                        tool="fuzzy-match",
-                        command=(
-                            "fuzzy-match",
-                            ".",
-                            "-name",
-                            "<query>",
-                            "-type",
-                            "<type>",
-                        ),
-                    ),
-                    SkillToolInvocation(
-                        tool="shell",
-                        command=(
-                            "powdrr-lift",
-                            "system-specification",
-                            "--work-item-name",
-                            "<work-item-name>",
-                        ),
-                    ),
-                ),
             ),
             SkillStep(
                 description="Summarize the result.",
                 details="Leave the user with a concise handoff.",
-                tool_invocations=(
-                    SkillToolInvocation(tool="shell", command=("printf", "progress")),
-                ),
             ),
         ),
     )

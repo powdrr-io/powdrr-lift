@@ -99,6 +99,19 @@ class ParseAction(CorrectiveAction):
         )
 
 
+class WorkflowToolAction(CorrectiveAction):
+    def applies_to(self, code: str) -> bool:
+        return code.casefold() == "workflow_tool_action_invalid"
+
+    def instructions(self, error: ValidationError) -> str:
+        return (
+            "Return a corrected invoke_tool action using exactly one of the "
+            "tool invocations declared by the current workflow step. Preserve "
+            "the declared command structure and replace only invalid arguments; "
+            "do not retry the rejected action unchanged."
+        )
+
+
 class GenericValidationAction(CorrectiveAction):
     def applies_to(self, code: str) -> bool:
         return True
@@ -117,6 +130,7 @@ _ACTIONS: tuple[CorrectiveAction, ...] = (
     DuplicateIdAction(),
     MissingValueAction(),
     ParseAction(),
+    WorkflowToolAction(),
     GenericValidationAction(),
 )
 

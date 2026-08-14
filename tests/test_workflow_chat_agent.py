@@ -3467,6 +3467,16 @@ def test_action_repair_prompt_includes_the_rejected_edit() -> None:
     assert "don't do this again" in prompt
 
 
+def test_action_repair_prompt_explains_validation_errors() -> None:
+    prompt = _action_repair_prompt(
+        SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
+        validation_error="command does not match the declared template",
+    )
+
+    assert "returned a validation_error" in prompt
+    assert "matches the current step's declared tool template exactly" in prompt
+
+
 def test_edit_action_normalizes_fenced_yaml_before_validation(tmp_path: Path) -> None:
     yaml_path = tmp_path / "project-structure.yaml"
     yaml_path.write_text("name: original\n", encoding="utf-8")
@@ -3700,6 +3710,16 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
             if call_index == 2:
                 assert "command" in messages[1]["content"]
                 assert "does not match" in messages[1]["content"]
+                prompt = json.loads(messages[1]["content"])
+                assert '"validation_error"' in prompt["transcript"][-1]["content"]
+                assert (
+                    "workflow_tool_action_invalid"
+                    in prompt["transcript"][-1]["content"]
+                )
+                assert (
+                    "Return a corrected invoke_tool action"
+                    in (prompt["transcript"][-1]["content"])
+                )
                 return {
                     "kind": "invoke_tool",
                     "tool": "fuzzy-match",

@@ -3330,6 +3330,16 @@ def _command_token_matches(actual: str, expected: str) -> bool:
     placeholder_matches = list(re.finditer(r"<[^<>]+>", expected))
     if not placeholder_matches:
         return False
+    if len(placeholder_matches) == 1 and placeholder_matches[0].span() == (
+        0,
+        len(expected),
+    ):
+        # A command-template argument such as <populated-pr-description> can
+        # intentionally contain spaces and newlines.  The command parser keeps
+        # that value as one argv item when the LLM returns an array (or quotes
+        # it in a shell command), so validating it as a non-whitespace token
+        # incorrectly rejects otherwise valid commands.
+        return bool(actual)
     pattern_parts: list[str] = []
     previous_end = 0
     for placeholder_match in placeholder_matches:

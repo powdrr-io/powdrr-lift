@@ -1,59 +1,100 @@
 # powdrr-lift
 
-GATHER STRUCTURED CONTEXT -> SYNTHESIZE UPDATED CONTEXT -> LEVERAGE CURATED CONTEXT
+## The software factory for agents that need to ship
 
-`powdrr-lift` is an agent persistent memory system. However it is not Yet Another Memory
-System. `powdrr-lift` is an opinionated coding agent memory system that:
+Most coding agents are impressive right up until they are not. Give one a large repo,
+a long conversation, and permission to act, and familiar failure modes appear quickly:
 
-* Requires the agent to submit a changelog with every PR
-* Synthesizes current state from a set of changelogs
-* Curates and provides relevant context during design, implementation, and review
+* Context gets compressed. The agent forgets why it started, loses the dependency chain,
+  and edits the first plausible file it finds.
+* A small request turns into an unreviewed refactor because “clean this up” becomes the
+  agent's new definition of success.
+* A failed patch is retried with slightly different wording until the agent declares
+  victory, leaving a half-fixed codebase behind.
+* An autonomous run reports “done” without proving that the change matches the request,
+  the repository's rules, or the decisions made earlier.
 
-`powdrr-lift` is designed for individuals and teams focused on increasing code quality,
-increasing code understandability, decreasing token costs, and decreasing time wasted.
+**Powdrr Lift is built for the other outcome.**
 
-## Why Powdrr-Lift?
+It is a software factory: a human-facing workflow chat client for directing work, plus
+fully autonomous agents that can keep a task moving through planning, implementation,
+validation, review, and handoff. The factory is powered by structured, self-validating
+workflows instead of an ever-growing prompt. Every task has an explicit shape, every
+step has a purpose, and every action is checked against the step that authorized it.
 
-AI coding assistants are powerful, but they are hard to trust when the only source of
-truth is chat history and a pile of markdown notes. `powdrr-lift` adds a structured
-change layer so humans and agents can agree on what changed before, during, and after
-the code lands.
+That is the fundamental difference. A generic agent can lose the plot and improvise a
+new one. Powdrr Lift cannot silently turn a focused workflow into free-form work: the
+agent operates inside a well-formulated plan, receives targeted context, uses declared
+actions, works in a dedicated worktree, and stops when it cannot make validated progress.
+The result is autonomy with a contract.
 
-* Agree on the change hierarchy before implementation - capture intent, decisions,
-  file changes, entities, relationships, invariants, and guidance as structured data.
-* Validate at a finer granularity - the more structure the system has, the more
-  confidently both agents and humans can check coherency and catch drift early.
-* Surface the right context - targeted edit, blame, and entity views keep the current
-  change connected to its related code areas and prior decisions.
-* Keep the workflow opinionated - the repo has strong guardrails on purpose, because
-  opinionated systems make it easier to stay aligned and easier to encode your own
-  point of view when the work demands it.
+## Why engineers use Powdrr Lift
 
-In practice, that means less ambiguity, less wasted work, and more confidence that the
-next change is still pointing in the right direction.
+### Direct the work in chat—or let it run
 
-## How Are We Different?
+Start with a conversation when the problem is still ambiguous. The workflow chat client
+matches the request to a well-formulated plan, asks the questions that matter, and shows the
+agent's current step and context. Once the work is specified, autonomous workflows can
+continue driving it forward without requiring a human to translate every decision into
+the next prompt.
 
-`powdrr-lift` is intentionally more opinionated than a generic prompt-and-patch workflow.
-That opinionatedness is the point: stronger guardrails, stronger validation, and stronger
-coherency statements.
+### Keep agents grounded in the repository
 
-**vs. OpenSpec** - OpenSpec is a useful spec-first pattern for AI coding, but `powdrr-lift`
-goes further by making the structure more granular and more machine-checkable. That gives
-humans and agents higher-confidence validation, clearer lineage, and stronger context across
-the full hierarchy of change.
+Powdrr Lift gathers the relevant specifications, decisions, entities, relationships,
+invariants, files, and prior workflow context before an agent acts. It does not ask a
+model to reconstruct the whole project from chat history. It gives the model the smallest
+useful slice of the repository, then records the resulting decisions and execution events
+for the next step and the next review.
 
-**vs. Spec Kit** - Spec Kit is thorough, but it can feel heavyweight. `powdrr-lift` keeps the
-workflow structured without forcing a rigid phase-gate process. The repo is opinionated, but
-the artifacts stay directly tied to the change and are designed for continuous iteration.
+### Make the workflow executable and self-validating
 
-**vs. Kiro** - Kiro is powerful, but it is tied to a specific IDE and a narrower model/tooling
-environment. `powdrr-lift` is repo-native and assistant-agnostic, so you can use it with the
-tools and workflows you already have.
+Skills are checked-in YAML or JSON definitions with ordered steps, declared tools,
+expected outcomes, and composable subskills. The runtime validates skill directories,
+resolves dependencies, validates actions against the active step, detects repeated
+failures and stalled roundtrips, and persists an execution summary. If an agent cannot
+produce a coherent next action, the workflow has a defined stop—not permission to invent
+one.
 
-**vs. nothing** - AI coding without a structured spec layer means vague prompts, weak traceability,
-and a lot of accidental drift. `powdrr-lift` replaces that with coherent artifacts, validation,
-and review surfaces that keep the work directionally aligned.
+### Isolate changes before they become damage
+
+Every invocation resolves a worktree context. Work happens on a dedicated branch instead
+of silently mutating the primary checkout, and the workflow carries its worktree and
+pull-request context forward. This makes autonomous execution inspectable, reversible,
+and ready for human review.
+
+### Preserve the why, not just the diff
+
+Powdrr Lift's structured change layer captures intent, decisions, affected entities,
+relationships, invariants, and guidance alongside the code. Reviews can ask not only
+“what changed?” but “why was this the right change, what does it depend on, and what must
+remain true?” That context stays useful long after the original conversation is gone.
+
+## How Powdrr Lift is different
+
+Powdrr Lift is intentionally more opinionated than a prompt-and-patch assistant. The
+guardrails are the product. They turn an agent from a clever text generator into a
+repeatable engineering system:
+
+| Generic agent behavior | Powdrr Lift behavior |
+| --- | --- |
+| Loses context and guesses what to do next | Gathers typed, relevant context for the active step |
+| Expands a small request into unrelated edits | Uses declared actions tied to a checked-in workflow |
+| Repeats a failing action until the conversation ends | Detects stalls, records the failure, and stops |
+| Claims completion based on its own narrative | Produces validated artifacts and an execution summary |
+| Modifies the checkout where it was launched | Works in a dedicated worktree with reviewable state |
+
+This is not a thin memory layer bolted onto a chatbot. It is a structured change system
+for software teams that want more output without surrendering direction, traceability, or
+the ability to say no.
+
+## What you get
+
+* Human-guided workflow chat for ambiguous or high-leverage work.
+* Autonomous skill flows that compose planning, implementation, validation, and review.
+* Structured specifications and changelogs that preserve intent across revisions.
+* Targeted context, edit, blame, and entity views grounded in repository state.
+* Worktree-isolated changes, explicit progress, and durable execution summaries.
+* More useful code reviews, fewer wasted tokens, and less cleanup after the agent leaves.
 
 ## Design
 
@@ -67,10 +108,10 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 
 ## How It Works
 
-1. Install `powdrrlift` skills to your favorite coding agent
-2. Prompt and use your agent, the agent will pickup up skills automatically
-3. Explicitly use the skills for even better planning, coding output, and code reviews
-4. Explore the `powdrrlift` UI to get insights into the reasons and relationships in your code
+1. Install Powdrr Lift in the repository where you want work done
+2. Start workflow chat and describe the outcome you want
+3. Answer the questions that shape the plan, or let an autonomous workflow continue
+4. Review the validated artifacts, execution summary, and proposed code changes
 
 ## What You Will Notice
 
@@ -80,35 +121,6 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 * Less tokens spent with more output generated
 
 ## Get Started
-
-### For OpenCode
-
-1. **Clone this repository**
-   ```bash
-   git clone <repository-url>
-   cd powdrr-lift
-   ```
-
-2. **Install RTK**
-
-   Install the `rtk` command and make sure it is available on your `PATH`.
-   Powdrr-Lift requires RTK because every workflow shell tool invocation runs
-   through it.
-
-3. **Install the skills**
-   ```bash
-   ./scripts/install-skills.sh
-   ```
-
-4. **OpenCode will automatically load the skills**
-   - Skills are installed to `~/.config/opencode/skills/`
-   - Configuration is installed to `~/.config/opencode/opencode.json`
-   - Skills are enabled for default agents
-
-4. **Start using the skills**
-   - Run `opencode` in your project
-   - The skills will be available automatically
-   - Use the `skill` tool to invoke specific skills
 
 ### For Codex Proxy Recording
 
@@ -215,7 +227,8 @@ brew install powdrr-lift
 
 ### Available Skills
 
-This repository includes 10 installable skills for OpenCode:
+This repository includes 10 reusable skills for planning, implementation, validation,
+review, and repository-state management:
 
 1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated system specification document from the analysis and commit it.
 
@@ -236,17 +249,6 @@ This repository includes 10 installable skills for OpenCode:
 9. **specify-system** - Create, fill, and validate system specification templates with the repository's system-specification CLI or MCP endpoints.
 
 10. **synchronize-code-and-state** - Generate the current codebase-state snapshot, compare it to the source tree and changelog index, and reconcile mismatches by changing code and/or the changelog while preserving the repo's intent.
-
-**Usage:**
-```bash
-# In OpenCode, you can invoke skills manually:
-skill({ name: "prepare-pr-changelog" })
-skill({ name: "review-pr-changelog" })
-skill({ name: "specify-system" })
-```
-
-OpenCode will automatically load skills and display them in the available skills list.
-
 
 ## Background
 

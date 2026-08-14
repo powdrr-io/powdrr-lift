@@ -170,6 +170,7 @@ def test_current_file_context_cache_reuses_unchanged_file(tmp_path: Path) -> Non
 
     path.write_text("one\ntwo\nthree\n", encoding="utf-8")
     updated = _current_file_context(tmp_path, path, cache=cache)
+    assert updated is not None
     assert updated is not first
     assert updated["line_count"] == 3
 

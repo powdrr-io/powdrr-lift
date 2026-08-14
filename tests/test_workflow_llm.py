@@ -5,6 +5,7 @@ from typing import Any
 
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
+    WorkflowActionObservation,
     WorkflowLLMActionEngine,
     prune_execution_events,
     workflow_action_signature,
@@ -15,6 +16,24 @@ from powdrr_lift.workflow_llm import (
 class _Action:
     kind: str
     value: str = ""
+
+
+class _ProgressStrategy:
+    def __init__(self, state: str) -> None:
+        self.state = state
+        self.observations: list[WorkflowActionObservation] = []
+
+    def material_state(self, action: _Action) -> str:
+        _ = action
+        return self.state
+
+    def record_no_progress(
+        self,
+        action: _Action,
+        observation: WorkflowActionObservation,
+    ) -> None:
+        _ = action
+        self.observations.append(observation)
 
 
 def test_action_engine_uses_the_same_state_aware_no_progress_rule() -> None:
@@ -66,6 +85,30 @@ def test_action_engine_accepts_a_material_state_change_for_a_repeat() -> None:
 
     assert observation.made_progress is True
     assert observation.decision is ProgressDecision.PROGRESS
+
+
+def test_action_engine_reports_stalls_through_the_runner_strategy() -> None:
+    engine = WorkflowLLMActionEngine(max_stalled_roundtrips=1)
+    strategy = _ProgressStrategy("unchanged")
+    action = _Action(kind="invoke_tool", value="git status --short")
+
+    first_state = engine.begin_action(action, strategy=strategy)
+    engine.complete_action(
+        action,
+        before_state=first_state,
+        signature=workflow_action_signature,
+        strategy=strategy,
+    )
+    repeated_state = engine.begin_action(action, strategy=strategy)
+    observation = engine.complete_action(
+        action,
+        before_state=repeated_state,
+        signature=workflow_action_signature,
+        strategy=strategy,
+    )
+
+    assert observation.decision is ProgressDecision.THRESHOLD
+    assert strategy.observations == [observation]
 
 
 def test_prompt_event_pruning_preserves_task_results_and_bounds_large_values() -> None:

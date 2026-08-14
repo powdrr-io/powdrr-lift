@@ -33,6 +33,7 @@ class WorkflowLLMTimeoutExhausted(RuntimeError):
 
 
 ActionT = TypeVar("ActionT")
+StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
 _MAX_PROMPT_EVENT_CHARS = 8_000
 
@@ -143,6 +144,18 @@ class WorkflowActionObservation:
     correction: str | None = None
 
 
+class WorkflowActionProgressStrategy(Protocol[StrategyActionT]):
+    """Adapter hooks for state snapshots and runner-specific reporting."""
+
+    def material_state(self, action: StrategyActionT) -> object: ...
+
+    def record_no_progress(
+        self,
+        action: StrategyActionT,
+        observation: WorkflowActionObservation,
+    ) -> None: ...
+
+
 class WorkflowLLMActionEngine:
     """Own JSON parsing and repeated-action accounting for a workflow session."""
 
@@ -219,6 +232,34 @@ class WorkflowLLMActionEngine:
                 no_progress_feedback(action_signature) if not made_progress else None
             ),
         )
+
+    def begin_action(
+        self,
+        action: ActionT,
+        *,
+        strategy: WorkflowActionProgressStrategy[ActionT],
+    ) -> object:
+        """Capture the adapter's material state before executing an action."""
+        return strategy.material_state(action)
+
+    def complete_action(
+        self,
+        action: ActionT,
+        *,
+        before_state: object,
+        signature: Callable[[ActionT], str],
+        strategy: WorkflowActionProgressStrategy[ActionT],
+    ) -> WorkflowActionObservation:
+        """Observe an executed action and delegate only reporting to its adapter."""
+        observation = self.observe_action(
+            action,
+            signature=signature,
+            before_state=before_state,
+            after_state=strategy.material_state(action),
+        )
+        if not observation.made_progress:
+            strategy.record_no_progress(action, observation)
+        return observation
 
     def record_action_failure(
         self,

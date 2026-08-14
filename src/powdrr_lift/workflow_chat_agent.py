@@ -62,6 +62,8 @@ from powdrr_lift.core.validation_messages import (
 from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
+    WorkflowActionObservation,
+    WorkflowActionProgressStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
     prune_execution_events,
@@ -433,6 +435,28 @@ class _WorkflowExecutionState:
     )
 
 
+@dataclass(slots=True)
+class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction]):
+    """Keep chat-only transcript and status context outside the shared engine."""
+
+    state: _WorkflowExecutionState
+
+    def material_state(self, action: SkillChatAction) -> object:
+        return _workflow_action_material_state(action, self.state)
+
+    def record_no_progress(
+        self,
+        action: SkillChatAction,
+        observation: WorkflowActionObservation,
+    ) -> None:
+        _ = action
+        assert observation.correction is not None
+        self.state.transcript.append(
+            {"role": "user", "content": observation.correction}
+        )
+        self.state.execution_context.append(observation.correction)
+
+
 @dataclass(frozen=True, slots=True)
 class _SkillExecutionFrame:
     parent_skill: SkillCatalogEntry
@@ -496,7 +520,7 @@ def _normalize_cache_usage(usage: Mapping[str, Any]) -> dict[str, int] | None:
 class _LLMExchangeRecordingClient:
     """Record every LLM request and response in the active repository root."""
 
-    def __init__(self, client: WorkflowChatClient, repo_root: Path) -> None:
+    def __init__(self, client: WorkflowLLMClient, repo_root: Path) -> None:
         self._client = client
         self._repo_root = repo_root.expanduser().resolve()
 
@@ -1043,9 +1067,6 @@ def _estimate_message_tokens(
     )
 
 
-WorkflowChatClient = WorkflowLLMClient
-
-
 class _ModelUnavailableError(RuntimeError):
     pass
 
@@ -1175,13 +1196,13 @@ def run_workflow_chat(
     provider = provider_roles.provider_for(provider_role)
     current_model = _provider_definition(provider).forced_model or current_model
     credentials = _resolve_credentials(provider, config.api_key, config.base_url)
-    clients: dict[tuple[str, str], WorkflowChatClient] = {}
+    clients: dict[tuple[str, str], WorkflowLLMClient] = {}
 
     def client_for(
         selected_provider: str,
         selected_credentials: WorkflowChatCredentials,
         selected_model: str,
-    ) -> WorkflowChatClient:
+    ) -> WorkflowLLMClient:
         key = (selected_provider, selected_model)
         if key not in clients:
             clients[key] = _LLMExchangeRecordingClient(
@@ -1197,7 +1218,7 @@ def run_workflow_chat(
 
     def client_for_model(
         selected_model: str, selected_provider: str
-    ) -> WorkflowChatClient:
+    ) -> WorkflowLLMClient:
         selected_credentials = _resolve_credentials(
             selected_provider,
             config.api_key,
@@ -1353,6 +1374,7 @@ def run_workflow_chat(
     action_engine = WorkflowLLMActionEngine(
         max_stalled_roundtrips=config.max_stalled_roundtrips
     )
+    progress_strategy = _ChatActionProgressStrategy(execution_state)
     last_failed_action: SkillChatAction | None = None
     last_validation_error: str | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
@@ -1586,9 +1608,9 @@ def run_workflow_chat(
                 else None,
             )
 
-        before_action_state = _workflow_action_material_state(
+        before_action_state = action_engine.begin_action(
             action,
-            execution_state,
+            strategy=progress_strategy,
         )
         handler = action_handlers.get(action.kind)
         if handler is None:
@@ -1688,19 +1710,14 @@ def run_workflow_chat(
         action_signature = _workflow_action_signature(action)
         last_failed_action = None
         last_validation_error = None
-        observation = action_engine.observe_action(
+        observation = action_engine.complete_action(
             action,
-            signature=_workflow_action_signature,
             before_state=before_action_state,
-            after_state=_workflow_action_material_state(action, execution_state),
+            signature=_workflow_action_signature,
+            strategy=progress_strategy,
         )
         if not observation.made_progress:
             assert observation.correction is not None
-            no_progress_message = observation.correction
-            execution_state.transcript.append(
-                {"role": "user", "content": no_progress_message}
-            )
-            execution_state.execution_context.append(no_progress_message)
             _verbose_print(
                 stderr,
                 config.verbose,
@@ -2976,11 +2993,6 @@ def _workflow_action_material_state(
         )
     if action.kind == "prompt_user":
         return _last_user_message(state)
-    if action.kind == "read_document":
-        return (
-            str(state.current_file_path) if state.current_file_path else None,
-            _current_file_contents(state),
-        )
     return None
 
 
@@ -4193,7 +4205,7 @@ def _resolve_llm_mapping(
 
 def _complete_json_with_model_fallback(
     *,
-    client_for: Callable[[str, str], WorkflowChatClient],
+    client_for: Callable[[str, str], WorkflowLLMClient],
     messages: list[dict[str, str]],
     context: str,
     model: str,
@@ -4297,7 +4309,7 @@ def _long_context_backup_for(
 
 
 def _complete_json_with_repair(
-    client: WorkflowChatClient,
+    client: WorkflowLLMClient,
     messages: list[dict[str, str]],
     *,
     context: str,
@@ -5077,7 +5089,7 @@ def _extract_command_option(
 
 
 def _attempt_json_repair(
-    client: WorkflowChatClient,
+    client: WorkflowLLMClient,
     messages: Sequence[dict[str, str]],
     *,
     context: str,
@@ -5380,7 +5392,7 @@ def _build_chat_client(
     model: str,
     model_cache_dir: Path,
     progress_stream: TextIO | None = None,
-) -> WorkflowChatClient:
+) -> WorkflowLLMClient:
     provider = _provider_definition(credentials.provider)
     if provider.client_kind == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)

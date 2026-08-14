@@ -488,7 +488,8 @@ class WorkflowChatApp(App[None]):
         steps.border_title = " > ".join(skill_path)
         expected_item_count = len(skill.skill.steps) + (2 if nested else 0)
         items = list(steps.query(ListItem))
-        if len(steps.children) != expected_item_count:
+        rebuilt = len(steps.children) != expected_item_count
+        if rebuilt:
             steps.clear()
             if nested:
                 assert nested_parent_skill is not None
@@ -507,8 +508,9 @@ class WorkflowChatApp(App[None]):
                 for step_index, step in enumerate(skill.skill.steps)
             ]
             steps.mount(*items)
-        items = list(steps.query(ListItem))
-        if nested:
+        else:
+            items = list(steps.query(ListItem))
+        if nested and not rebuilt:
             items = items[2:]
         steps.set_class(bool(items), "has-content")
         for step_index, item in enumerate(items):

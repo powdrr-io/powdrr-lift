@@ -21,7 +21,7 @@ import pytest
 import yaml
 from textual.containers import ScrollableContainer
 from textual.events import Key
-from textual.widgets import Label, ListView, Static, TextArea
+from textual.widgets import Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -822,6 +822,44 @@ def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> No
         "-------",
         "1. Nested step.",
         "specify-a-feature > nested",
+    ]
+
+
+def test_textual_parent_progress_is_colored_after_nested_completion() -> None:
+    async def exercise() -> list[tuple[str, bool, bool]]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            parent_skill = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
+            nested_skill = SkillCatalogEntry(
+                Path("nested.yaml"),
+                Skill(
+                    name="nested",
+                    when_to_use=("Run nested work.",),
+                    steps=(SkillStep(description="Nested step."),),
+                ),
+            )
+            app._apply_progress(
+                nested_skill,
+                current_step_index=0,
+                status="running nested skill",
+                parent_skill=parent_skill,
+                parent_step_index=0,
+            )
+            app._apply_progress(parent_skill, current_step_index=1, status="resuming")
+            await pilot.pause()
+            return [
+                (
+                    str(item.query_one(Label).render()),
+                    item.has_class("completed"),
+                    item.has_class("current"),
+                )
+                for item in app.query_one("#steps", ListView).query(ListItem)
+            ]
+
+    assert asyncio.run(exercise()) == [
+        ("1. Capture the feature goal.", True, False),
+        ("2. Summarize the result.", False, True),
     ]
 
 

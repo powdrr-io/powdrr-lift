@@ -11,6 +11,10 @@ from powdrr_lift.core.skill_specification import (
     SkillToolInvocation,
     skill_step_from_data,
 )
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 
 class TaskComplexity(StrEnum):
@@ -48,10 +52,8 @@ AssigneeRole = AgentRole | HumanRole
 
 
 @dataclass(frozen=True, slots=True)
-class WorkflowTaskValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class WorkflowTaskValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -869,14 +871,7 @@ def _report_to_data(report: WorkflowTaskValidationReport) -> dict[str, Any]:
         "validation_successful": report.validation_successful,
         "task_ids": report.task_ids,
         "task_paths": report.task_paths,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": issue.message,
-                "path": issue.path,
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }
 
 

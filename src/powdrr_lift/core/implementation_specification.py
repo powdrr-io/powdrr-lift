@@ -17,14 +17,15 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.specification_v1 import validate_module_tool_references
 from powdrr_lift.core.template_generation import merge_existing_template_content
-from powdrr_lift.core.validation_messages import instructional_validation_message
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 
 @dataclass(frozen=True, slots=True)
-class ImplementationSpecificationValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class ImplementationSpecificationValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -1084,16 +1085,5 @@ def _report_to_data(
         "architecture_id": report.architecture_id,
         "available_entity_ids": report.available_entity_ids,
         "available_relationship_ids": report.available_relationship_ids,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": instructional_validation_message(
-                    issue.message,
-                    code=issue.code,
-                    path=issue.path,
-                ),
-                **({"path": issue.path} if issue.path is not None else {}),
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }

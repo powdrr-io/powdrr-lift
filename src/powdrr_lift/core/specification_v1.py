@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
+from powdrr_lift.core.validation_messages import ValidationError
 
 _MODULE_FIELDS = {
     "id",
@@ -28,10 +29,8 @@ _TOOL_FIELDS = {
 
 
 @dataclass(frozen=True, slots=True)
-class SpecificationV1Issue:
-    code: str
-    message: str
-    path: str | None = None
+class SpecificationV1Issue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)

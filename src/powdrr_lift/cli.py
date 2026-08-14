@@ -1459,8 +1459,9 @@ def _run_validate_project_structure(args: argparse.Namespace) -> int:
         "issues": [
             {
                 "code": issue.code,
-                "message": issue.message,
-                "path": issue.path,
+                "message": issue.instructional_message(),
+                "corrective_action": issue.corrective_action,
+                **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues
         ],

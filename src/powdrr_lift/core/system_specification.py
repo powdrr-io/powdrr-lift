@@ -15,16 +15,17 @@ from powdrr_lift.core.spec_paths import (
     system_specification_path,
 )
 from powdrr_lift.core.template_generation import merge_existing_template_content
-from powdrr_lift.core.validation_messages import instructional_validation_message
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 _ALLOWED_STATES = {"added", "removed", "supercedes"}
 
 
 @dataclass(frozen=True, slots=True)
-class SystemSpecificationValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class SystemSpecificationValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -745,18 +746,7 @@ def _report_to_data(report: SystemSpecificationValidationReport) -> dict[str, An
         "system_id": report.system_id,
         "requirement_ids": report.requirement_ids,
         "approach_ids": report.approach_ids,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": instructional_validation_message(
-                    issue.message,
-                    code=issue.code,
-                    path=issue.path,
-                ),
-                "path": issue.path,
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }
 
 

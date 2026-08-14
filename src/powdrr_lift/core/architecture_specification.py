@@ -18,16 +18,14 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.specification_v1 import validate_module_tool_sections
 from powdrr_lift.core.template_generation import merge_existing_template_content
-from powdrr_lift.core.validation_messages import instructional_validation_message
+from powdrr_lift.core.validation_messages import ValidationError
 
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
 
 
 @dataclass(frozen=True, slots=True)
-class ArchitectureSpecificationValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class ArchitectureSpecificationValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -441,8 +439,8 @@ def _collect_entity_ids(
             require_reference=True,
             missing_reference_code="missing_entity_rationale_reference",
             missing_reference_message=(
-                "Each entity rationale must cite at least one current requirement "
-                "or approach id in quotes."
+                f"Entity {entity_id!r} is missing a rationale that cites at least "
+                "one current requirement or approach id in quotes."
             ),
             unknown_reference_code="unknown_entity_rationale_reference",
             unknown_reference_message=(
@@ -604,8 +602,9 @@ def _collect_relationship_ids(
             require_reference=True,
             missing_reference_code="missing_relationship_rationale_reference",
             missing_reference_message=(
-                "Each entity relationship rationale must cite at least one "
-                "current requirement or approach id in quotes."
+                f"Entity relationship {relationship_id!r} is missing a rationale "
+                "that cites at least one current requirement or approach id in "
+                "quotes."
             ),
             unknown_reference_code="unknown_relationship_rationale_reference",
             unknown_reference_message=(
@@ -1016,11 +1015,8 @@ def _report_to_data(
         "issues": [
             {
                 "code": issue.code,
-                "message": instructional_validation_message(
-                    issue.message,
-                    code=issue.code,
-                    path=issue.path,
-                ),
+                "message": issue.instructional_message(),
+                "corrective_action": issue.corrective_action,
                 **({"path": issue.path} if issue.path is not None else {}),
             }
             for issue in report.issues

@@ -13,6 +13,10 @@ from powdrr_lift.core.skill_specification import (
     SkillToolInvocation,
     skill_step_from_data,
 )
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 from powdrr_lift.core.workflow_task_specification import (
     AgentRole,
     AssigneeRole,
@@ -28,10 +32,8 @@ from powdrr_lift.core.workflow_task_specification import (
 
 
 @dataclass(frozen=True, slots=True)
-class WorkflowTemplateValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class WorkflowTemplateValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -883,14 +885,7 @@ def _report_to_data(
     return {
         "validation_successful": report.validation_successful,
         "task_template_count": report.task_template_count,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": issue.message,
-                "path": issue.path,
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }
 
 

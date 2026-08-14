@@ -160,54 +160,9 @@ steps:
 - description: Create or update the pull request for the validated feature.
   llm_type: simple_task
   details: >-
-    Review the staged specification artifacts, commit them, and push the
-    current feature branch with its upstream set. Then create or update the draft
-    pull request by first invoking `powdrr-lift pull-request-description
-    --kind feature`. Keep the generated template in workflow context; do not
-    print the template or completed PR body as a chat/status response. Fill every
-    section returned by that command and pass the completed text as the `--body`
-    value for the `gh pr create` command. Populate every
-    core section with the validated specification documents, feature intent,
-    behavior before and after, explicit scope and non-goals, implementation
-    details, compatibility considerations, exact validation commands and
-    results, risks and mitigations, reviewer focus, dependencies, follow-up, and
-    references. If a section does not apply, write Not applicable and why; never
-    leave placeholders or claim an unrun check passed. If a pull request already
-    exists for the branch, update its body instead of attempting to create a
-    second one. Do not report this step complete until the GitHub command
-    succeeds and its output includes the pull request URL. Do not begin
-    implementation in this skill.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - pull-request-description
-    - --kind
-    - feature
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
-  - tool: shell
-    command:
-    - git
-    - commit
-    - -m
-    - "Add <work-item-name> feature specification"
-  - tool: shell
-    command:
-    - git
-    - push
-    - -u
-    - origin
-    - HEAD
-  - tool: shell
-    command:
-    - gh
-    - pr
-    - create
-    - "--draft"
-    - "--title"
-    - <pull-request-title>
-    - "--body"
-    - <populated-pr-description>
+    Invoke create-pull-request with pr-kind `feature`, commit message `Add
+    <work-item-name> feature specification`, and pull-request title
+    `<pull-request-title>`. Pass the validated specification documents and
+    feature intent as context. Do not begin implementation in this skill.
+  uses_skills:
+  - create-pull-request

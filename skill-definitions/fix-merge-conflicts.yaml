@@ -220,55 +220,10 @@ steps:
 - description: Commit and push the resolved branch to the existing pull request.
   llm_type: simple_task
   details: >-
-    Confirm that only the merge resolution and directly required follow-up
-    changes are staged. Commit the merge resolution with a focused message and
-    push the current PR branch to its existing upstream. Verify the PR's head
-    SHA and merge state changed, then update the existing PR body by first
-    invoking `powdrr-lift pull-request-description --kind
-    merge-conflict`. Fill every section returned by that command and pass the
-    completed text as the `--body` value, preserving the core sections and
-    completing the Conflict Resolution section with one row per conflicted file,
-    the
-    competing intent, the selected resolution, and its validation. Include
-    residual risks and reviewer focus. If a section does not apply, write Not
-    applicable and why; never leave placeholders or claim an unrun check passed.
-    Never create a second PR, merge the PR, or resolve review threads unless
-    separately requested.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - pull-request-description
-    - --kind
-    - merge-conflict
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
-  - tool: shell
-    command:
-    - git
-    - diff
-    - --cached
-    - --stat
-  - tool: shell
-    command:
-    - git
-    - commit
-    - -m
-    - Resolve merge conflicts
-  - tool: shell
-    command:
-    - git
-    - push
-    - -u
-    - origin
-    - HEAD
-  - tool: shell
-    command:
-    - gh
-    - pr
-    - view
-    - <current-pr>
-    - --json
-    - url,headRefOid,mergeable,mergeStateStatus
+    Invoke create-pull-request with pr-kind `merge-conflict`, commit message
+    `Resolve merge conflicts`, and the existing pull-request reference and
+    title. Pass the conflict ledger as context and require one Conflict
+    Resolution row per conflicted file containing the competing intent,
+    selected resolution, and validation. Never create a second PR or merge it.
+  uses_skills:
+  - create-pull-request

@@ -427,9 +427,12 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
                     entity_type=entity.type,
                 )
             )
-        if catalog:
-            return catalog
 
+    # The checked-in codebase state is authoritative for repository-wide
+    # entities, but a workflow may be validating a specification that exists
+    # only in the current worktree. Include those local implementation
+    # features as well instead of falling back to them only when the codebase
+    # state is empty.
     implementation_paths = [
         specification_path
         for implementation_dir in _IMPLEMENTATION_SPECIFICATION_DIRS

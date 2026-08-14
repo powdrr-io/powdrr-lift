@@ -92,12 +92,18 @@ class Skill:
     name: str
     when_to_use: tuple[str, ...]
     steps: tuple[SkillStep, ...]
+    adversarial: bool | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "when_to_use": list(self.when_to_use),
             "steps": [step.to_data() for step in self.steps],
+            **(
+                {"adversarial": self.adversarial}
+                if self.adversarial is not None
+                else {}
+            ),
         }
 
     def to_json(self) -> str:
@@ -148,7 +154,15 @@ def skill_from_data(data: Mapping[str, Any]) -> Skill:
     name = _required_string(data, "name")
     when_to_use = _required_string_sequence(data, "when_to_use")
     steps = _parse_steps(data.get("steps"))
-    return Skill(name=name, when_to_use=when_to_use, steps=steps)
+    adversarial = data.get("adversarial")
+    if adversarial is not None and not isinstance(adversarial, bool):
+        raise ValueError("Skill adversarial must be a boolean.")
+    return Skill(
+        name=name,
+        when_to_use=when_to_use,
+        steps=steps,
+        adversarial=adversarial,
+    )
 
 
 def load_skill(path: str | Path) -> Skill:
@@ -232,7 +246,7 @@ def build_skill_validation_report(
 
     _validate_unknown_keys(
         raw_skill,
-        {"name", "when_to_use", "steps"},
+        {"name", "when_to_use", "steps", "adversarial"},
         issues,
         path=_path_prefix(source_path) or "",
         subject="skill",
@@ -245,6 +259,16 @@ def build_skill_validation_report(
                 code="missing_name",
                 message="Skill entries must include a non-empty name.",
                 path=_child_path(source_path, "name"),
+            )
+        )
+
+    adversarial = raw_skill.get("adversarial")
+    if adversarial is not None and not isinstance(adversarial, bool):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_adversarial_type",
+                message="Skill adversarial must be a boolean.",
+                path=_child_path(source_path, "adversarial"),
             )
         )
 

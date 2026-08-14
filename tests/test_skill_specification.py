@@ -50,6 +50,7 @@ def test_skill_round_trips_through_json() -> None:
             ),
             SkillStep(description="Summarize the result."),
         ),
+        adversarial=True,
     )
 
     json_text = skill_to_json(skill)
@@ -58,6 +59,7 @@ def test_skill_round_trips_through_json() -> None:
     assert parsed == skill
     assert json.loads(json_text) == {
         "name": "specify-a-feature",
+        "adversarial": True,
         "when_to_use": [
             "When the user wants to work through a feature synchronously.",
             (
@@ -153,6 +155,52 @@ def test_skill_validation_reports_yaml_parse_errors_as_yaml(tmp_path: Path) -> N
     assert report.validation_successful is False
     assert report.issues[0].code == "invalid_yaml"
     assert "Could not parse YAML skill document" in report.issues[0].message
+
+
+def test_skill_validation_accepts_adversarial_values() -> None:
+    report = build_skill_validation_report(
+        "name: adversarial\n"
+        "adversarial: true\n"
+        "when_to_use: [review]\n"
+        "steps: [{description: challenge}]\n",
+        source_path=Path("adversarial.yaml"),
+    )
+
+    assert report.validation_successful is True
+
+    assert (
+        load_skill(
+            Path(__file__).resolve().parents[1]
+            / "skill-definitions"
+            / "adversarial-pr-review.yaml"
+        ).adversarial
+        is True
+    )
+
+
+def test_skill_validation_accepts_inherited_adversarial_value() -> None:
+    report = build_skill_validation_report(
+        "name: inherited\n"
+        "adversarial: null\n"
+        "when_to_use: [review]\n"
+        "steps: [{description: challenge}]\n",
+        source_path=Path("inherited.yaml"),
+    )
+
+    assert report.validation_successful is True
+
+
+def test_skill_validation_rejects_non_boolean_adversarial_option() -> None:
+    report = build_skill_validation_report(
+        "name: adversarial\n"
+        "adversarial: 'yes'\n"
+        "when_to_use: [review]\n"
+        "steps: [{description: challenge}]\n",
+        source_path=Path("adversarial.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["invalid_adversarial_type"]
 
 
 def test_skill_directory_validation_rejects_unknown_reference(
@@ -324,6 +372,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     assert report.validation_successful is True
     assert report.skill_names == [
         "address-review-comments",
+        "adversarial-pr-review",
         "bootstrap-code-structure",
         "dead-code-review",
         "feature-functionality-review",
@@ -360,6 +409,7 @@ def test_checked_in_review_skill_definitions_exist() -> None:
     assert (skills_dir / "finish-pr-prep.yaml").is_file()
     assert (skills_dir / "feature-test-coverage-review.yaml").is_file()
     assert (skills_dir / "dead-code-review.yaml").is_file()
+    assert (skills_dir / "adversarial-pr-review.yaml").is_file()
     assert (skills_dir / "review-architecture.yaml").is_file()
     assert (skills_dir / "review-system.yaml").is_file()
 

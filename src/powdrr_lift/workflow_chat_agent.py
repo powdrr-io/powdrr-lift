@@ -2252,6 +2252,36 @@ def _can_reuse_workflow_context(context: WorkflowContext | None) -> bool:
     )
 
 
+def _workflow_context_pr_is_closed(context: WorkflowContext | None) -> bool:
+    """Return whether the saved workflow PR has been closed or merged.
+
+    A failed GitHub lookup is intentionally treated as unknown so users can
+    still choose whether to reuse an otherwise valid worktree.
+    """
+    if (
+        context is None
+        or not _can_reuse_workflow_context(context)
+        or context.pr_number is None
+    ):
+        return False
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", str(context.pr_number), "--json", "state"],
+            cwd=context.worktree_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False
+        payload = json.loads(result.stdout)
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    return payload.get("state") in {"CLOSED", "MERGED"}
+
+
 def _worktree_reuse_decision(
     request: str,
     selected_skill: SkillCatalogEntry,
@@ -2298,6 +2328,19 @@ def _resolve_worktree_for_request(
 ) -> Path:
     if _is_dedicated_worktree(configured_repo_root):
         return configured_repo_root
+    if _workflow_context_pr_is_closed(context):
+        assert context is not None
+        _verbose_print(
+            stderr,
+            verbose,
+            f"Previous workflow pull request #{context.pr_number} is closed; "
+            "creating a new worktree",
+        )
+        return _resolve_worktree_context(
+            configured_repo_root,
+            stderr=stderr,
+            verbose=verbose,
+        )
     decision = _worktree_reuse_decision(request, selected_skill, context)
     if decision is None:
         answer = _prompt_user(

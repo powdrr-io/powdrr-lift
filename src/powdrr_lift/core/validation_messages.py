@@ -10,7 +10,23 @@ def instructional_validation_message(
     """Make a validation issue directly usable as an LLM repair instruction."""
     location = f" at `{path}`" if path else ""
     normalized_code = code.casefold()
-    if "unknown" in normalized_code or "unavailable" in normalized_code:
+    if normalized_code in {
+        "missing_entity_rationale_reference",
+        "missing_relationship_rationale_reference",
+    }:
+        section = (
+            "entity relationship" if "relationship" in normalized_code else "entity"
+        )
+        action = (
+            "First use the workflow gather_context action exactly like "
+            '`{"kind":"gather_context","types":["requirements"],'
+            '"keywords":["<work-item-name>"],"filters":{}}` to retrieve '
+            "the current requirement ids. Then reason about which returned "
+            f"requirement drives this {section}, edit its rationale to cite "
+            "an exact returned requirement id in quotes, and rerun the same "
+            "evaluate command. Do not invent or reuse an outdated id."
+        )
+    elif "unknown" in normalized_code or "unavailable" in normalized_code:
         action = (
             "Replace the unknown reference with an id that is defined in the "
             "referenced section, or add that id to the referenced section."

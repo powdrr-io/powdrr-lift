@@ -441,8 +441,8 @@ def _collect_entity_ids(
             require_reference=True,
             missing_reference_code="missing_entity_rationale_reference",
             missing_reference_message=(
-                "Each entity rationale must cite at least one current requirement "
-                "or approach id in quotes."
+                f"Entity {entity_id!r} is missing a rationale that cites at least "
+                "one current requirement or approach id in quotes."
             ),
             unknown_reference_code="unknown_entity_rationale_reference",
             unknown_reference_message=(
@@ -604,8 +604,9 @@ def _collect_relationship_ids(
             require_reference=True,
             missing_reference_code="missing_relationship_rationale_reference",
             missing_reference_message=(
-                "Each entity relationship rationale must cite at least one "
-                "current requirement or approach id in quotes."
+                f"Entity relationship {relationship_id!r} is missing a rationale "
+                "that cites at least one current requirement or approach id in "
+                "quotes."
             ),
             unknown_reference_code="unknown_relationship_rationale_reference",
             unknown_reference_message=(

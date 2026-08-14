@@ -8,12 +8,15 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
+
 
 @dataclass(frozen=True, slots=True)
-class SkillValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class SkillValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -830,14 +833,7 @@ def _report_to_data(report: SkillValidationReport) -> dict[str, Any]:
         "validation_successful": report.validation_successful,
         "skill_names": report.skill_names,
         "skill_paths": report.skill_paths,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": issue.message,
-                "path": issue.path,
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }
 
 

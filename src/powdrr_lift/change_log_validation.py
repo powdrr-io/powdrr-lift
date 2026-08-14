@@ -45,14 +45,15 @@ from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
 from powdrr_lift.core.system_specification import (
     build_system_specification_validation_report,
 )
-from powdrr_lift.core.validation_messages import instructional_validation_message
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 
 @dataclass(frozen=True, slots=True)
-class ValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class ValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -878,18 +879,7 @@ def _report_to_data(report: ValidationReport) -> dict[str, Any]:
         "default_branch_name": report.default_branch_name,
         "expected_change_files": report.expected_change_files,
         "proposed_change_files": report.proposed_change_files,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": instructional_validation_message(
-                    issue.message,
-                    code=issue.code,
-                    path=issue.path,
-                ),
-                **({"path": issue.path} if issue.path is not None else {}),
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }
 
 

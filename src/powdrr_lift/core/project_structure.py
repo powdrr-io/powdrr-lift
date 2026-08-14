@@ -11,6 +11,7 @@ from powdrr_lift.core.specification_v1 import (
     validate_module_tool_sections,
     validate_no_explicit_empty_values,
 )
+from powdrr_lift.core.validation_messages import ValidationError
 
 PROJECT_STRUCTURE_TEMPLATE = """# Project structure specification template.
 #
@@ -44,10 +45,8 @@ tools:
 
 
 @dataclass(frozen=True, slots=True)
-class ProjectStructureValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class ProjectStructureValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)

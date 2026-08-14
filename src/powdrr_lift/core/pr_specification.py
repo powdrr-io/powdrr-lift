@@ -12,7 +12,10 @@ from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.codebase_state import build_codebase_state_report
 from powdrr_lift.core.spec_paths import CURRENT_ROOT, PROPOSALS_ROOT
 from powdrr_lift.core.template_generation import merge_existing_template_content
-from powdrr_lift.core.validation_messages import instructional_validation_message
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 _DEFAULT_OUTPUT_PATH = PROPOSALS_ROOT
 _IMPLEMENTATION_SPECIFICATION_DIRS = (
@@ -23,10 +26,8 @@ _IMPLEMENTATION_SPECIFICATION_DIRS = (
 
 
 @dataclass(frozen=True, slots=True)
-class PRSpecificationValidationIssue:
-    code: str
-    message: str
-    path: str | None = None
+class PRSpecificationValidationIssue(ValidationError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -968,18 +969,7 @@ def _report_to_data(
 ) -> Mapping[str, Any]:
     return {
         "validation_successful": report.validation_successful,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": instructional_validation_message(
-                    issue.message,
-                    code=issue.code,
-                    path=issue.path,
-                ),
-                **({"path": issue.path} if issue.path is not None else {}),
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
         "proposed_pr_id": report.proposed_pr_id,
         "available_feature_ids": report.available_feature_ids,
         "known_pr_ids": report.known_pr_ids,

@@ -70,13 +70,13 @@ def _corrective_action(code: str) -> str:
     return action
 
 
-def instructional_validation_message(
-    message: str,
-    *,
-    code: str,
-    path: str | None,
-) -> str:
-    """Compatibility wrapper for validators that have not adopted ValidationError."""
-    return ValidationError(
-        code=code, message=message, path=path
-    ).instructional_message()
+def validation_error_to_data(error: ValidationError) -> dict[str, str]:
+    """Serialize one validator-generated error without losing its repair action."""
+    data = {
+        "code": error.code,
+        "message": error.instructional_message(),
+        "corrective_action": error.corrective_action,
+    }
+    if error.path is not None:
+        data["path"] = error.path
+    return data

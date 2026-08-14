@@ -1357,6 +1357,7 @@ def run_workflow_chat(
     previous_action_signature: str | None = None
     failed_action_signature: str | None = None
     last_failed_action: SkillChatAction | None = None
+    last_validation_error: str | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
         provider = provider_roles.provider_for(provider_role)
         current_model = _provider_definition(provider).forced_model or current_model
@@ -1459,6 +1460,7 @@ def run_workflow_chat(
             repair_instructions=_action_repair_prompt(
                 selected_skill,
                 failed_action=last_failed_action,
+                validation_error=last_validation_error,
             ),
             config=config,
             input_func=input_func,
@@ -1581,8 +1583,10 @@ def run_workflow_chat(
         handler = action_handlers.get(action.kind)
         if handler is None:
             raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
+        failure_kind = "validation_error"
         try:
             _validate_workflow_action_for_step(action, current_step)
+            failure_kind = "action_error"
             should_continue = handler(
                 action,
                 execution_state,
@@ -1621,13 +1625,36 @@ def run_workflow_chat(
                 }
             )
             execution_state.execution_context.append(feedback)
+            failure_result_key = (
+                "validation_error"
+                if failure_kind == "validation_error"
+                else "action_error"
+            )
+            validation_result = {
+                failure_result_key: {
+                    "action": json.loads(_workflow_action_signature(action)),
+                    "message": str(exc),
+                    "corrective_instructions": feedback,
+                }
+            }
+            if failure_kind == "validation_error":
+                execution_state.transcript.append(
+                    {
+                        "role": "user",
+                        "content": json.dumps(validation_result, ensure_ascii=False),
+                    }
+                )
             execution_state.execution_events.append(
                 {
-                    "kind": "action_error",
+                    "kind": failure_kind,
                     "action_kind": action.kind,
                     "error": str(exc),
+                    "result": validation_result,
                     "step_index": execution_state.step_index,
                 }
+            )
+            last_validation_error = (
+                str(exc) if failure_kind == "validation_error" else None
             )
             if action_signature == failed_action_signature:
                 stalled_roundtrips += 1
@@ -1644,6 +1671,7 @@ def run_workflow_chat(
             continue
         action_signature = _workflow_action_signature(action)
         last_failed_action = None
+        last_validation_error = None
         made_progress = _workflow_action_made_progress(
             action,
             previous_action_signature=previous_action_signature,
@@ -5099,6 +5127,7 @@ def _action_repair_prompt(
     selected_skill: SkillCatalogEntry,
     *,
     failed_action: SkillChatAction | None = None,
+    validation_error: str | None = None,
 ) -> str:
     prompt = (
         "Generate a JSON document selecting the best action based on this "
@@ -5121,6 +5150,13 @@ def _action_repair_prompt(
         "and a clear English question ending in '?' for prompt_user. Do not "
         "combine actions or output markdown."
     )
+    if validation_error is not None:
+        prompt += (
+            "\nThe previous action returned a validation_error and was not "
+            "executed. Do not repeat it unchanged. Read the validation_error "
+            "message and return an action that matches the current step's "
+            "declared tool template exactly."
+        )
     if failed_action is not None:
         prompt += (
             "\nThe previous edit action failed and was not applied. don't do this "

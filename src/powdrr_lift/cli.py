@@ -71,6 +71,10 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
+from powdrr_lift.pull_request_description import (
+    find_existing_pull_request,
+    render_pull_request_description_template,
+)
 from powdrr_lift.repository_state import render_repository_state
 from powdrr_lift.workflow_chat_agent import (
     ALL_PROVIDERS,
@@ -100,6 +104,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to inspect; defaults to the current worktree.",
     )
     repository_state_parser.set_defaults(func=_run_repository_state)
+
+    pull_request_description_parser = subparsers.add_parser(
+        "pull-request-description",
+        aliases=["pull_request_description", "pr-description"],
+        help="Print the instructed pull-request description template.",
+    )
+    pull_request_description_parser.add_argument(
+        "--kind",
+        choices=(
+            "general",
+            "feature",
+            "project-structure",
+            "ci-fix",
+            "merge-conflict",
+            "review-comments",
+        ),
+        default="general",
+        help="Workflow-specific section to append to the common template.",
+    )
+    pull_request_description_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Worktree to inspect for an existing pull request; defaults to cwd.",
+    )
+    pull_request_description_parser.set_defaults(func=_run_pull_request_description)
 
     init_parser = subparsers.add_parser(
         "init",
@@ -1131,6 +1160,17 @@ def main(argv: list[str] | None = None) -> int:
 def _run_repository_state(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     sys.stdout.write(render_repository_state(repo_root))
+    return 0
+
+
+def _run_pull_request_description(args: argparse.Namespace) -> int:
+    existing_pull_request = find_existing_pull_request(args.repo_root)
+    sys.stdout.write(
+        render_pull_request_description_template(
+            args.kind,
+            existing_pull_request=existing_pull_request,
+        )
+    )
     return 0
 
 

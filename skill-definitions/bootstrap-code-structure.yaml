@@ -163,12 +163,25 @@ steps:
   details: >-
     Review the staged project-structure artifact, commit it, and push the
     current feature branch with its upstream set. Then create or update a
-    draft pull request describing the project-structure artifact and the
-    discovery and validation evidence. If a pull request already exists for
-    the branch, update it instead of creating a second one. Do not report
-    completion until the GitHub command succeeds and its output includes the
-    pull request URL.
+    draft pull request by first invoking `powdrr-lift pull-request-description
+    --kind project-structure`. Fill every section returned by that command and
+    pass the completed text as the `--body` value. Populate
+    every core section with the project-structure problem, before/after
+    behavior, discovered scope, implementation details, compatibility impact,
+    exact discovery and validation commands and results, risks, reviewer focus,
+    follow-up, and references. Add a Project Structure Evidence section naming
+    the generated artifact and the evidence used to derive it. If a section does
+    not apply, write Not applicable and why; never leave placeholders or claim
+    an unrun check passed. If a pull request already exists for the branch,
+    update it instead of creating a second one. Do not report completion until
+    the GitHub command succeeds and its output includes the pull request URL.
   tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - pull-request-description
+    - --kind
+    - project-structure
   - tool: internal
     command:
     - powdrr-lift
@@ -192,4 +205,5 @@ steps:
     - pr
     - create
     - --draft
-    - --fill
+    - --body
+    - <populated-pr-description>

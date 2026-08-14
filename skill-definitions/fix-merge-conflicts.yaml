@@ -223,11 +223,24 @@ steps:
     Confirm that only the merge resolution and directly required follow-up
     changes are staged. Commit the merge resolution with a focused message and
     push the current PR branch to its existing upstream. Verify the PR's head
-    SHA and merge state changed, then report the conflict ledger, resolution
-    decisions, validation evidence, and any residual review risks. Never create
-    a second PR, merge the PR, or resolve review threads unless separately
-    requested.
+    SHA and merge state changed, then update the existing PR body by first
+    invoking `powdrr-lift pull-request-description --kind
+    merge-conflict`. Fill every section returned by that command and pass the
+    completed text as the `--body` value, preserving the core sections and
+    completing the Conflict Resolution section with one row per conflicted file,
+    the
+    competing intent, the selected resolution, and its validation. Include
+    residual risks and reviewer focus. If a section does not apply, write Not
+    applicable and why; never leave placeholders or claim an unrun check passed.
+    Never create a second PR, merge the PR, or resolve review threads unless
+    separately requested.
   tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - pull-request-description
+    - --kind
+    - merge-conflict
   - tool: internal
     command:
     - powdrr-lift

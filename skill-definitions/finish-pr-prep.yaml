@@ -45,10 +45,13 @@ steps:
 - description: Leave the branch ready for pull request creation.
   llm_type: simple_task
   details: >-
-    Confirm that the intended files remain staged, the worktree has no
-    unintended leftovers, and the final commands and results are recorded for
-    the upcoming pull request summary. Do not create or update the pull request
-    in this skill.
+    Invoke the listed `powdrr-lift repository-state` tool exactly once. Use its
+    result to confirm that the intended files remain staged, the worktree has
+    no unintended leftovers, and the final commands and results are recorded
+    for the upcoming pull request summary. After receiving that result, choose
+    `next_step` immediately; do not invoke `repository-state` again unless a
+    file or staging state changed after the first check. Do not create or
+    update the pull request in this skill.
   tool_invocations:
   - tool: internal
     command:

@@ -5,6 +5,7 @@ import sys
 import traceback
 from collections.abc import Callable
 from math import ceil
+from pathlib import Path
 from queue import Queue
 from threading import Event, Thread
 from typing import Any, TextIO, cast
@@ -663,11 +664,15 @@ class WorkflowChatApp(App[None]):
                 failure_details.append(
                     "Recent workflow context:\n" + "\n".join(self._recent_output[-12:])
                 )
-            self._set_message(
-                "Workflow error:\n"
-                + "\n".join(failure_details)
-                + "\nPress Ctrl+C to exit."
-            )
+            failure_report = "Workflow error:\n" + "\n".join(failure_details)
+            try:
+                repo_root = self._config.repo_root or Path.cwd()
+                (repo_root / "agent_error.txt").write_text(
+                    failure_report + "\n", encoding="utf-8"
+                )
+            except OSError:
+                pass
+            self._set_message(failure_report + "\nPress Ctrl+C to exit.")
 
     def on_unmount(self) -> None:
         self._stop_requested.set()

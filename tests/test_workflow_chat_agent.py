@@ -861,9 +861,13 @@ def test_textual_status_truncates_large_messages() -> None:
     assert len(rendered) < 9_000
 
 
-def test_textual_failure_retains_diagnostics_instead_of_unknown_error() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+def test_textual_failure_retains_diagnostics_instead_of_unknown_error(
+    tmp_path: Path,
+) -> None:
+    async def exercise(repo_root: Path) -> str:
+        app = WorkflowChatApp(
+            SkillChatConfig(skills_dir=Path("skill-definitions"), repo_root=repo_root)
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             app._record_output("stderr", "yaml.parser.ParserError: invalid syntax")
@@ -874,12 +878,15 @@ def test_textual_failure_retains_diagnostics_instead_of_unknown_error() -> None:
             await pilot.pause()
             return str(app.query_one("#status", Static).render())
 
-    rendered = asyncio.run(exercise())
+    rendered = asyncio.run(exercise(tmp_path))
     assert "unknown error" not in rendered
     assert "workflow exited with status 1" in rendered
     assert "yaml.parser.ParserError: invalid syntax" in rendered
     assert "line 12, column 7" in rendered
     assert "Editing project-structure.yaml" in rendered
+    error_log = (tmp_path / "agent_error.txt").read_text(encoding="utf-8")
+    assert "Workflow error:" in error_log
+    assert "Editing project-structure.yaml" in error_log
 
 
 def test_textual_status_shows_latest_output() -> None:

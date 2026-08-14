@@ -1599,6 +1599,7 @@ def run_workflow_chat(
                 current_file_context,
             )
             print(feedback, file=stderr)
+            _write_agent_error(worktree_root, feedback)
             execution_state.transcript.append(
                 {
                     "role": "assistant",
@@ -2003,6 +2004,16 @@ def _path_without_suffix(value: str) -> str:
 def _verbose_print(stderr: TextIO, verbose: bool, message: str) -> None:
     if verbose:
         print(f"[verbose] {message}", file=stderr)
+
+
+def _write_agent_error(repo_root: Path, message: str) -> None:
+    """Persist the latest failure context without hiding the original error."""
+    try:
+        (repo_root / "agent_error.txt").write_text(
+            message.rstrip() + "\n", encoding="utf-8"
+        )
+    except OSError:
+        return
 
 
 def _verbose_json(

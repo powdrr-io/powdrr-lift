@@ -3289,6 +3289,7 @@ def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
         file_context,
     )
     assert "Preserve surrounding mapping keys" in yaml_feedback
+    assert "unescaped double quotes" in yaml_feedback
     assert "current file has 70 lines" not in yaml_feedback
 
     range_feedback = _workflow_edit_failure_feedback(

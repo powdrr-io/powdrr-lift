@@ -163,10 +163,22 @@ steps:
     changes are staged. Commit them with a focused message, push the current
     branch to its existing upstream PR branch, and verify that the PR head SHA
     changed. Never create a second PR, merge the PR, or claim the remote CI is
-    green before GitHub reports a new successful run. Include the failure
-    matrix, local reproduction results, Stack Overflow references, edits, and
-    validation results in the PR update or handoff context.
+    green before GitHub reports a new successful run. Update the existing PR
+    body by first invoking `powdrr-lift pull-request-description --kind ci-fix`.
+    Fill every section returned by that command and pass the completed text as
+    the `--body` value, preserving the core sections and completing the CI
+    Failure section with the check, run, failed
+    command, root cause, local reproduction, fix, and post-fix validation.
+    Include the failure matrix, Stack Overflow references, risks, reviewer focus,
+    and exact results. If a section does not apply, write Not applicable and
+    why; never leave placeholders or claim an unrun check passed.
   tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - pull-request-description
+    - --kind
+    - ci-fix
   - tool: internal
     command:
     - powdrr-lift

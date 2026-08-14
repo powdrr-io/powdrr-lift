@@ -181,12 +181,26 @@ steps:
   details: >-
     Review the staged planning artifacts, commit them, and push the current
     feature branch with its upstream set. Then create or update a draft pull
-    request describing the feature, proposed PRs, execution workflows,
-    dependencies, and validation evidence. If a pull request already exists for
-    the branch, update it rather than creating a second one. Do not implement
-    any proposed PR. Do not report this step complete until the GitHub command
-    succeeds and its output includes the pull request URL.
+    request by first invoking `powdrr-lift pull-request-description --kind
+    feature`. Fill every section returned by that command and pass the
+    completed text as the `--body` value. Populate every core
+    section with the feature problem, before/after planning behavior, included
+    and excluded scope, proposed PR implementation details, workflow and
+    dependency relationships, compatibility considerations, exact validation
+    commands and results, risks, reviewer focus, follow-up, and references.
+    Add a Feature Plan section with every proposed PR and execution workflow.
+    If a section does not apply, write Not applicable and why; never leave
+    placeholders or claim an unrun check passed. If a pull request already
+    exists for the branch, update it rather than creating a second one. Do not
+    implement any proposed PR. Do not report this step complete until the
+    GitHub command succeeds and its output includes the pull request URL.
   tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - pull-request-description
+    - --kind
+    - feature
   - tool: internal
     command:
     - powdrr-lift
@@ -210,7 +224,8 @@ steps:
     - pr
     - create
     - --draft
-    - --fill
+    - --body
+    - <populated-pr-description>
 - description: Hand the draft pull request to the user for review.
   llm_type: standard_reasoning
   details: >-

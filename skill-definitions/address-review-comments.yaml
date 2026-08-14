@@ -118,10 +118,24 @@ steps:
     unrelated files, commit it with a message describing the review update, and
     push the current feature branch to its existing upstream. Verify that the
     push succeeds and that the pull request head now points to the new commit.
-    Resolve each review thread only after its requested change is present and
-    pushed, and report any comment that remains open or blocked. Never merge the
-    pull request or push directly to main.
+    Update the existing PR body by first invoking `powdrr-lift
+    pull-request-description --kind review-comments`. Fill every section
+    returned by that command and pass the completed text as the `--body` value,
+    preserving the core sections and completing the Review Feedback Addressed
+    section with one row per actionable comment containing its location, requested
+    outcome, resolution, and validation. Include residual risks and reviewer
+    focus. If a section does not apply, write Not applicable and why; never
+    leave placeholders or claim an unrun check passed. Resolve each review
+    thread only after its requested change is present and pushed, and report any
+    comment that remains open or blocked. Never merge the pull request or push
+    directly to main.
   tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - pull-request-description
+    - --kind
+    - review-comments
   - tool: internal
     command:
     - powdrr-lift

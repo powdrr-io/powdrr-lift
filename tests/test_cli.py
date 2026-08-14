@@ -59,6 +59,30 @@ def test_cli_repository_state_reports_staged_unstaged_and_untracked_files(
     assert files["new.txt"]["untracked"] is True
 
 
+def test_cli_pull_request_description_generates_instructed_feature_template() -> None:
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        assert main(["pull-request-description", "--kind", "feature"]) == 0
+
+    template = stdout.getvalue()
+    for heading in (
+        "## Summary",
+        "## Problem",
+        "## Behavior",
+        "## Scope",
+        "## Implementation",
+        "## Validation",
+        "## Risks and Mitigations",
+        "## Reviewer Guide",
+        "## Dependencies and Follow-up",
+        "## References",
+        "## Feature Plan",
+    ):
+        assert heading in template
+    assert "Do not leave placeholders" in template
+
+
 def test_cli_process_workflow_task_wires_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

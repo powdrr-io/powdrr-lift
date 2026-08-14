@@ -1,18 +1,42 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 
-def instructional_validation_message(
-    message: str,
-    *,
-    code: str,
-    path: str | None,
-) -> str:
-    """Make a validation issue directly usable as an LLM repair instruction."""
-    location = f" at `{path}`" if path else ""
+
+@dataclass(frozen=True, slots=True)
+class ValidationError:
+    """A validation failure with the repair instructions for that failure."""
+
+    code: str
+    message: str
+    path: str | None = None
+    corrective_action: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.corrective_action:
+            object.__setattr__(
+                self,
+                "corrective_action",
+                _corrective_action(self.code),
+            )
+
+    def instructional_message(self) -> str:
+        location = f" at `{self.path}`" if self.path else ""
+        return (
+            f"{self.message} Corrective action: edit the specification{location}; "
+            f"{self.corrective_action} Then rerun the same evaluate command to "
+            "verify the correction."
+        )
+
+
+def _corrective_action(code: str) -> str:
+    """Return repair guidance at error construction time, not serialization time."""
     normalized_code = code.casefold()
     if normalized_code in {
         "missing_entity_rationale_reference",
         "missing_relationship_rationale_reference",
+        "unknown_entity_rationale_reference",
+        "unknown_relationship_rationale_reference",
     }:
         section = (
             "entity relationship" if "relationship" in normalized_code else "entity"
@@ -24,7 +48,8 @@ def instructional_validation_message(
             "the current requirement ids. Then reason about which returned "
             f"requirement drives this {section}, edit its rationale to cite "
             "an exact returned requirement id in quotes, and rerun the same "
-            "evaluate command. Do not invent or reuse an outdated id."
+            "evaluate command. Replace any unknown or outdated id; do not "
+            "invent one."
         )
     elif "unknown" in normalized_code or "unavailable" in normalized_code:
         action = (
@@ -42,7 +67,16 @@ def instructional_validation_message(
         )
     else:
         action = "Change the value to the type and format required by this error."
-    return (
-        f"{message} Corrective action: edit the specification{location}; {action} "
-        "Then rerun the same evaluate command to verify the correction."
-    )
+    return action
+
+
+def instructional_validation_message(
+    message: str,
+    *,
+    code: str,
+    path: str | None,
+) -> str:
+    """Compatibility wrapper for validators that have not adopted ValidationError."""
+    return ValidationError(
+        code=code, message=message, path=path
+    ).instructional_message()

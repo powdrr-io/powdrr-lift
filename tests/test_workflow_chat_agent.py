@@ -170,6 +170,7 @@ def test_workflow_validation_guidance_prescribes_current_requirement_gather() ->
                         "code": "missing_relationship_rationale_reference",
                         "path": "entity_relationships[0].rationale",
                         "message": "Entity relationship photo-displays-in-gallery is missing a rationale that cites at least one current requirement.",
+                        "corrective_action": "First use the workflow gather_context action.",
                     }
                 ]
             }

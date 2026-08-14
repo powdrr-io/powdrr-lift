@@ -3256,13 +3256,7 @@ def _workflow_validation_guidance(
         issue
         for issue in issues
         if isinstance(issue, dict)
-        and str(issue.get("code", "")).casefold()
-        in {
-            "missing_entity_rationale_reference",
-            "missing_relationship_rationale_reference",
-            "unknown_entity_rationale_reference",
-            "unknown_relationship_rationale_reference",
-        }
+        and "gather_context" in str(issue.get("corrective_action", ""))
     ]
     if not rationale_issues:
         return None

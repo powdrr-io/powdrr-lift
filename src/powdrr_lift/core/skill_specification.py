@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
@@ -456,13 +457,18 @@ def build_skill_validation_report(
                             path=_child_path(tool_path, "tool"),
                         )
                     )
-                elif tool not in {"shell", "internal", "fuzzy-match", "ref"}:
+                elif tool not in {
+                    "shell",
+                    "internal",
+                    "fuzzy-match",
+                    "ref",
+                } and not is_basedpyright_tool(tool):
                     issues.append(
                         SkillValidationIssue(
                             code="unsupported_tool",
                             message=(
                                 "Skill tool invocations currently support shell, "
-                                "internal, fuzzy-match, and ref."
+                                "internal, fuzzy-match, ref, and basedpyright tools."
                             ),
                             path=_child_path(tool_path, "tool"),
                         )

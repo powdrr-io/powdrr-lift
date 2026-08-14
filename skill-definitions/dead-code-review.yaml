@@ -50,7 +50,10 @@ steps:
     For every candidate, trace definitions to all call sites, imports, registrations,
     routes, handlers, configuration keys, fixtures, tests, generated outputs, and
     documentation references using repository search and the language's available
-    static-analysis conventions. Check both sides of the diff and relevant history
+    static-analysis conventions. For Python files, use the typed
+    `basedpyright-symbol` and `basedpyright-structure` tools to resolve symbols
+    and module structure before relying on text matches. Check both sides of the
+    diff and relevant history
     when intent or compatibility is unclear. Report a dead-code finding only when
     the PR makes the code unreachable, leaves an obsolete implementation after
     replacing it, removes its last consumer, or strands a test/configuration path.
@@ -78,6 +81,12 @@ steps:
     - --follow
     - --
     - <candidate-path>
+  - tool: basedpyright-symbol
+    command:
+    - query=<candidate-symbol>
+  - tool: basedpyright-structure
+    command:
+    - path=<candidate-python-file>
 - description: Validate each candidate and prepare precise inline findings.
   llm_type: high_reasoning
   details: >-

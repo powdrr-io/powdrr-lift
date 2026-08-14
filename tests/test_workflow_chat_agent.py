@@ -243,6 +243,42 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         wildcard_step,
     )
 
+    pull_request_step = replace(
+        step,
+        tool_invocations=(
+            SkillToolInvocation(
+                tool="shell",
+                command=(
+                    "gh",
+                    "pr",
+                    "create",
+                    "--draft",
+                    "--body",
+                    "<populated-pr-description>",
+                ),
+            ),
+        ),
+    )
+    _validate_workflow_action_for_step(
+        _parse_action_response(
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {
+                    "command": [
+                        "gh",
+                        "pr",
+                        "create",
+                        "--draft",
+                        "--body",
+                        "## Summary\n\nA detailed pull request description.",
+                    ]
+                },
+            }
+        ),
+        pull_request_step,
+    )
+
     with pytest.raises(RuntimeError, match="fuzzy-match.*not supported"):
         _validate_workflow_action_for_step(
             _parse_action_response(

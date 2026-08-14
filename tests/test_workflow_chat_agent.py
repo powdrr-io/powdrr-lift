@@ -101,6 +101,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_provider_roles,
     _resolve_skill_path,
     _resolve_worktree_context,
+    _resolve_worktree_for_request,
     _serialize_messages,
     _validate_internal_command,
     _validate_user_question,
@@ -6477,6 +6478,72 @@ def test_workflow_context_is_loaded_and_ad_hoc_reuses_previous_worktree(
     assert context is not None
     assert context.pr_number == 215
     assert _worktree_reuse_decision("Check the typo", skill, context) is True
+
+
+@pytest.mark.parametrize("state", ["CLOSED", "MERGED"])
+def test_closed_workflow_pr_creates_a_new_worktree_without_prompting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    state: str,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    previous_worktree = repo_root / ".worktrees" / "previous"
+    previous_worktree.mkdir(parents=True)
+    new_worktree = repo_root / ".worktrees" / "new"
+    new_worktree.mkdir(parents=True)
+    context = WorkflowContext(worktree_root=previous_worktree, pr_number=215)
+    skill = SkillCatalogEntry(
+        repo_root / "handle-ad-hoc.yaml",
+        Skill(
+            name="handle-ad-hoc",
+            when_to_use=("Handle follow-ups.",),
+            steps=(),
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    def _fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        captured["cwd"] = kwargs["cwd"]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({"state": state}),
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
+        lambda repo_root, stderr, verbose: new_worktree,
+    )
+
+    stderr = io.StringIO()
+    resolved = _resolve_worktree_for_request(
+        repo_root,
+        request="Check the typo",
+        selected_skill=skill,
+        context=context,
+        input_func=lambda: pytest.fail("closed PRs should not prompt for reuse"),
+        stdout=io.StringIO(),
+        stderr=stderr,
+        verbose=True,
+    )
+
+    assert resolved == new_worktree
+    assert captured["command"] == [
+        "gh",
+        "pr",
+        "view",
+        "215",
+        "--json",
+        "state",
+    ]
+    assert captured["cwd"] == previous_worktree
+    assert "pull request #215 is closed" in stderr.getvalue()
 
 
 def test_worktree_reuse_decision_is_ambiguous_for_unrelated_new_skill(

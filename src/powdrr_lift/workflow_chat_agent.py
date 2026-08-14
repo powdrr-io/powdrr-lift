@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, TextIO, cast
 from urllib.error import HTTPError, URLError
@@ -63,9 +64,13 @@ from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
     WorkflowActionObservation,
+    WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
-    WorkflowLLMActionEngine,
+    WorkflowActionRequest,
+    WorkflowExecutionStrategy,
     WorkflowLLMClient,
+    WorkflowLLMExecutionAborted,
+    WorkflowLLMExecutionDriver,
     prune_execution_events,
 )
 from powdrr_lift.workflow_llm import (
@@ -455,6 +460,429 @@ class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction
             {"role": "user", "content": observation.correction}
         )
         self.state.execution_context.append(observation.correction)
+
+
+@dataclass(slots=True)
+class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
+    """Interactive adapter around the shared action-roundtrip driver."""
+
+    config: WorkflowChatConfig
+    selection: SkillChatSelection
+    catalog: tuple[SkillCatalogEntry, ...]
+    workflow_context: WorkflowContext | None
+    state: _WorkflowExecutionState
+    progress: _WorkflowProgressDisplay
+    input_func: Callable[[], str]
+    stdout: TextIO
+    stderr: TextIO
+    client_for_model: Callable[[str, str], WorkflowLLMClient]
+    provider_roles: LLMProviderRoles
+    provider_role: LLMProviderRole
+    current_model: str
+    provider: str
+    driver: WorkflowLLMExecutionDriver
+    skill_stack: list[_SkillExecutionFrame] = field(default_factory=list)
+    completed_dependencies: set[tuple[str, int, str]] = field(default_factory=set)
+    last_failed_action: SkillChatAction | None = None
+    last_validation_error: str | None = None
+    failure_kind: str = "validation_error"
+    current_step: Any = None
+    current_step_index: int = 0
+    step_roundtrips: int = 0
+
+    @property
+    def selected_skill(self) -> SkillCatalogEntry:
+        return self.state.selected_skill
+
+    def _parent_progress(self) -> tuple[SkillCatalogEntry | None, int | None]:
+        if not self.skill_stack:
+            return None, None
+        frame = self.skill_stack[-1]
+        return frame.parent_skill, frame.parent_step_index
+
+    def _restore_parent(self) -> None:
+        frame = self.skill_stack.pop()
+        if frame.dependency_key is not None:
+            self.completed_dependencies.add(frame.dependency_key)
+        self.state.selected_skill = frame.parent_skill
+        self.state.step_index = frame.resume_step_index
+        if frame.clean_context:
+            self.state.transcript = list(frame.parent_transcript or ())
+            self.state.execution_events = list(frame.parent_execution_events or ())
+            self.state.execution_context = list(frame.parent_execution_context or ())
+            self.state.current_file_path = frame.parent_current_file_path
+        self.current_model = frame.parent_model
+        self.provider = frame.parent_provider
+        self.provider_role = frame.parent_provider_role
+
+    def _push_skill(
+        self,
+        nested_skill: SkillCatalogEntry,
+        *,
+        resume_step_index: int,
+        dependency_key: tuple[str, int, str] | None = None,
+        clean_context: bool = False,
+    ) -> None:
+        _push_nested_skill(
+            self.skill_stack,
+            current_skill=self.selected_skill,
+            nested_skill=nested_skill,
+            parent_step_index=self.current_step_index,
+            resume_step_index=resume_step_index,
+            dependency_key=dependency_key,
+            parent_model=self.current_model,
+            parent_provider=self.provider,
+            parent_provider_role=self.provider_role,
+            clean_context=clean_context,
+            parent_transcript=tuple(self.state.transcript) if clean_context else None,
+            parent_execution_events=(
+                tuple(self.state.execution_events) if clean_context else None
+            ),
+            parent_execution_context=(
+                tuple(self.state.execution_context) if clean_context else None
+            ),
+            parent_current_file_path=(
+                self.state.current_file_path if clean_context else None
+            ),
+        )
+        self.state.selected_skill = nested_skill
+        self.state.step_index = 0
+
+    def next_request(self) -> WorkflowActionRequest | None:
+        while True:
+            if self.state.step_index >= len(self.selected_skill.skill.steps):
+                if not self.skill_stack:
+                    return None
+                self._restore_parent()
+                continue
+            self.provider = self.provider_roles.provider_for(self.provider_role)
+            self.current_model = (
+                _provider_definition(self.provider).forced_model or self.current_model
+            )
+            self.current_step_index = self.state.step_index
+            self.current_step = self.selected_skill.skill.steps[self.current_step_index]
+            dependency_name = _next_skill_dependency(
+                self.selected_skill,
+                self.current_step_index,
+                self.completed_dependencies,
+            )
+            if dependency_name is not None:
+                nested_skill = _find_skill_by_name(self.catalog, dependency_name)
+                nested_role: LLMProviderRole = (
+                    self.provider_role
+                    if nested_skill.skill.adversarial is None
+                    else ("adversarial" if nested_skill.skill.adversarial else "normal")
+                )
+                self._push_skill(
+                    nested_skill,
+                    resume_step_index=self.current_step_index,
+                    dependency_key=(
+                        str(self.selected_skill.path),
+                        self.current_step_index,
+                        dependency_name,
+                    ),
+                )
+                self.provider_role = nested_role
+                continue
+            step_mapping = (
+                _resolve_llm_mapping(
+                    self.current_step.llm_type or self.selection.llm_type,
+                    mappings=_active_llm_mappings(
+                        self.config, self.provider_roles, self.provider_role
+                    ),
+                    provider=self.provider,
+                )
+                if _provider_supports_llm_mappings(self.provider)
+                else None
+            )
+            if step_mapping is None:
+                step_mapping = LLMModelMapping(
+                    self.current_model, provider=self.provider
+                )
+            self.current_model = step_mapping.model
+            self.provider = _resolve_provider(
+                self.config.provider,
+                self.current_model,
+                mapping=step_mapping,
+            )
+            self.step_roundtrips += 1
+            parent_skill, parent_step_index = self._parent_progress()
+            self.progress.update(
+                self.selected_skill,
+                current_step_index=self.current_step_index,
+                status=f"waiting for {self.current_model} LLM response...",
+                parent_skill=parent_skill,
+                parent_step_index=parent_step_index,
+            )
+            messages = _build_step_execution_messages(
+                selected_skill=self.selected_skill,
+                current_step=self.current_step,
+                current_step_index=self.current_step_index,
+                transcript=self.state.transcript,
+                execution_events=self.state.execution_events,
+                execution_context=self.state.execution_context,
+                current_file_path=self.state.current_file_path,
+                worktree_root=self.state.worktree_root,
+                catalog=self.catalog,
+                workflow_context=self.workflow_context,
+                current_file_context_cache=self.state.current_file_context_cache,
+            )
+            return WorkflowActionRequest(
+                client=self.client_for_model(self.current_model, self.provider),
+                messages=messages,
+                parser=_parse_action_response,
+                model=self.current_model,
+                stderr=self.stderr,
+                max_timeout_retries=0,
+                timeout_backoff_seconds=0,
+                request_action=partial(self._request_action, messages),
+            )
+
+    def _request_action(self, messages: list[dict[str, str]]) -> SkillChatAction:
+        action, self.current_model, self.provider = _complete_json_with_model_fallback(
+            client_for=self.client_for_model,
+            messages=messages,
+            parser=_parse_action_response,
+            context=(
+                f"workflow execution for step {self.current_step_index + 1}/"
+                f"{len(self.selected_skill.skill.steps)}"
+            ),
+            model=self.current_model,
+            repair_instructions=_action_repair_prompt(
+                self.selected_skill,
+                failed_action=self.last_failed_action,
+                validation_error=self.last_validation_error,
+            ),
+            config=self.config,
+            input_func=self.input_func,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            provider=self.provider,
+            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
+            + tuple(
+                _active_llm_mappings(
+                    self.config, self.provider_roles, self.provider_role
+                )
+            ),
+            empty_response_fallback_payload={"kind": "next_step"},
+        )
+        if action is None:
+            raise WorkflowLLMExecutionAborted(1)
+        return action
+
+    def material_state(self, action: SkillChatAction) -> object:
+        return _workflow_action_material_state(action, self.state)
+
+    def record_no_progress(
+        self,
+        action: SkillChatAction,
+        observation: WorkflowActionObservation,
+    ) -> None:
+        _ChatActionProgressStrategy(self.state).record_no_progress(action, observation)
+
+    def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
+        if action.llm_type is not None and _provider_supports_llm_mappings(
+            self.provider
+        ):
+            mapping = _resolve_llm_mapping(
+                action.llm_type,
+                mappings=_active_llm_mappings(
+                    self.config, self.provider_roles, self.provider_role
+                ),
+                provider=self.provider,
+            )
+            assert mapping is not None
+            self.current_model = mapping.model
+            self.provider = mapping.provider
+        if action.kind == "invoke_skill":
+            if action.skill_name is None:
+                raise RuntimeError("invoke_skill action must include a skill name.")
+            nested_skill = _find_skill_by_name(self.catalog, action.skill_name)
+            context = list(action.context)
+            if action.decisions_and_context is not None:
+                context.append(action.decisions_and_context)
+            nested_role: LLMProviderRole = (
+                (
+                    self.provider_role
+                    if nested_skill.skill.adversarial is None
+                    else ("adversarial" if nested_skill.skill.adversarial else "normal")
+                )
+                if action.provider_role is None
+                else action.provider_role
+            )
+            self._push_skill(
+                nested_skill,
+                resume_step_index=self.current_step_index + 1,
+                clean_context=action.clean,
+            )
+            self.state.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "skill": action.skill_name,
+                    "step_index": self.current_step_index,
+                }
+            )
+            if action.clean:
+                self.state.transcript = []
+                self.state.execution_events = []
+                self.state.execution_context = context
+                self.state.current_file_path = None
+            else:
+                self.state.execution_context.extend(context)
+            self.provider_role = nested_role
+            return WorkflowActionOutcome()
+        if action.kind == "complete" and self.skill_stack:
+            self._restore_parent()
+            return WorkflowActionOutcome()
+        status = _workflow_action_progress_status(action)
+        if status is not None:
+            parent_skill, parent_step_index = self._parent_progress()
+            self.progress.update(
+                self.selected_skill,
+                current_step_index=self.state.step_index,
+                status=status,
+                parent_skill=parent_skill,
+                parent_step_index=parent_step_index,
+            )
+        self.failure_kind = "validation_error"
+        _validate_workflow_action_for_step(action, self.current_step)
+        self.failure_kind = "action_error"
+        handler = _workflow_action_handlers().get(action.kind)
+        if handler is None:
+            raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
+        should_continue = handler(
+            action,
+            self.state,
+            self.stdout,
+            self.stderr,
+            self.input_func,
+            self.config,
+        )
+        self.last_failed_action = None
+        self.last_validation_error = None
+        return WorkflowActionOutcome(continue_running=should_continue)
+
+    def record_response_error(
+        self,
+        error: RuntimeError,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        _ = payload
+        raise error
+
+    def record_action_error(self, action: SkillChatAction, error: Exception) -> None:
+        signature = _workflow_action_signature(action)
+        feedback = _workflow_edit_failure_feedback(
+            action,
+            error,
+            _current_file_context(
+                self.state.worktree_root, self.state.current_file_path
+            ),
+        )
+        print(feedback, file=self.stderr)
+        _write_agent_error(
+            self.state.worktree_root,
+            feedback + _rejected_edit_guidance(action),
+        )
+        self.last_failed_action = action
+        self.state.transcript.extend(
+            [
+                {"role": "assistant", "content": signature},
+                {"role": "user", "content": feedback},
+            ]
+        )
+        self.state.execution_context.append(feedback)
+        validator_data = (
+            validation_error_to_data(error.validation_error)
+            if isinstance(error, _WorkflowToolValidationError)
+            else None
+        )
+        validation_result = {
+            self.failure_kind: {
+                "action": json.loads(signature),
+                "message": str(error),
+                "corrective_instructions": feedback,
+                **({"validator": validator_data} if validator_data else {}),
+            }
+        }
+        if self.failure_kind == "validation_error":
+            self.state.transcript.append(
+                {"role": "user", "content": json.dumps(validation_result)}
+            )
+        self.state.execution_events.append(
+            {
+                "kind": self.failure_kind,
+                "action_kind": action.kind,
+                "error": str(error),
+                "result": validation_result,
+                "step_index": self.state.step_index,
+            }
+        )
+        self.last_validation_error = (
+            validator_data["message"] if validator_data is not None else None
+        )
+
+    def action_failure_exit_code(self, action: SkillChatAction) -> int:
+        _ = action
+        print("Workflow stopped after repeated action failures.", file=self.stderr)
+        return 1
+
+    def observe_outcome(
+        self,
+        action: SkillChatAction,
+        observation: WorkflowActionObservation,
+        outcome: WorkflowActionOutcome,
+    ) -> WorkflowActionOutcome:
+        if not observation.made_progress:
+            if observation.decision == ProgressDecision.THRESHOLD:
+                if action.kind != "invoke_tool":
+                    print(
+                        "Workflow stopped after repeated roundtrips without progress.",
+                        file=self.stderr,
+                    )
+                    return WorkflowActionOutcome(exit_code=1)
+                if _workflow_step_requires_pull_request(self.current_step):
+                    warning = (
+                        "Warning: a required pull-request creation step made no "
+                        "progress; the workflow cannot skip PR creation."
+                    )
+                    print(warning, file=self.stderr)
+                    return WorkflowActionOutcome(exit_code=1)
+                warning = (
+                    "Warning: repeated tool action made no progress; skipping to "
+                    "the next workflow step."
+                )
+                parent_skill, parent_step_index = self._parent_progress()
+                self.progress.update(
+                    self.selected_skill,
+                    current_step_index=self.state.step_index,
+                    status=warning,
+                    parent_skill=parent_skill,
+                    parent_step_index=parent_step_index,
+                )
+                print(warning, file=self.stderr)
+                self.state.step_index = self.current_step_index + 1
+                self.driver.action_engine.reset_progress()
+                if not self.skill_stack and self.state.step_index >= len(
+                    self.selected_skill.skill.steps
+                ):
+                    outcome = WorkflowActionOutcome(continue_running=False)
+        if self.state.step_index != self.current_step_index:
+            self.step_roundtrips = 0
+            self.driver.action_engine.reset_progress()
+        if not outcome.continue_running:
+            parent_skill, parent_step_index = self._parent_progress()
+            self.progress.update(
+                self.selected_skill,
+                current_step_index=len(self.selected_skill.skill.steps),
+                status=f"{self.selected_skill.skill.name} skill completed",
+                parent_skill=parent_skill,
+                parent_step_index=parent_step_index,
+            )
+        return outcome
+
+    def exhausted_roundtrips_exit_code(self) -> int:
+        return 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -1367,457 +1795,34 @@ def run_workflow_chat(
         worktree_root=worktree_root,
     )
     root_skill = selected_skill
-    skill_stack: list[_SkillExecutionFrame] = []
-    completed_skill_dependencies: set[tuple[str, int, str]] = set()
-    action_handlers = _workflow_action_handlers()
-    step_roundtrips = 0
-    action_engine = WorkflowLLMActionEngine(
+    driver = WorkflowLLMExecutionDriver(
         max_stalled_roundtrips=config.max_stalled_roundtrips
     )
-    progress_strategy = _ChatActionProgressStrategy(execution_state)
-    last_failed_action: SkillChatAction | None = None
-    last_validation_error: str | None = None
-    while execution_state.step_index < len(selected_skill.skill.steps):
-        provider = provider_roles.provider_for(provider_role)
-        current_model = _provider_definition(provider).forced_model or current_model
-        current_step_index = execution_state.step_index
-        current_step = selected_skill.skill.steps[execution_state.step_index]
-        dependency_name = _next_skill_dependency(
-            selected_skill,
-            current_step_index,
-            completed_skill_dependencies,
-        )
-        if dependency_name is not None:
-            nested_skill = _find_skill_by_name(catalog, dependency_name)
-            nested_provider_role: LLMProviderRole = (
-                provider_role
-                if nested_skill.skill.adversarial is None
-                else ("adversarial" if nested_skill.skill.adversarial else "normal")
-            )
-            _push_nested_skill(
-                skill_stack,
-                current_skill=selected_skill,
-                nested_skill=nested_skill,
-                parent_step_index=current_step_index,
-                resume_step_index=current_step_index,
-                dependency_key=(
-                    str(selected_skill.path),
-                    current_step_index,
-                    dependency_name,
-                ),
-                parent_model=current_model,
-                parent_provider=provider,
-                parent_provider_role=provider_role,
-            )
-            selected_skill = nested_skill
-            execution_state.selected_skill = nested_skill
-            execution_state.step_index = 0
-            provider_role = nested_provider_role
-            continue
-        step_mapping = (
-            _resolve_llm_mapping(
-                current_step.llm_type or selection.llm_type,
-                mappings=_active_llm_mappings(config, provider_roles, provider_role),
-                provider=provider,
-            )
-            if _provider_supports_llm_mappings(provider)
-            else None
-        )
-        if step_mapping is None:
-            if _provider_supports_llm_mappings(provider) and (
-                current_step.llm_type is not None or selection.llm_type is not None
-            ):
-                raise RuntimeError(
-                    "The workflow step llm_type did not resolve to an LLM mapping."
-                )
-            step_mapping = LLMModelMapping(current_model, provider=provider)
-        assert step_mapping is not None
-        current_model = step_mapping.model
-        provider = _resolve_provider(
-            config.provider,
-            current_model,
-            mapping=step_mapping,
-        )
-        credentials = _resolve_credentials(provider, config.api_key, config.base_url)
-        step_roundtrips += 1
-        _verbose_print(
-            stderr,
-            config.verbose,
-            (
-                f"Starting execution roundtrip {step_roundtrips} for "
-                f"step {execution_state.step_index + 1}/"
-                f"{len(selected_skill.skill.steps)}"
-            ),
-        )
-        progress.update(
-            selected_skill,
-            current_step_index=execution_state.step_index,
-            status=f"waiting for {current_model} LLM response...",
-            parent_skill=skill_stack[-1].parent_skill if skill_stack else None,
-            parent_step_index=skill_stack[-1].parent_step_index
-            if skill_stack
-            else None,
-        )
-        action, current_model, provider = _complete_json_with_model_fallback(
-            client_for=client_for_model,
-            messages=_build_step_execution_messages(
-                selected_skill=selected_skill,
-                current_step=current_step,
-                current_step_index=execution_state.step_index,
-                transcript=execution_state.transcript,
-                execution_events=execution_state.execution_events,
-                execution_context=execution_state.execution_context,
-                current_file_path=execution_state.current_file_path,
-                worktree_root=worktree_root,
-                catalog=catalog,
-                workflow_context=workflow_context,
-                current_file_context_cache=execution_state.current_file_context_cache,
-            ),
-            parser=_parse_action_response,
-            context=(
-                f"workflow execution for step {execution_state.step_index + 1}/"
-                f"{len(selected_skill.skill.steps)}"
-            ),
-            model=current_model,
-            repair_instructions=_action_repair_prompt(
-                selected_skill,
-                failed_action=last_failed_action,
-                validation_error=last_validation_error,
-            ),
-            config=config,
-            input_func=input_func,
-            stdout=stdout,
-            stderr=stderr,
-            provider=provider,
-            model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
-            + tuple(_active_llm_mappings(config, provider_roles, provider_role)),
-            empty_response_fallback_payload={"kind": "next_step"},
-        )
-        if action is None:
-            return 1
-        if action.llm_type is not None:
-            action_mapping = (
-                _resolve_llm_mapping(
-                    action.llm_type,
-                    mappings=_active_llm_mappings(
-                        config, provider_roles, provider_role
-                    ),
-                    provider=provider,
-                )
-                if _provider_supports_llm_mappings(provider)
-                else None
-            )
-            assert action_mapping is not None
-            current_model = action_mapping.model
-            provider = action_mapping.provider
-        _verbose_print(
-            stderr,
-            config.verbose,
-            f"Execution result: kind={action.kind}",
-        )
-        _verbose_print(stderr, config.verbose, f"Execution action: {action.kind}")
-
-        if action.kind == "invoke_skill":
-            if action.skill_name is None:
-                raise RuntimeError("invoke_skill action must include a skill name.")
-            nested_skill = _find_skill_by_name(catalog, action.skill_name)
-            explicit_context = list(action.context)
-            if action.decisions_and_context is not None:
-                explicit_context.append(action.decisions_and_context)
-            nested_provider_role = (
-                (
-                    provider_role
-                    if nested_skill.skill.adversarial is None
-                    else ("adversarial" if nested_skill.skill.adversarial else "normal")
-                )
-                if action.provider_role is None
-                else action.provider_role
-            )
-            _push_nested_skill(
-                skill_stack,
-                current_skill=selected_skill,
-                nested_skill=nested_skill,
-                parent_step_index=current_step_index,
-                resume_step_index=current_step_index + 1,
-                parent_model=current_model,
-                parent_provider=provider,
-                parent_provider_role=provider_role,
-                clean_context=action.clean,
-                parent_transcript=tuple(execution_state.transcript)
-                if action.clean
-                else None,
-                parent_execution_events=tuple(execution_state.execution_events)
-                if action.clean
-                else None,
-                parent_execution_context=tuple(execution_state.execution_context)
-                if action.clean
-                else None,
-                parent_current_file_path=execution_state.current_file_path
-                if action.clean
-                else None,
-            )
-            execution_state.execution_events.append(
-                {
-                    "kind": action.kind,
-                    "skill": action.skill_name,
-                    "step_index": current_step_index,
-                }
-            )
-            if action.clean:
-                execution_state.transcript = []
-                execution_state.execution_events = []
-                execution_state.execution_context = explicit_context
-                execution_state.current_file_path = None
-            else:
-                execution_state.execution_context.extend(explicit_context)
-            provider_role = nested_provider_role
-            selected_skill = nested_skill
-            execution_state.selected_skill = nested_skill
-            execution_state.step_index = 0
-            continue
-
-        if action.kind == "complete" and skill_stack:
-            frame = skill_stack.pop()
-            if frame.dependency_key is not None:
-                completed_skill_dependencies.add(frame.dependency_key)
-            selected_skill = frame.parent_skill
-            execution_state.selected_skill = selected_skill
-            execution_state.step_index = frame.resume_step_index
-            if frame.clean_context:
-                execution_state.transcript = list(frame.parent_transcript or ())
-                execution_state.execution_events = list(
-                    frame.parent_execution_events or ()
-                )
-                execution_state.execution_context = list(
-                    frame.parent_execution_context or ()
-                )
-                execution_state.current_file_path = frame.parent_current_file_path
-            current_model = frame.parent_model
-            provider = frame.parent_provider
-            provider_role = frame.parent_provider_role
-            continue
-        action_status = _workflow_action_progress_status(action)
-        if action_status is not None:
-            progress.update(
-                selected_skill,
-                current_step_index=execution_state.step_index,
-                status=action_status,
-                parent_skill=skill_stack[-1].parent_skill if skill_stack else None,
-                parent_step_index=skill_stack[-1].parent_step_index
-                if skill_stack
-                else None,
-            )
-
-        before_action_state = action_engine.begin_action(
-            action,
-            strategy=progress_strategy,
-        )
-        handler = action_handlers.get(action.kind)
-        if handler is None:
-            raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
-        failure_kind = "validation_error"
-        try:
-            _validate_workflow_action_for_step(action, current_step)
-            failure_kind = "action_error"
-            should_continue = handler(
-                action,
-                execution_state,
-                stdout,
-                stderr,
-                input_func,
-                config,
-            )
-        except (RuntimeError, ValueError) as exc:
-            action_signature = _workflow_action_signature(action)
-            current_file_context = _current_file_context(
-                worktree_root,
-                execution_state.current_file_path,
-            )
-            feedback = _workflow_edit_failure_feedback(
-                action,
-                exc,
-                current_file_context,
-            )
-            print(feedback, file=stderr)
-            _write_agent_error(
-                worktree_root,
-                feedback + _rejected_edit_guidance(action),
-            )
-            last_failed_action = action
-            execution_state.transcript.append(
-                {
-                    "role": "assistant",
-                    "content": _workflow_action_signature(action),
-                }
-            )
-            execution_state.transcript.append(
-                {
-                    "role": "user",
-                    "content": feedback,
-                }
-            )
-            execution_state.execution_context.append(feedback)
-            validator_data = (
-                validation_error_to_data(exc.validation_error)
-                if isinstance(exc, _WorkflowToolValidationError)
-                else None
-            )
-            failure_result_key = (
-                "validation_error"
-                if failure_kind == "validation_error"
-                else "action_error"
-            )
-            validation_result = {
-                failure_result_key: {
-                    "action": json.loads(_workflow_action_signature(action)),
-                    "message": str(exc),
-                    "corrective_instructions": feedback,
-                    **({"validator": validator_data} if validator_data else {}),
-                }
-            }
-            if failure_kind == "validation_error":
-                execution_state.transcript.append(
-                    {
-                        "role": "user",
-                        "content": json.dumps(validation_result, ensure_ascii=False),
-                    }
-                )
-            execution_state.execution_events.append(
-                {
-                    "kind": failure_kind,
-                    "action_kind": action.kind,
-                    "error": str(exc),
-                    "result": validation_result,
-                    "step_index": execution_state.step_index,
-                }
-            )
-            last_validation_error = (
-                validator_data["message"] if validator_data is not None else None
-            )
-            if (
-                action_engine.record_action_failure(
-                    action,
-                    signature=_workflow_action_signature,
-                )
-                == ProgressDecision.THRESHOLD
-            ):
-                print(
-                    "Workflow stopped after repeated action failures.",
-                    file=stderr,
-                )
-                return 1
-            continue
-        action_signature = _workflow_action_signature(action)
-        last_failed_action = None
-        last_validation_error = None
-        observation = action_engine.complete_action(
-            action,
-            before_state=before_action_state,
-            signature=_workflow_action_signature,
-            strategy=progress_strategy,
-        )
-        if not observation.made_progress:
-            assert observation.correction is not None
-            _verbose_print(
-                stderr,
-                config.verbose,
-                (
-                    f"No progress detected for workflow step "
-                    f"({action_engine.stalled_roundtrips}/"
-                    f"{config.max_stalled_roundtrips})"
-                ),
-            )
-            if observation.decision == ProgressDecision.THRESHOLD:
-                if action.kind == "invoke_tool":
-                    if _workflow_step_requires_pull_request(current_step):
-                        warning = (
-                            "Warning: a required pull-request creation step made "
-                            "no progress; the workflow cannot skip PR creation."
-                        )
-                        progress.update(
-                            selected_skill,
-                            current_step_index=execution_state.step_index,
-                            status=warning,
-                            parent_skill=skill_stack[-1].parent_skill
-                            if skill_stack
-                            else None,
-                            parent_step_index=skill_stack[-1].parent_step_index
-                            if skill_stack
-                            else None,
-                        )
-                        print(warning, file=stderr)
-                        print(
-                            "Workflow stopped before the required pull request was "
-                            "created.",
-                            file=stderr,
-                        )
-                        return 1
-                    warning = (
-                        "Warning: repeated tool action made no progress; "
-                        "skipping to the next workflow step."
-                    )
-                    progress.update(
-                        selected_skill,
-                        current_step_index=execution_state.step_index,
-                        status=warning,
-                        parent_skill=skill_stack[-1].parent_skill
-                        if skill_stack
-                        else None,
-                        parent_step_index=skill_stack[-1].parent_step_index
-                        if skill_stack
-                        else None,
-                    )
-                    print(warning, file=stderr)
-                    execution_state.step_index = current_step_index + 1
-                    action_engine.reset_progress()
-                    if not skill_stack and execution_state.step_index >= len(
-                        selected_skill.skill.steps
-                    ):
-                        should_continue = False
-                else:
-                    stalled_action_context = (
-                        "Workflow stopped after repeated roundtrips without progress. "
-                        f"Step {execution_state.step_index + 1} "
-                        f"({current_step.description}) repeatedly returned the "
-                        f"unchanged action: {action_signature}"
-                    )
-                    print(stalled_action_context, file=stderr)
-                    print(
-                        "Workflow stopped after repeated roundtrips without progress.",
-                        file=stderr,
-                    )
-                    return 1
-        if execution_state.step_index != current_step_index:
-            step_roundtrips = 0
-            action_engine.reset_progress()
-        if execution_state.step_index >= len(selected_skill.skill.steps):
-            if skill_stack:
-                frame = skill_stack.pop()
-                if frame.dependency_key is not None:
-                    completed_skill_dependencies.add(frame.dependency_key)
-                selected_skill = frame.parent_skill
-                execution_state.selected_skill = selected_skill
-                execution_state.step_index = frame.resume_step_index
-                if frame.clean_context:
-                    execution_state.transcript = list(frame.parent_transcript or ())
-                    execution_state.execution_events = list(
-                        frame.parent_execution_events or ()
-                    )
-                    execution_state.execution_context = list(
-                        frame.parent_execution_context or ()
-                    )
-                    execution_state.current_file_path = frame.parent_current_file_path
-                current_model = frame.parent_model
-                provider = frame.parent_provider
-                provider_role = frame.parent_provider_role
-                continue
-        if not should_continue:
-            progress.update(
-                selected_skill,
-                current_step_index=len(selected_skill.skill.steps),
-                status=f"{selected_skill.skill.name} skill completed",
-            )
-            break
+    execution_strategy = _ChatWorkflowExecutionStrategy(
+        config=config,
+        selection=selection,
+        catalog=catalog,
+        workflow_context=workflow_context,
+        state=execution_state,
+        progress=progress,
+        input_func=input_func,
+        stdout=stdout,
+        stderr=stderr,
+        client_for_model=client_for_model,
+        provider_roles=provider_roles,
+        provider_role=provider_role,
+        current_model=current_model,
+        provider=provider,
+        driver=driver,
+    )
+    exit_code = driver.run(
+        execution_strategy,
+        max_roundtrips=None,
+        signature=_workflow_action_signature,
+    )
+    if exit_code != 0:
+        return exit_code
+    selected_skill = execution_strategy.selected_skill
 
     summary = _build_skill_execution_summary(
         root_skill,

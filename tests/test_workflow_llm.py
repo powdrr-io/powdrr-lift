@@ -6,7 +6,11 @@ from typing import Any
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
     WorkflowActionObservation,
+    WorkflowActionOutcome,
+    WorkflowActionRequest,
+    WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
+    WorkflowLLMExecutionDriver,
     prune_execution_events,
     workflow_action_signature,
 )
@@ -34,6 +38,74 @@ class _ProgressStrategy:
     ) -> None:
         _ = action
         self.observations.append(observation)
+
+
+class _Client:
+    def __init__(self, payloads: list[dict[str, Any]]) -> None:
+        self.payloads = payloads
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        _ = messages
+        return self.payloads.pop(0)
+
+
+class _ExecutionStrategy(WorkflowExecutionStrategy):
+    def __init__(self) -> None:
+        self.client = _Client([{"kind": "next_step"}, {"kind": "complete"}])
+        self.executed: list[str] = []
+        self.observations: list[WorkflowActionObservation] = []
+
+    def next_request(self) -> WorkflowActionRequest:
+        return WorkflowActionRequest(
+            client=self.client,
+            messages=[{"role": "user", "content": "run"}],
+            parser=lambda payload: _Action(kind=str(payload["kind"])),
+            model="test",
+            stderr=None,
+            max_timeout_retries=0,
+            timeout_backoff_seconds=0,
+        )
+
+    def material_state(self, action: _Action) -> object:
+        _ = action
+        return None
+
+    def record_no_progress(
+        self,
+        action: _Action,
+        observation: WorkflowActionObservation,
+    ) -> None:
+        _ = action
+        self.observations.append(observation)
+
+    def record_response_error(
+        self, error: RuntimeError, payload: dict[str, Any] | None
+    ) -> None:
+        raise error
+
+    def execute_action(self, action: _Action) -> WorkflowActionOutcome:
+        self.executed.append(action.kind)
+        return WorkflowActionOutcome(continue_running=action.kind != "complete")
+
+    def record_action_error(self, action: _Action, error: Exception) -> None:
+        raise error
+
+    def action_failure_exit_code(self, action: _Action) -> int:
+        _ = action
+        return 1
+
+    def observe_outcome(
+        self,
+        action: _Action,
+        observation: WorkflowActionObservation,
+        outcome: WorkflowActionOutcome,
+    ) -> WorkflowActionOutcome:
+        _ = action
+        self.observations.append(observation)
+        return outcome
+
+    def exhausted_roundtrips_exit_code(self) -> int:
+        return 2
 
 
 def test_action_engine_uses_the_same_state_aware_no_progress_rule() -> None:
@@ -109,6 +181,53 @@ def test_action_engine_reports_stalls_through_the_runner_strategy() -> None:
 
     assert observation.decision is ProgressDecision.THRESHOLD
     assert strategy.observations == [observation]
+
+
+def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None:
+    strategy = _ExecutionStrategy()
+
+    exit_code = WorkflowLLMExecutionDriver(max_stalled_roundtrips=1).run(
+        strategy,
+        max_roundtrips=3,
+        signature=workflow_action_signature,
+    )
+
+    assert exit_code == 0
+    assert strategy.executed == ["next_step", "complete"]
+    assert [observation.signature for observation in strategy.observations] == [
+        '{"kind": "next_step", "value": ""}',
+        '{"kind": "complete", "value": ""}',
+    ]
+
+
+def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
+    strategy = _ExecutionStrategy()
+    action = _Action(kind="complete")
+    original_next_request = strategy.next_request
+
+    def next_request() -> WorkflowActionRequest:
+        request = original_next_request()
+        return WorkflowActionRequest(
+            client=request.client,
+            messages=request.messages,
+            parser=request.parser,
+            model=request.model,
+            stderr=request.stderr,
+            max_timeout_retries=request.max_timeout_retries,
+            timeout_backoff_seconds=request.timeout_backoff_seconds,
+            request_action=lambda: action,
+        )
+
+    strategy.next_request = next_request  # type: ignore[method-assign]
+
+    exit_code = WorkflowLLMExecutionDriver(max_stalled_roundtrips=1).run(
+        strategy,
+        max_roundtrips=1,
+        signature=workflow_action_signature,
+    )
+
+    assert exit_code == 0
+    assert strategy.executed == ["complete"]
 
 
 def test_prompt_event_pruning_preserves_task_results_and_bounds_large_values() -> None:

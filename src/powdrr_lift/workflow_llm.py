@@ -32,6 +32,14 @@ class WorkflowLLMTimeoutExhausted(RuntimeError):
     """Raised when a provider request keeps timing out after its retry budget."""
 
 
+class WorkflowLLMExecutionAborted(RuntimeError):
+    """Stop a shared execution loop after its adapter aborts a request."""
+
+    def __init__(self, exit_code: int) -> None:
+        super().__init__("Workflow execution was aborted by its adapter.")
+        self.exit_code = exit_code
+
+
 ActionT = TypeVar("ActionT")
 StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
@@ -154,6 +162,146 @@ class WorkflowActionProgressStrategy(Protocol[StrategyActionT]):
         action: StrategyActionT,
         observation: WorkflowActionObservation,
     ) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowActionRequest:
+    """One fully specified request for the next workflow action.
+
+    The runner owns the LLM exchange.  Adapters only provide the current
+    context and the parser appropriate for their durable or interactive
+    boundary.
+    """
+
+    client: WorkflowLLMClient
+    messages: list[dict[str, str]]
+    parser: Callable[[dict[str, Any]], Any]
+    model: str
+    stderr: Any
+    max_timeout_retries: int
+    timeout_backoff_seconds: float
+    request_action: Callable[[], Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowActionOutcome:
+    """The adapter's result after the shared runner executes an action."""
+
+    continue_running: bool = True
+    exit_code: int | None = None
+
+
+class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
+    """Boundary between the shared execution loop and its presentation mode.
+
+    A strategy owns only its input/output boundary: building the current
+    context, presenting status, and translating terminal or human-input
+    actions into its native outcome.  The shared driver owns roundtrips,
+    parsing, timeout handling, action-failure accounting, and no-progress
+    correction.
+    """
+
+    def next_request(self) -> WorkflowActionRequest | None: ...
+
+    def execute_action(self, action: Any) -> WorkflowActionOutcome: ...
+
+    def record_response_error(
+        self,
+        error: RuntimeError,
+        payload: dict[str, Any] | None,
+    ) -> None: ...
+
+    def record_action_error(self, action: Any, error: Exception) -> None: ...
+
+    def action_failure_exit_code(self, action: Any) -> int: ...
+
+    def observe_outcome(
+        self,
+        action: Any,
+        observation: WorkflowActionObservation,
+        outcome: WorkflowActionOutcome,
+    ) -> WorkflowActionOutcome: ...
+
+    def exhausted_roundtrips_exit_code(self) -> int: ...
+
+
+class WorkflowLLMExecutionDriver:
+    """Run workflow action roundtrips through one shared control loop.
+
+    This is deliberately the only loop that combines an LLM response with
+    action execution.  Chat and durable-task adapters cannot independently
+    drift in parsing, corrective-action thresholds, or no-progress behavior.
+    """
+
+    def __init__(self, *, max_stalled_roundtrips: int) -> None:
+        self.action_engine = WorkflowLLMActionEngine(
+            max_stalled_roundtrips=max_stalled_roundtrips
+        )
+
+    def run(
+        self,
+        strategy: WorkflowExecutionStrategy,
+        *,
+        max_roundtrips: int | None,
+        signature: Callable[[Any], str],
+    ) -> int:
+        roundtrips = 0
+        while max_roundtrips is None or roundtrips < max(1, max_roundtrips):
+            roundtrips += 1
+            request = strategy.next_request()
+            if request is None:
+                return 0
+            try:
+                action = (
+                    request.request_action()
+                    if request.request_action is not None
+                    else self.action_engine.request_action(
+                        client=request.client,
+                        messages=request.messages,
+                        parser=request.parser,
+                        model=request.model,
+                        stderr=request.stderr,
+                        max_timeout_retries=request.max_timeout_retries,
+                        timeout_backoff_seconds=request.timeout_backoff_seconds,
+                    )
+                )
+            except WorkflowLLMTimeoutExhausted:
+                raise
+            except WorkflowLLMExecutionAborted as exc:
+                return exc.exit_code
+            except RuntimeError as exc:
+                strategy.record_response_error(exc, self.action_engine.last_payload)
+                continue
+
+            before_state = strategy.material_state(action)
+            try:
+                outcome = strategy.execute_action(action)
+            except (RuntimeError, ValueError) as exc:
+                strategy.record_action_error(action, exc)
+                if (
+                    self.action_engine.record_action_failure(
+                        action,
+                        signature=signature,
+                    )
+                    == ProgressDecision.THRESHOLD
+                ):
+                    return strategy.action_failure_exit_code(action)
+                continue
+
+            observation = self.action_engine.observe_action(
+                action,
+                signature=signature,
+                before_state=before_state,
+                after_state=strategy.material_state(action),
+            )
+            if not observation.made_progress:
+                strategy.record_no_progress(action, observation)
+            outcome = strategy.observe_outcome(action, observation, outcome)
+            if outcome.exit_code is not None:
+                return outcome.exit_code
+            if not outcome.continue_running:
+                return 0
+        return strategy.exhausted_roundtrips_exit_code()
 
 
 class WorkflowLLMActionEngine:

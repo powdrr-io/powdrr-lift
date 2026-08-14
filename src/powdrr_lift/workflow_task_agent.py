@@ -57,9 +57,13 @@ from powdrr_lift.workflow_llm import (
     ProgressDecision,
     WorkflowAction,
     WorkflowActionObservation,
+    WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
+    WorkflowActionRequest,
+    WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
+    WorkflowLLMExecutionDriver,
     WorkflowLLMTimeoutExhausted,
     complete_json_with_timeout_retry,
     prune_execution_events,
@@ -113,6 +117,374 @@ class _TaskActionProgressStrategy(WorkflowActionProgressStrategy[WorkflowAction]
         )
         if observation.decision == ProgressDecision.THRESHOLD:
             self.action_engine.reset_progress()
+
+
+@dataclass(slots=True)
+class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
+    """Durable-task adapter for the shared action-roundtrip driver.
+
+    Its policy is intentionally limited to durable task state, publishing, and
+    human handoff. Requesting, parsing, retrying, failure thresholds, and
+    no-progress correction are all owned by ``WorkflowLLMExecutionDriver``.
+    """
+
+    config: WorkflowTaskAgentConfig
+    workflow: WorkflowInstance
+    task: WorkflowTask
+    skill_catalog: tuple[SkillCatalogEntry, ...]
+    repo_root: Path
+    client: WorkflowLLMClient
+    compaction_client: WorkflowLLMClient
+    model: str
+    mapping_provider: str
+    stdout: TextIO
+    stderr: TextIO
+    action_engine: WorkflowLLMActionEngine
+    events: list[dict[str, Any]]
+    response_correction: str | None = None
+    compacted_context: dict[str, Any] | None = None
+
+    def next_request(self) -> WorkflowActionRequest:
+        while True:
+            messages = _build_task_messages(
+                self.workflow,
+                self.task,
+                self.events,
+                skill_catalog=self.skill_catalog,
+                response_correction=self.response_correction,
+                compacted_context=self.compacted_context,
+            )
+            limits = _model_limits_for(self.mapping_provider, self.model)
+            estimated_input_tokens = _estimate_message_tokens(messages)
+            print(
+                f"Workflow task context: {estimated_input_tokens} estimated input "
+                f"tokens of {limits.context_window} allowed.",
+                file=self.stderr,
+                flush=True,
+            )
+            if estimated_input_tokens + 1024 < limits.context_window:
+                _print_waiting_for_model(self.stderr, self.model)
+                return WorkflowActionRequest(
+                    client=self.client,
+                    messages=messages,
+                    parser=_parse_task_action,
+                    model=self.model,
+                    stderr=self.stderr,
+                    max_timeout_retries=self.config.max_timeout_retries,
+                    timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                )
+
+            print(
+                "Compacting workflow task context before the next LLM call: "
+                f"{estimated_input_tokens} estimated input tokens would exceed "
+                f"the {limits.context_window}-token context window.",
+                file=self.stderr,
+                flush=True,
+            )
+            self.compacted_context, before_tokens, after_tokens = (
+                _compact_workflow_task_context(
+                    self.workflow,
+                    self.task,
+                    self.events,
+                    client=self.compaction_client,
+                    stderr=self.stderr,
+                    max_timeout_retries=self.config.max_timeout_retries,
+                    timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                )
+            )
+            self.events.append(
+                {
+                    "kind": "context_compaction",
+                    "before_estimated_input_tokens": before_tokens,
+                    "after_estimated_input_tokens": after_tokens,
+                }
+            )
+            print(
+                "Compacted workflow task context: "
+                f"{before_tokens} -> {after_tokens} estimated input tokens.",
+                file=self.stderr,
+                flush=True,
+            )
+            self.response_correction = None
+
+    def material_state(self, action: WorkflowAction) -> object:
+        return _task_action_material_state(action, self.repo_root)
+
+    def record_no_progress(
+        self,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation,
+    ) -> None:
+        _TaskActionProgressStrategy(
+            action_engine=self.action_engine,
+            repo_root=self.repo_root,
+            events=self.events,
+            stderr=self.stderr,
+        ).record_no_progress(action, observation)
+        self.response_correction = observation.correction
+
+    def record_response_error(
+        self,
+        error: RuntimeError,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        if not _is_repairable_task_response_error(error):
+            raise error
+        response_details = (
+            json.dumps(payload, indent=2, ensure_ascii=False)
+            if payload is not None
+            else f"<no parsed response; client error: {error}>"
+        )
+        print(
+            f"Workflow task LLM response requiring repair:\n{response_details}",
+            file=self.stderr,
+            flush=True,
+        )
+        self.response_correction = (
+            "The previous response was invalid: "
+            f"{error} Return exactly one complete JSON object matching one of "
+            "the documented action shapes. Do not return markdown, prose, "
+            "or an empty response."
+        )
+        print(
+            "Workflow task response needs repair; requesting a corrected "
+            "JSON response from the LLM.",
+            file=self.stderr,
+        )
+        self.events.append(
+            {
+                "kind": "llm_response_error",
+                "error": str(error),
+                "response": payload,
+            }
+        )
+
+    def execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
+        self.response_correction = None
+        if action.kind == "gather_context":
+            report = gather_specification_context(
+                self.repo_root,
+                types=list(action.types),
+                keywords=list(action.keywords),
+                filters=action.filters,
+            )
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "types": list(action.types),
+                    "keywords": list(action.keywords),
+                    "filters": action.filters,
+                    "result": json.loads(render_gather_context_report(report)),
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "next_step":
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "decisions_and_context": action.decisions_and_context,
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "read_document":
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "result": _read_task_document(action, self.repo_root),
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "edit":
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "result": _apply_task_edits(action, self.repo_root),
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "prompt_user":
+            return self._handoff(_prompt_user_handoff(action, self.task), "handoff")
+        if action.kind == "invoke_skill":
+            if action.skill_name is None:
+                raise RuntimeError("invoke_skill action must include a skill name.")
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "skill": action.skill_name,
+                    "result": _run_skill_for_agent(
+                        action.skill_name,
+                        catalog=self.skill_catalog,
+                        client=self.client,
+                        task=self.task,
+                        repo_root=self.repo_root,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        max_timeout_retries=self.config.max_timeout_retries,
+                        timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                    ),
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "invoke_tool":
+            self._execute_tool(action)
+            return WorkflowActionOutcome()
+        if action.kind == "complete":
+            completed = self.workflow.complete_task(
+                self.task.task_id,
+                action.output_state,
+            )
+            if action.text:
+                print(action.text, file=self.stdout)
+            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
+            _publish_workflow_progress(
+                self.repo_root,
+                self.workflow,
+                reason=f"complete {completed.task_id}",
+                stdout=self.stdout,
+            )
+            return WorkflowActionOutcome(continue_running=False)
+        if action.kind == "get-human-input":
+            return self._handoff(action.human_input or {}, "human input required by")
+        raise RuntimeError(f"Unsupported workflow task action: {action.kind}")
+
+    def _handoff(
+        self, human_input: dict[str, Any], reason_prefix: str
+    ) -> WorkflowActionOutcome:
+        human_task, follow_up_task = _insert_human_handoff(
+            self.workflow,
+            self.task,
+            human_input,
+        )
+        print(f"Workflow blocked on human task: {human_task.task_id}", file=self.stdout)
+        if follow_up_task is not None:
+            print(
+                f"Inserted follow-up task: {follow_up_task.task_id}",
+                file=self.stdout,
+            )
+        _publish_workflow_progress(
+            self.repo_root,
+            self.workflow,
+            reason=f"{reason_prefix} {self.task.task_id}",
+            stdout=self.stdout,
+        )
+        return WorkflowActionOutcome(continue_running=False)
+
+    def _execute_tool(self, action: WorkflowAction) -> None:
+        repaired_parameters = _repair_workflow_file_command(
+            action.parameters,
+            self.workflow.directory,
+        )
+        if repaired_parameters is not None:
+            print(
+                "Corrected malformed workflow filename suffix to the exact .json "
+                "filename.",
+                file=self.stderr,
+            )
+            action = WorkflowAction(
+                kind=action.kind,
+                tool=action.tool,
+                parameters=repaired_parameters,
+            )
+        command_error = _workflow_file_command_error(
+            action.parameters,
+            self.workflow.directory,
+        )
+        if command_error is not None:
+            print(command_error, file=self.stderr)
+            result: Any = {
+                "command": action.parameters.get("command"),
+                "cwd": str(self.repo_root),
+                "returncode": 2,
+                "stdout": "",
+                "stderr": command_error,
+            }
+        elif action.tool in {"shell", "internal"}:
+            if action.tool == "internal":
+                _validate_internal_command(action.parameters.get("command"))
+            result = _execute_shell_tool(
+                action.parameters,
+                worktree_root=self.repo_root,
+                stdout=self.stdout,
+                stderr=self.stderr,
+                verbose=self.config.verbose,
+            )
+        elif action.tool == "fuzzy-match":
+            result = _execute_fuzzy_match_tool(
+                action.parameters,
+                worktree_root=self.repo_root,
+            )
+        elif action.tool is not None and is_basedpyright_tool(action.tool):
+            result = execute_basedpyright_tool(
+                action.tool,
+                action.parameters,
+                worktree_root=self.repo_root,
+            )
+        else:
+            raise RuntimeError(
+                f"Unsupported workflow task tool {action.tool!r}; supported tools "
+                "are shell, internal, fuzzy-match, basedpyright-symbol, and "
+                "basedpyright-structure."
+            )
+        self.events.append(
+            {
+                "kind": action.kind,
+                "tool": action.tool,
+                "parameters": action.parameters,
+                "result": result,
+            }
+        )
+
+    def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
+        self.response_correction = _action_response_correction(action, error)
+        self.events.append(
+            {
+                "kind": (
+                    "tool_error" if action.kind == "invoke_tool" else "action_error"
+                ),
+                "action_kind": action.kind,
+                "tool": action.tool,
+                "parameters": action.parameters,
+                "error": str(error),
+            }
+        )
+        print(
+            "Workflow task action needs correction; requesting a corrected action "
+            "from the LLM.",
+            file=self.stderr,
+        )
+
+    def action_failure_exit_code(self, action: WorkflowAction) -> int:
+        _ = action
+        print(
+            "Workflow task stopped after repeated corrective-action failures.",
+            file=self.stderr,
+        )
+        return 1
+
+    def observe_outcome(
+        self,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation,
+        outcome: WorkflowActionOutcome,
+    ) -> WorkflowActionOutcome:
+        _ = action
+        if observation.correction is not None:
+            self.response_correction = observation.correction
+        return outcome
+
+    def exhausted_roundtrips_exit_code(self) -> int:
+        print(
+            "Workflow task "
+            f"{self.task.task_id} blocked after reaching the roundtrip limit.",
+            file=self.stderr,
+        )
+        _publish_workflow_progress(
+            self.repo_root,
+            self.workflow,
+            reason=f"roundtrip limit for {self.task.task_id}",
+            stdout=self.stdout,
+        )
+        return 2
 
 
 def run_workflow_task(
@@ -179,420 +551,39 @@ def run_workflow_task(
             dump_root,
         )
 
-    events: list[dict[str, Any]] = []
-    response_correction: str | None = None
-    compacted_context: dict[str, Any] | None = None
-    action_engine = WorkflowLLMActionEngine(
+    driver_events: list[dict[str, Any]] = []
+    driver = WorkflowLLMExecutionDriver(
         max_stalled_roundtrips=config.max_stalled_roundtrips
     )
-    progress_strategy = _TaskActionProgressStrategy(
-        action_engine=action_engine,
+    strategy = _TaskWorkflowExecutionStrategy(
+        config=config,
+        workflow=workflow,
+        task=task,
+        skill_catalog=skill_catalog,
         repo_root=repo_root,
-        events=events,
-        stderr=stderr,
-    )
-    for _roundtrip in range(max(1, config.max_roundtrips)):
-        messages = _build_task_messages(
-            workflow,
-            task,
-            events,
-            skill_catalog=skill_catalog,
-            response_correction=response_correction,
-            compacted_context=compacted_context,
-        )
-        limits = _model_limits_for(mapping.provider, model)
-        estimated_input_tokens = _estimate_message_tokens(messages)
-        print(
-            f"Workflow task context: {estimated_input_tokens} estimated input "
-            f"tokens of {limits.context_window} allowed.",
-            file=stderr,
-            flush=True,
-        )
-        if estimated_input_tokens + 1024 >= limits.context_window:
-            print(
-                "Compacting workflow task context before the next LLM call: "
-                f"{estimated_input_tokens} estimated input tokens would exceed "
-                f"the {limits.context_window}-token context window.",
-                file=stderr,
-                flush=True,
-            )
-            try:
-                compacted_context, before_tokens, after_tokens = (
-                    _compact_workflow_task_context(
-                        workflow,
-                        task,
-                        events,
-                        client=compaction_client,
-                        stderr=stderr,
-                        max_timeout_retries=config.max_timeout_retries,
-                        timeout_backoff_seconds=config.timeout_backoff_seconds,
-                    )
-                )
-            except WorkflowLLMTimeoutExhausted as exc:
-                return _handle_exhausted_timeout(
-                    repo_root,
-                    task,
-                    stdout=stdout,
-                    stderr=stderr,
-                    error=exc,
-                )
-            events.append(
-                {
-                    "kind": "context_compaction",
-                    "before_estimated_input_tokens": before_tokens,
-                    "after_estimated_input_tokens": after_tokens,
-                }
-            )
-            print(
-                "Compacted workflow task context: "
-                f"{before_tokens} -> {after_tokens} estimated input tokens.",
-                file=stderr,
-                flush=True,
-            )
-            response_correction = None
-            continue
-
-        _print_waiting_for_model(stderr, model)
-        response: dict[str, Any] | None = None
-        try:
-            action = action_engine.request_action(
-                client=client,
-                messages=messages,
-                parser=_parse_task_action,
-                model=model,
-                stderr=stderr,
-                max_timeout_retries=config.max_timeout_retries,
-                timeout_backoff_seconds=config.timeout_backoff_seconds,
-            )
-            response = action_engine.last_payload
-        except WorkflowLLMTimeoutExhausted as exc:
-            return _handle_exhausted_timeout(
-                repo_root,
-                task,
-                stdout=stdout,
-                stderr=stderr,
-                error=exc,
-            )
-        except RuntimeError as exc:
-            if not _is_repairable_task_response_error(exc):
-                raise
-            response = action_engine.last_payload
-            if response is not None:
-                response_details = json.dumps(
-                    response,
-                    indent=2,
-                    ensure_ascii=False,
-                )
-            else:
-                response_details = f"<no parsed response; client error: {exc}>"
-            print(
-                f"Workflow task LLM response requiring repair:\n{response_details}",
-                file=stderr,
-                flush=True,
-            )
-            response_correction = (
-                "The previous response was invalid: "
-                f"{exc} Return exactly one complete JSON object matching one of "
-                "the documented action shapes. Do not return markdown, prose, "
-                "or an empty response."
-            )
-            print(
-                "Workflow task response needs repair; requesting a corrected "
-                "JSON response from the LLM.",
-                file=stderr,
-            )
-            events.append(
-                {
-                    "kind": "llm_response_error",
-                    "error": str(exc),
-                    "response": response,
-                }
-            )
-            continue
-        response_correction = None
-        before_action_state = action_engine.begin_action(
-            action,
-            strategy=progress_strategy,
-        )
-        result: Any
-        if action.kind == "gather_context":
-            report = gather_specification_context(
-                repo_root,
-                types=list(action.types),
-                keywords=list(action.keywords),
-                filters=action.filters,
-            )
-            events.append(
-                {
-                    "kind": action.kind,
-                    "types": list(action.types),
-                    "keywords": list(action.keywords),
-                    "filters": action.filters,
-                    "result": json.loads(render_gather_context_report(report)),
-                }
-            )
-            response_correction = action_engine.complete_action(
-                action,
-                before_state=before_action_state,
-                signature=workflow_action_signature,
-                strategy=progress_strategy,
-            ).correction
-            continue
-        if action.kind == "next_step":
-            events.append(
-                {
-                    "kind": action.kind,
-                    "decisions_and_context": action.decisions_and_context,
-                }
-            )
-            response_correction = action_engine.complete_action(
-                action,
-                before_state=before_action_state,
-                signature=workflow_action_signature,
-                strategy=progress_strategy,
-            ).correction
-            continue
-        if action.kind == "read_document":
-            try:
-                result = _read_task_document(action, repo_root)
-            except (RuntimeError, ValueError) as exc:
-                response_correction = _action_response_correction(action, exc)
-                if _task_action_failure_reached(action_engine, action, stderr=stderr):
-                    return 1
-                events.append(
-                    {
-                        "kind": "action_error",
-                        "action_kind": action.kind,
-                        "error": str(exc),
-                    }
-                )
-                print(
-                    "Workflow task action needs correction; requesting a "
-                    "corrected action from the LLM.",
-                    file=stderr,
-                )
-                continue
-            events.append({"kind": action.kind, "result": result})
-            response_correction = action_engine.complete_action(
-                action,
-                before_state=before_action_state,
-                signature=workflow_action_signature,
-                strategy=progress_strategy,
-            ).correction
-            continue
-        if action.kind == "edit":
-            try:
-                result = _apply_task_edits(action, repo_root)
-            except (RuntimeError, ValueError) as exc:
-                response_correction = _action_response_correction(action, exc)
-                if _task_action_failure_reached(action_engine, action, stderr=stderr):
-                    return 1
-                events.append(
-                    {
-                        "kind": "action_error",
-                        "action_kind": action.kind,
-                        "error": str(exc),
-                    }
-                )
-                print(
-                    "Workflow task action needs correction; requesting a "
-                    "corrected action from the LLM.",
-                    file=stderr,
-                )
-                continue
-            events.append({"kind": action.kind, "result": result})
-            response_correction = action_engine.complete_action(
-                action,
-                before_state=before_action_state,
-                signature=workflow_action_signature,
-                strategy=progress_strategy,
-            ).correction
-            continue
-        if action.kind == "prompt_user":
-            human_input = _prompt_user_handoff(action, task)
-            human_task, follow_up_task = _insert_human_handoff(
-                workflow,
-                task,
-                human_input,
-            )
-            print(f"Workflow blocked on human task: {human_task.task_id}", file=stdout)
-            if follow_up_task is not None:
-                print(
-                    f"Inserted follow-up task: {follow_up_task.task_id}",
-                    file=stdout,
-                )
-            _publish_workflow_progress(
-                repo_root,
-                workflow,
-                reason=f"handoff from {task.task_id}",
-                stdout=stdout,
-            )
-            return 0
-        if action.kind == "invoke_skill":
-            if action.skill_name is None:
-                raise RuntimeError("invoke_skill action must include a skill name.")
-            nested_result = _run_skill_for_agent(
-                action.skill_name,
-                catalog=skill_catalog,
-                client=client,
-                task=task,
-                repo_root=repo_root,
-                stdout=stdout,
-                stderr=stderr,
-                max_timeout_retries=config.max_timeout_retries,
-                timeout_backoff_seconds=config.timeout_backoff_seconds,
-            )
-            events.append(
-                {
-                    "kind": action.kind,
-                    "skill": action.skill_name,
-                    "result": nested_result,
-                }
-            )
-            response_correction = action_engine.complete_action(
-                action,
-                before_state=before_action_state,
-                signature=workflow_action_signature,
-                strategy=progress_strategy,
-            ).correction
-            continue
-        if action.kind == "invoke_tool":
-            repaired_parameters = _repair_workflow_file_command(
-                action.parameters,
-                workflow.directory,
-            )
-            if repaired_parameters is not None:
-                print(
-                    "Corrected malformed workflow filename suffix to the exact "
-                    ".json filename.",
-                    file=stderr,
-                )
-                action = WorkflowAction(
-                    kind=action.kind,
-                    tool=action.tool,
-                    parameters=repaired_parameters,
-                )
-            command_error = _workflow_file_command_error(
-                action.parameters,
-                workflow.directory,
-            )
-            if command_error is not None:
-                print(command_error, file=stderr)
-                result = {
-                    "command": action.parameters.get("command"),
-                    "cwd": str(repo_root),
-                    "returncode": 2,
-                    "stdout": "",
-                    "stderr": command_error,
-                }
-            else:
-                try:
-                    if action.tool in {"shell", "internal"}:
-                        if action.tool == "internal":
-                            _validate_internal_command(action.parameters.get("command"))
-                        result = _execute_shell_tool(
-                            action.parameters,
-                            worktree_root=repo_root,
-                            stdout=stdout,
-                            stderr=stderr,
-                            verbose=config.verbose,
-                        )
-                    elif action.tool == "fuzzy-match":
-                        result = _execute_fuzzy_match_tool(
-                            action.parameters,
-                            worktree_root=repo_root,
-                        )
-                    elif action.tool is not None and is_basedpyright_tool(action.tool):
-                        result = execute_basedpyright_tool(
-                            action.tool,
-                            action.parameters,
-                            worktree_root=repo_root,
-                        )
-                    else:
-                        raise RuntimeError(
-                            f"Unsupported workflow task tool {action.tool!r}; "
-                            "supported tools are shell, internal, fuzzy-match, "
-                            "basedpyright-symbol, and basedpyright-structure."
-                        )
-                except (RuntimeError, ValueError) as exc:
-                    response_correction = _action_response_correction(action, exc)
-                    if _task_action_failure_reached(
-                        action_engine, action, stderr=stderr
-                    ):
-                        return 1
-                    events.append(
-                        {
-                            "kind": "tool_error",
-                            "tool": action.tool,
-                            "parameters": action.parameters,
-                            "error": str(exc),
-                        }
-                    )
-                    print(
-                        "Workflow task tool call needs correction; requesting a "
-                        "corrected action from the LLM.",
-                        file=stderr,
-                    )
-                    continue
-            events.append(
-                {
-                    "kind": action.kind,
-                    "tool": action.tool,
-                    "parameters": action.parameters,
-                    "result": result,
-                }
-            )
-            response_correction = action_engine.complete_action(
-                action,
-                before_state=before_action_state,
-                signature=workflow_action_signature,
-                strategy=progress_strategy,
-            ).correction
-            continue
-        if action.kind == "complete":
-            completed = workflow.complete_task(task.task_id, action.output_state)
-            if action.text:
-                print(action.text, file=stdout)
-            print(f"Completed workflow task: {completed.task_id}", file=stdout)
-            _publish_workflow_progress(
-                repo_root,
-                workflow,
-                reason=f"complete {completed.task_id}",
-                stdout=stdout,
-            )
-            return 0
-        if action.kind == "get-human-input":
-            human_task, follow_up_task = _insert_human_handoff(
-                workflow,
-                task,
-                action.human_input or {},
-            )
-            print(f"Workflow blocked on human task: {human_task.task_id}", file=stdout)
-            if follow_up_task is not None:
-                print(
-                    f"Inserted follow-up task: {follow_up_task.task_id}",
-                    file=stdout,
-                )
-            _publish_workflow_progress(
-                repo_root,
-                workflow,
-                reason=f"human input required by {task.task_id}",
-                stdout=stdout,
-            )
-            return 0
-        raise RuntimeError(f"Unsupported workflow task action: {action.kind}")
-
-    print(
-        f"Workflow task {task.task_id} blocked after reaching the roundtrip limit.",
-        file=stderr,
-    )
-    _publish_workflow_progress(
-        repo_root,
-        workflow,
-        reason=f"roundtrip limit for {task.task_id}",
+        client=client,
+        compaction_client=compaction_client,
+        model=model,
+        mapping_provider=mapping.provider,
         stdout=stdout,
+        stderr=stderr,
+        action_engine=driver.action_engine,
+        events=driver_events,
     )
-    return 2
+    try:
+        return driver.run(
+            strategy,
+            max_roundtrips=config.max_roundtrips,
+            signature=workflow_action_signature,
+        )
+    except WorkflowLLMTimeoutExhausted as exc:
+        return _handle_exhausted_timeout(
+            repo_root,
+            task,
+            stdout=stdout,
+            stderr=stderr,
+            error=exc,
+        )
 
 
 def _select_task(

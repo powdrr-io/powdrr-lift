@@ -415,7 +415,7 @@ def test_pr_description_generators_are_used_by_pr_skills() -> None:
         )
 
 
-def test_create_pull_request_skill_has_prescribed_three_stage_flow() -> None:
+def test_create_pull_request_skill_has_prescribed_flow() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     skill = load_skill(skills_dir / "create-pull-request.yaml")
 
@@ -423,7 +423,10 @@ def test_create_pull_request_skill_has_prescribed_three_stage_flow() -> None:
     assert [step.description for step in skill.steps] == [
         "Generate the pull request description template.",
         "Fill in the pull request description template.",
-        "Commit, push, and create or update the pull request.",
+        "Commit the validated changes.",
+        "Push the committed changes.",
+        "Create a draft pull request when none exists.",
+        "Update the existing pull request.",
     ]
     assert skill.steps[0].tool_invocations[0].command == (
         "powdrr-lift",
@@ -433,8 +436,29 @@ def test_create_pull_request_skill_has_prescribed_three_stage_flow() -> None:
     )
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()
-    assert "gh pr create" in (skill.steps[2].details or "")
-    assert "gh pr edit" in (skill.steps[2].details or "")
+    assert skill.steps[2].tool_invocations[-1].command == (
+        "git",
+        "commit",
+        "-m",
+        "<commit-message>",
+    )
+    assert skill.steps[3].tool_invocations[0].command == (
+        "git",
+        "push",
+        "-u",
+        "origin",
+        "HEAD",
+    )
+    assert skill.steps[4].tool_invocations[0].command[:3] == (
+        "gh",
+        "pr",
+        "create",
+    )
+    assert skill.steps[5].tool_invocations[0].command[:3] == (
+        "gh",
+        "pr",
+        "edit",
+    )
 
 
 def test_checked_in_handle_ad_hoc_skill_matches_flow() -> None:

@@ -4951,6 +4951,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         def __init__(self, **_: object) -> None:
             self._call_index = 0
             self._pr_template_invoked = False
+            self._pr_commit_invoked = False
+            self._pr_push_invoked = False
             self._pr_create_invoked = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
@@ -4977,7 +4979,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "create-pull-request":
-                    assert prompt["current_step_index"] < 3
+                    assert prompt["current_step_index"] < 6
                     if (
                         prompt["current_step_index"] == 0
                         and not self._pr_template_invoked
@@ -4998,6 +5000,33 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         }
                     if (
                         prompt["current_step_index"] == 2
+                        and not self._pr_commit_invoked
+                    ):
+                        self._pr_commit_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": ["git", "commit", "-m", "test"]},
+                        }
+                    if prompt["current_step_index"] == 3 and not self._pr_push_invoked:
+                        self._pr_push_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": [
+                                    "git",
+                                    "push",
+                                    "-u",
+                                    "origin",
+                                    "HEAD",
+                                ]
+                            },
+                        }
+                    if (
+                        prompt["current_step_index"] == 4
                         and not self._pr_create_invoked
                     ):
                         self._pr_create_invoked = True

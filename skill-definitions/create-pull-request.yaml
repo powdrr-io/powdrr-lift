@@ -31,19 +31,11 @@ steps:
     If a section does not apply, write Not applicable and why. Never leave a
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
-- description: Commit, push, and create or update the pull request.
+- description: Commit the validated changes.
   llm_type: simple_task
   details: >-
     Confirm that only the intended validated files are staged, then commit with
-    `<commit-message>` and push the current feature branch with its upstream
-    set. If no pull request exists for the current branch, invoke `gh pr create
-    --draft --title <pull-request-title> --body <populated-pr-description>`.
-    If one already exists, update that PR with `gh pr edit <pr-reference>
-    --title <pull-request-title> --body <populated-pr-description>` instead of
-    creating a second PR. The body must be the completed template from the
-    previous step. Do not print the body. Do not report completion until the
-    GitHub command succeeds and its output includes the pull request URL. Never
-    merge the PR or push directly to main.
+    `<commit-message>`. Do not push or invoke any GitHub command in this step.
   tool_invocations:
   - tool: internal
     command:
@@ -55,6 +47,13 @@ steps:
     - commit
     - -m
     - <commit-message>
+- description: Push the committed changes.
+  llm_type: simple_task
+  details: >-
+    Push the current feature branch with its upstream set. Do not create or
+    update a pull request in this step; leave the completed body in workflow
+    context for the next step.
+  tool_invocations:
   - tool: shell
     command:
     - git
@@ -62,6 +61,16 @@ steps:
     - -u
     - origin
     - HEAD
+- description: Create a draft pull request when none exists.
+  llm_type: simple_task
+  details: >-
+    Use this step only when no pull request exists for the current branch.
+    Invoke `gh pr create --draft --title <pull-request-title> --body
+    <populated-pr-description>` using the completed body from the previous
+    steps. Do not print the body, edit an existing PR, or run any other tool.
+    Do not report completion until the command succeeds and its output includes
+    the pull request URL. Never merge the PR or push directly to main.
+  tool_invocations:
   - tool: shell
     command:
     - gh
@@ -72,6 +81,16 @@ steps:
     - <pull-request-title>
     - --body
     - <populated-pr-description>
+- description: Update the existing pull request.
+  llm_type: simple_task
+  details: >-
+    Use this step only when a pull request already exists for the current
+    branch. Invoke `gh pr edit <pr-reference> --title <pull-request-title>
+    --body <populated-pr-description>` using the completed body from the
+    previous steps. Do not print the body, create a second PR, or run any other
+    tool. Do not report completion until the command succeeds and its output
+    identifies the pull request. Never merge the PR or push directly to main.
+  tool_invocations:
   - tool: shell
     command:
     - gh

@@ -78,6 +78,9 @@ _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
+_MAX_PROMPT_TRANSCRIPT_ENTRIES = 32
+_MAX_PROMPT_TRANSCRIPT_CHARS = 24000
+_MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
@@ -434,6 +437,12 @@ class _WorkflowExecutionState:
     step_index: int
     worktree_root: Path
     current_file_path: Path | None = None
+    current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]] = field(
+        default_factory=dict
+    )
+    fuzzy_match_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1430,6 +1439,7 @@ def run_workflow_chat(
                 worktree_root=worktree_root,
                 catalog=catalog,
                 workflow_context=workflow_context,
+                current_file_context_cache=execution_state.current_file_context_cache,
             ),
             parser=_parse_action_response,
             context=(
@@ -2422,6 +2432,50 @@ def _execution_events_for_prompt(
     ]
 
 
+def _prompt_transcript(
+    transcript: Sequence[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Keep recurring prompts bounded while retaining the complete transcript."""
+    if len(transcript) <= _MAX_PROMPT_TRANSCRIPT_ENTRIES:
+        return list(transcript)
+
+    first = {
+        **transcript[0],
+        "content": _truncate_prompt_content(transcript[0].get("content", "")),
+    }
+    recent = [
+        {
+            **message,
+            "content": _truncate_prompt_content(message.get("content", "")),
+        }
+        for message in transcript[-(_MAX_PROMPT_TRANSCRIPT_ENTRIES - 2) :]
+    ]
+    omitted = {
+        "role": "user",
+        "content": "[Earlier workflow transcript omitted from this prompt; "
+        "full history remains in the execution summary.]",
+    }
+    compacted = [first, omitted, *recent]
+    while (
+        len(compacted) > 3
+        and sum(len(message.get("content", "")) for message in compacted)
+        > _MAX_PROMPT_TRANSCRIPT_CHARS
+    ):
+        compacted.pop(2)
+    return compacted
+
+
+def _truncate_prompt_content(content: str) -> str:
+    if len(content) <= _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS:
+        return content
+    half_limit = _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS // 2
+    return (
+        content[:half_limit]
+        + "\n... [prompt transcript message truncated] ...\n"
+        + content[-half_limit:]
+    )
+
+
 def _build_step_execution_messages(
     *,
     selected_skill: SkillCatalogEntry,
@@ -2434,8 +2488,14 @@ def _build_step_execution_messages(
     worktree_root: Path,
     catalog: Sequence[SkillCatalogEntry],
     workflow_context: WorkflowContext | None = None,
+    current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]]
+    | None = None,
 ) -> list[dict[str, str]]:
-    current_file_context = _current_file_context(worktree_root, current_file_path)
+    current_file_context = _current_file_context(
+        worktree_root,
+        current_file_path,
+        cache=current_file_context_cache,
+    )
     available_work_items = _available_work_item_names(worktree_root)
     available_tools = sorted(
         {
@@ -2509,7 +2569,7 @@ def _build_step_execution_messages(
                         }
                         for entry in catalog
                     ],
-                    "transcript": list(transcript),
+                    "transcript": _prompt_transcript(transcript),
                     "execution_events": _execution_events_for_prompt(execution_events),
                     "current_file": current_file_context,
                 },
@@ -2874,6 +2934,7 @@ def _handle_workflow_action_edit(
     for target_path, updated_text in pending_writes:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         target_path.write_text(updated_text, encoding="utf-8")
+    state.fuzzy_match_cache.clear()
 
     if action.decisions_and_context:
         state.execution_context.append(action.decisions_and_context)
@@ -3085,6 +3146,7 @@ def _handle_workflow_action_invoke_tool(
         tool_result = _execute_fuzzy_match_tool(
             action.parameters,
             worktree_root=state.worktree_root,
+            path_cache=state.fuzzy_match_cache,
         )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL:
@@ -3115,6 +3177,8 @@ def _handle_workflow_action_invoke_tool(
     )
     if inferred_path is not None:
         state.current_file_path = inferred_path
+    if action.tool == "shell":
+        state.fuzzy_match_cache.clear()
     state.transcript.append(
         {
             "role": "assistant",
@@ -3248,6 +3312,7 @@ def _execute_fuzzy_match_tool(
     parameters: dict[str, Any],
     *,
     worktree_root: Path,
+    path_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] | None = None,
 ) -> dict[str, Any]:
     command = parameters.get("command")
     if not isinstance(command, (str, list, tuple)):
@@ -3257,7 +3322,11 @@ def _execute_fuzzy_match_tool(
     return {
         "tool": "fuzzy-match",
         "command": list(command) if not isinstance(command, str) else command,
-        "result": json.loads(fuzzy_match_json(command, worktree_root=worktree_root)),
+        "result": json.loads(
+            fuzzy_match_json(
+                command, worktree_root=worktree_root, path_cache=path_cache
+            )
+        ),
     }
 
 
@@ -4595,6 +4664,8 @@ def _file_edits_to_data(file_edits: SkillChatFileEdits) -> dict[str, Any]:
 def _current_file_context(
     worktree_root: Path,
     current_file_path: Path | None,
+    *,
+    cache: dict[tuple[str, int, int], dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     if current_file_path is None:
         return None
@@ -4614,8 +4685,12 @@ def _current_file_context(
             "exists": False,
         }
 
+    stat = resolved_path.stat()
+    cache_key = (str(resolved_path), stat.st_mtime_ns, stat.st_size)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
     lines = resolved_path.read_text(encoding="utf-8").splitlines()
-    return {
+    context = {
         "path": str(resolved_path.relative_to(worktree_root)),
         "exists": True,
         "line_count": len(lines),
@@ -4627,6 +4702,10 @@ def _current_file_context(
             for line_number, line in enumerate(lines, start=1)
         ],
     }
+    if cache is not None:
+        cache.clear()
+        cache[cache_key] = context
+    return context
 
 
 def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:

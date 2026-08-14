@@ -1,0 +1,77 @@
+# This file is read-only and should never be edited by a tool or agent.
+schema: https://powdrr.io/schemas/specification-v1
+# Architecture id: arch-interaction-file-logging
+# Available entities:
+# - interaction-log-writer
+# - interaction-log-reader
+# - binary-data-handler
+# Available relationships:
+# - rel-writer-reader
+# - rel-writer-binary
+# - rel-reader-binary
+# Available modules:
+# - interaction-log-writer
+# - interaction-log-reader
+# - binary-data-handler
+# Available tools:
+title: Interaction File Logging
+architecture_id: "arch-interaction-file-logging"
+entities:
+  - id: interaction-log-writer
+    action: added
+    rationale: Add the log writer module to capture and write all human and LLM interaction inputs and outputs to JSON log files per "req-log-all-interactions" and "app-json-file-log".
+  - id: interaction-log-reader
+    action: added
+    rationale: Add the log reader module to retrieve interaction records from JSON log files per "req-log-all-interactions".
+  - id: binary-data-handler
+    action: added
+    rationale: Add the binary data handler module to encode and decode binary data for JSON-safe storage and retrieval per "req-log-all-interactions".
+modules:
+  - id: interaction-log-writer
+    action: added
+    relative_location: src/interaction_file_logging/writer.py
+    purpose: Append JSON records to the interaction log file.
+  - id: interaction-log-reader
+    action: added
+    relative_location: src/interaction_file_logging/reader.py
+    purpose: Read and parse interaction records from the log file.
+  - id: binary-data-handler
+    action: added
+    relative_location: src/interaction_file_logging/binary.py
+    purpose: Encode and decode binary data for JSON-safe storage.
+tools: []
+entity_relationships:
+  - id: rel-writer-reader
+    action: added
+    rationale: The writer appends records that the reader later retrieves per "req-log-all-interactions".
+  - id: rel-writer-binary
+    action: added
+    rationale: The writer uses the binary handler to encode binary data before writing per "req-log-all-interactions".
+  - id: rel-reader-binary
+    action: added
+    rationale: The reader uses the binary handler to decode binary data after reading per "req-log-all-interactions".
+features:
+  - id: feature-interaction-capture
+    action: added
+    description: Capture and persist all human and LLM interaction inputs and outputs to per-session JSON log files.
+    functional_requirements:
+      - All human and LLM inputs and outputs must be written to the log file.
+      - Log files must be in JSON format.
+      - Each CLI session must produce its own timestamped log file in the .powdrr directory.
+  - id: feature-binary-data-handling
+    action: added
+    description: Store and retrieve binary data in JSON log files without data loss.
+    functional_requirements:
+      - Binary data must be encoded as JSON-safe strings before writing.
+      - Binary data must be decoded back to its original form after reading.
+      - Binary data round-trip must preserve data integrity.
+decisions:
+  - id: dec-json-format
+    action: added
+    description: Use JSON as the log format for interoperability and ease of parsing.
+  - id: dec-hidden-directory
+    action: added
+    description: Store log files in a hidden .powdrr directory to avoid cluttering the user's workspace.
+  - id: dec-per-session-files
+    action: added
+    description: Use per-session timestamped log files to prevent concurrent session conflicts.

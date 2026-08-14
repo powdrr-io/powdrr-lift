@@ -1,0 +1,89 @@
+# This file is read-only and should never be edited by a tool or agent.
+#
+schema: https://powdrr.io/schemas/specification-v1
+# Allowed entity types:
+# - Module
+id: arch-interaction-file-logging
+title: Interaction File Logging
+entities:
+  - id: interaction-log-writer
+    type: Module
+    action: added
+    summary: Captures and writes all human and LLM interaction inputs and outputs to JSON log files.
+    rationale: Ensure every interaction is persisted in JSON format per "req-log-all-interactions" and "app-json-file-log".
+  - id: interaction-log-reader
+    type: Module
+    action: added
+    summary: Reads and retrieves interaction records from JSON log files.
+    rationale: Support retrieval and verification of stored interactions per "req-log-all-interactions".
+  - id: binary-data-handler
+    type: Module
+    action: added
+    summary: Encodes and decodes binary data for JSON-safe storage and retrieval.
+    rationale: Ensure binary data can be stored and retrieved properly per "req-log-all-interactions".
+modules:
+  - id: interaction-log-writer
+    action: added
+    relative_location: src/interaction_file_logging/writer.py
+    purpose: Append JSON records to the interaction log file.
+  - id: interaction-log-reader
+    action: added
+    relative_location: src/interaction_file_logging/reader.py
+    purpose: Read and parse interaction records from the log file.
+  - id: binary-data-handler
+    action: added
+    relative_location: src/interaction_file_logging/binary.py
+    purpose: Encode and decode binary data for JSON-safe storage.
+tools: []
+entity_relationships:
+  - id: rel-writer-reader
+    source: interaction-log-writer
+    target: interaction-log-reader
+    relationship: writes_to
+    description: The writer appends records that the reader later retrieves.
+    rationale: Both modules operate on the same log file per "req-log-all-interactions".
+  - id: rel-writer-binary
+    source: interaction-log-writer
+    target: binary-data-handler
+    relationship: uses
+    description: The writer uses the binary handler to encode binary data before writing.
+    rationale: Binary data must be encoded for JSON-safe storage per "req-log-all-interactions".
+  - id: rel-reader-binary
+    source: interaction-log-reader
+    target: binary-data-handler
+    relationship: uses
+    description: The reader uses the binary handler to decode binary data after reading.
+    rationale: Binary data must be decoded back to original form per "req-log-all-interactions".
+invariants:
+  - id: inv-log-append-only
+    description: The log file must never be truncated or overwritten; only appended to.
+    rationale: No updates may be lost per "req-log-all-interactions".
+    related:
+      entities:
+        - interaction-log-writer
+      entity_relationships:
+        - rel-writer-reader
+  - id: inv-json-validity
+    description: Every record written to the log file must be valid JSON.
+    rationale: The format must be JSON per "app-json-file-log".
+    related:
+      entities:
+        - interaction-log-writer
+      entity_relationships: []
+guidance:
+  - id: guide-hidden-directory
+    description: Store the log file in a hidden directory (e.g., .powdrr) to avoid cluttering the user's workspace.
+    rationale: Use a hidden directory per "app-json-file-log".
+    related:
+      entities:
+        - interaction-log-writer
+      entity_relationships: []
+  - id: guide-binary-roundtrip
+    description: Binary data must survive a write-then-read cycle without corruption.
+    rationale: Binary data must be stored and retrieved properly per "req-log-all-interactions".
+    related:
+      entities:
+        - binary-data-handler
+      entity_relationships:
+        - rel-writer-binary
+        - rel-reader-binary

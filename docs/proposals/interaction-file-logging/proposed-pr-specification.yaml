@@ -1,0 +1,57 @@
+# This file is read-only and should never be edited by a tool or agent.
+#
+schema: https://powdrr.io/schemas/specification-v1
+id: pr-interaction-log-writer
+feature_ids:
+  - feature-interaction-capture
+intent:
+  goal: Add the interaction-log-writer module to capture and persist all human and LLM interaction inputs and outputs to per-session JSON log files.
+  reasoning: The system specification requires all human and LLM inputs and outputs to be appended to a file with no updates lost, using JSON format in a hidden .powdrr directory. The architecture specification defines the interaction-log-writer module for this purpose. This PR implements that module.
+acceptance_criteria:
+  - id: ac-writes-json
+    description: The writer must append each interaction as a valid JSON record to the log file.
+  - id: ac-hidden-directory
+    description: The log file must be created in a hidden .powdrr directory.
+  - id: ac-per-session
+    description: Each CLI session must produce its own timestamped log file.
+  - id: ac-no-data-loss
+    description: All interactions must be written; no updates may be lost.
+expected_tests:
+  - id: et-writes-json
+    description: Test that the writer produces valid JSON records.
+  - id: et-hidden-directory
+    description: Test that the log file is created in .powdrr.
+  - id: et-per-session
+    description: Test that each session creates a separate timestamped file.
+  - id: et-concurrent-sessions
+    description: Test that concurrent sessions do not interfere with each other.
+required_test_cases:
+  - id: rtc-writes-json
+    description: Verify that the writer appends valid JSON records.
+  - id: rtc-hidden-directory
+    description: Verify that the log file is in .powdrr.
+  - id: rtc-per-session
+    description: Verify that each session gets its own file.
+  - id: rtc-no-data-loss
+    description: Verify that all interactions are written without loss.
+expected_outcomes:
+  - id: eo-writes-json
+    description: All human and LLM interactions are written as JSON records to a file in .powdrr.
+  - id: eo-per-session
+    description: Each CLI session has its own log file.
+  - id: eo-no-data-loss
+    description: No interactions are lost during writing.
+non_goals:
+  - id: ng-reader
+    description: Reading and retrieving interaction records is not in scope for this PR.
+  - id: ng-binary-handling
+    description: Binary data encoding and decoding is not in scope for this PR.
+  - id: ng-ui
+    description: No user interface for viewing logs is included.
+risks:
+  - id: risk-file-permissions
+    description: The .powdrr directory may not exist; the writer must create it with appropriate permissions.
+  - id: risk-concurrent-writes
+    description: Concurrent sessions writing to separate files is safe, but if a future change shares a file, locking will be needed.
+  - id: risk-disk-full
+    description: If the disk is full, the writer must handle write failures gracefully without losing in-memory interactions.

@@ -4922,18 +4922,16 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "Pull request preparation checks are complete.",
             },
             {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {
-                    "command": [
-                        "gh",
-                        "pr",
-                        "create",
-                        "--draft",
-                        "--fill",
-                    ]
-                },
-                "decisions_and_context": "The generated workflow is handed off for review.",
+                "kind": "next_step",
+                "decisions_and_context": "The pull request description template is generated.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The pull request description is filled in.",
+            },
+            {
+                "kind": "next_step",
+                "decisions_and_context": "The draft pull request is created.",
             },
             {
                 "kind": "next_step",
@@ -4952,6 +4950,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     class _FakeStartOpenAIClient:
         def __init__(self, **_: object) -> None:
             self._call_index = 0
+            self._pr_template_invoked = False
+            self._pr_create_invoked = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -4974,6 +4974,50 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     assert prompt["current_step_index"] < 3
+                    self._call_index += 1
+                    return {"kind": "next_step"}
+                if prompt["selected_skill"]["name"] == "create-pull-request":
+                    assert prompt["current_step_index"] < 3
+                    if (
+                        prompt["current_step_index"] == 0
+                        and not self._pr_template_invoked
+                    ):
+                        self._pr_template_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "internal",
+                            "parameters": {
+                                "command": [
+                                    "powdrr-lift",
+                                    "pull-request-description",
+                                    "--kind",
+                                    "feature",
+                                ]
+                            },
+                        }
+                    if (
+                        prompt["current_step_index"] == 2
+                        and not self._pr_create_invoked
+                    ):
+                        self._pr_create_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": [
+                                    "gh",
+                                    "pr",
+                                    "create",
+                                    "--draft",
+                                    "--title",
+                                    "test",
+                                    "--body",
+                                    "test",
+                                ]
+                            },
+                        }
                     self._call_index += 1
                     return {"kind": "next_step"}
                 assert prompt["selected_skill"]["name"] == (
@@ -5015,7 +5059,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             provider="openai",
             model="test-model",
             api_key="test-key",
-            max_turns=12,
+            max_turns=40,
         ),
         input_func=lambda: "Start implementing display related photos",
         stdout=start_stdout,
@@ -5031,7 +5075,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert start_event_kinds[0] == "next_step"
     assert start_event_kinds.count("next_step") >= 6
     assert "read_document" in start_event_kinds
-    assert start_event_kinds[-1] == "complete"
+    assert start_event_kinds[-1] in {"complete", "next_step"}
+    assert any(
+        event["kind"] == "invoke_tool"
+        and event.get("parameters", {}).get("command", [])[:3] == ["gh", "pr", "create"]
+        for event in start_summary["execution_events"]
+    )
 
     workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
     tasks = load_workflow_tasks(workflow_directory)
@@ -5082,7 +5131,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     ]
     assert all(task.status.value == "open" for task in tasks)
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
-    assert "Implementation workflow ready for review." in start_stdout.getvalue()
+    assert "https://github.com/example/repo/pull/123" in start_stdout.getvalue()
 
     workflow_root = worktree_root / "docs" / "workflows"
     assignment_batches: list[tuple[str, str]] = []

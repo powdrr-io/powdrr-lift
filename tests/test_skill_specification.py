@@ -341,39 +341,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
     assert skill.steps[12].uses_skills == ("finish-pr-prep",)
-    assert "do not print the template or completed PR body" in (
-        skill.steps[13].details or ""
-    )
-    assert "Do not report this step complete until the GitHub command succeeds" in (
-        skill.steps[13].details or ""
-    )
-    assert "value for the `gh pr create` command" in (skill.steps[13].details or "")
-    assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
-        (
-            "powdrr-lift",
-            "pull-request-description",
-            "--kind",
-            "feature",
-        ),
-        ("powdrr-lift", "repository-state"),
-        (
-            "git",
-            "commit",
-            "-m",
-            "Add <work-item-name> feature specification",
-        ),
-        ("git", "push", "-u", "origin", "HEAD"),
-        (
-            "gh",
-            "pr",
-            "create",
-            "--draft",
-            "--title",
-            "<pull-request-title>",
-            "--body",
-            "<populated-pr-description>",
-        ),
-    ]
+    assert "create-pull-request" in (skill.steps[13].details or "")
+    assert skill.steps[13].uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -385,6 +354,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "address-review-comments",
         "adversarial-pr-review",
         "bootstrap-code-structure",
+        "create-pull-request",
         "dead-code-review",
         "feature-functionality-review",
         "feature-test-coverage-review",
@@ -438,15 +408,33 @@ def test_pr_description_generators_are_used_by_pr_skills() -> None:
 
     for skill_name, kind in expected_kinds.items():
         skill = load_skill(skills_dir / f"{skill_name}.yaml")
-        invocations = [
-            invocation for step in skill.steps for invocation in step.tool_invocations
-        ]
         assert any(
-            invocation.tool == "internal"
-            and invocation.command
-            == ("powdrr-lift", "pull-request-description", "--kind", kind)
-            for invocation in invocations
+            "create-pull-request" in (step.uses_skills or ())
+            and kind in (step.details or "")
+            for step in skill.steps
         )
+
+
+def test_create_pull_request_skill_has_prescribed_three_stage_flow() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    skill = load_skill(skills_dir / "create-pull-request.yaml")
+
+    assert skill.name == "create-pull-request"
+    assert [step.description for step in skill.steps] == [
+        "Generate the pull request description template.",
+        "Fill in the pull request description template.",
+        "Commit, push, and create or update the pull request.",
+    ]
+    assert skill.steps[0].tool_invocations[0].command == (
+        "powdrr-lift",
+        "pull-request-description",
+        "--kind",
+        "<pr-kind>",
+    )
+    assert "do not print" in (skill.steps[0].details or "").lower()
+    assert "do not print" in (skill.steps[1].details or "").lower()
+    assert "gh pr create" in (skill.steps[2].details or "")
+    assert "gh pr edit" in (skill.steps[2].details or "")
 
 
 def test_checked_in_handle_ad_hoc_skill_matches_flow() -> None:
@@ -482,7 +470,7 @@ def test_checked_in_address_review_comments_skill_matches_flow() -> None:
     assert "design, entities, relationships" in (skill.steps[1].details or "")
     assert "system-specification" in (skill.steps[2].details or "")
     assert skill.steps[4].uses_skills == ("finish-pr-prep",)
-    assert skill.steps[5].tool_invocations[-1].command == ("git", "push")
+    assert skill.steps[5].uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_feature_test_coverage_review_skill_matches_review_flow() -> None:
@@ -652,27 +640,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         ("git", "add", "docs/proposals/<feature-name>", "docs/workflows"),
     ]
     assert skill.steps[6].uses_skills == ("finish-pr-prep",)
-    assert [invocation.command for invocation in skill.steps[7].tool_invocations] == [
-        ("powdrr-lift", "pull-request-description", "--kind", "feature"),
-        ("powdrr-lift", "repository-state"),
-        (
-            "git",
-            "commit",
-            "-m",
-            "Add <feature-name> implementation workflow",
-        ),
-        ("git", "push", "-u", "origin", "HEAD"),
-        (
-            "gh",
-            "pr",
-            "create",
-            "--draft",
-            "--title",
-            "<pull-request-title>",
-            "--body",
-            "<populated-pr-description>",
-        ),
-    ]
+    assert skill.steps[7].uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_bootstrap_skill_verifies_discovered_tools() -> None:

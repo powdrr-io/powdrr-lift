@@ -114,39 +114,11 @@ steps:
 - description: Commit and push the addressed changes to the existing pull request.
   llm_type: simple_task
   details: >-
-    Confirm the final staged diff contains every addressed review change and no
-    unrelated files, commit it with a message describing the review update, and
-    push the current feature branch to its existing upstream. Verify that the
-    push succeeds and that the pull request head now points to the new commit.
-    Update the existing PR body by first invoking `powdrr-lift
-    pull-request-description --kind review-comments`. Fill every section
-    returned by that command and pass the completed text as the `--body` value,
-    preserving the core sections and completing the Review Feedback Addressed
-    section with one row per actionable comment containing its location, requested
-    outcome, resolution, and validation. Include residual risks and reviewer
-    focus. If a section does not apply, write Not applicable and why; never
-    leave placeholders or claim an unrun check passed. Resolve each review
-    thread only after its requested change is present and pushed, and report any
-    comment that remains open or blocked. Never merge the pull request or push
-    directly to main.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - pull-request-description
-    - --kind
-    - review-comments
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
-  - tool: shell
-    command:
-    - git
-    - commit
-    - -m
-    - "Address pull request review comments"
-  - tool: shell
-    command:
-    - git
-    - push
+    Invoke create-pull-request with pr-kind `review-comments`, commit message
+    `Address pull request review comments`, and the existing pull-request
+    reference and title. Pass the review ledger as context and require one
+    Review Feedback Addressed row per actionable comment. Resolve each review
+    thread only after its requested change is present and pushed. Never merge
+    the pull request or push directly to main.
+  uses_skills:
+  - create-pull-request

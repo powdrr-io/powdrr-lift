@@ -498,6 +498,23 @@ def test_textual_response_grows_and_submits_on_return(
     assert received == ["line one\nline two", "follow-up request"]
 
 
+def test_textual_response_grows_for_trailing_newline() -> None:
+    async def exercise() -> tuple[int, float]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "line one\n"
+            await pilot.pause()
+            height_style = response.styles.height
+            assert height_style is not None
+            return int(height_style.value), response.scroll_y
+
+    height, scroll_y = asyncio.run(exercise())
+    assert height >= 4
+    assert scroll_y == 0
+
+
 def test_textual_response_grows_for_wrapped_text() -> None:
     async def exercise() -> tuple[int, float]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

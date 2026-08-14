@@ -3185,9 +3185,6 @@ def _handle_workflow_action_invoke_tool(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
             "internal, fuzzy-match, basedpyright-symbol, and basedpyright-structure."
         )
-    validation_guidance = _workflow_validation_guidance(action, tool_result)
-    if validation_guidance is not None:
-        tool_result = {**tool_result, "workflow_guidance": validation_guidance}
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
         worktree_root=state.worktree_root,
@@ -3229,70 +3226,6 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     return True
-
-
-def _workflow_validation_guidance(
-    action: SkillChatAction,
-    tool_result: dict[str, Any],
-) -> str | None:
-    """Turn semantic specification failures into an actionable repair loop."""
-    if action.tool != _INTERNAL_TOOL or tool_result.get("returncode") == 0:
-        return None
-    command_items = _command_items(action.parameters.get("command"))
-    if len(command_items) < 2 or command_items[0] != _INTERNAL_BINARY:
-        return None
-    if command_items[1] != "evaluate-architecture-specification":
-        return None
-    try:
-        report = json.loads(str(tool_result.get("stdout", "")))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(report, dict):
-        return None
-    issues = report.get("issues")
-    if not isinstance(issues, list):
-        return None
-    rationale_issues = [
-        issue
-        for issue in issues
-        if isinstance(issue, dict)
-        and "gather_context" in str(issue.get("corrective_action", ""))
-    ]
-    if not rationale_issues:
-        return None
-    work_item_name = _extract_command_option(command_items, "--work-item-name")
-    work_item = work_item_name or "<work-item-name>"
-    issue_lines = []
-    for issue in rationale_issues:
-        path = issue.get("path", "the reported rationale field")
-        message = issue.get("message", "The rationale reference is invalid.")
-        issue_lines.append(f"- `{path}`: {message}")
-    return (
-        "The architecture specification is structurally valid but failed semantic "
-        "validation. Treat each issue below as a required repair, not as a reason "
-        "to retry the same edit:\n"
-        + "\n".join(issue_lines)
-        + "\nFirst, call this exact workflow action to retrieve the current "
-        "requirements (do not invent IDs): "
-        + json.dumps(
-            {
-                "kind": "gather_context",
-                "types": ["requirements"],
-                "keywords": [work_item],
-                "filters": {},
-                "decisions_and_context": (
-                    "Retrieve current requirements before repairing architecture "
-                    "rationales."
-                ),
-            },
-            ensure_ascii=False,
-        )
-        + "\nThen reason about which returned requirement drives each named "
-        "entity or relationship, edit only the corresponding rationale to cite "
-        "an exact returned requirement id in quotes, and rerun this same "
-        "evaluate command. Do not cite the work-item name, an invented id, or "
-        "an obsolete requirement."
-    )
 
 
 def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:

@@ -63,7 +63,6 @@ from powdrr_lift.workflow_chat_agent import (
     LocalModelRuntimeError,
     OpenAIChatClient,
     SkillCatalogEntry,
-    SkillChatAction,
     SkillChatConfig,
     SkillChatEdit,
     WorkflowContext,
@@ -107,7 +106,6 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_action_for_step,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
-    _workflow_validation_guidance,
     _WorkflowEditRangeError,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
@@ -146,44 +144,6 @@ def test_execution_events_for_prompt_compacts_results_without_mutating_summary_d
         }
     ]
     assert events[0]["result"] == {"stdout": "a large result"}
-
-
-def test_workflow_validation_guidance_prescribes_current_requirement_gather() -> None:
-    action = SkillChatAction(
-        kind="invoke_tool",
-        tool="internal",
-        parameters={
-            "command": [
-                "powdrr-lift",
-                "evaluate-architecture-specification",
-                "--work-item-name",
-                "display-related-photos",
-            ]
-        },
-    )
-    result = {
-        "returncode": 1,
-        "stdout": json.dumps(
-            {
-                "issues": [
-                    {
-                        "code": "missing_relationship_rationale_reference",
-                        "path": "entity_relationships[0].rationale",
-                        "message": "Entity relationship photo-displays-in-gallery is missing a rationale that cites at least one current requirement.",
-                        "corrective_action": "First use the workflow gather_context action.",
-                    }
-                ]
-            }
-        ),
-    }
-
-    guidance = _workflow_validation_guidance(action, result)
-
-    assert guidance is not None
-    assert '"types": ["requirements"]' in guidance
-    assert '"keywords": ["display-related-photos"]' in guidance
-    assert "photo-displays-in-gallery" in guidance
-    assert "edit only the corresponding rationale" in guidance
 
 
 def test_prompt_transcript_keeps_request_and_bounds_history() -> None:

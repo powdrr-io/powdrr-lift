@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -12,7 +13,7 @@ class CorrectiveAction(ABC):
         """Return whether this action handles the validation code."""
 
     @abstractmethod
-    def instructions(self, code: str) -> str:
+    def instructions(self, error: ValidationError) -> str:
         """Return precise instructions for repairing the validation error."""
 
 
@@ -27,8 +28,8 @@ class RationaleReferenceAction(CorrectiveAction):
     def applies_to(self, code: str) -> bool:
         return code.casefold() in self._CODES
 
-    def instructions(self, code: str) -> str:
-        subject = self._CODES[code.casefold()]
+    def instructions(self, error: ValidationError) -> str:
+        subject = self._CODES[error.code.casefold()]
         return (
             "First use the workflow gather_context action exactly like "
             '`{"kind":"gather_context","types":["requirements"],'
@@ -46,10 +47,13 @@ class UnknownReferenceAction(CorrectiveAction):
         normalized = code.casefold()
         return "unknown" in normalized or "unavailable" in normalized
 
-    def instructions(self, code: str) -> str:
+    def instructions(self, error: ValidationError) -> str:
+        location = f" at `{error.path}`" if error.path else ""
         return (
-            "Replace the unknown reference with an id that is defined in the "
-            "referenced section, or add that id to the referenced section."
+            f"The unknown id is identified by the validator{location}: "
+            f"{error.message} Use gather_context to discover the current ids "
+            "in the referenced section, then replace that id with an exact "
+            "current id and rerun the same evaluate command."
         )
 
 
@@ -57,8 +61,13 @@ class DuplicateIdAction(CorrectiveAction):
     def applies_to(self, code: str) -> bool:
         return "duplicate" in code.casefold()
 
-    def instructions(self, code: str) -> str:
-        return "Remove or rename the duplicate id so every id is unique."
+    def instructions(self, error: ValidationError) -> str:
+        location = f" at `{error.path}`" if error.path else ""
+        return (
+            f"Remove or rename the duplicate identified by the validator{location}: "
+            f"{error.message} Ensure every id is unique, then rerun the same "
+            "evaluate command."
+        )
 
 
 class MissingValueAction(CorrectiveAction):
@@ -66,8 +75,13 @@ class MissingValueAction(CorrectiveAction):
         normalized = code.casefold()
         return "missing" in normalized or "required" in normalized
 
-    def instructions(self, code: str) -> str:
-        return "Add the missing required field or item with a valid value."
+    def instructions(self, error: ValidationError) -> str:
+        location = f" at `{error.path}`" if error.path else ""
+        return (
+            f"Add the missing field identified by the validator{location}: "
+            f"{error.message} Use the expected type and a valid value, then "
+            "rerun the same evaluate command."
+        )
 
 
 class ParseAction(CorrectiveAction):
@@ -75,10 +89,13 @@ class ParseAction(CorrectiveAction):
         normalized = code.casefold()
         return "parse" in normalized or "yaml" in normalized
 
-    def instructions(self, code: str) -> str:
+    def instructions(self, error: ValidationError) -> str:
+        line_match = re.search(r"line (\d+)", error.message, flags=re.IGNORECASE)
+        line = f" on line {line_match.group(1)}" if line_match else ""
         return (
-            "Correct the YAML syntax near this error and preserve the required "
-            "mapping and sequence structure."
+            f"Correct the YAML syntax{line} identified by the parser: "
+            f"{error.message} Preserve the required mapping and sequence "
+            "structure, then rerun the same evaluate command."
         )
 
 
@@ -86,8 +103,12 @@ class GenericValidationAction(CorrectiveAction):
     def applies_to(self, code: str) -> bool:
         return True
 
-    def instructions(self, code: str) -> str:
-        return "Change the value to the type and format required by this error."
+    def instructions(self, error: ValidationError) -> str:
+        location = f" at `{error.path}`" if error.path else ""
+        return (
+            f"Correct the value identified by the validator{location}: "
+            f"{error.message} Then rerun the same evaluate command."
+        )
 
 
 _ACTIONS: tuple[CorrectiveAction, ...] = (
@@ -118,7 +139,7 @@ class ValidationError:
 
     @property
     def corrective_action(self) -> str:
-        return self._action.instructions(self.code)
+        return self._action.instructions(self)
 
     def instructional_message(self) -> str:
         location = f" at `{self.path}`" if self.path else ""

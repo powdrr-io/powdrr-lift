@@ -1739,18 +1739,44 @@ def run_workflow_chat(
                 ),
             )
             if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
-                stalled_action_context = (
-                    "Workflow stopped after repeated roundtrips without progress. "
-                    f"Step {execution_state.step_index + 1} "
-                    f"({current_step.description}) repeatedly returned the "
-                    f"unchanged action: {action_signature}"
-                )
-                print(stalled_action_context, file=stderr)
-                print(
-                    "Workflow stopped after repeated roundtrips without progress.",
-                    file=stderr,
-                )
-                return 1
+                if action.kind == "invoke_tool":
+                    warning = (
+                        "Warning: repeated tool action made no progress; "
+                        "skipping to the next workflow step."
+                    )
+                    progress.update(
+                        selected_skill,
+                        current_step_index=execution_state.step_index,
+                        status=warning,
+                        parent_skill=skill_stack[-1].parent_skill
+                        if skill_stack
+                        else None,
+                        parent_step_index=skill_stack[-1].parent_step_index
+                        if skill_stack
+                        else None,
+                    )
+                    print(warning, file=stderr)
+                    execution_state.step_index = current_step_index + 1
+                    stalled_roundtrips = 0
+                    previous_action_signature = None
+                    failed_action_signature = None
+                    if not skill_stack and execution_state.step_index >= len(
+                        selected_skill.skill.steps
+                    ):
+                        should_continue = False
+                else:
+                    stalled_action_context = (
+                        "Workflow stopped after repeated roundtrips without progress. "
+                        f"Step {execution_state.step_index + 1} "
+                        f"({current_step.description}) repeatedly returned the "
+                        f"unchanged action: {action_signature}"
+                    )
+                    print(stalled_action_context, file=stderr)
+                    print(
+                        "Workflow stopped after repeated roundtrips without progress.",
+                        file=stderr,
+                    )
+                    return 1
         if execution_state.step_index != current_step_index:
             step_roundtrips = 0
             stalled_roundtrips = 0

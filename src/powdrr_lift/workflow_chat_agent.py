@@ -1740,6 +1740,29 @@ def run_workflow_chat(
             )
             if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
                 if action.kind == "invoke_tool":
+                    if _workflow_step_requires_pull_request(current_step):
+                        warning = (
+                            "Warning: a required pull-request creation step made "
+                            "no progress; the workflow cannot skip PR creation."
+                        )
+                        progress.update(
+                            selected_skill,
+                            current_step_index=execution_state.step_index,
+                            status=warning,
+                            parent_skill=skill_stack[-1].parent_skill
+                            if skill_stack
+                            else None,
+                            parent_step_index=skill_stack[-1].parent_step_index
+                            if skill_stack
+                            else None,
+                        )
+                        print(warning, file=stderr)
+                        print(
+                            "Workflow stopped before the required pull request was "
+                            "created.",
+                            file=stderr,
+                        )
+                        return 1
                     warning = (
                         "Warning: repeated tool action made no progress; "
                         "skipping to the next workflow step."
@@ -3021,6 +3044,13 @@ def _workflow_action_made_progress(
     return False
 
 
+def _workflow_step_requires_pull_request(step: Any) -> bool:
+    return any(
+        tuple(invocation.command[:3]) == ("gh", "pr", "create")
+        for invocation in step.tool_invocations
+    )
+
+
 def _handle_workflow_action_complete(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
@@ -3304,6 +3334,9 @@ def _handle_workflow_action_invoke_tool(
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL:
             _validate_internal_command(action.parameters.get("command"))
+        command_items = _command_items_for_validation(
+            action.parameters.get("command")
+        )
         tool_result = _execute_shell_tool(
             action.parameters,
             worktree_root=state.worktree_root,
@@ -3311,6 +3344,10 @@ def _handle_workflow_action_invoke_tool(
             stderr=stderr,
             verbose=config.verbose,
             announce=False,
+            print_stdout=not (
+                action.tool == _INTERNAL_TOOL
+                and command_items[1:2] == ["pull-request-description"]
+            ),
         )
     elif is_basedpyright_tool(action.tool or ""):
         assert action.tool is not None
@@ -3814,6 +3851,7 @@ def _execute_shell_tool(
     stderr: TextIO,
     verbose: bool,
     announce: bool = True,
+    print_stdout: bool = True,
 ) -> dict[str, Any]:
     command = parameters.get("command")
     if isinstance(command, str):
@@ -3880,10 +3918,11 @@ def _execute_shell_tool(
         env=env,
     )
     if process.stdout:
-        print(process.stdout, end="", file=stdout)
-        _verbose_print(
-            stderr, verbose, f"Shell tool stdout:\n{process.stdout.rstrip()}"
-        )
+        if print_stdout:
+            print(process.stdout, end="", file=stdout)
+            _verbose_print(
+                stderr, verbose, f"Shell tool stdout:\n{process.stdout.rstrip()}"
+            )
     if process.stderr:
         print(process.stderr, end="", file=stderr)
     _verbose_print(

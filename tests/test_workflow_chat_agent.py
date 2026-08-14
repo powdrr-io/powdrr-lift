@@ -6178,6 +6178,39 @@ def test_execute_shell_tool_verbose_prints_stdout(
     assert "[verbose] Shell tool stdout:\ntool stdout" in stderr.getvalue()
 
 
+def test_execute_shell_tool_can_suppress_stdout_without_losing_result(
+    tmp_path: Path,
+) -> None:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+        run.return_value.returncode = 0
+        run.return_value.stdout = "generated PR template\n"
+        run.return_value.stderr = ""
+
+        result = _execute_shell_tool(
+            {
+                "command": [
+                    "powdrr-lift",
+                    "pull-request-description",
+                    "--kind",
+                    "feature",
+                ]
+            },
+            worktree_root=tmp_path,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=True,
+            announce=False,
+            print_stdout=False,
+        )
+
+    assert stdout.getvalue() == ""
+    assert "generated PR template" not in stderr.getvalue()
+    assert result["stdout"] == "generated PR template\n"
+
+
 def test_resolve_api_key_prefers_env_over_codex_auth(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

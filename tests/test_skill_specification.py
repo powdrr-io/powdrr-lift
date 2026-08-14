@@ -341,6 +341,12 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
     assert skill.steps[12].uses_skills == ("finish-pr-prep",)
+    assert "do not print the template or completed PR body" in (
+        skill.steps[13].details or ""
+    )
+    assert "Do not report this step complete until the GitHub command succeeds" in (
+        skill.steps[13].details or ""
+    )
     assert [invocation.command for invocation in skill.steps[13].tool_invocations] == [
         (
             "powdrr-lift",

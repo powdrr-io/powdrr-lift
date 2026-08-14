@@ -130,9 +130,8 @@ steps:
     - --check
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
 - description: Stage the validated project-structure artifact.
   llm_type: simple_task
   details: >-
@@ -143,9 +142,8 @@ steps:
   tool_invocations:
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
   - tool: shell
     command:
     - git
@@ -173,9 +171,8 @@ steps:
   tool_invocations:
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
   - tool: shell
     command:
     - git

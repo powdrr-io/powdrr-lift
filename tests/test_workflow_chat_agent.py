@@ -5915,8 +5915,20 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
         )
 
     assert run.call_args.args[0] == "rtk git status"
+    assert run.call_args.kwargs["cwd"] == tmp_path.resolve()
     assert "Invoking" not in stdout.getvalue()
     assert "Invoking" not in stderr.getvalue()
+
+
+def test_execute_shell_tool_rejects_cwd_outside_worktree(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="must stay within the current worktree"):
+        _execute_shell_tool(
+            {"command": ["pwd"], "cwd": str(tmp_path.parent)},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+        )
 
 
 def test_execute_shell_tool_verbose_prints_stdout(

@@ -99,9 +99,8 @@ steps:
     - --check
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
 - description: Run finish-pr-prep on the final staged changes.
   llm_type: fast_iteration
   details: >-
@@ -125,9 +124,8 @@ steps:
   tool_invocations:
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
   - tool: shell
     command:
     - git

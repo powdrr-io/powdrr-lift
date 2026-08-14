@@ -26,9 +26,8 @@ steps:
     label: pr-prep
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state
   - tool: shell
     command:
     - git
@@ -53,6 +52,5 @@ steps:
   tool_invocations:
   - tool: shell
     command:
-    - git
-    - status
-    - --short
+    - powdrr-lift
+    - repository-state

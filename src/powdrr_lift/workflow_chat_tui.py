@@ -13,7 +13,7 @@ from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import ScrollableContainer
-from textual.events import Key
+from textual.events import Key, Resize
 from textual.widgets import Label, ListItem, ListView, TextArea
 
 from powdrr_lift.workflow_chat_agent import (
@@ -192,7 +192,6 @@ class WorkflowChatApp(App[None]):
         width: 100%;
         height: auto;
         min-height: 3;
-        max-height: 30;
         border: round $primary;
         margin: 0;
     }
@@ -344,17 +343,23 @@ class WorkflowChatApp(App[None]):
 
     @on(TextArea.Changed, "#response")
     def _on_response_changed(self, event: TextArea.Changed) -> None:
-        self._resize_text_area(event.text_area, max_height=30)
+        self._resize_text_area(event.text_area)
+
+    @on(Resize)
+    def _on_response_resized(self, event: Resize) -> None:
+        _ = event
+        if self._response is not None:
+            self._resize_text_area(self._response)
 
     @staticmethod
-    def _resize_text_area(text_area: TextArea, *, max_height: int) -> None:
+    def _resize_text_area(text_area: TextArea) -> None:
         """Keep entered text visible, including wrapped long lines."""
         width = max(text_area.size.width - 4, 20)
         line_count = sum(
             max(1, ceil(len(line) / width))
             for line in (text_area.text.splitlines() or [""])
         )
-        text_area.styles.height = min(max(3, line_count + 2), max_height)
+        text_area.styles.height = max(3, line_count + 2)
 
     def _submit_response(self) -> None:
         if self._response is None or self._response.disabled:

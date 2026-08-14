@@ -1069,6 +1069,14 @@ class LocalModelRuntimeError(RuntimeError):
     """Raised when the required local GPU model cannot run."""
 
 
+class _WorkflowEditRangeError(RuntimeError):
+    """Raised when a line-based edit falls outside the current file."""
+
+
+class _WorkflowStructuredDocumentError(RuntimeError):
+    """Raised when an edit produces invalid structured document text."""
+
+
 class _WorkflowProgressDisplay:
     def __init__(
         self,
@@ -1575,17 +1583,10 @@ def run_workflow_chat(
                 worktree_root,
                 execution_state.current_file_path,
             )
-            line_count_feedback = ""
-            if current_file_context and current_file_context.get("exists"):
-                line_count_feedback = (
-                    " The current file has "
-                    f"{current_file_context['line_count']} lines; every edit "
-                    "range must stay within that line count."
-                )
-            feedback = (
-                f"Workflow {action.kind} action failed: {exc}. "
-                "Re-read the current file context and return a corrected action."
-                f"{line_count_feedback}"
+            feedback = _workflow_edit_failure_feedback(
+                action,
+                exc,
+                current_file_context,
             )
             print(feedback, file=stderr)
             execution_state.transcript.append(
@@ -2627,6 +2628,11 @@ def _action_system_prompt() -> str:
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
+        "For YAML or JSON edits, preserve the surrounding document structure. "
+        "When replacing a list item, start at the list item rather than its "
+        "mapping key (for example, preserve `entities:` above `- id: ...`). "
+        "After composing all line edits, ensure the complete resulting document "
+        "remains valid before returning the action.\n"
         "When edit is available, current_file includes the file path and its "
         "current contents as context.\n"
         "Use invoke_skill for a listed nested skill; it runs in the same worktree "
@@ -4550,7 +4556,7 @@ def _validate_structured_document_text(path: Path, text: str) -> None:
         try:
             json.loads(text)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
+            raise _WorkflowStructuredDocumentError(
                 f"Edited JSON file {path} is invalid at line {exc.lineno}, "
                 f"column {exc.colno}: {exc.msg}. Correct the JSON before "
                 "continuing."
@@ -4567,7 +4573,7 @@ def _validate_structured_document_text(path: Path, text: str) -> None:
             else:
                 location = "an unknown location"
             problem = getattr(exc, "problem", None) or str(exc)
-            raise RuntimeError(
+            raise _WorkflowStructuredDocumentError(
                 f"Edited YAML file {path} is invalid at {location}: {problem}. "
                 "Correct the YAML before continuing."
             ) from exc
@@ -4635,7 +4641,7 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
         start_index = edit.start_line - 1
         if edit.kind == "add":
             if start_index > len(lines):
-                raise RuntimeError(
+                raise _WorkflowEditRangeError(
                     "Workflow edit action add start_line "
                     f"{edit.start_line} is beyond the end of the file, which has "
                     f"{len(lines)} lines."
@@ -4647,7 +4653,7 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
         end_line = edit.end_line if edit.end_line is not None else edit.start_line
         end_index = end_line
         if end_index > len(lines):
-            raise RuntimeError(
+            raise _WorkflowEditRangeError(
                 "Workflow edit action range ends at line "
                 f"{end_line}, but the file has {len(lines)} lines."
             )
@@ -4662,6 +4668,32 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
     if not lines:
         return ""
     return "\n".join(lines) + "\n"
+
+
+def _workflow_edit_failure_feedback(
+    action: SkillChatAction,
+    error: Exception,
+    current_file_context: dict[str, Any] | None,
+) -> str:
+    feedback = (
+        f"Workflow {action.kind} action failed: {error}. "
+        "Re-read the current file context and return a corrected action."
+    )
+    if isinstance(error, _WorkflowEditRangeError):
+        if current_file_context and current_file_context.get("exists"):
+            feedback += (
+                " The current file has "
+                f"{current_file_context['line_count']} lines; every edit range "
+                "must stay within that line count."
+            )
+    elif isinstance(error, _WorkflowStructuredDocumentError):
+        feedback += (
+            " The edit range was within the file, but the resulting structured "
+            "document is invalid. Preserve surrounding mapping keys and YAML "
+            "indentation, such as section headers like `entities:`; correct the "
+            "document before retrying."
+        )
+    return feedback
 
 
 def _edit_sort_key(edit: SkillChatEdit) -> tuple[int, int]:

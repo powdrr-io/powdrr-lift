@@ -92,14 +92,18 @@ class Skill:
     name: str
     when_to_use: tuple[str, ...]
     steps: tuple[SkillStep, ...]
-    adversarial: bool = False
+    adversarial: bool | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "when_to_use": list(self.when_to_use),
             "steps": [step.to_data() for step in self.steps],
-            **({"adversarial": True} if self.adversarial else {}),
+            **(
+                {"adversarial": self.adversarial}
+                if self.adversarial is not None
+                else {}
+            ),
         }
 
     def to_json(self) -> str:
@@ -150,8 +154,8 @@ def skill_from_data(data: Mapping[str, Any]) -> Skill:
     name = _required_string(data, "name")
     when_to_use = _required_string_sequence(data, "when_to_use")
     steps = _parse_steps(data.get("steps"))
-    adversarial = data.get("adversarial", False)
-    if not isinstance(adversarial, bool):
+    adversarial = data.get("adversarial")
+    if adversarial is not None and not isinstance(adversarial, bool):
         raise ValueError("Skill adversarial must be a boolean.")
     return Skill(
         name=name,
@@ -258,8 +262,8 @@ def build_skill_validation_report(
             )
         )
 
-    adversarial = raw_skill.get("adversarial", False)
-    if not isinstance(adversarial, bool):
+    adversarial = raw_skill.get("adversarial")
+    if adversarial is not None and not isinstance(adversarial, bool):
         issues.append(
             SkillValidationIssue(
                 code="invalid_adversarial_type",

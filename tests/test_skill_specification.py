@@ -157,13 +157,34 @@ def test_skill_validation_reports_yaml_parse_errors_as_yaml(tmp_path: Path) -> N
     assert "Could not parse YAML skill document" in report.issues[0].message
 
 
-def test_skill_validation_accepts_adversarial_boolean() -> None:
+def test_skill_validation_accepts_adversarial_values() -> None:
     report = build_skill_validation_report(
         "name: adversarial\n"
         "adversarial: true\n"
         "when_to_use: [review]\n"
         "steps: [{description: challenge}]\n",
         source_path=Path("adversarial.yaml"),
+    )
+
+    assert report.validation_successful is True
+
+    assert (
+        load_skill(
+            Path(__file__).resolve().parents[1]
+            / "skill-definitions"
+            / "adversarial-pr-review.yaml"
+        ).adversarial
+        is True
+    )
+
+
+def test_skill_validation_accepts_inherited_adversarial_value() -> None:
+    report = build_skill_validation_report(
+        "name: inherited\n"
+        "adversarial: null\n"
+        "when_to_use: [review]\n"
+        "steps: [{description: challenge}]\n",
+        source_path=Path("inherited.yaml"),
     )
 
     assert report.validation_successful is True

@@ -290,6 +290,10 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "<type>",
     )
     assert skill.steps[4].uses_skills == ("review-architecture",)
+    assert "choose `next_step` immediately" in (skill.steps[2].details or "")
+    assert "choose `next_step` immediately" in (skill.steps[4].details or "")
+    assert "invoke its validator once" in (skill.steps[5].details or "")
+    assert "choose `next_step` immediately" in (skill.steps[9].details or "")
     assert skill.steps[4].tool_invocations[0].command == (
         "powdrr-lift",
         "evaluate-architecture-specification",
@@ -718,6 +722,13 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
         "--work-item-name",
         "<work-item-name>",
     )
+    assert skill.steps[3].details == (
+        "Invoke the listed system validator exactly once after the specification "
+        "edits. If it succeeds, use its result to confirm that no inconsistencies "
+        "remain and choose `next_step` immediately. If it reports validation "
+        "errors, edit the specification to address them before invoking the "
+        "validator again; never repeat the same validation command unchanged."
+    )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
         "evaluate-system-specification",
@@ -762,6 +773,14 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "Compare the gathered entity model against the new needs. If the "
         "existing spec already covers them, report that no update is needed "
         "and stop."
+    )
+    assert skill.steps[3].details == (
+        "Invoke the listed architecture validator exactly once after the "
+        "specification edits. If it succeeds, use its result to confirm that "
+        "no inconsistencies remain and choose `next_step` immediately. If it "
+        "reports validation errors, edit the specification to address them "
+        "before invoking the validator again; never repeat the same validation "
+        "command unchanged."
     )
     assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",

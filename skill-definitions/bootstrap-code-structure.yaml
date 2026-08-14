@@ -105,9 +105,11 @@ steps:
     that every listed tool has a command, a non-empty `labels` list, and every
     module has a purpose and location. Confirm that testing, linting, and
     formatting tools have the `pr-prep` label unless their evidence explicitly
-    supports ad hoc or one-off use. Fix any validator failures or
-    inconsistencies and repeat validation until the schema validator succeeds.
-    Do not run a
+    supports ad hoc or one-off use. Invoke the validator once for the current
+    artifact, then run the conflict-marker and diff checks once. If any check
+    fails, edit or restage the affected artifact before rerunning that check;
+    never repeat an unchanged command. After all checks succeed, record the
+    results and choose `next_step` immediately. Do not run a
     feature-specific architecture validator or require a feature/work-item
     name.
   tool_invocations:

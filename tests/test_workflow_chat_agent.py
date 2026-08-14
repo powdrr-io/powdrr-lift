@@ -2499,6 +2499,16 @@ def test_workflow_execution_skips_repeated_no_progress_tool_step(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        lambda *_args, **_kwargs: {
+            "command": "rtk printf same",
+            "cwd": str(repo_root),
+            "returncode": 0,
+            "stdout": "same",
+            "stderr": "",
+        },
+    )
 
     stderr = io.StringIO()
     exit_code = run_workflow_chat(

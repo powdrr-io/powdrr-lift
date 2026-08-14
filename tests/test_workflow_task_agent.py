@@ -19,6 +19,7 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.workflow_chat_agent import LLMModelLimits, _action_system_prompt
 from powdrr_lift.workflow_task_agent import (
+    WorkflowTaskAction,
     WorkflowTaskAgentConfig,
     _build_zai_client,
     _handle_exhausted_timeout,
@@ -78,6 +79,12 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     prompt = client.messages[0][1]["content"]
     assert client.messages[0][0]["content"] == _action_system_prompt()
     assert '"execution_mode": "process_workflow_task"' in prompt
+
+
+def test_task_runner_uses_the_shared_workflow_action_contract() -> None:
+    from powdrr_lift.workflow_chat_agent import SkillChatAction
+
+    assert WorkflowTaskAction is SkillChatAction
 
 
 def test_process_workflow_task_runs_nested_skill_in_same_worktree(
@@ -365,7 +372,7 @@ def test_process_workflow_task_retries_llm_timeouts_with_backoff(
         return {"kind": "complete", "output_state": {"version": "v2"}}
 
     client.complete_json = _complete  # type: ignore[method-assign]
-    monkeypatch.setattr("powdrr_lift.workflow_task_agent.time.sleep", sleeps.append)
+    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
     stderr = io.StringIO()
 
     exit_code = run_workflow_task(

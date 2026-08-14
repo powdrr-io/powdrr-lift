@@ -4,10 +4,9 @@ import json
 import os
 import re
 import subprocess
-import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Protocol, TextIO
+from typing import Any, TextIO
 
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -33,7 +32,6 @@ from powdrr_lift.workflow_chat_agent import (
     ZAI_LLM_MAPPINGS,
     LocalLlamaChatClient,
     SkillCatalogEntry,
-    SkillChatAction,
     _action_system_prompt,
     _apply_file_edits,
     _build_step_execution_messages,
@@ -54,17 +52,19 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _resolve_worktree_file_path,
     _validate_internal_command,
-    _workflow_action_signature,
 )
-from powdrr_lift.workflow_execution import (
+from powdrr_lift.workflow_llm import (
     ProgressDecision,
-    WorkflowExecutionController,
-    no_progress_feedback,
+    WorkflowAction,
+    WorkflowLLMActionEngine,
+    WorkflowLLMClient,
+    WorkflowLLMTimeoutExhausted,
+    complete_json_with_timeout_retry,
+    prune_execution_events,
+    workflow_action_signature,
 )
 
-
-class WorkflowTaskChatClient(Protocol):
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
+WorkflowTaskChatClient = WorkflowLLMClient
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,27 +81,7 @@ class WorkflowTaskAgentConfig:
     verbose: bool = False
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowTaskAction:
-    kind: str
-    tool: str = "shell"
-    skill_name: str | None = None
-    file_path: str | None = None
-    start_line: int | None = None
-    end_line: int | None = None
-    edits: tuple[Any, ...] = ()
-    file_edits: tuple[Any, ...] = ()
-    types: tuple[str, ...] = ()
-    keywords: tuple[str, ...] = ()
-    filters: dict[str, object] = field(default_factory=dict)
-    output_state: Any = None
-    text: str | None = None
-    parameters: dict[str, Any] = field(default_factory=dict)
-    human_input: dict[str, Any] | None = None
-    decisions_and_context: str | None = None
-    provider_role: Literal["normal", "adversarial"] | None = None
-    clean: bool = False
-    context: tuple[str, ...] = ()
+WorkflowTaskAction = WorkflowAction
 
 
 def run_workflow_task(
@@ -171,7 +151,9 @@ def run_workflow_task(
     events: list[dict[str, Any]] = []
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
-    progress_controller = WorkflowExecutionController(config.max_stalled_roundtrips)
+    action_engine = WorkflowLLMActionEngine(
+        max_stalled_roundtrips=config.max_stalled_roundtrips
+    )
     for _roundtrip in range(max(1, config.max_roundtrips)):
         messages = _build_task_messages(
             workflow,
@@ -209,7 +191,7 @@ def run_workflow_task(
                         timeout_backoff_seconds=config.timeout_backoff_seconds,
                     )
                 )
-            except _WorkflowTaskTimeoutExhausted as exc:
+            except WorkflowLLMTimeoutExhausted as exc:
                 return _handle_exhausted_timeout(
                     repo_root,
                     task,
@@ -236,16 +218,17 @@ def run_workflow_task(
         _print_waiting_for_model(stderr, model)
         response: dict[str, Any] | None = None
         try:
-            response = _complete_task_json_with_timeout_retry(
-                client,
-                messages,
+            action = action_engine.request_action(
+                client=client,
+                messages=messages,
+                parser=_parse_task_action,
                 model=model,
                 stderr=stderr,
                 max_timeout_retries=config.max_timeout_retries,
                 timeout_backoff_seconds=config.timeout_backoff_seconds,
             )
-            action = _parse_task_action(response)
-        except _WorkflowTaskTimeoutExhausted as exc:
+            response = action_engine.last_payload
+        except WorkflowLLMTimeoutExhausted as exc:
             return _handle_exhausted_timeout(
                 repo_root,
                 task,
@@ -256,6 +239,7 @@ def run_workflow_task(
         except RuntimeError as exc:
             if not _is_repairable_task_response_error(exc):
                 raise
+            response = action_engine.last_payload
             if response is not None:
                 response_details = json.dumps(
                     response,
@@ -289,32 +273,7 @@ def run_workflow_task(
             )
             continue
         response_correction = None
-        action_signature = _task_action_signature(action)
-        action_progress = _task_action_made_progress(
-            action,
-            previous_action_signature=progress_controller.previous_action_signature,
-        )
-        progress_decision = progress_controller.observe(
-            action_signature,
-            made_progress=action_progress,
-        )
-        if progress_decision == ProgressDecision.THRESHOLD:
-            no_progress_message = no_progress_feedback(action_signature)
-            events.append(
-                {
-                    "kind": "no_progress",
-                    "action_kind": action.kind,
-                    "message": no_progress_message,
-                }
-            )
-            print(
-                "Workflow task action made no progress; requesting a different "
-                "action from the LLM.",
-                file=stderr,
-            )
-            response_correction = no_progress_message
-            progress_controller.reset()
-            continue
+        before_action_state = _task_action_material_state(action, repo_root)
         result: Any
         if action.kind == "gather_context":
             report = gather_specification_context(
@@ -332,6 +291,14 @@ def run_workflow_task(
                     "result": json.loads(render_gather_context_report(report)),
                 }
             )
+            response_correction = _record_task_action_progress(
+                action_engine,
+                action,
+                before_state=before_action_state,
+                repo_root=repo_root,
+                events=events,
+                stderr=stderr,
+            )
             continue
         if action.kind == "next_step":
             events.append(
@@ -340,15 +307,21 @@ def run_workflow_task(
                     "decisions_and_context": action.decisions_and_context,
                 }
             )
+            response_correction = _record_task_action_progress(
+                action_engine,
+                action,
+                before_state=before_action_state,
+                repo_root=repo_root,
+                events=events,
+                stderr=stderr,
+            )
             continue
         if action.kind == "read_document":
             try:
                 result = _read_task_document(action, repo_root)
             except (RuntimeError, ValueError) as exc:
                 response_correction = _action_response_correction(action, exc)
-                if _task_action_failure_reached(
-                    progress_controller, action, stderr=stderr
-                ):
+                if _task_action_failure_reached(action_engine, action, stderr=stderr):
                     return 1
                 events.append(
                     {
@@ -364,15 +337,21 @@ def run_workflow_task(
                 )
                 continue
             events.append({"kind": action.kind, "result": result})
+            response_correction = _record_task_action_progress(
+                action_engine,
+                action,
+                before_state=before_action_state,
+                repo_root=repo_root,
+                events=events,
+                stderr=stderr,
+            )
             continue
         if action.kind == "edit":
             try:
                 result = _apply_task_edits(action, repo_root)
             except (RuntimeError, ValueError) as exc:
                 response_correction = _action_response_correction(action, exc)
-                if _task_action_failure_reached(
-                    progress_controller, action, stderr=stderr
-                ):
+                if _task_action_failure_reached(action_engine, action, stderr=stderr):
                     return 1
                 events.append(
                     {
@@ -388,6 +367,14 @@ def run_workflow_task(
                 )
                 continue
             events.append({"kind": action.kind, "result": result})
+            response_correction = _record_task_action_progress(
+                action_engine,
+                action,
+                before_state=before_action_state,
+                repo_root=repo_root,
+                events=events,
+                stderr=stderr,
+            )
             continue
         if action.kind == "prompt_user":
             human_input = _prompt_user_handoff(action, task)
@@ -429,6 +416,14 @@ def run_workflow_task(
                     "skill": action.skill_name,
                     "result": nested_result,
                 }
+            )
+            response_correction = _record_task_action_progress(
+                action_engine,
+                action,
+                before_state=before_action_state,
+                repo_root=repo_root,
+                events=events,
+                stderr=stderr,
             )
             continue
         if action.kind == "invoke_tool":
@@ -477,7 +472,7 @@ def run_workflow_task(
                             action.parameters,
                             worktree_root=repo_root,
                         )
-                    elif is_basedpyright_tool(action.tool):
+                    elif action.tool is not None and is_basedpyright_tool(action.tool):
                         result = execute_basedpyright_tool(
                             action.tool,
                             action.parameters,
@@ -492,7 +487,7 @@ def run_workflow_task(
                 except (RuntimeError, ValueError) as exc:
                     response_correction = _action_response_correction(action, exc)
                     if _task_action_failure_reached(
-                        progress_controller, action, stderr=stderr
+                        action_engine, action, stderr=stderr
                     ):
                         return 1
                     events.append(
@@ -516,6 +511,14 @@ def run_workflow_task(
                     "parameters": action.parameters,
                     "result": result,
                 }
+            )
+            response_correction = _record_task_action_progress(
+                action_engine,
+                action,
+                before_state=before_action_state,
+                repo_root=repo_root,
+                events=events,
+                stderr=stderr,
             )
             continue
         if action.kind == "complete":
@@ -753,47 +756,6 @@ def _default_branch(repo_root: Path) -> str:
     return "main"
 
 
-class _WorkflowTaskTimeoutExhausted(RuntimeError):
-    pass
-
-
-def _complete_task_json_with_timeout_retry(
-    client: WorkflowTaskChatClient,
-    messages: list[dict[str, str]],
-    *,
-    model: str,
-    stderr: TextIO,
-    max_timeout_retries: int,
-    timeout_backoff_seconds: float,
-) -> dict[str, Any]:
-    timeout_retries = 0
-    while True:
-        try:
-            return client.complete_json(messages)
-        except RuntimeError as exc:
-            if not _is_timeout_error(exc):
-                raise
-            if timeout_retries >= max(0, max_timeout_retries):
-                raise _WorkflowTaskTimeoutExhausted(
-                    f"LLM request timed out after {timeout_retries} retries: {exc}"
-                ) from exc
-            timeout_retries += 1
-            delay_seconds = timeout_backoff_seconds * (2 ** (timeout_retries - 1))
-            print(
-                f"LLM request timed out for {model}; retrying in "
-                f"{delay_seconds:g} seconds "
-                f"(retry {timeout_retries}/{max_timeout_retries}).",
-                file=stderr,
-                flush=True,
-            )
-            time.sleep(delay_seconds)
-
-
-def _is_timeout_error(error: RuntimeError) -> bool:
-    message = str(error).casefold()
-    return "timed out" in message or "timeout" in message
-
-
 def _handle_exhausted_timeout(
     repo_root: Path,
     task: WorkflowTask,
@@ -856,7 +818,7 @@ def _build_task_messages(
     if compacted_context is None:
         context_data = {
             "task_context": workflow.task_context(task.task_id),
-            "events": events,
+            "events": prune_execution_events(events, include_results=True),
         }
     else:
         context_data = {"compacted_context": compacted_context}
@@ -977,7 +939,7 @@ def _compact_workflow_task_context(
         file=stderr,
         flush=True,
     )
-    response = _complete_task_json_with_timeout_retry(
+    response = complete_json_with_timeout_retry(
         client,
         compaction_messages,
         model="context-compaction",
@@ -1044,30 +1006,84 @@ def _action_response_correction(
     return correction
 
 
-def _task_action_signature(action: WorkflowTaskAction) -> str:
-    return json.dumps(asdict(action), sort_keys=True, ensure_ascii=False)
+def _task_action_material_state(
+    action: WorkflowTaskAction,
+    repo_root: Path,
+) -> tuple[tuple[str, str | None], ...] | None:
+    """Return the stable state that a repeat of this action may change.
+
+    This intentionally avoids a repository-wide ``git status`` scan for every
+    action.  Edits are the only action whose target is known in advance; tool
+    output and event logging are context, not material progress.
+    """
+    if action.kind != "edit":
+        return None
+    file_paths = (
+        tuple(group.file_path for group in action.file_edits)
+        if action.file_edits
+        else ((action.file_path,) if action.file_path is not None else ())
+    )
+    if not file_paths:
+        return None
+    material_state: list[tuple[str, str | None]] = []
+    for file_path in file_paths:
+        path = _resolve_worktree_file_path(file_path, repo_root)
+        material_state.append(
+            (
+                str(path),
+                path.read_text(encoding="utf-8") if path.exists() else None,
+            )
+        )
+    return tuple(material_state)
 
 
-def _task_action_made_progress(
+def _record_task_action_progress(
+    action_engine: WorkflowLLMActionEngine,
     action: WorkflowTaskAction,
     *,
-    previous_action_signature: str | None,
-) -> bool:
-    if action.kind in {"complete", "next_step", "gather_context"}:
-        return True
-    if previous_action_signature is None:
-        return True
-    return _task_action_signature(action) != previous_action_signature
+    before_state: object,
+    repo_root: Path,
+    events: list[dict[str, Any]],
+    stderr: TextIO,
+) -> str | None:
+    """Record the action through the same no-progress policy as chat."""
+    observation = action_engine.observe_action(
+        action,
+        signature=workflow_action_signature,
+        before_state=before_state,
+        after_state=_task_action_material_state(action, repo_root),
+    )
+    if observation.made_progress:
+        return None
+    assert observation.correction is not None
+    events.append(
+        {
+            "kind": "no_progress",
+            "action_kind": action.kind,
+            "message": observation.correction,
+        }
+    )
+    print(
+        "Workflow task action made no progress; requesting a different action "
+        "from the LLM.",
+        file=stderr,
+    )
+    if observation.decision == ProgressDecision.THRESHOLD:
+        action_engine.reset_progress()
+    return observation.correction
 
 
 def _task_action_failure_reached(
-    controller: WorkflowExecutionController,
+    action_engine: WorkflowLLMActionEngine,
     action: WorkflowTaskAction,
     *,
     stderr: TextIO,
 ) -> bool:
     if (
-        controller.record_failure(_task_action_signature(action))
+        action_engine.record_action_failure(
+            action,
+            signature=workflow_action_signature,
+        )
         != ProgressDecision.THRESHOLD
     ):
         return False
@@ -1170,9 +1186,7 @@ def _parse_task_action(payload: dict[str, Any]) -> WorkflowTaskAction:
     normalized_payload = dict(payload)
     if normalized_kind == "invoke_tool" and "tool" not in normalized_payload:
         normalized_payload["tool"] = "shell"
-    return _workflow_task_action_from_skill_action(
-        _parse_action_response(normalized_payload)
-    )
+    return _parse_action_response(normalized_payload)
 
 
 def _run_skill_for_agent(
@@ -1195,7 +1209,7 @@ def _run_skill_for_agent(
         f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
         task.details or "",
     ]
-    progress_controller = WorkflowExecutionController(3)
+    action_engine = WorkflowLLMActionEngine(max_stalled_roundtrips=3)
     while stack:
         current_skill, step_index = stack[-1]
         if step_index >= len(current_skill.skill.steps):
@@ -1213,23 +1227,22 @@ def _run_skill_for_agent(
             worktree_root=repo_root,
             catalog=catalog,
         )
-        response = _complete_task_json_with_timeout_retry(
-            client,
-            messages,
+        action = action_engine.request_action(
+            client=client,
+            messages=messages,
+            parser=_parse_action_response,
             model="nested-skill",
             stderr=stderr,
             max_timeout_retries=max_timeout_retries,
             timeout_backoff_seconds=timeout_backoff_seconds,
         )
-        action = _parse_action_response(response)
-        action_signature = _workflow_action_signature(action)
-        progress_decision = progress_controller.observe(
-            action_signature,
-            made_progress=action.kind in {"complete", "next_step", "gather_context"}
-            or progress_controller.previous_action_signature is None
-            or action_signature != progress_controller.previous_action_signature,
+        observation = action_engine.observe_action(
+            action,
+            signature=workflow_action_signature,
+            before_state=None,
+            after_state=None,
         )
-        if progress_decision == ProgressDecision.THRESHOLD:
+        if observation.decision == ProgressDecision.THRESHOLD:
             execution_events.append(
                 {
                     "kind": "no_progress",
@@ -1241,7 +1254,7 @@ def _run_skill_for_agent(
                 "The previous nested workflow action made no progress; choose "
                 "a different action or next_step."
             )
-            progress_controller.reset()
+            action_engine.reset_progress()
             continue
         if action.kind == "complete":
             stack.pop()
@@ -1280,20 +1293,18 @@ def _run_skill_for_agent(
             )
             continue
         if action.kind == "read_document":
-            task_action = _workflow_task_action_from_skill_action(action)
             execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": _read_task_document(task_action, repo_root),
+                    "result": _read_task_document(action, repo_root),
                 }
             )
             continue
         if action.kind == "edit":
-            task_action = _workflow_task_action_from_skill_action(action)
             execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": _apply_task_edits(task_action, repo_root),
+                    "result": _apply_task_edits(action, repo_root),
                 }
             )
             continue
@@ -1368,15 +1379,14 @@ def _apply_task_edits(
     action: WorkflowTaskAction,
     repo_root: Path,
 ) -> list[dict[str, Any]]:
-    groups = action.file_edits
-    if not groups:
+    if action.file_edits:
+        edit_groups = [(group.file_path, group.edits) for group in action.file_edits]
+    else:
         if action.file_path is None:
             raise RuntimeError("edit action must include a file path.")
-        groups = ((action.file_path, action.edits),)
+        edit_groups = [(action.file_path, action.edits)]
     results: list[dict[str, Any]] = []
-    for group in groups:
-        file_path = group[0] if isinstance(group, tuple) else group.file_path
-        edits = group[1] if isinstance(group, tuple) else group.edits
+    for file_path, edits in edit_groups:
         path = _resolve_worktree_file_path(file_path, repo_root)
         current = path.read_text(encoding="utf-8") if path.exists() else ""
         updated = _apply_file_edits(current, edits)
@@ -1414,31 +1424,6 @@ def _prompt_user_handoff(
             "output_state_type": task.output_state_type,
         },
     }
-
-
-def _workflow_task_action_from_skill_action(
-    action: SkillChatAction,
-) -> WorkflowTaskAction:
-    return WorkflowTaskAction(
-        kind=action.kind,
-        tool=action.tool or "shell",
-        skill_name=action.skill_name,
-        file_path=action.file_path,
-        start_line=action.start_line,
-        end_line=action.end_line,
-        edits=action.edits,
-        file_edits=action.file_edits,
-        types=action.types,
-        keywords=action.keywords,
-        filters=action.filters,
-        output_state=action.output_state,
-        text=action.text,
-        parameters=action.parameters,
-        decisions_and_context=action.decisions_and_context,
-        provider_role=action.provider_role,
-        clean=action.clean,
-        context=action.context,
-    )
 
 
 def _parse_human_input(value: object) -> dict[str, Any]:

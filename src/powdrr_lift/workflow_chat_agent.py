@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, Protocol, TextIO, cast
+from typing import Any, Literal, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -60,10 +60,26 @@ from powdrr_lift.core.validation_messages import (
     validation_error_to_data,
 )
 from powdrr_lift.fuzzy_match import fuzzy_match_json
-from powdrr_lift.workflow_execution import (
+from powdrr_lift.workflow_llm import (
     ProgressDecision,
-    WorkflowExecutionController,
-    no_progress_feedback,
+    WorkflowLLMActionEngine,
+    WorkflowLLMClient,
+    prune_execution_events,
+)
+from powdrr_lift.workflow_llm import (
+    WorkflowAction as SkillChatAction,
+)
+from powdrr_lift.workflow_llm import (
+    WorkflowEdit as SkillChatEdit,
+)
+from powdrr_lift.workflow_llm import (
+    WorkflowFileEdits as SkillChatFileEdits,
+)
+from powdrr_lift.workflow_llm import (
+    complete_json as _request_json,
+)
+from powdrr_lift.workflow_llm import (
+    workflow_action_signature as _shared_workflow_action_signature,
 )
 
 _DEFAULT_MODEL = "glm-5.2"
@@ -400,43 +416,6 @@ WorkflowChatResult = SkillChatResult
 WorkflowChatSelection = SkillChatSelection
 
 
-@dataclass(frozen=True, slots=True)
-class SkillChatAction:
-    kind: str
-    tool: str | None = None
-    skill_name: str | None = None
-    file_path: str | None = None
-    start_line: int | None = None
-    end_line: int | None = None
-    text: str | None = None
-    output_state: Any = None
-    parameters: dict[str, Any] = field(default_factory=dict)
-    edits: tuple[SkillChatEdit, ...] = field(default_factory=tuple)
-    file_edits: tuple[SkillChatFileEdits, ...] = field(default_factory=tuple)
-    types: tuple[str, ...] = field(default_factory=tuple)
-    keywords: tuple[str, ...] = field(default_factory=tuple)
-    filters: dict[str, object] = field(default_factory=dict)
-    decisions_and_context: str | None = None
-    llm_type: str | None = None
-    provider_role: LLMProviderRole | None = None
-    clean: bool = False
-    context: tuple[str, ...] = field(default_factory=tuple)
-
-
-@dataclass(frozen=True, slots=True)
-class SkillChatEdit:
-    kind: str
-    start_line: int
-    end_line: int | None = None
-    text: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class SkillChatFileEdits:
-    file_path: str
-    edits: tuple[SkillChatEdit, ...]
-
-
 @dataclass(slots=True)
 class _WorkflowExecutionState:
     selected_skill: SkillCatalogEntry
@@ -523,7 +502,7 @@ class _LLMExchangeRecordingClient:
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         try:
-            response = self._client.complete_json(messages)
+            response = _request_json(self._client, messages)
         except Exception as exc:
             serialized_messages = _client_serialized_messages(
                 self._client,
@@ -1064,8 +1043,7 @@ def _estimate_message_tokens(
     )
 
 
-class WorkflowChatClient(Protocol):
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
+WorkflowChatClient = WorkflowLLMClient
 
 
 class _ModelUnavailableError(RuntimeError):
@@ -1372,7 +1350,9 @@ def run_workflow_chat(
     completed_skill_dependencies: set[tuple[str, int, str]] = set()
     action_handlers = _workflow_action_handlers()
     step_roundtrips = 0
-    progress_controller = WorkflowExecutionController(config.max_stalled_roundtrips)
+    action_engine = WorkflowLLMActionEngine(
+        max_stalled_roundtrips=config.max_stalled_roundtrips
+    )
     last_failed_action: SkillChatAction | None = None
     last_validation_error: str | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
@@ -1438,9 +1418,6 @@ def run_workflow_chat(
         )
         credentials = _resolve_credentials(provider, config.api_key, config.base_url)
         step_roundtrips += 1
-        before_file_contents = _current_file_contents(execution_state)
-        before_last_user_message = _last_user_message(execution_state)
-        before_context_length = len(execution_state.execution_context)
         _verbose_print(
             stderr,
             config.verbose,
@@ -1609,6 +1586,10 @@ def run_workflow_chat(
                 else None,
             )
 
+        before_action_state = _workflow_action_material_state(
+            action,
+            execution_state,
+        )
         handler = action_handlers.get(action.kind)
         if handler is None:
             raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
@@ -1692,7 +1673,10 @@ def run_workflow_chat(
                 validator_data["message"] if validator_data is not None else None
             )
             if (
-                progress_controller.record_failure(action_signature)
+                action_engine.record_action_failure(
+                    action,
+                    signature=_workflow_action_signature,
+                )
                 == ProgressDecision.THRESHOLD
             ):
                 print(
@@ -1704,25 +1688,15 @@ def run_workflow_chat(
         action_signature = _workflow_action_signature(action)
         last_failed_action = None
         last_validation_error = None
-        made_progress = _workflow_action_made_progress(
+        observation = action_engine.observe_action(
             action,
-            previous_action_signature=progress_controller.previous_action_signature,
-            before_file_contents=before_file_contents,
-            before_last_user_message=before_last_user_message,
-            before_context_length=before_context_length,
-            state=execution_state,
+            signature=_workflow_action_signature,
+            before_state=before_action_state,
+            after_state=_workflow_action_material_state(action, execution_state),
         )
-        if made_progress:
-            progress_decision = progress_controller.observe(
-                action_signature,
-                made_progress=True,
-            )
-        else:
-            progress_decision = progress_controller.observe(
-                action_signature,
-                made_progress=False,
-            )
-            no_progress_message = no_progress_feedback(action_signature)
+        if not observation.made_progress:
+            assert observation.correction is not None
+            no_progress_message = observation.correction
             execution_state.transcript.append(
                 {"role": "user", "content": no_progress_message}
             )
@@ -1732,11 +1706,11 @@ def run_workflow_chat(
                 config.verbose,
                 (
                     f"No progress detected for workflow step "
-                    f"({progress_controller.stalled_roundtrips}/"
+                    f"({action_engine.stalled_roundtrips}/"
                     f"{config.max_stalled_roundtrips})"
                 ),
             )
-            if progress_decision == ProgressDecision.THRESHOLD:
+            if observation.decision == ProgressDecision.THRESHOLD:
                 if action.kind == "invoke_tool":
                     if _workflow_step_requires_pull_request(current_step):
                         warning = (
@@ -1778,7 +1752,7 @@ def run_workflow_chat(
                     )
                     print(warning, file=stderr)
                     execution_state.step_index = current_step_index + 1
-                    progress_controller.reset()
+                    action_engine.reset_progress()
                     if not skill_stack and execution_state.step_index >= len(
                         selected_skill.skill.steps
                     ):
@@ -1798,7 +1772,7 @@ def run_workflow_chat(
                     return 1
         if execution_state.step_index != current_step_index:
             step_roundtrips = 0
-            progress_controller.reset()
+            action_engine.reset_progress()
         if execution_state.step_index >= len(selected_skill.skill.steps):
             if skill_stack:
                 frame = skill_stack.pop()
@@ -2571,10 +2545,7 @@ def _execution_events_for_prompt(
     event stream as metadata while leaving the complete event stream intact
     for persistence and diagnostics.
     """
-    return [
-        {key: value for key, value in event.items() if key != "result"}
-        for event in execution_events
-    ]
+    return prune_execution_events(execution_events, include_results=False)
 
 
 def _prompt_transcript(
@@ -2970,28 +2941,51 @@ def _last_user_message(state: _WorkflowExecutionState) -> str | None:
     return state.transcript[-1]["content"]
 
 
+def _workflow_action_material_state(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+) -> object:
+    """Return only state that proves this action changed the workflow.
+
+    Tool transcript entries are observations, not progress.  Counting them made
+    an unchanged tool call appear productive forever and let the prompt grow
+    without bound.  This mirrors durable task execution's edit-only material
+    state snapshot while retaining the genuinely interactive user response.
+    """
+    if action.kind == "edit":
+        file_paths = (
+            tuple(group.file_path for group in action.file_edits)
+            if action.file_edits
+            else ((action.file_path,) if action.file_path is not None else ())
+        )
+        return tuple(
+            (
+                file_path,
+                (
+                    target_path.read_text(encoding="utf-8")
+                    if (
+                        target_path := _resolve_worktree_file_path(
+                            file_path,
+                            state.worktree_root,
+                        )
+                    ).exists()
+                    else None
+                ),
+            )
+            for file_path in file_paths
+        )
+    if action.kind == "prompt_user":
+        return _last_user_message(state)
+    if action.kind == "read_document":
+        return (
+            str(state.current_file_path) if state.current_file_path else None,
+            _current_file_contents(state),
+        )
+    return None
+
+
 def _workflow_action_signature(action: SkillChatAction) -> str:
-    return json.dumps(
-        {
-            "kind": action.kind,
-            "tool": action.tool,
-            "skill_name": action.skill_name,
-            "file_path": action.file_path,
-            "start_line": action.start_line,
-            "end_line": action.end_line,
-            "text": action.text,
-            "output_state": action.output_state,
-            "parameters": action.parameters,
-            "edits": [_edit_to_data(edit) for edit in action.edits],
-            "file_edits": [_file_edits_to_data(group) for group in action.file_edits],
-            "types": action.types,
-            "keywords": action.keywords,
-            "decisions_and_context": action.decisions_and_context,
-            "llm_type": action.llm_type,
-        },
-        sort_keys=True,
-        ensure_ascii=False,
-    )
+    return _shared_workflow_action_signature(action)
 
 
 def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
@@ -3013,30 +3007,6 @@ def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
             command_line = action.tool or "tool"
         return f"Invoking {command_line}"
     return None
-
-
-def _workflow_action_made_progress(
-    action: SkillChatAction,
-    *,
-    previous_action_signature: str | None,
-    before_file_contents: str | None,
-    before_last_user_message: str | None,
-    before_context_length: int,
-    state: _WorkflowExecutionState,
-) -> bool:
-    if action.kind in {"complete", "next_step"}:
-        return True
-    if previous_action_signature is None:
-        return True
-    if _workflow_action_signature(action) != previous_action_signature:
-        return True
-    if action.kind == "edit":
-        return _current_file_contents(state) != before_file_contents
-    if action.kind == "prompt_user":
-        return _last_user_message(state) != before_last_user_message
-    if action.kind == "read_document":
-        return len(state.execution_context) > before_context_length
-    return False
 
 
 def _workflow_step_requires_pull_request(step: Any) -> bool:
@@ -4353,7 +4323,7 @@ def _complete_json_with_repair(
         )
         _print_waiting_for_model(stderr, model)
         try:
-            payload = client.complete_json(messages)
+            payload = _request_json(client, messages)
             _verbose_json(
                 stderr,
                 config.verbose,
@@ -4380,7 +4350,7 @@ def _complete_json_with_repair(
                     time.sleep(delay_seconds)
                     try:
                         _print_waiting_for_model(stderr, model)
-                        payload = client.complete_json(messages)
+                        payload = _request_json(client, messages)
                         _verbose_json(
                             stderr,
                             config.verbose,
@@ -5133,7 +5103,7 @@ def _attempt_json_repair(
     )
     try:
         _print_waiting_for_model(stderr, model)
-        repaired_payload = client.complete_json(repair_messages)
+        repaired_payload = _request_json(client, repair_messages)
         _verbose_json(
             stderr,
             verbose,

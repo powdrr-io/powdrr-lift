@@ -5,7 +5,7 @@ import os
 import re
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol, TextIO
 
@@ -54,6 +54,10 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_file_path,
     _validate_internal_command,
 )
+from powdrr_lift.workflow_execution import (
+    ProgressDecision,
+    WorkflowExecutionController,
+)
 
 
 class WorkflowTaskChatClient(Protocol):
@@ -68,6 +72,7 @@ class WorkflowTaskAgentConfig:
     api_key: str | None = None
     base_url: str | None = None
     max_roundtrips: int = 12
+    max_stalled_roundtrips: int = 3
     max_timeout_retries: int = 3
     timeout_backoff_seconds: float = 2.0
     verbose: bool = False
@@ -163,6 +168,7 @@ def run_workflow_task(
     events: list[dict[str, Any]] = []
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
+    progress_controller = WorkflowExecutionController(config.max_stalled_roundtrips)
     for _roundtrip in range(max(1, config.max_roundtrips)):
         messages = _build_task_messages(
             workflow,
@@ -280,6 +286,38 @@ def run_workflow_task(
             )
             continue
         response_correction = None
+        action_signature = _task_action_signature(action)
+        action_progress = _task_action_made_progress(
+            action,
+            previous_action_signature=progress_controller.previous_action_signature,
+        )
+        progress_decision = progress_controller.observe(
+            action_signature,
+            made_progress=action_progress,
+        )
+        if progress_decision == ProgressDecision.THRESHOLD:
+            no_progress_feedback = (
+                "The previous workflow task action made no progress because it "
+                "repeated the same action. Do not repeat it unchanged. Choose a "
+                "different action, make a real edit, or choose next_step if the "
+                "current task is satisfied. Repeated action: "
+                f"{action_signature}"
+            )
+            events.append(
+                {
+                    "kind": "no_progress",
+                    "action_kind": action.kind,
+                    "message": no_progress_feedback,
+                }
+            )
+            print(
+                "Workflow task action made no progress; requesting a different "
+                "action from the LLM.",
+                file=stderr,
+            )
+            response_correction = no_progress_feedback
+            progress_controller.reset()
+            continue
         result: Any
         if action.kind == "gather_context":
             report = gather_specification_context(
@@ -311,6 +349,10 @@ def run_workflow_task(
                 result = _read_task_document(action, repo_root)
             except (RuntimeError, ValueError) as exc:
                 response_correction = _action_response_correction(action, exc)
+                if _task_action_failure_reached(
+                    progress_controller, action, stderr=stderr
+                ):
+                    return 1
                 events.append(
                     {
                         "kind": "action_error",
@@ -331,6 +373,10 @@ def run_workflow_task(
                 result = _apply_task_edits(action, repo_root)
             except (RuntimeError, ValueError) as exc:
                 response_correction = _action_response_correction(action, exc)
+                if _task_action_failure_reached(
+                    progress_controller, action, stderr=stderr
+                ):
+                    return 1
                 events.append(
                     {
                         "kind": "action_error",
@@ -448,6 +494,10 @@ def run_workflow_task(
                         )
                 except (RuntimeError, ValueError) as exc:
                     response_correction = _action_response_correction(action, exc)
+                    if _task_action_failure_reached(
+                        progress_controller, action, stderr=stderr
+                    ):
+                        return 1
                     events.append(
                         {
                             "kind": "tool_error",
@@ -993,6 +1043,40 @@ def _action_response_correction(
             "range within the document line count stated in the error."
         )
     return correction
+
+
+def _task_action_signature(action: WorkflowTaskAction) -> str:
+    return json.dumps(asdict(action), sort_keys=True, ensure_ascii=False)
+
+
+def _task_action_made_progress(
+    action: WorkflowTaskAction,
+    *,
+    previous_action_signature: str | None,
+) -> bool:
+    if action.kind in {"complete", "next_step", "gather_context"}:
+        return True
+    if previous_action_signature is None:
+        return True
+    return _task_action_signature(action) != previous_action_signature
+
+
+def _task_action_failure_reached(
+    controller: WorkflowExecutionController,
+    action: WorkflowTaskAction,
+    *,
+    stderr: TextIO,
+) -> bool:
+    if (
+        controller.record_failure(_task_action_signature(action))
+        != ProgressDecision.THRESHOLD
+    ):
+        return False
+    print(
+        "Workflow task stopped after repeated corrective-action failures.",
+        file=stderr,
+    )
+    return True
 
 
 def _task_system_prompt() -> str:

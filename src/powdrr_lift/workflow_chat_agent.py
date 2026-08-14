@@ -60,6 +60,10 @@ from powdrr_lift.core.validation_messages import (
     validation_error_to_data,
 )
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.workflow_execution import (
+    ProgressDecision,
+    WorkflowExecutionController,
+)
 
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
@@ -1367,9 +1371,7 @@ def run_workflow_chat(
     completed_skill_dependencies: set[tuple[str, int, str]] = set()
     action_handlers = _workflow_action_handlers()
     step_roundtrips = 0
-    stalled_roundtrips = 0
-    previous_action_signature: str | None = None
-    failed_action_signature: str | None = None
+    progress_controller = WorkflowExecutionController(config.max_stalled_roundtrips)
     last_failed_action: SkillChatAction | None = None
     last_validation_error: str | None = None
     while execution_state.step_index < len(selected_skill.skill.steps):
@@ -1688,36 +1690,37 @@ def run_workflow_chat(
             last_validation_error = (
                 validator_data["message"] if validator_data is not None else None
             )
-            if action_signature == failed_action_signature:
-                stalled_roundtrips += 1
-            else:
-                stalled_roundtrips = 1
-                failed_action_signature = action_signature
-            if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
+            if (
+                progress_controller.record_failure(action_signature)
+                == ProgressDecision.THRESHOLD
+            ):
                 print(
                     "Workflow stopped after repeated action failures.",
                     file=stderr,
                 )
                 return 1
-            previous_action_signature = None
             continue
         action_signature = _workflow_action_signature(action)
         last_failed_action = None
         last_validation_error = None
         made_progress = _workflow_action_made_progress(
             action,
-            previous_action_signature=previous_action_signature,
+            previous_action_signature=progress_controller.previous_action_signature,
             before_file_contents=before_file_contents,
             before_last_user_message=before_last_user_message,
             before_context_length=before_context_length,
             state=execution_state,
         )
-        previous_action_signature = action_signature
         if made_progress:
-            stalled_roundtrips = 0
-            failed_action_signature = None
+            progress_decision = progress_controller.observe(
+                action_signature,
+                made_progress=True,
+            )
         else:
-            stalled_roundtrips += 1
+            progress_decision = progress_controller.observe(
+                action_signature,
+                made_progress=False,
+            )
             no_progress_feedback = (
                 "The previous workflow action made no progress because it repeated "
                 "the same action without changing the file, staging state, or "
@@ -1735,10 +1738,11 @@ def run_workflow_chat(
                 config.verbose,
                 (
                     f"No progress detected for workflow step "
-                    f"({stalled_roundtrips}/{config.max_stalled_roundtrips})"
+                    f"({progress_controller.stalled_roundtrips}/"
+                    f"{config.max_stalled_roundtrips})"
                 ),
             )
-            if stalled_roundtrips >= max(1, config.max_stalled_roundtrips):
+            if progress_decision == ProgressDecision.THRESHOLD:
                 if action.kind == "invoke_tool":
                     if _workflow_step_requires_pull_request(current_step):
                         warning = (
@@ -1780,9 +1784,7 @@ def run_workflow_chat(
                     )
                     print(warning, file=stderr)
                     execution_state.step_index = current_step_index + 1
-                    stalled_roundtrips = 0
-                    previous_action_signature = None
-                    failed_action_signature = None
+                    progress_controller.reset()
                     if not skill_stack and execution_state.step_index >= len(
                         selected_skill.skill.steps
                     ):
@@ -1802,8 +1804,7 @@ def run_workflow_chat(
                     return 1
         if execution_state.step_index != current_step_index:
             step_roundtrips = 0
-            stalled_roundtrips = 0
-            previous_action_signature = None
+            progress_controller.reset()
         if execution_state.step_index >= len(selected_skill.skill.steps):
             if skill_stack:
                 frame = skill_stack.pop()

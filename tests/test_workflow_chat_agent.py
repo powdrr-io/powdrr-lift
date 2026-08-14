@@ -516,6 +516,23 @@ def test_textual_response_grows_for_wrapped_text() -> None:
     assert scroll_y == 0
 
 
+def test_textual_response_grows_beyond_previous_thirty_row_cap() -> None:
+    async def exercise() -> tuple[int, float]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test(size=(80, 50)) as pilot:
+            response = app.query_one("#response", TextArea)
+            response.text = "\n".join(f"line {number}" for number in range(35))
+            await pilot.pause()
+            height_style = response.styles.height
+            assert height_style is not None
+            return int(height_style.value), response.scroll_y
+
+    height, scroll_y = asyncio.run(exercise())
+    assert height >= 37
+    assert scroll_y == 0
+
+
 def test_textual_startup_shows_initial_question(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

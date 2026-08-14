@@ -5,6 +5,18 @@ when_to_use:
 - When the workflow needs reliable application modules, test modules, tools, and validation commands for the whole repository.
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
+- description: Check whether the project-structure artifact already exists.
+  llm_type: simple_task
+  details: >-
+    Use the gather_context workflow action with types [modules, tools] and no
+    keywords or filters. Inspect the returned match paths specifically for
+    docs/project_structure/project-structure.yaml. If that artifact exists,
+    preserve it, include its exact path and the reuse decision in
+    decisions_and_context, and choose complete immediately. Do not inspect the
+    source tree, run discovery commands, generate a template, edit the
+    artifact, validate it, stage it, or invoke any nested skill. If the artifact
+    does not exist, record that result and choose next_step so the discovery
+    step can begin.
 - description: Discover the project-wide modules, tools, tests, and development commands.
   llm_type: long_context
   details: >-
@@ -16,11 +28,9 @@ steps:
     tests, formatting, linting, type checking, packaging, and other repository
     validation. Use basedpyright-symbol and basedpyright-structure for Python
     source when available. Record paths, symbols, commands, and evidence in
-    decisions_and_context before continuing. Use the gather_context workflow
-    action to look for an existing project-structure artifact:
-    {"kind":"gather_context","types":["modules","tools"],"keywords":[]}
-    Inspect returned match paths for docs/project_structure and carry the
-    result into the next step. After discovering each tool, try its command
+    decisions_and_context before continuing. The initial existence check has
+    already confirmed that no project-structure artifact exists. After
+    discovering each tool, try its command
     with the smallest safe invocation that exercises its syntax and working
     directory. For commands that require project inputs, use a read-only,
     help, dry-run, or otherwise non-destructive invocation. If a discovered

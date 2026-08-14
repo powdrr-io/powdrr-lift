@@ -27,7 +27,12 @@ steps:
     - "<work-item-name>"
 - description: Validate the updated system specification and confirm it is still consistent.
   llm_type: fast_iteration
-  details: Re-run system validation after edits and report any remaining inconsistencies.
+  details: >-
+    Invoke the listed system validator exactly once after the specification
+    edits. If it succeeds, use its result to confirm that no inconsistencies
+    remain and choose `next_step` immediately. If it reports validation errors,
+    edit the specification to address them before invoking the validator again;
+    never repeat the same validation command unchanged.
   tool_invocations:
   - tool: internal
     command:

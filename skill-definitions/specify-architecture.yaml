@@ -31,7 +31,12 @@ steps:
     points at listed entities or relationships.
 - description: Validate the filled architecture template and fix any validation errors.
   llm_type: fast_iteration
-  details: Re-run validation until there are no unknown types or broken references.
+  details: >-
+    Invoke the architecture validator once for the current file. If it
+    succeeds, record that there are no unknown types or broken references and
+    choose `next_step` immediately. If it reports validation errors, edit the
+    file to address them before invoking the validator again; never repeat the
+    same validation command unchanged.
   tool_invocations:
   - tool: internal
     command:

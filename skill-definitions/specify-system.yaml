@@ -27,10 +27,14 @@ steps:
   llm_type: standard_reasoning
   details: Keep each statement concrete enough that it can be validated against the
     work item without interpretation.
-- description: Validate the filled template and fix issues until it passes.
+- description: Validate the filled template and resolve any reported issues.
   llm_type: fast_iteration
-  details: The user should leave with a coherent system spec that captures requirements
-    and approach in a form that can be validated immediately.
+  details: >-
+    Invoke the system validator once for the current file. If it succeeds,
+    record that the system specification is valid and choose `next_step`
+    immediately. If it reports validation errors, edit the file to address
+    them before invoking the validator again; never repeat the same validation
+    command unchanged.
   tool_invocations:
   - tool: internal
     command:

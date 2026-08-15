@@ -2834,7 +2834,8 @@ def _action_system_prompt() -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; invoke_tool requires a tool listed in the current step's "
+        "line numbers; do not use edit for .yaml or .yml files; use yaml_edit "
+        "instead. invoke_tool requires a tool listed in the current step's "
         "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
@@ -2849,7 +2850,7 @@ def _action_system_prompt() -> str:
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
-        '{"kind":"edit","file_path":"docs/proposals/example/system-specification.yaml",'
+        '{"kind":"edit","file_path":"src/example.py",'
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
@@ -3160,6 +3161,7 @@ def _handle_workflow_action_edit(
     pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
     for file_edit in file_edits:
+        _reject_line_edit_for_yaml(file_edit.file_path)
         target_path = _resolve_worktree_file_path(
             file_edit.file_path,
             state.worktree_root,
@@ -3870,15 +3872,17 @@ def _parse_workflow_action_edit(
 ) -> SkillChatAction:
     file_edits_value = payload.get("file_edits")
     if file_edits_value is not None:
+        parsed_file_edits = _required_file_edits(file_edits_value)
         return SkillChatAction(
             kind="edit",
-            file_edits=_required_file_edits(file_edits_value),
+            file_edits=parsed_file_edits,
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
         )
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
         raise RuntimeError("Workflow edit action must include file_path.")
+    _reject_line_edit_for_yaml(file_path)
     edits = _required_edit_operations(payload.get("edits"))
     return SkillChatAction(
         kind="edit",
@@ -3887,6 +3891,15 @@ def _parse_workflow_action_edit(
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
+
+
+def _reject_line_edit_for_yaml(file_path: str) -> None:
+    if file_path.strip().lower().endswith((".yaml", ".yml")):
+        raise RuntimeError(
+            f"Workflow edit action cannot target YAML file {file_path.strip()!r}. "
+            "Use yaml_edit with structural operations: upsert_item, "
+            "remove_item, or set_value."
+        )
 
 
 def _parse_workflow_action_yaml_edit(
@@ -4397,6 +4410,7 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
             raise RuntimeError(
                 "Workflow edit action file_edits entries must include file_path."
             )
+        _reject_line_edit_for_yaml(file_path)
         file_edits.append(
             SkillChatFileEdits(
                 file_path=file_path.strip(),

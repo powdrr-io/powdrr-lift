@@ -46,6 +46,7 @@ from powdrr_lift.workflow_chat_agent import (
     _model_limits_for,
     _parse_action_response,
     _print_waiting_for_model,
+    _reject_line_edit_for_yaml,
     _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
@@ -1404,6 +1405,7 @@ def _apply_task_edits(
         edit_groups = [(action.file_path, action.edits)]
     results: list[dict[str, Any]] = []
     for file_path, edits in edit_groups:
+        _reject_line_edit_for_yaml(file_path)
         path = _resolve_worktree_file_path(file_path, repo_root)
         current = path.read_text(encoding="utf-8") if path.exists() else ""
         updated = _apply_file_edits(current, edits)

@@ -3201,16 +3201,15 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
                 "decisions_and_context": "Create the system spec template.",
             },
             {
-                "kind": "edit",
+                "kind": "yaml_edit",
                 "file_path": (
                     "docs/proposals/display-related-photos/system-specification.yaml"
                 ),
-                "edits": [
+                "operations": [
                     {
-                        "kind": "replace",
-                        "start_line": 3,
-                        "end_line": 3,
-                        "text": "id: display-related-photos",
+                        "op": "set_value",
+                        "path": ["id"],
+                        "value": "display-related-photos",
                     }
                 ],
                 "decisions_and_context": "Set the system spec id.",
@@ -3262,7 +3261,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
                 assert prompt["current_file"]["path"] == str(
                     system_spec_path.relative_to(worktree_root)
                 )
-                assert prompt["execution_events"][-1]["kind"] == "edit"
+                assert prompt["execution_events"][-1]["kind"] == "yaml_edit"
             elif self._call_index == 4:
                 assert prompt["current_file"]["path"] == str(
                     system_spec_path.relative_to(worktree_root)
@@ -3337,8 +3336,9 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
     )
 
     assert exit_code == 0
-    assert system_spec_path.read_text(encoding="utf-8").splitlines()[2] == (
+    assert (
         "id: display-related-photos"
+        in system_spec_path.read_text(encoding="utf-8").splitlines()
     )
     summary = json.loads(
         (worktree_root / "generated" / "skill-execution.json").read_text(
@@ -3347,7 +3347,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
     )
     assert [event["kind"] for event in summary["execution_events"]] == [
         "invoke_tool",
-        "edit",
+        "yaml_edit",
         "next_step",
         "complete",
     ]
@@ -3584,46 +3584,50 @@ def test_edit_action_can_update_multiple_files_in_one_response(
 def test_edit_action_rejects_invalid_yaml_before_writing(tmp_path: Path) -> None:
     yaml_path = tmp_path / "project-structure.yaml"
     yaml_path.write_text("name: original\n", encoding="utf-8")
-    action = _parse_action_response(
-        {
-            "kind": "edit",
-            "file_path": yaml_path.name,
-            "edits": [
-                {
-                    "kind": "replace",
-                    "start_line": 1,
-                    "text": "name: [",
-                }
-            ],
-        }
-    )
-    state = _WorkflowExecutionState(
-        selected_skill=SkillCatalogEntry(tmp_path / "skill.json", _build_skill()),
-        transcript=[],
-        execution_events=[],
-        execution_context=[],
-        step_index=0,
-        worktree_root=tmp_path,
-    )
-
-    with pytest.raises(RuntimeError, match="Edited YAML file .*line [12]"):
-        _handle_workflow_action_edit(
-            action,
-            state,
-            io.StringIO(),
-            io.StringIO(),
-            lambda: "",
-            SkillChatConfig(skills_dir=tmp_path),
+    with pytest.raises(RuntimeError, match="Use yaml_edit"):
+        _parse_action_response(
+            {
+                "kind": "edit",
+                "file_path": yaml_path.name,
+                "edits": [
+                    {
+                        "kind": "replace",
+                        "start_line": 1,
+                        "text": "name: [",
+                    }
+                ],
+            }
         )
 
     assert yaml_path.read_text(encoding="utf-8") == "name: original\n"
+
+
+def test_edit_action_rejects_yaml_file_edits_with_yaml_edit_guidance() -> None:
+    with pytest.raises(RuntimeError, match="Use yaml_edit"):
+        _parse_action_response(
+            {
+                "kind": "edit",
+                "file_edits": [
+                    {
+                        "file_path": "docs/structure.yml",
+                        "edits": [
+                            {
+                                "kind": "replace",
+                                "start_line": 1,
+                                "text": "name: changed",
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
 
 
 def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
     action = _parse_action_response(
         {
             "kind": "edit",
-            "file_path": "implementation-specification.yaml",
+            "file_path": "implementation-specification.txt",
             "edits": [
                 {
                     "kind": "replace",
@@ -3659,7 +3663,7 @@ def test_action_repair_prompt_includes_the_rejected_edit() -> None:
     action = _parse_action_response(
         {
             "kind": "edit",
-            "file_path": "implementation-specification.yaml",
+            "file_path": "implementation-specification.txt",
             "edits": [
                 {
                     "kind": "replace",
@@ -3677,7 +3681,7 @@ def test_action_repair_prompt_includes_the_rejected_edit() -> None:
     )
 
     assert "previous edit action failed and was not applied" in prompt
-    assert '"file_path": "implementation-specification.yaml"' in prompt
+    assert '"file_path": "implementation-specification.txt"' in prompt
     assert "don't do this again" in prompt
 
 
@@ -3691,18 +3695,18 @@ def test_action_repair_prompt_explains_validation_errors() -> None:
     assert "matches the current step's declared tool template exactly" in prompt
 
 
-def test_edit_action_normalizes_fenced_yaml_before_validation(tmp_path: Path) -> None:
-    yaml_path = tmp_path / "project-structure.yaml"
-    yaml_path.write_text("name: original\n", encoding="utf-8")
+def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) -> None:
+    json_path = tmp_path / "settings.json"
+    json_path.write_text('{"name": "original"}\n', encoding="utf-8")
     action = _parse_action_response(
         {
             "kind": "edit",
-            "file_path": yaml_path.name,
+            "file_path": json_path.name,
             "edits": [
                 {
                     "kind": "replace",
                     "start_line": 1,
-                    "text": "```yaml\nname: corrected\n```",
+                    "text": '```json\n{"name": "corrected"}\n```',
                 }
             ],
         }
@@ -3725,9 +3729,7 @@ def test_edit_action_normalizes_fenced_yaml_before_validation(tmp_path: Path) ->
         SkillChatConfig(skills_dir=tmp_path),
     )
 
-    assert yaml.safe_load(yaml_path.read_text(encoding="utf-8")) == {
-        "name": "corrected"
-    }
+    assert json.loads(json_path.read_text(encoding="utf-8")) == {"name": "corrected"}
 
 
 def test_edit_action_rejects_invalid_json_before_writing(tmp_path: Path) -> None:
@@ -4286,46 +4288,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         yaml_text: str,
     ) -> dict[str, object]:
         current_file = cast(dict[str, object], prompt["current_file"])
-        current_file_lines = cast(
-            list[dict[str, object]],
-            current_file.get("lines", []),
-        )
-        line_count = current_file.get("line_count")
-        if isinstance(line_count, int) and line_count > 0:
-            return {
-                "kind": "edit",
-                "file_path": current_file["path"],
-                "edits": [
-                    {
-                        "kind": "replace",
-                        "start_line": 1,
-                        "end_line": line_count,
-                        "text": yaml_text,
-                    }
-                ],
-            }
-        if current_file_lines:
-            return {
-                "kind": "edit",
-                "file_path": current_file["path"],
-                "edits": [
-                    {
-                        "kind": "replace",
-                        "start_line": 1,
-                        "end_line": len(current_file_lines),
-                        "text": yaml_text,
-                    }
-                ],
-            }
+        parsed = yaml.safe_load(yaml_text)
+        assert isinstance(parsed, dict)
         return {
-            "kind": "edit",
+            "kind": "yaml_edit",
             "file_path": current_file["path"],
-            "edits": [
-                {
-                    "kind": "add",
-                    "start_line": 1,
-                    "text": yaml_text,
-                }
+            "operations": [
+                {"op": "set_value", "path": [key], "value": value}
+                for key, value in parsed.items()
             ],
         }
 

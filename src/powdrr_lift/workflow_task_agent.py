@@ -34,6 +34,7 @@ from powdrr_lift.workflow_chat_agent import (
     SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
+    _apply_yaml_operations,
     _build_step_execution_messages,
     _estimate_message_tokens,
     _execute_fuzzy_match_tool,
@@ -45,6 +46,7 @@ from powdrr_lift.workflow_chat_agent import (
     _model_limits_for,
     _parse_action_response,
     _print_waiting_for_model,
+    _reject_line_edit_for_yaml,
     _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
@@ -299,6 +301,39 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 {
                     "kind": action.kind,
                     "result": _apply_task_edits(action, self.repo_root),
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "yaml_edit":
+            if action.file_path is None:
+                raise RuntimeError("yaml_edit action must include file_path.")
+            path = _resolve_worktree_file_path(action.file_path, self.repo_root)
+            if not path.exists():
+                raise RuntimeError(
+                    f"yaml_edit target {action.file_path!r} does not exist. "
+                    "Read or generate the YAML document first."
+                )
+            updated = _apply_yaml_operations(
+                path,
+                path.read_text(encoding="utf-8"),
+                action.yaml_operations,
+            )
+            path.write_text(updated, encoding="utf-8")
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "file_path": action.file_path,
+                    "operations": [
+                        {
+                            "op": operation.operation,
+                            "section": operation.section,
+                            "id": operation.item_id,
+                            "path": list(operation.path),
+                            "value": operation.value,
+                        }
+                        for operation in action.yaml_operations
+                    ],
+                    "result": {"line_count": len(updated.splitlines())},
                 }
             )
             return WorkflowActionOutcome()
@@ -1370,6 +1405,7 @@ def _apply_task_edits(
         edit_groups = [(action.file_path, action.edits)]
     results: list[dict[str, Any]] = []
     for file_path, edits in edit_groups:
+        _reject_line_edit_for_yaml(file_path)
         path = _resolve_worktree_file_path(file_path, repo_root)
         current = path.read_text(encoding="utf-8") if path.exists() else ""
         updated = _apply_file_edits(current, edits)

@@ -65,6 +65,17 @@ class WorkflowFileEdits:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkflowYamlOperation:
+    """One structural mutation in a YAML workflow action."""
+
+    operation: str
+    section: str | None = None
+    item_id: str | None = None
+    path: tuple[str, ...] = field(default_factory=tuple)
+    value: Any = None
+
+
+@dataclass(frozen=True, slots=True)
 class WorkflowAction:
     """The action schema parsed for both chat and durable workflow tasks."""
 
@@ -79,6 +90,7 @@ class WorkflowAction:
     parameters: dict[str, Any] = field(default_factory=dict)
     edits: tuple[WorkflowEdit, ...] = field(default_factory=tuple)
     file_edits: tuple[WorkflowFileEdits, ...] = field(default_factory=tuple)
+    yaml_operations: tuple[WorkflowYamlOperation, ...] = field(default_factory=tuple)
     types: tuple[str, ...] = field(default_factory=tuple)
     keywords: tuple[str, ...] = field(default_factory=tuple)
     filters: dict[str, object] = field(default_factory=dict)

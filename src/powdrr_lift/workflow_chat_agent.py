@@ -83,6 +83,9 @@ from powdrr_lift.workflow_llm import (
     WorkflowFileEdits as SkillChatFileEdits,
 )
 from powdrr_lift.workflow_llm import (
+    WorkflowYamlOperation as SkillChatYamlOperation,
+)
+from powdrr_lift.workflow_llm import (
     complete_json as _request_json,
 )
 from powdrr_lift.workflow_llm import (
@@ -1528,6 +1531,10 @@ class _WorkflowStructuredDocumentError(RuntimeError):
     """Raised when an edit produces invalid structured document text."""
 
 
+class _WorkflowYamlEditError(RuntimeError):
+    """Raised when a structural YAML edit cannot be applied safely."""
+
+
 class _WorkflowToolValidationError(RuntimeError):
     def __init__(self, validation_error: ValidationError) -> None:
         self.validation_error = validation_error
@@ -2827,11 +2834,14 @@ def _action_system_prompt() -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; invoke_tool requires a tool listed in the current step's "
+        "line numbers; do not use edit for .yaml or .yml files; use yaml_edit "
+        "instead. invoke_tool requires a tool listed in the current step's "
         "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
-        "and basedpyright-structure takes parameters.path; invoke_skill takes "
+        "and basedpyright-structure takes parameters.path; yaml_edit requires "
+        "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
+        "takes "
         "a skill name from available_skills; next_step has "
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
@@ -2840,12 +2850,18 @@ def _action_system_prompt() -> str:
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
-        '{"kind":"edit","file_path":"docs/proposals/example/system-specification.yaml",'
+        '{"kind":"edit","file_path":"src/example.py",'
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
         "For edits across multiple files, use one edit action with "
         '"file_edits":[{"file_path":"...","edits":[...]}].\n'
+        '{"kind":"yaml_edit","file_path":"docs/proposals/example/implementation-specification.yaml",'
+        '"operations":[{"op":"upsert_item","section":"features",'
+        '"id":"feature-capture","value":{"action":"added",'
+        '"description":"Capture interactions",'
+        '"functional_requirements":["Store input and output"]}}],'
+        '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
         '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
         '"llm_type":"simple_task"}\n'
         '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
@@ -2890,6 +2906,11 @@ def _action_system_prompt() -> str:
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
+        "Use yaml_edit for YAML specification files. It preserves section keys "
+        "and edits list items structurally: upsert_item uses section, id, and a "
+        "complete value mapping; remove_item uses section and id; set_value uses "
+        "a mapping-key path and value. If yaml_edit reports a usage error, "
+        "follow its corrective instructions and retry with the corrected shape.\n"
         "For YAML or JSON edits, preserve the surrounding document structure. "
         "When replacing a list item, start at the list item rather than its "
         "mapping key (for example, preserve `entities:` above `- id: ...`). "
@@ -3005,6 +3026,7 @@ def _workflow_action_handlers() -> dict[
     return {
         "complete": _handle_workflow_action_complete,
         "edit": _handle_workflow_action_edit,
+        "yaml_edit": _handle_workflow_action_yaml_edit,
         "read_document": _handle_workflow_action_read_document,
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
@@ -3036,7 +3058,7 @@ def _workflow_action_material_state(
     without bound.  This mirrors durable task execution's edit-only material
     state snapshot while retaining the genuinely interactive user response.
     """
-    if action.kind == "edit":
+    if action.kind in {"edit", "yaml_edit"}:
         file_paths = (
             tuple(group.file_path for group in action.file_edits)
             if action.file_edits
@@ -3068,7 +3090,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
 
 
 def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
-    if action.kind == "edit":
+    if action.kind in {"edit", "yaml_edit"}:
         return "Edited file"
     if action.kind == "read_document":
         return "Reading file"
@@ -3139,6 +3161,7 @@ def _handle_workflow_action_edit(
     pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
     for file_edit in file_edits:
+        _reject_line_edit_for_yaml(file_edit.file_path)
         target_path = _resolve_worktree_file_path(
             file_edit.file_path,
             state.worktree_root,
@@ -3197,6 +3220,75 @@ def _handle_workflow_action_edit(
             config.verbose,
             f"Applied edit to {result['file_path']}",
         )
+    return True
+
+
+def _handle_workflow_action_yaml_edit(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    if action.file_path is None:
+        raise _WorkflowYamlEditError(
+            "yaml_edit requires file_path. Use a repository-relative .yaml or "
+            ".yml path."
+        )
+    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
+    if not target_path.exists():
+        raise _WorkflowYamlEditError(
+            f"yaml_edit target {action.file_path!r} does not exist. Read or "
+            "generate the YAML document before applying structural edits."
+        )
+    state.current_file_path = target_path
+    current_text = target_path.read_text(encoding="utf-8")
+    updated_text = _apply_yaml_operations(
+        target_path,
+        current_text,
+        action.yaml_operations,
+    )
+    _validate_structured_document_text(target_path, updated_text)
+    target_path.write_text(updated_text, encoding="utf-8")
+    state.fuzzy_match_cache.clear()
+
+    if action.decisions_and_context:
+        state.execution_context.append(action.decisions_and_context)
+    action_data = {
+        "kind": action.kind,
+        "file_path": action.file_path,
+        "operations": [
+            _yaml_operation_to_data(operation) for operation in action.yaml_operations
+        ],
+    }
+    result = {
+        "file_path": str(target_path),
+        "line_count": len(updated_text.splitlines()),
+    }
+    state.transcript.extend(
+        [
+            {
+                "role": "assistant",
+                "content": json.dumps(action_data, ensure_ascii=False),
+            },
+            {
+                "role": "user",
+                "content": json.dumps({"yaml_edit_result": result}, ensure_ascii=False),
+            },
+        ]
+    )
+    state.execution_events.append(
+        {
+            **action_data,
+            "result": result,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    print(f"Edited YAML file: {target_path}", file=stdout)
+    _verbose_print(stderr, config.verbose, f"Applied YAML edit to {target_path}")
     return True
 
 
@@ -3714,6 +3806,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
     return {
         "complete": _parse_workflow_action_complete,
         "edit": _parse_workflow_action_edit,
+        "yaml_edit": _parse_workflow_action_yaml_edit,
         "gather_context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
@@ -3779,15 +3872,17 @@ def _parse_workflow_action_edit(
 ) -> SkillChatAction:
     file_edits_value = payload.get("file_edits")
     if file_edits_value is not None:
+        parsed_file_edits = _required_file_edits(file_edits_value)
         return SkillChatAction(
             kind="edit",
-            file_edits=_required_file_edits(file_edits_value),
+            file_edits=parsed_file_edits,
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
         )
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
         raise RuntimeError("Workflow edit action must include file_path.")
+    _reject_line_edit_for_yaml(file_path)
     edits = _required_edit_operations(payload.get("edits"))
     return SkillChatAction(
         kind="edit",
@@ -3795,6 +3890,113 @@ def _parse_workflow_action_edit(
         edits=edits,
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
+    )
+
+
+def _reject_line_edit_for_yaml(file_path: str) -> None:
+    if file_path.strip().lower().endswith((".yaml", ".yml")):
+        raise RuntimeError(
+            f"Workflow edit action cannot target YAML file {file_path.strip()!r}. "
+            "Use yaml_edit with structural operations: upsert_item, "
+            "remove_item, or set_value."
+        )
+
+
+def _parse_workflow_action_yaml_edit(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    file_path = payload.get("file_path")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise RuntimeError(
+            "yaml_edit requires file_path. Use a repository-relative .yaml or "
+            ".yml path."
+        )
+    if not file_path.strip().lower().endswith((".yaml", ".yml")):
+        raise RuntimeError("yaml_edit file_path must end in .yaml or .yml.")
+    raw_operations = payload.get("operations")
+    if not isinstance(raw_operations, Sequence) or isinstance(
+        raw_operations,
+        (str, bytes, bytearray),
+    ):
+        raise RuntimeError(
+            "yaml_edit requires a non-empty operations array. Supported "
+            "operations are upsert_item, remove_item, and set_value."
+        )
+    operations = tuple(_parse_yaml_operation(item) for item in raw_operations)
+    if not operations:
+        raise RuntimeError(
+            "yaml_edit operations must not be empty. Use upsert_item, "
+            "remove_item, or set_value."
+        )
+    return SkillChatAction(
+        kind="yaml_edit",
+        file_path=file_path.strip(),
+        yaml_operations=operations,
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
+def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
+    if not isinstance(value, Mapping):
+        raise RuntimeError(
+            'yaml_edit operations must be objects. Example: {"op": '
+            '"upsert_item", "section": "features", "id": '
+            '"feature-id", "value": {...}}.'
+        )
+    operation = value.get("op")
+    if operation not in {"upsert_item", "remove_item", "set_value"}:
+        raise RuntimeError(
+            f"yaml_edit operation op must be upsert_item, remove_item, or "
+            f"set_value; received {operation!r}."
+        )
+    if operation == "set_value":
+        raw_path = value.get("path")
+        if (
+            not isinstance(raw_path, Sequence)
+            or isinstance(
+                raw_path,
+                (str, bytes, bytearray),
+            )
+            or not raw_path
+            or not all(isinstance(item, str) and item.strip() for item in raw_path)
+        ):
+            raise RuntimeError(
+                "yaml_edit set_value requires a non-empty path array of mapping "
+                'keys, for example ["title"].'
+            )
+        if "value" not in value:
+            raise RuntimeError("yaml_edit set_value requires value.")
+        return SkillChatYamlOperation(
+            operation=operation,
+            path=tuple(item.strip() for item in raw_path),
+            value=value["value"],
+        )
+
+    section = value.get("section")
+    item_id = value.get("id")
+    if not isinstance(section, str) or not section.strip():
+        raise RuntimeError(
+            f"yaml_edit {operation} requires a non-empty section, such as "
+            "features or decisions."
+        )
+    if not isinstance(item_id, str) or not item_id.strip():
+        raise RuntimeError(
+            f"yaml_edit {operation} requires a non-empty id. Use read_document "
+            "to discover the existing item id."
+        )
+    if operation == "upsert_item" and not isinstance(value.get("value"), Mapping):
+        raise RuntimeError(
+            "yaml_edit upsert_item requires value to be a mapping containing the "
+            "complete item fields."
+        )
+    return SkillChatYamlOperation(
+        operation=operation,
+        section=section.strip(),
+        item_id=item_id.strip(),
+        value=value.get("value"),
     )
 
 
@@ -4208,6 +4410,7 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
             raise RuntimeError(
                 "Workflow edit action file_edits entries must include file_path."
             )
+        _reject_line_edit_for_yaml(file_path)
         file_edits.append(
             SkillChatFileEdits(
                 file_path=file_path.strip(),
@@ -4987,6 +5190,19 @@ def _edit_to_data(edit: SkillChatEdit) -> dict[str, Any]:
     return data
 
 
+def _yaml_operation_to_data(operation: SkillChatYamlOperation) -> dict[str, Any]:
+    data: dict[str, Any] = {"op": operation.operation}
+    if operation.section is not None:
+        data["section"] = operation.section
+    if operation.item_id is not None:
+        data["id"] = operation.item_id
+    if operation.path:
+        data["path"] = list(operation.path)
+    if operation.value is not None:
+        data["value"] = operation.value
+    return data
+
+
 def _file_edits_to_data(file_edits: SkillChatFileEdits) -> dict[str, Any]:
     return {
         "file_path": file_edits.file_path,
@@ -5076,6 +5292,126 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _apply_yaml_operations(
+    path: Path,
+    current_text: str,
+    operations: Sequence[SkillChatYamlOperation],
+) -> str:
+    if path.suffix.lower() not in {".yaml", ".yml"}:
+        raise _WorkflowYamlEditError(
+            "yaml_edit only supports .yaml and .yml files. Use edit for other "
+            "file types."
+        )
+    try:
+        document = yaml.safe_load(current_text)
+    except yaml.YAMLError as exc:
+        raise _WorkflowYamlEditError(
+            f"Cannot apply yaml_edit because {path} is already invalid YAML: "
+            f"{exc}. Repair the YAML with edit first, then retry yaml_edit."
+        ) from exc
+    if document is None:
+        document = {}
+    if not isinstance(document, Mapping):
+        raise _WorkflowYamlEditError(
+            "yaml_edit requires the document root to be a YAML mapping."
+        )
+    updated: dict[str, Any] = dict(document)
+
+    for operation in operations:
+        if operation.operation == "set_value":
+            if not operation.path:
+                raise _WorkflowYamlEditError(
+                    "set_value requires a non-empty path, for example "
+                    '["title"] or ["features", "0", "description"].'
+                )
+            target: Any = updated
+            for key in operation.path[:-1]:
+                if not isinstance(target, dict) or key not in target:
+                    raise _WorkflowYamlEditError(
+                        f"set_value path {list(operation.path)!r} cannot find "
+                        f"mapping key {key!r}. Re-read the YAML and use existing "
+                        "mapping keys in the path."
+                    )
+                target = target[key]
+            if not isinstance(target, dict):
+                raise _WorkflowYamlEditError(
+                    f"set_value path {list(operation.path)!r} does not resolve "
+                    "to a YAML mapping."
+                )
+            target[operation.path[-1]] = operation.value
+            continue
+
+        if operation.section is None or operation.item_id is None:
+            raise _WorkflowYamlEditError(
+                f"{operation.operation} requires section and id. Use an operation "
+                'such as {"op": "upsert_item", "section": "features", '
+                '"id": "feature-id", "value": {...}}.'
+            )
+        raw_items = updated.get(operation.section)
+        if raw_items is None and operation.operation == "upsert_item":
+            raw_items = []
+            updated[operation.section] = raw_items
+        if not isinstance(raw_items, list):
+            raise _WorkflowYamlEditError(
+                f"YAML section {operation.section!r} must be a list for "
+                f"{operation.operation}. Re-read the document and use the exact "
+                "section name."
+            )
+
+        matching_indexes = [
+            index
+            for index, item in enumerate(raw_items)
+            if isinstance(item, Mapping) and item.get("id") == operation.item_id
+        ]
+        if len(matching_indexes) > 1:
+            raise _WorkflowYamlEditError(
+                f"YAML section {operation.section!r} contains duplicate id "
+                f"{operation.item_id!r}; repair the duplicates before yaml_edit."
+            )
+        if operation.operation == "remove_item":
+            if not matching_indexes:
+                raise _WorkflowYamlEditError(
+                    f"No item with id {operation.item_id!r} exists in section "
+                    f"{operation.section!r}. Use read_document to inspect ids "
+                    "before retrying."
+                )
+            del raw_items[matching_indexes[0]]
+            continue
+
+        if operation.operation == "upsert_item":
+            if not isinstance(operation.value, Mapping):
+                raise _WorkflowYamlEditError(
+                    "upsert_item requires value to be a mapping containing the "
+                    "complete item fields."
+                )
+            item = dict(operation.value)
+            item["id"] = operation.item_id
+            if matching_indexes:
+                raw_items[matching_indexes[0]] = item
+            else:
+                raw_items[:] = [
+                    existing
+                    for existing in raw_items
+                    if not (
+                        isinstance(existing, Mapping) and existing.get("id") is None
+                    )
+                ]
+                raw_items.append(item)
+            continue
+
+        raise _WorkflowYamlEditError(
+            f"Unsupported yaml_edit operation {operation.operation!r}. Use "
+            "upsert_item, remove_item, or set_value."
+        )
+
+    return yaml.safe_dump(
+        updated,
+        sort_keys=False,
+        allow_unicode=True,
+        default_flow_style=False,
+    )
+
+
 def _workflow_edit_failure_feedback(
     action: SkillChatAction,
     error: Exception,
@@ -5102,17 +5438,26 @@ def _workflow_edit_failure_feedback(
             "unescaped double quotes inside a double-quoted value. Correct the "
             "document before retrying."
         )
+    elif isinstance(error, _WorkflowYamlEditError):
+        feedback += (
+            " Use yaml_edit only for .yaml or .yml files. Its operations are "
+            "structural: upsert_item replaces or appends a list item by section "
+            "and id, remove_item deletes one by section and id, and set_value "
+            "updates a mapping value by path. Do not use line numbers or replace "
+            "section headers."
+        )
     return feedback
 
 
 def _rejected_edit_guidance(action: SkillChatAction) -> str:
-    if action.kind != "edit":
+    if action.kind not in {"edit", "yaml_edit"}:
         return ""
     return (
         "\n\nLast proposed edit (NOT APPLIED):\n"
         f"{_workflow_action_signature(action)}\n"
-        "don't do this again; return a corrected edit after rereading the "
-        "current file."
+        "Do not repeat it unchanged. Re-read the current file and return a "
+        "corrected action using the structural yaml_edit contract when editing "
+        "YAML."
     )
 
 
@@ -5383,7 +5728,8 @@ def _action_repair_prompt(
         "context. The available actions are: gather_context to discover "
         "repository specifications before deciding; prompt_user to ask one "
         "necessary human question; edit to make a known line-based file change; "
-        "invoke_skill to run a listed nested skill; invoke_tool to run a shell, "
+        "invoke_skill to run a listed nested skill; yaml_edit to make a "
+        "structural YAML change; invoke_tool to run a shell, "
         "fuzzy-match, or basedpyright query; read_document to "
         "request a bounded line range from a known document; next_step when the "
         "current step is complete; and complete when the skill is finished.\n"
@@ -5392,7 +5738,8 @@ def _action_repair_prompt(
         "this corrective response is also empty, the system will interpret it "
         "as next_step.\n"
         "Return exactly one JSON object with a kind and the fields required by "
-        "that action. Use file_path and edits or file_edits for edit, tool and "
+        "that action. Use file_path and edits or file_edits for edit, file_path "
+        "and operations for yaml_edit, tool and "
         "parameters.command for invoke_tool, skill for invoke_skill, file_path "
         "with positive start_line "
         "and end_line for read_document, non-empty types for gather_context, "
@@ -5409,7 +5756,10 @@ def _action_repair_prompt(
     if failed_action is not None:
         prompt += (
             "\nThe previous edit action failed and was not applied. don't do this "
-            "again; reread the current file and return a corrected edit. The "
+            "again; do not repeat it "
+            "unchanged; reread the current file and return a corrected action. "
+            "For YAML, use yaml_edit with upsert_item, remove_item, or set_value "
+            "instead of line numbers. The "
             "rejected edit was:\n"
             f"{_workflow_action_signature(failed_action)}"
         )

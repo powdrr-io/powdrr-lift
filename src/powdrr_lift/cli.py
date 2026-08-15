@@ -1601,6 +1601,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
                     proposed_yaml,
                     work_item_name=work_item_name,
                     repo_root=repo_root,
+                    file_path=specification_path,
                 )
             elif kind == "architecture":
                 validation_successful = (
@@ -1616,6 +1617,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
                     entity_types=entity_types,
                     work_item_name=work_item_name,
                     repo_root=repo_root,
+                    file_path=specification_path,
                 )
             elif kind == "implementation":
                 architecture_path = args.architecture_specification or (
@@ -1634,6 +1636,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
                     architecture_specification_path=architecture_path,
                     work_item_name=work_item_name,
                     repo_root=repo_root,
+                    file_path=specification_path,
                 )
             else:
                 validation_successful = build_pr_specification_validation_report(
@@ -1645,6 +1648,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
                     proposed_yaml,
                     work_item_name=work_item_name,
                     repo_root=repo_root,
+                    file_path=specification_path,
                 )
         except (OSError, ValueError) as exc:
             print(f"{specification_path}: {exc}", file=sys.stderr)

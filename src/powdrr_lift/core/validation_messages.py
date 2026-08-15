@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 
 class CorrectiveAction(ABC):
@@ -164,13 +165,40 @@ class ValidationError:
         )
 
 
-def validation_error_to_data(error: ValidationError) -> dict[str, str]:
+def validation_error_to_data(
+    error: ValidationError,
+    *,
+    file_path: str | None = None,
+) -> dict[str, Any]:
     """Serialize one validator-generated error without losing its repair action."""
-    data = {
+    data: dict[str, Any] = {
         "code": error.code,
         "message": error.instructional_message(),
         "corrective_action": error.corrective_action,
     }
+    is_yaml_file = file_path is not None and file_path.casefold().endswith(
+        (".yaml", ".yml")
+    )
+    if is_yaml_file:
+        data["yaml_edit_guidance"] = (
+            "Use yaml_edit with structural operations after determining the exact "
+            f"replacement for `{error.path or '<invalid-value>'}`; do not use a "
+            "line-based edit on this YAML file."
+        )
+        if error.path is not None and re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_-]*", error.path
+        ):
+            data["yaml_edit"] = {
+                "kind": "yaml_edit",
+                "file_path": file_path,
+                "operations": [
+                    {
+                        "op": "set_value",
+                        "path": [error.path],
+                        "value": "<correct-value>",
+                    }
+                ],
+            }
     if error.path is not None:
         data["path"] = error.path
     return data

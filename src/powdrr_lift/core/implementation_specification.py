@@ -216,6 +216,7 @@ def validate_implementation_specification_yaml(
     work_item_name: str,
     architecture_specification_path: str | Path | None = None,
     repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
 ) -> str:
     report = build_implementation_specification_validation_report(
         proposed_implementation_specification_yaml,
@@ -223,7 +224,7 @@ def validate_implementation_specification_yaml(
         architecture_specification_path=architecture_specification_path,
         repo_root=repo_root,
     )
-    return yaml.safe_dump(_report_to_data(report), sort_keys=False)
+    return yaml.safe_dump(_report_to_data(report, file_path=file_path), sort_keys=False)
 
 
 def build_implementation_specification_validation_report(
@@ -1079,11 +1080,16 @@ def _resolve_input_path(
 
 def _report_to_data(
     report: ImplementationSpecificationValidationReport,
+    *,
+    file_path: str | Path | None = None,
 ) -> Mapping[str, Any]:
     return {
         "validation_successful": report.validation_successful,
         "architecture_id": report.architecture_id,
         "available_entity_ids": report.available_entity_ids,
         "available_relationship_ids": report.available_relationship_ids,
-        "issues": [validation_error_to_data(issue) for issue in report.issues],
+        "issues": [
+            validation_error_to_data(issue, file_path=str(file_path))
+            for issue in report.issues
+        ],
     }

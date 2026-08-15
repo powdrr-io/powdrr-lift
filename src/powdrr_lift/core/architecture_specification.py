@@ -18,7 +18,10 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.specification_v1 import validate_module_tool_sections
 from powdrr_lift.core.template_generation import merge_existing_template_content
-from powdrr_lift.core.validation_messages import ValidationError
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
 
@@ -178,6 +181,7 @@ def validate_architecture_specification_yaml(
     entity_types: Sequence[str],
     work_item_name: str,
     repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
 ) -> str:
     report = build_architecture_specification_validation_report(
         proposed_architecture_specification_yaml=proposed_architecture_specification_yaml,
@@ -185,7 +189,7 @@ def validate_architecture_specification_yaml(
         work_item_name=work_item_name,
         repo_root=repo_root,
     )
-    return yaml.safe_dump(_report_to_data(report), sort_keys=False)
+    return yaml.safe_dump(_report_to_data(report, file_path=file_path), sort_keys=False)
 
 
 def build_architecture_specification_validation_report(
@@ -1007,18 +1011,15 @@ def _resolve_output_path(
 
 def _report_to_data(
     report: ArchitectureSpecificationValidationReport,
+    *,
+    file_path: str | Path | None = None,
 ) -> Mapping[str, Any]:
     return {
         "validation_successful": report.validation_successful,
         "title": report.title,
         "allowed_entity_types": report.allowed_entity_types,
         "issues": [
-            {
-                "code": issue.code,
-                "message": issue.instructional_message(),
-                "corrective_action": issue.corrective_action,
-                **({"path": issue.path} if issue.path is not None else {}),
-            }
+            validation_error_to_data(issue, file_path=str(file_path))
             for issue in report.issues
         ],
     }

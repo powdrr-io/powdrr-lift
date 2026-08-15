@@ -39,6 +39,56 @@ def test_cli_init_writes_template(tmp_path: Path) -> None:
     ]
 
 
+def test_cli_llm_diff_shows_json_changes(tmp_path: Path) -> None:
+    first_path = tmp_path / "llm-first.json"
+    second_path = tmp_path / "llm-second.json"
+    first_path.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-08-14T00:00:00Z",
+                "input": [{"role": "user", "content": "old prompt"}],
+                "output": {"kind": "complete", "text": "old answer"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    second_path.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-08-14T00:01:00Z",
+                "input": [{"role": "user", "content": "new prompt"}],
+                "output": {"kind": "complete", "text": "new answer"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert main(["llm-diff", str(first_path), str(second_path)]) == 0
+
+    diff = stdout.getvalue()
+    assert f"--- {first_path}" in diff
+    assert f"+++ {second_path}" in diff
+    assert '-      "content": "old prompt"' in diff
+    assert '+      "content": "new prompt"' in diff
+    assert '-    "text": "old answer"' in diff
+    assert '+    "text": "new answer"' in diff
+
+
+def test_cli_llm_diff_reports_invalid_json(tmp_path: Path) -> None:
+    invalid_path = tmp_path / "llm-invalid.json"
+    valid_path = tmp_path / "llm-valid.json"
+    invalid_path.write_text("not json", encoding="utf-8")
+    valid_path.write_text("{}", encoding="utf-8")
+    stderr = io.StringIO()
+
+    with redirect_stderr(stderr):
+        assert main(["llm-diff", str(invalid_path), str(valid_path)]) == 2
+
+    assert "invalid JSON" in stderr.getvalue()
+
+
 def test_cli_repository_state_reports_staged_unstaged_and_untracked_files(
     tmp_path: Path,
 ) -> None:

@@ -57,6 +57,7 @@ from powdrr_lift.core import (
     validate_pr_specification_yaml,
     validate_system_specification_yaml,
 )
+from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.project_structure import (
     create_project_structure_template,
     validate_project_structure_yaml,
@@ -897,6 +898,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate_pr_specification_parser.set_defaults(func=_run_evaluate_pr_specification)
 
+    evaluate_specification_parser = subparsers.add_parser(
+        "evaluate",
+        aliases=["evaluate-specification", "evaluate_specification"],
+        help="Validate one specification-v1 YAML file or a directory of them.",
+    )
+    evaluate_specification_parser.add_argument(
+        "path",
+        type=Path,
+        help="Specification-v1 YAML file or directory to validate.",
+    )
+    evaluate_specification_parser.add_argument(
+        "--work-item-name",
+        help="Work item name used when validating the specification files.",
+    )
+    evaluate_specification_parser.add_argument(
+        "--architecture-specification",
+        type=Path,
+        help="Architecture specification path for implementation validation.",
+    )
+    evaluate_specification_parser.add_argument(
+        "--entity-type",
+        dest="entity_types",
+        action="append",
+        help="Allowed architecture entity type. May be repeated.",
+    )
+    evaluate_specification_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to use when running validation.",
+    )
+    evaluate_specification_parser.set_defaults(func=_run_evaluate_specification)
+
     openai_proxy_parser = subparsers.add_parser(
         "openai-proxy",
         aliases=["openai_proxy"],
@@ -1729,6 +1762,132 @@ def _run_evaluate_pr_specification(args: argparse.Namespace) -> int:
     if not report_yaml.endswith("\n"):
         sys.stdout.write("\n")
     return 0 if report.validation_successful else 1
+
+
+_SPECIFICATION_FILENAMES = {
+    "system-specification.yaml": "system",
+    "system-specification.yml": "system",
+    "architecture-specification.yaml": "architecture",
+    "architecture-specification.yml": "architecture",
+    "implementation-specification.yaml": "implementation",
+    "implementation-specification.yml": "implementation",
+    "proposed-pr-specification.yaml": "pr",
+    "proposed-pr-specification.yml": "pr",
+}
+
+
+def _run_evaluate_specification(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    input_path = args.path if args.path.is_absolute() else repo_root / args.path
+    if not input_path.exists():
+        print(f"Specification path does not exist: {input_path}", file=sys.stderr)
+        return 1
+
+    specification_paths = (
+        [input_path]
+        if input_path.is_file()
+        else sorted(
+            path
+            for path in input_path.rglob("*")
+            if path.is_file() and path.name in _SPECIFICATION_FILENAMES
+        )
+    )
+    if not specification_paths:
+        print(
+            f"No recognized specification-v1 YAML files found under {input_path}.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.entity_types:
+        entity_types = tuple(args.entity_types)
+    else:
+        try:
+            entity_types = tuple(load_entity_taxonomy(repo_root).entity_types)
+        except OSError:
+            entity_types = ()
+    overall_success = True
+    for specification_path in specification_paths:
+        kind = _SPECIFICATION_FILENAMES.get(specification_path.name)
+        if kind is None:
+            print(
+                f"Unsupported specification-v1 filename: {specification_path.name}",
+                file=sys.stderr,
+            )
+            overall_success = False
+            continue
+
+        work_item_name = args.work_item_name or specification_path.parent.name
+        try:
+            normalize_specification_v1_file(specification_path)
+            proposed_yaml = _read_input(specification_path)
+            if kind == "system":
+                validation_successful = build_system_specification_validation_report(
+                    proposed_yaml,
+                    work_item_name=work_item_name,
+                    repo_root=repo_root,
+                ).validation_successful
+                report_yaml = validate_system_specification_yaml(
+                    proposed_yaml,
+                    work_item_name=work_item_name,
+                    repo_root=repo_root,
+                )
+            elif kind == "architecture":
+                validation_successful = (
+                    build_architecture_specification_validation_report(
+                        proposed_yaml,
+                        entity_types=entity_types,
+                        work_item_name=work_item_name,
+                        repo_root=repo_root,
+                    ).validation_successful
+                )
+                report_yaml = validate_architecture_specification_yaml(
+                    proposed_yaml,
+                    entity_types=entity_types,
+                    work_item_name=work_item_name,
+                    repo_root=repo_root,
+                )
+            elif kind == "implementation":
+                architecture_path = args.architecture_specification or (
+                    specification_path.parent / "architecture-specification.yaml"
+                )
+                validation_successful = (
+                    build_implementation_specification_validation_report(
+                        proposed_yaml,
+                        architecture_specification_path=architecture_path,
+                        work_item_name=work_item_name,
+                        repo_root=repo_root,
+                    ).validation_successful
+                )
+                report_yaml = validate_implementation_specification_yaml(
+                    proposed_yaml,
+                    architecture_specification_path=architecture_path,
+                    work_item_name=work_item_name,
+                    repo_root=repo_root,
+                )
+            else:
+                validation_successful = build_pr_specification_validation_report(
+                    proposed_yaml,
+                    work_item_name=work_item_name,
+                    repo_root=repo_root,
+                ).validation_successful
+                report_yaml = validate_pr_specification_yaml(
+                    proposed_yaml,
+                    work_item_name=work_item_name,
+                    repo_root=repo_root,
+                )
+        except (OSError, ValueError) as exc:
+            print(f"{specification_path}: {exc}", file=sys.stderr)
+            overall_success = False
+            continue
+
+        print(f"File: {specification_path}")
+        sys.stdout.write(report_yaml)
+        if not report_yaml.endswith("\n"):
+            sys.stdout.write("\n")
+        overall_success = overall_success and validation_successful
+
+    return 0 if overall_success else 1
 
 
 def _run_openai_proxy(args: argparse.Namespace) -> int:

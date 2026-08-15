@@ -99,46 +99,20 @@ steps:
 - description: Validate every spec-v1 document before creating execution workflows.
   llm_type: fast_iteration
   details: >-
-    Validate the selected system and architecture specifications and every
-    proposed PR implementation specification before continuing. Use the exact
-    discovered file paths with
-    the corresponding evaluate-* command; for implementation specifications,
-    also pass the matching architecture specification. Run each validator
-    once. If any validator reports an error, use its corrective guidance to
-    edit the affected document with yaml_edit, then rerun that validator only
-    after the document has changed. Do not instantiate workflows, stage
-    artifacts, request approval, or create a pull request while any spec-v1
-    document is invalid. Record the successful validation results and exact
-    validated paths in context for the next step.
+    Run the single evaluate command once on the selected feature specification
+    directory. It discovers every recognized spec-v1 YAML file and validates
+    each file against its schema and cross-document rules. If it reports an
+    error, use its corrective guidance to edit the affected document with
+    yaml_edit, then rerun evaluate only after the document has changed. Do not
+    instantiate workflows, stage artifacts, request approval, or create a pull
+    request while any spec-v1 document is invalid. Record the successful
+    validation results and exact validated paths in context for the next step.
   tool_invocations:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-system-specification
-    - --work-item-name
-    - <feature-name>
-    - --input
-    - <system-specification-path>
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate-architecture-specification
-    - --work-item-name
-    - <feature-name>
-    - --input
-    - <architecture-specification-path>
-    - --entity-type
-    - <type>
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate-implementation-specification
-    - --work-item-name
-    - <feature-name>
-    - --input
-    - <implementation-specification-path>
-    - --architecture-specification
-    - <architecture-specification-path>
+    - evaluate
+    - docs/proposals/<feature-name>
 - description: Instantiate an execution workflow for every proposed PR.
   llm_type: simple_task
   details: >-

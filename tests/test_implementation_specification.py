@@ -128,6 +128,37 @@ def test_create_implementation_specification_template_writes_default_file(
     )
 
 
+def test_cli_evaluate_validates_specification_directory(tmp_path: Path) -> None:
+    _write_architecture_specification(tmp_path)
+    output_path = implementation_specification_default_output_path(
+        "powdrr-lift",
+        tmp_path,
+    )
+    main(
+        [
+            "implementation-specification",
+            "--work-item-name",
+            "powdrr-lift",
+            "--repo-root",
+            str(tmp_path),
+        ]
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "evaluate",
+                str(output_path.parent),
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+
+    assert exit_code == 1
+    assert "template_boilerplate_not_removed" in stdout.getvalue()
+
+
 def test_validate_implementation_specification_reports_errors(
     tmp_path: Path,
 ) -> None:

@@ -655,21 +655,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
-        "evaluate-system-specification",
-        "--work-item-name",
-        "<feature-name>",
-        "--input",
-        "<system-specification-path>",
-    )
-    assert skill.steps[3].tool_invocations[2].command == (
-        "powdrr-lift",
-        "evaluate-implementation-specification",
-        "--work-item-name",
-        "<feature-name>",
-        "--input",
-        "<implementation-specification-path>",
-        "--architecture-specification",
-        "<architecture-specification-path>",
+        "evaluate",
+        "docs/proposals/<feature-name>",
     )
     assert skill.steps[4].tool_invocations[0].command == (
         "powdrr-lift",

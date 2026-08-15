@@ -1,0 +1,43 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Logging - Logging Module
+architecture_id: '2026-08-14'
+entities:
+- action: added
+  rationale: Core entity for the interaction-file-logging feature, required by "req-1"
+    and "app-1".
+  id: interaction-log-entry
+modules:
+- action: added
+  relative_location: src/powdrr_lift/interaction_log.py
+  purpose: Provides the logging module that intercepts interactions, serializes them
+    as JSON, and writes them to the log file.
+  id: logging-module
+tools:
+- action: added
+  when_to_use: When validating that a log file contains valid JSON entries with the
+    expected structure.
+  template: null
+  how_to_use: Run the validator against the log file path to check JSON validity and
+    entry structure.
+  id: interaction-log-validator
+entity_relationships:
+- action: added
+  rationale: Each interaction log entry is written to the log file by the logging
+    module, required by "app-1".
+  id: rel-log-entry-to-file
+features:
+- action: added
+  description: Capture and persist all human and LLM interaction inputs and outputs
+    to per-session JSON log files.
+  supercedes: null
+  functional_requirements:
+  - All human and LLM inputs and outputs must be written to the log file.
+  - Log files must be in JSON format.
+  - Each CLI session must produce its own timestamped log file in the .powdrr directory.
+  id: feature-interaction-capture
+decisions:
+- action: added
+  description: Use asynchronous I/O or a background queue to write log entries so
+    the interaction flow is never blocked.
+  supercedes: null
+  id: decision-non-blocking-write

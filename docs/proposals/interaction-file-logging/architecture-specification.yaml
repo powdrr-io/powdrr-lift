@@ -1,43 +1,56 @@
-# This file is read-only and should never be edited by a tool or agent.
 schema: https://powdrr.io/schemas/specification-v1
-# Allowed entity types:
-# - interaction
 id: 2026-08-14
 title: Interaction File Logging Architecture
 entities:
-  - id: interaction-log-entry
-    type: interaction
-    action: added
-    summary: A single recorded interaction between a human or LLM, containing the input, output, and metadata.
-    rationale: The core domain entity for the interaction-file-logging feature, required by "req-1" and "app-1".
+- id: interaction-log-entry
+  type: Feature
+  action: added
+  summary: A single recorded interaction between a human or LLM, containing the input,
+    output, and metadata.
+  rationale: The core domain entity for the interaction-file-logging feature, required
+    by "req-1" and "app-1".
 modules:
-  - id: logging-module
-    action: added
-    relative_location: src/powdrr_lift/interaction_log.py
-    purpose: Provides the logging module that intercepts interactions, serializes them as JSON, and writes them to the log file.
+- id: logging-module
+  action: added
+  relative_location: src/powdrr_lift/interaction_log.py
+  purpose: Provides the logging module that intercepts interactions, serializes them
+    as JSON, and writes them to the log file.
 tools:
-  - id: interaction-log-validator
-    action: added
-    when_to_use: When validating that a log file contains valid JSON entries with the expected structure.
-    how_to_use: Run the validator against the log file path to check JSON validity and entry structure.
+- id: interaction-log-validator
+  action: added
+  when_to_use: When validating that a log file contains valid JSON entries with the
+    expected structure.
+  how_to_use: Run the validator against the log file path to check JSON validity and
+    entry structure.
 entity_relationships:
-  - id: rel-log-entry-to-file
-    source: interaction-log-entry
-    target: interaction-log-entry
-    relationship: written_by
-    description: Each interaction log entry is written to the log file by the logging module.
-    rationale: Required by "app-1".
+- id: rel-log-entry-to-file
+  source: interaction-log-entry
+  target: interaction-log-entry
+  relationship: written_by
+  description: Each interaction log entry is written to the log file by the logging
+    module.
+  rationale: Required by "app-1".
 invariants:
-  - id: inv-log-append-only
-    description: Log entries must only be appended to the log file; no existing entry may be modified or deleted.
-    rationale: Required by req-1 ("All human and LLM interaction inputs and outputs must be captured and written to a JSON log file.") to ensure a complete, immutable audit trail.
-    related:
-      entities: [interaction-log-entry]
-      entity_relationships: [rel-log-entry-to-file]
+- id: inv-log-append-only
+  description: Log entries must only be appended to the log file; no existing entry
+    may be modified or deleted.
+  rationale: Required by req-1 ("All human and LLM interaction inputs and outputs
+    must be captured and written to a JSON log file.") to ensure a complete, immutable
+    audit trail.
+  related:
+    entities:
+    - interaction-log-entry
+    entity_relationships:
+    - rel-log-entry-to-file
 guidance:
-  - id: guide-non-blocking-write
-    description: Use asynchronous I/O or a background queue to write log entries so the interaction flow is never blocked.
-    rationale: Required by req-3 ("The logging mechanism must not block or delay the interaction flow.") and app-4 ("Use a non-blocking write strategy (e.g., asynchronous I/O or a background queue) to avoid blocking interactions.")
-    related:
-      entities: [interaction-log-entry]
-      entity_relationships: [rel-log-entry-to-file]
+- id: guide-non-blocking-write
+  description: Use asynchronous I/O or a background queue to write log entries so
+    the interaction flow is never blocked.
+  rationale: Required by req-3 ("The logging mechanism must not block or delay the
+    interaction flow.") and app-4 ("Use a non-blocking write strategy (e.g., asynchronous
+    I/O or a background queue) to avoid blocking interactions.")
+  related:
+    entities:
+    - interaction-log-entry
+    entity_relationships:
+    - rel-log-entry-to-file

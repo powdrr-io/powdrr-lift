@@ -20,4 +20,8 @@ def merge_existing_template_content(
     if not instruction_prefix:
         return existing_content
 
-    return f"{instruction_prefix}\n{existing_content.rstrip(chr(10))}\n"
+    existing_without_trailing_newline = existing_content.rstrip("\n")
+    if existing_without_trailing_newline.startswith(instruction_prefix):
+        return f"{existing_without_trailing_newline}\n"
+
+    return f"{instruction_prefix}\n{existing_without_trailing_newline}\n"

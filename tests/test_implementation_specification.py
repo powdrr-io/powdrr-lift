@@ -108,6 +108,25 @@ def test_create_implementation_specification_template_writes_default_file(
         "decisions",
     ]
 
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "implementation-specification",
+                "--work-item-name",
+                "powdrr-lift",
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+
+    assert exit_code == 0
+    assert (
+        output_path.read_text(encoding="utf-8").count(
+            "# Implementation specification template."
+        )
+        == 1
+    )
+
 
 def test_validate_implementation_specification_reports_errors(
     tmp_path: Path,

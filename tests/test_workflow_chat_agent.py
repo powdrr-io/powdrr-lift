@@ -4522,7 +4522,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "System template filled with the captured goal and success criteria."
                     ),
                     expected_event_count=4,
-                    expected_last_event_kind="edit",
+                    expected_last_event_kind="yaml_edit",
                 )
                 response = {
                     "kind": "next_step",
@@ -4654,7 +4654,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "Architecture template filled with the chosen entity model and relationships."
                     ),
                     expected_event_count=9,
-                    expected_last_event_kind="edit",
+                    expected_last_event_kind="yaml_edit",
                 )
                 response = {
                     "kind": "next_step",
@@ -4786,7 +4786,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "Implementation template filled with the chosen layout and requirements."
                     ),
                     expected_event_count=14,
-                    expected_last_event_kind="edit",
+                    expected_last_event_kind="yaml_edit",
                 )
                 response = {
                     "kind": "invoke_tool",
@@ -4885,7 +4885,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "PR template filled with acceptance criteria and risks."
                     ),
                     expected_event_count=18,
-                    expected_last_event_kind="edit",
+                    expected_last_event_kind="yaml_edit",
                 )
                 response = {
                     "kind": "next_step",

@@ -4547,9 +4547,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 )
                 assert tool_invocations[0]["command"] == [
                     "powdrr-lift",
-                    "evaluate-system-specification",
-                    "--work-item-name",
-                    "<work-item-name>",
+                    "evaluate",
+                    "docs/proposals/<work-item-name>",
                 ]
                 response = {
                     "kind": "invoke_tool",
@@ -4557,9 +4556,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "parameters": {
                         "command": [
                             "powdrr-lift",
-                            "evaluate-system-specification",
-                            "--work-item-name",
-                            "display-related-photos",
+                            "evaluate",
+                            "docs/proposals/display-related-photos",
                         ],
                     },
                     "decisions_and_context": (
@@ -4679,11 +4677,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 )
                 assert tool_invocations[0]["command"] == [
                     "powdrr-lift",
-                    "evaluate-architecture-specification",
-                    "--work-item-name",
-                    "<work-item-name>",
-                    "--entity-type",
-                    "<type>",
+                    "evaluate",
+                    "docs/proposals/<work-item-name>",
                 ]
                 response = {
                     "kind": "invoke_tool",
@@ -4691,11 +4686,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "parameters": {
                         "command": [
                             "powdrr-lift",
-                            "evaluate-architecture-specification",
-                            "--work-item-name",
-                            "display-related-photos",
-                            "--entity-type",
-                            "photo",
+                            "evaluate",
+                            "docs/proposals/display-related-photos",
                         ],
                     },
                     "decisions_and_context": (
@@ -4794,9 +4786,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "parameters": {
                         "command": [
                             "powdrr-lift",
-                            "evaluate-implementation-specification",
-                            "--work-item-name",
-                            "display-related-photos",
+                            "evaluate",
+                            "docs/proposals/display-related-photos",
                         ],
                     },
                     "decisions_and_context": (
@@ -6340,9 +6331,8 @@ def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
             "tool": "internal",
             "command": [
                 "powdrr-lift",
-                "evaluate-system-specification",
-                "--work-item-name",
-                "<work-item-name>",
+                "evaluate",
+                "docs/proposals/<work-item-name>/system-specification.yaml",
             ],
         },
     ]

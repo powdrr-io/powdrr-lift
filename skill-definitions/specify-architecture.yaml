@@ -32,7 +32,7 @@ steps:
 - description: Validate the filled architecture template and fix any validation errors.
   llm_type: fast_iteration
   details: >-
-    Invoke the architecture validator once for the current file. If it
+    Invoke the generic evaluator once for the current file. If it
     succeeds, record that there are no unknown types or broken references and
     choose `next_step` immediately. If it reports validation errors, edit the
     file to address them before invoking the validator again; never repeat the
@@ -41,8 +41,5 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
+    - evaluate
+    - docs/proposals/<work-item-name>/architecture-specification.yaml

@@ -28,7 +28,7 @@ steps:
 - description: Validate the updated system specification and confirm it is still consistent.
   llm_type: fast_iteration
   details: >-
-    Invoke the listed system validator exactly once after the specification
+    Invoke the generic evaluator exactly once after the specification
     edits. If it succeeds, use its result to confirm that no inconsistencies
     remain and choose `next_step` immediately. If it reports validation errors,
     edit the specification to address them before invoking the validator again;
@@ -37,6 +37,5 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-system-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    - evaluate
+    - docs/proposals/<work-item-name>/system-specification.yaml

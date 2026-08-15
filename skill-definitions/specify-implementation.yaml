@@ -31,7 +31,7 @@ steps:
     issues.
   llm_type: fast_iteration
   details: >-
-    Invoke the implementation validator once for the current file. If it
+    Invoke the generic evaluator once for the current file. If it
     succeeds, record that architecture mismatches and duplicate ids are
     resolved and choose `next_step` immediately. If it reports validation
     errors, edit the file to address them before invoking the validator again;
@@ -40,6 +40,5 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    - evaluate
+    - docs/proposals/<work-item-name>/implementation-specification.yaml

@@ -24,7 +24,7 @@ Use this skill to draft a system specification, reconcile it with the repo's rul
    - Use `state: supercedes` when an item replaces same-section ids.
    - Keep every `supercedes` reference inside the same section.
 3. Validate the specification.
-   - Run `powdrr-lift evaluate-system-specification --work-item-name <work-item-name>`.
+   - Run `powdrr-lift evaluate docs/proposals/<work-item-name>/system-specification.yaml`.
    - If using MCP, call `validate_system_specification` with the work item name.
    - Treat any validation failure as a cue to fix the spec and rerun the validator.
 4. Iterate until clean.

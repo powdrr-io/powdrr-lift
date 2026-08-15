@@ -30,9 +30,8 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-system-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    - evaluate
+    - docs/proposals/<work-item-name>
 - description: Generate the architecture template and fill it out.
   llm_type: simple_task
   details: Capture the entity model before review.
@@ -59,11 +58,8 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
+    - evaluate
+    - docs/proposals/<work-item-name>
 - description: Generate the implementation template and fill it out.
   llm_type: simple_task
   details: >-
@@ -81,9 +77,8 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    - evaluate
+    - docs/proposals/<work-item-name>
 - description: Decide on proposed PRs and fill each template.
   llm_type: high_reasoning
   details: Fill PR templates with intent, criteria, tests, and risks.
@@ -104,32 +99,17 @@ steps:
 - description: Validate every generated specification before implementation.
   llm_type: fast_iteration
   details: >-
-    Run each validation command below once in order. If a command reports a
-    validation error, edit the affected document before rerunning that command;
-    never repeat an unchanged validation command. After all three commands
-    succeed and the documents agree, record the results and choose `next_step`
+    Run the generic evaluator below once for the specification directory. If it
+    reports a validation error, edit the affected document before rerunning it;
+    never repeat an unchanged validation command. After all documents succeed
+    and agree, record the results and choose `next_step`
     immediately.
   tool_invocations:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-system-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate-architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate-implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    - evaluate
+    - docs/proposals/<work-item-name>
 - description: If any specification validation fails, fix it and return to the validation
     step.
   llm_type: fast_iteration

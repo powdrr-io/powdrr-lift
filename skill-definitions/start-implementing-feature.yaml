@@ -96,6 +96,23 @@ steps:
     - <feature-name>
     - --output
     - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
+- description: Validate every spec-v1 document before creating execution workflows.
+  llm_type: fast_iteration
+  details: >-
+    Run the single evaluate command once on the selected feature specification
+    directory. It discovers every recognized spec-v1 YAML file and validates
+    each file against its schema and cross-document rules. If it reports an
+    error, use its corrective guidance to edit the affected document with
+    yaml_edit, then rerun evaluate only after the document has changed. Do not
+    instantiate workflows, stage artifacts, request approval, or create a pull
+    request while any spec-v1 document is invalid. Record the successful
+    validation results and exact validated paths in context for the next step.
+  tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - evaluate
+    - docs/proposals/<feature-name>
 - description: Instantiate an execution workflow for every proposed PR.
   llm_type: simple_task
   details: >-

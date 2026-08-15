@@ -18,7 +18,10 @@ from powdrr_lift.core.spec_paths import (
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
 from powdrr_lift.core.specification_v1 import validate_module_tool_sections
 from powdrr_lift.core.template_generation import merge_existing_template_content
-from powdrr_lift.core.validation_messages import ValidationError
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
 
 _RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
 
@@ -1012,13 +1015,5 @@ def _report_to_data(
         "validation_successful": report.validation_successful,
         "title": report.title,
         "allowed_entity_types": report.allowed_entity_types,
-        "issues": [
-            {
-                "code": issue.code,
-                "message": issue.instructional_message(),
-                "corrective_action": issue.corrective_action,
-                **({"path": issue.path} if issue.path is not None else {}),
-            }
-            for issue in report.issues
-        ],
+        "issues": [validation_error_to_data(issue) for issue in report.issues],
     }

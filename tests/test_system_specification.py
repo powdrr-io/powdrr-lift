@@ -356,3 +356,32 @@ def test_cli_validate_system_specification_reports_yaml(
     report = yaml.safe_load(stdout.getvalue())
     assert report["validation_successful"] is True
     assert report["system_id"] == "sys-1"
+
+
+def test_cli_evaluate_includes_yaml_edit_for_top_level_specification_issue(
+    tmp_path: Path,
+) -> None:
+    spec_path = tmp_path / "system-specification.yaml"
+    spec_path.write_text(
+        "version: 1\nrequirements: []\napproach: []\n",
+        encoding="utf-8",
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(["evaluate", str(spec_path), "--repo-root", str(tmp_path)])
+
+    assert exit_code == 1
+    report = yaml.safe_load(stdout.getvalue())
+    issue = next(issue for issue in report["issues"] if issue["path"] == "id")
+    assert issue["yaml_edit"] == {
+        "kind": "yaml_edit",
+        "file_path": str(spec_path),
+        "operations": [
+            {
+                "op": "set_value",
+                "path": ["id"],
+                "value": "<correct-value>",
+            }
+        ],
+    }

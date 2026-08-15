@@ -1652,6 +1652,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
             continue
 
         print(f"File: {specification_path}")
+        report_yaml = report_yaml.replace("<validated-file>", str(specification_path))
         sys.stdout.write(report_yaml)
         if not report_yaml.endswith("\n"):
             sys.stdout.write("\n")

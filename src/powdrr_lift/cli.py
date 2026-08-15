@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import subprocess
 import sys
@@ -846,6 +847,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     openai_proxy_parser.set_defaults(func=_run_openai_proxy)
 
+    llm_diff_parser = subparsers.add_parser(
+        "llm-diff",
+        aliases=["llm_diff"],
+        help="Show the differences between two recorded llm-*.json exchanges.",
+    )
+    llm_diff_parser.add_argument(
+        "first_file",
+        type=Path,
+        help="Earlier or reference llm-*.json exchange file.",
+    )
+    llm_diff_parser.add_argument(
+        "second_file",
+        type=Path,
+        help="Later or changed llm-*.json exchange file.",
+    )
+    llm_diff_parser.set_defaults(func=_run_llm_diff)
+
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
         aliases=["download_qwen_model"],
@@ -1678,6 +1696,42 @@ def _run_openai_proxy(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _run_llm_diff(args: argparse.Namespace) -> int:
+    try:
+        first = _read_llm_exchange(args.first_file)
+        second = _read_llm_exchange(args.second_file)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(f"llm-diff: {exc}", file=sys.stderr)
+        return 2
+
+    first_text = json.dumps(first, ensure_ascii=False, indent=2, sort_keys=True)
+    second_text = json.dumps(second, ensure_ascii=False, indent=2, sort_keys=True)
+    diff = difflib.unified_diff(
+        first_text.splitlines(),
+        second_text.splitlines(),
+        fromfile=str(args.first_file),
+        tofile=str(args.second_file),
+        lineterm="",
+    )
+    output = "\n".join(diff)
+    if output:
+        sys.stdout.write(output + "\n")
+    else:
+        print("No differences.")
+    return 0
+
+
+def _read_llm_exchange(path: Path) -> object:
+    try:
+        exchange = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}: invalid JSON: {exc.msg}") from exc
+
+    if not isinstance(exchange, dict):
+        raise ValueError(f"{path}: expected a JSON object")
+    return exchange
 
 
 def _run_download_qwen_model(args: argparse.Namespace) -> int:

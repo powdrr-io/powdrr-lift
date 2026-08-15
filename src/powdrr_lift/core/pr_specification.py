@@ -258,13 +258,14 @@ def validate_pr_specification_yaml(
     *,
     work_item_name: str,
     repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
 ) -> str:
     report = build_pr_specification_validation_report(
         proposed_pr_specification_yaml,
         work_item_name=work_item_name,
         repo_root=repo_root,
     )
-    return yaml.safe_dump(_report_to_data(report), sort_keys=False)
+    return yaml.safe_dump(_report_to_data(report, file_path=file_path), sort_keys=False)
 
 
 def build_pr_specification_validation_report(
@@ -969,10 +970,15 @@ def _resolve_output_path(
 
 def _report_to_data(
     report: PRSpecificationValidationReport,
+    *,
+    file_path: str | Path | None = None,
 ) -> Mapping[str, Any]:
     return {
         "validation_successful": report.validation_successful,
-        "issues": [validation_error_to_data(issue) for issue in report.issues],
+        "issues": [
+            validation_error_to_data(issue, file_path=str(file_path))
+            for issue in report.issues
+        ],
         "proposed_pr_id": report.proposed_pr_id,
         "available_feature_ids": report.available_feature_ids,
         "known_pr_ids": report.known_pr_ids,

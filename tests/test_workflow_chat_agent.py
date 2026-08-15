@@ -4992,7 +4992,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     _assert_validation_success(implementation_report, label="implementation")
     _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
-    assert "Would you please review the draft result?" in stdout.getvalue()
+    assert "Would you please review the draft result?" not in stdout.getvalue()
 
     start_skills_dir = worktree_root / "skill-definitions"
     start_output_dir = Path("start-generated")

@@ -502,13 +502,10 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
     with redirect_stdout(stdout):
         exit_code = main(
             [
-                "evaluate-pr-specification",
-                "--work-item-name",
-                "PR-456",
+                "evaluate",
+                str(spec_path),
                 "--repo-root",
                 str(tmp_path),
-                "--input",
-                str(spec_path),
             ]
         )
 

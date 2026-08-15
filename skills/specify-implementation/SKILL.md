@@ -26,7 +26,7 @@ Use this skill to produce an implementation specification that stays consistent 
    - Give each feature a unique id, a description, and functional requirements.
    - Give each decision a unique id and description.
 4. Validate the specification.
-   - Run `powdrr-lift evaluate-implementation-specification --work-item-name <work-item-name>`.
+   - Run `powdrr-lift evaluate docs/proposals/<work-item-name>/implementation-specification.yaml`.
    - If using MCP, call `validate_implementation_specification` with the work item name.
    - Treat any validation failure as a cue to fix the spec and rerun the validator.
 5. Iterate until clean.

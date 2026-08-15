@@ -564,17 +564,14 @@ def test_cli_validate_architecture_specification_reports_yaml(
     with redirect_stdout(stdout):
         exit_code = main(
             [
-                "evaluate-architecture-specification",
-                "--work-item-name",
-                "powdrr-lift",
+                "evaluate",
+                str(spec_path),
                 "--entity-type",
                 "Service",
                 "--entity-type",
                 "Skill",
                 "--repo-root",
                 str(tmp_path),
-                "--input",
-                str(spec_path),
             ]
         )
 

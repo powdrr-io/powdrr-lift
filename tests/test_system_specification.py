@@ -345,13 +345,10 @@ def test_cli_validate_system_specification_reports_yaml(
     with redirect_stdout(stdout):
         exit_code = main(
             [
-                "evaluate-system-specification",
-                "--work-item-name",
-                "powdrr-lift",
+                "evaluate",
+                str(spec_path),
                 "--repo-root",
                 str(tmp_path),
-                "--input",
-                str(spec_path),
             ]
         )
 

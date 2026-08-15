@@ -387,13 +387,10 @@ def test_cli_validate_implementation_specification_reports_yaml(
     with redirect_stdout(stdout):
         exit_code = main(
             [
-                "evaluate-implementation-specification",
-                "--work-item-name",
-                "powdrr-lift",
+                "evaluate",
+                str(spec_path),
                 "--repo-root",
                 str(tmp_path),
-                "--input",
-                str(spec_path),
             ]
         )
 

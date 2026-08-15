@@ -41,13 +41,13 @@ Use this skill when you need to take a feature from discovery through implementa
    - If so, have the produced file say, "This file is already complete, delete this line and then move on to the next step".
    - Otherwise keep the normal system-map instructions.
    - Fill the sections one at a time, verify each section, and remove instructions when done.
-   - After filling the file, run `powdrr-lift evaluate-system-specification --work-item-name <work-item-name>` to make sure the file validates before moving on.
+   - After filling the file, run `powdrr-lift evaluate docs/proposals/<work-item-name>/system-specification.yaml` to make sure the file validates before moving on.
 3. Build the feature and PR template.
    - Dispatch a fresh subagent to own this phase.
    - Run `powdrr-lift feature-pr-specification --work-item-name <work-item-name>`.
    - If using MCP, call `create_feature_pr_specification`.
    - Use the completed system map and the request to produce the implementation contract.
-   - After filling the file, run `powdrr-lift evaluate-pr-specification --work-item-name <work-item-name>` to make sure the file validates before moving on.
+   - After filling the file, run `powdrr-lift evaluate docs/proposals/<work-item-name>/proposed-pr-specification.yaml` to make sure the file validates before moving on.
 4. Execute implementation tasks.
    - Split the work into small, disjoint tasks from the template, the changelog gaps, or the plan diff.
    - For each task:

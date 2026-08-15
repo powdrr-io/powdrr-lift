@@ -31,7 +31,7 @@ steps:
     consistent.
   llm_type: fast_iteration
   details: >-
-    Invoke the listed architecture validator exactly once after the specification
+    Invoke the generic evaluator exactly once after the specification
     edits. If it succeeds, use its result to confirm that no inconsistencies
     remain and choose `next_step` immediately. If it reports validation errors,
     edit the specification to address them before invoking the validator again;
@@ -40,8 +40,5 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
+    - evaluate
+    - docs/proposals/<work-item-name>/architecture-specification.yaml

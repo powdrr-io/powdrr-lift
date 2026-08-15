@@ -30,7 +30,7 @@ steps:
 - description: Validate the filled template and resolve any reported issues.
   llm_type: fast_iteration
   details: >-
-    Invoke the system validator once for the current file. If it succeeds,
+    Invoke the generic evaluator once for the current file. If it succeeds,
     record that the system specification is valid and choose `next_step`
     immediately. If it reports validation errors, edit the file to address
     them before invoking the validator again; never repeat the same validation
@@ -39,6 +39,5 @@ steps:
   - tool: internal
     command:
     - powdrr-lift
-    - evaluate-system-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    - evaluate
+    - docs/proposals/<work-item-name>/system-specification.yaml

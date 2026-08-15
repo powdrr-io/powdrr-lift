@@ -26,7 +26,7 @@ Use this skill to draft a PR specification that ties a proposed PR to current fe
    - Keep the proposed PR self-contained; use the section lists to describe
      what changes, not a file list.
 3. Validate the specification.
-   - Run `powdrr-lift evaluate-pr-specification --input docs/specs/<work-item-name>/proposed-pr-specification.yaml`.
+   - Run `powdrr-lift evaluate docs/specs/<work-item-name>/proposed-pr-specification.yaml`.
    - If using MCP, call `validate_pr_specification`.
    - Treat any validation failure as a cue to fix the template and rerun.
 4. Iterate until clean.

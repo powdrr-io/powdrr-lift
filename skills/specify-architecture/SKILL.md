@@ -25,7 +25,7 @@ Use this skill to produce an architecture specification that stays consistent wi
    - Use `related.entities` and `related.entity_relationships` in `invariants` and `guidance` whenever those items refer to specific entities or relationships.
    - Keep every entity mentioned anywhere in the spec listed in `entities`.
 3. Validate the specification.
-   - Run `powdrr-lift evaluate-architecture-specification --work-item-name <work-item-name> --entity-type <type> ...`.
+   - Run `powdrr-lift evaluate docs/proposals/<work-item-name>/architecture-specification.yaml`.
    - If using MCP, call `validate_architecture_specification` with the same
      allowed entity type list and work item name.
    - Use the same allowed entity type set you used when creating the template.

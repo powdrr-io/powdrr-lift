@@ -277,9 +277,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     )
     assert skill.steps[2].tool_invocations[0].command == (
         "powdrr-lift",
-        "evaluate-system-specification",
-        "--work-item-name",
-        "<work-item-name>",
+        "evaluate",
+        "docs/proposals/<work-item-name>",
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
@@ -296,11 +295,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert "choose `next_step` immediately" in (skill.steps[9].details or "")
     assert skill.steps[4].tool_invocations[0].command == (
         "powdrr-lift",
-        "evaluate-architecture-specification",
-        "--work-item-name",
-        "<work-item-name>",
-        "--entity-type",
-        "<type>",
+        "evaluate",
+        "docs/proposals/<work-item-name>",
     )
     assert skill.steps[5].tool_invocations[0].command == (
         "powdrr-lift",
@@ -317,23 +313,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert [invocation.command for invocation in skill.steps[9].tool_invocations] == [
         (
             "powdrr-lift",
-            "evaluate-system-specification",
-            "--work-item-name",
-            "<work-item-name>",
-        ),
-        (
-            "powdrr-lift",
-            "evaluate-architecture-specification",
-            "--work-item-name",
-            "<work-item-name>",
-            "--entity-type",
-            "<type>",
-        ),
-        (
-            "powdrr-lift",
-            "evaluate-implementation-specification",
-            "--work-item-name",
-            "<work-item-name>",
+            "evaluate",
+            "docs/proposals/<work-item-name>",
         ),
     ]
     assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
@@ -755,7 +736,7 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
         "<work-item-name>",
     )
     assert skill.steps[3].details == (
-        "Invoke the listed system validator exactly once after the specification "
+        "Invoke the generic evaluator exactly once after the specification "
         "edits. If it succeeds, use its result to confirm that no inconsistencies "
         "remain and choose `next_step` immediately. If it reports validation "
         "errors, edit the specification to address them before invoking the "
@@ -763,9 +744,8 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
-        "evaluate-system-specification",
-        "--work-item-name",
-        "<work-item-name>",
+        "evaluate",
+        "docs/proposals/<work-item-name>/system-specification.yaml",
     )
 
 
@@ -807,7 +787,7 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "and stop."
     )
     assert skill.steps[3].details == (
-        "Invoke the listed architecture validator exactly once after the "
+        "Invoke the generic evaluator exactly once after the "
         "specification edits. If it succeeds, use its result to confirm that "
         "no inconsistencies remain and choose `next_step` immediately. If it "
         "reports validation errors, edit the specification to address them "
@@ -824,9 +804,6 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",
-        "evaluate-architecture-specification",
-        "--work-item-name",
-        "<work-item-name>",
-        "--entity-type",
-        "<type>",
+        "evaluate",
+        "docs/proposals/<work-item-name>/architecture-specification.yaml",
     )

@@ -155,25 +155,13 @@ steps:
     - proposed-pr-id=<proposed-pr-name>
     - --template
     - templates/execute-proposed-pr.yaml
-- description: Review and approve the implementation plan and workflows.
-  llm_type: high_reasoning
-  details: >-
-    Present the discovered feature documents, every proposed PR
-    implementation-specification, every execution workflow, and the dependency
-    order to the user. Ask the user to approve the complete implementation
-    plan or identify specific changes. If the user requests changes, update
-    the affected specifications or workflows and review them again. Do not
-    commit artifacts, create a pull request, or begin implementation until the
-    user explicitly approves the PR boundaries, implementation files, tests,
-    acceptance criteria, validation commands, risks, and dependency order.
-    Pass the approved artifact paths and approval decision to the next step.
-- description: Stage the approved artifacts for pull request preparation.
+- description: Stage the validated artifacts for pull request preparation.
   llm_type: simple_task
   details: >-
-    Only after explicit user approval, inspect the worktree and stage the
-    approved implementation specifications under docs/proposals/<feature-name>/ and
-    execution workflows under docs/workflows/. Review the staged paths and do
-    not commit or create a pull request yet.
+    Inspect the worktree and stage the validated implementation specifications
+    under docs/proposals/<feature-name>/ and execution workflows under
+    docs/workflows/. Review the staged paths and do not commit or create a pull
+    request yet.
   tool_invocations:
   - tool: internal
     command:
@@ -188,17 +176,17 @@ steps:
 - description: Run finish-pr-prep before creating the draft pull request.
   llm_type: fast_iteration
   details: >-
-    Run finish-pr-prep after the approved planning artifacts are staged. If
-    cleanup changes files, restage only the approved planning artifacts before
+    Run finish-pr-prep after the validated planning artifacts are staged. If
+    cleanup changes files, restage only the validated planning artifacts before
     continuing. Do not implement any proposed PR in this skill.
   uses_skills:
   - finish-pr-prep
-- description: Commit the approved artifacts and open a draft pull request.
+- description: Commit the validated artifacts and open a draft pull request.
   llm_type: simple_task
   details: >-
     You must invoke create-pull-request with pr-kind `feature`, commit message
     `Add <feature-name> implementation workflow`, and pull-request title
-    `<pull-request-title>`. Pass the approved planning artifacts and the
+    `<pull-request-title>`. Pass the validated planning artifacts and the
     Feature Plan context. Do not summarize or print a proposed PR description,
     and do not advance to the handoff step until the nested skill has actually
     committed, pushed, and created or updated a pull request successfully. If
@@ -211,5 +199,5 @@ steps:
   details: >-
     Show the pull request URL. Summarize the feature specification used, every
     proposed PR implementation-specification, every execution workflow, and
-    their dependency relationships. State that implementation has not begun
-    and wait for the user's review and approval before any implementation work.
+    their dependency relationships. State that implementation has not begun;
+    the draft pull request is ready for the user's review.

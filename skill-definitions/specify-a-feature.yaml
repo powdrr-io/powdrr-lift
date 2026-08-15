@@ -89,13 +89,6 @@ steps:
     - pr-specification
     - "--work-item-name"
     - "<work-item-name>"
-- description: Prompt the user to review the result.
-  llm_type: standard_reasoning
-  details: Show the draft plan and confirm it still matches.
-- description: Incorporate the user's approved feedback into the feature plan.
-  llm_type: high_reasoning
-  details: Update the specifications and proposed PRs only when the user confirms
-    a change.
 - description: Validate every generated specification before implementation.
   llm_type: fast_iteration
   details: >-

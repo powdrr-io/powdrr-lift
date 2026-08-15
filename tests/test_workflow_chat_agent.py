@@ -69,6 +69,7 @@ from powdrr_lift.workflow_chat_agent import (
     _action_repair_prompt,
     _action_system_prompt,
     _apply_file_edits,
+    _apply_yaml_operations,
     _available_work_item_documents,
     _available_work_item_names,
     _backup_model_for,
@@ -114,6 +115,7 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     _WorkflowStructuredDocumentError,
+    _WorkflowYamlEditError,
     _worktree_reuse_decision,
     download_local_qwen_model,
     run_workflow_chat,
@@ -3432,6 +3434,93 @@ def test_empty_replace_text_removes_the_selected_lines() -> None:
     )
 
     assert _apply_file_edits("one\ntwo\nthree\nfour\n", action.edits) == ("one\nfour\n")
+
+
+def test_yaml_edit_preserves_section_keys_and_updates_items_structurally() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/specification.yaml",
+            "operations": [
+                {
+                    "op": "upsert_item",
+                    "section": "entities",
+                    "id": "interaction-log-entry",
+                    "value": {
+                        "action": "added",
+                        "rationale": "Capture one interaction.",
+                    },
+                },
+                {
+                    "op": "set_value",
+                    "path": ["title"],
+                    "value": "Interaction File Logging",
+                },
+            ],
+        }
+    )
+
+    updated = _apply_yaml_operations(
+        Path("docs/specification.yaml"),
+        "title: null\nentities:\n  - id: null\n    action: null\n",
+        action.yaml_operations,
+    )
+
+    assert yaml.safe_load(updated) == {
+        "title": "Interaction File Logging",
+        "entities": [
+            {
+                "action": "added",
+                "rationale": "Capture one interaction.",
+                "id": "interaction-log-entry",
+            }
+        ],
+    }
+    assert "entities:" in updated
+
+
+def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
+    with pytest.raises(RuntimeError, match="non-empty operations array"):
+        _parse_action_response(
+            {"kind": "yaml_edit", "file_path": "docs/specification.yaml"}
+        )
+
+    with pytest.raises(RuntimeError, match="upsert_item, remove_item, or set_value"):
+        _parse_action_response(
+            {
+                "kind": "yaml_edit",
+                "file_path": "docs/specification.yaml",
+                "operations": [{"op": "replace_lines"}],
+            }
+        )
+
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/specification.yaml",
+            "operations": [
+                {
+                    "op": "remove_item",
+                    "section": "entities",
+                    "id": "missing",
+                }
+            ],
+        }
+    )
+    with pytest.raises(_WorkflowYamlEditError, match="Use read_document"):
+        _apply_yaml_operations(
+            Path("docs/specification.yaml"),
+            "entities:\n  - id: present\n",
+            action.yaml_operations,
+        )
+
+    feedback = _workflow_edit_failure_feedback(
+        action,
+        _WorkflowYamlEditError("No item with id 'missing' exists."),
+        {"exists": True, "line_count": 2},
+    )
+    assert "upsert_item" in feedback
+    assert "Do not use line numbers" in feedback
 
 
 def test_edit_action_can_update_multiple_files_in_one_response(

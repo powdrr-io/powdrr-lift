@@ -70,10 +70,10 @@ def test_cli_llm_diff_shows_json_changes(tmp_path: Path) -> None:
     diff = stdout.getvalue()
     assert f"--- {first_path}" in diff
     assert f"+++ {second_path}" in diff
-    assert '-          "content": "old prompt"' in diff
-    assert '+          "content": "new prompt"' in diff
-    assert '-      "text": "old answer"' in diff
-    assert '+      "text": "new answer"' in diff
+    assert '-      "content": "old prompt"' in diff
+    assert '+      "content": "new prompt"' in diff
+    assert '-    "text": "old answer"' in diff
+    assert '+    "text": "new answer"' in diff
 
 
 def test_cli_llm_diff_reports_invalid_json(tmp_path: Path) -> None:

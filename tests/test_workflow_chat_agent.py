@@ -4976,7 +4976,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     event_kinds = [event["kind"] for event in summary["execution_events"]]
     assert event_kinds[0:2] == ["prompt_user", "next_step"]
     assert event_kinds[-2:] == ["prompt_user", "complete"]
-    assert event_kinds.count("edit") == 4
+    assert event_kinds.count("yaml_edit") == 4
     assert event_kinds.count("invoke_tool") >= 7
 
     system_report = yaml.safe_load(

@@ -158,6 +158,14 @@ directory.
 powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/implement-a-feature
 ```
 
+Durable tasks can be processed with `process-workflow-task`. This agent uses
+the `deepinfra-cheap` provider by default and reads `DEEPINFRA_API_TOKEN` (or
+`DEEPINFRA_API_KEY`):
+
+```bash
+powdrr-lift process-workflow-task --workflow-dir docs/workflows/implement-a-feature --repo-root .
+```
+
 ### Command-key clipboard shortcuts
 
 The workflow chat TUI uses Textual's Kitty keyboard protocol support. Textual

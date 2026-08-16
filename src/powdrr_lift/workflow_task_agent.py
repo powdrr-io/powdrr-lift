@@ -29,7 +29,7 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.workflow_chat_agent import (
-    ZAI_LLM_MAPPINGS,
+    DEEPINFRA_CHEAP_LLM_MAPPINGS,
     LocalLlamaChatClient,
     SkillCatalogEntry,
     _action_system_prompt,
@@ -556,15 +556,15 @@ def run_workflow_task(
     )
     mapping = _resolve_llm_mapping(
         task.llm_type,
-        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
-        provider="zai",
+        mappings=tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
+        provider="deepinfra-cheap",
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
     model = mapping.model
     client_was_provided = client is not None
     if client is None:
-        client = _build_zai_client(config, task, progress_stream=stderr)
+        client = _build_workflow_client(config, task, progress_stream=stderr)
     dump_root = _resolve_project_root(
         configured_repo_root,
         repo_root,
@@ -573,11 +573,11 @@ def run_workflow_task(
     compaction_client = client
     long_context_backup = _long_context_backup_for(
         model,
-        tuple(ZAI_LLM_MAPPINGS.items()),
+        tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
     )
     if not client_was_provided and long_context_backup is not None:
         compaction_client = _LLMExchangeRecordingClient(
-            _build_zai_client_for_mapping(
+            _build_workflow_client_for_mapping(
                 config,
                 task,
                 long_context_backup,
@@ -1540,7 +1540,7 @@ def _next_handoff_id(workflow: WorkflowInstance) -> str:
     return f"human-input-{index}"
 
 
-def _build_zai_client(
+def _build_workflow_client(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
     *,
@@ -1548,12 +1548,12 @@ def _build_zai_client(
 ) -> WorkflowLLMClient:
     mapping = _resolve_llm_mapping(
         task.llm_type,
-        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
-        provider="zai",
+        mappings=tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
+        provider="deepinfra-cheap",
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
-    return _build_zai_client_for_mapping(
+    return _build_workflow_client_for_mapping(
         config,
         task,
         mapping,
@@ -1561,7 +1561,7 @@ def _build_zai_client(
     )
 
 
-def _build_zai_client_for_mapping(
+def _build_workflow_client_for_mapping(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
     mapping: Any,

@@ -158,8 +158,10 @@ directory.
 powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/implement-a-feature
 ```
 
-Durable tasks can be processed with `process-workflow-task`. This agent uses
-the `deepinfra-cheap` provider by default and reads `DEEPINFRA_API_TOKEN` (or
+Durable tasks can be processed with `process-workflow-task`. Its `auto` default
+uses the same credential and provider-priority lookup as `workflow-chat`; pass
+`--provider` to override it explicitly. For example, when DeepInfra is the
+highest-priority configured provider, it reads `DEEPINFRA_API_TOKEN` (or
 `DEEPINFRA_API_KEY`):
 
 ```bash

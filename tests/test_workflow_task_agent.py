@@ -663,6 +663,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
 ) -> None:
     workflow = _workflow(tmp_path)
     captured: dict[str, str] = {}
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "test-token")
 
     class _FakeOpenAIClient:
         def __init__(

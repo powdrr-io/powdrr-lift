@@ -5966,6 +5966,21 @@ def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
     return LLMProviderRoles(normal=normal, adversarial=adversarial)
 
 
+def resolve_workflow_provider(
+    provider: str = "auto",
+    *,
+    normal_provider: str | None = None,
+) -> str:
+    """Resolve the normal provider using workflow-chat's provider policy."""
+    return _resolve_provider_roles(
+        SkillChatConfig(
+            skills_dir=Path("."),
+            provider=provider,
+            normal_provider=normal_provider,
+        )
+    ).normal
+
+
 def _auto_provider_candidates() -> tuple[str, ...]:
     """Return configured providers in their declared automatic priority order."""
     candidates: list[tuple[int, str]] = []

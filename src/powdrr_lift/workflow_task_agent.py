@@ -29,13 +29,13 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.workflow_chat_agent import (
-    DEEPINFRA_CHEAP_LLM_MAPPINGS,
     LocalLlamaChatClient,
     SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
+    _default_llm_mappings,
     _estimate_message_tokens,
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
@@ -54,6 +54,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _resolve_worktree_file_path,
     _validate_internal_command,
+    resolve_workflow_provider,
 )
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
@@ -77,6 +78,7 @@ from powdrr_lift.workflow_llm import (
 class WorkflowTaskAgentConfig:
     workflow_dir: Path
     repo_root: Path = Path(".")
+    provider: str = "auto"
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
@@ -554,10 +556,12 @@ def run_workflow_task(
         reason=f"claim {task.task_id}",
         stdout=stdout,
     )
+    provider = resolve_workflow_provider(config.provider)
+    mappings = tuple(_default_llm_mappings(provider).items())
     mapping = _resolve_llm_mapping(
         task.llm_type,
-        mappings=tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
-        provider="deepinfra-cheap",
+        mappings=mappings,
+        provider=provider,
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
@@ -573,7 +577,7 @@ def run_workflow_task(
     compaction_client = client
     long_context_backup = _long_context_backup_for(
         model,
-        tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
+        mappings,
     )
     if not client_was_provided and long_context_backup is not None:
         compaction_client = _LLMExchangeRecordingClient(
@@ -1546,10 +1550,11 @@ def _build_workflow_client(
     *,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
+    provider = resolve_workflow_provider(config.provider)
     mapping = _resolve_llm_mapping(
         task.llm_type,
-        mappings=tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
-        provider="deepinfra-cheap",
+        mappings=tuple(_default_llm_mappings(provider).items()),
+        provider=provider,
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")

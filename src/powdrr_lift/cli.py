@@ -1014,6 +1014,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root used as the working directory for task tools.",
     )
     process_workflow_task_parser.add_argument(
+        "--provider",
+        choices=["auto", *ALL_PROVIDERS],
+        default="auto",
+        help=(
+            "Normal LLM provider to use. Auto applies the same configured "
+            "provider-priority lookup as workflow-chat."
+        ),
+    )
+    process_workflow_task_parser.add_argument(
         "--task-id",
         help="Process this task instead of the first ready agent task.",
     )
@@ -1177,6 +1186,7 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
         WorkflowTaskAgentConfig(
             workflow_dir=workflow_dir,
             repo_root=repo_root,
+            provider=args.provider,
             task_id=args.task_id,
             api_key=args.api_key,
             base_url=args.base_url,

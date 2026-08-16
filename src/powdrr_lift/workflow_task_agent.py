@@ -29,6 +29,8 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.workflow_chat_agent import (
+    _DEFAULT_MODEL,
+    LLMModelMapping,
     LocalLlamaChatClient,
     SkillCatalogEntry,
     _action_system_prompt,
@@ -558,7 +560,7 @@ def run_workflow_task(
     )
     provider = resolve_workflow_provider(config.provider)
     mappings = tuple(_default_llm_mappings(provider).items())
-    mapping = _resolve_llm_mapping(
+    mapping = _resolve_workflow_task_mapping(
         task.llm_type,
         mappings=mappings,
         provider=provider,
@@ -1551,7 +1553,7 @@ def _build_workflow_client(
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
     provider = resolve_workflow_provider(config.provider)
-    mapping = _resolve_llm_mapping(
+    mapping = _resolve_workflow_task_mapping(
         task.llm_type,
         mappings=tuple(_default_llm_mappings(provider).items()),
         provider=provider,
@@ -1563,6 +1565,24 @@ def _build_workflow_client(
         task,
         mapping,
         progress_stream=progress_stream,
+    )
+
+
+def _resolve_workflow_task_mapping(
+    llm_type: str | None,
+    *,
+    mappings: tuple[tuple[str, LLMModelMapping], ...],
+    provider: str,
+) -> LLMModelMapping | None:
+    """Resolve task mappings, using workflow-chat's model for generic providers."""
+    if llm_type is None:
+        return None
+    if not mappings:
+        return LLMModelMapping(_DEFAULT_MODEL, provider=provider)
+    return _resolve_llm_mapping(
+        llm_type,
+        mappings=mappings,
+        provider=provider,
     )
 
 

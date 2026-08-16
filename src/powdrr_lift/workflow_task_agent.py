@@ -84,7 +84,7 @@ class WorkflowTaskAgentConfig:
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
-    max_roundtrips: int = 12
+    max_roundtrips: int | None = None
     max_stalled_roundtrips: int = 3
     max_timeout_retries: int = 3
     timeout_backoff_seconds: float = 2.0
@@ -123,6 +123,30 @@ class _TaskActionProgressStrategy(WorkflowActionProgressStrategy[WorkflowAction]
         )
         if observation.decision == ProgressDecision.THRESHOLD:
             self.action_engine.reset_progress()
+
+
+class _WorkflowTaskDisplayClient:
+    """Display complete workflow-task exchanges instead of transport chunks."""
+
+    def __init__(self, client: WorkflowLLMClient, *, stderr: TextIO) -> None:
+        self._client = client
+        self._stderr = stderr
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        print(
+            "Workflow task LLM input:\n"
+            f"{json.dumps(messages, indent=2, ensure_ascii=False)}",
+            file=self._stderr,
+            flush=True,
+        )
+        response = self._client.complete_json(messages)
+        print(
+            "Workflow task LLM output:\n"
+            f"{json.dumps(response, indent=2, ensure_ascii=False)}",
+            file=self._stderr,
+            flush=True,
+        )
+        return response
 
 
 @dataclass(slots=True)
@@ -514,7 +538,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     def exhausted_roundtrips_exit_code(self) -> int:
         print(
             "Workflow task "
-            f"{self.task.task_id} blocked after reaching the roundtrip limit.",
+            f"{self.task.task_id} stopped after reaching the configured "
+            "roundtrip limit.",
             file=self.stderr,
         )
         _publish_workflow_progress(
@@ -570,11 +595,12 @@ def run_workflow_task(
     model = mapping.model
     client_was_provided = client is not None
     if client is None:
-        client = _build_workflow_client(config, task, progress_stream=stderr)
+        client = _build_workflow_client(config, task)
     dump_root = _resolve_project_root(
         configured_repo_root,
         repo_root,
     )
+    client = _WorkflowTaskDisplayClient(client, stderr=stderr)
     client = _LLMExchangeRecordingClient(client, dump_root)
     compaction_client = client
     long_context_backup = _long_context_backup_for(
@@ -583,11 +609,13 @@ def run_workflow_task(
     )
     if not client_was_provided and long_context_backup is not None:
         compaction_client = _LLMExchangeRecordingClient(
-            _build_workflow_client_for_mapping(
-                config,
-                task,
-                long_context_backup,
-                progress_stream=stderr,
+            _WorkflowTaskDisplayClient(
+                _build_workflow_client_for_mapping(
+                    config,
+                    task,
+                    long_context_backup,
+                ),
+                stderr=stderr,
             ),
             dump_root,
         )

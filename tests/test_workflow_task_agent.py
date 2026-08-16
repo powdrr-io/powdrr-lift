@@ -20,7 +20,7 @@ from powdrr_lift.core import (
 from powdrr_lift.workflow_chat_agent import LLMModelLimits, _action_system_prompt
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
-    _build_zai_client,
+    _build_workflow_client,
     _handle_exhausted_timeout,
     _workflow_file_command_error,
     run_workflow_task,
@@ -657,32 +657,55 @@ def test_workflow_file_command_error_is_not_reported_for_exact_filename(
     )
 
 
-def test_workflow_task_client_uses_task_llm_type_for_zai_model(
+def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     workflow = _workflow(tmp_path)
     captured: dict[str, str] = {}
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "test-token")
 
-    class _FakeLocalClient:
-        def __init__(self, *, model_path: Path) -> None:
-            captured["model_path"] = str(model_path)
+    class _FakeOpenAIClient:
+        def __init__(
+            self,
+            *,
+            model: str,
+            api_key: str,
+            base_url: str,
+            limits: object,
+            progress_stream: object = None,
+        ) -> None:
+            captured.update(
+                {
+                    "model": model,
+                    "api_key": api_key,
+                    "base_url": base_url,
+                }
+            )
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent.LocalLlamaChatClient",
-        _FakeLocalClient,
+        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._resolve_local_model_path",
-        lambda model_cache_dir: tmp_path / "qwen2.5-coder-q5_k_m.gguf",
+        "powdrr_lift.workflow_task_agent._resolve_credentials",
+        lambda provider, api_key, base_url: type(
+            "Credentials",
+            (),
+            {"api_key": "test-token", "base_url": "https://example.test"},
+        )(),
     )
 
-    _build_zai_client(
+    _build_workflow_client(
         WorkflowTaskAgentConfig(workflow_dir=workflow.directory),
         workflow.tasks[0],
     )
 
-    assert captured == {"model_path": str(tmp_path / "qwen2.5-coder-q5_k_m.gguf")}
+    assert captured == {
+        "model": "deepseek-ai/DeepSeek-V4-Flash",
+        "api_key": "test-token",
+        "base_url": "https://example.test",
+    }
 
 
 def test_process_workflow_task_blocks_with_human_handoff_and_follow_up(

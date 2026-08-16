@@ -158,6 +158,16 @@ directory.
 powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/implement-a-feature
 ```
 
+Durable tasks can be processed with `process-workflow-task`. Its `auto` default
+uses the same credential and provider-priority lookup as `workflow-chat`; pass
+`--provider` to override it explicitly. For example, when DeepInfra is the
+highest-priority configured provider, it reads `DEEPINFRA_API_TOKEN` (or
+`DEEPINFRA_API_KEY`):
+
+```bash
+powdrr-lift process-workflow-task --workflow-dir docs/workflows/implement-a-feature --repo-root .
+```
+
 ### Command-key clipboard shortcuts
 
 The workflow chat TUI uses Textual's Kitty keyboard protocol support. Textual

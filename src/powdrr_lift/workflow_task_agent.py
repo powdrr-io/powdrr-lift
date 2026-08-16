@@ -29,13 +29,15 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.workflow_chat_agent import (
-    ZAI_LLM_MAPPINGS,
+    _DEFAULT_MODEL,
+    LLMModelMapping,
     LocalLlamaChatClient,
     SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
+    _default_llm_mappings,
     _estimate_message_tokens,
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
@@ -54,6 +56,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _resolve_worktree_file_path,
     _validate_internal_command,
+    resolve_workflow_provider,
 )
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
@@ -77,6 +80,7 @@ from powdrr_lift.workflow_llm import (
 class WorkflowTaskAgentConfig:
     workflow_dir: Path
     repo_root: Path = Path(".")
+    provider: str = "auto"
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
@@ -554,17 +558,19 @@ def run_workflow_task(
         reason=f"claim {task.task_id}",
         stdout=stdout,
     )
-    mapping = _resolve_llm_mapping(
+    provider = resolve_workflow_provider(config.provider)
+    mappings = tuple(_default_llm_mappings(provider).items())
+    mapping = _resolve_workflow_task_mapping(
         task.llm_type,
-        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
-        provider="zai",
+        mappings=mappings,
+        provider=provider,
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
     model = mapping.model
     client_was_provided = client is not None
     if client is None:
-        client = _build_zai_client(config, task, progress_stream=stderr)
+        client = _build_workflow_client(config, task, progress_stream=stderr)
     dump_root = _resolve_project_root(
         configured_repo_root,
         repo_root,
@@ -573,11 +579,11 @@ def run_workflow_task(
     compaction_client = client
     long_context_backup = _long_context_backup_for(
         model,
-        tuple(ZAI_LLM_MAPPINGS.items()),
+        mappings,
     )
     if not client_was_provided and long_context_backup is not None:
         compaction_client = _LLMExchangeRecordingClient(
-            _build_zai_client_for_mapping(
+            _build_workflow_client_for_mapping(
                 config,
                 task,
                 long_context_backup,
@@ -1540,20 +1546,21 @@ def _next_handoff_id(workflow: WorkflowInstance) -> str:
     return f"human-input-{index}"
 
 
-def _build_zai_client(
+def _build_workflow_client(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
     *,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
-    mapping = _resolve_llm_mapping(
+    provider = resolve_workflow_provider(config.provider)
+    mapping = _resolve_workflow_task_mapping(
         task.llm_type,
-        mappings=tuple(ZAI_LLM_MAPPINGS.items()),
-        provider="zai",
+        mappings=tuple(_default_llm_mappings(provider).items()),
+        provider=provider,
     )
     if mapping is None:
         raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
-    return _build_zai_client_for_mapping(
+    return _build_workflow_client_for_mapping(
         config,
         task,
         mapping,
@@ -1561,7 +1568,25 @@ def _build_zai_client(
     )
 
 
-def _build_zai_client_for_mapping(
+def _resolve_workflow_task_mapping(
+    llm_type: str | None,
+    *,
+    mappings: tuple[tuple[str, LLMModelMapping], ...],
+    provider: str,
+) -> LLMModelMapping | None:
+    """Resolve task mappings, using workflow-chat's model for generic providers."""
+    if llm_type is None:
+        return None
+    if not mappings:
+        return LLMModelMapping(_DEFAULT_MODEL, provider=provider)
+    return _resolve_llm_mapping(
+        llm_type,
+        mappings=mappings,
+        provider=provider,
+    )
+
+
+def _build_workflow_client_for_mapping(
     config: WorkflowTaskAgentConfig,
     task: WorkflowTask,
     mapping: Any,

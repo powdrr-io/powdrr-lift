@@ -4307,7 +4307,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
         "Decide on proposed PRs and fill each template.",
-        "Prompt the user to review the result.",
+        "Validate every generated specification before implementation.",
     ]
 
     captured: dict[str, object] = {"messages": []}
@@ -4892,23 +4892,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="next_step",
                 )
                 response = {
-                    "kind": "prompt_user",
-                    "text": "Would you please review the draft result?",
-                    "decisions_and_context": "Ask the user to review the draft.",
-                }
-            elif self._call_index == 21:
-                self._assert_execution_prompt(
-                    messages,
-                    expected_step_index=7,
-                    expected_step_description=step_descriptions[7],
-                    expected_context_suffix="Ask the user to review the draft.",
-                    expected_event_count=20,
-                    expected_last_event_kind="prompt_user",
-                )
-                response = {
                     "kind": "complete",
                     "text": "Feature specification complete.",
-                    "decisions_and_context": "User review requested.",
+                    "decisions_and_context": "Specification validation is complete.",
                 }
             else:
                 raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
@@ -4966,7 +4952,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert summary["selected_skill_name"] == "specify-a-feature"
     event_kinds = [event["kind"] for event in summary["execution_events"]]
     assert event_kinds[0:2] == ["prompt_user", "next_step"]
-    assert event_kinds[-2:] == ["prompt_user", "complete"]
+    assert event_kinds[-1] == "complete"
     assert event_kinds.count("yaml_edit") == 4
     assert event_kinds.count("invoke_tool") >= 7
 
@@ -5006,7 +4992,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     _assert_validation_success(implementation_report, label="implementation")
     _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
-    assert "Would you please review the draft result?" in stdout.getvalue()
+    assert "Would you please review the draft result?" not in stdout.getvalue()
 
     start_skills_dir = worktree_root / "skill-definitions"
     start_output_dir = Path("start-generated")
@@ -5069,7 +5055,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             },
             {
                 "kind": "next_step",
-                "decisions_and_context": "The approved planning artifacts are staged.",
+                "decisions_and_context": "The validated planning artifacts are staged.",
             },
             {
                 "kind": "next_step",

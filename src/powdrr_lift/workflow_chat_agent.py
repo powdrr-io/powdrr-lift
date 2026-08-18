@@ -1423,6 +1423,11 @@ def _serialize_messages(messages: Sequence[Mapping[str, str]]) -> str:
     return json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
 
 
+def _serialize_prompt_json(value: object) -> str:
+    """Serialize structured prompt context without formatting-only whitespace."""
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
 def _serialize_openai_payload(
     payload: Mapping[str, Any],
     *,
@@ -1974,8 +1979,8 @@ def _build_selection_messages(
                         },
                     },
                 },
-                indent=2,
                 ensure_ascii=False,
+                separators=(",", ":"),
             ),
         },
     ]
@@ -2777,8 +2782,8 @@ def _build_step_execution_messages(
                     "execution_events": _execution_events_for_prompt(execution_events),
                     "current_file": current_file_context,
                 },
-                indent=2,
                 ensure_ascii=False,
+                separators=(",", ":"),
             ),
         },
     ]
@@ -5635,15 +5640,14 @@ def _build_json_repair_messages(
     )
     if previous_payload is not None:
         repair_message += (
-            "\nPrevious response:\n"
-            f"{json.dumps(previous_payload, indent=2, ensure_ascii=False)}"
+            f"\nPrevious response:\n{_serialize_prompt_json(previous_payload)}"
         )
     repaired_messages = list(messages)
     if previous_payload is not None:
         repaired_messages.append(
             {
                 "role": "assistant",
-                "content": json.dumps(previous_payload, indent=2, ensure_ascii=False),
+                "content": _serialize_prompt_json(previous_payload),
             }
         )
     repaired_messages.append({"role": "user", "content": repair_message})

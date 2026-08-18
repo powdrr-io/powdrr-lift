@@ -78,7 +78,8 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert completed.output_state == {"version": "v2"}
     prompt = client.messages[0][1]["content"]
     assert client.messages[0][0]["content"] == _action_system_prompt()
-    assert '"execution_mode": "process_workflow_task"' in prompt
+    assert '"execution_mode":"process_workflow_task"' in prompt
+    assert "\n" not in prompt
     displayed = stderr.getvalue()
     assert "Workflow task LLM input:" in displayed
     assert "Workflow task LLM output:" in displayed

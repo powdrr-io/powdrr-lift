@@ -969,8 +969,8 @@ def _build_task_messages(
                         for entry in skill_catalog
                     ],
                 },
-                indent=2,
                 ensure_ascii=False,
+                separators=(",", ":"),
             ),
         },
     ]
@@ -1016,8 +1016,8 @@ def _compact_workflow_task_context(
                         )
                     },
                 },
-                indent=2,
                 ensure_ascii=False,
+                separators=(",", ":"),
             ),
         },
     ]

@@ -382,9 +382,7 @@ class WorkflowLLMActionEngine:
         signature: Callable[[ActionT], str],
         before_state: object,
         after_state: object,
-        terminal_kinds: frozenset[str] = frozenset(
-            {"complete", "next_step", "gather_context"}
-        ),
+        terminal_kinds: frozenset[str] = frozenset({"complete", "next_step"}),
     ) -> WorkflowActionObservation:
         """Apply the same material-progress rule to either workflow adapter.
 

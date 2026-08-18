@@ -98,6 +98,7 @@ def gather_specification_context(
     types: list[str],
     keywords: list[str] | None = None,
     filters: dict[str, object] | None = None,
+    pr_number: int | None = None,
 ) -> GatherContextReport:
     repo_root_path = _resolve_repo_root(repo_root)
     normalized_types = _normalize_context_types(types)
@@ -105,7 +106,9 @@ def gather_specification_context(
     normalized_filters = _normalize_filters(filters)
     matches: list[GatherContextMatch] = []
 
-    for spec_path in _iter_context_specification_paths(repo_root_path):
+    for spec_path in _iter_context_specification_paths(
+        repo_root_path, pr_number=pr_number
+    ):
         raw_spec = _load_yaml_mapping(spec_path)
         if raw_spec is None:
             continue
@@ -201,17 +204,33 @@ def _normalize_filters(filters: dict[str, object] | None) -> dict[str, list[str]
     return normalized
 
 
-def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
+def _iter_context_specification_paths(
+    repo_root: Path, *, pr_number: int | None = None
+) -> list[Path]:
     paths: list[Path] = []
     for docs_root in (
         repo_root / "docs" / "current",
-        repo_root / "docs" / "proposals",
         repo_root / "docs" / "specs",
     ):
         if docs_root.exists():
             paths.extend(
                 path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
             )
+
+    proposals_root = repo_root / "docs" / "proposals"
+    if pr_number is None:
+        if proposals_root.exists():
+            paths.extend(
+                path
+                for path in sorted(proposals_root.rglob("*.yaml"))
+                if path.is_file()
+            )
+    else:
+        proposed_path = (
+            proposals_root / f"PR-{pr_number}" / "proposed-pr-specification.yaml"
+        )
+        if proposed_path.is_file():
+            paths.append(proposed_path)
 
     project_structure_root = repo_root / "docs" / "project_structure"
     if project_structure_root.exists():

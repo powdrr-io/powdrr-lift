@@ -12,7 +12,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -436,6 +436,7 @@ class _WorkflowExecutionState:
     execution_context: list[str]
     step_index: int
     worktree_root: Path
+    pr_number: int | None = None
     current_file_path: Path | None = None
     current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]] = field(
         default_factory=dict
@@ -1815,6 +1816,18 @@ def run_workflow_chat(
         verbose=config.verbose,
     )
     repo_root = worktree_root
+    pr_number = (
+        workflow_context.pr_number
+        if workflow_context is not None and workflow_context.pr_number is not None
+        else _current_pull_request_number(worktree_root)
+    )
+    if workflow_context is not None and pr_number != workflow_context.pr_number:
+        workflow_context = replace(workflow_context, pr_number=pr_number)
+    elif workflow_context is None and pr_number is not None:
+        workflow_context = WorkflowContext(
+            worktree_root=worktree_root,
+            pr_number=pr_number,
+        )
     project_root = _resolve_project_root(configured_repo_root, worktree_root)
     output_dir = config.output_dir
     if output_dir is not None and not output_dir.is_absolute():
@@ -1828,6 +1841,7 @@ def run_workflow_chat(
         execution_context=[],
         step_index=0,
         worktree_root=worktree_root,
+        pr_number=pr_number,
     )
     root_skill = selected_skill
     driver = WorkflowLLMExecutionDriver(
@@ -2232,6 +2246,29 @@ def _load_workflow_context(project_root: Path) -> WorkflowContext | None:
         if isinstance(payload.get("request"), str)
         else None,
     )
+
+
+def _current_pull_request_number(worktree_root: Path) -> int | None:
+    """Resolve the PR attached to the worktree's current branch, if any."""
+    if not (worktree_root / ".git").exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", "--json", "number"],
+            cwd=worktree_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return None
+        payload = json.loads(result.stdout)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    value = payload.get("number")
+    return value if isinstance(value, int) else None
 
 
 def _persist_workflow_context(
@@ -2823,6 +2860,11 @@ def _action_system_prompt() -> str:
         "Choose exactly one outcome and use it for the following reason:\n"
         "- gather_context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
+        "When previous_workflow_context.pr_number is present, gather_context "
+        "automatically includes the current specifications and the proposed "
+        "specification at docs/proposals/PR-<pr_number>/proposed-pr-"
+        "specification.yaml, scoped to that exact PR. Do not use fuzzy-match to "
+        "find that proposal or substitute another PR's proposal.\n"
         "- prompt_user: choose this only when a specific human decision or fact "
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
@@ -3783,6 +3825,7 @@ def _handle_workflow_action_gather_context(
         types=list(action.types),
         keywords=list(action.keywords) if action.keywords else None,
         filters=action.filters,
+        pr_number=state.pr_number,
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(

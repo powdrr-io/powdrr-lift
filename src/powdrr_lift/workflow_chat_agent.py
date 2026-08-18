@@ -71,6 +71,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     WorkflowLLMExecutionAborted,
     WorkflowLLMExecutionDriver,
+    WorkflowLLMHTTPError,
     prune_execution_events,
 )
 from powdrr_lift.workflow_llm import (
@@ -1105,9 +1106,10 @@ class OpenAIChatClient:
                     progress_stream=self._progress_stream,
                 )
         except HTTPError as exc:
-            raise RuntimeError(
-                "OpenAI request failed with HTTP "
-                f"{exc.code}: {exc.read().decode('utf-8', errors='replace')}"
+            raise WorkflowLLMHTTPError(
+                "OpenAI",
+                exc.code,
+                exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
@@ -1352,9 +1354,10 @@ class AnthropicChatClient:
             with urlopen(request, timeout=self._timeout) as response:
                 raw_response = response.read().decode("utf-8")
         except HTTPError as exc:
-            raise RuntimeError(
-                "Anthropic request failed with HTTP "
-                f"{exc.code}: {exc.read().decode('utf-8', errors='replace')}"
+            raise WorkflowLLMHTTPError(
+                "Anthropic",
+                exc.code,
+                exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc

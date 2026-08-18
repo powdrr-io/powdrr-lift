@@ -32,6 +32,14 @@ class WorkflowLLMTimeoutExhausted(RuntimeError):
     """Raised when a provider request keeps timing out after its retry budget."""
 
 
+class WorkflowLLMHTTPError(RuntimeError):
+    """A provider response that includes an HTTP status code."""
+
+    def __init__(self, provider: str, status_code: int, detail: str) -> None:
+        self.status_code = status_code
+        super().__init__(f"{provider} request failed with HTTP {status_code}: {detail}")
+
+
 class WorkflowLLMExecutionAborted(RuntimeError):
     """Stop a shared execution loop after its adapter aborts a request."""
 
@@ -123,11 +131,8 @@ def is_timeout_error(error: RuntimeError) -> bool:
 
 def is_retryable_provider_error(error: RuntimeError) -> bool:
     """Return whether a provider failure is transient enough to retry."""
-    message = str(error).casefold()
-    return (
-        is_timeout_error(error)
-        or "http 429" in message
-        or "engine_overloaded" in message
+    return is_timeout_error(error) or (
+        isinstance(error, WorkflowLLMHTTPError) and error.status_code == 429
     )
 
 

@@ -18,6 +18,7 @@ from powdrr_lift.core import (
     save_skill,
 )
 from powdrr_lift.workflow_chat_agent import LLMModelLimits, _action_system_prompt
+from powdrr_lift.workflow_llm import WorkflowLLMHTTPError
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
@@ -406,9 +407,10 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
         client.messages.append(messages)
         calls += 1
         if calls < 3:
-            raise RuntimeError(
-                "OpenAI request failed with HTTP 429: "
-                '{"error":{"code":"engine_overloaded"}}'
+            raise WorkflowLLMHTTPError(
+                "OpenAI",
+                429,
+                '{"error":{"code":"engine_overloaded"}}',
             )
         return {"kind": "complete", "output_state": {"version": "v2"}}
 

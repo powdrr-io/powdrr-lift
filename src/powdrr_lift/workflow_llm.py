@@ -467,7 +467,7 @@ def workflow_action_summary(action: object) -> str:
     rationale = getattr(action, "decisions_and_context", None)
     if isinstance(rationale, str) and rationale.strip():
         summary += " — " + " ".join(rationale.split())
-    return summary[:280].rstrip()
+    return summary.rstrip()
 
 
 def prune_execution_events(

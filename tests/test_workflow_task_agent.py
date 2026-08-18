@@ -58,7 +58,11 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
     )
 
 
-def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> None:
+@pytest.mark.parametrize("verbose", [False, True])
+def test_process_workflow_task_completes_claimed_agent_task(
+    tmp_path: Path,
+    verbose: bool,
+) -> None:
     workflow = _workflow(tmp_path)
     client = _FakeClient([{"kind": "complete", "output_state": {"version": "v2"}}])
     stderr = io.StringIO()
@@ -68,6 +72,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
         WorkflowTaskAgentConfig(
             workflow_dir=workflow.directory,
             repo_root=tmp_path,
+            verbose=verbose,
         ),
         client=client,
         stdout=stdout,
@@ -83,9 +88,9 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert '"execution_mode":"process_workflow_task"' in prompt
     assert "\n" not in prompt
     displayed = stderr.getvalue()
-    assert "Workflow task LLM input:" in displayed
-    assert "Workflow task LLM output:" in displayed
-    assert '"kind": "complete"' in displayed
+    assert ("Workflow task LLM input:" in displayed) is verbose
+    assert ("Workflow task LLM output:" in displayed) is verbose
+    assert ('"kind": "complete"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
     assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
 

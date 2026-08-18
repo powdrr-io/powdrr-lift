@@ -608,7 +608,8 @@ def run_workflow_task(
         configured_repo_root,
         repo_root,
     )
-    client = _WorkflowTaskDisplayClient(client, stderr=stderr)
+    if config.verbose:
+        client = _WorkflowTaskDisplayClient(client, stderr=stderr)
     client = _LLMExchangeRecordingClient(client, dump_root)
     compaction_client = client
     long_context_backup = _long_context_backup_for(
@@ -616,15 +617,18 @@ def run_workflow_task(
         mappings,
     )
     if not client_was_provided and long_context_backup is not None:
-        compaction_client = _LLMExchangeRecordingClient(
-            _WorkflowTaskDisplayClient(
-                _build_workflow_client_for_mapping(
-                    config,
-                    task,
-                    long_context_backup,
-                ),
+        backup_client = _build_workflow_client_for_mapping(
+            config,
+            task,
+            long_context_backup,
+        )
+        if config.verbose:
+            backup_client = _WorkflowTaskDisplayClient(
+                backup_client,
                 stderr=stderr,
-            ),
+            )
+        compaction_client = _LLMExchangeRecordingClient(
+            backup_client,
             dump_root,
         )
 

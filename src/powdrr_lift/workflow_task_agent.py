@@ -86,8 +86,8 @@ class WorkflowTaskAgentConfig:
     base_url: str | None = None
     max_roundtrips: int | None = None
     max_stalled_roundtrips: int = 3
-    max_timeout_retries: int = 3
-    timeout_backoff_seconds: float = 2.0
+    max_timeout_retries: int = 8
+    timeout_backoff_seconds: float = 10.0
     verbose: bool = False
 
 

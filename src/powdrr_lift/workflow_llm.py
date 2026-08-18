@@ -32,6 +32,14 @@ class WorkflowLLMTimeoutExhausted(RuntimeError):
     """Raised when a provider request keeps timing out after its retry budget."""
 
 
+class WorkflowLLMHTTPError(RuntimeError):
+    """A provider response that includes an HTTP status code."""
+
+    def __init__(self, provider: str, status_code: int, detail: str) -> None:
+        self.status_code = status_code
+        super().__init__(f"{provider} request failed with HTTP {status_code}: {detail}")
+
+
 class WorkflowLLMExecutionAborted(RuntimeError):
     """Stop a shared execution loop after its adapter aborts a request."""
 
@@ -121,6 +129,13 @@ def is_timeout_error(error: RuntimeError) -> bool:
     return "timed out" in message or "timeout" in message
 
 
+def is_retryable_provider_error(error: RuntimeError) -> bool:
+    """Return whether a provider failure is transient enough to retry."""
+    return is_timeout_error(error) or (
+        isinstance(error, WorkflowLLMHTTPError) and error.status_code == 429
+    )
+
+
 def complete_json_with_timeout_retry(
     client: WorkflowLLMClient,
     messages: list[dict[str, str]],
@@ -130,24 +145,25 @@ def complete_json_with_timeout_retry(
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
 ) -> dict[str, Any]:
-    """Request JSON with the common exponential timeout retry policy."""
-    timeout_retries = 0
+    """Request JSON with the common exponential transient-error retry policy."""
+    retries = 0
     while True:
         try:
             return complete_json(client, messages)
         except RuntimeError as exc:
-            if not is_timeout_error(exc):
+            if not is_retryable_provider_error(exc):
                 raise
-            if timeout_retries >= max(0, max_timeout_retries):
+            if retries >= max(0, max_timeout_retries):
                 raise WorkflowLLMTimeoutExhausted(
-                    f"LLM request timed out after {timeout_retries} retries: {exc}"
+                    f"LLM request failed after {retries} retries: {exc}"
                 ) from exc
-            timeout_retries += 1
-            delay_seconds = timeout_backoff_seconds * (2 ** (timeout_retries - 1))
+            retries += 1
+            delay_seconds = timeout_backoff_seconds * (2 ** (retries - 1))
+            reason = "timed out" if is_timeout_error(exc) else "provider is overloaded"
             print(
-                f"LLM request timed out for {model}; retrying in "
+                f"LLM request {reason} for {model}; retrying in "
                 f"{delay_seconds:g} seconds "
-                f"(retry {timeout_retries}/{max_timeout_retries}).",
+                f"(retry {retries}/{max_timeout_retries}).",
                 file=stderr,
                 flush=True,
             )

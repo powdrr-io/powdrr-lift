@@ -231,6 +231,10 @@ class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
 
     def next_request(self) -> WorkflowActionRequest | None: ...
 
+    def report_roundtrip(self, roundtrip: int, action: Any) -> None:
+        """Present one parsed LLM action; adapters may leave this as a no-op."""
+        _ = roundtrip, action
+
     def execute_action(self, action: Any) -> WorkflowActionOutcome: ...
 
     def record_response_error(
@@ -301,6 +305,7 @@ class WorkflowLLMExecutionDriver:
                 strategy.record_response_error(exc, self.action_engine.last_payload)
                 continue
 
+            strategy.report_roundtrip(roundtrips, action)
             before_state = strategy.material_state(action)
             try:
                 outcome = strategy.execute_action(action)
@@ -459,6 +464,26 @@ def workflow_action_signature(action: object) -> str:
     else:
         value = action
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def workflow_action_summary(action: object) -> str:
+    """Return a short human-readable explanation of a proposed action."""
+    kind = str(getattr(action, "kind", "action"))
+    detail_by_kind = {
+        "gather_context": "types=" + ",".join(getattr(action, "types", ())),
+        "prompt_user": getattr(action, "text", None),
+        "edit": getattr(action, "file_path", None),
+        "yaml_edit": getattr(action, "file_path", None),
+        "invoke_skill": getattr(action, "skill_name", None),
+        "invoke_tool": getattr(action, "tool", None),
+        "read_document": getattr(action, "file_path", None),
+    }
+    detail = detail_by_kind.get(kind)
+    summary = kind if not detail else f"{kind} ({detail})"
+    rationale = getattr(action, "decisions_and_context", None)
+    if isinstance(rationale, str) and rationale.strip():
+        summary += " — " + " ".join(rationale.split())
+    return summary.rstrip()
 
 
 def prune_execution_events(

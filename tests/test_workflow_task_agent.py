@@ -62,6 +62,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     workflow = _workflow(tmp_path)
     client = _FakeClient([{"kind": "complete", "output_state": {"version": "v2"}}])
     stderr = io.StringIO()
+    stdout = io.StringIO()
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -69,7 +70,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
             repo_root=tmp_path,
         ),
         client=client,
-        stdout=io.StringIO(),
+        stdout=stdout,
         stderr=stderr,
     )
 
@@ -86,6 +87,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     assert "Workflow task LLM output:" in displayed
     assert '"kind": "complete"' in displayed
     assert "received streamed LLM data" not in displayed
+    assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
 
 
 def test_process_workflow_task_runs_nested_skill_in_same_worktree(

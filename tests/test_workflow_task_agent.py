@@ -392,6 +392,48 @@ def test_process_workflow_task_retries_llm_timeouts_with_backoff(
     assert stderr.getvalue().count("retrying in") == 2
 
 
+def test_process_workflow_task_retries_provider_overload_with_backoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    client = _FakeClient([])
+    calls = 0
+    sleeps: list[float] = []
+
+    def _complete(messages: list[dict[str, str]]) -> dict[str, object]:
+        nonlocal calls
+        client.messages.append(messages)
+        calls += 1
+        if calls < 3:
+            raise RuntimeError(
+                "OpenAI request failed with HTTP 429: "
+                '{"error":{"code":"engine_overloaded"}}'
+            )
+        return {"kind": "complete", "output_state": {"version": "v2"}}
+
+    client.complete_json = _complete  # type: ignore[method-assign]
+    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+            max_timeout_retries=2,
+            timeout_backoff_seconds=1.5,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert calls == 3
+    assert sleeps == [1.5, 3.0]
+    assert stderr.getvalue().count("provider is overloaded") == 2
+
+
 def test_exhausted_timeout_deletes_only_dedicated_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

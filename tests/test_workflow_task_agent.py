@@ -60,6 +60,7 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
 def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
     client = _FakeClient([{"kind": "complete", "output_state": {"version": "v2"}}])
+    stderr = io.StringIO()
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -68,7 +69,7 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
         ),
         client=client,
         stdout=io.StringIO(),
-        stderr=io.StringIO(),
+        stderr=stderr,
     )
 
     assert exit_code == 0
@@ -78,6 +79,11 @@ def test_process_workflow_task_completes_claimed_agent_task(tmp_path: Path) -> N
     prompt = client.messages[0][1]["content"]
     assert client.messages[0][0]["content"] == _action_system_prompt()
     assert '"execution_mode": "process_workflow_task"' in prompt
+    displayed = stderr.getvalue()
+    assert "Workflow task LLM input:" in displayed
+    assert "Workflow task LLM output:" in displayed
+    assert '"kind": "complete"' in displayed
+    assert "received streamed LLM data" not in displayed
 
 
 def test_process_workflow_task_runs_nested_skill_in_same_worktree(

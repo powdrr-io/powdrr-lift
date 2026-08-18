@@ -1034,8 +1034,10 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser.add_argument(
         "--max-roundtrips",
         type=int,
-        default=12,
-        help="Maximum LLM action roundtrips for the claimed task.",
+        default=None,
+        help=(
+            "Optional maximum LLM action roundtrips; by default progress is unlimited."
+        ),
     )
     process_workflow_task_parser.add_argument("--verbose", action="store_true")
     process_workflow_task_parser.set_defaults(func=_run_process_workflow_task)

@@ -72,6 +72,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMExecutionAborted,
     WorkflowLLMExecutionDriver,
     prune_execution_events,
+    workflow_action_summary,
 )
 from powdrr_lift.workflow_llm import (
     WorkflowAction as SkillChatAction,
@@ -675,6 +676,19 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def material_state(self, action: SkillChatAction) -> object:
         return _workflow_action_material_state(action, self.state)
+
+    def report_roundtrip(self, roundtrip: int, action: SkillChatAction) -> None:
+        _ = roundtrip
+        parent_skill, parent_step_index = self._parent_progress()
+        self.progress.update(
+            self.selected_skill,
+            current_step_index=self.current_step_index,
+            status=(
+                f"roundtrip {self.step_roundtrips}: {workflow_action_summary(action)}"
+            ),
+            parent_skill=parent_skill,
+            parent_step_index=parent_step_index,
+        )
 
     def record_no_progress(
         self,
@@ -2970,7 +2984,9 @@ def _action_system_prompt() -> str:
         "step.\n"
         "Use complete when the skill is finished.\n"
         "Always include decisions_and_context with the concise information "
-        "future steps will need.\n"
+        "future steps will need. Keep it to one short sentence explaining why "
+        "you chose this action or what it enables next; it is shown in progress "
+        "status after every roundtrip.\n"
         "Always include llm_type to select the model for the next roundtrip. "
         "Use high_reasoning for architecture, difficult reasoning, and final "
         "review; standard_reasoning for normal implementation; simple_task "

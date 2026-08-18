@@ -73,6 +73,7 @@ from powdrr_lift.workflow_llm import (
     complete_json_with_timeout_retry,
     prune_execution_events,
     workflow_action_signature,
+    workflow_action_summary,
 )
 
 
@@ -239,6 +240,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def material_state(self, action: WorkflowAction) -> object:
         return _task_action_material_state(action, self.repo_root)
+
+    def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:
+        print(
+            f"Workflow task roundtrip {roundtrip}: {workflow_action_summary(action)}",
+            file=self.stdout,
+            flush=True,
+        )
 
     def record_no_progress(
         self,

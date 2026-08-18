@@ -124,6 +124,7 @@ from powdrr_lift.workflow_chat_tui import (
     WorkflowChatApp,
     _TextualStdoutOutput,
 )
+from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 
 # ruff: noqa: E501
 
@@ -150,6 +151,20 @@ def test_execution_events_for_prompt_compacts_results_without_mutating_summary_d
         }
     ]
     assert events[0]["result"] == {"stdout": "a large result"}
+
+
+def test_workflow_action_summary_explains_action_and_reason() -> None:
+    summary = workflow_action_summary(
+        WorkflowAction(
+            kind="invoke_tool",
+            tool="shell",
+            decisions_and_context="The file must be inspected before editing.",
+        )
+    )
+
+    assert summary == (
+        "invoke_tool (shell) — The file must be inspected before editing."
+    )
 
 
 def test_prompt_transcript_keeps_request_and_bounds_history() -> None:
@@ -2630,6 +2645,10 @@ def test_workflow_execution_skips_repeated_no_progress_tool_step(
     assert any(
         status == "Warning: repeated tool action made no progress; "
         "skipping to the next workflow step."
+        for status in progress_statuses
+    )
+    assert any(
+        status.startswith("roundtrip 1: invoke_tool (shell)")
         for status in progress_statuses
     )
     assert "made no progress" in "\n".join(

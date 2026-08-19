@@ -2914,6 +2914,7 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "read_document" in prompt
     assert "start_line" in prompt
     assert "end_line" in prompt
+    assert "multiple independent edits" in prompt
 
 
 def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
@@ -3545,6 +3546,7 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
         {"exists": True, "line_count": 2},
     )
     assert "upsert_item" in feedback
+    assert "multiple independent operations" in feedback
     assert "Do not use line numbers" in feedback
 
 

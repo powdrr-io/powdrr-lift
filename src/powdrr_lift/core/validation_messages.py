@@ -161,7 +161,9 @@ class ValidationError:
         return (
             f"{self.message} Corrective action: edit the specification{location}; "
             f"{self.corrective_action} Then rerun the same evaluate command to "
-            "verify the correction."
+            "verify the correction. If the report contains multiple issues, "
+            "correct them together in one yaml_edit action when they affect the "
+            "same YAML file."
         )
 
 
@@ -183,7 +185,13 @@ def validation_error_to_data(
         data["yaml_edit_guidance"] = (
             "Use yaml_edit with structural operations after determining the exact "
             f"replacement for `{error.path or '<invalid-value>'}`; do not use a "
-            "line-based edit on this YAML file."
+            "line-based edit on this YAML file. If the validation report contains "
+            "multiple independent issues in this file, combine their operations "
+            "into one yaml_edit action. For example: "
+            '{"kind":"yaml_edit","file_path":"specification.yaml",'
+            '"operations":[{"op":"set_value","path":["id"],'
+            '"value":"system-1"},{"op":"set_value",'
+            '"path":["title"],"value":"System"}]}'
         )
         if error.path is not None and re.fullmatch(
             r"[A-Za-z_][A-Za-z0-9_-]*", error.path

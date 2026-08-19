@@ -2948,7 +2948,9 @@ def _action_system_prompt() -> str:
         "Use yaml_edit for YAML specification files. It preserves section keys "
         "and edits list items structurally: upsert_item uses section, id, and a "
         "complete value mapping; remove_item uses section and id; set_value uses "
-        "a mapping-key path and value. If yaml_edit reports a usage error, "
+        "a mapping-key path and value. Try to combine multiple independent edits "
+        "to the same YAML file into one yaml_edit operations array. If yaml_edit "
+        "reports a usage error, "
         "follow its corrective instructions and retry with the corrected shape.\n"
         "For YAML or JSON edits, preserve the surrounding document structure. "
         "When replacing a list item, start at the list item rather than its "
@@ -3964,13 +3966,15 @@ def _parse_workflow_action_yaml_edit(
     ):
         raise RuntimeError(
             "yaml_edit requires a non-empty operations array. Supported "
-            "operations are upsert_item, remove_item, and set_value."
+            "operations are upsert_item, remove_item, and set_value. Include "
+            "all independent edits for this YAML file in one operations array."
         )
     operations = tuple(_parse_yaml_operation(item) for item in raw_operations)
     if not operations:
         raise RuntimeError(
             "yaml_edit operations must not be empty. Use upsert_item, "
-            "remove_item, or set_value."
+            "remove_item, or set_value. Try to include multiple independent "
+            "edits in this one operations array when possible."
         )
     return SkillChatAction(
         kind="yaml_edit",
@@ -5493,8 +5497,9 @@ def _workflow_edit_failure_feedback(
             " Use yaml_edit only for .yaml or .yml files. Its operations are "
             "structural: upsert_item replaces or appends a list item by section "
             "and id, remove_item deletes one by section and id, and set_value "
-            "updates a mapping value by path. Do not use line numbers or replace "
-            "section headers."
+            "updates a mapping value by path. Include multiple independent "
+            "operations in one yaml_edit action when correcting the same file. "
+            "Do not use line numbers or replace section headers."
         )
     return feedback
 
@@ -5793,7 +5798,8 @@ def _action_repair_prompt(
         "with positive start_line "
         "and end_line for read_document, non-empty types for gather_context, "
         "and a clear English question ending in '?' for prompt_user. Do not "
-        "combine actions or output markdown."
+        "combine actions or output markdown. For yaml_edit, combine all "
+        "independent corrections for the same file in one operations array."
     )
     if validation_error is not None:
         prompt += (

@@ -138,6 +138,28 @@ def test_action_engine_uses_the_same_state_aware_no_progress_rule() -> None:
     assert "Do not invoke this action unchanged again" in (threshold.correction or "")
 
 
+def test_action_engine_treats_repeated_gather_context_as_no_progress() -> None:
+    engine = WorkflowLLMActionEngine(max_stalled_roundtrips=2)
+    action = _Action(kind="gather_context", value="requirements")
+
+    first = engine.observe_action(
+        action,
+        signature=workflow_action_signature,
+        before_state="unchanged",
+        after_state="unchanged",
+    )
+    repeated = engine.observe_action(
+        action,
+        signature=workflow_action_signature,
+        before_state="unchanged",
+        after_state="unchanged",
+    )
+
+    assert first.made_progress is True
+    assert repeated.made_progress is False
+    assert repeated.correction is not None
+
+
 def test_action_engine_accepts_a_material_state_change_for_a_repeat() -> None:
     engine = WorkflowLLMActionEngine(max_stalled_roundtrips=1)
     action = _Action(kind="edit", value="README.md")

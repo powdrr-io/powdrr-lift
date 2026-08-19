@@ -100,6 +100,7 @@ class WorkflowAction:
     file_edits: tuple[WorkflowFileEdits, ...] = field(default_factory=tuple)
     yaml_operations: tuple[WorkflowYamlOperation, ...] = field(default_factory=tuple)
     types: tuple[str, ...] = field(default_factory=tuple)
+    feature_id: str | None = None
     keywords: tuple[str, ...] = field(default_factory=tuple)
     filters: dict[str, object] = field(default_factory=dict)
     decisions_and_context: str | None = None
@@ -382,9 +383,7 @@ class WorkflowLLMActionEngine:
         signature: Callable[[ActionT], str],
         before_state: object,
         after_state: object,
-        terminal_kinds: frozenset[str] = frozenset(
-            {"complete", "next_step", "gather_context"}
-        ),
+        terminal_kinds: frozenset[str] = frozenset({"complete", "next_step"}),
     ) -> WorkflowActionObservation:
         """Apply the same material-progress rule to either workflow adapter.
 

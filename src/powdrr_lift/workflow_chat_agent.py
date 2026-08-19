@@ -2823,6 +2823,10 @@ def _action_system_prompt() -> str:
         "Choose exactly one outcome and use it for the following reason:\n"
         "- gather_context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
+        "When a feature's proposal must be scoped, pass its feature_id to "
+        "gather_context. It includes current specifications and only YAML files "
+        "under docs/proposed/<feature_id>. Do not use fuzzy-match to locate the "
+        "feature proposal or substitute another feature's proposal.\n"
         "- prompt_user: choose this only when a specific human decision or fact "
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
@@ -2868,7 +2872,8 @@ def _action_system_prompt() -> str:
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
-        '{"kind":"gather_context","types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
+        '{"kind":"gather_context","feature_id":"display-related-photos",'
+        '"types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
         '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
@@ -3783,6 +3788,7 @@ def _handle_workflow_action_gather_context(
         types=list(action.types),
         keywords=list(action.keywords) if action.keywords else None,
         filters=action.filters,
+        feature_id=action.feature_id,
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(
@@ -4038,6 +4044,13 @@ def _parse_workflow_action_gather_context(
         field_name="keywords",
     )
     filters = _optional_action_filters(payload.get("filters"))
+    feature_id = payload.get("feature_id")
+    if feature_id is not None and (
+        not isinstance(feature_id, str) or not feature_id.strip()
+    ):
+        raise RuntimeError(
+            "Workflow gather_context action feature_id must be a non-empty string."
+        )
     normalized_types = tuple(
         normalize_context_type(context_type) for context_type in types
     )
@@ -4046,6 +4059,7 @@ def _parse_workflow_action_gather_context(
         types=normalized_types,
         keywords=keywords,
         filters=filters,
+        feature_id=feature_id.strip() if isinstance(feature_id, str) else None,
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )

@@ -305,10 +305,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 types=list(action.types),
                 keywords=list(action.keywords),
                 filters=action.filters,
+                feature_id=action.feature_id,
             )
             self.events.append(
                 {
                     "kind": action.kind,
+                    "feature_id": action.feature_id,
                     "types": list(action.types),
                     "keywords": list(action.keywords),
                     "filters": action.filters,
@@ -1347,6 +1349,7 @@ def _run_skill_for_agent(
             report = gather_specification_context(
                 repo_root,
                 types=list(action.types),
+                feature_id=action.feature_id,
                 keywords=list(action.keywords),
             )
             execution_events.append(

@@ -3040,6 +3040,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
             },
             {
                 "kind": "gather_context",
+                "feature_id": "display-related-photos",
                 "types": ["requirements"],
                 "keywords": ["related photos"],
                 "decisions_and_context": (

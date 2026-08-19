@@ -98,14 +98,24 @@ def gather_specification_context(
     types: list[str],
     keywords: list[str] | None = None,
     filters: dict[str, object] | None = None,
+    feature_id: str | None = None,
 ) -> GatherContextReport:
     repo_root_path = _resolve_repo_root(repo_root)
+    if feature_id is not None:
+        feature_id = feature_id.strip()
+        if not feature_id or Path(feature_id).name != feature_id:
+            raise ValueError(
+                "Context feature_id must be a non-empty directory name without "
+                "path separators."
+            )
     normalized_types = _normalize_context_types(types)
     normalized_keywords = _normalize_keywords(keywords)
     normalized_filters = _normalize_filters(filters)
     matches: list[GatherContextMatch] = []
 
-    for spec_path in _iter_context_specification_paths(repo_root_path):
+    for spec_path in _iter_context_specification_paths(
+        repo_root_path, feature_id=feature_id
+    ):
         raw_spec = _load_yaml_mapping(spec_path)
         if raw_spec is None:
             continue
@@ -201,17 +211,32 @@ def _normalize_filters(filters: dict[str, object] | None) -> dict[str, list[str]
     return normalized
 
 
-def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
+def _iter_context_specification_paths(
+    repo_root: Path, *, feature_id: str | None = None
+) -> list[Path]:
     paths: list[Path] = []
     for docs_root in (
         repo_root / "docs" / "current",
-        repo_root / "docs" / "proposals",
         repo_root / "docs" / "specs",
     ):
         if docs_root.exists():
             paths.extend(
                 path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
             )
+
+    proposal_roots = (
+        repo_root / "docs" / "proposed",
+        repo_root / "docs" / "proposals",
+    )
+    if feature_id is not None:
+        for proposals_root in proposal_roots:
+            feature_root = proposals_root / feature_id
+            if feature_root.exists():
+                paths.extend(
+                    path
+                    for path in sorted(feature_root.rglob("*.yaml"))
+                    if path.is_file()
+                )
 
     project_structure_root = repo_root / "docs" / "project_structure"
     if project_structure_root.exists():
@@ -225,7 +250,7 @@ def _iter_context_specification_paths(repo_root: Path) -> list[Path]:
     if current_state_path.is_file():
         paths.append(current_state_path)
 
-    return paths
+    return list(dict.fromkeys(paths))
 
 
 def _load_yaml_mapping(path: Path) -> dict[str, Any] | None:
@@ -251,19 +276,23 @@ def _describe_specification_path(
 
     path_parts = relative_path.parts
     if (
-        len(path_parts) >= 4
+        len(path_parts) >= 3
         and path_parts[0] == "docs"
-        and path_parts[1] in {"current", "proposals", "specs"}
+        and path_parts[1] in {"current", "proposed", "proposals", "specs"}
     ):
         work_item_name = path_parts[2]
-        specification_type = path.stem.removesuffix("-specification")
+        specification_type = (
+            "proposed"
+            if path_parts[1] in {"proposed", "proposals"}
+            else "current-state"
+        )
         return work_item_name, specification_type
 
     if path_parts == (".powdrr-lift", "state", "current-state.yaml"):
         return "current-state", "current-state"
 
     if len(path_parts) >= 3 and path_parts[:2] == ("docs", "project_structure"):
-        return "project-structure", path.stem
+        return "project-structure", "current-state"
 
     return None, None
 

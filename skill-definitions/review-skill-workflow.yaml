@@ -11,12 +11,14 @@ steps:
 - description: Resolve and read the target definition.
   llm_type: long_context
   details: >-
-    Identify exactly one target skill or workflow from the user's path, name, or
-    context. If the target is not an exact path, use fuzzy-match once to locate
-    candidates, then ask one specific question if more than one candidate is
-    plausible. Read the complete target definition with read_document. Do not
-    edit it during this step. Record its goal, inputs, outputs, dependencies,
-    steps or tasks, and any existing validation requirements.
+    Select exactly one target from the user's explicit path or name. If the
+    user provides neither, ask them to identify the skill or workflow before
+    using a tool. If the name is not an exact path, use fuzzy-match once to
+    locate candidates, then ask one specific question if more than one
+    candidate is plausible. Read the complete target definition with
+    read_document. Do not edit it during this step. Record its goal, inputs,
+    outputs, dependencies, steps or tasks, and existing validation
+    requirements.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -30,8 +32,9 @@ steps:
 - description: Inventory every target step and its execution surface.
   llm_type: standard_reasoning
   details: >-
-    Create one row per target step or task. Preserve source order and quote the
-    description and English instructions. For each row count explicit
+    Build an inventory table with one row for each target step or task. Preserve
+    source order and quote the description and English instructions in that
+    row. For each row count explicit
     tool_invocations, uses_skills or nested workflow calls, and distinct action
     clauses in the English instructions. Count an action clause whenever the
     text tells the LLM to inspect, decide, edit, invoke, validate, record, ask,
@@ -95,10 +98,11 @@ steps:
     fails, correct the target and rerun validation only after a change; never
     repeat the same validation command unchanged. Report the final per-step
     counts, remaining justified exceptions, validation result, and exact file
-    changed.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - <target-definition-path>
+    changed. Then invoke create-pull-request with pr-kind
+    `skill-workflow-review`, a concise commit message, and a pull-request title
+    that identifies the target. Pass the changed definition, final review
+    report, and validation result as context. Do not report completion until
+    the nested skill returns a pull-request URL; never merge the PR or push
+    directly to main.
+  uses_skills:
+  - create-pull-request

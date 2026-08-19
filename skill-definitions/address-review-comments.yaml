@@ -122,7 +122,8 @@ steps:
   details: >-
     Invoke create-pull-request with pr-kind `review-comments`, commit message
     `Address pull request review comments`, and the existing pull-request
-    reference and title. Pass the review ledger as context and require one
+    reference and title. Pass a `files_to_publish` context list containing
+    every intended changed file, along with the review ledger, and require one
     Review Feedback Addressed row per actionable comment. Resolve each review
     thread only after its requested change is present and pushed. Never merge
     the pull request or push directly to main.

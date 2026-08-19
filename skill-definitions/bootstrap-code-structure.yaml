@@ -175,7 +175,9 @@ steps:
   details: >-
     Invoke create-pull-request with pr-kind `project-structure`, commit
     message `Add project structure artifact`, and pull-request title
-    `<pull-request-title>`. Pass the generated artifact and its discovery
-    evidence as context.
+    `<pull-request-title>`. Pass `files_to_publish` containing exactly
+    `docs/project_structure/project-structure.yaml`, along with the generated
+    artifact and its discovery evidence as context. The nested skill must
+    stage exactly that path.
   uses_skills:
   - create-pull-request

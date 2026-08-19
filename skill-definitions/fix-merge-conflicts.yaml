@@ -225,7 +225,8 @@ steps:
   details: >-
     Invoke create-pull-request with pr-kind `merge-conflict`, commit message
     `Resolve merge conflicts`, and the existing pull-request reference and
-    title. Pass the conflict ledger as context and require one Conflict
+    title. Pass a `files_to_publish` context list containing every resolved
+    file, along with the conflict ledger, and require one Conflict
     Resolution row per conflicted file containing the competing intent,
     selected resolution, and validation. Never create a second PR or merge it.
   uses_skills:

@@ -3771,12 +3771,18 @@ def _command_matches_invocation(
     command: Sequence[str],
     expected_command: Sequence[str],
 ) -> bool:
-    if len(command) != len(expected_command):
-        return False
-    return all(
-        _command_token_matches(actual, expected)
-        for actual, expected in zip(command, expected_command, strict=True)
-    )
+    actual_index = 0
+    for expected_index, expected in enumerate(expected_command):
+        if expected == "<files-to-publish>":
+            return expected_index == len(expected_command) - 1 and actual_index < len(
+                command
+            )
+        if actual_index >= len(command):
+            return False
+        if not _command_token_matches(command[actual_index], expected):
+            return False
+        actual_index += 1
+    return actual_index == len(command)
 
 
 def _command_token_matches(actual: str, expected: str) -> bool:
@@ -4273,10 +4279,12 @@ def _execute_shell_tool(
     print_stdout: bool = True,
 ) -> dict[str, Any]:
     command = parameters.get("command")
+    validation_command: str | Sequence[str]
     if isinstance(command, str):
         command_display = _rtk_command_display(command)
         run_command: str | list[str] = _wrap_shell_command(command)
         use_shell = True
+        validation_command = command
     elif isinstance(command, Sequence) and not isinstance(
         command,
         (str, bytes, bytearray),
@@ -4286,10 +4294,22 @@ def _execute_shell_tool(
         command_display = " ".join(shlex.quote(item) for item in wrapped_command)
         run_command = wrapped_command
         use_shell = False
+        validation_command = normalized_command
     else:
         raise RuntimeError(
             "Workflow invoke_tool action parameters must include a command."
         )
+
+    empty_pr_error = _empty_pull_request_error(validation_command, worktree_root)
+    if empty_pr_error is not None:
+        print(empty_pr_error, file=stderr)
+        return {
+            "command": command_display,
+            "cwd": str(worktree_root.resolve()),
+            "returncode": 2,
+            "stdout": "",
+            "stderr": empty_pr_error,
+        }
 
     cwd_value = parameters.get("cwd")
     if cwd_value is None:
@@ -4356,6 +4376,55 @@ def _execute_shell_tool(
         "stdout": process.stdout,
         "stderr": process.stderr,
     }
+
+
+def _empty_pull_request_error(
+    command: str | Sequence[str],
+    worktree_root: Path,
+) -> str | None:
+    """Prevent an avoidable GitHub error when a branch has no committed delta."""
+    if isinstance(command, str):
+        try:
+            command_items = shlex.split(command)
+        except ValueError:
+            return None
+    else:
+        command_items = list(command)
+    if command_items[:3] != ["gh", "pr", "create"]:
+        return None
+
+    base = "main"
+    for index, item in enumerate(command_items[:-1]):
+        if item == "--base":
+            base = command_items[index + 1]
+            break
+    ahead = subprocess.run(
+        ["git", "rev-list", "--count", f"{base}..HEAD"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if ahead.returncode != 0 or ahead.stdout.strip() != "0":
+        return None
+    status = subprocess.run(
+        ["git", "status", "--short"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    detail = (
+        "Uncommitted changes are present."
+        if status.stdout.strip()
+        else "There are no uncommitted changes either."
+    )
+    return (
+        f"Cannot create a pull request: no commits exist between {base} and HEAD. "
+        f"{detail} Stage the exact files_to_publish paths, commit them, push the "
+        "branch, and retry the pull-request creation step. Do not claim PR "
+        "creation succeeded until a PR URL is returned."
+    )
 
 
 def _validate_internal_command(command: object) -> None:

@@ -168,8 +168,9 @@ steps:
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `ci-fix`, commit message `Fix CI
-    failures`, and the existing pull-request reference and title. Pass the
-    failure matrix, root cause, reproduction, fix, post-fix validation, and
+    failures`, and the existing pull-request reference and title. Pass a
+    `files_to_publish` context list containing every intended fix/test file,
+    along with the failure matrix, root cause, reproduction, fix, post-fix validation, and
     Stack Overflow references as context. Require the CI Failure section and
     verify the pushed head changed. Never claim remote CI is green before
     GitHub reports a successful run.

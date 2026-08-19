@@ -190,8 +190,10 @@ steps:
   details: >-
     You must invoke create-pull-request with pr-kind `feature`, commit message
     `Add <feature-name> implementation workflow`, and pull-request title
-    `<pull-request-title>`. Pass the validated planning artifacts and the
-    Feature Plan context. Do not summarize or print a proposed PR description,
+    `<pull-request-title>`. Pass a `files_to_publish` context list containing
+    every validated file under `docs/proposals/<feature-name>/` and
+    `docs/workflows/`, plus the validated planning artifacts and Feature Plan
+    context. The nested skill must stage exactly that list. Do not summarize or print a proposed PR description,
     and do not advance to the handoff step until the nested skill has actually
     committed, pushed, and created or updated a pull request successfully. If
     the nested skill reports an error, continue its corrective steps or stop

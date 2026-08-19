@@ -404,6 +404,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         stderr=self.stderr,
                         max_timeout_retries=self.config.max_timeout_retries,
                         timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                        context=action.context,
+                        clean=action.clean,
                     ),
                 }
             )
@@ -1431,15 +1433,20 @@ def _run_skill_for_agent(
     stderr: TextIO,
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
+    context: tuple[str, ...] = (),
+    clean: bool = False,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     stack: list[tuple[SkillCatalogEntry, int]] = [(selected_skill, 0)]
-    transcript = [{"role": "user", "content": task.description}]
+    transcript = [] if clean else [{"role": "user", "content": task.description}]
     execution_events: list[dict[str, Any]] = []
-    execution_context = [
-        f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
-        task.details or "",
-    ]
+    execution_context = list(context)
+    if not clean:
+        execution_context = [
+            f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
+            task.details or "",
+            *execution_context,
+        ]
     action_engine = WorkflowLLMActionEngine(max_stalled_roundtrips=3)
     while stack:
         current_skill, step_index = stack[-1]

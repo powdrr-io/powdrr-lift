@@ -1,0 +1,6 @@
+{
+  "proposed_pr_id": "pr-2-log-rotation",
+  "base_branch": "main",
+  "integration_branch": "powdrr/pr-2-log-rotation",
+  "workflow_relative_directory": "docs/workflows/interaction-file-logging"
+}

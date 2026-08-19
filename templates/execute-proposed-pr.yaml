@@ -21,16 +21,18 @@ task_templates:
   llm_type: long_context
   input_state:
     proposed_pr: <proposed-pr-id>
-    feature_id: <feature-id>
+    # This is the proposal directory under docs/proposals, not a semantic
+    # feature entity ID from feature_ids or a nested features section.
+    feature_id: <work-item-name>
   details: >-
     First resolve proposed_pr to the exact proposed PR specification. The
-    workflow instantiation hard-codes feature_id from the matching proposed PR;
-    pass that exact value in the first gather_context action:
-    {"kind":"gather_context","feature_id":"<feature-id>","types":["proposed_prs","requirements","approach","invariants","guidance","features","acceptance_criteria","expected_tests","required_test_cases","risks","decisions"],"keywords":["<proposed-pr-id>"]}.
-    feature_id scopes proposal discovery to docs/proposals/<feature-id> and
-    keywords identify the proposed PR within that feature. Do not omit
-    feature_id, use the proposed PR id as feature_id, or infer the feature from
-    keywords. Use the gathered context to identify the proposed PR, its goals,
+    use the proposal directory from input_state as feature_id in the first
+    gather_context action:
+    {"kind":"gather_context","feature_id":"<work-item-name>","types":["proposed_prs","requirements","approach","invariants","guidance","features","acceptance_criteria","expected_tests","required_test_cases","risks","decisions"],"keywords":["<proposed-pr-id>"]}.
+    feature_id scopes proposal discovery to docs/proposals/<work-item-name> and
+    keywords identify the proposed PR within that directory. Do not use a
+    semantic feature ID, the proposed PR ID, or a keyword-only fuzzy lookup as
+    feature_id. Use the gathered context to identify the proposed PR, its goals,
     scope, acceptance criteria, tests, dependencies, risks, and related
     requirements. Use read_document only when a specific section of a known
     document is needed. Do not guess a path when gathered context provides the

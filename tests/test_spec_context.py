@@ -138,3 +138,10 @@ def test_gather_context_resolves_proposed_pr_document_in_explicit_feature(
     assert report.matches[0].path == str(proposal_path)
     assert report.matches[0].section == "proposed_prs"
     assert report.matches[0].item["id"] == "pr-interaction-capture-17"
+
+    assert not gather_specification_context(
+        tmp_path,
+        types=["proposed_prs"],
+        keywords=["different-pr"],
+        feature_id="interaction-file-logging",
+    ).matches

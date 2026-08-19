@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 
 from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.spec_paths import PROPOSED_PR_SPECIFICATION_FILENAME
 
 _CONTEXT_TYPE_ALIASES: dict[str, str] = {
     "requirements": "requirements",
@@ -125,23 +126,7 @@ def gather_specification_context(
             repo_root_path,
             spec_path,
         )
-        if (
-            "proposed_prs" in normalized_types
-            and feature_id is not None
-            and "proposed_prs" not in raw_spec
-            and spec_path.name == "proposed-pr-specification.yaml"
-        ):
-            matches.append(
-                GatherContextMatch(
-                    path=str(spec_path),
-                    section="proposed_prs",
-                    item_index=None,
-                    work_item_name=work_item_name,
-                    specification_type=specification_type,
-                    item=raw_spec,
-                )
-            )
-        for section_name, section_value in raw_spec.items():
+        for section_name, section_value in _context_sections(spec_path, raw_spec):
             normalized_section_name = _CONTEXT_TYPE_ALIASES.get(
                 str(section_name).strip().lower(),
                 str(section_name).strip().lower(),
@@ -248,14 +233,16 @@ def _iter_context_specification_paths(
         repo_root / "docs" / "proposals",
     )
     if feature_id is not None:
+        scoped_roots: list[Path] = []
         for proposals_root in proposal_roots:
-            proposal_root = proposals_root / feature_id
-            if proposal_root.exists():
-                paths.extend(
-                    path
-                    for path in sorted(proposal_root.rglob("*.yaml"))
-                    if path.is_file()
-                )
+            exact_root = proposals_root / feature_id
+            if exact_root.is_dir():
+                scoped_roots.append(exact_root)
+
+        for proposal_root in scoped_roots:
+            paths.extend(
+                path for path in sorted(proposal_root.rglob("*.yaml")) if path.is_file()
+            )
 
     project_structure_root = repo_root / "docs" / "project_structure"
     if project_structure_root.exists():
@@ -270,6 +257,20 @@ def _iter_context_specification_paths(
         paths.append(current_state_path)
 
     return list(dict.fromkeys(paths))
+
+
+def _context_sections(
+    path: Path,
+    raw_spec: dict[str, Any],
+) -> list[tuple[str, Any]]:
+    """Return structured sections, including the canonical PR document record."""
+    sections = list(raw_spec.items())
+    if (
+        path.name == PROPOSED_PR_SPECIFICATION_FILENAME
+        and "proposed_prs" not in raw_spec
+    ):
+        sections.append(("proposed_prs", raw_spec))
+    return sections
 
 
 def _load_yaml_mapping(path: Path) -> dict[str, Any] | None:

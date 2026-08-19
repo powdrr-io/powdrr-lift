@@ -763,7 +763,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
     )
 
     assert captured == {
-        "model": "deepseek-ai/DeepSeek-V4-Flash",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
         "api_key": "test-token",
         "base_url": "https://example.test",
     }

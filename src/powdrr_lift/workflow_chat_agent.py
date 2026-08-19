@@ -101,7 +101,8 @@ _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
-_DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
+_DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
+_DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
 ALL_LLM_TYPES = (
     "high_reasoning",
     "standard_reasoning",
@@ -182,6 +183,10 @@ DEEPINFRA_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
         context_window=1_000_000,
         max_output_tokens=16_384,
     ),
+    "deepseek-ai/deepseek-v4-flash-0731": LLMModelLimits(
+        context_window=1_000_000,
+        max_output_tokens=16_384,
+    ),
     "qwen/qwen3-next-80b-a3b-instruct": LLMModelLimits(
         context_window=128_000,
         max_output_tokens=16_384,
@@ -243,7 +248,14 @@ DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
 }
 
 DEEPINFRA_CHEAP_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    llm_type: LLMModelMapping(_DEEPINFRA_CHEAP_MODEL, provider="deepinfra-cheap")
+    llm_type: LLMModelMapping(
+        _DEEPINFRA_CHEAP_MODEL,
+        provider="deepinfra-cheap",
+        backup_model=LLMModelMapping(
+            _DEEPINFRA_CHEAP_BACKUP_MODEL,
+            provider="deepinfra-cheap",
+        ),
+    )
     for llm_type in ALL_LLM_TYPES
 }
 

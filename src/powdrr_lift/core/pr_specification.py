@@ -264,6 +264,7 @@ def validate_pr_specification_yaml(
         proposed_pr_specification_yaml,
         work_item_name=work_item_name,
         repo_root=repo_root,
+        file_path=file_path,
     )
     return yaml.safe_dump(_report_to_data(report, file_path=file_path), sort_keys=False)
 
@@ -273,16 +274,15 @@ def build_pr_specification_validation_report(
     *,
     work_item_name: str,
     repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
 ) -> PRSpecificationValidationReport:
     repo_root_path = _resolve_repo_root(repo_root)
     issues: list[PRSpecificationValidationIssue] = []
-    current_proposed_pr_id = _normalize_identifier(work_item_name)
-
     feature_catalog = _load_feature_catalog(repo_root_path)
     available_feature_ids = [entry.feature_id for entry in feature_catalog]
     known_pr_ids = _load_existing_pr_ids(
         repo_root_path,
-        excluded_proposed_pr_id=current_proposed_pr_id,
+        excluded_file_path=file_path,
     )
 
     try:
@@ -478,16 +478,22 @@ def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
 def _load_existing_pr_ids(
     repo_root: Path,
     *,
-    excluded_proposed_pr_id: str | None = None,
+    excluded_file_path: str | Path | None = None,
 ) -> list[str]:
     pr_ids: list[str] = []
     seen_ids: set[str] = set()
-    excluded_identifier = (
-        _normalize_identifier(excluded_proposed_pr_id)
-        if excluded_proposed_pr_id is not None
+    excluded_path = (
+        (
+            (repo_root / Path(excluded_file_path))
+            if not Path(excluded_file_path).expanduser().is_absolute()
+            else Path(excluded_file_path).expanduser()
+        ).resolve()
+        if excluded_file_path is not None
         else None
     )
     for specification_path in _iter_proposed_pr_specification_paths(repo_root):
+        if excluded_path is not None and specification_path.resolve() == excluded_path:
+            continue
         try:
             raw_spec = _load_yaml_mapping(
                 specification_path.read_text(encoding="utf-8")
@@ -500,11 +506,6 @@ def _load_existing_pr_ids(
             continue
 
         normalized_proposed_pr_id = _normalize_identifier(proposed_pr_id)
-        if (
-            excluded_identifier is not None
-            and normalized_proposed_pr_id == excluded_identifier
-        ):
-            continue
 
         if normalized_proposed_pr_id in seen_ids:
             continue

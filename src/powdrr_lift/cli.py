@@ -1793,6 +1793,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
                     proposed_yaml,
                     work_item_name=work_item_name,
                     repo_root=repo_root,
+                    file_path=specification_path,
                 ).validation_successful
                 report_yaml = validate_pr_specification_yaml(
                     proposed_yaml,

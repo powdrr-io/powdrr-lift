@@ -221,9 +221,10 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
     assert report.validation_successful is False
     assert report.proposed_pr_id == "pr-123"
     assert report.available_feature_ids == ["feature-a", "feature-b"]
-    assert report.known_pr_ids == []
+    assert report.known_pr_ids == ["pr-123"]
     assert {issue.code for issue in report.issues} == {
         "duplicate_feature_id",
+        "duplicate_proposed_pr_id",
         "unknown_feature_id",
         "duplicate_detail_id",
     }
@@ -279,6 +280,25 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
     )
 
     assert report.validation_successful is True
+
+
+def test_validate_pr_specification_does_not_flag_the_current_file_as_duplicate(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    existing_path = _write_existing_pr_specification(tmp_path)
+    proposed_spec = existing_path.read_text(encoding="utf-8")
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=existing_path,
+    )
+
+    assert report.validation_successful is True
+    assert report.proposed_pr_id == "pr-123"
+    assert report.known_pr_ids == []
 
 
 def test_pr_specification_feature_catalog_includes_local_features(

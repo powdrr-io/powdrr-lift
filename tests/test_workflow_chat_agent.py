@@ -2386,8 +2386,13 @@ def test_explicit_provider_selection_is_not_overridden() -> None:
 
 
 def test_deepinfra_cheap_maps_every_llm_type_to_flash() -> None:
-    expected_model = "deepseek-ai/DeepSeek-V4-Flash"
+    expected_model = "deepseek-ai/DeepSeek-V4-Flash-0731"
+    expected_backup_model = "deepseek-ai/DeepSeek-V4-Flash"
     for llm_type in DEEPINFRA_CHEAP_LLM_MAPPINGS:
+        mapping = DEEPINFRA_CHEAP_LLM_MAPPINGS[llm_type]
+        assert mapping.model == expected_model
+        assert mapping.backup_model is not None
+        assert mapping.backup_model.model == expected_backup_model
         assert (
             _resolve_llm_model(
                 llm_type,

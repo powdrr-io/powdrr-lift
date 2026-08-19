@@ -1193,16 +1193,13 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     if not output_root.is_absolute():
         output_root = repo_root / output_root
     template_values = _parse_template_values(args.template_value)
-    integration_worktree: Path | None = None
-    integration_branch: str | None = None
     try:
-        if repo_root.is_dir() and (repo_root / ".git").is_dir():
-            proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
-            integration_worktree, integration_branch = create_workflow_worktree(
-                repo_root,
-                proposed_pr_id,
-            )
-            output_root = integration_worktree / output_root.relative_to(repo_root)
+        proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
+        integration_worktree, integration_branch = create_workflow_worktree(
+            repo_root,
+            proposed_pr_id,
+        )
+        output_root = integration_worktree / output_root.relative_to(repo_root)
         output_directory, tasks = instantiate_workflow_template(
             template_path=template_path,
             work_item_name=args.work_item_name,
@@ -1210,21 +1207,18 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             workflow_instance_name=args.workflow_instance_name,
             template_values=template_values,
         )
-        if integration_worktree is not None and integration_branch is not None:
-            relative_workflow = output_directory.relative_to(integration_worktree)
-            state = WorkflowGitState(
-                proposed_pr_id=template_values.get(
-                    "proposed-pr-id", args.work_item_name
-                ),
-                base_branch="main",
-                integration_branch=integration_branch,
-                workflow_relative_directory=str(relative_workflow),
-            )
-            save_workflow_git_state(output_directory, state)
-            commit_and_push_workflow_initialization(
-                integration_worktree,
-                output_directory,
-            )
+        relative_workflow = output_directory.relative_to(integration_worktree)
+        state = WorkflowGitState(
+            proposed_pr_id=template_values.get("proposed-pr-id", args.work_item_name),
+            base_branch="main",
+            integration_branch=integration_branch,
+            workflow_relative_directory=str(relative_workflow),
+        )
+        save_workflow_git_state(output_directory, state)
+        commit_and_push_workflow_initialization(
+            integration_worktree,
+            output_directory,
+        )
     except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print(f"Could not instantiate workflow: {exc}", file=sys.stderr)
         return 1

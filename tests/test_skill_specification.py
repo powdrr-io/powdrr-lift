@@ -415,6 +415,11 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     )
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()
+    assert "git rev-list --count" in (skill.steps[4].details or "")
+    assert (
+        "uncommitted files alone are not sufficient"
+        in (skill.steps[4].details or "").lower()
+    )
     assert skill.steps[2].tool_invocations[-1].command == (
         "git",
         "commit",

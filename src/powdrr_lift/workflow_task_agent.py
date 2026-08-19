@@ -37,7 +37,6 @@ from powdrr_lift.workflow_chat_agent import (
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
-    _current_pull_request_number,
     _default_llm_mappings,
     _estimate_message_tokens,
     _execute_fuzzy_match_tool,
@@ -173,7 +172,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     stderr: TextIO
     action_engine: WorkflowLLMActionEngine
     events: list[dict[str, Any]]
-    pr_number: int | None = None
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
 
@@ -307,11 +305,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 types=list(action.types),
                 keywords=list(action.keywords),
                 filters=action.filters,
-                pr_number=self.pr_number,
+                feature_id=action.feature_id,
             )
             self.events.append(
                 {
                     "kind": action.kind,
+                    "feature_id": action.feature_id,
                     "types": list(action.types),
                     "keywords": list(action.keywords),
                     "filters": action.filters,
@@ -649,7 +648,6 @@ def run_workflow_task(
         stderr=stderr,
         action_engine=driver.action_engine,
         events=driver_events,
-        pr_number=_current_pull_request_number(repo_root),
     )
     try:
         return driver.run(
@@ -1347,6 +1345,7 @@ def _run_skill_for_agent(
             report = gather_specification_context(
                 repo_root,
                 types=list(action.types),
+                feature_id=action.feature_id,
                 keywords=list(action.keywords),
             )
             execution_events.append(

@@ -62,24 +62,22 @@ def test_gather_context_discovers_project_structure_artifact(tmp_path: Path) -> 
     assert {match.section for match in report.matches} == {"modules", "tools"}
 
 
-def test_gather_context_scopes_current_and_exact_pr_proposal(tmp_path: Path) -> None:
+def test_gather_context_scopes_current_and_exact_feature_proposal(
+    tmp_path: Path,
+) -> None:
     current_path = tmp_path / "docs" / "current" / "system.yaml"
     current_path.parent.mkdir(parents=True)
     current_path.write_text(
         "requirements:\n- id: current\n  description: current requirement\n",
         encoding="utf-8",
     )
-    proposal_path = (
-        tmp_path / "docs" / "proposals" / "PR-42" / "proposed-pr-specification.yaml"
-    )
+    proposal_path = tmp_path / "docs" / "proposed" / "feature-a" / "proposal.yaml"
     proposal_path.parent.mkdir(parents=True)
     proposal_path.write_text(
         "requirements:\n- id: proposed\n  description: proposed requirement\n",
         encoding="utf-8",
     )
-    other_proposal_path = (
-        tmp_path / "docs" / "proposals" / "PR-99" / "proposed-pr-specification.yaml"
-    )
+    other_proposal_path = tmp_path / "docs" / "proposed" / "feature-b" / "proposal.yaml"
     other_proposal_path.parent.mkdir(parents=True)
     other_proposal_path.write_text(
         "requirements:\n- id: unrelated\n  description: unrelated requirement\n",
@@ -89,7 +87,7 @@ def test_gather_context_scopes_current_and_exact_pr_proposal(tmp_path: Path) -> 
     report = gather_specification_context(
         tmp_path,
         types=["requirements"],
-        pr_number=42,
+        feature_id="feature-a",
     )
 
     assert {match.item["id"] for match in report.matches} == {"current", "proposed"}

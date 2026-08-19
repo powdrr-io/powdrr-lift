@@ -4052,6 +4052,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         text=True,
     )
     subprocess.run(
+        ["git", "branch", "-M", "main"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
         cwd=repo_root,
         check=True,
@@ -4060,6 +4065,25 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ["git", "config", "user.name", "Test User"],
         cwd=repo_root,
         check=True,
+    )
+    remote_repo = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "init", "--bare", str(remote_repo)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", str(remote_repo)],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "push", "--set-upstream", "origin", "main"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     tool_bin = tmp_path / "bin"
     tool_bin.mkdir()

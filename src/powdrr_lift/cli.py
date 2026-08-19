@@ -94,6 +94,7 @@ from powdrr_lift.workflow_git import (
     create_workflow_worktree,
     inspect_workflow_run,
     save_workflow_git_state,
+    synchronize_workflow_initialization,
 )
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
@@ -1199,7 +1200,6 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             repo_root,
             proposed_pr_id,
         )
-        output_root = integration_worktree / output_root.relative_to(repo_root)
         output_directory, tasks = instantiate_workflow_template(
             template_path=template_path,
             work_item_name=args.work_item_name,
@@ -1207,7 +1207,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             workflow_instance_name=args.workflow_instance_name,
             template_values=template_values,
         )
-        relative_workflow = output_directory.relative_to(integration_worktree)
+        relative_workflow = output_directory.relative_to(repo_root)
         state = WorkflowGitState(
             proposed_pr_id=template_values.get("proposed-pr-id", args.work_item_name),
             base_branch="main",
@@ -1216,9 +1216,11 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
         )
         save_workflow_git_state(output_directory, state)
         commit_and_push_workflow_initialization(
-            integration_worktree,
+            repo_root,
             output_directory,
+            push=False,
         )
+        synchronize_workflow_initialization(integration_worktree, repo_root)
     except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print(f"Could not instantiate workflow: {exc}", file=sys.stderr)
         return 1

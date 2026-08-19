@@ -2575,7 +2575,7 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
     assert "Done." in stdout.getvalue()
 
 
-def test_workflow_execution_skips_repeated_no_progress_tool_step(
+def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2662,13 +2662,8 @@ def test_workflow_execution_skips_repeated_no_progress_tool_step(
         ),
     )
 
-    assert exit_code == 0
-    assert "skipping to the next workflow step" in stderr.getvalue()
-    assert any(
-        status == "Warning: repeated tool action made no progress; "
-        "skipping to the next workflow step."
-        for status in progress_statuses
-    )
+    assert exit_code == 1
+    assert "required tool step made no progress" in stderr.getvalue()
     assert any(
         status.startswith("roundtrip 1: invoke_tool (shell)")
         for status in progress_statuses
@@ -5192,6 +5187,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._pr_push_invoked = False
             self._pr_create_invoked = False
             self._pr_update_invoked = False
+            self._start_invoked_steps: set[int] = set()
+            self._bootstrap_invoked_steps: set[int] = set()
+            self._finish_invoked_steps: set[int] = set()
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -5209,7 +5207,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             else:
                 assert prompt["execution_mode"] == "execute_selected_skill"
                 if prompt["selected_skill"]["name"] == "bootstrap-code-structure":
-                    assert prompt["current_step_index"] < 8
+                    step_index = int(prompt["current_step_index"])
+                    assert step_index < 8
                     shell_invocations = [
                         invocation
                         for invocation in prompt["current_step"].get(
@@ -5217,7 +5216,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         )
                         if invocation.get("tool") == "shell"
                     ]
-                    if shell_invocations:
+                    if (
+                        shell_invocations
+                        and step_index not in self._bootstrap_invoked_steps
+                    ):
+                        self._bootstrap_invoked_steps.add(step_index)
                         self._call_index += 1
                         return {
                             "kind": "invoke_tool",
@@ -5227,7 +5230,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
-                    assert prompt["current_step_index"] < 3
+                    step_index = int(prompt["current_step_index"])
+                    assert step_index < 3
                     shell_invocations = [
                         invocation
                         for invocation in prompt["current_step"].get(
@@ -5235,7 +5239,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         )
                         if invocation.get("tool") == "shell"
                     ]
-                    if shell_invocations:
+                    if (
+                        shell_invocations
+                        and step_index not in self._finish_invoked_steps
+                    ):
+                        self._finish_invoked_steps.add(step_index)
                         self._call_index += 1
                         return {
                             "kind": "invoke_tool",
@@ -5354,18 +5362,33 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
                 )
-                shell_invocations = [
-                    invocation
-                    for invocation in prompt["current_step"].get("tool_invocations", [])
-                    if invocation.get("tool") == "shell"
-                ]
-                if shell_invocations:
+                step_index = int(prompt["current_step_index"])
+                tool_invocations = prompt["current_step"].get("tool_invocations", [])
+                if tool_invocations and step_index not in self._start_invoked_steps:
+                    invocation = next(
+                        (
+                            item
+                            for item in tool_invocations
+                            if item.get("tool") == "shell"
+                        ),
+                        tool_invocations[0],
+                    )
+                    self._start_invoked_steps.add(step_index)
                     self._call_index += 1
+                    command = [
+                        str(part)
+                        .replace("<feature-name>", "display-related-photos")
+                        .replace("<proposed-pr-name>", "display-related-photos-pr-001")
+                        .replace("<feature-id>", "display-related-photos")
+                        for part in invocation["command"]
+                    ]
                     return {
                         "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {"command": shell_invocations[0]["command"]},
+                        "tool": invocation["tool"],
+                        "parameters": {"command": command},
                     }
+                self._call_index += 1
+                return {"kind": "next_step"}
             response = next(start_responses)
             self._call_index += 1
             return response
@@ -5450,15 +5473,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         stderr=start_stderr,
     )
 
-    assert start_exit_code == 0
+    assert start_exit_code == 0, start_stderr.getvalue()
     start_summary_path = worktree_root / start_output_dir / "skill-execution.json"
     assert start_summary_path.exists()
     start_summary = json.loads(start_summary_path.read_text(encoding="utf-8"))
     assert start_summary["selected_skill_name"] == "start-implementing-feature"
     start_event_kinds = [event["kind"] for event in start_summary["execution_events"]]
-    assert start_event_kinds[0] == "next_step"
+    assert start_event_kinds[0] == "invoke_tool"
     assert start_event_kinds.count("next_step") >= 6
-    assert "read_document" in start_event_kinds
     assert start_event_kinds[-1] in {"complete", "next_step"}
     assert any(
         event["kind"] == "invoke_tool"
@@ -5480,7 +5502,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert (workflow_directory / ".workflow-git.json").exists()
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
-        f"task-{index:03d}" for index in range(1, 13)
+        f"display-related-photos-pr-001-task-{index:03d}" for index in range(1, 13)
     ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
         "Gather context about the proposed PR",
@@ -5496,7 +5518,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Finish pull request preparation",
         "Create the pull request",
     ]
-    assert [task.upstream_task_ids for task in tasks] == [
+    assert [
+        tuple(task_id[task_id.rfind("task-") :] for task_id in task.upstream_task_ids)
+        for task in tasks
+    ] == [
         (),
         ("task-001",),
         ("task-001", "task-002"),

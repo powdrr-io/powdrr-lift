@@ -69,7 +69,7 @@ steps:
     ask for a feature or target module. Wait for it to complete, then confirm
     from its returned context that the staged project-structure artifact is
     available before continuing.
-- description: Create implementation specifications for the proposed PRs.
+- description: Generate implementation specification templates for the proposed PRs.
   llm_type: high_reasoning
   details: >-
     If proposed PR specifications or implementation specifications already
@@ -78,12 +78,12 @@ steps:
     of proposed PRs that implement the feature as ordered steps with
     incremental validation, clear boundaries, and low risk. For each proposed
     PR, define its goal, implementation scope, files, tests, acceptance
-    criteria, validation commands, dependencies, and risks. Then invoke the
-    implementation-specification tool once for each proposed PR and fill out
-    the generated template with that PR's implementation plan. Keep each PR's
-    specification separate and give each one a stable proposed-PR name. Pass
-    the complete set of proposed PRs and every created or reused
-    implementation-specification file as context to the next step.
+    criteria, validation commands, dependencies, and risks. Invoke the
+    implementation-specification tool once for each proposed PR. This step
+    only generates the files; do not fill in, validate, instantiate, stage, or
+    commit them. Keep each PR's specification separate and give each one a
+    stable proposed-PR name. Record every generated path and its proposed-PR
+    relationship for the next step.
     Use the always-available read_document action to inspect
     templates/execute-proposed-pr.yaml; do not invoke sed or another shell
     command to read the file.
@@ -96,7 +96,19 @@ steps:
     - <feature-name>
     - --output
     - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
-- description: Validate every spec-v1 document before creating execution workflows.
+- description: Fill every generated implementation specification completely.
+  llm_type: high_reasoning
+  details: >-
+    For each generated implementation-specification file, replace every
+    placeholder and fill every required field using the selected feature,
+    project-structure, and proposed-PR context. Remove all generator
+    instructions and instructional comments from the resulting YAML. Do not
+    leave null, empty, example, or TODO values in a required field. Keep each
+    proposed PR in its own file and preserve its stable proposed-PR id. Use
+    yaml_edit for edits and make all edits in this active worktree. Do not
+    validate or instantiate workflows until every file is fully populated.
+    Pass the exact filled paths and proposed-PR mapping to the validation step.
+- description: Validate every implementation specification before creating execution workflows.
   llm_type: fast_iteration
   details: >-
     Run the single evaluate command once on the selected feature specification
@@ -105,31 +117,36 @@ steps:
     error, use its corrective guidance to edit the affected document with
     yaml_edit, then rerun evaluate only after the document has changed. Do not
     instantiate workflows, stage artifacts, request approval, or create a pull
-    request while any spec-v1 document is invalid. Record the successful
-    validation results and exact validated paths in context for the next step.
+    request while any spec-v1 document is invalid. Confirm that validation
+    passed for every filled implementation-specification path and record the
+    successful results before continuing.
   tool_invocations:
   - tool: internal
     command:
     - powdrr-lift
     - evaluate
     - docs/proposals/<feature-name>
-- description: Instantiate an execution workflow for every proposed PR.
+- description: Instantiate an execution workflow for every validated proposed PR.
   llm_type: simple_task
   details: >-
     If an execution workflow already exists for every proposed PR, inspect the
     matching workflow directories, reuse them, and skip this step. Otherwise
-    invoke the workflow instantiation tool once for each proposed PR that does
-    not already have a workflow. Before invoking it, inspect the selected
-    workflow template and identify every placeholder used in task input_state.
-    Resolve each placeholder from the matching proposed PR and pass every
-    template-specific value explicitly with a repeated
-    --template-value NAME=VALUE option. Use the fixed
-    templates/execute-proposed-pr.yaml template, the canonical feature name as
-    the shared work-item name, and a distinct workflow instance name derived
-    from each proposed PR. Preserve the proposed-PR order and encode each
-    dependency in the workflow task dependencies and input state. Never leave
-    a required input_state placeholder empty. Never ask the user for a template
-    path. Do not overwrite an existing workflow instance without user approval.
+    invoke the workflow instantiation tool once for each validated proposed PR
+    that does not already have a workflow. Before invoking it, inspect the
+    selected workflow template and identify every placeholder used in task
+    input_state. Resolve each placeholder from the matching validated
+    proposed-PR specification and pass every template-specific value
+    explicitly with a repeated --template-value NAME=VALUE option. Use the
+    fixed templates/execute-proposed-pr.yaml template, the canonical feature
+    name as the shared work-item name, and a distinct workflow instance name
+    derived from each proposed PR. Preserve the proposed-PR order and encode
+    each dependency in the workflow task dependencies and input state. Never
+    leave a required input_state placeholder empty. Never ask the user for a
+    template path. Do not overwrite an existing workflow instance without
+    user approval. The command must create the powdrr/<proposed-pr-id>
+    integration branch, while writing the generated workflow files into this
+    active worktree so they are included in this PR. Treat a returned workflow
+    directory outside the active worktree as an inconsistency and stop.
     Pass every created or reused workflow file and its proposed-PR relationship
     as context to the next step.
   tool_invocations:
@@ -159,6 +176,21 @@ steps:
     - feature-id=<feature-id>
     - --template
     - templates/execute-proposed-pr.yaml
+- description: Verify workflow artifacts are in the active worktree.
+  llm_type: fast_iteration
+  details: >-
+    Inspect the instantiate-workflow result and the active repository state.
+    Confirm that every generated workflow JSON file and .workflow-git.json is
+    present under docs/workflows/ in this active worktree, that the integration
+    branch is powdrr/<proposed-pr-id>, and that no required artifact exists
+    only below .worktrees/. If any file is missing or the paths are outside the
+    active worktree, stop and report the inconsistency; do not stage or create
+    a pull request.
+  tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - repository-state
 - description: Stage the validated artifacts for pull request preparation.
   llm_type: simple_task
   details: >-

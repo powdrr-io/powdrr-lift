@@ -761,6 +761,21 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.state.execution_context.extend(context)
             self.provider_role = nested_role
             return WorkflowActionOutcome()
+        if action.kind == "goto_step":
+            target_index = _step_index_by_id(self.selected_skill, action.step_id)
+            self.state.step_index = target_index
+            if action.decisions_and_context:
+                self.state.execution_context.append(action.decisions_and_context)
+            self.state.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "step_id": action.step_id,
+                    "target_step_index": target_index,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": self.current_step_index,
+                }
+            )
+            return WorkflowActionOutcome()
         if action.kind == "complete" and self.skill_stack:
             self._restore_parent()
             return WorkflowActionOutcome()
@@ -2853,6 +2868,11 @@ def _action_system_prompt() -> str:
         "its descendants. Set clean=true only when the skill must receive only the "
         "explicit context list (and decisions_and_context) and must not return "
         "its gathered context to the caller.\n"
+        "- goto_step: choose this when the current step explicitly says to repeat "
+        "work. Set step_id to the labeled target step and include the progress "
+        "that proves why another iteration is needed. Use it until the current "
+        "step's stated completion condition is satisfied. Never use an unknown "
+        "step_id or jump without making progress.\n"
         "- invoke_tool: choose this only when the current step's explicitly "
         "listed tool_invocations support the tool needed for the next action.\n"
         "- read_document: choose this when you know the document path but need "
@@ -2880,7 +2900,8 @@ def _action_system_prompt() -> str:
         "and basedpyright-structure takes parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
         "takes "
-        "a skill name from available_skills; next_step has "
+        "a skill name from available_skills; goto_step takes a step_id matching "
+        "an id on a step in the current skill; next_step has "
         "no action-specific fields; read_document requires file_path, positive "
         "start_line and positive end_line for a range of at most 2000 lines; "
         "complete may include a human-readable text.\n"
@@ -2908,6 +2929,8 @@ def _action_system_prompt() -> str:
         '{"kind":"invoke_skill","skill":"adversarial-review",'
         '"provider_role":"adversarial","clean":true,'
         '"context":["Review only this diff."],"decisions_and_context":"..."}\n'
+        '{"kind":"goto_step","step_id":"process-next-item",'
+        '"decisions_and_context":"More items remain; continue with the next item."}\n'
         '{"kind":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
         '"llm_type":"long_context"}\n'
@@ -2967,6 +2990,10 @@ def _action_system_prompt() -> str:
         "and returns here when complete. Use invoke_tool for shell commands, "
         "fuzzy-match searches, or basedpyright "
         "symbol and structure queries.\n"
+        "Use goto_step only with an id declared on a step in the current skill. "
+        "The target step becomes current and receives accumulated context; the "
+        "jump must identify the remaining item or changed condition requiring "
+        "another pass.\n"
         "When a tool result reports validation failure, a non-zero validation "
         "status, or structured validation errors with corrective_action, do "
         "not invoke the same validation command again unchanged. First use the "
@@ -3125,7 +3152,21 @@ def _workflow_action_material_state(
         )
     if action.kind == "prompt_user":
         return _last_user_message(state)
+    if action.kind == "goto_step":
+        return (action.step_id, state.step_index)
     return None
+
+
+def _step_index_by_id(skill: SkillCatalogEntry, step_id: str | None) -> int:
+    if step_id is None:
+        raise RuntimeError("Workflow goto_step action must include step_id.")
+    for index, step in enumerate(skill.skill.steps):
+        if step.id == step_id:
+            return index
+    raise RuntimeError(
+        f"Workflow goto_step target {step_id!r} is not declared in skill "
+        f"{skill.skill.name!r}."
+    )
 
 
 def _workflow_action_signature(action: SkillChatAction) -> str:
@@ -3606,7 +3647,7 @@ def _validate_workflow_step_transition(
     current_step_index: int,
 ) -> None:
     """Prevent the LLM from skipping a step's required tool invocation."""
-    if action.kind not in {"next_step", "complete"}:
+    if action.kind not in {"next_step", "goto_step", "complete"}:
         return
     invocations = tuple(
         invocation for invocation in step.tool_invocations if invocation.tool != "ref"
@@ -3730,12 +3771,18 @@ def _command_matches_invocation(
     command: Sequence[str],
     expected_command: Sequence[str],
 ) -> bool:
-    if len(command) != len(expected_command):
-        return False
-    return all(
-        _command_token_matches(actual, expected)
-        for actual, expected in zip(command, expected_command, strict=True)
-    )
+    actual_index = 0
+    for expected_index, expected in enumerate(expected_command):
+        if expected == "<files-to-publish>":
+            return expected_index == len(expected_command) - 1 and actual_index < len(
+                command
+            )
+        if actual_index >= len(command):
+            return False
+        if not _command_token_matches(command[actual_index], expected):
+            return False
+        actual_index += 1
+    return actual_index == len(command)
 
 
 def _command_token_matches(actual: str, expected: str) -> bool:
@@ -3854,6 +3901,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "gather_context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
+        "goto_step": _parse_workflow_action_goto_step,
         "read_document": _parse_workflow_action_read_document,
         "next_step": _parse_workflow_action_next_step,
         "prompt_user": _parse_workflow_action_prompt_user,
@@ -3889,6 +3937,22 @@ def _parse_workflow_action_invoke_skill(
         provider_role=provider_role,
         clean=clean,
         context=tuple(value.strip() for value in raw_context),
+    )
+
+
+def _parse_workflow_action_goto_step(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    step_id = payload.get("step_id")
+    if not isinstance(step_id, str) or not step_id.strip():
+        raise RuntimeError("Workflow goto_step action must include step_id.")
+    return SkillChatAction(
+        kind="goto_step",
+        step_id=step_id.strip(),
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
     )
 
 
@@ -4236,10 +4300,7 @@ def _execute_shell_tool(
             "Workflow invoke_tool action parameters must include a command."
         )
 
-    empty_pr_error = _empty_pull_request_error(
-        validation_command,
-        worktree_root,
-    )
+    empty_pr_error = _empty_pull_request_error(validation_command, worktree_root)
     if empty_pr_error is not None:
         print(empty_pr_error, file=stderr)
         return {
@@ -4353,17 +4414,16 @@ def _empty_pull_request_error(
         text=True,
         check=False,
     )
-    uncommitted = status.stdout.strip()
     detail = (
         "Uncommitted changes are present."
-        if uncommitted
+        if status.stdout.strip()
         else "There are no uncommitted changes either."
     )
     return (
         f"Cannot create a pull request: no commits exist between {base} and HEAD. "
-        f"{detail} Stage the intended changes, commit them, push the branch, and "
-        "retry the pull-request creation step. Do not claim PR creation succeeded "
-        "until a PR URL is returned."
+        f"{detail} Stage the exact files_to_publish paths, commit them, push the "
+        "branch, and retry the pull-request creation step. Do not claim PR "
+        "creation succeeded until a PR URL is returned."
     )
 
 
@@ -4379,6 +4439,8 @@ def _skill_step_to_data(step: Any) -> dict[str, Any]:
         "details": step.details,
         "uses_skills": list(step.uses_skills),
     }
+    if step.id is not None:
+        data["id"] = step.id
     if step.tool_invocations:
         data["tool_invocations"] = [
             _tool_invocation_to_data(tool_invocation)

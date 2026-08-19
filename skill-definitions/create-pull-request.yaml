@@ -31,11 +31,30 @@ steps:
     If a section does not apply, write Not applicable and why. Never leave a
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
+- description: Stage the exact files that belong in the pull request.
+  llm_type: simple_task
+  details: >-
+    Read the `files_to_publish` list from workflow context. It is authoritative
+    for this pull request. Verify every listed path exists or is an intended
+    new file, then invoke `git add` with exactly those paths. Do not use `git
+    add .`, `git add --all`, or stage logs, caches, or unrelated files. Verify
+    the staged names with `git diff --cached --name-only`; do not advance until
+    every intended path is staged and no unintended path is staged.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - add
+    - <files-to-publish>
 - description: Commit the validated changes.
   llm_type: simple_task
   details: >-
-    Confirm that only the intended validated files are staged, then commit with
-    `<commit-message>`. Do not push or invoke any GitHub command in this step.
+    Confirm with `git diff --cached --name-only` that the exact
+    `files_to_publish` list is staged and that the staged diff is non-empty.
+    If any intended file is missing or any unrelated file is staged, correct
+    the staging before continuing. Commit with `<commit-message>`, then verify
+    that `HEAD` advanced. Never create an empty commit. Do not push or invoke
+    any GitHub command in this step.
   tool_invocations:
   - tool: internal
     command:
@@ -50,9 +69,10 @@ steps:
 - description: Push the committed changes.
   llm_type: simple_task
   details: >-
-    Push the current feature branch with its upstream set. Do not create or
-    update a pull request in this step; leave the completed body in workflow
-    context for the next step.
+    Push the current feature branch with its upstream set. Verify that the
+    remote branch contains the committed `HEAD` before continuing. Do not
+    create or update a pull request in this step; leave the completed body in
+    workflow context for the next step.
   tool_invocations:
   - tool: shell
     command:
@@ -67,10 +87,11 @@ steps:
     First verify that the current branch has at least one committed change
     relative to the exact base branch. If `git rev-list --count
     <base-branch>..HEAD` is zero, do not invoke `gh pr create`: inspect
-    `git status`, stage the intended validated files, commit them, push the
-    branch, and retry this step. Uncommitted files alone are not sufficient for
-    a pull request. Use this step only when no pull request exists for the
-    current branch.
+    `git status`, stage the intended files, commit them, push the branch, and
+    retry this step. Uncommitted files alone are not sufficient for a pull
+    request. Confirm that the pushed `HEAD` contains every `files_to_publish`
+    path. Use this step only when no pull request exists for the current
+    branch.
     Invoke `gh pr create --draft --title <pull-request-title> --body
     <populated-pr-description>` using the completed body from the previous
     steps. Do not print the body, edit an existing PR, or run any other tool.

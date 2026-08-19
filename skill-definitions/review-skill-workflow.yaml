@@ -1,0 +1,124 @@
+---
+name: review-skill-workflow
+when_to_use:
+- When the user wants to review or rewrite a skill definition for directive,
+  concise, consistently executable instructions.
+- When the user wants to review a workflow definition or generated workflow task
+  sequence for excessive tool calls, hidden substeps, or ambiguous instructions.
+- When the review should produce an improved definition rather than only a prose
+  critique.
+steps:
+- id: resolve-target
+  description: Resolve and read the target definition.
+  llm_type: long_context
+  details: >-
+    Select exactly one target from the user's explicit path or name. If the
+    user provides neither, ask them to identify the skill or workflow before
+    using a tool. If the name is not an exact path, use fuzzy-match once to
+    locate candidates, then ask one specific question if more than one
+    candidate is plausible. Read the complete target definition with
+    read_document. Do not edit it during this step. Record its goal, inputs,
+    outputs, dependencies, steps or tasks, and existing validation
+    requirements.
+  tool_invocations:
+  - tool: fuzzy-match
+    command:
+    - fuzzy-match
+    - <skill-definitions-or-workflow-root>
+    - -name
+    - <target-name>
+    - -type
+    - f
+    - -print
+- id: inventory-steps
+  description: Inventory every target step and its execution surface.
+  llm_type: standard_reasoning
+  details: >-
+    Build an inventory table with one row for each target step or task. Preserve
+    source order and quote the description and English instructions in that
+    row. For each row count explicit
+    tool_invocations, uses_skills or nested workflow calls, and distinct action
+    clauses in the English instructions. Count an action clause whenever the
+    text tells the LLM to inspect, decide, edit, invoke, validate, record, ask,
+    or report; count conditional branches separately. Mark whether every tool
+    call has a concrete purpose, complete arguments or placeholders, timing,
+    expected result, and failure or retry rule. Treat a tool command plus an
+    unmentioned follow-up command as separate calls. Do not infer missing
+    instructions from repository conventions.
+- id: score-steps
+  description: Score directive quality and identify scope-preserving rewrites.
+  llm_type: high_reasoning
+  details: >-
+    Review each inventory row against four gates: tool economy, substep
+    economy, invocation specificity, and goal fidelity. Prefer zero tool calls
+    for reasoning-only steps and one tool call for an atomic operation. Flag
+    every step with more than one independent tool call, more than three action
+    clauses, vague verbs, mixed decisions and execution, repeated context,
+    missing inputs or outputs, implicit data handoffs between steps or skills,
+    unbounded retry language, or a tool call whose
+    arguments and success condition are not explicit. Distinguish a real
+    prerequisite from unnecessary orchestration. Do not remove a required
+    validation or evidence check merely to lower a count. For each finding,
+    state the smallest safe change and the requirement it preserves.
+- id: draft-rewrites
+  description: Draft concise, directive replacement steps.
+  llm_type: high_reasoning
+  details: >-
+    Rewrite only steps that fail a gate. Keep the original goal, required
+    evidence, dependencies, safety constraints, and output. Give each rewritten
+    step one observable outcome and at most one tool invocation. Use imperative
+    sentences with explicit inputs, exact command arguments or placeholders,
+    expected result, and one bounded correction rule. Favor explicit
+    instructions on what data to pass between steps and skills. Move rationale and
+    background out of execution instructions. Do not combine unrelated actions
+    into a single step and do not invent a tool, file, field, or dependency.
+    Present original text, proposed text, tool count, action-clause count, and
+    preserved requirements for every rewrite.
+- id: independent-review
+  description: Obtain an independent adversarial completeness review.
+  llm_type: high_reasoning
+  details: >-
+    Return this exact action shape to invoke the independent review:
+    {"kind":"invoke_skill","skill":"independent-skill-workflow-review",
+    "provider_role":"adversarial","clean":true,"context":["<target goal>",
+    "<original step text>","<proposed replacement text>",
+    "<preserved requirements>","<inventory counts>"],
+    "decisions_and_context":"Compare the rewrite with the original."}.
+    Pass the target goal, original step text, proposed replacement text,
+    preserved-requirement list, and inventory counts in the context array.
+    Ask it to compare the rewrite with the original without seeing this skill's
+    findings or preferred answer. Require it to identify omitted goals,
+    dependencies, safety checks, outputs, hidden tool calls, or instructions
+    that remain ambiguous. Do not edit the target while the independent review
+    is running.
+- id: reconcile-rewrites
+  description: Reconcile feedback and iterate until the rewrite is complete.
+  llm_type: high_reasoning
+  details: >-
+    Compare the independent review with the original inventory. Restore every
+    requirement the independent reviewer proves was omitted, then shorten or
+    split the replacement without increasing unnecessary tool calls. Repeat the
+    independent review for any changed step; do not proceed while an actionable
+    omission or ambiguity remains. If a changed rewrite needs another
+    independent check, use goto_step with step_id `independent-review` and
+    return here after that check. Stop only when every changed step has zero or
+    one tool call, no more than three action clauses unless justified, explicit
+    invocation instructions, and a complete preserved-requirement list.
+- id: apply-and-publish
+  description: Apply and validate the accepted definition.
+  llm_type: fast_iteration
+  details: >-
+    Apply the accepted rewrites to the target definition with the appropriate
+    structured edit. Preserve unrelated steps and formatting. Validate the
+    complete skill or workflow definition once after editing. If validation
+    fails, correct the target and rerun validation only after a change; never
+    repeat the same validation command unchanged. Report the final per-step
+    counts, remaining justified exceptions, validation result, and exact file
+    changed. Then invoke create-pull-request with pr-kind
+    `skill-workflow-review`, a concise commit message, and a pull-request title
+    that identifies the target. Pass the changed definition, final review
+    report, and validation result as context. Do not report completion until
+    the nested skill returns a pull-request URL; never merge the PR or push
+    directly to main.
+  uses_skills:
+  - create-pull-request

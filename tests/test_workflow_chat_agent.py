@@ -75,6 +75,7 @@ from powdrr_lift.workflow_chat_agent import (
     _backup_model_for,
     _build_selection_messages,
     _catalog_entry_to_data,
+    _command_matches_invocation,
     _complete_json_with_model_fallback,
     _current_file_context,
     _empty_pull_request_error,
@@ -128,6 +129,21 @@ from powdrr_lift.workflow_chat_tui import (
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 
 # ruff: noqa: E501
+
+
+def test_goto_step_action_requires_a_step_id() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "goto_step",
+            "step_id": "process-next-item",
+            "decisions_and_context": "More items remain.",
+        }
+    )
+
+    assert action.kind == "goto_step"
+    assert action.step_id == "process-next-item"
+    with pytest.raises(RuntimeError, match="must include step_id"):
+        _parse_action_response({"kind": "goto_step"})
 
 
 def test_execution_events_for_prompt_compacts_results_without_mutating_summary_data() -> (
@@ -5171,6 +5187,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         def __init__(self, **_: object) -> None:
             self._call_index = 0
             self._pr_template_invoked = False
+            self._pr_stage_invoked = False
             self._pr_commit_invoked = False
             self._pr_push_invoked = False
             self._pr_create_invoked = False
@@ -5228,7 +5245,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     self._call_index += 1
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "create-pull-request":
-                    assert prompt["current_step_index"] < 6
+                    assert prompt["current_step_index"] < 7
                     if (
                         prompt["current_step_index"] == 0
                         and not self._pr_template_invoked
@@ -5247,8 +5264,22 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                                 ]
                             },
                         }
+                    if prompt["current_step_index"] == 2 and not self._pr_stage_invoked:
+                        self._pr_stage_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": [
+                                    "git",
+                                    "add",
+                                    "docs/proposals/display-related-photos",
+                                ]
+                            },
+                        }
                     if (
-                        prompt["current_step_index"] == 2
+                        prompt["current_step_index"] == 3
                         and not self._pr_commit_invoked
                     ):
                         self._pr_commit_invoked = True
@@ -5258,7 +5289,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             "tool": "shell",
                             "parameters": {"command": ["git", "commit", "-m", "test"]},
                         }
-                    if prompt["current_step_index"] == 3 and not self._pr_push_invoked:
+                    if prompt["current_step_index"] == 4 and not self._pr_push_invoked:
                         self._pr_push_invoked = True
                         self._call_index += 1
                         return {
@@ -5275,7 +5306,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             },
                         }
                     if (
-                        prompt["current_step_index"] == 4
+                        prompt["current_step_index"] == 5
                         and not self._pr_create_invoked
                     ):
                         self._pr_create_invoked = True
@@ -5297,7 +5328,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             },
                         }
                     if (
-                        prompt["current_step_index"] == 5
+                        prompt["current_step_index"] == 6
                         and not self._pr_update_invoked
                     ):
                         self._pr_update_invoked = True
@@ -6557,6 +6588,44 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
     assert run.call_args.kwargs["cwd"] == tmp_path.resolve()
     assert "Invoking" not in stdout.getvalue()
     assert "Invoking" not in stderr.getvalue()
+
+
+def test_command_invocation_accepts_multiple_publish_files() -> None:
+    expected = ("git", "add", "<files-to-publish>")
+
+    assert _command_matches_invocation(
+        ["git", "add", "docs/a.yaml", "docs/b.yaml"],
+        expected,
+    )
+    assert not _command_matches_invocation(["git", "add"], expected)
+    assert not _command_matches_invocation(
+        ["git", "add", "docs/a.yaml", "--all"],
+        ("git", "add", "<files-to-publish>", "--all"),
+    )
+
+
+def test_empty_pull_request_error_rejects_uncommitted_only_branch(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    git_config = ["-c", "user.name=Test", "-c", "user.email=test@example.com"]
+    subprocess.run(
+        ["git", *git_config, "commit", "--allow-empty", "-m", "base"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+    (tmp_path / "new.txt").write_text("new\n", encoding="utf-8")
+
+    error = _empty_pull_request_error(
+        ["gh", "pr", "create", "--base", "main"],
+        tmp_path,
+    )
+
+    assert error is not None
+    assert "no commits exist between main and HEAD" in error
+    assert "files_to_publish" in error
 
 
 def test_execute_shell_tool_rejects_cwd_outside_worktree(tmp_path: Path) -> None:

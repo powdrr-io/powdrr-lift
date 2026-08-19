@@ -30,6 +30,7 @@ def test_skill_round_trips_through_json() -> None:
         steps=(
             SkillStep(
                 description="Capture the feature goal.",
+                id="capture-goal",
                 details="Record the user-visible outcome first.",
             ),
             SkillStep(
@@ -70,6 +71,7 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
+                "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
             {
@@ -103,6 +105,22 @@ def test_skill_file_helpers_round_trip(tmp_path: Path) -> None:
     output_path = save_skill(skill, tmp_path / "clarify-intent.json")
     assert output_path.exists()
     assert load_skill(output_path) == skill
+
+
+def test_skill_validation_rejects_duplicate_step_ids() -> None:
+    report = build_skill_validation_report(
+        "name: repeated\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- id: repeat\n"
+        "  description: First\n"
+        "- id: repeat\n"
+        "  description: Second\n",
+        source_path=Path("repeated.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
 
 
 def test_skill_directory_validation_accepts_references(tmp_path: Path) -> None:
@@ -341,7 +359,9 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "fix-ci-failures",
         "fix-merge-conflicts",
         "handle-ad-hoc",
+        "independent-skill-workflow-review",
         "review-architecture",
+        "review-skill-workflow",
         "review-system",
         "security-review",
         "specify-a-feature",
@@ -390,6 +410,7 @@ def test_pr_description_generators_are_used_by_pr_skills() -> None:
         assert any(
             "create-pull-request" in (step.uses_skills or ())
             and kind in (step.details or "")
+            and "files_to_publish" in (step.details or "")
             for step in skill.steps
         )
 
@@ -402,6 +423,7 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     assert [step.description for step in skill.steps] == [
         "Generate the pull request description template.",
         "Fill in the pull request description template.",
+        "Stage the exact files that belong in the pull request.",
         "Commit the validated changes.",
         "Push the committed changes.",
         "Create a draft pull request when none exists.",
@@ -415,30 +437,32 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     )
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()
-    assert "git rev-list --count" in (skill.steps[4].details or "")
-    assert (
-        "uncommitted files alone are not sufficient"
-        in (skill.steps[4].details or "").lower()
+    assert "files_to_publish" in (skill.steps[2].details or "")
+    assert "git diff --cached --name-only" in (skill.steps[2].details or "")
+    assert skill.steps[2].tool_invocations[0].command == (
+        "git",
+        "add",
+        "<files-to-publish>",
     )
-    assert skill.steps[2].tool_invocations[-1].command == (
+    assert skill.steps[3].tool_invocations[-1].command == (
         "git",
         "commit",
         "-m",
         "<commit-message>",
     )
-    assert skill.steps[3].tool_invocations[0].command == (
+    assert skill.steps[4].tool_invocations[0].command == (
         "git",
         "push",
         "-u",
         "origin",
         "HEAD",
     )
-    assert skill.steps[4].tool_invocations[0].command[:3] == (
+    assert skill.steps[5].tool_invocations[0].command[:3] == (
         "gh",
         "pr",
         "create",
     )
-    assert skill.steps[5].tool_invocations[0].command[:3] == (
+    assert skill.steps[6].tool_invocations[0].command[:3] == (
         "gh",
         "pr",
         "edit",

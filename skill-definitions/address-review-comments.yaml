@@ -41,7 +41,8 @@ steps:
     - graphql
     - -f
     - query=<review-thread-query>
-- description: Classify each comment against the feature contract.
+- id: classify-comments
+  description: Classify each comment against the feature contract.
   llm_type: high_reasoning
   details: >-
     For every actionable comment, read the relevant feature definition and
@@ -54,7 +55,8 @@ steps:
     explicitly changes them. If a comment conflicts with the feature contract
     or another comment, identify the conflict and resolve it from the most
     authoritative specification rather than silently guessing.
-- description: Update the v1 specification for design-level feedback.
+- id: update-specifications
+  description: Update the v1 specification for design-level feedback.
   llm_type: standard_reasoning
   details: >-
     For each comment classified as a design-level change, generate or reuse the
@@ -81,7 +83,8 @@ steps:
     - <evaluate-specification-command>
     - --work-item-name
     - <work-item-name>
-- description: Implement and test every actionable review correction.
+- id: implement-corrections
+  description: Implement and test every actionable review correction.
   llm_type: high_reasoning
   details: >-
     Apply the requested code, test, documentation, and specification changes in
@@ -89,8 +92,10 @@ steps:
     update or add tests required by the revised feature contract, and avoid
     unrelated cleanup. Re-read the changed files and diff against the PR so that
     every actionable comment is either addressed or explicitly recorded as
-    blocked with its reason. Stage only the intended files after the changes are
-    complete; do not create a new pull request for this workflow.
+    blocked with its reason. If a correction or test fails, use goto_step with
+    step_id `implement-corrections` after fixing the cause and continue until
+    every actionable comment is addressed. Stage only the intended files after
+    the changes are complete; do not create a new pull request for this workflow.
   tool_invocations:
   - tool: shell
     command:
@@ -101,7 +106,8 @@ steps:
     command:
     - powdrr-lift
     - repository-state
-- description: Run finish-pr-prep on the final staged changes.
+- id: validate-corrections
+  description: Run finish-pr-prep on the final staged changes.
   llm_type: fast_iteration
   details: >-
     Invoke finish-pr-prep after all implementation, test, documentation, and
@@ -116,7 +122,8 @@ steps:
   details: >-
     Invoke create-pull-request with pr-kind `review-comments`, commit message
     `Address pull request review comments`, and the existing pull-request
-    reference and title. Pass the review ledger as context and require one
+    reference and title. Pass a `files_to_publish` context list containing
+    every intended changed file, along with the review ledger, and require one
     Review Feedback Addressed row per actionable comment. Resolve each review
     thread only after its requested change is present and pushed. Never merge
     the pull request or push directly to main.

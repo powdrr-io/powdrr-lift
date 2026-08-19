@@ -55,6 +55,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_project_root,
     _resolve_worktree_context,
     _resolve_worktree_file_path,
+    _step_index_by_id,
     _validate_internal_command,
     resolve_workflow_provider,
 )
@@ -1496,6 +1497,21 @@ def _run_skill_for_agent(
             stack[-1] = (current_skill, step_index + 1)
             execution_events.append(
                 {"kind": action.kind, "skill": current_skill.skill.name}
+            )
+            continue
+        if action.kind == "goto_step":
+            target_index = _step_index_by_id(current_skill, action.step_id)
+            stack[-1] = (current_skill, target_index)
+            if action.decisions_and_context:
+                execution_context.append(action.decisions_and_context)
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "skill": current_skill.skill.name,
+                    "step_id": action.step_id,
+                    "target_step_index": target_index,
+                    "decisions_and_context": action.decisions_and_context,
+                }
             )
             continue
         if action.kind == "invoke_skill":

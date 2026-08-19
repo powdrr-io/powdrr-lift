@@ -129,6 +129,21 @@ from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 # ruff: noqa: E501
 
 
+def test_goto_step_action_requires_a_step_id() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "goto_step",
+            "step_id": "process-next-item",
+            "decisions_and_context": "More items remain.",
+        }
+    )
+
+    assert action.kind == "goto_step"
+    assert action.step_id == "process-next-item"
+    with pytest.raises(RuntimeError, match="must include step_id"):
+        _parse_action_response({"kind": "goto_step"})
+
+
 def test_execution_events_for_prompt_compacts_results_without_mutating_summary_data() -> (
     None
 ):

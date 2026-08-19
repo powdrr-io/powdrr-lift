@@ -71,9 +71,12 @@ class SkillStep:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
+    id: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {"description": self.description}
+        if self.id is not None:
+            data["id"] = self.id
         if self.details is not None:
             data["details"] = self.details
         if self.llm_type is not None:
@@ -321,6 +324,7 @@ def build_skill_validation_report(
                     path=_child_path(source_path, "steps"),
                 )
             )
+        seen_step_ids: set[str] = set()
         for index, step in enumerate(steps):
             step_path = _sequence_path(source_path, "steps", index)
             if not isinstance(step, Mapping):
@@ -336,6 +340,7 @@ def build_skill_validation_report(
             _validate_unknown_keys(
                 step_mapping,
                 {
+                    "id",
                     "description",
                     "details",
                     "llm_type",
@@ -356,6 +361,30 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "description"),
                     )
                 )
+
+            step_id = step_mapping.get("id")
+            normalized_step_id = _optional_string(step_id)
+            if step_id is not None and normalized_step_id is None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_step_id",
+                        message="Skill step id must be a non-empty string.",
+                        path=_child_path(step_path, "id"),
+                    )
+                )
+            elif normalized_step_id is not None:
+                if normalized_step_id in seen_step_ids:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="duplicate_step_id",
+                            message=(
+                                f"Skill step id {normalized_step_id!r} must be "
+                                "unique within the skill."
+                            ),
+                            path=_child_path(step_path, "id"),
+                        )
+                    )
+                seen_step_ids.add(normalized_step_id)
 
             details = step_mapping.get("details")
             if details is not None and _optional_string(details) is None:
@@ -841,6 +870,7 @@ def _parse_step(raw_step: object) -> SkillStep:
 
 def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     """Parse the reusable executable-step shape used by skills and workflows."""
+    step_id = _optional_string(data.get("id"))
     description = _required_string(data, "description")
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
@@ -849,6 +879,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         data.get("tool_invocations"),
     )
     return SkillStep(
+        id=step_id,
         description=description,
         details=details,
         llm_type=llm_type,

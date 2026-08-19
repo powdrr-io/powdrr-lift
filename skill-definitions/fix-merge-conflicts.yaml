@@ -161,7 +161,8 @@ steps:
     - diff
     - <related-pr-number>
     - --patch
-- description: Plan the semantic resolution before editing conflict markers.
+- id: plan-resolutions
+  description: Plan the semantic resolution before editing conflict markers.
   llm_type: high_reasoning
   details: >-
     For each conflict, state the merged behavior in plain language and map it
@@ -173,7 +174,8 @@ steps:
     the conflict hunk, test updates, generated-file regeneration, migration,
     or documentation change. Do not edit until every conflict has a plan; if
     intent cannot be determined safely, ask one precise question.
-- description: Apply and verify the conflict resolutions.
+- id: verify-resolutions
+  description: Apply and verify the conflict resolutions.
   llm_type: fast_iteration
   details: >-
     Edit only the planned files and any directly required follow-up files.
@@ -182,8 +184,9 @@ steps:
     focused tests for every conflict area first, then run all validation
     commands required by the repository's PR-preparation tool references. If a
     test or check fails, return to the conflict ledger, determine whether the
-    failure is caused by the resolution, and iterate until the affected checks
-    pass. Abort or stop for user input rather than guessing if the merge would
+    failure is caused by the resolution, then use goto_step with step_id
+    `plan-resolutions` to update the conflict plan before returning here. Abort
+    or stop for user input rather than guessing if the merge would
     discard behavior that cannot be reconciled.
   tool_invocations:
   - tool: shell

@@ -30,6 +30,7 @@ def test_skill_round_trips_through_json() -> None:
         steps=(
             SkillStep(
                 description="Capture the feature goal.",
+                id="capture-goal",
                 details="Record the user-visible outcome first.",
             ),
             SkillStep(
@@ -70,6 +71,7 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
+                "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
             {
@@ -103,6 +105,22 @@ def test_skill_file_helpers_round_trip(tmp_path: Path) -> None:
     output_path = save_skill(skill, tmp_path / "clarify-intent.json")
     assert output_path.exists()
     assert load_skill(output_path) == skill
+
+
+def test_skill_validation_rejects_duplicate_step_ids() -> None:
+    report = build_skill_validation_report(
+        "name: repeated\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- id: repeat\n"
+        "  description: First\n"
+        "- id: repeat\n"
+        "  description: Second\n",
+        source_path=Path("repeated.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
 
 
 def test_skill_directory_validation_accepts_references(tmp_path: Path) -> None:

@@ -1329,7 +1329,11 @@ def _task_system_prompt() -> str:
 
 
 def _workflow_file_names(workflow_dir: Path) -> list[str]:
-    return sorted(path.name for path in workflow_dir.glob("*.json") if path.is_file())
+    return sorted(
+        path.name
+        for path in workflow_dir.glob("*.json")
+        if path.is_file() and path.name != ".workflow-git.json"
+    )
 
 
 def _workflow_file_command_error(

@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
@@ -86,6 +87,14 @@ from powdrr_lift.workflow_chat_agent import (
     run_workflow_chat,
 )
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
+from powdrr_lift.workflow_git import (
+    WorkflowGitState,
+    cleanup_workflow_run,
+    commit_and_push_workflow_initialization,
+    create_workflow_worktree,
+    inspect_workflow_run,
+    save_workflow_git_state,
+)
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
@@ -1042,6 +1051,36 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser.add_argument("--verbose", action="store_true")
     process_workflow_task_parser.set_defaults(func=_run_process_workflow_task)
 
+    workflow_recovery_parser = subparsers.add_parser(
+        "workflow-recovery",
+        aliases=["workflow_recovery"],
+        help="Inspect or clean up Git state for one durable workflow run.",
+    )
+    workflow_recovery_parser.add_argument(
+        "--proposed-pr-id",
+        required=True,
+        help="Work-item proposed PR id used to name the workflow branches.",
+    )
+    workflow_recovery_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to inspect; defaults to the current worktree.",
+    )
+    workflow_recovery_parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help=(
+            "Remove dangling task branches, worktrees, claims, and task PRs; "
+            "preserve the integration branch as the last checkpoint."
+        ),
+    )
+    workflow_recovery_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the complete inspection or cleanup report as JSON.",
+    )
+    workflow_recovery_parser.set_defaults(func=_run_workflow_recovery)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -1153,15 +1192,40 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     output_root = args.output_root
     if not output_root.is_absolute():
         output_root = repo_root / output_root
+    template_values = _parse_template_values(args.template_value)
+    integration_worktree: Path | None = None
+    integration_branch: str | None = None
     try:
+        if repo_root.is_dir() and (repo_root / ".git").is_dir():
+            proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
+            integration_worktree, integration_branch = create_workflow_worktree(
+                repo_root,
+                proposed_pr_id,
+            )
+            output_root = integration_worktree / output_root.relative_to(repo_root)
         output_directory, tasks = instantiate_workflow_template(
             template_path=template_path,
             work_item_name=args.work_item_name,
             output_root=output_root,
             workflow_instance_name=args.workflow_instance_name,
-            template_values=_parse_template_values(args.template_value),
+            template_values=template_values,
         )
-    except (FileExistsError, OSError, ValueError) as exc:
+        if integration_worktree is not None and integration_branch is not None:
+            relative_workflow = output_directory.relative_to(integration_worktree)
+            state = WorkflowGitState(
+                proposed_pr_id=template_values.get(
+                    "proposed-pr-id", args.work_item_name
+                ),
+                base_branch="main",
+                integration_branch=integration_branch,
+                workflow_relative_directory=str(relative_workflow),
+            )
+            save_workflow_git_state(output_directory, state)
+            commit_and_push_workflow_initialization(
+                integration_worktree,
+                output_directory,
+            )
+    except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print(f"Could not instantiate workflow: {exc}", file=sys.stderr)
         return 1
 
@@ -1172,6 +1236,10 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
                 "task_count": len(tasks),
                 "first_task": str(output_directory / f"{tasks[0].task_id}.json"),
                 "first_task_id": tasks[0].task_id,
+                "integration_branch": integration_branch,
+                "integration_worktree": (
+                    str(integration_worktree) if integration_worktree else None
+                ),
             },
             indent=2,
         )
@@ -1198,6 +1266,58 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
+
+
+def _run_workflow_recovery(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        report = inspect_workflow_run(repo_root, args.proposed_pr_id)
+        if args.cleanup:
+            report = cleanup_workflow_run(
+                repo_root,
+                args.proposed_pr_id,
+                report=report,
+            )
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"Workflow recovery failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        _print_workflow_recovery_report(report, cleanup=args.cleanup)
+    return 1 if report.get("errors") else 0
+
+
+def _print_workflow_recovery_report(
+    report: dict[str, Any],
+    *,
+    cleanup: bool,
+) -> None:
+    action = "Cleanup" if cleanup else "Inspection"
+    print(f"{action} for proposed PR id: {report['proposed_pr_id']}")
+    print(f"Integration branch: {report['integration_branch']}")
+    print(
+        "Integration checkpoint: "
+        f"branch_exists={report['integration_branch_exists']} "
+        f"worktree_exists={report['integration_worktree_exists']}"
+    )
+    inconsistencies = report.get("inconsistencies", [])
+    if inconsistencies:
+        print("Inconsistencies:")
+        for item in inconsistencies:
+            print(f"  - {item}")
+    for key in ("task_branches", "claim_refs", "worktrees", "pull_requests"):
+        values = report.get(key, [])
+        if values:
+            print(f"{key.replace('_', ' ').title()}:")
+            for value in values:
+                print(f"  - {value}")
+    if cleanup:
+        for item in report.get("removed", []):
+            print(f"Removed: {item}")
+    for error in report.get("errors", []):
+        print(f"Error: {error}", file=sys.stderr)
 
 
 def _run_init_from_plan_diff(args: argparse.Namespace) -> int:

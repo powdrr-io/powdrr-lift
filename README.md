@@ -168,6 +168,20 @@ highest-priority configured provider, it reads `DEEPINFRA_API_TOKEN` (or
 powdrr-lift process-workflow-task --workflow-dir docs/workflows/implement-a-feature --repo-root .
 ```
 
+If an agent stops partway through and leaves Git state uncertain, inspect the
+run by its work-item id (the proposed PR id), then clean only its disposable
+task artifacts:
+
+```bash
+powdrr-lift workflow-recovery --proposed-pr-id feature-17 --repo-root .
+powdrr-lift workflow-recovery --proposed-pr-id feature-17 --repo-root . --cleanup
+```
+
+Inspection is read-only. Cleanup closes related open task PRs, removes task
+branches, worktrees, claims, and uncommitted workflow-directory artifacts, and
+preserves the `powdrr/feature-17` integration branch and worktree as the last
+consistent checkpoint. Add `--json` for machine-readable state.
+
 ### Command-key clipboard shortcuts
 
 The workflow chat TUI uses Textual's Kitty keyboard protocol support. Textual

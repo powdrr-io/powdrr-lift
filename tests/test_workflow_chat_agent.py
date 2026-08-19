@@ -5382,12 +5382,16 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         for event in start_summary["execution_events"]
     )
 
-    integration_worktree = (
-        worktree_root / ".worktrees" / "powdrr" / "display-related-photos-pr-001"
+    instantiate_event = next(
+        event
+        for event in start_summary["execution_events"]
+        if event["kind"] == "invoke_tool"
+        and event["parameters"]["command"][1] == "instantiate-workflow"
     )
-    workflow_directory = (
-        integration_worktree / "docs" / "workflows" / "display-related-photos"
-    )
+    instantiate_result = cast(dict[str, object], instantiate_event["result"])
+    instantiate_output = json.loads(cast(str, instantiate_result["stdout"]))
+    integration_worktree = Path(instantiate_output["integration_worktree"])
+    workflow_directory = Path(instantiate_output["workflow_directory"])
     assert (workflow_directory / ".workflow-git.json").exists()
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [

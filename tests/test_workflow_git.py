@@ -14,6 +14,7 @@ from powdrr_lift.workflow_git import (
     inspect_workflow_run,
     integration_branch_name,
     load_workflow_git_state,
+    resolve_git_repository_root,
     save_workflow_git_state,
     task_branch_name,
 )
@@ -218,3 +219,17 @@ def test_inspection_follows_registered_nested_integration_worktree(
             "status": "open",
         }
     ]
+
+
+def test_resolve_git_repository_root_from_nested_worktree(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+
+    nested_worktree = tmp_path / ".worktrees" / "chat"
+    _git(tmp_path, "worktree", "add", str(nested_worktree), "-b", "chat", "main")
+
+    assert resolve_git_repository_root(nested_worktree) == tmp_path.resolve()

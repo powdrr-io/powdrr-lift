@@ -93,6 +93,7 @@ from powdrr_lift.workflow_git import (
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
     inspect_workflow_run,
+    resolve_git_repository_root,
     save_workflow_git_state,
     synchronize_workflow_initialization,
 )
@@ -1195,9 +1196,10 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
         output_root = repo_root / output_root
     template_values = _parse_template_values(args.template_value)
     try:
+        project_root = resolve_git_repository_root(repo_root)
         proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
         integration_worktree, integration_branch = create_workflow_worktree(
-            repo_root,
+            project_root,
             proposed_pr_id,
         )
         output_directory, tasks = instantiate_workflow_template(

@@ -115,6 +115,27 @@ def task_worktree_path(
     )
 
 
+def resolve_git_repository_root(repo_root: str | Path) -> Path:
+    """Return the common repository root for a checkout or Git worktree."""
+    repo_root_path = Path(repo_root).resolve()
+    result = _git(
+        repo_root_path,
+        ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Could not determine the common Git directory for {repo_root_path}: "
+            f"{result.stderr.strip()}"
+        )
+    common_git_directory = Path(result.stdout.strip()).resolve()
+    if common_git_directory.name != ".git":
+        raise RuntimeError(
+            f"Git common directory is not a repository .git directory: "
+            f"{common_git_directory}"
+        )
+    return common_git_directory.parent
+
+
 def create_workflow_worktree(
     repo_root: str | Path,
     proposed_pr_id: str,

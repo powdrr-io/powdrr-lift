@@ -644,6 +644,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "<proposed-pr-name>",
         "--template-value",
         "proposed-pr-id=<proposed-pr-name>",
+        "--template-value",
+        "feature-id=<feature-id>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )

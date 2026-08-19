@@ -114,7 +114,8 @@ def gather_specification_context(
     matches: list[GatherContextMatch] = []
 
     for spec_path in _iter_context_specification_paths(
-        repo_root_path, feature_id=feature_id
+        repo_root_path,
+        feature_id=feature_id,
     ):
         raw_spec = _load_yaml_mapping(spec_path)
         if raw_spec is None:
@@ -124,6 +125,22 @@ def gather_specification_context(
             repo_root_path,
             spec_path,
         )
+        if (
+            "proposed_prs" in normalized_types
+            and feature_id is not None
+            and "proposed_prs" not in raw_spec
+            and spec_path.name == "proposed-pr-specification.yaml"
+        ):
+            matches.append(
+                GatherContextMatch(
+                    path=str(spec_path),
+                    section="proposed_prs",
+                    item_index=None,
+                    work_item_name=work_item_name,
+                    specification_type=specification_type,
+                    item=raw_spec,
+                )
+            )
         for section_name, section_value in raw_spec.items():
             normalized_section_name = _CONTEXT_TYPE_ALIASES.get(
                 str(section_name).strip().lower(),
@@ -212,7 +229,9 @@ def _normalize_filters(filters: dict[str, object] | None) -> dict[str, list[str]
 
 
 def _iter_context_specification_paths(
-    repo_root: Path, *, feature_id: str | None = None
+    repo_root: Path,
+    *,
+    feature_id: str | None = None,
 ) -> list[Path]:
     paths: list[Path] = []
     for docs_root in (
@@ -230,11 +249,11 @@ def _iter_context_specification_paths(
     )
     if feature_id is not None:
         for proposals_root in proposal_roots:
-            feature_root = proposals_root / feature_id
-            if feature_root.exists():
+            proposal_root = proposals_root / feature_id
+            if proposal_root.exists():
                 paths.extend(
                     path
-                    for path in sorted(feature_root.rglob("*.yaml"))
+                    for path in sorted(proposal_root.rglob("*.yaml"))
                     if path.is_file()
                 )
 

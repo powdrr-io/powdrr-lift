@@ -106,3 +106,35 @@ def test_gather_context_scopes_current_and_exact_feature_proposal(
         "current-state",
         "proposed",
     }
+
+
+def test_gather_context_resolves_proposed_pr_document_in_explicit_feature(
+    tmp_path: Path,
+) -> None:
+    proposal_path = (
+        tmp_path
+        / "docs"
+        / "proposals"
+        / "interaction-file-logging"
+        / "proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True)
+    proposal_path.write_text(
+        "id: pr-interaction-capture-17\n"
+        "feature_ids: [feature-interaction-capture]\n"
+        "acceptance_criteria:\n"
+        "  - id: ac-log-file-created\n",
+        encoding="utf-8",
+    )
+
+    report = gather_specification_context(
+        tmp_path,
+        types=["proposed_prs"],
+        keywords=["pr-interaction-capture-17"],
+        feature_id="interaction-file-logging",
+    )
+
+    assert len(report.matches) == 1
+    assert report.matches[0].path == str(proposal_path)
+    assert report.matches[0].section == "proposed_prs"
+    assert report.matches[0].item["id"] == "pr-interaction-capture-17"

@@ -1371,6 +1371,7 @@ def _validate_v2_structured_file_specification(
             raw_yaml,
             work_item_name=work_item_name,
             repo_root=repo_root,
+            file_path=structured_file_path,
         )
         _append_structured_file_validation_issues(
             issues=issues,

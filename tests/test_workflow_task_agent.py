@@ -194,6 +194,14 @@ def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
     )
 
     assert exit_code == 0
+    review_prompt = json.loads(client.messages[1][1]["content"])
+    assert review_prompt["step_context"] == [
+        "Target skill: review-skill-workflow",
+        "Original step: obtain an independent review",
+        "Proposed step: invoke the adversarial reviewer with context",
+    ]
+    assert review_prompt["transcript"] == []
+    assert review_prompt["execution_events"] == []
     nested_prompt = json.loads(client.messages[2][1]["content"])
     assert nested_prompt["selected_skill"]["name"] == "independent-review"
     assert nested_prompt["step_context"] == [

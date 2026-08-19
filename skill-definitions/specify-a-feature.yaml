@@ -135,7 +135,9 @@ steps:
   details: >-
     Invoke create-pull-request with pr-kind `feature`, commit message `Add
     <work-item-name> feature specification`, and pull-request title
-    `<pull-request-title>`. Pass the validated specification documents and
-    feature intent as context. Do not begin implementation in this skill.
+    `<pull-request-title>`. Pass a `files_to_publish` context list containing
+    every validated specification document, along with the validated
+    specification documents and feature intent. The nested skill must stage
+    exactly that list. Do not begin implementation in this skill.
   uses_skills:
   - create-pull-request

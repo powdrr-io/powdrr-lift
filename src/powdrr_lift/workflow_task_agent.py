@@ -59,11 +59,13 @@ from powdrr_lift.workflow_chat_agent import (
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_git import (
+    WorkflowGitInconsistency,
     WorkflowGitState,
     claim_workflow_task,
     create_task_worktree,
     load_workflow_git_state,
     task_branch_name,
+    validate_workflow_git_state,
 )
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
@@ -575,26 +577,39 @@ def run_workflow_task(
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
     configured_workflow_dir = config.workflow_dir.resolve()
-    configured_workflow = WorkflowInstance.from_directory(configured_workflow_dir)
-    configured_task = _select_task(configured_workflow, config.task_id)
-    configured_git_state = load_workflow_git_state(configured_workflow_dir)
-    if configured_git_state is not None and configured_task is not None:
-        project_root = _resolve_project_root(
-            configured_repo_root,
-            configured_repo_root,
+    try:
+        configured_workflow = WorkflowInstance.from_directory(configured_workflow_dir)
+        configured_task = _select_task(configured_workflow, config.task_id)
+        configured_git_state = load_workflow_git_state(configured_workflow_dir)
+        if configured_git_state is not None and configured_task is not None:
+            project_root = _resolve_project_root(
+                configured_repo_root,
+                configured_repo_root,
+            )
+            validate_workflow_git_state(
+                project_root,
+                configured_git_state,
+                configured_task.task_id,
+            )
+            claim_workflow_task(
+                project_root,
+                configured_git_state,
+                configured_task.task_id,
+            )
+        repo_root, workflow_dir = _resolve_workflow_task_context(
+            config,
+            configured_repo_root=configured_repo_root,
+            task_id=configured_task.task_id if configured_task is not None else None,
+            stdout=stdout,
+            stderr=stderr,
         )
-        claim_workflow_task(
-            project_root,
-            configured_git_state,
-            configured_task.task_id,
+    except WorkflowGitInconsistency as exc:
+        print(
+            "Workflow Git state is inconsistent; no task work was started.",
+            file=stderr,
         )
-    repo_root, workflow_dir = _resolve_workflow_task_context(
-        config,
-        configured_repo_root=configured_repo_root,
-        task_id=configured_task.task_id if configured_task is not None else None,
-        stdout=stdout,
-        stderr=stderr,
-    )
+        print(str(exc), file=stderr)
+        return 2
     skill_catalog = _load_skill_catalog(
         repo_root / "skill-definitions",
         stderr=stderr,
@@ -738,11 +753,27 @@ def _resolve_workflow_task_context(
                 configured_repo_root,
                 configured_repo_root,
             )
-            task_worktree, task_branch = create_task_worktree(
-                project_root,
-                workflow_git_state,
-                task_id,
-            )
+            try:
+                task_worktree, task_branch = create_task_worktree(
+                    project_root,
+                    workflow_git_state,
+                    task_id,
+                )
+            except RuntimeError as exc:
+                raise WorkflowGitInconsistency(
+                    json.dumps(
+                        {
+                            "proposed_pr_id": workflow_git_state.proposed_pr_id,
+                            "task_id": task_id,
+                            "inconsistencies": [str(exc)],
+                            "recovery_command": (
+                                "powdrr-lift workflow-recovery --proposed-pr-id "
+                                f"{workflow_git_state.proposed_pr_id} --cleanup"
+                            ),
+                        },
+                        indent=2,
+                    )
+                ) from exc
             print(
                 f"Using workflow task branch {task_branch} in {task_worktree}",
                 file=stdout,

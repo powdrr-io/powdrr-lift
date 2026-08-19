@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
@@ -88,8 +89,10 @@ from powdrr_lift.workflow_chat_agent import (
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
 from powdrr_lift.workflow_git import (
     WorkflowGitState,
+    cleanup_workflow_run,
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
+    inspect_workflow_run,
     save_workflow_git_state,
 )
 from powdrr_lift.workflow_task_agent import (
@@ -1048,6 +1051,36 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser.add_argument("--verbose", action="store_true")
     process_workflow_task_parser.set_defaults(func=_run_process_workflow_task)
 
+    workflow_recovery_parser = subparsers.add_parser(
+        "workflow-recovery",
+        aliases=["workflow_recovery"],
+        help="Inspect or clean up Git state for one durable workflow run.",
+    )
+    workflow_recovery_parser.add_argument(
+        "--proposed-pr-id",
+        required=True,
+        help="Work-item proposed PR id used to name the workflow branches.",
+    )
+    workflow_recovery_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to inspect; defaults to the current worktree.",
+    )
+    workflow_recovery_parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help=(
+            "Remove dangling task branches, worktrees, claims, and task PRs; "
+            "preserve the integration branch as the last checkpoint."
+        ),
+    )
+    workflow_recovery_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the complete inspection or cleanup report as JSON.",
+    )
+    workflow_recovery_parser.set_defaults(func=_run_workflow_recovery)
+
     blame_ui_parser = subparsers.add_parser(
         "blame-ui",
         aliases=["blame_ui"],
@@ -1233,6 +1266,58 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
+
+
+def _run_workflow_recovery(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        report = inspect_workflow_run(repo_root, args.proposed_pr_id)
+        if args.cleanup:
+            report = cleanup_workflow_run(
+                repo_root,
+                args.proposed_pr_id,
+                report=report,
+            )
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"Workflow recovery failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        _print_workflow_recovery_report(report, cleanup=args.cleanup)
+    return 1 if report.get("errors") else 0
+
+
+def _print_workflow_recovery_report(
+    report: dict[str, Any],
+    *,
+    cleanup: bool,
+) -> None:
+    action = "Cleanup" if cleanup else "Inspection"
+    print(f"{action} for proposed PR id: {report['proposed_pr_id']}")
+    print(f"Integration branch: {report['integration_branch']}")
+    print(
+        "Integration checkpoint: "
+        f"branch_exists={report['integration_branch_exists']} "
+        f"worktree_exists={report['integration_worktree_exists']}"
+    )
+    inconsistencies = report.get("inconsistencies", [])
+    if inconsistencies:
+        print("Inconsistencies:")
+        for item in inconsistencies:
+            print(f"  - {item}")
+    for key in ("task_branches", "claim_refs", "worktrees", "pull_requests"):
+        values = report.get(key, [])
+        if values:
+            print(f"{key.replace('_', ' ').title()}:")
+            for value in values:
+                print(f"  - {value}")
+    if cleanup:
+        for item in report.get("removed", []):
+            print(f"Removed: {item}")
+    for error in report.get("errors", []):
+        print(f"Error: {error}", file=sys.stderr)
 
 
 def _run_init_from_plan_diff(args: argparse.Namespace) -> int:

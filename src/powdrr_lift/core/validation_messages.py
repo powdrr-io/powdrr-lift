@@ -187,7 +187,11 @@ def validation_error_to_data(
             f"replacement for `{error.path or '<invalid-value>'}`; do not use a "
             "line-based edit on this YAML file. If the validation report contains "
             "multiple independent issues in this file, combine their operations "
-            "into one yaml_edit action."
+            "into one yaml_edit action. For example: "
+            '{"kind":"yaml_edit","file_path":"specification.yaml",'
+            '"operations":[{"op":"set_value","path":["id"],'
+            '"value":"system-1"},{"op":"set_value",'
+            '"path":["title"],"value":"System"}]}'
         )
         if error.path is not None and re.fullmatch(
             r"[A-Za-z_][A-Za-z0-9_-]*", error.path

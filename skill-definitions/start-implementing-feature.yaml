@@ -143,6 +143,8 @@ steps:
     - <proposed-pr-name>
     - --template-value
     - proposed-pr-id=<proposed-pr-name>
+    - --template-value
+    - feature-id=<feature-id>
     - --template
     - templates/execute-proposed-pr.yaml
   - tool: internal
@@ -153,6 +155,8 @@ steps:
     - <feature-name>
     - --template-value
     - proposed-pr-id=<proposed-pr-name>
+    - --template-value
+    - feature-id=<feature-id>
     - --template
     - templates/execute-proposed-pr.yaml
 - description: Stage the validated artifacts for pull request preparation.

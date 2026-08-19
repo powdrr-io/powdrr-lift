@@ -215,12 +215,11 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ]
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
+    assert template.task_templates[0].input_state["feature_id"] == "<feature-id>"
     assert template.task_templates[0].llm_type == "long_context"
     assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
     assert "gather_context action" in (template.task_templates[0].details or "")
-    assert '"feature_id":"<feature-id-from-result>"' in (
-        template.task_templates[0].details or ""
-    )
+    assert '"feature_id":"<feature-id>"' in (template.task_templates[0].details or "")
     assert "feature_id scopes proposal discovery" in (
         template.task_templates[0].details or ""
     )
@@ -306,11 +305,15 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
         template_path=template_path,
         work_item_name="Interaction File Log",
         workflow_instance_name="interaction-file-log-pr-001",
-        template_values={"proposed-pr-id": "interaction-file-log-pr-001"},
+        template_values={
+            "proposed-pr-id": "interaction-file-log-pr-001",
+            "feature-id": "feature-interaction-capture",
+        },
         output_root=tmp_path / "workflows",
     )
 
     assert tasks[0].input_state["proposed_pr"] == "interaction-file-log-pr-001"
+    assert tasks[0].input_state["feature_id"] == "feature-interaction-capture"
     assert tasks[1].input_state["proposed_pr_context"] == (
         "interaction-file-log-pr-001-task-001.proposed-pr-context-state"
     )

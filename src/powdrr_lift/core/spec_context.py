@@ -116,7 +116,6 @@ def gather_specification_context(
     for spec_path in _iter_context_specification_paths(
         repo_root_path,
         feature_id=feature_id,
-        include_proposed_prs="proposed_prs" in normalized_types,
     ):
         raw_spec = _load_yaml_mapping(spec_path)
         if raw_spec is None:
@@ -128,12 +127,9 @@ def gather_specification_context(
         )
         if (
             "proposed_prs" in normalized_types
+            and feature_id is not None
             and "proposed_prs" not in raw_spec
-            and _matches_proposed_pr_document(
-                raw_spec,
-                work_item_name=work_item_name,
-                keywords=normalized_keywords,
-            )
+            and spec_path.name == "proposed-pr-specification.yaml"
         ):
             matches.append(
                 GatherContextMatch(
@@ -236,7 +232,6 @@ def _iter_context_specification_paths(
     repo_root: Path,
     *,
     feature_id: str | None = None,
-    include_proposed_prs: bool = False,
 ) -> list[Path]:
     paths: list[Path] = []
     for docs_root in (
@@ -252,13 +247,9 @@ def _iter_context_specification_paths(
         repo_root / "docs" / "proposed",
         repo_root / "docs" / "proposals",
     )
-    if feature_id is not None or include_proposed_prs:
+    if feature_id is not None:
         for proposals_root in proposal_roots:
-            proposal_root = (
-                proposals_root / feature_id
-                if feature_id is not None
-                else proposals_root
-            )
+            proposal_root = proposals_root / feature_id
             if proposal_root.exists():
                 paths.extend(
                     path
@@ -279,23 +270,6 @@ def _iter_context_specification_paths(
         paths.append(current_state_path)
 
     return list(dict.fromkeys(paths))
-
-
-def _matches_proposed_pr_document(
-    raw_spec: dict[str, Any],
-    *,
-    work_item_name: str | None,
-    keywords: list[str],
-) -> bool:
-    if not keywords:
-        return False
-    candidates = [raw_spec.get("id"), work_item_name]
-    normalized_candidates = {
-        str(candidate).strip().casefold()
-        for candidate in candidates
-        if candidate is not None and str(candidate).strip()
-    }
-    return any(keyword.casefold() in normalized_candidates for keyword in keywords)
 
 
 def _load_yaml_mapping(path: Path) -> dict[str, Any] | None:

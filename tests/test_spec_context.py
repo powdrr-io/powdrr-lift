@@ -108,7 +108,7 @@ def test_gather_context_scopes_current_and_exact_feature_proposal(
     }
 
 
-def test_gather_context_resolves_proposed_pr_document_by_id_without_feature_id(
+def test_gather_context_resolves_proposed_pr_document_in_explicit_feature(
     tmp_path: Path,
 ) -> None:
     proposal_path = (
@@ -131,6 +131,7 @@ def test_gather_context_resolves_proposed_pr_document_by_id_without_feature_id(
         tmp_path,
         types=["proposed_prs"],
         keywords=["pr-interaction-capture-17"],
+        feature_id="interaction-file-logging",
     )
 
     assert len(report.matches) == 1

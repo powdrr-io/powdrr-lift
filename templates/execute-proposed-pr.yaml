@@ -21,25 +21,22 @@ task_templates:
   llm_type: long_context
   input_state:
     proposed_pr: <proposed-pr-id>
+    feature_id: <feature-id>
   details: >-
-    First resolve proposed_pr to the exact proposed PR specification. Choose
-    the gather_context action and make the first call with the proposed PR id
-    as a keyword and no feature_id:
-    {"kind":"gather_context","types":["proposed_prs"],"keywords":["<proposed-pr-id>"]}.
-    Read the returned proposal's feature_ids, then make the broader context
-    call with feature_id set to that exact feature id and the proposed PR id
-    retained as a keyword:
-    {"kind":"gather_context","feature_id":"<feature-id-from-result>","types":["proposed_prs","requirements","approach","invariants","guidance","features","acceptance_criteria","expected_tests","required_test_cases","risks","decisions"],"keywords":["<proposed-pr-id>"]}.
-    feature_id scopes proposal discovery to docs/proposals/<feature-id>;
-    keywords identify the proposed PR within that feature. Do not put the
-    feature id only in keywords or use the proposed PR id as feature_id. Use
-    the gathered context to identify the proposed PR, its feature, its goals,
+    First resolve proposed_pr to the exact proposed PR specification. The
+    workflow instantiation hard-codes feature_id from the matching proposed PR;
+    pass that exact value in the first gather_context action:
+    {"kind":"gather_context","feature_id":"<feature-id>","types":["proposed_prs","requirements","approach","invariants","guidance","features","acceptance_criteria","expected_tests","required_test_cases","risks","decisions"],"keywords":["<proposed-pr-id>"]}.
+    feature_id scopes proposal discovery to docs/proposals/<feature-id> and
+    keywords identify the proposed PR within that feature. Do not omit
+    feature_id, use the proposed PR id as feature_id, or infer the feature from
+    keywords. Use the gathered context to identify the proposed PR, its goals,
     scope, acceptance criteria, tests, dependencies, risks, and related
     requirements. Use read_document only when a specific section of a known
     document is needed. Do not guess a path when gathered context provides the
     path. Record the exact specification path and all relevant implementation
-    context in output_state. If either lookup is ambiguous or returns no
-    match, choose prompt_user with one precise question instead of guessing.
+    context in output_state. If the lookup is ambiguous or returns no match,
+    choose prompt_user with one precise question instead of guessing.
   output_state_type: proposed-pr-context-state
   dependent_state:
   - proposed-pr-context-gathered

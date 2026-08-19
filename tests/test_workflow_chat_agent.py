@@ -6639,6 +6639,58 @@ def test_execute_shell_tool_rejects_cwd_outside_worktree(tmp_path: Path) -> None
         )
 
 
+def test_empty_pull_request_error_reports_uncommitted_changes(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    git_config = ["-c", "user.name=Test", "-c", "user.email=test@example.com"]
+    subprocess.run(
+        ["git", *git_config, "commit", "--allow-empty", "-m", "base"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "switch", "-c", "feature"], cwd=tmp_path, check=True)
+    (tmp_path / "change.txt").write_text("change\n", encoding="utf-8")
+
+    error = _empty_pull_request_error(
+        ["gh", "pr", "create", "--base", "main"],
+        tmp_path,
+    )
+
+    assert error is not None
+    assert "no commits exist between main and HEAD" in error
+    assert "Uncommitted changes are present" in error
+
+
+def test_empty_pull_request_error_ignores_branch_with_commits(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    git_config = ["-c", "user.name=Test", "-c", "user.email=test@example.com"]
+    subprocess.run(
+        ["git", *git_config, "commit", "--allow-empty", "-m", "base"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "switch", "-c", "feature"], cwd=tmp_path, check=True)
+    (tmp_path / "change.txt").write_text("change\n", encoding="utf-8")
+    subprocess.run(["git", "add", "change.txt"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", *git_config, "commit", "-m", "change"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    assert (
+        _empty_pull_request_error(
+            ["gh", "pr", "create", "--base", "main"],
+            tmp_path,
+        )
+        is None
+    )
+
+
 def test_execute_shell_tool_verbose_prints_stdout(
     tmp_path: Path,
 ) -> None:

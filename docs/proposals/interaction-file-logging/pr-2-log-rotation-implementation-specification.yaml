@@ -1,0 +1,44 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Log Rotation and Size Management
+architecture_id: '2026-08-14'
+entities:
+- action: added
+  rationale: Core entity for the interaction-file-logging feature, required by "req-1"
+    and "app-1".
+  id: interaction-log-entry
+modules:
+- action: changed
+  relative_location: src/powdrr_lift/interaction_log.py
+  purpose: Extends the logging module with file rotation and size management to prevent
+    unbounded log file growth.
+  id: logging-module
+tools:
+- action: changed
+  when_to_use: When validating that a log file contains valid JSON entries with the
+    expected structure and that rotation produced valid rotated files.
+  template: null
+  how_to_use: Run the validator against the log file path to check JSON validity,
+    entry structure, and rotation correctness.
+  id: interaction-log-validator
+entity_relationships:
+- action: added
+  rationale: Each interaction log entry is written to the log file by the logging
+    module, required by "app-1".
+  id: rel-log-entry-to-file
+features:
+- action: added
+  description: Add file rotation and size management to the interaction log so large
+    payloads are handled and unbounded file growth is prevented.
+  supercedes: null
+  functional_requirements:
+  - The log file must rotate when it exceeds a configured size threshold.
+  - Rotated log files must be retained with a bounded count.
+  - Rotation must not block or delay the interaction flow.
+  - Rotation must preserve existing log entries without data loss.
+  id: feature-log-rotation
+decisions:
+- action: added
+  description: Use size-based rotation with a configurable threshold and a bounded
+    number of retained rotated files to prevent unbounded growth.
+  supercedes: null
+  id: decision-size-based-rotation

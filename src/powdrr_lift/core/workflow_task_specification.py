@@ -337,7 +337,7 @@ def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:
     return tuple(
         load_workflow_task(task_path)
         for task_path in sorted(directory_path.glob("*.json"))
-        if task_path.is_file()
+        if task_path.is_file() and not task_path.name.startswith(".")
     )
 
 

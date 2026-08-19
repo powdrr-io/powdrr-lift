@@ -4051,6 +4051,58 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         capture_output=True,
         text=True,
     )
+    source_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "switch", "--orphan", "test-main"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "restore", "--source", source_commit, "--worktree", "--staged", "."],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Create isolated test base"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "branch", "-M", "main"],
+        cwd=repo_root,
+        check=True,
+    )
+    remote_repo = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "init", "--bare", str(remote_repo)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", str(remote_repo)],
+        cwd=repo_root,
+        check=True,
+    )
     tool_bin = tmp_path / "bin"
     tool_bin.mkdir()
     powdrr_lift_wrapper = tool_bin / "powdrr-lift"
@@ -5382,7 +5434,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         for event in start_summary["execution_events"]
     )
 
-    workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
+    instantiate_event = next(
+        event
+        for event in start_summary["execution_events"]
+        if event["kind"] == "invoke_tool"
+        and event["parameters"]["command"][1] == "instantiate-workflow"
+    )
+    instantiate_result = cast(dict[str, object], instantiate_event["result"])
+    assert instantiate_result["returncode"] == 0, instantiate_result.get("stderr", "")
+    instantiate_output = json.loads(cast(str, instantiate_result["stdout"]))
+    integration_worktree = Path(instantiate_output["integration_worktree"])
+    workflow_directory = Path(instantiate_output["workflow_directory"])
+    assert (workflow_directory / ".workflow-git.json").exists()
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
         f"task-{index:03d}" for index in range(1, 13)
@@ -5433,7 +5496,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
     assert "https://github.com/example/repo/pull/123" in start_stdout.getvalue()
 
-    workflow_root = worktree_root / "docs" / "workflows"
+    workflow_root = integration_worktree / "docs" / "workflows"
     assignment_batches: list[tuple[str, str]] = []
     while ready_tasks := load_ready_workflow_tasks(workflow_root):
         current_assignment = (
@@ -5463,7 +5526,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     for item in invocation.command
                 ]
                 if invocation.tool == "fuzzy-match":
-                    result = execute_fuzzy_match(command, worktree_root=worktree_root)
+                    result = execute_fuzzy_match(
+                        command, worktree_root=integration_worktree
+                    )
                     assert result["matches"], f"command={command!r} result={result!r}"
                 elif command[:1] == ["pytest"]:
                     # This integration test uses a clone whose committed tests
@@ -5478,7 +5543,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 else:
                     result = _execute_shell_tool(
                         {"command": command},
-                        worktree_root=worktree_root,
+                        worktree_root=integration_worktree,
                         stdout=start_stdout,
                         stderr=start_stderr,
                         verbose=False,

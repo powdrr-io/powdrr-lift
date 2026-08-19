@@ -103,6 +103,10 @@ def test_workflow_task_directory_loader_reads_all_json_files(
 
     save_workflow_task(task_b, tmp_path / "b.json")
     save_workflow_task(task_a, tmp_path / "a.json")
+    (tmp_path / ".workflow-git.json").write_text(
+        json.dumps({"integration_branch": "powdrr/feature"}),
+        encoding="utf-8",
+    )
 
     assert load_workflow_tasks(tmp_path) == (task_a, task_b)
 

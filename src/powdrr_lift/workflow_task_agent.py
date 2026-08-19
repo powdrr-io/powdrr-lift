@@ -622,6 +622,7 @@ def run_workflow_task(
         workflow,
         reason=f"claim {task.task_id}",
         stdout=stdout,
+        open_pull_request=False,
     )
     provider = resolve_workflow_provider(config.provider)
     mappings = tuple(_default_llm_mappings(provider).items())
@@ -779,6 +780,7 @@ def _publish_workflow_progress(
     *,
     reason: str,
     stdout: TextIO,
+    open_pull_request: bool = True,
 ) -> None:
     """Commit and publish durable workflow progress for execution tasks.
 
@@ -810,6 +812,9 @@ def _publish_workflow_progress(
         ["commit", "-m", f"Persist workflow progress: {reason}"],
     )
     _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
+    if not open_pull_request:
+        print(f"Published workflow task branch: {branch}", file=stdout)
+        return
 
     workflow_git_state = load_workflow_git_state(workflow.directory)
     default_branch = (

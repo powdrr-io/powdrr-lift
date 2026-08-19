@@ -173,8 +173,9 @@ def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
         *,
         reason: str,
         stdout: object,
+        open_pull_request: bool = True,
     ) -> None:
-        del reason, stdout
+        del reason, stdout, open_pull_request
         published_roots.append(repo_root)
         assert published_workflow.directory == workflow.directory
 
@@ -224,7 +225,9 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         *,
         reason: str,
         stdout: object,
+        open_pull_request: bool = True,
     ) -> None:
+        del open_pull_request
         assert repo_root == tmp_path
         assert published_workflow.directory == workflow.directory
         published_reasons.append(reason)

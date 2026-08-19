@@ -4051,8 +4051,15 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         capture_output=True,
         text=True,
     )
+    source_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     subprocess.run(
-        ["git", "switch", "-C", "main"],
+        ["git", "switch", "--orphan", "test-main"],
         cwd=repo_root,
         check=True,
     )
@@ -4062,7 +4069,25 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         check=True,
     )
     subprocess.run(
+        ["git", "restore", "--source", source_commit, "--worktree", "--staged", "."],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
         ["git", "config", "user.name", "Test User"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Create isolated test base"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "branch", "-M", "main"],
         cwd=repo_root,
         check=True,
     )

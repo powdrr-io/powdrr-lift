@@ -1,0 +1,32 @@
+{
+  "task_id": "human-input-1",
+  "status": "open",
+  "upstream_task_ids": [],
+  "dependent_state": [],
+  "complexity": "low",
+  "input_state": {
+    "question": "The proposed PR 'pr-interaction-capture-17' and work item 'interaction-file-logging' were not found in any checked-in specification documents. Could you provide the exact path or directory where the proposed PR specification for 'pr-interaction-capture-17' is located?",
+    "task": {
+      "task_id": "pr-interaction-capture-17-task-001",
+      "status": "locked",
+      "upstream_task_ids": [],
+      "dependent_state": [
+        "proposed-pr-context-gathered"
+      ],
+      "complexity": "high",
+      "input_state": {
+        "proposed_pr": "pr-interaction-capture-17"
+      },
+      "assignee_type": "agent",
+      "assignee_role": "architect",
+      "output_state_type": "proposed-pr-context-state",
+      "description": "Gather context about the proposed PR",
+      "details": "First resolve proposed_pr to the exact proposed PR specification. Choose the gather_context action with these context types: proposed_prs, requirements, approach, invariants, guidance, features, acceptance_criteria, expected_tests, required_test_cases, risks, and decisions. Include the proposed PR id as a keyword. Use the gathered context to identify the proposed PR, its feature, its goals, scope, acceptance criteria, tests, dependencies, risks, and related requirements. Use read_document only when a specific section of a known document is needed. Do not guess a path when gathered context provides the path. Record the exact specification path and all relevant implementation context in output_state. If the proposed PR cannot be identified unambiguously, choose prompt_user with one precise question instead of proceeding.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'pr-interaction-capture-17'. Use these values as search context and verify repository documents before deciding what they identify.",
+      "llm_type": "long_context"
+    }
+  },
+  "assignee_type": "human",
+  "assignee_role": "reviewer",
+  "output_state_type": "human-response-state",
+  "description": "The proposed PR 'pr-interaction-capture-17' and work item 'interaction-file-logging' were not found in any checked-in specification documents. Could you provide the exact path or directory where the proposed PR specification for 'pr-interaction-capture-17' is located?"
+}

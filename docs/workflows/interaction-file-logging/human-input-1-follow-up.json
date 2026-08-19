@@ -1,0 +1,17 @@
+{
+  "task_id": "human-input-1-follow-up",
+  "status": "open",
+  "upstream_task_ids": [
+    "human-input-1"
+  ],
+  "dependent_state": [],
+  "complexity": "medium",
+  "input_state": {
+    "proposed_pr": "pr-interaction-capture-17"
+  },
+  "assignee_type": "agent",
+  "assignee_role": "architect",
+  "output_state_type": "proposed-pr-context-state",
+  "description": "Gather context about the proposed PR",
+  "details": "gather_context and fuzzy-match both returned no matches for pr-interaction-capture-17 or interaction-file-logging; need user guidance to locate the specification."
+}

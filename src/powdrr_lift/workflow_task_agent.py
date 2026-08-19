@@ -1437,7 +1437,9 @@ def _run_skill_for_agent(
     clean: bool = False,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
-    stack: list[tuple[SkillCatalogEntry, int]] = [(selected_skill, 0)]
+    stack: list[tuple[SkillCatalogEntry, int, bool, list[str]]] = [
+        (selected_skill, 0, False, [])
+    ]
     transcript = [] if clean else [{"role": "user", "content": task.description}]
     execution_events: list[dict[str, Any]] = []
     execution_context = list(context)
@@ -1449,9 +1451,11 @@ def _run_skill_for_agent(
         ]
     action_engine = WorkflowLLMActionEngine(max_stalled_roundtrips=3)
     while stack:
-        current_skill, step_index = stack[-1]
+        current_skill, step_index, clean_context, parent_context = stack[-1]
         if step_index >= len(current_skill.skill.steps):
             stack.pop()
+            if clean_context:
+                execution_context = parent_context
             continue
         step = current_skill.skill.steps[step_index]
         messages = _build_step_execution_messages(
@@ -1496,19 +1500,26 @@ def _run_skill_for_agent(
             continue
         if action.kind == "complete":
             stack.pop()
+            if clean_context:
+                execution_context = parent_context
             execution_events.append(
                 {"kind": action.kind, "skill": current_skill.skill.name}
             )
             continue
         if action.kind == "next_step":
-            stack[-1] = (current_skill, step_index + 1)
+            stack[-1] = (
+                current_skill,
+                step_index + 1,
+                clean_context,
+                parent_context,
+            )
             execution_events.append(
                 {"kind": action.kind, "skill": current_skill.skill.name}
             )
             continue
         if action.kind == "goto_step":
             target_index = _step_index_by_id(current_skill, action.step_id)
-            stack[-1] = (current_skill, target_index)
+            stack[-1] = (current_skill, target_index, clean_context, parent_context)
             if action.decisions_and_context:
                 execution_context.append(action.decisions_and_context)
             execution_events.append(
@@ -1525,11 +1536,26 @@ def _run_skill_for_agent(
             if action.skill_name is None:
                 raise RuntimeError("invoke_skill action must include a skill name.")
             nested_skill = _find_skill_by_name(catalog, action.skill_name)
-            if any(entry.path == nested_skill.path for entry, _ in stack):
+            if any(entry.path == nested_skill.path for entry, _, _, _ in stack):
                 raise RuntimeError(
                     f"Recursive skill invocation is not allowed: {action.skill_name!r}."
                 )
-            stack.append((nested_skill, 0))
+            nested_context = list(action.context)
+            if action.decisions_and_context is not None:
+                nested_context.append(action.decisions_and_context)
+            stack[-1] = (current_skill, step_index, clean_context, parent_context)
+            stack.append(
+                (
+                    nested_skill,
+                    0,
+                    action.clean,
+                    list(execution_context),
+                )
+            )
+            if action.clean:
+                execution_context = nested_context
+            else:
+                execution_context.extend(nested_context)
             execution_events.append({"kind": action.kind, "skill": action.skill_name})
             continue
         if action.kind == "gather_context":

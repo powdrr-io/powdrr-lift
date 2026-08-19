@@ -84,8 +84,10 @@ steps:
     "<original step text>","<proposed replacement text>",
     "<preserved requirements>","<inventory counts>"],
     "decisions_and_context":"Compare the rewrite with the original."}.
-    Pass the target goal, original step text, proposed replacement text,
-    preserved-requirement list, and inventory counts in the context array.
+    Keep clean=true so the reviewer receives no inherited task or parent-skill
+    context. Pass the target goal, original step text, proposed replacement
+    text, preserved-requirement list, and inventory counts in the context array;
+    do not omit any of these entries or rely on inherited context.
     Ask it to compare the rewrite with the original without seeing this skill's
     findings or preferred answer. Require it to identify omitted goals,
     dependencies, safety checks, outputs, hidden tool calls, or instructions

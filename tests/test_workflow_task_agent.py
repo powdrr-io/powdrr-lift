@@ -133,10 +133,18 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     assert len(client.messages) == 3
 
 
-def test_process_workflow_task_passes_clean_nested_skill_context(
+def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
     tmp_path: Path,
 ) -> None:
     skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="review-skill",
+            when_to_use=("Review a skill.",),
+            steps=(SkillStep(description="Delegate the independent review."),),
+        ),
+        skills_dir / "review-skill.yaml",
+    )
     save_skill(
         Skill(
             name="independent-review",
@@ -150,7 +158,7 @@ def test_process_workflow_task_passes_clean_nested_skill_context(
         [
             {
                 "kind": "invoke_skill",
-                "skill": "independent-review",
+                "skill": "review-skill",
                 "clean": True,
                 "context": [
                     "Target skill: review-skill-workflow",
@@ -158,6 +166,18 @@ def test_process_workflow_task_passes_clean_nested_skill_context(
                     "Proposed step: invoke the adversarial reviewer with context",
                 ],
             },
+            {
+                "kind": "invoke_skill",
+                "skill": "independent-review",
+                "provider_role": "adversarial",
+                "clean": True,
+                "context": [
+                    "Target skill: review-skill-workflow",
+                    "Original step: obtain an independent review",
+                    "Proposed step: invoke the adversarial reviewer with context",
+                ],
+            },
+            {"kind": "complete", "text": "Independent review complete."},
             {"kind": "complete", "text": "Review complete."},
             {"kind": "complete", "output_state": {"ok": True}},
         ]
@@ -174,7 +194,7 @@ def test_process_workflow_task_passes_clean_nested_skill_context(
     )
 
     assert exit_code == 0
-    nested_prompt = json.loads(client.messages[1][1]["content"])
+    nested_prompt = json.loads(client.messages[2][1]["content"])
     assert nested_prompt["selected_skill"]["name"] == "independent-review"
     assert nested_prompt["step_context"] == [
         "Target skill: review-skill-workflow",

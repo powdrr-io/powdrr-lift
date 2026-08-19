@@ -892,6 +892,13 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         file=self.stderr,
                     )
                     return WorkflowActionOutcome(exit_code=1)
+                if self.current_step.tool_invocations:
+                    warning = (
+                        "Workflow stopped: a required tool step made no progress; "
+                        "the step cannot be skipped."
+                    )
+                    print(warning, file=self.stderr)
+                    return WorkflowActionOutcome(exit_code=1)
                 if _workflow_step_requires_pull_request(self.current_step):
                     warning = (
                         "Warning: a required pull-request creation step made no "

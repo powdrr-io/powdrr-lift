@@ -220,8 +220,10 @@ def claim_workflow_task(
 def commit_and_push_workflow_initialization(
     worktree: str | Path,
     workflow_directory: str | Path,
+    *,
+    push: bool = True,
 ) -> None:
-    """Commit the initial task graph and publish the integration branch."""
+    """Commit the initial task graph and optionally publish its branch."""
     worktree_path = Path(worktree).resolve()
     workflow_path = Path(workflow_directory).resolve()
     relative_workflow = workflow_path.relative_to(worktree_path)
@@ -230,8 +232,30 @@ def commit_and_push_workflow_initialization(
         worktree_path,
         ["commit", "-m", "Initialize durable workflow run"],
     )
-    branch = _run_git(worktree_path, ["branch", "--show-current"])
-    _run_git(worktree_path, ["push", "--set-upstream", "origin", branch])
+    if push:
+        branch = _run_git(worktree_path, ["branch", "--show-current"])
+        _run_git(worktree_path, ["push", "--set-upstream", "origin", branch])
+
+
+def synchronize_workflow_initialization(
+    integration_worktree: str | Path,
+    source_worktree: str | Path,
+) -> None:
+    """Make the integration branch contain the active workflow commit."""
+    integration_path = Path(integration_worktree).resolve()
+    source_path = Path(source_worktree).resolve()
+    source_branch = _run_git(source_path, ["branch", "--show-current"])
+    if source_branch in {"main", "master"}:
+        raise RuntimeError(
+            "Cannot initialize a workflow from a protected branch; use a "
+            "dedicated feature worktree."
+        )
+    _run_git(integration_path, ["merge", "--ff-only", source_branch])
+    integration_branch = _run_git(integration_path, ["branch", "--show-current"])
+    _run_git(
+        integration_path,
+        ["push", "--set-upstream", "origin", integration_branch],
+    )
 
 
 def inspect_workflow_run(

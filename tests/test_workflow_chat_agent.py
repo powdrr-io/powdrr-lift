@@ -2575,7 +2575,7 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
     assert "Done." in stdout.getvalue()
 
 
-def test_workflow_execution_skips_repeated_no_progress_tool_step(
+def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2662,13 +2662,8 @@ def test_workflow_execution_skips_repeated_no_progress_tool_step(
         ),
     )
 
-    assert exit_code == 0
-    assert "skipping to the next workflow step" in stderr.getvalue()
-    assert any(
-        status == "Warning: repeated tool action made no progress; "
-        "skipping to the next workflow step."
-        for status in progress_statuses
-    )
+    assert exit_code == 1
+    assert "required tool step made no progress" in stderr.getvalue()
     assert any(
         status.startswith("roundtrip 1: invoke_tool (shell)")
         for status in progress_statuses
@@ -5192,6 +5187,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._pr_push_invoked = False
             self._pr_create_invoked = False
             self._pr_update_invoked = False
+            self._start_invoked_steps: set[int] = set()
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -5354,18 +5350,26 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
                 )
-                shell_invocations = [
-                    invocation
-                    for invocation in prompt["current_step"].get("tool_invocations", [])
-                    if invocation.get("tool") == "shell"
-                ]
-                if shell_invocations:
+                step_index = int(prompt["current_step_index"])
+                tool_invocations = prompt["current_step"].get("tool_invocations", [])
+                if tool_invocations and step_index not in self._start_invoked_steps:
+                    invocation = tool_invocations[0]
+                    self._start_invoked_steps.add(step_index)
                     self._call_index += 1
+                    command = [
+                        str(part)
+                        .replace("<feature-name>", "display-related-photos")
+                        .replace("<proposed-pr-name>", "display-related-photos-pr-001")
+                        .replace("<feature-id>", "display-related-photos")
+                        for part in invocation["command"]
+                    ]
                     return {
                         "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {"command": shell_invocations[0]["command"]},
+                        "tool": invocation["tool"],
+                        "parameters": {"command": command},
                     }
+                self._call_index += 1
+                return {"kind": "next_step"}
             response = next(start_responses)
             self._call_index += 1
             return response

@@ -95,3 +95,14 @@ def test_gather_context_scopes_current_and_exact_feature_proposal(
         str(current_path),
         str(proposal_path),
     }
+    assert {
+        match.path
+        for match in gather_specification_context(
+            tmp_path,
+            types=["requirements"],
+        ).matches
+    } == {str(current_path)}
+    assert {match.specification_type for match in report.matches} == {
+        "current-state",
+        "proposed",
+    }

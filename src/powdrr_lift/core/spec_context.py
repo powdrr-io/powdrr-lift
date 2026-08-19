@@ -228,15 +228,7 @@ def _iter_context_specification_paths(
         repo_root / "docs" / "proposed",
         repo_root / "docs" / "proposals",
     )
-    if feature_id is None:
-        for proposals_root in proposal_roots:
-            if proposals_root.exists():
-                paths.extend(
-                    path
-                    for path in sorted(proposals_root.rglob("*.yaml"))
-                    if path.is_file()
-                )
-    else:
+    if feature_id is not None:
         for proposals_root in proposal_roots:
             feature_root = proposals_root / feature_id
             if feature_root.exists():
@@ -284,19 +276,23 @@ def _describe_specification_path(
 
     path_parts = relative_path.parts
     if (
-        len(path_parts) >= 4
+        len(path_parts) >= 3
         and path_parts[0] == "docs"
         and path_parts[1] in {"current", "proposed", "proposals", "specs"}
     ):
         work_item_name = path_parts[2]
-        specification_type = path.stem.removesuffix("-specification")
+        specification_type = (
+            "proposed"
+            if path_parts[1] in {"proposed", "proposals"}
+            else "current-state"
+        )
         return work_item_name, specification_type
 
     if path_parts == (".powdrr-lift", "state", "current-state.yaml"):
         return "current-state", "current-state"
 
     if len(path_parts) >= 3 and path_parts[:2] == ("docs", "project_structure"):
-        return "project-structure", path.stem
+        return "project-structure", "current-state"
 
     return None, None
 

@@ -6579,6 +6579,7 @@ def test_empty_pull_request_error_reports_uncommitted_changes(tmp_path: Path) ->
         check=True,
         capture_output=True,
     )
+    subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
     subprocess.run(["git", "switch", "-c", "feature"], cwd=tmp_path, check=True)
     (tmp_path / "change.txt").write_text("change\n", encoding="utf-8")
 
@@ -6601,6 +6602,7 @@ def test_empty_pull_request_error_ignores_branch_with_commits(tmp_path: Path) ->
         check=True,
         capture_output=True,
     )
+    subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
     subprocess.run(["git", "switch", "-c", "feature"], cwd=tmp_path, check=True)
     (tmp_path / "change.txt").write_text("change\n", encoding="utf-8")
     subprocess.run(["git", "add", "change.txt"], cwd=tmp_path, check=True)

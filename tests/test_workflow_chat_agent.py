@@ -4051,6 +4051,16 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         capture_output=True,
         text=True,
     )
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=repo_root,
+        check=True,
+    )
     tool_bin = tmp_path / "bin"
     tool_bin.mkdir()
     powdrr_lift_wrapper = tool_bin / "powdrr-lift"
@@ -5389,6 +5399,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         and event["parameters"]["command"][1] == "instantiate-workflow"
     )
     instantiate_result = cast(dict[str, object], instantiate_event["result"])
+    assert instantiate_result["returncode"] == 0, instantiate_result
     instantiate_output = json.loads(cast(str, instantiate_result["stdout"]))
     integration_worktree = Path(instantiate_output["integration_worktree"])
     workflow_directory = Path(instantiate_output["workflow_directory"])

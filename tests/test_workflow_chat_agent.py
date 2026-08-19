@@ -5382,7 +5382,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         for event in start_summary["execution_events"]
     )
 
-    workflow_directory = worktree_root / "docs" / "workflows" / "display-related-photos"
+    integration_worktree = (
+        worktree_root / ".worktrees" / "powdrr" / "display-related-photos-pr-001"
+    )
+    workflow_directory = (
+        integration_worktree / "docs" / "workflows" / "display-related-photos"
+    )
+    assert (workflow_directory / ".workflow-git.json").exists()
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
         f"task-{index:03d}" for index in range(1, 13)
@@ -5433,7 +5439,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert select_ready_workflow_tasks(tasks) == (tasks[0],)
     assert "https://github.com/example/repo/pull/123" in start_stdout.getvalue()
 
-    workflow_root = worktree_root / "docs" / "workflows"
+    workflow_root = integration_worktree / "docs" / "workflows"
     assignment_batches: list[tuple[str, str]] = []
     while ready_tasks := load_ready_workflow_tasks(workflow_root):
         current_assignment = (
@@ -5463,7 +5469,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     for item in invocation.command
                 ]
                 if invocation.tool == "fuzzy-match":
-                    result = execute_fuzzy_match(command, worktree_root=worktree_root)
+                    result = execute_fuzzy_match(
+                        command, worktree_root=integration_worktree
+                    )
                     assert result["matches"], f"command={command!r} result={result!r}"
                 elif command[:1] == ["pytest"]:
                     # This integration test uses a clone whose committed tests
@@ -5478,7 +5486,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 else:
                     result = _execute_shell_tool(
                         {"command": command},
-                        worktree_root=worktree_root,
+                        worktree_root=integration_worktree,
                         stdout=start_stdout,
                         stderr=start_stderr,
                         verbose=False,

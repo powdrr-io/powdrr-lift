@@ -6600,6 +6600,7 @@ def test_empty_pull_request_error_rejects_uncommitted_only_branch(
         check=True,
         capture_output=True,
     )
+    subprocess.run(["git", "branch", "-M", "main"], cwd=tmp_path, check=True)
     (tmp_path / "new.txt").write_text("new\n", encoding="utf-8")
 
     error = _empty_pull_request_error(

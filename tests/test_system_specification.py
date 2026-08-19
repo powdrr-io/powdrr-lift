@@ -385,3 +385,27 @@ def test_cli_evaluate_includes_yaml_edit_for_top_level_specification_issue(
             }
         ],
     }
+
+
+def test_cli_evaluate_returns_multiple_yaml_issues_with_repair_actions(
+    tmp_path: Path,
+) -> None:
+    spec_path = tmp_path / "system-specification.yaml"
+    spec_path.write_text(
+        "version: 1\nrequirements: invalid\napproach: invalid\n",
+        encoding="utf-8",
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(["evaluate", str(spec_path), "--repo-root", str(tmp_path)])
+
+    assert exit_code == 1
+    report = yaml.safe_load(stdout.getvalue())
+    assert len(report["issues"]) == 3
+    assert {issue["path"] for issue in report["issues"]} == {
+        "id",
+        "requirements",
+        "approach",
+    }
+    assert all("yaml_edit" in issue for issue in report["issues"])

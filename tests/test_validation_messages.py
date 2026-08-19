@@ -12,5 +12,6 @@ def test_validation_error_only_includes_yaml_edit_for_yaml_files() -> None:
 
     assert "yaml_edit" in yaml_data
     assert "yaml_edit_guidance" in yaml_data
+    assert "multiple independent issues" in yaml_data["yaml_edit_guidance"]
     assert "yaml_edit" not in json_data
     assert "yaml_edit_guidance" not in json_data

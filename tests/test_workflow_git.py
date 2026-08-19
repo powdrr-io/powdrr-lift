@@ -14,6 +14,7 @@ from powdrr_lift.workflow_git import (
     inspect_workflow_run,
     integration_branch_name,
     load_workflow_git_state,
+    resolve_git_repository_root,
     save_workflow_git_state,
     task_branch_name,
 )
@@ -162,3 +163,73 @@ def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) 
         ).returncode
         == 0
     )
+
+
+def test_inspection_follows_registered_nested_integration_worktree(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+
+    nested_worktree = (
+        tmp_path
+        / ".worktrees"
+        / "workflow-chat"
+        / ".worktrees"
+        / "powdrr"
+        / "feature-17"
+    )
+    nested_worktree.parent.mkdir(parents=True)
+    _git(
+        tmp_path,
+        "worktree",
+        "add",
+        str(nested_worktree),
+        "-b",
+        "powdrr/feature-17",
+        "main",
+    )
+    workflow_dir = nested_worktree / "docs" / "workflows" / "feature-17"
+    workflow_dir.mkdir(parents=True)
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="docs/workflows/feature-17",
+    )
+    save_workflow_git_state(workflow_dir, state)
+    (workflow_dir / "task-001.json").write_text(
+        '{"task_id": "task-001", "status": "open"}\n',
+        encoding="utf-8",
+    )
+
+    report = inspect_workflow_run(tmp_path, "feature-17")
+
+    assert report["integration_worktree"] == str(nested_worktree)
+    assert report["integration_worktree_exists"] is True
+    assert report["workflow_git_state"] == state.to_data()
+    assert report["tasks"] == [
+        {
+            "path": str(workflow_dir / "task-001.json"),
+            "task_id": "task-001",
+            "status": "open",
+        }
+    ]
+
+
+def test_resolve_git_repository_root_from_nested_worktree(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+
+    nested_worktree = tmp_path / ".worktrees" / "chat"
+    _git(tmp_path, "worktree", "add", str(nested_worktree), "-b", "chat", "main")
+
+    assert resolve_git_repository_root(nested_worktree) == tmp_path.resolve()

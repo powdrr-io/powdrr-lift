@@ -115,6 +115,27 @@ def task_worktree_path(
     )
 
 
+def resolve_git_repository_root(repo_root: str | Path) -> Path:
+    """Return the common repository root for a checkout or Git worktree."""
+    repo_root_path = Path(repo_root).resolve()
+    result = _git(
+        repo_root_path,
+        ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Could not determine the common Git directory for {repo_root_path}: "
+            f"{result.stderr.strip()}"
+        )
+    common_git_directory = Path(result.stdout.strip()).resolve()
+    if common_git_directory.name != ".git":
+        raise RuntimeError(
+            f"Git common directory is not a repository .git directory: "
+            f"{common_git_directory}"
+        )
+    return common_git_directory.parent
+
+
 def create_workflow_worktree(
     repo_root: str | Path,
     proposed_pr_id: str,
@@ -271,7 +292,16 @@ def inspect_workflow_run(
     task_branches = _for_each_ref(repo_root_path, f"refs/heads/{task_prefix}")
     claim_refs = _for_each_ref(repo_root_path, claim_prefix)
     worktrees = _workflow_worktrees(repo_root_path, integration_branch, task_prefix)
-    integration_worktree = workflow_worktree_path(repo_root_path, proposed_pr_id)
+    registered_integration_worktrees = [
+        Path(item["path"])
+        for item in worktrees
+        if item.get("branch") == integration_branch
+    ]
+    integration_worktree = (
+        registered_integration_worktrees[0]
+        if registered_integration_worktrees
+        else workflow_worktree_path(repo_root_path, proposed_pr_id)
+    )
     state_paths = (
         sorted(integration_worktree.rglob(WORKFLOW_GIT_STATE_FILENAME))
         if integration_worktree.is_dir()
@@ -282,6 +312,8 @@ def inspect_workflow_run(
     if state is not None:
         workflow_directory = integration_worktree / state.workflow_relative_directory
         for task_path in sorted(workflow_directory.glob("*.json")):
+            if task_path.name == WORKFLOW_GIT_STATE_FILENAME:
+                continue
             try:
                 task = json.loads(task_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):

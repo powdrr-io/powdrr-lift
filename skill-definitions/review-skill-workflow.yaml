@@ -54,7 +54,8 @@ steps:
     for reasoning-only steps and one tool call for an atomic operation. Flag
     every step with more than one independent tool call, more than three action
     clauses, vague verbs, mixed decisions and execution, repeated context,
-    missing inputs or outputs, unbounded retry language, or a tool call whose
+    missing inputs or outputs, implicit data handoffs between steps or skills,
+    unbounded retry language, or a tool call whose
     arguments and success condition are not explicit. Distinguish a real
     prerequisite from unnecessary orchestration. Do not remove a required
     validation or evidence check merely to lower a count. For each finding,
@@ -67,7 +68,8 @@ steps:
     evidence, dependencies, safety constraints, and output. Give each rewritten
     step one observable outcome and at most one tool invocation. Use imperative
     sentences with explicit inputs, exact command arguments or placeholders,
-    expected result, and one bounded correction rule. Move rationale and
+    expected result, and one bounded correction rule. Favor explicit
+    instructions on what data to pass between steps and skills. Move rationale and
     background out of execution instructions. Do not combine unrelated actions
     into a single step and do not invent a tool, file, field, or dependency.
     Present original text, proposed text, tool count, action-clause count, and

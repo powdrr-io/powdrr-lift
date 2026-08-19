@@ -17,9 +17,13 @@ steps:
   llm_type: high_reasoning
   details: >-
     Return one finding per omitted goal, dependency, input, output, safety
-    check, validation condition, tool argument, failure rule, or hidden action.
-    Also flag any proposed step that still permits multiple tool calls, more
-    than three independent action clauses, or an ambiguous success condition.
-    For every finding cite the original requirement and explain the smallest
-    correction. If the rewrite is complete, state that explicitly and list the
-    requirements checked.
+    check, validation condition, tool argument, failure rule, hidden action, or
+    implicit data handoff between steps or skills.
+    Each finding must contain both a judgment and a directive: state what is
+    wrong, then state the smallest concrete correction. Also flag any proposed
+    step that still permits multiple tool calls, more than three independent
+    action clauses, or an ambiguous success condition. For example, judge
+    "This English references a tool without an invocation example" and direct
+    "Provide a targeted example for <tool-name> using <required-arguments>."
+    Cite the original requirement for every finding. If the rewrite is complete,
+    state that explicitly and list the requirements checked.

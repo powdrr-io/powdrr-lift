@@ -1,0 +1,33 @@
+{
+  "task_id": "human-input-1",
+  "status": "open",
+  "upstream_task_ids": [],
+  "dependent_state": [],
+  "complexity": "low",
+  "input_state": {
+    "question": "The proposed PR specification for pr-interaction-capture-17 was not found in the checked-in docs under feature-interaction-file-logging; should I proceed without it or is there a different location or identifier for this proposed PR?",
+    "task": {
+      "task_id": "pr-interaction-capture-17-task-001",
+      "status": "locked",
+      "upstream_task_ids": [],
+      "dependent_state": [
+        "proposed-pr-context-gathered"
+      ],
+      "complexity": "high",
+      "input_state": {
+        "proposed_pr": "pr-interaction-capture-17",
+        "feature_id": "feature-interaction-file-logging"
+      },
+      "assignee_type": "agent",
+      "assignee_role": "architect",
+      "output_state_type": "proposed-pr-context-state",
+      "description": "Gather context about the proposed PR",
+      "details": "First resolve proposed_pr to the exact proposed PR specification. The workflow instantiation hard-codes feature_id from the matching proposed PR; pass that exact value in the first gather_context action: {\"kind\":\"gather_context\",\"feature_id\":\"<feature-id>\",\"types\":[\"proposed_prs\",\"requirements\",\"approach\",\"invariants\",\"guidance\",\"features\",\"acceptance_criteria\",\"expected_tests\",\"required_test_cases\",\"risks\",\"decisions\"],\"keywords\":[\"<proposed-pr-id>\"]}. feature_id scopes proposal discovery to docs/proposals/<feature-id> and keywords identify the proposed PR within that feature. Do not omit feature_id, use the proposed PR id as feature_id, or infer the feature from keywords. Use the gathered context to identify the proposed PR, its goals, scope, acceptance criteria, tests, dependencies, risks, and related requirements. Use read_document only when a specific section of a known document is needed. Do not guess a path when gathered context provides the path. Record the exact specification path and all relevant implementation context in output_state. If the lookup is ambiguous or returns no match, choose prompt_user with one precise question instead of guessing.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'pr-interaction-capture-17'. Use these values as search context and verify repository documents before deciding what they identify.",
+      "llm_type": "long_context"
+    }
+  },
+  "assignee_type": "human",
+  "assignee_role": "reviewer",
+  "output_state_type": "human-response-state",
+  "description": "The proposed PR specification for pr-interaction-capture-17 was not found in the checked-in docs under feature-interaction-file-logging; should I proceed without it or is there a different location or identifier for this proposed PR?"
+}

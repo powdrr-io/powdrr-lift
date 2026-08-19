@@ -4052,7 +4052,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         text=True,
     )
     subprocess.run(
-        ["git", "branch", "-M", "main"],
+        ["git", "switch", "-C", "main"],
         cwd=repo_root,
         check=True,
     )

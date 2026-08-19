@@ -4078,13 +4078,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         cwd=repo_root,
         check=True,
     )
-    subprocess.run(
-        ["git", "push", "--set-upstream", "origin", "main"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
     tool_bin = tmp_path / "bin"
     tool_bin.mkdir()
     powdrr_lift_wrapper = tool_bin / "powdrr-lift"

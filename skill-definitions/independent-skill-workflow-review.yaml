@@ -1,0 +1,25 @@
+---
+name: independent-skill-workflow-review
+adversarial: true
+when_to_use:
+- When review-skill-workflow requests an independent completeness check of a
+  proposed skill or workflow rewrite.
+steps:
+- description: Compare the original and proposed definitions without bias.
+  llm_type: high_reasoning
+  details: >-
+    Read the supplied target goal, original step text, proposed replacement,
+    preserved-requirement list, and inventory counts. Reconstruct the original
+    step's required behavior before judging the rewrite. Do not use the parent
+    review's findings as evidence and do not propose improvements merely because
+    your wording differs.
+- description: Report omissions and execution risks.
+  llm_type: high_reasoning
+  details: >-
+    Return one finding per omitted goal, dependency, input, output, safety
+    check, validation condition, tool argument, failure rule, or hidden action.
+    Also flag any proposed step that still permits multiple tool calls, more
+    than three independent action clauses, or an ambiguous success condition.
+    For every finding cite the original requirement and explain the smallest
+    correction. If the rewrite is complete, state that explicitly and list the
+    requirements checked.

@@ -58,6 +58,13 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_internal_command,
     resolve_workflow_provider,
 )
+from powdrr_lift.workflow_git import (
+    WorkflowGitState,
+    claim_workflow_task,
+    create_task_worktree,
+    load_workflow_git_state,
+    task_branch_name,
+)
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
     WorkflowAction,
@@ -567,9 +574,24 @@ def run_workflow_task(
     stderr: TextIO,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
+    configured_workflow_dir = config.workflow_dir.resolve()
+    configured_workflow = WorkflowInstance.from_directory(configured_workflow_dir)
+    configured_task = _select_task(configured_workflow, config.task_id)
+    configured_git_state = load_workflow_git_state(configured_workflow_dir)
+    if configured_git_state is not None and configured_task is not None:
+        project_root = _resolve_project_root(
+            configured_repo_root,
+            configured_repo_root,
+        )
+        claim_workflow_task(
+            project_root,
+            configured_git_state,
+            configured_task.task_id,
+        )
     repo_root, workflow_dir = _resolve_workflow_task_context(
         config,
         configured_repo_root=configured_repo_root,
+        task_id=configured_task.task_id if configured_task is not None else None,
         stdout=stdout,
         stderr=stderr,
     )
@@ -580,6 +602,16 @@ def run_workflow_task(
     workflow = WorkflowInstance.from_directory(workflow_dir)
     task = _select_task(workflow, config.task_id)
     if task is None:
+        workflow_git_state = load_workflow_git_state(workflow_dir)
+        if workflow_git_state is not None and workflow.tasks:
+            if all(item.status is TaskStatus.COMPLETED for item in workflow.tasks):
+                _open_final_workflow_pull_request(
+                    repo_root,
+                    workflow,
+                    workflow_git_state,
+                    stdout=stdout,
+                )
+                return 0
         print("No ready agent task found.", file=stderr)
         return 1
     task = workflow.claim_task(task.task_id)
@@ -684,19 +716,51 @@ def _resolve_workflow_task_context(
     config: WorkflowTaskAgentConfig,
     *,
     configured_repo_root: Path,
+    task_id: str | None,
     stdout: TextIO,
     stderr: TextIO,
 ) -> tuple[Path, Path]:
     """Use the same dedicated worktree isolation as workflow chat."""
+    configured_workflow_dir = config.workflow_dir.resolve()
+    workflow_git_state = load_workflow_git_state(configured_workflow_dir)
+    if workflow_git_state is not None and task_id is not None:
+        current_branch = _git_output(
+            configured_repo_root,
+            ["branch", "--show-current"],
+        )
+        expected_task_branch = task_branch_name(
+            workflow_git_state.proposed_pr_id,
+            task_id,
+        )
+        if current_branch != expected_task_branch:
+            project_root = _resolve_project_root(
+                configured_repo_root,
+                configured_repo_root,
+            )
+            task_worktree, task_branch = create_task_worktree(
+                project_root,
+                workflow_git_state,
+                task_id,
+            )
+            print(
+                f"Using workflow task branch {task_branch} in {task_worktree}",
+                file=stdout,
+                flush=True,
+            )
+            return (
+                task_worktree,
+                task_worktree / workflow_git_state.workflow_relative_directory,
+            )
+
     if not _is_git_worktree(configured_repo_root):
-        return configured_repo_root, config.workflow_dir.resolve()
+        return configured_repo_root, configured_workflow_dir
 
     worktree_root = _resolve_worktree_context(
         configured_repo_root,
         stderr=stderr,
         verbose=config.verbose,
     )
-    workflow_dir = config.workflow_dir.resolve()
+    workflow_dir = configured_workflow_dir
     try:
         workflow_relative_path = workflow_dir.relative_to(configured_repo_root)
     except ValueError as exc:
@@ -747,7 +811,12 @@ def _publish_workflow_progress(
     )
     _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
 
-    default_branch = _default_branch(repo_root)
+    workflow_git_state = load_workflow_git_state(workflow.directory)
+    default_branch = (
+        workflow_git_state.integration_branch
+        if workflow_git_state is not None
+        else _default_branch(repo_root)
+    )
     existing_pr = subprocess.run(
         ["gh", "pr", "view", branch, "--json", "url", "--jq", ".url"],
         cwd=repo_root,
@@ -773,7 +842,6 @@ def _publish_workflow_progress(
             "gh",
             "pr",
             "create",
-            "--draft",
             "--base",
             default_branch,
             "--head",
@@ -796,6 +864,66 @@ def _publish_workflow_progress(
             f"{created_pr.stderr.strip()}"
         )
     print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
+
+
+def _open_final_workflow_pull_request(
+    repo_root: Path,
+    workflow: WorkflowInstance,
+    workflow_git_state: WorkflowGitState,
+    *,
+    stdout: TextIO,
+) -> None:
+    """Open the human-facing integration PR after every task is complete."""
+    existing_pr = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "view",
+            workflow_git_state.integration_branch,
+            "--json",
+            "url",
+            "--jq",
+            ".url",
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if existing_pr.returncode == 0 and existing_pr.stdout.strip():
+        print(f"Updated final workflow PR: {existing_pr.stdout.strip()}", file=stdout)
+        return
+    created_pr = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            workflow_git_state.base_branch,
+            "--head",
+            workflow_git_state.integration_branch,
+            "--title",
+            f"Workflow: {workflow.directory.name}",
+            "--body",
+            (
+                "Final integration pull request for durable workflow "
+                f"{workflow.directory.name}. All task branches have been merged."
+            ),
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if created_pr.returncode != 0:
+        raise RuntimeError(
+            f"Could not create final workflow pull request: {created_pr.stderr.strip()}"
+        )
+    print(f"Created final workflow PR: {created_pr.stdout.strip()}", file=stdout)
 
 
 def _is_git_worktree(repo_root: Path) -> bool:

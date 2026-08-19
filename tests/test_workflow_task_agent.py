@@ -133,6 +133,85 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     assert len(client.messages) == 3
 
 
+def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="review-skill",
+            when_to_use=("Review a skill.",),
+            steps=(SkillStep(description="Delegate the independent review."),),
+        ),
+        skills_dir / "review-skill.yaml",
+    )
+    save_skill(
+        Skill(
+            name="independent-review",
+            when_to_use=("Review supplied material.",),
+            steps=(SkillStep(description="Review the supplied material."),),
+        ),
+        skills_dir / "independent-review.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {
+                "kind": "invoke_skill",
+                "skill": "review-skill",
+                "clean": True,
+                "context": [
+                    "Target skill: review-skill-workflow",
+                    "Original step: obtain an independent review",
+                    "Proposed step: invoke the adversarial reviewer with context",
+                ],
+            },
+            {
+                "kind": "invoke_skill",
+                "skill": "independent-review",
+                "provider_role": "adversarial",
+                "clean": True,
+                "context": [
+                    "Target skill: review-skill-workflow",
+                    "Original step: obtain an independent review",
+                    "Proposed step: invoke the adversarial reviewer with context",
+                ],
+            },
+            {"kind": "complete", "text": "Independent review complete."},
+            {"kind": "complete", "text": "Review complete."},
+            {"kind": "complete", "output_state": {"ok": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    review_prompt = json.loads(client.messages[1][1]["content"])
+    assert review_prompt["step_context"] == [
+        "Target skill: review-skill-workflow",
+        "Original step: obtain an independent review",
+        "Proposed step: invoke the adversarial reviewer with context",
+    ]
+    assert review_prompt["transcript"] == []
+    assert review_prompt["execution_events"] == []
+    nested_prompt = json.loads(client.messages[2][1]["content"])
+    assert nested_prompt["selected_skill"]["name"] == "independent-review"
+    assert nested_prompt["step_context"] == [
+        "Target skill: review-skill-workflow",
+        "Original step: obtain an independent review",
+        "Proposed step: invoke the adversarial reviewer with context",
+    ]
+    assert nested_prompt["transcript"] == []
+
+
 def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -168,6 +168,18 @@ highest-priority configured provider, it reads `DEEPINFRA_API_TOKEN` (or
 powdrr-lift process-workflow-task --workflow-dir docs/workflows/implement-a-feature --repo-root .
 ```
 
+Human-assigned tasks can be handled through the same durable workflow protocol:
+
+```bash
+powdrr-lift process-human-task --workflow-dir docs/workflows/implement-a-feature --repo-root .
+```
+
+The command selects the first ready human task, or a specific task with
+`--task-id`, shows its task and upstream context, claims it, prompts for an
+answer, records the answer as `output_state.answer`, and publishes the updated
+workflow state. Use `--answer` or `--answer-file` for non-interactive use and
+`--role reviewer|decider` to filter discovery.
+
 If an agent stops partway through and leaves Git state uncertain, inspect the
 run by its work-item id (the proposed PR id), then clean only its disposable
 task artifacts:

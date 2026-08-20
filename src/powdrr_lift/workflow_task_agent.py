@@ -1011,6 +1011,26 @@ def _publish_workflow_progress(
     print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
 
 
+def publish_workflow_progress(
+    repo_root: Path,
+    workflow: WorkflowInstance,
+    *,
+    reason: str,
+    stdout: TextIO,
+    open_pull_request: bool = True,
+    events: Sequence[Mapping[str, Any]] = (),
+) -> None:
+    """Publish workflow progress for non-LLM workflow participants."""
+    _publish_workflow_progress(
+        repo_root,
+        workflow,
+        reason=reason,
+        stdout=stdout,
+        open_pull_request=open_pull_request,
+        events=events,
+    )
+
+
 def _write_workflow_record(
     repo_root: Path,
     workflow: WorkflowInstance,

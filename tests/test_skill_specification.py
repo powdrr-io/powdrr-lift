@@ -398,12 +398,21 @@ def test_review_skill_workflow_ends_with_pull_request_creation() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     skill = load_skill(skills_dir / "review-skill-workflow.yaml")
 
-    assert [step.description for step in skill.steps[-4:]] == [
+    assert [step.description for step in skill.steps[-5:]] == [
         "Apply and validate the accepted definition.",
+        "Confirm the reviewed definition changed before preparing a pull request.",
         "Stage the reviewed definition for pull-request preparation.",
         "Run final pull-request preparation checks.",
         "Create or update the pull request for the reviewed definition.",
     ]
+    assert skill.steps[-4].tool_invocations[0].command == (
+        "git",
+        "diff",
+        "--name-only",
+        "--",
+        "<target-definition-path>",
+    )
+    assert "choose `complete`" in (skill.steps[-4].details or "")
     assert skill.steps[-3].tool_invocations[0].command == (
         "git",
         "add",

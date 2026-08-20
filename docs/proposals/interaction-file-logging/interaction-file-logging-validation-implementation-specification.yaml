@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Logging Validation Tooling
+architecture_id: '2026-08-14'
+entities:
+- id: interaction-log-entry
+  action: added
+  rationale: Represents a single interaction log entry captured by the logging module.
+modules:
+- id: logging-module
+  action: added
+  relative_location: src/powdrr_lift/logging/
+  purpose: Captures and writes interaction log entries to files.
+tools:
+- id: interaction-log-validator
+  action: added
+  when_to_use: Validate interaction log files for correctness and schema compliance.
+  template: uv run powdrr-lift validate-interaction-log <file>
+  how_to_use: Run from repository root with the path to the interaction log file.
+entity_relationships:
+- id: rel-log-entry-to-file
+  action: added
+  rationale: Links each interaction log entry to the file it is written to.
+features:
+- id: interaction-log-validation
+  action: added
+  description: Validate interaction log files to ensure they conform to the expected
+    schema and structure.
+  functional_requirements:
+  - Provide a CLI command to validate an interaction log file.
+  - Report validation errors with line numbers and descriptions.
+  - Exit with a non-zero status when validation fails.
+decisions:
+- id: validation-tooling
+  action: added
+  description: Provide a dedicated validation tool for interaction log files to support
+    incremental verification.

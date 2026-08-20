@@ -2778,12 +2778,6 @@ def _prompt_step_context(execution_context: Sequence[str]) -> list[str]:
         and sum(len(value) for value in recent) > _MAX_PROMPT_STEP_CONTEXT_CHARS
     ):
         recent.pop(0)
-    if len(recent) < len(execution_context):
-        return [
-            "[Earlier step context omitted; required handoff records remain "
-            "available separately.]",
-            *recent,
-        ]
     return recent
 
 
@@ -2896,6 +2890,7 @@ def _build_step_execution_messages(
                         {
                             "name": entry.skill.name,
                             "path": str(entry.path),
+                            "adversarial": entry.skill.adversarial,
                         }
                         for entry in catalog
                     ],
@@ -3067,8 +3062,10 @@ def _action_system_prompt() -> str:
         "quoted YAML value. "
         "After composing all line edits, ensure the complete resulting document "
         "remains valid before returning the action.\n"
-        "When edit is available, current_file includes the file path and its "
-        "current contents as context.\n"
+        "When edit is available, current_file includes the file path and the "
+        "current contents when the file is small enough to fit this prompt. "
+        "For an omitted large file, use read_document to inspect the exact "
+        "range before editing.\n"
         "Use invoke_skill for a listed nested skill; it runs in the same worktree "
         "and returns here when complete. Use invoke_tool for shell commands, "
         "fuzzy-match searches, or basedpyright "
@@ -5767,49 +5764,30 @@ def _current_file_context(
     if cache is not None and cache_key in cache:
         return cache[cache_key]
     lines = resolved_path.read_text(encoding="utf-8").splitlines()
-    if len(lines) <= _MAX_PROMPT_FILE_LINES:
-        prompt_lines = lines
-        excerpt_start_line = 1 if lines else None
-        excerpt_end_line = len(lines) if lines else None
-    else:
-        half_lines = _MAX_PROMPT_FILE_LINES // 2
-        prompt_lines = [*lines[:half_lines], *lines[-half_lines:]]
-        excerpt_start_line = 1
-        excerpt_end_line = len(lines)
-    serialized_size = sum(len(line) for line in prompt_lines)
-    if serialized_size > _MAX_PROMPT_FILE_CHARS:
-        prompt_lines = [line[:_MAX_PROMPT_FILE_CHARS] for line in prompt_lines[:1]]
+    serialized_size = sum(len(line) for line in lines)
+    content_omitted = (
+        len(lines) > _MAX_PROMPT_FILE_LINES or serialized_size > _MAX_PROMPT_FILE_CHARS
+    )
+    prompt_lines = [] if content_omitted else lines
     context = {
         "path": str(resolved_path.relative_to(worktree_root)),
         "exists": True,
         "line_count": len(lines),
         "lines": [
             {
-                "line_number": (
-                    line_number
-                    if len(lines) <= _MAX_PROMPT_FILE_LINES
-                    else (
-                        line_number
-                        if line_number <= _MAX_PROMPT_FILE_LINES // 2
-                        else (
-                            len(lines)
-                            - _MAX_PROMPT_FILE_LINES // 2
-                            + line_number
-                            - _MAX_PROMPT_FILE_LINES // 2
-                        )
-                    )
-                ),
+                "line_number": line_number,
                 "text": line,
             }
             for line_number, line in enumerate(prompt_lines, start=1)
         ],
     }
-    if len(lines) > _MAX_PROMPT_FILE_LINES or serialized_size > _MAX_PROMPT_FILE_CHARS:
+    if content_omitted:
         context.update(
             {
-                "truncated": True,
-                "excerpt_start_line": excerpt_start_line,
-                "excerpt_end_line": excerpt_end_line,
+                "content_omitted": True,
+                "content_omitted_reason": (
+                    "Use read_document to inspect the required line range."
+                ),
             }
         )
     if cache is not None:

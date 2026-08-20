@@ -220,7 +220,9 @@ def test_current_file_context_cache_reuses_unchanged_file(tmp_path: Path) -> Non
     assert updated["line_count"] == 3
 
 
-def test_current_file_context_bounds_large_files(tmp_path: Path) -> None:
+def test_current_file_context_omits_large_files_without_truncating(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "large.txt"
     path.write_text(
         "\n".join(f"line-{index}" for index in range(1, 501)), encoding="utf-8"
@@ -230,10 +232,8 @@ def test_current_file_context_bounds_large_files(tmp_path: Path) -> None:
 
     assert context is not None
     assert context["line_count"] == 500
-    assert context["truncated"] is True
-    assert len(context["lines"]) == 200
-    assert context["lines"][0]["line_number"] == 1
-    assert context["lines"][-1]["line_number"] == 500
+    assert context["content_omitted"] is True
+    assert context["lines"] == []
 
 
 def test_prompt_step_context_keeps_newest_entries_and_bounds_size() -> None:
@@ -241,10 +241,10 @@ def test_prompt_step_context_keeps_newest_entries_and_bounds_size() -> None:
 
     prompt_context = _prompt_step_context(context)
 
-    assert len(prompt_context) <= 25
+    assert len(prompt_context) <= 24
     assert sum(len(value) for value in prompt_context) <= 16000 + 80
     assert prompt_context[-1].startswith("entry-39")
-    assert "Earlier step context omitted" in prompt_context[0]
+    assert not prompt_context[0].startswith("[Earlier step context omitted")
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(

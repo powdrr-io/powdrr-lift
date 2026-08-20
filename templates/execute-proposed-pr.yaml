@@ -243,11 +243,12 @@ task_templates:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     implementation_diffs: <upstream-task-4>.generated-product-code-state
     completeness_review: <upstream-task-6>.specification-completeness-state
+    feature_id: <work-item-name>
     promoted_documents: {}
   details: >-
     After implementation and validation are complete, move the feature's
-    specification directory from docs/proposals/<work-item-name>/ to
-    docs/current/<work-item-name>/. Use git mv so the committed implementation
+    specification directory from docs/proposals/<feature_id>/ to
+    docs/current/<feature_id>/. Use git mv so the committed implementation
     records the transition and preserves history. Move only the documents for
     the completed feature; leave unrelated proposals in place. If the proposal
     directory does not exist or the current directory already exists, inspect

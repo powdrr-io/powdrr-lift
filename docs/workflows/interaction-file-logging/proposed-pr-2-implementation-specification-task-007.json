@@ -1,0 +1,37 @@
+{
+  "task_id": "proposed-pr-2-implementation-specification-task-007",
+  "status": "open",
+  "upstream_task_ids": [
+    "proposed-pr-2-implementation-specification-task-001",
+    "proposed-pr-2-implementation-specification-task-002",
+    "proposed-pr-2-implementation-specification-task-005",
+    "proposed-pr-2-implementation-specification-task-006"
+  ],
+  "dependent_state": [
+    "specification-complete"
+  ],
+  "complexity": "high",
+  "input_state": {
+    "proposed_pr_context": "proposed-pr-2-implementation-specification-task-001.proposed-pr-context-state",
+    "execution_plan": "proposed-pr-2-implementation-specification-task-002.detailed-execution-plan-state",
+    "implementation_diffs": "proposed-pr-2-implementation-specification-task-005.generated-product-code-state",
+    "test_results": "proposed-pr-2-implementation-specification-task-006.all-tests-passing-state",
+    "acceptance_criteria": "proposed-pr-2-implementation-specification-task-001.proposed-pr-context-state"
+  },
+  "assignee_type": "agent",
+  "assignee_role": "architect",
+  "output_state_type": "specification-completeness-state",
+  "description": "Confirm functional completeness against the specification",
+  "details": "Re-read the proposed PR specification and compare it line by line with the implementation diff and passing test results. Confirm that every goal, acceptance criterion, required file change, error case, and validation requirement is covered. Identify accidental scope, missing behavior, untested behavior, and contradictions. If anything is incomplete, make the required scoped correction and send it back through validation. Otherwise record an explicit criterion-by-criterion completeness result in output_state.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'proposed-pr-2-implementation-specification'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "high_reasoning",
+  "tool_invocations": [
+    {
+      "tool": "shell",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ]
+    }
+  ]
+}

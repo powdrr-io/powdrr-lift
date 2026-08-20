@@ -1,0 +1,61 @@
+schema: https://powdrr.io/schemas/pr-workflow-record-v1
+pull_request: 321
+title: Add CLI for completing human workflow tasks
+branch: codex/human-task-cli
+base_branch: main
+workflow:
+  name: human-task-cli
+  path: src/powdrr_lift/workflow_human_task.py
+  skills:
+  - human-task-cli
+  steps:
+  - id: inspect
+    status: completed
+    description: Trace the existing durable workflow and Git lifecycle
+  - id: implement
+    status: completed
+    description: Implement human task discovery, presentation, claim, answer, completion,
+      and publication
+  - id: verify
+    status: completed
+    description: Run the full test, formatting, lint, and diff checks
+  - id: publish
+    status: completed
+    description: Commit, push, and open the pull request
+tool_calls:
+- tool: shell
+  parameters:
+    command:
+    - rg
+    - human-task
+  why: Locate existing human-task data model, CLI commands, and workflow protocol
+    before implementing a new endpoint.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - apply_patch
+  why: Add the durable human-task runner, CLI wiring, tests, and documentation while
+    preserving the existing Git claim/publish lifecycle.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - uv
+    - run
+    - pytest
+    - -q
+  why: Verify the complete implementation and existing behavior before opening the
+    PR.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - gh
+    - pr
+    - create
+    - --draft
+  why: Open the required reviewable pull request for the feature branch.
+  returncode: 0
+explanation: This record documents the implementation and validation of the human-task
+  CLI, including the workflow protocol decisions that make claims and answers durable.

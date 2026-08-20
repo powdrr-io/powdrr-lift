@@ -537,14 +537,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "parameters": action.parameters,
             "result": result,
         }
-        if action.tool == "shell":
-            _record_task_pull_request(
-                action,
-                self.workflow,
-                self.repo_root,
-                self.events,
-                result,
-            )
+        _record_task_pull_request(
+            action,
+            self.workflow,
+            self.repo_root,
+            self.events,
+            result,
+        )
         self.events.append(event)
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
@@ -1838,16 +1837,24 @@ def _run_skill_for_agent(
                 )
             else:
                 raise RuntimeError(f"Unsupported nested skill tool: {action.tool!r}")
-            if action.tool == "shell":
-                _record_skill_pull_request(
-                    action,
-                    repo_root,
-                    current_skill,
-                    execution_events,
-                    result,
-                    step_index=step_index,
-                )
-            execution_events.append({"kind": action.kind, "result": result})
+            _record_skill_pull_request(
+                action,
+                repo_root,
+                current_skill,
+                execution_events,
+                result,
+                step_index=step_index,
+            )
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "tool": action.tool,
+                    "parameters": action.parameters,
+                    "result": result,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": step_index,
+                }
+            )
             continue
         if action.kind == "prompt_user":
             raise RuntimeError("Nested skills in agent workflows cannot prompt users.")

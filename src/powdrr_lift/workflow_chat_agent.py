@@ -3596,11 +3596,7 @@ def _handle_workflow_action_invoke_tool(
             "internal, fuzzy-match, basedpyright-symbol, and basedpyright-structure."
         )
     if action.tool == "shell":
-        _record_chat_pull_request(
-            action,
-            state,
-            tool_result,
-        )
+        _record_chat_pull_request(action, state, tool_result)
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
         worktree_root=state.worktree_root,
@@ -3635,6 +3631,7 @@ def _handle_workflow_action_invoke_tool(
     state.execution_events.append(
         {
             "kind": action.kind,
+            "tool": action.tool,
             "parameters": action.parameters,
             "result": tool_result,
             "decisions_and_context": action.decisions_and_context,
@@ -3777,7 +3774,10 @@ def _validate_workflow_step_transition(
     def successful_event_matches(invocation: Any, event: Mapping[str, Any]) -> bool:
         if event.get("kind") != "invoke_tool":
             return False
-        if event.get("tool") not in {None, invocation.tool}:
+        event_tool = event.get("tool")
+        if event_tool not in {None, invocation.tool} and not (
+            event_tool == _INTERNAL_TOOL and invocation.tool == "shell"
+        ):
             return False
         if event.get("step_index") != current_step_index:
             return False

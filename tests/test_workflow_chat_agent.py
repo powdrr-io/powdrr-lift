@@ -92,6 +92,7 @@ from powdrr_lift.workflow_chat_agent import (
     _normalize_cache_usage,
     _parse_action_response,
     _parse_json_object,
+    _prompt_step_context,
     _prompt_transcript,
     _prompt_user,
     _request_token_budget,
@@ -217,6 +218,33 @@ def test_current_file_context_cache_reuses_unchanged_file(tmp_path: Path) -> Non
     assert updated is not None
     assert updated is not first
     assert updated["line_count"] == 3
+
+
+def test_current_file_context_bounds_large_files(tmp_path: Path) -> None:
+    path = tmp_path / "large.txt"
+    path.write_text(
+        "\n".join(f"line-{index}" for index in range(1, 501)), encoding="utf-8"
+    )
+
+    context = _current_file_context(tmp_path, path)
+
+    assert context is not None
+    assert context["line_count"] == 500
+    assert context["truncated"] is True
+    assert len(context["lines"]) == 200
+    assert context["lines"][0]["line_number"] == 1
+    assert context["lines"][-1]["line_number"] == 500
+
+
+def test_prompt_step_context_keeps_newest_entries_and_bounds_size() -> None:
+    context = [f"entry-{index}-" + "x" * 2000 for index in range(40)]
+
+    prompt_context = _prompt_step_context(context)
+
+    assert len(prompt_context) <= 25
+    assert sum(len(value) for value in prompt_context) <= 16000 + 80
+    assert prompt_context[-1].startswith("entry-39")
+    assert "Earlier step context omitted" in prompt_context[0]
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(

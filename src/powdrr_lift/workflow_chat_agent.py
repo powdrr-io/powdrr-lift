@@ -124,6 +124,10 @@ _MAX_DOCUMENT_CONTEXT_LINES = 2000
 _MAX_PROMPT_TRANSCRIPT_ENTRIES = 32
 _MAX_PROMPT_TRANSCRIPT_CHARS = 24000
 _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
+_MAX_PROMPT_FILE_LINES = 200
+_MAX_PROMPT_FILE_CHARS = 16000
+_MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
+_MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
@@ -2639,6 +2643,15 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     }
 
 
+def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
+    """Return only skill identity; the active step carries execution details."""
+    return {
+        "file": str(entry.path),
+        "name": entry.skill.name,
+        "adversarial": entry.skill.adversarial,
+    }
+
+
 def _selection_system_prompt() -> str:
     return (
         "Task: route the user's request to the best available skill. Read the "
@@ -2754,6 +2767,26 @@ def _prompt_transcript(
     return compacted
 
 
+def _prompt_step_context(execution_context: Sequence[str]) -> list[str]:
+    """Bound recurring step context while retaining the newest handoff facts."""
+    if len(execution_context) <= _MAX_PROMPT_STEP_CONTEXT_ENTRIES:
+        recent = list(execution_context)
+    else:
+        recent = list(execution_context[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:])
+    while (
+        len(recent) > 1
+        and sum(len(value) for value in recent) > _MAX_PROMPT_STEP_CONTEXT_CHARS
+    ):
+        recent.pop(0)
+    if len(recent) < len(execution_context):
+        return [
+            "[Earlier step context omitted; required handoff records remain "
+            "available separately.]",
+            *recent,
+        ]
+    return recent
+
+
 def _truncate_prompt_content(content: str) -> str:
     if len(content) <= _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS:
         return content
@@ -2830,7 +2863,7 @@ def _build_step_execution_messages(
                         current_step,
                         handoff_records or {},
                     ),
-                    "step_context": list(execution_context),
+                    "step_context": _prompt_step_context(execution_context),
                     "available_tools": [
                         {
                             "name": tool,
@@ -2858,13 +2891,11 @@ def _build_step_execution_messages(
                             )
                         ),
                     },
-                    "selected_skill": _catalog_entry_to_data(selected_skill),
+                    "selected_skill": _selected_skill_prompt_data(selected_skill),
                     "available_skills": [
                         {
                             "name": entry.skill.name,
                             "path": str(entry.path),
-                            "adversarial": entry.skill.adversarial,
-                            "when_to_use": list(entry.skill.when_to_use),
                         }
                         for entry in catalog
                     ],
@@ -5736,18 +5767,51 @@ def _current_file_context(
     if cache is not None and cache_key in cache:
         return cache[cache_key]
     lines = resolved_path.read_text(encoding="utf-8").splitlines()
+    if len(lines) <= _MAX_PROMPT_FILE_LINES:
+        prompt_lines = lines
+        excerpt_start_line = 1 if lines else None
+        excerpt_end_line = len(lines) if lines else None
+    else:
+        half_lines = _MAX_PROMPT_FILE_LINES // 2
+        prompt_lines = [*lines[:half_lines], *lines[-half_lines:]]
+        excerpt_start_line = 1
+        excerpt_end_line = len(lines)
+    serialized_size = sum(len(line) for line in prompt_lines)
+    if serialized_size > _MAX_PROMPT_FILE_CHARS:
+        prompt_lines = [line[:_MAX_PROMPT_FILE_CHARS] for line in prompt_lines[:1]]
     context = {
         "path": str(resolved_path.relative_to(worktree_root)),
         "exists": True,
         "line_count": len(lines),
         "lines": [
             {
-                "line_number": line_number,
+                "line_number": (
+                    line_number
+                    if len(lines) <= _MAX_PROMPT_FILE_LINES
+                    else (
+                        line_number
+                        if line_number <= _MAX_PROMPT_FILE_LINES // 2
+                        else (
+                            len(lines)
+                            - _MAX_PROMPT_FILE_LINES // 2
+                            + line_number
+                            - _MAX_PROMPT_FILE_LINES // 2
+                        )
+                    )
+                ),
                 "text": line,
             }
-            for line_number, line in enumerate(lines, start=1)
+            for line_number, line in enumerate(prompt_lines, start=1)
         ],
     }
+    if len(lines) > _MAX_PROMPT_FILE_LINES or serialized_size > _MAX_PROMPT_FILE_CHARS:
+        context.update(
+            {
+                "truncated": True,
+                "excerpt_start_line": excerpt_start_line,
+                "excerpt_end_line": excerpt_end_line,
+            }
+        )
     if cache is not None:
         cache.clear()
         cache[cache_key] = context

@@ -1,0 +1,29 @@
+{
+  "task_id": "proposed-pr-1-implementation-specification-task-012",
+  "status": "open",
+  "upstream_task_ids": [
+    "proposed-pr-1-implementation-specification-task-001",
+    "proposed-pr-1-implementation-specification-task-005",
+    "proposed-pr-1-implementation-specification-task-006",
+    "proposed-pr-1-implementation-specification-task-007",
+    "proposed-pr-1-implementation-specification-task-011"
+  ],
+  "dependent_state": [
+    "pull-request-created"
+  ],
+  "complexity": "high",
+  "input_state": {
+    "proposed_pr_context": "proposed-pr-1-implementation-specification-task-001.proposed-pr-context-state",
+    "implementation_diffs": "proposed-pr-1-implementation-specification-task-005.generated-product-code-state",
+    "test_results": "proposed-pr-1-implementation-specification-task-006.all-tests-passing-state",
+    "completeness_review": "proposed-pr-1-implementation-specification-task-007.specification-completeness-state",
+    "lint_results": "proposed-pr-1-implementation-specification-task-011.pull-request-prep-state",
+    "pull_request": {}
+  },
+  "assignee_type": "human",
+  "assignee_role": "reviewer",
+  "output_state_type": "pull-request-created-state",
+  "description": "Create the pull request",
+  "details": "Present the proposed PR specification, implementation summary, changed files, acceptance-criteria results, test commands and results, lint and type-check results, risks, and remaining caveats. Ask the human reviewer to confirm that the work is ready for a pull request. After approval, create the pull request using the repository's normal Git workflow and record its URL and final status in output_state. Do not create a pull request before the human explicitly approves it.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'proposed-pr-1-implementation-specification'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "standard_reasoning"
+}

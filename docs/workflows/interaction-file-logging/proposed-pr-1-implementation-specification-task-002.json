@@ -1,0 +1,31 @@
+{
+  "task_id": "proposed-pr-1-implementation-specification-task-002",
+  "status": "open",
+  "upstream_task_ids": [
+    "proposed-pr-1-implementation-specification-task-001"
+  ],
+  "dependent_state": [
+    "execution-plan-created"
+  ],
+  "complexity": "high",
+  "input_state": {
+    "proposed_pr_context": "proposed-pr-1-implementation-specification-task-001.proposed-pr-context-state",
+    "execution_plan": []
+  },
+  "assignee_type": "agent",
+  "assignee_role": "architect",
+  "output_state_type": "detailed-execution-plan-state",
+  "description": "Create a detailed execution plan",
+  "details": "Read the gathered proposed PR specification and all referenced documents. Create a detailed, ordered execution plan before changing files. Map every acceptance criterion to one or more tests, identify the exact test files and product files to change, describe the expected initially failing test command, define the implementation sequence, and define the final validation commands. Detect missing requirements, conflicts, excessive scope, or unsafe assumptions. If the plan is not implementable, use get-human-input for a specific decision. Otherwise record the complete plan in output_state and pass it to the next task.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'proposed-pr-1-implementation-specification'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "high_reasoning",
+  "tool_invocations": [
+    {
+      "tool": "shell",
+      "command": [
+        "git",
+        "diff",
+        "--stat"
+      ]
+    }
+  ]
+}

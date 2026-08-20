@@ -1,5 +1,4 @@
 schema: https://powdrr.io/schemas/specification-v1
-title: null
 architecture_id: '2026-08-14'
 entities:
 - id: interaction-log-entry
@@ -28,7 +27,6 @@ features:
   action: added
   description: Record user and system interactions to a file-based log for auditability
     and replay.
-  supercedes: null
   functional_requirements:
   - The system must capture each user interaction and its system response.
   - The system must persist interaction entries to a file in a structured format.
@@ -38,4 +36,3 @@ decisions:
   action: added
   description: Use a file-based log format for interaction recording to keep the implementation
     simple and inspectable.
-  supercedes: null

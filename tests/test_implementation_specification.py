@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import shutil
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -157,6 +158,42 @@ def test_cli_evaluate_validates_specification_directory(tmp_path: Path) -> None:
 
     assert exit_code == 1
     assert "template_boilerplate_not_removed" in stdout.getvalue()
+
+
+def test_cli_evaluate_validates_prefixed_specification_files(tmp_path: Path) -> None:
+    _write_architecture_specification(tmp_path)
+    output_path = implementation_specification_default_output_path(
+        "powdrr-lift",
+        tmp_path,
+    )
+    main(
+        [
+            "implementation-specification",
+            "--work-item-name",
+            "powdrr-lift",
+            "--repo-root",
+            str(tmp_path),
+        ]
+    )
+    prefixed_output_path = output_path.with_name(
+        "pr-1-implementation-specification.yaml"
+    )
+    shutil.copyfile(output_path, prefixed_output_path)
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "evaluate",
+                str(output_path.parent),
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+
+    assert exit_code == 1
+    assert stdout.getvalue().count("File:") == 3
+    assert stdout.getvalue().count("template_boilerplate_not_removed") == 2
 
 
 def test_validate_implementation_specification_reports_errors(

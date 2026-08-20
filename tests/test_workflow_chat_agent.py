@@ -94,9 +94,11 @@ from powdrr_lift.workflow_chat_agent import (
     _normalize_cache_usage,
     _parse_action_response,
     _parse_json_object,
+    _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,
     _prompt_user,
+    _record_durable_fact,
     _request_token_budget,
     _resolve_api_key,
     _resolve_base_url,
@@ -256,6 +258,46 @@ def test_prompt_step_context_keeps_newest_entries_and_bounds_size() -> None:
     assert sum(len(value) for value in prompt_context) <= 16000 + 80
     assert prompt_context[-1].startswith("entry-39")
     assert not prompt_context[0].startswith("[Earlier step context omitted")
+
+
+def test_durable_facts_deduplicate_decisions_and_are_prompt_ready(
+    tmp_path: Path,
+) -> None:
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(SkillStep(description="Run"),)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+
+    _record_durable_fact(
+        state,
+        "Use the exact specification path.",
+        kind="decision",
+        source="gather_context",
+    )
+    _record_durable_fact(
+        state,
+        "  Use the exact specification path. ",
+        kind="decision",
+        source="next_step",
+    )
+
+    assert len(state.durable_facts) == 1
+    assert state.execution_context == ["Use the exact specification path."]
+    assert _prompt_durable_facts(state.durable_facts) == [
+        {
+            "value": "Use the exact specification path.",
+            "kind": "decision",
+            "source": "gather_context",
+            "step_index": 0,
+        }
+    ]
 
 
 def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
@@ -3358,7 +3400,9 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 assert prompt["current_step"]["description"] == (
                     "Summarize the gathered context."
                 )
-                assert prompt["step_context"][-1] == "Requirements gathered."
+                assert prompt["durable_facts"][-1]["value"] == (
+                    "Requirements gathered."
+                )
                 assert prompt["execution_events"][-1]["kind"] == "next_step"
             else:
                 raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
@@ -4721,7 +4765,15 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             if expected_context_suffix is None:
                 assert prompt["step_context"] == []
             else:
-                assert prompt["step_context"][-1] == expected_context_suffix
+                prompt_context_values = [
+                    *prompt["step_context"],
+                    *(
+                        fact["value"]
+                        for fact in prompt["durable_facts"]
+                        if isinstance(fact, dict) and "value" in fact
+                    ),
+                ]
+                assert expected_context_suffix in prompt_context_values
             if expected_last_event_kind is not None:
                 assert execution_events[-1]["kind"] == expected_last_event_kind
             return prompt

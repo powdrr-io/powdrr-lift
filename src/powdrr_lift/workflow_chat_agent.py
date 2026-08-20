@@ -3177,27 +3177,14 @@ def _modular_action_system_prompt(current_step: Any) -> str:
     include_context = _step_needs_prompt_catalog(current_step, "context_types")
     include_skills = _step_needs_prompt_catalog(current_step, "skills")
     prompt = (
-        "Task: execute the current checked-in skill step using the supplied current "
-        "step, handoff inputs, latest action result, and allowed tools. Choose one "
+        "Task: execute the supplied details using the handoff inputs, latest action "
+        "result, and allowed tools. Choose one "
         "action that makes progress without asking for information already present.\n"
         "Return exactly one JSON action. Include decisions_and_context when a later "
-        "step needs it, and include outputs using the declared names. Do not rely on "
-        "hidden transcript history.\n"
-        "Available actions are gather_context, prompt_user, edit, yaml_edit, "
-        "invoke_tool, invoke_skill, read_document, goto_step, next_step, and complete. "
-        "prompt_user requires one clear English question ending in '?'. edit requires "
-        "valid line edits and must not target YAML; use yaml_edit for YAML. "
-        "invoke_tool "
-        "requires a command permitted by the current step.\n"
-        "When a step declares tool_invocations, invoke a declared tool successfully "
-        "before next_step or complete. A prose summary is not a tool invocation. "
+        "step needs it, and include outputs using the declared names.\n"
         "Use goto_step only with a declared step id and include the progress requiring "
-        "another pass.\n"
-        "Always include llm_type: high_reasoning for difficult reasoning or final "
-        "review, "
-        "standard_reasoning for implementation, simple_task for mechanical work, "
-        "fast_iteration for quick feedback, long_context for large specifications, "
-        "or vision for image-oriented tasks.\n"
+        "another pass. Use next_step when the current details are complete and "
+        "complete when the skill is finished.\n"
     )
     if include_context:
         context_type_lines = "\n".join(
@@ -3213,6 +3200,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             f"{context_type_lines}\n"
             'Example: {"kind":"gather_context","feature_id":"display-related-photos",'
             '"types":["requirements"],"keywords":["photo"]}.\n'
+            "prompt_user requires one clear English question ending in '?'.\n"
         )
     if include_skills:
         prompt += (
@@ -3232,6 +3220,13 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "for at most 2000 lines, with line 0 meaning the beginning and an "
             "end_line past "
             "EOF clamped.\n"
+            "edit requires valid line edits and must not target YAML; use yaml_edit "
+            "for YAML.\n"
+        )
+    if current_step.tool_invocations:
+        prompt += (
+            "Tool guidance: invoke one of the declared tool_invocations successfully "
+            "before next_step or complete. A prose summary is not a tool invocation.\n"
         )
     prompt += (
         "When a validation result contains corrective_action, apply it before "

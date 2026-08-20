@@ -2652,22 +2652,13 @@ def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     }
 
 
-def _step_prompt_text(step: Any) -> str:
-    return " ".join(
-        str(value)
-        for value in (step.description, step.details or "", *step.uses_skills)
-    ).lower()
-
-
 def _step_needs_prompt_catalog(step: Any, capability: str) -> bool:
-    text = _step_prompt_text(step)
-    if capability == "context_types":
-        return "gather_context" in text or "gather context" in text
-    if capability == "skills":
-        return (
-            bool(step.uses_skills) or "invoke_skill" in text or "nested skill" in text
-        )
-    raise ValueError(f"Unknown prompt catalog capability: {capability}")
+    configured_catalogs = getattr(step, "prompt_catalogs", None)
+    if configured_catalogs is None:
+        return True
+    if capability not in {"context_types", "skills"}:
+        raise ValueError(f"Unknown prompt catalog capability: {capability}")
+    return capability in configured_catalogs
 
 
 def _workflow_context_prompt_data(
@@ -2963,6 +2954,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "Choose exactly one outcome and use it for the following reason:\n"
         "- gather_context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
+        "After gathering context, include the relevant findings in "
+        "decisions_and_context and report next_step when the current step is "
+        "complete; do not leave the gathered result only in the tool history.\n"
         "When a feature's proposal must be scoped, pass its feature_id to "
         "gather_context. It includes current specifications and only YAML files "
         "under docs/proposed/<feature_id>. Do not use fuzzy-match to locate the "

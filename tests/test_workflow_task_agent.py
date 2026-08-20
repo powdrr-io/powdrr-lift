@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -253,8 +254,9 @@ def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
         reason: str,
         stdout: object,
         open_pull_request: bool = True,
+        events: Sequence[Mapping[str, object]] = (),
     ) -> None:
-        del reason, stdout, open_pull_request
+        del reason, stdout, open_pull_request, events
         published_roots.append(repo_root)
         assert published_workflow.directory == workflow.directory
 
@@ -305,8 +307,9 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         reason: str,
         stdout: object,
         open_pull_request: bool = True,
+        events: Sequence[Mapping[str, object]] = (),
     ) -> None:
-        del open_pull_request
+        del open_pull_request, events
         assert repo_root == tmp_path
         assert published_workflow.directory == workflow.directory
         published_reasons.append(reason)

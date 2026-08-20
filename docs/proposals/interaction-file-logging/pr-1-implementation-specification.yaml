@@ -1,0 +1,70 @@
+# Implementation specification template.
+#
+# Instructions:
+# - Use the proposal folder `docs/proposals/interaction-file-logging`.
+# - Keep `architecture_id` aligned with the architecture specification.
+# - Copy entity ids and relationship ids only from the architecture
+#   specification listed below.
+# - Give every entity and entity relationship an `action` of `added`
+#   or `removed`.
+# - Give every module and tool an `action` of `added`, `removed`,
+#   or `changed`, and copy their ids from the architecture specification.
+# - related_modules values must reference module ids from the
+#   architecture specification; omit related_modules when empty.
+# - Include `supercedes` only when it lists one or more ids; omit the
+#   field when it would be empty.
+# - Treat entity relationships with the same item shape as entities:
+#   `id`, `action`, `rationale`, and optional `supercedes`.
+# - Give each feature and decision an `action` of `added` or
+#   `removed`.
+# - Include `supercedes` only when it lists one or more ids; omit the
+#   field when it would be empty.
+# - Give each feature a unique id, description, and functional
+#   requirements.
+# - Give each decision a unique id and description.
+# - Delete these instructions and replace them with this comment at the top:
+#   "# This file is read-only and should never be edited by a tool or agent."
+#
+schema: https://powdrr.io/schemas/specification-v1
+# Architecture id: 2026-08-14
+# Available entities:
+# - interaction-log-entry
+# Available relationships:
+# - rel-log-entry-to-file
+# Available modules:
+# - logging-module
+# Available tools:
+# - interaction-log-validator
+title: null
+architecture_id: "2026-08-14"
+entities:
+  - id: null
+    action: null
+    rationale: null
+modules:
+  - id: null
+    action: null
+    relative_location: null
+    purpose: null
+tools:
+  - id: null
+    action: null
+    when_to_use: null
+    template: null
+    how_to_use: null
+entity_relationships:
+  - id: null
+    action: null
+    rationale: null
+features:
+  - id: null
+    action: null
+    description: null
+    supercedes: null
+    functional_requirements:
+      - null
+decisions:
+  - id: null
+    action: null
+    description: null
+    supercedes: null

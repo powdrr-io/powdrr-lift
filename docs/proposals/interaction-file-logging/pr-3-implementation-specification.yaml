@@ -1,0 +1,37 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Add interaction log validation and reporting
+architecture_id: '2026-08-14'
+entities:
+- id: interaction-log-entry
+  action: added
+  rationale: Represent a single recorded interaction with its metadata and file reference.
+modules:
+- id: logging-module
+  action: changed
+  relative_location: src/powdrr_lift/logging/
+  purpose: Core domain logic for interaction log entries, validation, and reporting.
+tools:
+- id: interaction-log-validator
+  action: added
+  when_to_use: Validate interaction log entries against the schema and cross-document
+    rules.
+  template: uv run powdrr-lift validate-interaction-log
+  how_to_use: Run from repository root.
+entity_relationships:
+- id: rel-log-entry-to-file
+  action: added
+  rationale: Each interaction log entry references the file that produced it.
+features:
+- id: feature-interaction-log-validation
+  action: added
+  description: Add validation and reporting for interaction log entries so malformed
+    entries are caught before they are used.
+  functional_requirements:
+  - The system must validate every interaction log entry against the schema.
+  - The system must report validation errors with actionable corrective guidance.
+  - The system must support reporting summaries of validated interaction log entries.
+decisions:
+- id: decision-validation-before-use
+  action: added
+  description: Interaction log entries must be validated before they are consumed
+    by any downstream process.

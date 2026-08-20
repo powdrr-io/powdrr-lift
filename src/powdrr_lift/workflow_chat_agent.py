@@ -124,6 +124,10 @@ _MAX_DOCUMENT_CONTEXT_LINES = 2000
 _MAX_PROMPT_TRANSCRIPT_ENTRIES = 32
 _MAX_PROMPT_TRANSCRIPT_CHARS = 24000
 _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
+_MAX_PROMPT_FILE_LINES = 200
+_MAX_PROMPT_FILE_CHARS = 16000
+_MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
+_MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
@@ -2639,6 +2643,15 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     }
 
 
+def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
+    """Return only skill identity; the active step carries execution details."""
+    return {
+        "file": str(entry.path),
+        "name": entry.skill.name,
+        "adversarial": entry.skill.adversarial,
+    }
+
+
 def _selection_system_prompt() -> str:
     return (
         "Task: route the user's request to the best available skill. Read the "
@@ -2754,6 +2767,20 @@ def _prompt_transcript(
     return compacted
 
 
+def _prompt_step_context(execution_context: Sequence[str]) -> list[str]:
+    """Bound recurring step context while retaining the newest handoff facts."""
+    if len(execution_context) <= _MAX_PROMPT_STEP_CONTEXT_ENTRIES:
+        recent = list(execution_context)
+    else:
+        recent = list(execution_context[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:])
+    while (
+        len(recent) > 1
+        and sum(len(value) for value in recent) > _MAX_PROMPT_STEP_CONTEXT_CHARS
+    ):
+        recent.pop(0)
+    return recent
+
+
 def _truncate_prompt_content(content: str) -> str:
     if len(content) <= _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS:
         return content
@@ -2830,7 +2857,7 @@ def _build_step_execution_messages(
                         current_step,
                         handoff_records or {},
                     ),
-                    "step_context": list(execution_context),
+                    "step_context": _prompt_step_context(execution_context),
                     "available_tools": [
                         {
                             "name": tool,
@@ -2858,13 +2885,12 @@ def _build_step_execution_messages(
                             )
                         ),
                     },
-                    "selected_skill": _catalog_entry_to_data(selected_skill),
+                    "selected_skill": _selected_skill_prompt_data(selected_skill),
                     "available_skills": [
                         {
                             "name": entry.skill.name,
                             "path": str(entry.path),
                             "adversarial": entry.skill.adversarial,
-                            "when_to_use": list(entry.skill.when_to_use),
                         }
                         for entry in catalog
                     ],
@@ -3036,8 +3062,10 @@ def _action_system_prompt() -> str:
         "quoted YAML value. "
         "After composing all line edits, ensure the complete resulting document "
         "remains valid before returning the action.\n"
-        "When edit is available, current_file includes the file path and its "
-        "current contents as context.\n"
+        "When edit is available, current_file includes the file path and the "
+        "current contents when the file is small enough to fit this prompt. "
+        "For an omitted large file, use read_document to inspect the exact "
+        "range before editing.\n"
         "Use invoke_skill for a listed nested skill; it runs in the same worktree "
         "and returns here when complete. Use invoke_tool for shell commands, "
         "fuzzy-match searches, or basedpyright "
@@ -5736,6 +5764,11 @@ def _current_file_context(
     if cache is not None and cache_key in cache:
         return cache[cache_key]
     lines = resolved_path.read_text(encoding="utf-8").splitlines()
+    serialized_size = sum(len(line) for line in lines)
+    content_omitted = (
+        len(lines) > _MAX_PROMPT_FILE_LINES or serialized_size > _MAX_PROMPT_FILE_CHARS
+    )
+    prompt_lines = [] if content_omitted else lines
     context = {
         "path": str(resolved_path.relative_to(worktree_root)),
         "exists": True,
@@ -5745,9 +5778,18 @@ def _current_file_context(
                 "line_number": line_number,
                 "text": line,
             }
-            for line_number, line in enumerate(lines, start=1)
+            for line_number, line in enumerate(prompt_lines, start=1)
         ],
     }
+    if content_omitted:
+        context.update(
+            {
+                "content_omitted": True,
+                "content_omitted_reason": (
+                    "Use read_document to inspect the required line range."
+                ),
+            }
+        )
     if cache is not None:
         cache.clear()
         cache[cache_key] = context

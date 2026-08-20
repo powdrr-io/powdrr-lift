@@ -337,8 +337,13 @@ def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:
     return tuple(
         load_workflow_task(task_path)
         for task_path in sorted(directory_path.glob("*.json"))
-        if task_path.is_file() and not task_path.name.startswith(".")
+        if _is_workflow_task_path(task_path)
     )
+
+
+def _is_workflow_task_path(path: Path) -> bool:
+    """Keep workflow metadata files out of the task document collection."""
+    return path.is_file() and path.name != ".workflow-git.json"
 
 
 def select_ready_workflow_tasks(
@@ -747,7 +752,7 @@ def build_workflow_task_directory_validation_report(
     upstream_references: list[tuple[Path, WorkflowTask]] = []
 
     for task_path in sorted(directory_path.glob("*.json")):
-        if not task_path.is_file():
+        if not _is_workflow_task_path(task_path):
             continue
         task_paths.append(str(task_path))
         raw_content = task_path.read_text(encoding="utf-8")

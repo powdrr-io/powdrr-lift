@@ -282,6 +282,8 @@ def inspect_workflow_run(
     if state is not None:
         workflow_directory = integration_worktree / state.workflow_relative_directory
         for task_path in sorted(workflow_directory.glob("*.json")):
+            if task_path.name == WORKFLOW_GIT_STATE_FILENAME:
+                continue
             try:
                 task = json.loads(task_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):

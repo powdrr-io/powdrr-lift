@@ -10,6 +10,7 @@ import pytest
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import main
+from powdrr_lift.workflow_human_task import HumanTaskRunnerConfig
 from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig
 
 
@@ -226,6 +227,52 @@ def test_cli_process_workflow_task_wires_configuration(
     assert config.repo_root == tmp_path
     assert config.task_id == "task-1"
     assert config.max_roundtrips == 4
+
+
+def test_cli_process_human_task_wires_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_process_human_task(
+        config: HumanTaskRunnerConfig,
+        *,
+        stdout: object,
+        stderr: object,
+    ) -> int:
+        captured["config"] = config
+        return 0
+
+    monkeypatch.setattr("powdrr_lift.cli.run_human_task", _fake_process_human_task)
+    workflow_dir = tmp_path / "workflow"
+    answer_file = tmp_path / "answer.txt"
+
+    assert (
+        main(
+            [
+                "process-human-task",
+                "--workflow-dir",
+                str(workflow_dir),
+                "--repo-root",
+                str(tmp_path),
+                "--task-id",
+                "human-task-1",
+                "--role",
+                "reviewer",
+                "--answer-file",
+                str(answer_file),
+            ]
+        )
+        == 0
+    )
+    config = captured["config"]
+    assert isinstance(config, HumanTaskRunnerConfig)
+    assert config.workflow_dir == workflow_dir
+    assert config.repo_root == tmp_path
+    assert config.task_id == "human-task-1"
+    assert config.assignee_role.value == "reviewer"
+    assert config.answer_file == answer_file
 
 
 def test_cli_init_uses_pr_changelog_path(tmp_path: Path) -> None:

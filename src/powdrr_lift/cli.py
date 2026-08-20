@@ -65,6 +65,7 @@ from powdrr_lift.core.project_structure import (
     validate_project_structure_yaml,
 )
 from powdrr_lift.core.specification_v1 import normalize_specification_v1_file
+from powdrr_lift.core.workflow_task_specification import HumanRole
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
@@ -96,6 +97,10 @@ from powdrr_lift.workflow_git import (
     resolve_git_repository_root,
     save_workflow_git_state,
     synchronize_workflow_initialization,
+)
+from powdrr_lift.workflow_human_task import (
+    HumanTaskRunnerConfig,
+    run_human_task,
 )
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
@@ -1053,6 +1058,43 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser.add_argument("--verbose", action="store_true")
     process_workflow_task_parser.set_defaults(func=_run_process_workflow_task)
 
+    process_human_task_parser = subparsers.add_parser(
+        "process-human-task",
+        aliases=["process_human_task"],
+        help="Find, present, and complete one ready human workflow task.",
+    )
+    process_human_task_parser.add_argument(
+        "--workflow-dir",
+        type=Path,
+        required=True,
+        help="Directory containing the durable workflow task JSON files.",
+    )
+    process_human_task_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used for workflow Git coordination.",
+    )
+    process_human_task_parser.add_argument(
+        "--task-id",
+        help="Process this task instead of the first ready human task.",
+    )
+    process_human_task_parser.add_argument(
+        "--role",
+        choices=[role.value for role in HumanRole],
+        help="Only select a ready human task assigned to this role.",
+    )
+    answer_group = process_human_task_parser.add_mutually_exclusive_group()
+    answer_group.add_argument(
+        "--answer",
+        help="Answer non-interactively instead of prompting on stdin.",
+    )
+    answer_group.add_argument(
+        "--answer-file",
+        type=Path,
+        help="Read the human answer from a UTF-8 text file.",
+    )
+    process_human_task_parser.set_defaults(func=_run_process_human_task)
+
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
         aliases=["workflow_recovery"],
@@ -1260,6 +1302,25 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
             base_url=args.base_url,
             max_roundtrips=args.max_roundtrips,
             verbose=args.verbose,
+        ),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
+
+
+def _run_process_human_task(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    workflow_dir = args.workflow_dir
+    if not workflow_dir.is_absolute():
+        workflow_dir = repo_root / workflow_dir
+    return run_human_task(
+        HumanTaskRunnerConfig(
+            workflow_dir=workflow_dir,
+            repo_root=repo_root,
+            task_id=args.task_id,
+            assignee_role=HumanRole(args.role) if args.role else None,
+            answer=args.answer,
+            answer_file=args.answer_file,
         ),
         stdout=sys.stdout,
         stderr=sys.stderr,

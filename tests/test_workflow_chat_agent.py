@@ -76,6 +76,7 @@ from powdrr_lift.workflow_chat_agent import (
     _available_work_item_names,
     _backup_model_for,
     _build_selection_messages,
+    _build_step_execution_messages,
     _catalog_entry_to_data,
     _command_matches_invocation,
     _complete_json_with_model_fallback,
@@ -245,6 +246,73 @@ def test_prompt_step_context_keeps_newest_entries_and_bounds_size() -> None:
     assert sum(len(value) for value in prompt_context) <= 16000 + 80
     assert prompt_context[-1].startswith("entry-39")
     assert not prompt_context[0].startswith("[Earlier step context omitted")
+
+
+def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
+    tmp_path: Path,
+) -> None:
+    ordinary_step = SkillStep(
+        description="Inspect the current implementation.",
+        details="Use the declared shell command and report what it finds.",
+        tool_invocations=(SkillToolInvocation(tool="shell", command=("rg", "TODO")),),
+        prompt_catalogs=(),
+    )
+    gather_step = SkillStep(
+        description="Gather context and invoke the nested review skill.",
+        details="Use gather_context before continuing.",
+        uses_skills=("review-system",),
+        prompt_catalogs=("context_types", "skills"),
+    )
+    ordinary_skill = SkillCatalogEntry(
+        tmp_path / "ordinary.json",
+        Skill(name="ordinary", when_to_use=(), steps=(ordinary_step,)),
+    )
+    catalog = (
+        ordinary_skill,
+        SkillCatalogEntry(
+            tmp_path / "review.json",
+            Skill(name="review-system", when_to_use=(), steps=(gather_step,)),
+        ),
+    )
+
+    ordinary_prompt = json.loads(
+        _build_step_execution_messages(
+            selected_skill=ordinary_skill,
+            current_step=ordinary_step,
+            current_step_index=0,
+            transcript=[],
+            execution_events=[],
+            execution_context=[],
+            current_file_path=None,
+            worktree_root=tmp_path,
+            catalog=catalog,
+            workflow_context=WorkflowContext(
+                worktree_root=tmp_path,
+                branch_name="feature/test",
+                request="Inspect the implementation",
+            ),
+        )[1]["content"]
+    )
+    assert "available_context_types" not in ordinary_prompt
+    assert "available_skills" not in ordinary_prompt
+    assert ordinary_prompt["worktree_root"] == "."
+    assert "worktree_root" not in ordinary_prompt["previous_workflow_context"]
+
+    gather_prompt = json.loads(
+        _build_step_execution_messages(
+            selected_skill=ordinary_skill,
+            current_step=gather_step,
+            current_step_index=0,
+            transcript=[],
+            execution_events=[],
+            execution_context=[],
+            current_file_path=None,
+            worktree_root=tmp_path,
+            catalog=catalog,
+        )[1]["content"]
+    )
+    assert "available_context_types" in gather_prompt
+    assert "available_skills" in gather_prompt
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(

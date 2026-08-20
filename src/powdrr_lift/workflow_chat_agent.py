@@ -2652,6 +2652,29 @@ def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     }
 
 
+def _step_needs_prompt_catalog(step: Any, capability: str) -> bool:
+    configured_catalogs = getattr(step, "prompt_catalogs", None)
+    if configured_catalogs is None:
+        return True
+    if capability not in {"context_types", "skills"}:
+        raise ValueError(f"Unknown prompt catalog capability: {capability}")
+    return capability in configured_catalogs
+
+
+def _workflow_context_prompt_data(
+    workflow_context: WorkflowContext | None,
+) -> dict[str, object] | None:
+    if workflow_context is None:
+        return None
+    return {
+        "branch_name": workflow_context.branch_name,
+        "pr_number": workflow_context.pr_number,
+        "pr_url": workflow_context.pr_url,
+        "skill_name": workflow_context.skill_name,
+        "request": workflow_context.request,
+    }
+
+
 def _selection_system_prompt() -> str:
     return (
         "Task: route the user's request to the best available skill. Read the "
@@ -2840,64 +2863,65 @@ def _build_step_execution_messages(
             "Discover the classes, functions, methods, and variables in a Python file."
         ),
     }
+    prompt_data: dict[str, Any] = {
+        "execution_mode": "execute_selected_skill",
+        "current_step_index": current_step_index,
+        "current_step_count": len(selected_skill.skill.steps),
+        "current_step": _skill_step_to_data(current_step),
+        "handoff_inputs": _workflow_handoff_inputs(
+            current_step,
+            handoff_records or {},
+        ),
+        "step_context": _prompt_step_context(execution_context),
+        "available_tools": [
+            {
+                "name": tool,
+                "description": tool_descriptions.get(tool, tool),
+            }
+            for tool in available_tools
+        ],
+        "worktree_root": ".",
+        "previous_workflow_context": _workflow_context_prompt_data(workflow_context),
+        "work_item_context": {
+            "available": list(available_work_items),
+            "matches": list(
+                _match_work_item_names(
+                    transcript,
+                    available_work_items,
+                )
+            ),
+        },
+        "selected_skill": _selected_skill_prompt_data(selected_skill),
+        "transcript": _prompt_transcript(transcript),
+        "execution_events": _execution_events_for_prompt(execution_events),
+        "current_file": current_file_context,
+    }
+    if _step_needs_prompt_catalog(current_step, "context_types"):
+        prompt_data["available_context_types"] = [
+            {
+                "name": context_type,
+                "when_to_use": description,
+            }
+            for context_type, description in _context_type_catalog()
+        ]
+    if _step_needs_prompt_catalog(current_step, "skills"):
+        prompt_data["available_skills"] = [
+            {
+                "name": entry.skill.name,
+                "path": str(entry.path),
+                "adversarial": entry.skill.adversarial,
+            }
+            for entry in catalog
+        ]
     return [
         {
             "role": "system",
-            "content": _action_system_prompt(),
+            "content": _action_system_prompt(current_step=current_step),
         },
         {
             "role": "user",
             "content": json.dumps(
-                {
-                    "execution_mode": "execute_selected_skill",
-                    "current_step_index": current_step_index,
-                    "current_step_count": len(selected_skill.skill.steps),
-                    "current_step": _skill_step_to_data(current_step),
-                    "handoff_inputs": _workflow_handoff_inputs(
-                        current_step,
-                        handoff_records or {},
-                    ),
-                    "step_context": _prompt_step_context(execution_context),
-                    "available_tools": [
-                        {
-                            "name": tool,
-                            "description": tool_descriptions.get(tool, tool),
-                        }
-                        for tool in available_tools
-                    ],
-                    "available_context_types": [
-                        {
-                            "name": context_type,
-                            "when_to_use": description,
-                        }
-                        for context_type, description in _context_type_catalog()
-                    ],
-                    "worktree_root": str(worktree_root),
-                    "previous_workflow_context": (
-                        workflow_context.to_data() if workflow_context else None
-                    ),
-                    "work_item_context": {
-                        "available": list(available_work_items),
-                        "matches": list(
-                            _match_work_item_names(
-                                transcript,
-                                available_work_items,
-                            )
-                        ),
-                    },
-                    "selected_skill": _selected_skill_prompt_data(selected_skill),
-                    "available_skills": [
-                        {
-                            "name": entry.skill.name,
-                            "path": str(entry.path),
-                            "adversarial": entry.skill.adversarial,
-                        }
-                        for entry in catalog
-                    ],
-                    "transcript": _prompt_transcript(transcript),
-                    "execution_events": _execution_events_for_prompt(execution_events),
-                    "current_file": current_file_context,
-                },
+                prompt_data,
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),
@@ -2905,10 +2929,18 @@ def _build_step_execution_messages(
     ]
 
 
-def _action_system_prompt() -> str:
-    context_type_lines = "\n".join(
-        f"- {name}: {description}" for name, description in _context_type_catalog()
-    )
+def _action_system_prompt(*, current_step: Any | None = None) -> str:
+    if current_step is None or _step_needs_prompt_catalog(
+        current_step, "context_types"
+    ):
+        context_type_lines = "\n".join(
+            f"- {name}: {description}" for name, description in _context_type_catalog()
+        )
+    else:
+        context_type_lines = (
+            "Context-type descriptions are omitted because this step does not "
+            "request context."
+        )
     return (
         "Task: execute the current checked-in skill step using the current step, "
         "prior step context, transcript, execution events, available tools, and "
@@ -2922,6 +2954,9 @@ def _action_system_prompt() -> str:
         "Choose exactly one outcome and use it for the following reason:\n"
         "- gather_context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
+        "After gathering context, include the relevant findings in "
+        "decisions_and_context and report next_step when the current step is "
+        "complete; do not leave the gathered result only in the tool history.\n"
         "When a feature's proposal must be scoped, pass its feature_id to "
         "gather_context. It includes current specifications and only YAML files "
         "under docs/proposed/<feature_id>. Do not use fuzzy-match to locate the "

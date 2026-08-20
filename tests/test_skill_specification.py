@@ -34,11 +34,13 @@ def test_skill_round_trips_through_json() -> None:
                 description="Capture the feature goal.",
                 id="capture-goal",
                 details="Record the user-visible outcome first.",
+                prompt_catalogs=(),
             ),
             SkillStep(
                 description="Pull in the system context.",
                 details="Use the system spec and related context.",
                 uses_skills=("specify-system",),
+                prompt_catalogs=("context_types", "skills"),
                 tool_invocations=(
                     SkillToolInvocation(
                         tool="internal",
@@ -75,11 +77,13 @@ def test_skill_round_trips_through_json() -> None:
                 "description": "Capture the feature goal.",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
+                "prompt_catalogs": [],
             },
             {
                 "description": "Pull in the system context.",
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
+                "prompt_catalogs": ["context_types", "skills"],
                 "tool_invocations": [
                     {
                         "tool": "internal",

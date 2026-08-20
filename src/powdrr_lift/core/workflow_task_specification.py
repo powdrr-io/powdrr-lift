@@ -78,6 +78,7 @@ class WorkflowTask:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
+    prompt_catalogs: tuple[str, ...] | None = None
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -113,6 +114,8 @@ class WorkflowTask:
                 invocation.to_data() for invocation in self.tool_invocations
             ],
         }
+        if self.prompt_catalogs is not None:
+            step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         data.update({key: value for key, value in step_data.items() if value})
         return data
 
@@ -290,6 +293,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         llm_type=step.llm_type,
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
+        prompt_catalogs=step.prompt_catalogs,
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,

@@ -17,6 +17,7 @@ from powdrr_lift.core.validation_messages import (
 SUPPORTED_SKILL_TOOL_TYPES = (
     frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
 )
+SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +104,7 @@ class SkillStep:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
+    prompt_catalogs: tuple[str, ...] | None = None
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -121,6 +123,8 @@ class SkillStep:
             data["tool_invocations"] = [
                 tool_invocation.to_data() for tool_invocation in self.tool_invocations
             ]
+        if self.prompt_catalogs is not None:
+            data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.inputs:
             data["inputs"] = [item.to_data() for item in self.inputs]
         if self.outputs:
@@ -384,6 +388,7 @@ def build_skill_validation_report(
                     "llm_type",
                     "uses_skills",
                     "tool_invocations",
+                    "prompt_catalogs",
                     "inputs",
                     "outputs",
                 },
@@ -497,6 +502,62 @@ def build_skill_validation_report(
                         )
                         continue
                     seen_refs.add(normalized_ref)
+
+            prompt_catalogs = step_mapping.get("prompt_catalogs")
+            if prompt_catalogs is not None:
+                if not isinstance(prompt_catalogs, Sequence) or isinstance(
+                    prompt_catalogs,
+                    (str, bytes, bytearray),
+                ):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_prompt_catalogs_type",
+                            message="Skill step prompt_catalogs must be an array.",
+                            path=_child_path(step_path, "prompt_catalogs"),
+                        )
+                    )
+                else:
+                    seen_catalogs: set[str] = set()
+                    for catalog_index, catalog_value in enumerate(prompt_catalogs):
+                        normalized_catalog = _optional_string(catalog_value)
+                        catalog_path = _sequence_path(
+                            step_path, "prompt_catalogs", catalog_index
+                        )
+                        if normalized_catalog is None:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="invalid_prompt_catalog",
+                                    message=(
+                                        "Skill step prompt_catalogs must contain "
+                                        "non-empty strings."
+                                    ),
+                                    path=catalog_path,
+                                )
+                            )
+                        elif normalized_catalog not in SUPPORTED_PROMPT_CATALOGS:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="unsupported_prompt_catalog",
+                                    message=(
+                                        "Skill step prompt_catalogs currently "
+                                        "support context_types and skills."
+                                    ),
+                                    path=catalog_path,
+                                )
+                            )
+                        elif normalized_catalog in seen_catalogs:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="duplicate_prompt_catalog",
+                                    message=(
+                                        "Skill step prompt_catalogs must not contain "
+                                        "duplicates."
+                                    ),
+                                    path=catalog_path,
+                                )
+                            )
+                        else:
+                            seen_catalogs.add(normalized_catalog)
 
             _validate_step_contracts(step_mapping, step_path, issues)
 
@@ -1011,6 +1072,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     tool_invocations = _optional_tool_invocations(
         data.get("tool_invocations"),
     )
+    prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     return SkillStep(
@@ -1020,6 +1082,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         llm_type=llm_type,
         uses_skills=uses_skills,
         tool_invocations=tool_invocations,
+        prompt_catalogs=prompt_catalogs,
         inputs=inputs,
         outputs=outputs,
     )
@@ -1097,6 +1160,23 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step uses_skills must be an array.")
     return tuple(_required_string({"value": item}, "value") for item in value)
+
+
+def _optional_prompt_catalogs(value: object) -> tuple[str, ...] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("Skill step prompt_catalogs must be an array.")
+    result = tuple(_required_string({"value": item}, "value") for item in value)
+    unsupported = sorted(set(result) - SUPPORTED_PROMPT_CATALOGS)
+    if unsupported:
+        raise ValueError(
+            "Skill step prompt_catalogs contains unsupported values: "
+            + ", ".join(unsupported)
+        )
+    if len(result) != len(set(result)):
+        raise ValueError("Skill step prompt_catalogs must not contain duplicates.")
+    return result
 
 
 def _optional_tool_invocations(value: object) -> tuple[SkillToolInvocation, ...]:

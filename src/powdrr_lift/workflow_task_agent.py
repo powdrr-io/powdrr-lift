@@ -87,6 +87,71 @@ from powdrr_lift.workflow_llm import (
     workflow_action_summary,
 )
 
+_TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
+_TASK_PROMPT_INPUT_REFERENCE_RE = re.compile(r"\binput_state\.([A-Za-z0-9_-]+)\b")
+
+
+def _task_prompt_input_values(input_state: Any) -> dict[str, str]:
+    if not isinstance(input_state, Mapping):
+        return {}
+    values: dict[str, str] = {}
+    for key, value in input_state.items():
+        if isinstance(value, (dict, list, tuple)):
+            rendered = json.dumps(value, ensure_ascii=False, sort_keys=True)
+        else:
+            rendered = str(value)
+        normalized_key = str(key).replace("-", "_")
+        values[normalized_key] = rendered
+        values[str(key)] = rendered
+
+    # These are the stable template names used by workflow instantiation.
+    if "feature_id" in values:
+        values.update(
+            {
+                "feature-id": values["feature_id"],
+                "work-item-name": values["feature_id"],
+                "work_item_name": values["feature_id"],
+            }
+        )
+    if "proposed_pr" in values:
+        values.update(
+            {
+                "proposed-pr-id": values["proposed_pr"],
+                "proposed_pr_id": values["proposed_pr"],
+            }
+        )
+    return values
+
+
+def _resolve_task_prompt_text(text: str, input_state: Any) -> str:
+    values = _task_prompt_input_values(input_state)
+
+    def replace_input_reference(match: re.Match[str]) -> str:
+        key = match.group(1)
+        return values.get(key, values.get(key.replace("-", "_"), match.group(0)))
+
+    def replace_placeholder(match: re.Match[str]) -> str:
+        key = match.group(1)
+        return values.get(key, values.get(key.replace("-", "_"), match.group(0)))
+
+    resolved = _TASK_PROMPT_INPUT_REFERENCE_RE.sub(replace_input_reference, text)
+    return _TASK_PROMPT_PLACEHOLDER_RE.sub(replace_placeholder, resolved)
+
+
+def _resolve_task_prompt_data(value: Any, input_state: Any) -> Any:
+    if isinstance(value, str):
+        return _resolve_task_prompt_text(value, input_state)
+    if isinstance(value, Mapping):
+        return {
+            key: _resolve_task_prompt_data(item, input_state)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_resolve_task_prompt_data(item, input_state) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_resolve_task_prompt_data(item, input_state) for item in value)
+    return value
+
 
 @dataclass(frozen=True, slots=True)
 class WorkflowTaskAgentConfig:
@@ -1104,10 +1169,13 @@ def _build_task_messages(
     compacted_context: dict[str, Any] | None = None,
     skill_catalog: tuple[SkillCatalogEntry, ...] = (),
 ) -> list[dict[str, str]]:
+    resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
     context_data: dict[str, Any]
     if compacted_context is None:
         context_data = {
-            "task_context": workflow.task_context(task.task_id),
+            "task_context": _resolve_task_prompt_data(
+                workflow.task_context(task.task_id), task.input_state
+            ),
             "events": prune_execution_events(events, include_results=True),
         }
     else:
@@ -1119,7 +1187,7 @@ def _build_task_messages(
             "content": json.dumps(
                 {
                     "execution_mode": "process_workflow_task",
-                    "task": task.to_data(),
+                    "task": resolved_task_data,
                     **context_data,
                     "step_context": (
                         [response_correction] if response_correction is not None else []
@@ -1188,6 +1256,7 @@ def _compact_workflow_task_context(
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
 ) -> tuple[dict[str, Any], int, int]:
+    resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
     compaction_messages = [
         {
             "role": "system",
@@ -1205,11 +1274,13 @@ def _compact_workflow_task_context(
             "role": "user",
             "content": json.dumps(
                 {
-                    "task": task.to_data(),
-                    "task_description": task.description,
-                    "task_details": task.details,
+                    "task": resolved_task_data,
+                    "task_description": resolved_task_data["description"],
+                    "task_details": resolved_task_data.get("details"),
                     "current_context": {
-                        "task_context": workflow.task_context(task.task_id),
+                        "task_context": _resolve_task_prompt_data(
+                            workflow.task_context(task.task_id), task.input_state
+                        ),
                         "events": events,
                     },
                     "response_shape": {
@@ -1476,9 +1547,13 @@ def _run_skill_for_agent(
     execution_events: list[dict[str, Any]] = []
     execution_context = list(context)
     if not clean:
+        resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
         execution_context = [
-            f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
-            task.details or "",
+            (
+                "Task input: "
+                f"{json.dumps(resolved_task_data['input_state'], ensure_ascii=False)}"
+            ),
+            resolved_task_data.get("details") or "",
             *execution_context,
         ]
     action_engine = WorkflowLLMActionEngine(max_stalled_roundtrips=3)

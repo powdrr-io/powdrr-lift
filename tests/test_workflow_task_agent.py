@@ -95,6 +95,54 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
 
 
+def test_process_workflow_task_resolves_input_placeholders_before_llm(
+    tmp_path: Path,
+) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "workflow",
+        (
+            WorkflowTask(
+                task_id="agent-task",
+                status=TaskStatus.OPEN,
+                upstream_task_ids=(),
+                dependent_state=(),
+                complexity=TaskComplexity.MEDIUM,
+                input_state={
+                    "feature_id": "interaction-file-logging",
+                    "proposed_pr": "pr-interaction-capture-17",
+                },
+                description="Resolve the proposed PR.",
+                details=(
+                    "Use docs/proposals/<work-item-name>/ for "
+                    "input_state.feature_id and input_state.proposed_pr."
+                ),
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                llm_type="simple_task",
+            ),
+        ),
+    )
+    client = _FakeClient([{"kind": "complete", "output_state": {"ok": True}}])
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    prompt = client.messages[0][1]["content"]
+    assert "docs/proposals/interaction-file-logging/" in prompt
+    assert "pr-interaction-capture-17" in prompt
+    assert "<work-item-name>" not in prompt
+    assert "input_state.feature_id" not in prompt
+    assert "input_state.proposed_pr" not in prompt
+
+
 def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     tmp_path: Path,
 ) -> None:

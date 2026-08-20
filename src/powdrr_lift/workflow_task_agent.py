@@ -254,6 +254,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:
         print(
+            f"Workflow task LLM action:\n{workflow_action_signature(action)}",
+            file=self.stdout,
+            flush=True,
+        )
+        print(
             f"Workflow task roundtrip {roundtrip}: {workflow_action_summary(action)}",
             file=self.stdout,
             flush=True,
@@ -334,8 +339,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 raise RuntimeError(
                     "Cannot advance after gather_context returned no matches. "
                     "Verify that feature_id is the proposal directory under "
-                    "docs/proposals and that keywords contain the exact proposed "
-                    "PR id, then run gather_context again. An empty result does "
+                    "docs/proposals, remove overly narrow keywords, and run "
+                    "gather_context again. An empty result does "
                     "not prove that the specification is absent."
                 )
             self.events.append(

@@ -145,3 +145,35 @@ def test_gather_context_resolves_proposed_pr_document_in_explicit_feature(
         keywords=["different-pr"],
         feature_id="interaction-file-logging",
     ).matches
+
+
+def test_gather_context_reads_yaml_and_yml_from_current_and_one_proposal_root(
+    tmp_path: Path,
+) -> None:
+    current_root = tmp_path / "docs" / "current" / "feature"
+    current_root.mkdir(parents=True)
+    (current_root / "current.yml").write_text(
+        "requirements:\n- id: current-requirement\n", encoding="utf-8"
+    )
+
+    canonical_proposal = tmp_path / "docs" / "proposals" / "feature"
+    canonical_proposal.mkdir(parents=True)
+    (canonical_proposal / "proposal.yml").write_text(
+        "requirements:\n- id: canonical-proposal\n", encoding="utf-8"
+    )
+    legacy_proposal = tmp_path / "docs" / "proposed" / "feature"
+    legacy_proposal.mkdir(parents=True)
+    (legacy_proposal / "proposal.yaml").write_text(
+        "requirements:\n- id: legacy-proposal\n", encoding="utf-8"
+    )
+
+    report = gather_specification_context(
+        tmp_path,
+        types=["requirements"],
+        feature_id="feature",
+    )
+
+    assert {match.item["id"] for match in report.matches} == {
+        "current-requirement",
+        "canonical-proposal",
+    }

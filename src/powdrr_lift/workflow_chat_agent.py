@@ -691,7 +691,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         return _workflow_action_material_state(action, self.state)
 
     def report_roundtrip(self, roundtrip: int, action: SkillChatAction) -> None:
-        _ = roundtrip
+        print(
+            f"Workflow chat LLM action:\n{_workflow_action_signature(action)}",
+            file=self.stderr,
+            flush=True,
+        )
         parent_skill, parent_step_index = self._parent_progress()
         self.progress.update(
             self.selected_skill,
@@ -3665,8 +3669,8 @@ def _validate_workflow_step_transition(
                     message=(
                         "Cannot advance after gather_context returned no matches. "
                         "Use the proposal directory under docs/proposals as "
-                        "feature_id and the exact proposed PR id as a keyword, "
-                        "then gather context again. An empty result does not "
+                        "feature_id, remove overly narrow keywords, and gather "
+                        "context again. An empty result does not "
                         "prove that the specification is absent."
                     ),
                     path="kind",

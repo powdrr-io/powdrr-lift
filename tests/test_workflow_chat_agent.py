@@ -27,6 +27,8 @@ from powdrr_lift.cli import main
 from powdrr_lift.core import (
     Skill,
     SkillStep,
+    SkillStepInput,
+    SkillStepOutput,
     SkillToolInvocation,
     load_skill,
     save_skill,
@@ -109,6 +111,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _validate_workflow_handoff,
     _validate_workflow_step_transition,
     _workflow_action_material_state,
     _workflow_action_progress_status,
@@ -2956,6 +2959,55 @@ def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
     assert action.clean is True
     assert action.context == ("Review only this diff.",)
     assert action.decisions_and_context == "The change is intentionally narrow."
+
+
+def test_workflow_handoff_requires_declared_outputs_and_matching_inputs() -> None:
+    current_step = SkillStep(
+        description="Produce a validation result.",
+        outputs=(
+            SkillStepOutput(
+                name="validation_result",
+                type="validation_result",
+                required_for_next_step=True,
+            ),
+        ),
+    )
+    next_step = SkillStep(
+        description="Consume the validation result.",
+        inputs=(
+            SkillStepInput(
+                name="validation_result",
+                type="validation_result",
+            ),
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="required outputs"):
+        _validate_workflow_handoff(current_step, next_step, {}, current_step_index=0)
+
+    _validate_workflow_handoff(
+        current_step,
+        next_step,
+        {
+            "validation_result": {
+                "type": "validation_result",
+                "value": {},
+                "produced_by": {"step_index": 0},
+            }
+        },
+        current_step_index=0,
+    )
+
+
+def test_action_outputs_are_preserved_in_the_parsed_action() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "next_step",
+            "outputs": {"validation_result": {"ok": True}},
+        }
+    )
+
+    assert action.outputs == {"validation_result": {"ok": True}}
 
 
 def test_read_document_action_returns_requested_lines_as_next_context(

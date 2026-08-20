@@ -6,6 +6,8 @@ from pathlib import Path
 from powdrr_lift.core import (
     Skill,
     SkillStep,
+    SkillStepInput,
+    SkillStepOutput,
     SkillToolInvocation,
     build_skill_directory_validation_report,
     build_skill_validation_report,
@@ -93,6 +95,65 @@ def test_skill_round_trips_through_json() -> None:
             {"description": "Summarize the result."},
         ],
     }
+
+
+def test_skill_step_contracts_round_trip_and_validate() -> None:
+    skill = Skill(
+        name="handoff-test",
+        when_to_use=("Test explicit step handoffs.",),
+        steps=(
+            SkillStep(
+                id="produce",
+                description="Produce a result.",
+                outputs=(
+                    SkillStepOutput(
+                        name="validation_result",
+                        type="validation_result",
+                        required_for_next_step=True,
+                    ),
+                ),
+            ),
+            SkillStep(
+                id="consume",
+                description="Consume the result.",
+                inputs=(
+                    SkillStepInput(
+                        name="validation_result",
+                        type="validation_result",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+
+    assert parsed == skill
+    report = build_skill_validation_report(skill_to_json(skill))
+    assert report.validation_successful is True
+
+
+def test_skill_step_contracts_reject_duplicate_names() -> None:
+    report = build_skill_validation_report(
+        json.dumps(
+            {
+                "name": "invalid-handoff",
+                "when_to_use": ["Test invalid contracts."],
+                "steps": [
+                    {
+                        "description": "Produce values.",
+                        "outputs": [
+                            {"name": "result"},
+                            {"name": "result"},
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "duplicate_output_name" for issue in report.issues)
 
 
 def test_skill_file_helpers_round_trip(tmp_path: Path) -> None:

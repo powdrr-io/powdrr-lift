@@ -12,7 +12,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -453,6 +453,7 @@ class _WorkflowExecutionState:
     execution_context: list[str]
     step_index: int
     worktree_root: Path
+    handoff_records: dict[str, dict[str, Any]] = field(default_factory=dict)
     current_file_path: Path | None = None
     current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]] = field(
         default_factory=dict
@@ -532,6 +533,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.state.execution_events = list(frame.parent_execution_events or ())
             self.state.execution_context = list(frame.parent_execution_context or ())
             self.state.current_file_path = frame.parent_current_file_path
+            if frame.parent_handoff_records is None:
+                self.state.handoff_records = {}
+            else:
+                self.state.handoff_records = {
+                    name: dict(record) for name, record in frame.parent_handoff_records
+                }
         self.current_model = frame.parent_model
         self.provider = frame.parent_provider
         self.provider_role = frame.parent_provider_role
@@ -564,6 +571,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             ),
             parent_current_file_path=(
                 self.state.current_file_path if clean_context else None
+            ),
+            parent_handoff_records=(
+                tuple(self.state.handoff_records.items()) if clean_context else None
             ),
         )
         self.state.selected_skill = nested_skill
@@ -641,6 +651,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 transcript=self.state.transcript,
                 execution_events=self.state.execution_events,
                 execution_context=self.state.execution_context,
+                handoff_records=self.state.handoff_records,
                 current_file_path=self.state.current_file_path,
                 worktree_root=self.state.worktree_root,
                 catalog=self.catalog,
@@ -761,6 +772,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.state.transcript = []
                 self.state.execution_events = []
                 self.state.execution_context = context
+                self.state.handoff_records = {}
                 self.state.current_file_path = None
             else:
                 self.state.execution_context.extend(context)
@@ -802,6 +814,19 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.state.step_index,
         )
         _validate_workflow_action_for_step(action, self.current_step)
+        _validate_workflow_action_outputs(action, self.current_step)
+        if action.kind == "next_step":
+            next_step = (
+                self.selected_skill.skill.steps[self.state.step_index + 1]
+                if self.state.step_index + 1 < len(self.selected_skill.skill.steps)
+                else None
+            )
+            _validate_workflow_handoff(
+                self.current_step,
+                next_step,
+                self.state.handoff_records,
+                current_step_index=self.state.step_index,
+            )
         self.failure_kind = "action_error"
         handler = _workflow_action_handlers().get(action.kind)
         if handler is None:
@@ -814,6 +839,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.input_func,
             self.config,
         )
+        _record_workflow_action_outputs(action, self.state, self.current_step)
         self.last_failed_action = None
         self.last_validation_error = None
         return WorkflowActionOutcome(continue_running=should_continue)
@@ -961,6 +987,7 @@ class _SkillExecutionFrame:
     parent_execution_events: tuple[dict[str, Any], ...] | None = None
     parent_execution_context: tuple[str, ...] | None = None
     parent_current_file_path: Path | None = None
+    parent_handoff_records: tuple[tuple[str, dict[str, Any]], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1866,6 +1893,7 @@ def run_workflow_chat(
         execution_context=[],
         step_index=0,
         worktree_root=worktree_root,
+        handoff_records=_workflow_context_handoff_records(workflow_context),
     )
     root_skill = selected_skill
     driver = WorkflowLLMExecutionDriver(
@@ -2561,6 +2589,7 @@ def _push_nested_skill(
     parent_execution_events: tuple[dict[str, Any], ...] | None = None,
     parent_execution_context: tuple[str, ...] | None = None,
     parent_current_file_path: Path | None = None,
+    parent_handoff_records: tuple[tuple[str, dict[str, Any]], ...] | None = None,
 ) -> None:
     active_skill_paths = {str(frame.parent_skill.path) for frame in stack}
     active_skill_paths.add(str(current_skill.path))
@@ -2582,6 +2611,7 @@ def _push_nested_skill(
             parent_execution_events=parent_execution_events,
             parent_execution_context=parent_execution_context,
             parent_current_file_path=parent_current_file_path,
+            parent_handoff_records=parent_handoff_records,
         )
     )
 
@@ -2743,6 +2773,7 @@ def _build_step_execution_messages(
     transcript: Sequence[dict[str, str]],
     execution_events: Sequence[dict[str, Any]],
     execution_context: Sequence[str],
+    handoff_records: Mapping[str, Mapping[str, Any]] | None = None,
     current_file_path: Path | None,
     worktree_root: Path,
     catalog: Sequence[SkillCatalogEntry],
@@ -2795,6 +2826,10 @@ def _build_step_execution_messages(
                     "current_step_index": current_step_index,
                     "current_step_count": len(selected_skill.skill.steps),
                     "current_step": _skill_step_to_data(current_step),
+                    "handoff_inputs": _workflow_handoff_inputs(
+                        current_step,
+                        handoff_records or {},
+                    ),
                     "step_context": list(execution_context),
                     "available_tools": [
                         {
@@ -2893,6 +2928,10 @@ def _action_system_prompt() -> str:
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
         "is required.\n"
+        "When the current step declares outputs, provide the completed values "
+        "in an outputs object using exactly those declared names. A later step "
+        "receives only validated handoff inputs; do not rely on hidden transcript "
+        "history.\n"
         "Response: return exactly one JSON object matching exactly one of these "
         "outcome shapes. Include decisions_and_context when there is information "
         "a later step needs. Include llm_type only when the next roundtrip needs "
@@ -2916,7 +2955,8 @@ def _action_system_prompt() -> str:
         "no action-specific fields; read_document requires file_path, non-negative "
         "start_line and end_line for a range of at most 2000 lines. Line 0 means "
         "the beginning of the document, and an end_line beyond EOF is clamped; "
-        "complete may include a human-readable text.\n"
+        "complete may include a human-readable text; any action may include an "
+        "outputs object when the current step declares outputs.\n"
         '{"kind":"gather_context","feature_id":"display-related-photos",'
         '"types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
@@ -3729,6 +3769,155 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
         ) from exc
 
 
+def _validate_workflow_action_outputs(action: SkillChatAction, step: Any) -> None:
+    if not action.outputs or not step.outputs:
+        return
+    declared_names = {output.name for output in step.outputs}
+    unexpected = sorted(set(action.outputs) - declared_names)
+    if unexpected:
+        raise RuntimeError(
+            "Workflow action outputs are not declared by the current step: "
+            + ", ".join(unexpected)
+        )
+
+
+def _record_workflow_action_outputs(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    step: Any,
+) -> None:
+    if not action.outputs:
+        return
+    declarations = {output.name: output for output in step.outputs}
+    for name, value in action.outputs.items():
+        declaration = declarations.get(name)
+        state.handoff_records[name] = {
+            "name": name,
+            "type": declaration.type if declaration is not None else "any",
+            "value": value,
+            "produced_by": {
+                "step_index": state.step_index,
+                "action": action.kind,
+            },
+            "scope": declaration.scope if declaration is not None else "skill",
+        }
+
+
+def _workflow_handoff_inputs(
+    step: Any,
+    records: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "declared": [input_spec.to_data() for input_spec in step.inputs],
+        "resolved": {
+            input_spec.name: records[input_spec.name]
+            for input_spec in step.inputs
+            if input_spec.name in records
+        },
+        "missing_required": [
+            input_spec.name
+            for input_spec in step.inputs
+            if input_spec.required and input_spec.name not in records
+        ],
+    }
+
+
+def _workflow_context_handoff_records(
+    workflow_context: WorkflowContext | None,
+) -> dict[str, dict[str, Any]]:
+    if workflow_context is None:
+        return {}
+    records: dict[str, dict[str, Any]] = {}
+    for name, value in workflow_context.to_data().items():
+        if value is None:
+            continue
+        value_type = (
+            "path"
+            if name == "worktree_root"
+            else "integer"
+            if isinstance(value, int) and not isinstance(value, bool)
+            else "string"
+            if isinstance(value, str)
+            else "any"
+        )
+        records[name] = {
+            "name": name,
+            "type": value_type,
+            "value": value,
+            "produced_by": {"source": "workflow_context"},
+            "source": "workflow_context",
+            "scope": "skill",
+        }
+    return records
+
+
+def _validate_workflow_handoff(
+    current_step: Any,
+    next_step: Any,
+    records: Mapping[str, Mapping[str, Any]],
+    *,
+    current_step_index: int,
+) -> None:
+    def is_current_step_record(record: Mapping[str, Any]) -> bool:
+        producer = record.get("produced_by")
+        return (
+            isinstance(producer, Mapping)
+            and producer.get("step_index") == current_step_index
+        )
+
+    required_outputs = {
+        output.name for output in current_step.outputs if output.required_for_next_step
+    }
+    missing_outputs = sorted(
+        name
+        for name in required_outputs
+        if name not in records or not is_current_step_record(records[name])
+    )
+    if missing_outputs:
+        raise RuntimeError(
+            "Cannot advance: the current step has not produced required outputs: "
+            + ", ".join(missing_outputs)
+        )
+    if next_step is None:
+        return
+    missing_inputs = []
+    for input_spec in next_step.inputs:
+        record = records.get(input_spec.name)
+        if not input_spec.required and record is None:
+            continue
+        if (
+            record is None
+            or (
+                input_spec.source == "previous_step"
+                and not is_current_step_record(record)
+            )
+            or (
+                input_spec.source == "workflow_context"
+                and record.get("source") != "workflow_context"
+            )
+        ):
+            missing_inputs.append(input_spec.name)
+    if missing_inputs:
+        raise RuntimeError(
+            "Cannot advance: the next step is missing required inputs: "
+            + ", ".join(missing_inputs)
+        )
+    mismatched = []
+    for input_spec in next_step.inputs:
+        record = records.get(input_spec.name)
+        if record is None or input_spec.type == "any":
+            continue
+        if record.get("type") != input_spec.type:
+            mismatched.append(
+                f"{input_spec.name} (expected {input_spec.type}, "
+                f"got {record.get('type')})"
+            )
+    if mismatched:
+        raise RuntimeError(
+            "Cannot advance: handoff input types do not match: " + ", ".join(mismatched)
+        )
+
+
 def _validate_workflow_step_transition(
     action: SkillChatAction,
     step: Any,
@@ -3998,7 +4187,15 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     parser = _workflow_action_parsers().get(normalized_kind)
     if parser is None:
         raise RuntimeError(f"Unknown workflow action kind: {normalized_kind!r}")
-    return parser(payload, decisions_and_context, llm_type)
+    raw_outputs = payload.get("outputs", {})
+    if not isinstance(raw_outputs, Mapping) or any(
+        not isinstance(name, str) or not name.strip() for name in raw_outputs
+    ):
+        raise RuntimeError(
+            "Workflow action outputs must be an object with named values."
+        )
+    action = parser(payload, decisions_and_context, llm_type)
+    return replace(action, outputs=dict(raw_outputs))
 
 
 def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:

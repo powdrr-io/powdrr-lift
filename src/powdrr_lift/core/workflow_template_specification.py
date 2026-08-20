@@ -10,6 +10,8 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.core.skill_specification import (
+    SUPPORTED_STEP_TYPES,
+    SkillStepPreStep,
     SkillToolInvocation,
     skill_step_from_data,
 )
@@ -72,6 +74,8 @@ class WorkflowTaskTemplate:
     output_state_type: str = "state"
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
+    step_type: str = "freeform-skill-invoke"
+    pre_step: SkillStepPreStep | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -90,7 +94,8 @@ class WorkflowTaskTemplate:
             "output_state_type": self.output_state_type,
             "dependent_state": list(self.dependent_state),
         }
-        step_data = {
+        step_data: dict[str, Any] = {
+            "step_type": self.step_type,
             "details": self.details,
             "llm_type": self.llm_type,
             "uses_skills": list(self.uses_skills),
@@ -100,6 +105,8 @@ class WorkflowTaskTemplate:
         }
         if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
+        if self.pre_step is not None:
+            step_data["pre_step"] = self.pre_step.to_data()
         data.update({key: value for key, value in step_data.items() if value})
         if self.generation is not None:
             data["generation"] = self.generation.to_data()
@@ -265,6 +272,8 @@ def instantiate_workflow_template(
                 for invocation in task_template.tool_invocations
             ),
             output_state_type=task_template.output_state_type,
+            step_type=task_template.step_type,
+            pre_step=task_template.pre_step,
             upstream_task_ids=tuple(
                 task_ids[upstream_index] for upstream_index in upstream_task_indexes
             ),
@@ -482,6 +491,7 @@ def build_workflow_template_validation_report(
             raw_task_template_mapping,
             {
                 "description",
+                "step_type",
                 "complexity",
                 "input_state",
                 "assignee_type",
@@ -491,6 +501,7 @@ def build_workflow_template_validation_report(
                 "uses_skills",
                 "tool_invocations",
                 "prompt_catalogs",
+                "pre_step",
                 "output_state_type",
                 "dependent_state",
                 "generation",
@@ -499,6 +510,44 @@ def build_workflow_template_validation_report(
             path=task_template_path or "",
             subject="workflow task template",
         )
+
+        step_type = raw_task_template_mapping.get("step_type", "freeform-skill-invoke")
+        if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="invalid_step_type_value",
+                    message=(
+                        "Workflow task template step_type must be "
+                        "freeform-skill-invoke or gather_context_and_filter."
+                    ),
+                    path=_child_path(task_template_path, "step_type"),
+                )
+            )
+        pre_step = raw_task_template_mapping.get("pre_step")
+        if step_type == "gather_context_and_filter" and not isinstance(
+            pre_step, Mapping
+        ):
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="missing_pre_step",
+                    message=(
+                        "gather_context_and_filter task templates must declare "
+                        "a pre_step object."
+                    ),
+                    path=_child_path(task_template_path, "pre_step"),
+                )
+            )
+        elif step_type == "freeform-skill-invoke" and pre_step is not None:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="unexpected_pre_step",
+                    message=(
+                        "Only gather_context_and_filter task templates may "
+                        "declare pre_step."
+                    ),
+                    path=_child_path(task_template_path, "pre_step"),
+                )
+            )
 
         prompt_catalogs = raw_task_template_mapping.get("prompt_catalogs")
         if (
@@ -862,6 +911,8 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
+        step_type=step.step_type,
+        pre_step=step.pre_step,
         output_state_type=output_state_type,
         dependent_state=dependent_state,
         generation=parsed_generation,

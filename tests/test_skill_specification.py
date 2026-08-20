@@ -78,11 +78,13 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
+                "step_type": "freeform-skill-invoke",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
             {
                 "description": "Pull in the system context.",
+                "step_type": "freeform-skill-invoke",
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
                 "prompt_catalogs": ["context_types", "skills"],
@@ -98,7 +100,10 @@ def test_skill_round_trips_through_json() -> None:
                     }
                 ],
             },
-            {"description": "Summarize the result."},
+            {
+                "description": "Summarize the result.",
+                "step_type": "freeform-skill-invoke",
+            },
         ],
     }
 
@@ -115,6 +120,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             "steps" if path.parent.name == "skill-definitions" else "task_templates"
         )
         for index, step in enumerate(document[step_key]):
+            assert step["step_type"] == "freeform-skill-invoke", (
+                f"{path}:{step_key}[{index}]"
+            )
             if "prompt_catalogs" in step:
                 assert step["prompt_catalogs"], f"{path}:{step_key}[{index}]"
                 assert set(step["prompt_catalogs"]) <= {"context_types", "skills"}
@@ -172,7 +180,7 @@ def test_skill_step_contracts_reject_duplicate_names() -> None:
                     }
                 ],
             }
-        )
+        ),
     )
 
     assert report.validation_successful is False
@@ -205,6 +213,54 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
+
+
+def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
+    report = build_skill_validation_report(
+        yaml.safe_dump(
+            {
+                "name": "filter-context",
+                "when_to_use": ["When gathered context needs filtering."],
+                "steps": [
+                    {
+                        "description": "Filter gathered requirements.",
+                        "step_type": "gather_context_and_filter",
+                        "pre_step": {
+                            "action": "gather_context",
+                            "template": {
+                                "feature_id": "<feature-id>",
+                                "types": ["requirements"],
+                            },
+                            "instructions": "Keep matching requirements.",
+                        },
+                        "outputs": [
+                            {
+                                "name": "filtered_requirements",
+                                "required_for_next_step": True,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        source_path=Path("filter-context.yaml"),
+    )
+
+    assert report.validation_successful is True
+
+
+def test_skill_validation_rejects_unknown_step_type() -> None:
+    report = build_skill_validation_report(
+        "name: unknown-type\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- description: Review\n"
+        "  step_type: unknown\n",
+        source_path=Path("unknown-type.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["invalid_step_type_value"]
 
 
 def test_skill_validation_rejects_empty_prompt_catalogs() -> None:

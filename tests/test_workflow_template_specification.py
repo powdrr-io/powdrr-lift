@@ -65,6 +65,7 @@ def test_workflow_template_round_trips_through_json() -> None:
         "task_templates": [
             {
                 "description": "Generate one task per changed file.",
+                "step_type": "freeform-skill-invoke",
                 "complexity": "medium",
                 "input_state": {"files": []},
                 "assignee_type": "agent",
@@ -78,6 +79,7 @@ def test_workflow_template_round_trips_through_json() -> None:
             },
             {
                 "description": "Validate the aggregated results.",
+                "step_type": "freeform-skill-invoke",
                 "complexity": "high",
                 "input_state": {"ready": "<upstream-task-0>.state"},
                 "assignee_type": "agent",

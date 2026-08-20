@@ -15,6 +15,7 @@ how_to_fill_this_out:
   and review tasks complete.
 task_templates:
 - description: Gather context about the proposed PR
+  step_type: freeform-skill-invoke
   prompt_catalogs: [context_types]
   complexity: high
   assignee_type: agent
@@ -53,6 +54,7 @@ task_templates:
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create a detailed execution plan
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -80,6 +82,7 @@ task_templates:
   dependent_state:
   - execution-plan-created
 - description: Generate tests that will validate the new functionality
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -105,6 +108,7 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Validate the tests do not pass
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -130,6 +134,7 @@ task_templates:
   dependent_state:
   - tests-proven-failing
 - description: Generate product code changes
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -158,6 +163,7 @@ task_templates:
   dependent_state:
   - product-code-generated
 - description: Validate all tests pass
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -180,6 +186,7 @@ task_templates:
   dependent_state:
   - all-tests-passing
 - description: Confirm functional completeness against the specification
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -209,6 +216,7 @@ task_templates:
   dependent_state:
   - specification-complete
 - description: Run lint, type checks, and cleanup
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -244,6 +252,7 @@ task_templates:
   dependent_state:
   - lint-and-cleanup-complete
 - description: Promote the implemented feature documents to current state
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -274,6 +283,7 @@ task_templates:
   dependent_state:
   - current-state-documents-promoted
 - description: Stage the pull request changes
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -299,6 +309,7 @@ task_templates:
   dependent_state:
   - staged-for-pull-request
 - description: Finish pull request preparation
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -328,6 +339,7 @@ task_templates:
   dependent_state:
   - pull-request-prep-complete
 - description: Create the pull request
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: human
   assignee_role: reviewer

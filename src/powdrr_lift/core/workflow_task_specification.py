@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from powdrr_lift.core.skill_specification import (
+    SUPPORTED_STEP_TYPES,
+    SkillStepPreStep,
     SkillToolInvocation,
     skill_step_from_data,
 )
@@ -82,6 +84,8 @@ class WorkflowTask:
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
+    step_type: str = "freeform-skill-invoke"
+    pre_step: SkillStepPreStep | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -105,8 +109,9 @@ class WorkflowTask:
         }
         if self.output_state is not None:
             data["output_state"] = self.output_state
-        step_data = {
+        step_data: dict[str, Any] = {
             "description": self.description,
+            "step_type": self.step_type,
             "details": self.details,
             "llm_type": self.llm_type,
             "uses_skills": list(self.uses_skills),
@@ -116,6 +121,8 @@ class WorkflowTask:
         }
         if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
+        if self.pre_step is not None:
+            step_data["pre_step"] = self.pre_step.to_data()
         data.update({key: value for key, value in step_data.items() if value})
         return data
 
@@ -294,6 +301,8 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
+        step_type=step.step_type,
+        pre_step=step.pre_step,
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
@@ -453,6 +462,7 @@ def build_workflow_task_validation_report(
             "output_state",
             "output_state_type",
             "description",
+            "step_type",
             "assignee_type",
             "assignee_role",
             "details",
@@ -460,11 +470,48 @@ def build_workflow_task_validation_report(
             "uses_skills",
             "tool_invocations",
             "prompt_catalogs",
+            "pre_step",
         },
         issues,
         path=_format_path(source_path) or "",
         subject="workflow task",
     )
+
+    step_type = raw_task.get("step_type", "freeform-skill-invoke")
+    if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_step_type_value",
+                message=(
+                    "Workflow task step_type must be freeform-skill-invoke or "
+                    "gather_context_and_filter."
+                ),
+                path=_format_child_path(source_path, "step_type"),
+            )
+        )
+    pre_step = raw_task.get("pre_step")
+    if step_type == "gather_context_and_filter" and not isinstance(pre_step, Mapping):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="missing_pre_step",
+                message=(
+                    "gather_context_and_filter workflow tasks must declare a "
+                    "pre_step object."
+                ),
+                path=_format_child_path(source_path, "pre_step"),
+            )
+        )
+    elif step_type == "freeform-skill-invoke" and pre_step is not None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="unexpected_pre_step",
+                message=(
+                    "Only gather_context_and_filter workflow tasks may declare "
+                    "pre_step."
+                ),
+                path=_format_child_path(source_path, "pre_step"),
+            )
+        )
 
     prompt_catalogs = raw_task.get("prompt_catalogs")
     if (

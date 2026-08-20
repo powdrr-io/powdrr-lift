@@ -62,6 +62,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_project_root,
     _resolve_worktree_context,
     _resolve_worktree_file_path,
+    _run_deterministic_pre_step,
     _step_index_by_id,
     _validate_internal_command,
     _validate_workflow_action_outputs,
@@ -1776,6 +1777,16 @@ def _run_skill_for_agent(
                 handoff_records = parent_handoff_records
             continue
         step = current_skill.skill.steps[step_index]
+        if step.step_type == "gather_context_and_filter":
+            _run_deterministic_pre_step(
+                step,
+                worktree_root=repo_root,
+                execution_events=execution_events,
+                execution_context=execution_context,
+                handoff_records=handoff_records,
+                step_index=step_index,
+                workflow_context=None,
+            )
         messages = _build_step_execution_messages(
             selected_skill=current_skill,
             current_step=step,

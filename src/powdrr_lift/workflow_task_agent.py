@@ -29,6 +29,11 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
+from powdrr_lift.pr_workflow_record import (
+    is_pull_request_create_command,
+    pull_request_number,
+    record_pull_request_workflow,
+)
 from powdrr_lift.workflow_chat_agent import (
     _DEFAULT_MODEL,
     LLMModelMapping,
@@ -49,6 +54,7 @@ from powdrr_lift.workflow_chat_agent import (
     _model_limits_for,
     _parse_action_response,
     _print_waiting_for_model,
+    _record_skill_pull_request,
     _reject_line_edit_for_yaml,
     _resolve_credentials,
     _resolve_llm_mapping,
@@ -439,6 +445,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.workflow,
                 reason=f"complete {completed.task_id}",
                 stdout=self.stdout,
+                events=self.events,
             )
             return WorkflowActionOutcome(continue_running=False)
         if action.kind == "get-human-input":
@@ -464,6 +471,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.workflow,
             reason=f"{reason_prefix} {self.task.task_id}",
             stdout=self.stdout,
+            events=self.events,
         )
         return WorkflowActionOutcome(continue_running=False)
 
@@ -523,14 +531,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "are shell, internal, fuzzy-match, basedpyright-symbol, and "
                 "basedpyright-structure."
             )
-        self.events.append(
-            {
-                "kind": action.kind,
-                "tool": action.tool,
-                "parameters": action.parameters,
-                "result": result,
-            }
+        event = {
+            "kind": action.kind,
+            "tool": action.tool,
+            "parameters": action.parameters,
+            "result": result,
+        }
+        _record_task_pull_request(
+            action,
+            self.workflow,
+            self.repo_root,
+            self.events,
+            result,
         )
+        self.events.append(event)
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
         self.response_correction = _action_response_correction(action, error)
@@ -582,8 +596,59 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.workflow,
             reason=f"roundtrip limit for {self.task.task_id}",
             stdout=self.stdout,
+            events=self.events,
         )
         return 2
+
+
+def _record_task_pull_request(
+    action: WorkflowAction,
+    workflow: WorkflowInstance,
+    repo_root: Path,
+    events: Sequence[Mapping[str, Any]],
+    result: object,
+) -> None:
+    command = action.parameters.get("command")
+    if not isinstance(command, Sequence) or isinstance(command, (str, bytes)):
+        return
+    if not is_pull_request_create_command([str(item) for item in command]):
+        return
+    if not isinstance(result, Mapping) or result.get("returncode") != 0:
+        return
+    output = result.get("stdout")
+    if not isinstance(output, str):
+        return
+    number = pull_request_number(output)
+    if number is None:
+        raise RuntimeError(
+            "GitHub did not return a pull-request URL, so the workflow record "
+            "could not be named under docs/prs/<pr-number>.yaml."
+        )
+    branch = _git_output(repo_root, ["branch", "--show-current"])
+    state = load_workflow_git_state(workflow.directory)
+    record_pull_request_workflow(
+        repo_root,
+        number,
+        branch=branch,
+        base_branch=state.base_branch if state is not None else "main",
+        title="Agent-created pull request",
+        workflow_name=workflow.directory.name,
+        workflow_path=_relative_workflow_path(repo_root, workflow.directory),
+        steps=[_workflow_task_record(task) for task in workflow.tasks],
+        events=[
+            *events,
+            {
+                "kind": action.kind,
+                "tool": action.tool,
+                "parameters": action.parameters,
+                "result": result,
+            },
+        ],
+        explanation=(
+            "This record documents the durable workflow steps and tool calls "
+            "observed before the agent created the pull request."
+        ),
+    )
 
 
 def _last_gather_context_was_empty(events: Sequence[Mapping[str, Any]]) -> bool:
@@ -838,6 +903,7 @@ def _publish_workflow_progress(
     reason: str,
     stdout: TextIO,
     open_pull_request: bool = True,
+    events: Sequence[Mapping[str, Any]] = (),
 ) -> None:
     """Commit and publish durable workflow progress for execution tasks.
 
@@ -889,6 +955,13 @@ def _publish_workflow_progress(
         check=False,
     )
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
+        _write_workflow_record(
+            repo_root,
+            workflow,
+            workflow_git_state,
+            existing_pr.stdout.strip(),
+            events=events,
+        )
         print(
             f"Updated workflow progress PR: {existing_pr.stdout.strip()}", file=stdout
         )
@@ -925,7 +998,80 @@ def _publish_workflow_progress(
             "Could not create workflow progress pull request: "
             f"{created_pr.stderr.strip()}"
         )
+    _write_workflow_record(
+        repo_root,
+        workflow,
+        workflow_git_state,
+        created_pr.stdout.strip(),
+        events=events,
+        title=title,
+    )
     print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
+
+
+def _write_workflow_record(
+    repo_root: Path,
+    workflow: WorkflowInstance,
+    workflow_git_state: WorkflowGitState | None,
+    pull_request_output: str,
+    *,
+    events: Sequence[Mapping[str, Any]],
+    title: str | None = None,
+) -> None:
+    number = pull_request_number(pull_request_output)
+    if number is None:
+        raise RuntimeError(
+            "GitHub did not return a pull-request URL, so the workflow record "
+            "could not be named under docs/prs/<pr-number>.yaml."
+        )
+    branch = (
+        workflow_git_state.integration_branch
+        if workflow_git_state is not None
+        else _git_output(repo_root, ["branch", "--show-current"])
+    )
+    base_branch = (
+        workflow_git_state.base_branch
+        if workflow_git_state is not None
+        else _default_branch(repo_root)
+    )
+    record_pull_request_workflow(
+        repo_root,
+        number,
+        branch=branch,
+        base_branch=base_branch,
+        title=title or f"Workflow: {workflow.directory.name}",
+        workflow_name=workflow.directory.name,
+        workflow_path=_relative_workflow_path(repo_root, workflow.directory),
+        steps=[_workflow_task_record(task) for task in workflow.tasks],
+        events=events,
+        explanation=(
+            "This record documents the workflow steps selected for the pull "
+            "request and the tool calls observed while the durable agent ran."
+        ),
+    )
+
+
+def _workflow_task_record(task: WorkflowTask) -> dict[str, Any]:
+    data = task.to_data()
+    return {
+        key: data[key]
+        for key in (
+            "task_id",
+            "status",
+            "description",
+            "assignee_role",
+            "uses_skills",
+            "tool_invocations",
+        )
+        if key in data
+    }
+
+
+def _relative_workflow_path(repo_root: Path, workflow_directory: Path) -> str:
+    try:
+        return str(workflow_directory.resolve().relative_to(repo_root.resolve()))
+    except ValueError:
+        return str(workflow_directory)
 
 
 def _open_final_workflow_pull_request(
@@ -955,6 +1101,14 @@ def _open_final_workflow_pull_request(
         check=False,
     )
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
+        _write_workflow_record(
+            repo_root,
+            workflow,
+            workflow_git_state,
+            existing_pr.stdout.strip(),
+            events=(),
+            title=f"Workflow: {workflow.directory.name}",
+        )
         print(f"Updated final workflow PR: {existing_pr.stdout.strip()}", file=stdout)
         return
     created_pr = subprocess.run(
@@ -985,6 +1139,14 @@ def _open_final_workflow_pull_request(
         raise RuntimeError(
             f"Could not create final workflow pull request: {created_pr.stderr.strip()}"
         )
+    _write_workflow_record(
+        repo_root,
+        workflow,
+        workflow_git_state,
+        created_pr.stdout.strip(),
+        events=(),
+        title=f"Workflow: {workflow.directory.name}",
+    )
     print(f"Created final workflow PR: {created_pr.stdout.strip()}", file=stdout)
 
 
@@ -1675,7 +1837,24 @@ def _run_skill_for_agent(
                 )
             else:
                 raise RuntimeError(f"Unsupported nested skill tool: {action.tool!r}")
-            execution_events.append({"kind": action.kind, "result": result})
+            _record_skill_pull_request(
+                action,
+                repo_root,
+                current_skill,
+                execution_events,
+                result,
+                step_index=step_index,
+            )
+            execution_events.append(
+                {
+                    "kind": action.kind,
+                    "tool": action.tool,
+                    "parameters": action.parameters,
+                    "result": result,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": step_index,
+                }
+            )
             continue
         if action.kind == "prompt_user":
             raise RuntimeError("Nested skills in agent workflows cannot prompt users.")

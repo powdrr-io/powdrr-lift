@@ -61,6 +61,11 @@ from powdrr_lift.core.validation_messages import (
     validation_error_to_data,
 )
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.pr_workflow_record import (
+    is_pull_request_create_command,
+    pull_request_number,
+    record_pull_request_workflow,
+)
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
     WorkflowActionObservation,
@@ -3588,6 +3593,8 @@ def _handle_workflow_action_invoke_tool(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
             "internal, fuzzy-match, basedpyright-symbol, and basedpyright-structure."
         )
+    if action.tool == "shell":
+        _record_chat_pull_request(action, state, tool_result)
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
         worktree_root=state.worktree_root,
@@ -3622,6 +3629,7 @@ def _handle_workflow_action_invoke_tool(
     state.execution_events.append(
         {
             "kind": action.kind,
+            "tool": action.tool,
             "parameters": action.parameters,
             "result": tool_result,
             "decisions_and_context": action.decisions_and_context,
@@ -3629,6 +3637,78 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     return True
+
+
+def _record_chat_pull_request(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    tool_result: Mapping[str, Any],
+) -> None:
+    _record_skill_pull_request(
+        action,
+        state.worktree_root,
+        state.selected_skill,
+        state.execution_events,
+        tool_result,
+        step_index=state.step_index,
+    )
+
+
+def _record_skill_pull_request(
+    action: SkillChatAction,
+    repo_root: Path,
+    skill: SkillCatalogEntry,
+    events: Sequence[Mapping[str, Any]],
+    tool_result: Mapping[str, Any],
+    step_index: int | None = None,
+) -> None:
+    command = _command_items_for_validation(action.parameters.get("command"))
+    if not is_pull_request_create_command(command):
+        return
+    if tool_result.get("returncode") != 0:
+        return
+    output = tool_result.get("stdout")
+    if not isinstance(output, str):
+        return
+    number = pull_request_number(output)
+    if number is None:
+        raise RuntimeError(
+            "GitHub did not return a pull-request URL, so the workflow record "
+            "could not be named under docs/prs/<pr-number>.yaml."
+        )
+    event = {
+        "kind": action.kind,
+        "tool": action.tool,
+        "parameters": action.parameters,
+        "result": tool_result,
+        "decisions_and_context": action.decisions_and_context,
+        "step_index": step_index,
+    }
+    branch_result = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    branch = branch_result.stdout.strip()
+    if not branch:
+        raise RuntimeError("Could not determine the branch for the workflow record.")
+    record_pull_request_workflow(
+        repo_root,
+        number,
+        branch=branch,
+        base_branch="main",
+        title="Agent-created pull request",
+        workflow_name=skill.skill.name,
+        workflow_path=str(skill.path),
+        steps=[step.to_data() for step in skill.skill.steps],
+        events=[*events, event],
+        explanation=(
+            "This record documents the selected skill steps and the tool calls "
+            "observed before the agent created the pull request."
+        ),
+    )
 
 
 def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
@@ -3692,7 +3772,10 @@ def _validate_workflow_step_transition(
     def successful_event_matches(invocation: Any, event: Mapping[str, Any]) -> bool:
         if event.get("kind") != "invoke_tool":
             return False
-        if event.get("tool") not in {None, invocation.tool}:
+        event_tool = event.get("tool")
+        if event_tool not in {None, invocation.tool} and not (
+            event_tool == _INTERNAL_TOOL and invocation.tool == "shell"
+        ):
             return False
         if event.get("step_index") != current_step_index:
             return False

@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schemas/pr-workflow-record-v1
+pull_request: 328
+title: Add deterministic workflow pre-steps
+branch: codex/deterministic-workflow-step-types
+base_branch: main
+workflow:
+  name: deterministic-workflow-step-types
+  path: src/powdrr_lift/core/skill_specification.py
+  skills:
+  - workflow-step-types
+  steps:
+  - id: inspect
+    status: completed
+    description: Inspect skill and workflow schemas, loaders, prompts, and execution paths.
+  - id: implement
+    status: completed
+    description: Add explicit step types, deterministic gather_context pre-steps, placeholder resolution, and result handoff to the LLM.
+  - id: migrate-definitions
+    status: completed
+    description: Relabel every existing skill and workflow definition step as freeform-skill-invoke.
+  - id: verify
+    status: completed
+    description: Validate all definitions and run formatting, linting, type-check inspection, and the full test suite.
+tool_calls:
+- tool: shell
+  parameters:
+    command:
+    - git
+    - status
+    - --short
+  why: Confirm the dedicated feature worktree and preserve unrelated primary-checkout changes.
+  returncode: 0
+- tool: apply_patch
+  parameters:
+    files:
+    - src/powdrr_lift/core/skill_specification.py
+    - src/powdrr_lift/core/workflow_template_specification.py
+    - src/powdrr_lift/core/workflow_task_specification.py
+    - src/powdrr_lift/workflow_chat_agent.py
+    - src/powdrr_lift/workflow_task_agent.py
+  why: Add the schema, deterministic pre-step execution, prompt instructions, and nested workflow-task support.
+  returncode: 0
+- tool: apply_patch
+  parameters:
+    files:
+    - skill-definitions/*.yaml
+    - templates/*.yaml
+  why: Make the step type explicit on every existing skill and workflow definition step.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - uv
+    - run
+    - ruff
+    - check
+    - src
+    - tests
+  why: Check the changed Python implementation and tests for lint errors.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - uv
+    - run
+    - pytest
+    - -q
+  why: Verify the complete repository behavior, including deterministic pre-step and workflow execution coverage.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - gh
+    - pr
+    - create
+    - --draft
+    - --base
+    - main
+    - --head
+    - codex/deterministic-workflow-step-types
+  why: Publish the scoped feature branch for human review.
+  returncode: 0
+explanation: This record documents the schema migration and the deterministic pre-step execution path. Gather steps resolve template placeholders from workflow input context, call gather_context once, expose the structured result and interpretation instructions to the LLM, and leave output assignment and next action decisions to the LLM.

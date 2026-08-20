@@ -458,6 +458,7 @@ class _WorkflowExecutionState:
     step_index: int
     worktree_root: Path
     handoff_records: dict[str, dict[str, Any]] = field(default_factory=dict)
+    durable_facts: dict[str, dict[str, Any]] = field(default_factory=dict)
     current_file_path: Path | None = None
     current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]] = field(
         default_factory=dict
@@ -465,6 +466,31 @@ class _WorkflowExecutionState:
     fuzzy_match_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] = field(
         default_factory=dict
     )
+
+
+def _record_durable_fact(
+    state: _WorkflowExecutionState,
+    value: str,
+    *,
+    kind: str,
+    source: str,
+) -> None:
+    """Deduplicate durable decisions and corrections while retaining history."""
+    normalized = " ".join(value.split())
+    if not normalized:
+        return
+    key = f"{kind}:{normalized}"
+    state.durable_facts.setdefault(
+        key,
+        {
+            "value": normalized,
+            "kind": kind,
+            "source": source,
+            "step_index": state.step_index,
+        },
+    )
+    if normalized not in {" ".join(item.split()) for item in state.execution_context}:
+        state.execution_context.append(normalized)
 
 
 @dataclass(slots=True)
@@ -486,7 +512,12 @@ class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction
         self.state.transcript.append(
             {"role": "user", "content": observation.correction}
         )
-        self.state.execution_context.append(observation.correction)
+        _record_durable_fact(
+            self.state,
+            observation.correction,
+            kind="correction",
+            source="no_progress",
+        )
 
 
 @dataclass(slots=True)
@@ -543,6 +574,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.state.handoff_records = {
                     name: dict(record) for name, record in frame.parent_handoff_records
                 }
+            self.state.durable_facts = {
+                name: dict(record)
+                for name, record in (frame.parent_durable_facts or ())
+            }
         self.current_model = frame.parent_model
         self.provider = frame.parent_provider
         self.provider_role = frame.parent_provider_role
@@ -578,6 +613,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             ),
             parent_handoff_records=(
                 tuple(self.state.handoff_records.items()) if clean_context else None
+            ),
+            parent_durable_facts=(
+                tuple(self.state.durable_facts.items()) if clean_context else None
             ),
         )
         self.state.selected_skill = nested_skill
@@ -656,6 +694,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 execution_events=self.state.execution_events,
                 execution_context=self.state.execution_context,
                 handoff_records=self.state.handoff_records,
+                durable_facts=self.state.durable_facts,
                 current_file_path=self.state.current_file_path,
                 worktree_root=self.state.worktree_root,
                 catalog=self.catalog,
@@ -777,9 +816,16 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.state.execution_events = []
                 self.state.execution_context = context
                 self.state.handoff_records = {}
+                self.state.durable_facts = {}
                 self.state.current_file_path = None
             else:
-                self.state.execution_context.extend(context)
+                for context_value in context:
+                    _record_durable_fact(
+                        self.state,
+                        context_value,
+                        kind="decision",
+                        source="invoke_skill",
+                    )
             self.provider_role = nested_role
             return WorkflowActionOutcome()
         if action.kind == "goto_step":
@@ -877,7 +923,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 {"role": "user", "content": feedback},
             ]
         )
-        self.state.execution_context.append(feedback)
+        _record_durable_fact(
+            self.state,
+            feedback,
+            kind="correction",
+            source="action_error",
+        )
         validator_data = (
             validation_error_to_data(error.validation_error)
             if isinstance(error, _WorkflowToolValidationError)
@@ -992,6 +1043,7 @@ class _SkillExecutionFrame:
     parent_execution_context: tuple[str, ...] | None = None
     parent_current_file_path: Path | None = None
     parent_handoff_records: tuple[tuple[str, dict[str, Any]], ...] | None = None
+    parent_durable_facts: tuple[tuple[str, dict[str, Any]], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -2594,6 +2646,7 @@ def _push_nested_skill(
     parent_execution_context: tuple[str, ...] | None = None,
     parent_current_file_path: Path | None = None,
     parent_handoff_records: tuple[tuple[str, dict[str, Any]], ...] | None = None,
+    parent_durable_facts: tuple[tuple[str, dict[str, Any]], ...] | None = None,
 ) -> None:
     active_skill_paths = {str(frame.parent_skill.path) for frame in stack}
     active_skill_paths.add(str(current_skill.path))
@@ -2616,6 +2669,7 @@ def _push_nested_skill(
             parent_execution_context=parent_execution_context,
             parent_current_file_path=parent_current_file_path,
             parent_handoff_records=parent_handoff_records,
+            parent_durable_facts=parent_durable_facts,
         )
     )
 
@@ -2800,8 +2854,21 @@ def _prompt_transcript(
     return compacted
 
 
-def _prompt_step_context(execution_context: Sequence[str]) -> list[str]:
+def _prompt_step_context(
+    execution_context: Sequence[str],
+    durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[str]:
     """Bound recurring step context while retaining the newest handoff facts."""
+    fact_values = {
+        str(record.get("value"))
+        for record in (durable_facts or {}).values()
+        if record.get("value") is not None
+    }
+    execution_context = [
+        value
+        for value in execution_context
+        if " ".join(value.split()) not in fact_values
+    ]
     if len(execution_context) <= _MAX_PROMPT_STEP_CONTEXT_ENTRIES:
         recent = list(execution_context)
     else:
@@ -2812,6 +2879,14 @@ def _prompt_step_context(execution_context: Sequence[str]) -> list[str]:
     ):
         recent.pop(0)
     return recent
+
+
+def _prompt_durable_facts(
+    durable_facts: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return deduplicated durable facts in a compact, stable prompt shape."""
+    facts = list(durable_facts.values())[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:]
+    return [dict(fact) for fact in facts]
 
 
 def _truncate_prompt_content(content: str) -> str:
@@ -2834,6 +2909,7 @@ def _build_step_execution_messages(
     execution_events: Sequence[dict[str, Any]],
     execution_context: Sequence[str],
     handoff_records: Mapping[str, Mapping[str, Any]] | None = None,
+    durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
     current_file_path: Path | None,
     worktree_root: Path,
     catalog: Sequence[SkillCatalogEntry],
@@ -2882,7 +2958,8 @@ def _build_step_execution_messages(
             current_step,
             handoff_records or {},
         ),
-        "step_context": _prompt_step_context(execution_context),
+        "step_context": _prompt_step_context(execution_context, durable_facts),
+        "durable_facts": _prompt_durable_facts(durable_facts or {}),
         "available_tools": [
             {
                 "name": tool,
@@ -3408,7 +3485,12 @@ def _handle_workflow_action_complete(
     if action.text:
         print(action.text, file=stdout)
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     state.execution_events.append(
         {
             "kind": action.kind,
@@ -3464,7 +3546,12 @@ def _handle_workflow_action_edit(
     state.fuzzy_match_cache.clear()
 
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     action_data = {
         "kind": action.kind,
         "file_edits": [_file_edits_to_data(group) for group in file_edits],
@@ -3532,7 +3619,12 @@ def _handle_workflow_action_yaml_edit(
     state.fuzzy_match_cache.clear()
 
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     action_data = {
         "kind": action.kind,
         "file_path": action.file_path,
@@ -3648,7 +3740,12 @@ def _handle_workflow_action_read_document(
     )
     state.execution_context.append(f"Document context: {excerpt_text}")
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     state.execution_events.append(
         {
             "kind": action.kind,
@@ -3682,7 +3779,12 @@ def _handle_workflow_action_next_step(
     _ = input_func
     _ = config
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     state.execution_events.append(
         {
             "kind": action.kind,
@@ -3718,7 +3820,12 @@ def _handle_workflow_action_prompt_user(
     )
     state.transcript.append({"role": "user", "content": answer})
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     state.execution_events.append(
         {
             "kind": action.kind,
@@ -3806,7 +3913,12 @@ def _handle_workflow_action_invoke_tool(
         }
     )
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     state.execution_events.append(
         {
             "kind": action.kind,
@@ -4299,7 +4411,12 @@ def _handle_workflow_action_gather_context(
         ),
     )
     if action.decisions_and_context:
-        state.execution_context.append(action.decisions_and_context)
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
     state.execution_context.append(f"Gathered context:\n{gathered_context_text}")
     state.execution_events.append(
         {

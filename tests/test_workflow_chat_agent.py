@@ -308,6 +308,21 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert ordinary_prompt["worktree_root"] == "."
     assert "worktree_root" not in ordinary_prompt["previous_workflow_context"]
 
+    ordinary_system_prompt = _build_step_execution_messages(
+        selected_skill=ordinary_skill,
+        current_step=ordinary_step,
+        current_step_index=0,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        current_file_path=None,
+        worktree_root=tmp_path,
+        catalog=catalog,
+    )[0]["content"]
+    assert "Context guidance:" not in ordinary_system_prompt
+    assert "Nested-skill guidance:" not in ordinary_system_prompt
+    assert "entity-relationships" not in ordinary_system_prompt
+
     gather_prompt = json.loads(
         _build_step_execution_messages(
             selected_skill=ordinary_skill,
@@ -323,6 +338,20 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     )
     assert "available_context_types" in gather_prompt
     assert "available_skills" in gather_prompt
+
+    gather_system_prompt = _build_step_execution_messages(
+        selected_skill=ordinary_skill,
+        current_step=gather_step,
+        current_step_index=0,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        current_file_path=None,
+        worktree_root=tmp_path,
+        catalog=catalog,
+    )[0]["content"]
+    assert "Context guidance:" in gather_system_prompt
+    assert "Nested-skill guidance:" in gather_system_prompt
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(

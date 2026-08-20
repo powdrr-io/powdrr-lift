@@ -2927,7 +2927,7 @@ def _build_step_execution_messages(
     return [
         {
             "role": "system",
-            "content": _action_system_prompt(current_step=current_step),
+            "content": _modular_action_system_prompt(current_step),
         },
         {
             "role": "user",
@@ -3170,6 +3170,77 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "for large specifications; and vision for image-oriented tasks.\n"
         "Do not output markdown."
     )
+
+
+def _modular_action_system_prompt(current_step: Any) -> str:
+    """Build a compact action prompt with explicitly selected guidance sections."""
+    include_context = _step_needs_prompt_catalog(current_step, "context_types")
+    include_skills = _step_needs_prompt_catalog(current_step, "skills")
+    prompt = (
+        "Task: execute the current checked-in skill step using the supplied current "
+        "step, handoff inputs, latest action result, and allowed tools. Choose one "
+        "action that makes progress without asking for information already present.\n"
+        "Return exactly one JSON action. Include decisions_and_context when a later "
+        "step needs it, and include outputs using the declared names. Do not rely on "
+        "hidden transcript history.\n"
+        "Available actions are gather_context, prompt_user, edit, yaml_edit, "
+        "invoke_tool, invoke_skill, read_document, goto_step, next_step, and complete. "
+        "prompt_user requires one clear English question ending in '?'. edit requires "
+        "valid line edits and must not target YAML; use yaml_edit for YAML. "
+        "invoke_tool "
+        "requires a command permitted by the current step.\n"
+        "When a step declares tool_invocations, invoke a declared tool successfully "
+        "before next_step or complete. A prose summary is not a tool invocation. "
+        "Use goto_step only with a declared step id and include the progress requiring "
+        "another pass.\n"
+        "Always include llm_type: high_reasoning for difficult reasoning or final "
+        "review, "
+        "standard_reasoning for implementation, simple_task for mechanical work, "
+        "fast_iteration for quick feedback, long_context for large specifications, "
+        "or vision for image-oriented tasks.\n"
+    )
+    if include_context:
+        context_type_lines = "\n".join(
+            f"- {name}: {description}" for name, description in _context_type_catalog()
+        )
+        prompt += (
+            "Context guidance: use gather_context to discover checked-in specs. For a "
+            "feature proposal, pass the exact feature_id and do not use fuzzy-match to "
+            "substitute another proposal. After gathering, put relevant findings in "
+            "decisions_and_context and report next_step when complete. Use keywords to "
+            "narrow results and filters for exact fields; never use "
+            "filters.work_item_name. Supported context types:\n"
+            f"{context_type_lines}\n"
+            'Example: {"kind":"gather_context","feature_id":"display-related-photos",'
+            '"types":["requirements"],"keywords":["photo"]}.\n'
+        )
+    if include_skills:
+        prompt += (
+            "Nested-skill guidance: use invoke_skill only for a listed skill. It "
+            "inherits the current provider role by default; set provider_role to "
+            "adversarial or normal when needed. Set clean=true only when the nested "
+            "skill should receive only explicit context.\n"
+            'Example: {"kind":"invoke_skill","skill":"adversarial-review",'
+            '"provider_role":"adversarial","clean":true}.\n'
+        )
+    if getattr(current_step, "prompt_catalogs", None) is None or include_context:
+        prompt += (
+            "Structured-file guidance: use yaml_edit for YAML specifications, combine "
+            "independent corrections in one operations array, and preserve document "
+            "structure. Use read_document for the smallest useful range of a large "
+            "document; it requires file_path, non-negative start_line and end_line "
+            "for at most 2000 lines, with line 0 meaning the beginning and an "
+            "end_line past "
+            "EOF clamped.\n"
+        )
+    prompt += (
+        "When a validation result contains corrective_action, apply it before "
+        "retrying; do not repeat the same failed validation unchanged. Use edit "
+        "only when current "
+        "file context is sufficient. The worktree is the command root; use relative "
+        "paths. Do not output markdown."
+    )
+    return prompt
 
 
 def _context_type_catalog() -> tuple[tuple[str, str], ...]:

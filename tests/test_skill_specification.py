@@ -64,6 +64,7 @@ def test_skill_round_trips_through_json() -> None:
     parsed = skill_from_json(json_text)
 
     assert parsed == skill
+    assert parsed.steps[2].prompt_catalogs == ()
     assert json.loads(json_text) == {
         "name": "specify-a-feature",
         "adversarial": True,
@@ -79,7 +80,6 @@ def test_skill_round_trips_through_json() -> None:
                 "description": "Capture the feature goal.",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
-                "prompt_catalogs": [],
             },
             {
                 "description": "Pull in the system context.",

@@ -2653,9 +2653,7 @@ def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
 
 
 def _step_needs_prompt_catalog(step: Any, capability: str) -> bool:
-    configured_catalogs = getattr(step, "prompt_catalogs", None)
-    if configured_catalogs is None:
-        return True
+    configured_catalogs = getattr(step, "prompt_catalogs", ())
     if capability not in {"context_types", "skills"}:
         raise ValueError(f"Unknown prompt catalog capability: {capability}")
     return capability in configured_catalogs

@@ -104,7 +104,7 @@ class SkillStep:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
-    prompt_catalogs: tuple[str, ...] | None = None
+    prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -123,7 +123,7 @@ class SkillStep:
             data["tool_invocations"] = [
                 tool_invocation.to_data() for tool_invocation in self.tool_invocations
             ]
-        if self.prompt_catalogs is not None:
+        if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.inputs:
             data["inputs"] = [item.to_data() for item in self.inputs]
@@ -1162,9 +1162,9 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     return tuple(_required_string({"value": item}, "value") for item in value)
 
 
-def _optional_prompt_catalogs(value: object) -> tuple[str, ...] | None:
+def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
     if value is None:
-        return None
+        return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step prompt_catalogs must be an array.")
     result = tuple(_required_string({"value": item}, "value") for item in value)

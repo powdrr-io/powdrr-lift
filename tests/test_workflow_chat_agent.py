@@ -255,7 +255,6 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
         description="Inspect the current implementation.",
         details="Use the declared shell command and report what it finds.",
         tool_invocations=(SkillToolInvocation(tool="shell", command=("rg", "TODO")),),
-        prompt_catalogs=(),
     )
     gather_step = SkillStep(
         description="Gather context and invoke the nested review skill.",

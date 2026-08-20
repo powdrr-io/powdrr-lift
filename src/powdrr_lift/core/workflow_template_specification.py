@@ -68,7 +68,7 @@ class WorkflowTaskTemplate:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
-    prompt_catalogs: tuple[str, ...] | None = None
+    prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
@@ -98,7 +98,7 @@ class WorkflowTaskTemplate:
                 invocation.to_data() for invocation in self.tool_invocations
             ],
         }
-        if self.prompt_catalogs is not None:
+        if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         data.update({key: value for key, value in step_data.items() if value})
         if self.generation is not None:

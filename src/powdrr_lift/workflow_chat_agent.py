@@ -2653,9 +2653,7 @@ def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
 
 
 def _step_needs_prompt_catalog(step: Any, capability: str) -> bool:
-    configured_catalogs = getattr(step, "prompt_catalogs", None)
-    if configured_catalogs is None:
-        return True
+    configured_catalogs = getattr(step, "prompt_catalogs", ())
     if capability not in {"context_types", "skills"}:
         raise ValueError(f"Unknown prompt catalog capability: {capability}")
     return capability in configured_catalogs
@@ -3001,6 +2999,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
         "is required.\n"
+        "These next_step and complete rules apply to every step, including steps "
+        "whose optional prompt catalogs are omitted.\n"
         "When the current step declares outputs, provide the completed values "
         "in an outputs object using exactly those declared names. A later step "
         "receives only validated handoff inputs; do not rely on hidden transcript "

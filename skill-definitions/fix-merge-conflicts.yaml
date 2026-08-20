@@ -113,6 +113,7 @@ steps:
     - <conflicting-symbol-or-text>
     - --oneline
 - description: Gather the relevant pull-request and commit context for each side.
+  prompt_catalogs: [context_types]
   llm_type: long_context
   details: >-
     For every contributing commit or related PR in the conflict ledger, use

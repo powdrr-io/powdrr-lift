@@ -7,6 +7,7 @@ when_to_use:
   staged file set is known.
 steps:
 - description: Confirm the staged pull request scope and validation commands.
+  prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
     Inspect the staged and unstaged diff before final validation. Confirm that

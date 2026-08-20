@@ -9,6 +9,7 @@ when_to_use:
   critique.
 steps:
 - id: resolve-target
+  prompt_catalogs: [skills]
   description: Resolve and read the target definition.
   llm_type: long_context
   details: >-

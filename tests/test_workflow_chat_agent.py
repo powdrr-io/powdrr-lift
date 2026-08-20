@@ -265,7 +265,6 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
         description="Inspect the current implementation.",
         details="Use the declared shell command and report what it finds.",
         tool_invocations=(SkillToolInvocation(tool="shell", command=("rg", "TODO")),),
-        prompt_catalogs=(),
     )
     gather_step = SkillStep(
         description="Gather context and invoke the nested review skill.",
@@ -307,6 +306,10 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "available_skills" not in ordinary_prompt
     assert ordinary_prompt["worktree_root"] == "."
     assert "worktree_root" not in ordinary_prompt["previous_workflow_context"]
+    ordinary_system_prompt = _action_system_prompt(current_step=ordinary_step)
+    assert "Use next_step when the current step is complete" in ordinary_system_prompt
+    assert "Use complete when the skill is finished" in ordinary_system_prompt
+    assert "apply to every step" in ordinary_system_prompt
 
     ordinary_system_prompt = _build_step_execution_messages(
         selected_skill=ordinary_skill,

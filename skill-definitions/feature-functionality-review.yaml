@@ -37,6 +37,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Decide whether the referenced PR is the final proposed PR.
+  prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
     Treat the current PR as final only when the ordered feature plan identifies

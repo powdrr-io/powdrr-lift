@@ -37,6 +37,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Select the feature test scope for the current pull request.
+  prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
     Determine whether the current PR is intermediate or final in the ordered

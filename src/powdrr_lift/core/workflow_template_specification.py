@@ -68,7 +68,7 @@ class WorkflowTaskTemplate:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
-    prompt_catalogs: tuple[str, ...] | None = None
+    prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
@@ -98,7 +98,7 @@ class WorkflowTaskTemplate:
                 invocation.to_data() for invocation in self.tool_invocations
             ],
         }
-        if self.prompt_catalogs is not None:
+        if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         data.update({key: value for key, value in step_data.items() if value})
         if self.generation is not None:
@@ -490,6 +490,7 @@ def build_workflow_template_validation_report(
                 "llm_type",
                 "uses_skills",
                 "tool_invocations",
+                "prompt_catalogs",
                 "output_state_type",
                 "dependent_state",
                 "generation",
@@ -498,6 +499,23 @@ def build_workflow_template_validation_report(
             path=task_template_path or "",
             subject="workflow task template",
         )
+
+        prompt_catalogs = raw_task_template_mapping.get("prompt_catalogs")
+        if (
+            isinstance(prompt_catalogs, Sequence)
+            and not isinstance(prompt_catalogs, (str, bytes, bytearray))
+            and not prompt_catalogs
+        ):
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="empty_prompt_catalogs",
+                    message=(
+                        "Workflow task template prompt_catalogs must omit the field "
+                        "when no prompt catalog is needed."
+                    ),
+                    path=_child_path(task_template_path, "prompt_catalogs"),
+                )
+            )
 
         description = _optional_string(raw_task_template_mapping.get("description"))
         if description is None:

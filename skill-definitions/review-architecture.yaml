@@ -6,6 +6,7 @@ when_to_use:
 steps:
 - description: Gather the entities, entity relationships, invariants, and guidance
     context.
+  prompt_catalogs: [context_types]
   llm_type: simple_task
   details: Use the architecture context to understand the current model before judging
     whether it needs to change.

@@ -6,6 +6,7 @@ when_to_use:
   fit.
 steps:
 - description: Gather the requirements and approach context.
+  prompt_catalogs: [context_types]
   llm_type: simple_task
   details: Use the requirements and approach context to understand the new needs before
     judging the system specification.

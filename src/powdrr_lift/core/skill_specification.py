@@ -104,7 +104,7 @@ class SkillStep:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
-    prompt_catalogs: tuple[str, ...] | None = None
+    prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -123,7 +123,7 @@ class SkillStep:
             data["tool_invocations"] = [
                 tool_invocation.to_data() for tool_invocation in self.tool_invocations
             ]
-        if self.prompt_catalogs is not None:
+        if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.inputs:
             data["inputs"] = [item.to_data() for item in self.inputs]
@@ -517,6 +517,17 @@ def build_skill_validation_report(
                         )
                     )
                 else:
+                    if not prompt_catalogs:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="empty_prompt_catalogs",
+                                message=(
+                                    "Skill step prompt_catalogs must omit the field "
+                                    "when no prompt catalog is needed."
+                                ),
+                                path=_child_path(step_path, "prompt_catalogs"),
+                            )
+                        )
                     seen_catalogs: set[str] = set()
                     for catalog_index, catalog_value in enumerate(prompt_catalogs):
                         normalized_catalog = _optional_string(catalog_value)
@@ -1162,11 +1173,16 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     return tuple(_required_string({"value": item}, "value") for item in value)
 
 
-def _optional_prompt_catalogs(value: object) -> tuple[str, ...] | None:
+def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
     if value is None:
-        return None
+        return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step prompt_catalogs must be an array.")
+    if not value:
+        raise ValueError(
+            "Skill step prompt_catalogs must omit the field when no prompt catalog "
+            "is needed."
+        )
     result = tuple(_required_string({"value": item}, "value") for item in value)
     unsupported = sorted(set(result) - SUPPORTED_PROMPT_CATALOGS)
     if unsupported:

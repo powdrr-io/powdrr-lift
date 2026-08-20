@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
+
 from powdrr_lift.core import (
     Skill,
     SkillStep,
@@ -62,6 +64,7 @@ def test_skill_round_trips_through_json() -> None:
     parsed = skill_from_json(json_text)
 
     assert parsed == skill
+    assert parsed.steps[2].prompt_catalogs == ()
     assert json.loads(json_text) == {
         "name": "specify-a-feature",
         "adversarial": True,
@@ -77,7 +80,6 @@ def test_skill_round_trips_through_json() -> None:
                 "description": "Capture the feature goal.",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
-                "prompt_catalogs": [],
             },
             {
                 "description": "Pull in the system context.",
@@ -99,6 +101,23 @@ def test_skill_round_trips_through_json() -> None:
             {"description": "Summarize the result."},
         ],
     }
+
+
+def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
+    repository_root = Path(__file__).parents[1]
+    definition_paths = sorted((repository_root / "skill-definitions").glob("*.yaml"))
+    definition_paths += sorted((repository_root / "templates").glob("*.yaml"))
+
+    assert definition_paths
+    for path in definition_paths:
+        document = yaml.safe_load(path.read_text())
+        step_key = (
+            "steps" if path.parent.name == "skill-definitions" else "task_templates"
+        )
+        for index, step in enumerate(document[step_key]):
+            if "prompt_catalogs" in step:
+                assert step["prompt_catalogs"], f"{path}:{step_key}[{index}]"
+                assert set(step["prompt_catalogs"]) <= {"context_types", "skills"}
 
 
 def test_skill_step_contracts_round_trip_and_validate() -> None:
@@ -186,6 +205,20 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
+
+
+def test_skill_validation_rejects_empty_prompt_catalogs() -> None:
+    report = build_skill_validation_report(
+        "name: empty-catalogs\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- description: Review\n"
+        "  prompt_catalogs: []\n",
+        source_path=Path("empty-catalogs.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["empty_prompt_catalogs"]
 
 
 def test_skill_directory_validation_accepts_references(tmp_path: Path) -> None:

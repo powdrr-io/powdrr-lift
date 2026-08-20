@@ -78,7 +78,7 @@ class WorkflowTask:
     llm_type: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
-    prompt_catalogs: tuple[str, ...] | None = None
+    prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -114,7 +114,7 @@ class WorkflowTask:
                 invocation.to_data() for invocation in self.tool_invocations
             ],
         }
-        if self.prompt_catalogs is not None:
+        if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         data.update({key: value for key, value in step_data.items() if value})
         return data
@@ -459,11 +459,29 @@ def build_workflow_task_validation_report(
             "llm_type",
             "uses_skills",
             "tool_invocations",
+            "prompt_catalogs",
         },
         issues,
         path=_format_path(source_path) or "",
         subject="workflow task",
     )
+
+    prompt_catalogs = raw_task.get("prompt_catalogs")
+    if (
+        isinstance(prompt_catalogs, Sequence)
+        and not isinstance(prompt_catalogs, (str, bytes, bytearray))
+        and not prompt_catalogs
+    ):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="empty_prompt_catalogs",
+                message=(
+                    "Workflow task prompt_catalogs must omit the field when no "
+                    "prompt catalog is needed."
+                ),
+                path=_format_child_path(source_path, "prompt_catalogs"),
+            )
+        )
 
     task_id = _optional_string(raw_task.get("task_id"))
     if task_id is None:

@@ -332,6 +332,29 @@ def test_workflow_task_validation_reports_unknown_keys() -> None:
     assert report.issues[0].path == "unexpected"
 
 
+def test_workflow_task_validation_rejects_empty_prompt_catalogs() -> None:
+    report = build_workflow_task_validation_report(
+        json.dumps(
+            {
+                "task_id": "task-1",
+                "status": "completed",
+                "upstream_task_ids": [],
+                "dependent_state": ["state-a"],
+                "complexity": "low",
+                "input_state": {"ready": True},
+                "assignee_type": "agent",
+                "assignee_role": "coder",
+                "output_state_type": "state",
+                "description": "Task one.",
+                "prompt_catalogs": [],
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["empty_prompt_catalogs"]
+
+
 def test_workflow_task_validation_rejects_invalid_status() -> None:
     report = build_workflow_task_validation_report(
         json.dumps(

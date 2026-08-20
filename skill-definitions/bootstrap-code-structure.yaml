@@ -6,6 +6,7 @@ when_to_use:
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
 - description: Check whether the project-structure artifact already exists.
+  prompt_catalogs: [context_types]
   llm_type: simple_task
   details: >-
     Use the gather_context workflow action with types [modules, tools] and no
@@ -60,6 +61,7 @@ steps:
     - scripts
     - README.md
 - description: Reuse an existing project-structure artifact or create its template.
+  prompt_catalogs: [context_types]
   llm_type: simple_task
   details: >-
     If docs/project_structure contains an existing project-structure document,

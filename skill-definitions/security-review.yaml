@@ -6,6 +6,7 @@ when_to_use:
 - When security findings must be reported directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the pull request, feature scope, and security-relevant change surface.
+  prompt_catalogs: [context_types]
   llm_type: long_context
   details: >-
     Inspect the referenced PR's title, body, labels, commits, complete diff,

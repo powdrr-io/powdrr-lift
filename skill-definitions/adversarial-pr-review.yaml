@@ -9,6 +9,7 @@ when_to_use:
   comments.
 steps:
 - description: Discover the pull request and establish the exact change surface.
+  prompt_catalogs: []
   llm_type: long_context
   details: >-
     This is an adversarial review; the workflow selects its provider from the
@@ -43,6 +44,7 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Challenge framework and dependency choices.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     Act as a senior engineer educating a junior engineer on production-level
@@ -73,6 +75,7 @@ steps:
     - --
     - <changed-files>
 - description: Challenge readability and control-flow complexity.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     Review all added and materially changed code for readability regressions:
@@ -103,6 +106,7 @@ steps:
     - <head-sha>
     - --check
 - description: Validate findings and teach the production-level alternative.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     Validate each candidate against the complete diff, surrounding call sites,
@@ -131,6 +135,7 @@ steps:
     - <existing-framework-or-pattern>
     - <repository-paths>
 - description: Post actionable findings as inline pull-request comments.
+  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Check existing review threads and inline comments before posting. Post each
@@ -170,6 +175,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the adversarial review and report the result.
+  prompt_catalogs: []
   llm_type: standard_reasoning
   details: >-
     Re-read the target PR's comments and verify every intended finding is

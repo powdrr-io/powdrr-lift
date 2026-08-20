@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
+
 from powdrr_lift.core import (
     Skill,
     SkillStep,
@@ -99,6 +101,22 @@ def test_skill_round_trips_through_json() -> None:
             {"description": "Summarize the result."},
         ],
     }
+
+
+def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
+    repository_root = Path(__file__).parents[1]
+    definition_paths = sorted((repository_root / "skill-definitions").glob("*.yaml"))
+    definition_paths += sorted((repository_root / "templates").glob("*.yaml"))
+
+    assert definition_paths
+    for path in definition_paths:
+        document = yaml.safe_load(path.read_text())
+        step_key = (
+            "steps" if path.parent.name == "skill-definitions" else "task_templates"
+        )
+        for index, step in enumerate(document[step_key]):
+            assert "prompt_catalogs" in step, f"{path}:{step_key}[{index}]"
+            assert set(step["prompt_catalogs"]) <= {"context_types", "skills"}
 
 
 def test_skill_step_contracts_round_trip_and_validate() -> None:

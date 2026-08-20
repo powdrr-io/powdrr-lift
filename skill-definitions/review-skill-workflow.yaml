@@ -9,6 +9,7 @@ when_to_use:
   critique.
 steps:
 - id: resolve-target
+  prompt_catalogs: [skills]
   description: Resolve and read the target definition.
   llm_type: long_context
   details: >-
@@ -31,6 +32,7 @@ steps:
     - f
     - -print
 - id: inventory-steps
+  prompt_catalogs: []
   description: Inventory every target step and its execution surface.
   llm_type: standard_reasoning
   details: >-
@@ -46,6 +48,7 @@ steps:
     unmentioned follow-up command as separate calls. Do not infer missing
     instructions from repository conventions.
 - id: score-steps
+  prompt_catalogs: []
   description: Score directive quality and identify scope-preserving rewrites.
   llm_type: high_reasoning
   details: >-
@@ -61,6 +64,7 @@ steps:
     validation or evidence check merely to lower a count. For each finding,
     state the smallest safe change and the requirement it preserves.
 - id: draft-rewrites
+  prompt_catalogs: []
   description: Draft concise, directive replacement steps.
   llm_type: high_reasoning
   details: >-
@@ -75,6 +79,7 @@ steps:
     Present original text, proposed text, tool count, action-clause count, and
     preserved requirements for every rewrite.
 - id: independent-review
+  prompt_catalogs: []
   description: Obtain an independent adversarial completeness review.
   llm_type: high_reasoning
   details: >-
@@ -94,6 +99,7 @@ steps:
     that remain ambiguous. Do not edit the target while the independent review
     is running.
 - id: reconcile-rewrites
+  prompt_catalogs: []
   description: Reconcile feedback and iterate until the rewrite is complete.
   llm_type: high_reasoning
   details: >-
@@ -107,6 +113,7 @@ steps:
     one tool call, no more than three action clauses unless justified, explicit
     invocation instructions, and a complete preserved-requirement list.
 - id: apply-and-publish
+  prompt_catalogs: []
   description: Apply and validate the accepted definition.
   llm_type: fast_iteration
   details: >-
@@ -121,6 +128,7 @@ steps:
     update a pull request in this step.
 
 - id: verify-target-change
+  prompt_catalogs: []
   description: Confirm the reviewed definition changed before preparing a pull request.
   llm_type: simple_task
   details: >-
@@ -141,6 +149,7 @@ steps:
     - <target-definition-path>
 
 - id: stage-for-pull-request
+  prompt_catalogs: []
   description: Stage the reviewed definition for pull-request preparation.
   llm_type: simple_task
   details: >-
@@ -158,6 +167,7 @@ steps:
     - <target-definition-path>
 
 - id: finish-pull-request-prep
+  prompt_catalogs: []
   description: Run final pull-request preparation checks.
   llm_type: simple_task
   details: >-
@@ -169,6 +179,7 @@ steps:
   - finish-pr-prep
 
 - id: create-pull-request
+  prompt_catalogs: []
   description: Create or update the pull request for the reviewed definition.
   llm_type: simple_task
   details: >-

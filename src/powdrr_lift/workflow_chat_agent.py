@@ -2989,6 +2989,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
         "is required.\n"
+        "These next_step and complete rules apply to every step, including steps "
+        "whose optional prompt catalogs are omitted.\n"
         "When the current step declares outputs, provide the completed values "
         "in an outputs object using exactly those declared names. A later step "
         "receives only validated handoff inputs; do not rely on hidden transcript "

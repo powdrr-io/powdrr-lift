@@ -5,9 +5,11 @@ when_to_use:
 - When the flow must gather context and drive implementation.
 steps:
 - description: Capture the feature name, goal, and success criteria.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: Choose a stable kebab-case feature name and ask about outcomes, edge cases, tests, and constraints. Reuse this exact feature name as the work-item name for every generated document.
 - description: Generate the system template and fill it out.
+  prompt_catalogs: []
   llm_type: simple_task
   details: Fill the system template before review.
   tool_invocations:
@@ -18,6 +20,7 @@ steps:
     - "--work-item-name"
     - "<work-item-name>"
 - description: Review the system context before deciding the feature shape.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     After the nested system review completes, invoke the system validator once
@@ -33,6 +36,7 @@ steps:
     - evaluate
     - docs/proposals/<work-item-name>
 - description: Generate the architecture template and fill it out.
+  prompt_catalogs: []
   llm_type: simple_task
   details: Capture the entity model before review.
   tool_invocations:
@@ -45,6 +49,7 @@ steps:
     - "--entity-type"
     - "<type>"
 - description: Review architecture before implementation.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     After the nested architecture review completes, invoke the architecture
@@ -61,6 +66,7 @@ steps:
     - evaluate
     - docs/proposals/<work-item-name>
 - description: Generate the implementation template and fill it out.
+  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Invoke the implementation-specification tool once, complete the generated
@@ -80,6 +86,7 @@ steps:
     - evaluate
     - docs/proposals/<work-item-name>
 - description: Decide on proposed PRs and fill each template.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: Fill PR templates with intent, criteria, tests, and risks.
   tool_invocations:
@@ -90,6 +97,7 @@ steps:
     - "--work-item-name"
     - "<work-item-name>"
 - description: Validate every generated specification before implementation.
+  prompt_catalogs: []
   llm_type: fast_iteration
   details: >-
     Run the generic evaluator below once for the specification directory. If it
@@ -105,10 +113,12 @@ steps:
     - docs/proposals/<work-item-name>
 - description: If any specification validation fails, fix it and return to the validation
     step.
+  prompt_catalogs: []
   llm_type: fast_iteration
   details: Do not begin implementation or create a pull request while any required
     specification remains invalid.
 - description: Stage the validated specification artifacts for pull request preparation.
+  prompt_catalogs: []
   llm_type: simple_task
   details: Inspect the worktree and stage only the validated specification
     artifacts under docs/proposals/<work-item-name>/. Do not commit or create the
@@ -124,6 +134,7 @@ steps:
     - add
     - docs/proposals/<work-item-name>
 - description: Run finish-pr-prep before creating the pull request.
+  prompt_catalogs: []
   llm_type: fast_iteration
   details: Run finish-pr-prep after the intended specification artifacts are staged.
     If cleanup changes files, restage only the validated specification artifacts
@@ -131,6 +142,7 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Create or update the pull request for the validated feature.
+  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `feature`, commit message `Add

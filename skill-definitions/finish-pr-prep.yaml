@@ -7,6 +7,7 @@ when_to_use:
   staged file set is known.
 steps:
 - description: Confirm the staged pull request scope and validation commands.
+  prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
     Inspect the staged and unstaged diff before final validation. Confirm that
@@ -35,6 +36,7 @@ steps:
     - --cached
     - --stat
 - description: Run the final formatting, lint, type-check, and test passes.
+  prompt_catalogs: []
   llm_type: fast_iteration
   details: >-
     Run every validation command returned by the matching tool references for
@@ -43,6 +45,7 @@ steps:
     affected command until the final state is clean. Do not continue while any
     required check is failing.
 - description: Leave the branch ready for pull request creation.
+  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Invoke the listed `powdrr-lift repository-state` tool exactly once. Use its

@@ -8,6 +8,7 @@ when_to_use:
   pull request.
 steps:
 - description: Inspect the pull request and collect its review comments.
+  prompt_catalogs: []
   llm_type: long_context
   details: >-
     Resolve the current pull request from the worktree branch and inspect its
@@ -42,6 +43,7 @@ steps:
     - -f
     - query=<review-thread-query>
 - id: classify-comments
+  prompt_catalogs: []
   description: Classify each comment against the feature contract.
   llm_type: high_reasoning
   details: >-
@@ -56,6 +58,7 @@ steps:
     or another comment, identify the conflict and resolve it from the most
     authoritative specification rather than silently guessing.
 - id: update-specifications
+  prompt_catalogs: []
   description: Update the v1 specification for design-level feedback.
   llm_type: standard_reasoning
   details: >-
@@ -84,6 +87,7 @@ steps:
     - --work-item-name
     - <work-item-name>
 - id: implement-corrections
+  prompt_catalogs: []
   description: Implement and test every actionable review correction.
   llm_type: high_reasoning
   details: >-
@@ -107,6 +111,7 @@ steps:
     - powdrr-lift
     - repository-state
 - id: validate-corrections
+  prompt_catalogs: []
   description: Run finish-pr-prep on the final staged changes.
   llm_type: fast_iteration
   details: >-
@@ -118,6 +123,7 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Commit and push the addressed changes to the existing pull request.
+  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `review-comments`, commit message

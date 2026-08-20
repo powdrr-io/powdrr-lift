@@ -459,6 +459,7 @@ def build_workflow_task_validation_report(
             "llm_type",
             "uses_skills",
             "tool_invocations",
+            "prompt_catalogs",
         },
         issues,
         path=_format_path(source_path) or "",

@@ -490,6 +490,7 @@ def build_workflow_template_validation_report(
                 "llm_type",
                 "uses_skills",
                 "tool_invocations",
+                "prompt_catalogs",
                 "output_state_type",
                 "dependent_state",
                 "generation",

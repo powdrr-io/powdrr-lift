@@ -6,15 +6,18 @@ when_to_use:
   fit.
 steps:
 - description: Gather the requirements and approach context.
+  prompt_catalogs: [context_types]
   llm_type: simple_task
   details: Use the requirements and approach context to understand the new needs before
     judging the system specification.
 - description: Decide whether the current system specification needs to change.
+  prompt_catalogs: []
   llm_type: high_reasoning
   details: Compare the gathered requirements and approach against the new needs. If
     the existing spec already covers them, report that no update is needed and stop.
 - description: Generate and fill the system specification template only when changes
     are required.
+  prompt_catalogs: []
   llm_type: standard_reasoning
   details: Run the system specification command, then fill the generated template
     with the required updates.
@@ -26,6 +29,7 @@ steps:
     - "--work-item-name"
     - "<work-item-name>"
 - description: Validate the updated system specification and confirm it is still consistent.
+  prompt_catalogs: []
   llm_type: fast_iteration
   details: >-
     Invoke the generic evaluator exactly once after the specification

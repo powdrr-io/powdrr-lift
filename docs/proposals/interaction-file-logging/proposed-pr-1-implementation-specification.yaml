@@ -1,0 +1,34 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Add interaction log entry persistence and validation
+architecture_id: '2026-08-14'
+entities:
+- id: interaction-log-entry
+  action: added
+  rationale: Core entity representing a single interaction log entry to be persisted.
+modules:
+- id: logging-module
+  action: added
+  relative_location: src/powdrr_lift/logging/
+  purpose: Module for creating, persisting, and validating interaction log entries.
+tools:
+- id: interaction-log-validator
+  action: added
+  when_to_use: Validate interaction log entries against the schema.
+  template: uv run powdrr-lift validate-log
+  how_to_use: Run from repository root.
+entity_relationships:
+- id: rel-log-entry-to-file
+  action: added
+  rationale: Links each log entry to the file it was written to.
+features:
+- id: feature-log-entry-persistence
+  action: added
+  description: Persist interaction log entries to a file.
+  functional_requirements:
+  - Create a log entry with timestamp and content.
+  - Append log entries to a designated log file.
+  - Validate log entries before writing.
+decisions:
+- id: decision-log-format
+  action: added
+  description: Use a simple line-based format for log entries.

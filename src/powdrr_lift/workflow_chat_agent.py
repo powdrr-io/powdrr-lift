@@ -505,7 +505,6 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     failure_kind: str = "validation_error"
     current_step: Any = None
     current_step_index: int = 0
-    step_roundtrips: int = 0
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -622,7 +621,6 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.current_model,
                 mapping=step_mapping,
             )
-            self.step_roundtrips += 1
             parent_skill, parent_step_index = self._parent_progress()
             self.progress.update(
                 self.selected_skill,
@@ -700,9 +698,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.progress.update(
             self.selected_skill,
             current_step_index=self.current_step_index,
-            status=(
-                f"roundtrip {self.step_roundtrips}: {workflow_action_summary(action)}"
-            ),
+            status=(f"roundtrip {roundtrip}: {workflow_action_summary(action)}"),
             parent_skill=parent_skill,
             parent_step_index=parent_step_index,
         )
@@ -930,7 +926,6 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ):
                     outcome = WorkflowActionOutcome(continue_running=False)
         if self.state.step_index != self.current_step_index:
-            self.step_roundtrips = 0
             self.driver.action_engine.reset_progress()
         if not outcome.continue_running:
             parent_skill, parent_step_index = self._parent_progress()
@@ -2913,8 +2908,9 @@ def _action_system_prompt() -> str:
         "takes "
         "a skill name from available_skills; goto_step takes a step_id matching "
         "an id on a step in the current skill; next_step has "
-        "no action-specific fields; read_document requires file_path, positive "
-        "start_line and positive end_line for a range of at most 2000 lines; "
+        "no action-specific fields; read_document requires file_path, non-negative "
+        "start_line and end_line for a range of at most 2000 lines. Line 0 means "
+        "the beginning of the document, and an end_line beyond EOF is clamped; "
         "complete may include a human-readable text.\n"
         '{"kind":"gather_context","feature_id":"display-related-photos",'
         '"types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
@@ -3420,24 +3416,26 @@ def _handle_workflow_action_read_document(
             f"Workflow read_document action file does not exist: {action.file_path}"
         )
     lines = target_path.read_text(encoding="utf-8").splitlines()
-    if action.start_line > len(lines) or action.end_line > len(lines):
+    if action.start_line > len(lines) and lines:
         raise RuntimeError(
             f"Workflow read_document action line range {action.start_line}-"
             f"{action.end_line} is outside the document, which has "
             f"{len(lines)} lines."
         )
 
+    excerpt_start_line = max(1, action.start_line)
+    excerpt_end_line = min(action.end_line, len(lines))
     excerpt = {
         "path": str(target_path.relative_to(state.worktree_root)),
-        "start_line": action.start_line,
-        "end_line": action.end_line,
+        "start_line": excerpt_start_line,
+        "end_line": excerpt_end_line,
         "document_line_count": len(lines),
         "lines": [
             {
                 "line_number": line_number,
                 "text": lines[line_number - 1],
             }
-            for line_number in range(action.start_line, action.end_line + 1)
+            for line_number in range(excerpt_start_line, excerpt_end_line + 1)
         ],
     }
     excerpt_text = json.dumps(excerpt, ensure_ascii=False)
@@ -4235,11 +4233,11 @@ def _parse_workflow_action_read_document(
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
         raise RuntimeError("Workflow read_document action must include file_path.")
-    start_line = _required_edit_line_number(
+    start_line = _required_document_line_number(
         payload.get("start_line"),
         field_name="start_line",
     )
-    end_line = _required_edit_line_number(
+    end_line = _required_document_line_number(
         payload.get("end_line"),
         field_name="end_line",
     )
@@ -4684,6 +4682,15 @@ def _required_edit_line_number(value: object, *, field_name: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise RuntimeError(
             f"Workflow edit action {field_name} must be a positive integer."
+        )
+    return value
+
+
+def _required_document_line_number(value: object, *, field_name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise RuntimeError(
+            f"Workflow read_document action {field_name} must be a "
+            "non-negative integer."
         )
     return value
 

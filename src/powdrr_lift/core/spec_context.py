@@ -218,39 +218,45 @@ def _iter_context_specification_paths(
     *,
     feature_id: str | None = None,
 ) -> list[Path]:
+    """Return current documents plus one explicitly requested proposal tree.
+
+    Context discovery is intentionally path-scoped.  The current tree is the
+    default source of truth; proposal documents are supplemental and are only
+    included when the caller supplies a work-item directory.  Select one
+    proposal root so a repository containing both the canonical and legacy
+    layouts cannot silently merge two different proposals.
+    """
+
+    def yaml_files(root: Path) -> list[Path]:
+        if not root.is_dir():
+            return []
+        return [
+            path
+            for path in sorted((*root.rglob("*.yaml"), *root.rglob("*.yml")))
+            if path.is_file()
+        ]
+
     paths: list[Path] = []
     for docs_root in (
         repo_root / "docs" / "current",
         repo_root / "docs" / "specs",
     ):
-        if docs_root.exists():
-            paths.extend(
-                path for path in sorted(docs_root.rglob("*.yaml")) if path.is_file()
-            )
+        paths.extend(yaml_files(docs_root))
 
-    proposal_roots = (
-        repo_root / "docs" / "proposed",
-        repo_root / "docs" / "proposals",
-    )
     if feature_id is not None:
-        scoped_roots: list[Path] = []
-        for proposals_root in proposal_roots:
-            exact_root = proposals_root / feature_id
-            if exact_root.is_dir():
-                scoped_roots.append(exact_root)
-
-        for proposal_root in scoped_roots:
-            paths.extend(
-                path for path in sorted(proposal_root.rglob("*.yaml")) if path.is_file()
-            )
+        # ``proposed`` was used briefly; ``proposals`` is the canonical root.
+        # Prefer the canonical path and never combine both trees for one query.
+        for proposals_root in (
+            repo_root / "docs" / "proposals",
+            repo_root / "docs" / "proposed",
+        ):
+            proposal_root = proposals_root / feature_id
+            if proposal_root.is_dir():
+                paths.extend(yaml_files(proposal_root))
+                break
 
     project_structure_root = repo_root / "docs" / "project_structure"
-    if project_structure_root.exists():
-        paths.extend(
-            path
-            for path in sorted(project_structure_root.rglob("*.yaml"))
-            if path.is_file()
-        )
+    paths.extend(yaml_files(project_structure_root))
 
     current_state_path = repo_root / ".powdrr-lift" / "state" / "current-state.yaml"
     if current_state_path.is_file():

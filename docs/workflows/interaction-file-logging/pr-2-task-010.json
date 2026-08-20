@@ -1,0 +1,39 @@
+{
+  "task_id": "pr-2-task-010",
+  "status": "open",
+  "upstream_task_ids": [
+    "pr-2-task-005",
+    "pr-2-task-006",
+    "pr-2-task-007",
+    "pr-2-task-008",
+    "pr-2-task-009"
+  ],
+  "dependent_state": [
+    "staged-for-pull-request"
+  ],
+  "complexity": "medium",
+  "input_state": {
+    "implementation_diffs": "pr-2-task-005.generated-product-code-state",
+    "test_results": "pr-2-task-006.all-tests-passing-state",
+    "completeness_review": "pr-2-task-007.specification-completeness-state",
+    "lint_results": "pr-2-task-008.linted-and-cleaned-state",
+    "promoted_documents": "pr-2-task-009.promoted-current-state-documents",
+    "staged_changes": {}
+  },
+  "assignee_type": "agent",
+  "assignee_role": "reviewer",
+  "output_state_type": "staged-pull-request-state",
+  "description": "Stage the pull request changes",
+  "details": "Inspect the final diff and stage only the intended pull-request files. Ensure the staged set matches the approved scope and record the staged paths in output_state before final pull-request preparation.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'pr-2'. Use these values as search context and verify repository documents before deciding what they identify.",
+  "llm_type": "simple_task",
+  "tool_invocations": [
+    {
+      "tool": "shell",
+      "command": [
+        "git",
+        "status",
+        "--short"
+      ]
+    }
+  ]
+}

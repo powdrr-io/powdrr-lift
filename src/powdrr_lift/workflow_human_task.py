@@ -73,11 +73,12 @@ def run_human_task(
                 configured_git_state,
                 configured_task.task_id,
             )
-            repo_root, workflow_dir = create_task_worktree(
+            task_worktree, _task_branch = create_task_worktree(
                 project_root,
                 configured_git_state,
                 configured_task.task_id,
             )
+            repo_root = task_worktree
             workflow_dir = repo_root / configured_git_state.workflow_relative_directory
         except WorkflowGitInconsistency as exc:
             print(

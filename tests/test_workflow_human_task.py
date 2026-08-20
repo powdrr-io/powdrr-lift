@@ -3,6 +3,9 @@ from __future__ import annotations
 import io
 import subprocess
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from powdrr_lift.core.workflow_task_specification import (
     AssigneeType,
@@ -92,7 +95,7 @@ def test_run_human_task_can_select_role_and_read_answer_file(tmp_path: Path) -> 
 
 def test_run_human_task_claims_git_task_and_publishes_completion(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _git(tmp_path, "init", "-b", "main")
     _git(tmp_path, "config", "user.email", "test@example.com")
@@ -129,7 +132,14 @@ def test_run_human_task_claims_git_task_and_publishes_completion(
 
     published: dict[str, object] = {}
 
-    def _fake_publish(repo_root, published_workflow, *, reason, stdout, **kwargs):
+    def _fake_publish(
+        repo_root: Path,
+        published_workflow: WorkflowInstance,
+        *,
+        reason: str,
+        stdout: object,
+        **kwargs: Any,
+    ) -> None:
         published.update(
             repo_root=repo_root,
             workflow=published_workflow,
@@ -158,10 +168,10 @@ def test_run_human_task_claims_git_task_and_publishes_completion(
     )
 
     assert "complete human task human-review" == published["reason"]
-    assert published["repo_root"].name == "human-review"
-    task_branch_workflow = (
-        Path(published["repo_root"]) / "docs" / "workflows" / "feature-17"
-    )
+    published_root = published["repo_root"]
+    assert isinstance(published_root, Path)
+    assert published_root.name == "human-review"
+    task_branch_workflow = published_root / "docs" / "workflows" / "feature-17"
     completed = WorkflowInstance.from_directory(task_branch_workflow).tasks[0]
     assert completed.status is TaskStatus.COMPLETED
     assert completed.output_state == {"answer": "Approved."}

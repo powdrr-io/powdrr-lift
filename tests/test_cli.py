@@ -271,6 +271,7 @@ def test_cli_process_human_task_wires_configuration(
     assert config.workflow_dir == workflow_dir
     assert config.repo_root == tmp_path
     assert config.task_id == "human-task-1"
+    assert config.assignee_role is not None
     assert config.assignee_role.value == "reviewer"
     assert config.answer_file == answer_file
 

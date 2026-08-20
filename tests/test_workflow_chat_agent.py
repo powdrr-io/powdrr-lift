@@ -187,6 +187,22 @@ def test_latest_execution_event_keeps_only_the_latest_result_for_prompt() -> Non
     assert _latest_execution_event_for_prompt(events) == events[-1]
 
 
+def test_prompt_transcript_omits_action_observations_represented_by_events() -> None:
+    transcript = [
+        {"role": "user", "content": "Implement the change."},
+        {"role": "assistant", "content": '{"kind":"read_document"}'},
+        {"role": "user", "content": '{"document_context":{"lines":[]}}'},
+        {"role": "assistant", "content": "I need one decision."},
+        {"role": "user", "content": "Use the existing interface."},
+    ]
+
+    assert _prompt_transcript(transcript) == [
+        {"role": "user", "content": "Implement the change."},
+        {"role": "assistant", "content": "I need one decision."},
+        {"role": "user", "content": "Use the existing interface."},
+    ]
+
+
 def test_workflow_action_summary_explains_action_and_reason() -> None:
     summary = workflow_action_summary(
         WorkflowAction(

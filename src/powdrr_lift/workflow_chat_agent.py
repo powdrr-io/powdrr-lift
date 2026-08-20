@@ -2806,7 +2806,10 @@ def _execution_events_for_prompt(
     event stream as metadata while leaving the complete event stream intact
     for persistence and diagnostics.
     """
-    return prune_execution_events(execution_events, include_results=False)
+    return [
+        {key: value for key, value in event.items() if key != "decisions_and_context"}
+        for event in prune_execution_events(execution_events, include_results=False)
+    ]
 
 
 def _latest_execution_event_for_prompt(
@@ -2816,26 +2819,55 @@ def _latest_execution_event_for_prompt(
     if not execution_events:
         return None
     latest = prune_execution_events(execution_events[-1:], include_results=True)
-    return latest[0] if latest else None
+    if not latest:
+        return None
+    return {
+        key: value for key, value in latest[0].items() if key != "decisions_and_context"
+    }
+
+
+_PROMPT_OBSERVATION_RESULT_KEYS = {
+    "tool_result",
+    "edit_result",
+    "yaml_edit_result",
+    "document_context",
+}
+
+
+def _is_prompt_observation_message(message: Mapping[str, str]) -> bool:
+    """Identify action/result transcript entries represented by event state."""
+    content = message.get("content", "")
+    try:
+        decoded = json.loads(content)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(decoded, Mapping):
+        return False
+    if message.get("role") == "assistant":
+        return isinstance(decoded.get("kind"), str)
+    return bool(_PROMPT_OBSERVATION_RESULT_KEYS.intersection(decoded))
 
 
 def _prompt_transcript(
     transcript: Sequence[dict[str, str]],
 ) -> list[dict[str, str]]:
     """Keep recurring prompts bounded while retaining the complete transcript."""
-    if len(transcript) <= _MAX_PROMPT_TRANSCRIPT_ENTRIES:
-        return list(transcript)
+    conversational = [
+        message for message in transcript if not _is_prompt_observation_message(message)
+    ]
+    if len(conversational) <= _MAX_PROMPT_TRANSCRIPT_ENTRIES:
+        return conversational
 
     first = {
-        **transcript[0],
-        "content": _truncate_prompt_content(transcript[0].get("content", "")),
+        **conversational[0],
+        "content": _truncate_prompt_content(conversational[0].get("content", "")),
     }
     recent = [
         {
             **message,
             "content": _truncate_prompt_content(message.get("content", "")),
         }
-        for message in transcript[-(_MAX_PROMPT_TRANSCRIPT_ENTRIES - 2) :]
+        for message in conversational[-(_MAX_PROMPT_TRANSCRIPT_ENTRIES - 2) :]
     ]
     omitted = {
         "role": "user",

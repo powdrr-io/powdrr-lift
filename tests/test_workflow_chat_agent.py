@@ -86,6 +86,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execution_events_for_prompt,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
+    _latest_execution_event_for_prompt,
     _LLMExchangeRecordingClient,
     _load_workflow_context,
     _long_context_backup_for,
@@ -173,6 +174,15 @@ def test_execution_events_for_prompt_compacts_results_without_mutating_summary_d
         }
     ]
     assert events[0]["result"] == {"stdout": "a large result"}
+
+
+def test_latest_execution_event_keeps_only_the_latest_result_for_prompt() -> None:
+    events = [
+        {"kind": "edit", "result": {"file_path": "old.py"}},
+        {"kind": "invoke_tool", "result": {"stdout": "latest output"}},
+    ]
+
+    assert _latest_execution_event_for_prompt(events) == events[-1]
 
 
 def test_workflow_action_summary_explains_action_and_reason() -> None:

@@ -2557,6 +2557,7 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
 
     stdout = io.StringIO()
     stderr = io.StringIO()
+    progress_statuses: list[str] = []
     exit_code = run_workflow_chat(
         SkillChatConfig(
             skills_dir=skills_dir,
@@ -2569,10 +2570,19 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
         input_func=lambda: "Build the feature",
         stdout=stdout,
         stderr=stderr,
+        progress_callback=lambda _skill, _step, status, _parent, _parent_step: (
+            progress_statuses.append(status)
+        ),
     )
 
     assert exit_code == 0
     assert "Done." in stdout.getvalue()
+    assert any(
+        status.startswith("roundtrip 7: next_step") for status in progress_statuses
+    )
+    assert any(
+        status.startswith("roundtrip 8: complete") for status in progress_statuses
+    )
 
 
 def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
@@ -2993,6 +3003,45 @@ def test_read_document_action_returns_requested_lines_as_next_context(
         "three",
     ]
     assert state.execution_events[-1]["kind"] == "read_document"
+
+
+def test_read_document_action_clamps_range_past_end_of_short_document(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "short.md"
+    document.write_text("one\ntwo\nthree\n", encoding="utf-8")
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "kind": "read_document",
+            "file_path": "short.md",
+            "start_line": 0,
+            "end_line": 200,
+        }
+    )
+
+    assert (
+        _handle_workflow_action_read_document(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    context = json.loads(state.transcript[-1]["content"])["document_context"]
+    assert context["start_line"] == 1
+    assert context["end_line"] == 3
+    assert [line["text"] for line in context["lines"]] == ["one", "two", "three"]
 
 
 def test_run_workflow_chat_gathers_context_into_follow_up_step(

@@ -121,8 +121,8 @@ _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
-_MAX_PROMPT_TRANSCRIPT_ENTRIES = 32
-_MAX_PROMPT_TRANSCRIPT_CHARS = 24000
+_MAX_PROMPT_TRANSCRIPT_ENTRIES = 12
+_MAX_PROMPT_TRANSCRIPT_CHARS = 12000
 _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
 _MAX_PROMPT_FILE_LINES = 200
 _MAX_PROMPT_FILE_CHARS = 16000
@@ -2757,6 +2757,16 @@ def _execution_events_for_prompt(
     return prune_execution_events(execution_events, include_results=False)
 
 
+def _latest_execution_event_for_prompt(
+    execution_events: Sequence[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Retain the latest result separately from the compact event metadata."""
+    if not execution_events:
+        return None
+    latest = prune_execution_events(execution_events[-1:], include_results=True)
+    return latest[0] if latest else None
+
+
 def _prompt_transcript(
     transcript: Sequence[dict[str, str]],
 ) -> list[dict[str, str]]:
@@ -2894,6 +2904,7 @@ def _build_step_execution_messages(
         "selected_skill": _selected_skill_prompt_data(selected_skill),
         "transcript": _prompt_transcript(transcript),
         "execution_events": _execution_events_for_prompt(execution_events),
+        "latest_action": _latest_execution_event_for_prompt(execution_events),
         "current_file": current_file_context,
     }
     if _step_needs_prompt_catalog(current_step, "context_types"):
@@ -2944,7 +2955,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
     return (
         "Task: execute the current checked-in skill step using the current step, "
         "prior step context, transcript, execution events, available tools, and "
-        "current file context in the user message. Choose the single next action "
+        "latest_action result, and current file context in the user message. "
+        "Choose the single next action "
         "that makes the most progress without asking for information already "
         "available.\n"
         "When current_step.uses_skills is non-empty, those skills run automatically "

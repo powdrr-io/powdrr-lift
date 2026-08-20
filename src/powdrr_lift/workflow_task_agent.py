@@ -58,6 +58,8 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_file_path,
     _step_index_by_id,
     _validate_internal_command,
+    _validate_workflow_action_outputs,
+    _validate_workflow_handoff,
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_git import (
@@ -1470,11 +1472,27 @@ def _run_skill_for_agent(
             list[dict[str, str]],
             list[dict[str, Any]],
             list[str],
+            dict[str, dict[str, Any]],
         ]
-    ] = [(selected_skill, 0, False, [], [], [])]
+    ] = [(selected_skill, 0, False, [], [], [], {})]
     transcript = [] if clean else [{"role": "user", "content": task.description}]
     execution_events: list[dict[str, Any]] = []
     execution_context = list(context)
+    handoff_records: dict[str, dict[str, Any]] = {}
+    if isinstance(task.input_state, Mapping):
+        handoff_records.update(
+            {
+                str(name): {
+                    "name": str(name),
+                    "type": "any",
+                    "value": value,
+                    "produced_by": {"source": "task_context"},
+                    "source": "task_context",
+                    "scope": "skill",
+                }
+                for name, value in task.input_state.items()
+            }
+        )
     if not clean:
         execution_context = [
             f"Task input: {json.dumps(task.input_state, ensure_ascii=False)}",
@@ -1490,6 +1508,7 @@ def _run_skill_for_agent(
             parent_transcript,
             parent_events,
             parent_context,
+            parent_handoff_records,
         ) = stack[-1]
         if step_index >= len(current_skill.skill.steps):
             stack.pop()
@@ -1497,6 +1516,7 @@ def _run_skill_for_agent(
                 transcript = parent_transcript
                 execution_events = parent_events
                 execution_context = parent_context
+                handoff_records = parent_handoff_records
             continue
         step = current_skill.skill.steps[step_index]
         messages = _build_step_execution_messages(
@@ -1506,6 +1526,7 @@ def _run_skill_for_agent(
             transcript=transcript,
             execution_events=execution_events,
             execution_context=execution_context,
+            handoff_records=handoff_records,
             current_file_path=None,
             worktree_root=repo_root,
             catalog=catalog,
@@ -1519,6 +1540,7 @@ def _run_skill_for_agent(
             max_timeout_retries=max_timeout_retries,
             timeout_backoff_seconds=timeout_backoff_seconds,
         )
+        _validate_workflow_action_outputs(action, step)
         observation = action_engine.observe_action(
             action,
             signature=workflow_action_signature,
@@ -1540,16 +1562,31 @@ def _run_skill_for_agent(
             action_engine.reset_progress()
             continue
         if action.kind == "complete":
+            _validate_workflow_action_outputs(action, step)
+            _record_task_action_outputs(action, handoff_records, step, step_index)
             stack.pop()
             if clean_context:
                 transcript = parent_transcript
                 execution_events = parent_events
                 execution_context = parent_context
+                handoff_records = parent_handoff_records
             execution_events.append(
                 {"kind": action.kind, "skill": current_skill.skill.name}
             )
             continue
         if action.kind == "next_step":
+            _validate_workflow_action_outputs(action, step)
+            next_step = (
+                current_skill.skill.steps[step_index + 1]
+                if step_index + 1 < len(current_skill.skill.steps)
+                else None
+            )
+            _validate_workflow_handoff(
+                step,
+                next_step,
+                handoff_records,
+                current_step_index=step_index,
+            )
             stack[-1] = (
                 current_skill,
                 step_index + 1,
@@ -1557,6 +1594,7 @@ def _run_skill_for_agent(
                 parent_transcript,
                 parent_events,
                 parent_context,
+                handoff_records,
             )
             execution_events.append(
                 {"kind": action.kind, "skill": current_skill.skill.name}
@@ -1571,6 +1609,7 @@ def _run_skill_for_agent(
                 parent_transcript,
                 parent_events,
                 parent_context,
+                handoff_records,
             )
             if action.decisions_and_context:
                 execution_context.append(action.decisions_and_context)
@@ -1602,6 +1641,7 @@ def _run_skill_for_agent(
                 parent_transcript,
                 parent_events,
                 parent_context,
+                handoff_records,
             )
             stack.append(
                 (
@@ -1611,6 +1651,7 @@ def _run_skill_for_agent(
                     list(transcript),
                     list(execution_events),
                     list(execution_context),
+                    dict(handoff_records) if action.clean else handoff_records,
                 )
             )
             execution_events.append({"kind": action.kind, "skill": action.skill_name})
@@ -1618,6 +1659,7 @@ def _run_skill_for_agent(
                 transcript = []
                 execution_events = []
                 execution_context = nested_context
+                handoff_records = {}
             else:
                 execution_context.extend(nested_context)
             continue
@@ -1634,6 +1676,7 @@ def _run_skill_for_agent(
                     "result": json.loads(render_gather_context_report(report)),
                 }
             )
+            _record_task_action_outputs(action, handoff_records, step, step_index)
             continue
         if action.kind == "read_document":
             execution_events.append(
@@ -1642,6 +1685,7 @@ def _run_skill_for_agent(
                     "result": _read_task_document(action, repo_root),
                 }
             )
+            _record_task_action_outputs(action, handoff_records, step, step_index)
             continue
         if action.kind == "edit":
             execution_events.append(
@@ -1650,6 +1694,7 @@ def _run_skill_for_agent(
                     "result": _apply_task_edits(action, repo_root),
                 }
             )
+            _record_task_action_outputs(action, handoff_records, step, step_index)
             continue
         if action.kind == "invoke_tool":
             if action.tool in {"shell", "internal"}:
@@ -1676,11 +1721,32 @@ def _run_skill_for_agent(
             else:
                 raise RuntimeError(f"Unsupported nested skill tool: {action.tool!r}")
             execution_events.append({"kind": action.kind, "result": result})
+            _record_task_action_outputs(action, handoff_records, step, step_index)
             continue
         if action.kind == "prompt_user":
             raise RuntimeError("Nested skills in agent workflows cannot prompt users.")
         raise RuntimeError(f"Unsupported nested skill action: {action.kind!r}")
     return {"skill": skill_name, "events": execution_events}
+
+
+def _record_task_action_outputs(
+    action: WorkflowAction,
+    records: dict[str, dict[str, Any]],
+    step: Any,
+    step_index: int,
+) -> None:
+    if not action.outputs:
+        return
+    declarations = {output.name: output for output in step.outputs}
+    for name, value in action.outputs.items():
+        declaration = declarations.get(name)
+        records[name] = {
+            "name": name,
+            "type": declaration.type if declaration is not None else "any",
+            "value": value,
+            "produced_by": {"step_index": step_index, "action": action.kind},
+            "scope": declaration.scope if declaration is not None else "skill",
+        }
 
 
 def _read_task_document(

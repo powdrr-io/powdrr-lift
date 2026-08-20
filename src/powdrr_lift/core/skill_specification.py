@@ -65,6 +65,38 @@ class SkillToolInvocation:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillStepInput:
+    name: str
+    type: str = "any"
+    required: bool = True
+    source: str = "previous_step"
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "type": self.type,
+            "required": self.required,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SkillStepOutput:
+    name: str
+    type: str = "any"
+    required_for_next_step: bool = False
+    scope: str = "skill"
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "type": self.type,
+            "required_for_next_step": self.required_for_next_step,
+            "scope": self.scope,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -72,6 +104,8 @@ class SkillStep:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     id: str | None = None
+    inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
+    outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {"description": self.description}
@@ -87,6 +121,10 @@ class SkillStep:
             data["tool_invocations"] = [
                 tool_invocation.to_data() for tool_invocation in self.tool_invocations
             ]
+        if self.inputs:
+            data["inputs"] = [item.to_data() for item in self.inputs]
+        if self.outputs:
+            data["outputs"] = [item.to_data() for item in self.outputs]
         return data
 
 
@@ -346,6 +384,8 @@ def build_skill_validation_report(
                     "llm_type",
                     "uses_skills",
                     "tool_invocations",
+                    "inputs",
+                    "outputs",
                 },
                 issues,
                 path=step_path or "",
@@ -457,6 +497,8 @@ def build_skill_validation_report(
                         )
                         continue
                     seen_refs.add(normalized_ref)
+
+            _validate_step_contracts(step_mapping, step_path, issues)
 
             tool_invocations = step_mapping.get("tool_invocations")
             if tool_invocations is None:
@@ -862,6 +904,97 @@ def _parse_steps(raw_steps: object) -> tuple[SkillStep, ...]:
     return tuple(_parse_step(raw_step) for raw_step in raw_steps)
 
 
+def _validate_step_contracts(
+    step_mapping: Mapping[str, Any],
+    step_path: str,
+    issues: list[SkillValidationIssue],
+) -> None:
+    for field_name, item_keys in (
+        ("inputs", {"name", "type", "required", "source"}),
+        ("outputs", {"name", "type", "required_for_next_step", "scope"}),
+    ):
+        value = step_mapping.get(field_name)
+        if value is None:
+            continue
+        field_path = _child_path(step_path, field_name)
+        if not isinstance(value, Sequence) or isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            issues.append(
+                SkillValidationIssue(
+                    code=f"invalid_{field_name}_type",
+                    message=f"Skill step {field_name} must be an array.",
+                    path=field_path,
+                )
+            )
+            continue
+        seen_names: set[str] = set()
+        for index, item in enumerate(value):
+            item_path = _sequence_path(step_path, field_name, index)
+            if not isinstance(item, Mapping):
+                issues.append(
+                    SkillValidationIssue(
+                        code=f"invalid_{field_name[:-1]}_type",
+                        message=f"Skill step {field_name} must contain objects.",
+                        path=item_path,
+                    )
+                )
+                continue
+            _validate_unknown_keys(
+                item,
+                item_keys,
+                issues,
+                path=item_path,
+                subject=f"skill step {field_name[:-1]}",
+            )
+            name = _optional_string(item.get("name"))
+            if name is None:
+                issues.append(
+                    SkillValidationIssue(
+                        code=f"missing_{field_name[:-1]}_name",
+                        message=f"Skill step {field_name} must include a name.",
+                        path=_child_path(item_path, "name"),
+                    )
+                )
+            elif name in seen_names:
+                issues.append(
+                    SkillValidationIssue(
+                        code=f"duplicate_{field_name[:-1]}_name",
+                        message=(
+                            f"Skill step {field_name} names must be unique; "
+                            f"{name!r} is repeated."
+                        ),
+                        path=_child_path(item_path, "name"),
+                    )
+                )
+            else:
+                seen_names.add(name)
+            if (
+                item.get("type") is not None
+                and _optional_string(item.get("type")) is None
+            ):
+                issues.append(
+                    SkillValidationIssue(
+                        code=f"invalid_{field_name[:-1]}_type_name",
+                        message=(
+                            f"Skill step {field_name} type must be a non-empty string."
+                        ),
+                        path=_child_path(item_path, "type"),
+                    )
+                )
+            boolean_key = (
+                "required" if field_name == "inputs" else "required_for_next_step"
+            )
+            if boolean_key in item and not isinstance(item[boolean_key], bool):
+                issues.append(
+                    SkillValidationIssue(
+                        code=f"invalid_{boolean_key}",
+                        message=f"Skill step {boolean_key} must be a boolean.",
+                        path=_child_path(item_path, boolean_key),
+                    )
+                )
+
+
 def _parse_step(raw_step: object) -> SkillStep:
     if not isinstance(raw_step, Mapping):
         raise ValueError("Skill steps must be objects.")
@@ -878,6 +1011,8 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     tool_invocations = _optional_tool_invocations(
         data.get("tool_invocations"),
     )
+    inputs = _parse_step_inputs(data.get("inputs"))
+    outputs = _parse_step_outputs(data.get("outputs"))
     return SkillStep(
         id=step_id,
         description=description,
@@ -885,7 +1020,49 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         llm_type=llm_type,
         uses_skills=uses_skills,
         tool_invocations=tool_invocations,
+        inputs=inputs,
+        outputs=outputs,
     )
+
+
+def _parse_step_inputs(value: object) -> tuple[SkillStepInput, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("Skill step inputs must be an array.")
+    result: list[SkillStepInput] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise ValueError("Skill step inputs must contain objects.")
+        name = _required_string(item, "name")
+        item_type = _optional_string(item.get("type")) or "any"
+        source = _optional_string(item.get("source")) or "previous_step"
+        required = item.get("required", True)
+        if not isinstance(required, bool):
+            raise ValueError("Skill step input required must be a boolean.")
+        result.append(SkillStepInput(name, item_type, required, source))
+    return tuple(result)
+
+
+def _parse_step_outputs(value: object) -> tuple[SkillStepOutput, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("Skill step outputs must be an array.")
+    result: list[SkillStepOutput] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise ValueError("Skill step outputs must contain objects.")
+        name = _required_string(item, "name")
+        item_type = _optional_string(item.get("type")) or "any"
+        required_for_next_step = item.get("required_for_next_step", False)
+        if not isinstance(required_for_next_step, bool):
+            raise ValueError(
+                "Skill step output required_for_next_step must be a boolean."
+            )
+        scope = _optional_string(item.get("scope")) or "skill"
+        result.append(SkillStepOutput(name, item_type, required_for_next_step, scope))
+    return tuple(result)
 
 
 def _report_to_data(report: SkillValidationReport) -> dict[str, Any]:

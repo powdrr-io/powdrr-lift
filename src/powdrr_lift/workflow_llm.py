@@ -96,6 +96,7 @@ class WorkflowAction:
     end_line: int | None = None
     text: str | None = None
     output_state: Any = None
+    outputs: dict[str, Any] = field(default_factory=dict)
     parameters: dict[str, Any] = field(default_factory=dict)
     edits: tuple[WorkflowEdit, ...] = field(default_factory=tuple)
     file_edits: tuple[WorkflowFileEdits, ...] = field(default_factory=tuple)

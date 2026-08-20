@@ -1,0 +1,35 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Add interaction log query and reporting
+architecture_id: '2026-08-14'
+entities:
+- id: interaction-log-entry
+  action: added
+  rationale: Core entity representing a single interaction log entry to be queried
+    and reported.
+modules:
+- id: logging-module
+  action: added
+  relative_location: src/powdrr_lift/logging/
+  purpose: Module for querying and reporting interaction log entries.
+tools:
+- id: interaction-log-validator
+  action: added
+  when_to_use: Validate interaction log entries against the schema.
+  template: uv run powdrr-lift validate-log
+  how_to_use: Run from repository root.
+entity_relationships:
+- id: rel-log-entry-to-file
+  action: added
+  rationale: Links each log entry to the file it was written to.
+features:
+- id: feature-log-query-reporting
+  action: added
+  description: Query and report interaction log entries.
+  functional_requirements:
+  - Query log entries by timestamp range.
+  - Filter log entries by content keyword.
+  - Generate a summary report of log entries.
+decisions:
+- id: decision-log-query-api
+  action: added
+  description: Provide a simple query API for reading log entries.

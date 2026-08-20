@@ -1692,6 +1692,19 @@ _SPECIFICATION_FILENAMES = {
     "proposed-pr-specification.yaml": "pr",
     "proposed-pr-specification.yml": "pr",
 }
+_SPECIFICATION_FILENAME_SUFFIXES = tuple(
+    (f"-{filename}", kind) for filename, kind in _SPECIFICATION_FILENAMES.items()
+)
+
+
+def _specification_kind_for_filename(filename: str) -> str | None:
+    kind = _SPECIFICATION_FILENAMES.get(filename)
+    if kind is not None:
+        return kind
+    for suffix, suffix_kind in _SPECIFICATION_FILENAME_SUFFIXES:
+        if filename.endswith(suffix):
+            return suffix_kind
+    return None
 
 
 def _run_evaluate_specification(args: argparse.Namespace) -> int:
@@ -1707,7 +1720,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
         else sorted(
             path
             for path in input_path.rglob("*")
-            if path.is_file() and path.name in _SPECIFICATION_FILENAMES
+            if path.is_file() and _specification_kind_for_filename(path.name)
         )
     )
     if not specification_paths:
@@ -1726,7 +1739,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
             entity_types = ()
     overall_success = True
     for specification_path in specification_paths:
-        kind = _SPECIFICATION_FILENAMES.get(specification_path.name)
+        kind = _specification_kind_for_filename(specification_path.name)
         if kind is None:
             print(
                 f"Unsupported specification-v1 filename: {specification_path.name}",

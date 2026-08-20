@@ -89,6 +89,8 @@ def test_process_workflow_task_completes_claimed_agent_task(
     prompt = client.messages[0][1]["content"]
     assert client.messages[0][0]["content"] == _action_system_prompt()
     assert '"execution_mode":"process_workflow_task"' in prompt
+    assert json.loads(prompt)["workflow_dir"] == "workflow"
+    assert str(tmp_path) not in prompt
     assert "\n" not in prompt
     displayed = stderr.getvalue()
     assert ("Workflow task LLM input:" in displayed) is verbose

@@ -1,6 +1,0 @@
-{
-  "proposed_pr_id": "pr-interaction-capture-17",
-  "base_branch": "main",
-  "integration_branch": "powdrr/pr-interaction-capture-17",
-  "workflow_relative_directory": "docs/workflows/interaction-file-logging"
-}

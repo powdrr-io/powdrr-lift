@@ -4,6 +4,7 @@ import io
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -146,7 +147,7 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
 
 
 def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None:
-    events = [
+    events: list[dict[str, Any]] = [
         {
             "kind": "invoke_tool",
             "parameters": {"command": "cat a very large file"},

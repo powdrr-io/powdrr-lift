@@ -16,7 +16,6 @@ tools:
 - action: added
   when_to_use: When validating that a log file contains valid JSON entries with the
     expected structure.
-  template: null
   how_to_use: Run the validator against the log file path to check JSON validity and
     entry structure.
   id: interaction-log-validator
@@ -29,7 +28,6 @@ features:
 - action: added
   description: Capture and persist all human and LLM interaction inputs and outputs
     to per-session JSON log files.
-  supercedes: null
   functional_requirements:
   - All human and LLM inputs and outputs must be written to the log file.
   - Log files must be in JSON format.
@@ -39,5 +37,4 @@ decisions:
 - action: added
   description: Use asynchronous I/O or a background queue to write log entries so
     the interaction flow is never blocked.
-  supercedes: null
   id: decision-non-blocking-write

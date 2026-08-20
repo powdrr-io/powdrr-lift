@@ -6,7 +6,6 @@ when_to_use:
 - When no other skill is currently running and no listed skill is a better match.
 steps:
 - description: Handle what the user asked for.
-  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     Handle what the user asked for in the current worktree. Treat the user's
@@ -16,7 +15,6 @@ steps:
     workflow context and do not create a new worktree. Do not invent a larger
     task or a new feature when the request is an ad-hoc follow-up.
 - description: Run finish-pr-prep when files changed.
-  prompt_catalogs: []
   llm_type: fast_iteration
   details: >-
     Inspect the worktree diff. If any files changed during this skill, invoke

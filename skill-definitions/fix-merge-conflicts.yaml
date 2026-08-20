@@ -6,7 +6,6 @@ when_to_use:
 - When the resolved branch must be validated through the repository's PR-preparation workflow.
 steps:
 - description: Inspect the pull request and confirm its GitHub merge status.
-  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Resolve the repository and pull request from the user's reference. Confirm
@@ -37,7 +36,6 @@ steps:
     - <pr-reference>
     - --patch
 - description: Fetch the target branch and reproduce the merge conflict locally.
-  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Verify the current worktree and branch before fetching. Fetch the PR head
@@ -70,7 +68,6 @@ steps:
     - powdrr-lift
     - repository-state
 - description: Inventory each conflict and attribute the competing changes.
-  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     Enumerate every unmerged path and conflict marker. For each conflict,
@@ -166,7 +163,6 @@ steps:
     - <related-pr-number>
     - --patch
 - id: plan-resolutions
-  prompt_catalogs: []
   description: Plan the semantic resolution before editing conflict markers.
   llm_type: high_reasoning
   details: >-
@@ -180,7 +176,6 @@ steps:
     or documentation change. Do not edit until every conflict has a plan; if
     intent cannot be determined safely, ask one precise question.
 - id: verify-resolutions
-  prompt_catalogs: []
   description: Apply and verify the conflict resolutions.
   llm_type: fast_iteration
   details: >-
@@ -216,7 +211,6 @@ steps:
   - tool: ref
     label: pr-prep
 - description: Run the PR-preparation workflow on the resolved merge.
-  prompt_catalogs: []
   llm_type: simple_task
   uses_skills:
   - finish-pr-prep
@@ -228,7 +222,6 @@ steps:
     canonical formatting, lint, type-check, and test commands. Do not push or
     update the PR until finish-pr-prep reports the staged merge is ready.
 - description: Commit and push the resolved branch to the existing pull request.
-  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `merge-conflict`, commit message

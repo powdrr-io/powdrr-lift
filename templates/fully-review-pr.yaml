@@ -8,7 +8,6 @@ how_to_fill_this_out:
 - Each nested review skill must post its findings as inline comments on the referenced pull request.
 task_templates:
 - description: Review feature functionality and completeness
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -29,7 +28,6 @@ task_templates:
   dependent_state:
   - functionality-review-complete
 - description: Review feature test coverage
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -51,7 +49,6 @@ task_templates:
   dependent_state:
   - test-coverage-review-complete
 - description: Review pull request security
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: reviewer

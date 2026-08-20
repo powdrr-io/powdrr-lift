@@ -202,6 +202,32 @@ def test_workflow_template_validation_rejects_undeclared_detail_placeholders() -
     assert "missing_input" in report.issues[0].message
 
 
+def test_workflow_template_validation_rejects_empty_prompt_catalogs() -> None:
+    report = build_workflow_template_validation_report(
+        json.dumps(
+            {
+                "when_to_use": ["When a workflow needs review."],
+                "how_to_fill_this_out": ["Describe each task."],
+                "task_templates": [
+                    {
+                        "description": "Review the change.",
+                        "complexity": "low",
+                        "input_state": {},
+                        "assignee_type": "agent",
+                        "assignee_role": "reviewer",
+                        "output_state_type": "state",
+                        "dependent_state": [],
+                        "prompt_catalogs": [],
+                    }
+                ],
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["empty_prompt_catalogs"]
+
+
 def test_workflow_template_validation_accepts_declared_detail_placeholders() -> None:
     json_text = json.dumps(
         {

@@ -53,7 +53,6 @@ task_templates:
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create a detailed execution plan
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -81,7 +80,6 @@ task_templates:
   dependent_state:
   - execution-plan-created
 - description: Generate tests that will validate the new functionality
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -107,7 +105,6 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Validate the tests do not pass
-  prompt_catalogs: []
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -133,7 +130,6 @@ task_templates:
   dependent_state:
   - tests-proven-failing
 - description: Generate product code changes
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -162,7 +158,6 @@ task_templates:
   dependent_state:
   - product-code-generated
 - description: Validate all tests pass
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -185,7 +180,6 @@ task_templates:
   dependent_state:
   - all-tests-passing
 - description: Confirm functional completeness against the specification
-  prompt_catalogs: []
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -215,7 +209,6 @@ task_templates:
   dependent_state:
   - specification-complete
 - description: Run lint, type checks, and cleanup
-  prompt_catalogs: []
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -251,7 +244,6 @@ task_templates:
   dependent_state:
   - lint-and-cleanup-complete
 - description: Promote the implemented feature documents to current state
-  prompt_catalogs: []
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -282,7 +274,6 @@ task_templates:
   dependent_state:
   - current-state-documents-promoted
 - description: Stage the pull request changes
-  prompt_catalogs: []
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -308,7 +299,6 @@ task_templates:
   dependent_state:
   - staged-for-pull-request
 - description: Finish pull request preparation
-  prompt_catalogs: []
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -338,7 +328,6 @@ task_templates:
   dependent_state:
   - pull-request-prep-complete
 - description: Create the pull request
-  prompt_catalogs: []
   complexity: high
   assignee_type: human
   assignee_role: reviewer

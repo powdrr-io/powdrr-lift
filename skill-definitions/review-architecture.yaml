@@ -11,13 +11,11 @@ steps:
   details: Use the architecture context to understand the current model before judging
     whether it needs to change.
 - description: Decide whether the current architecture specification needs to change.
-  prompt_catalogs: []
   llm_type: high_reasoning
   details: Compare the gathered entity model against the new needs. If the existing
     spec already covers them, report that no update is needed and stop.
 - description: Generate and fill the architecture specification template only when
     changes are required.
-  prompt_catalogs: []
   llm_type: high_reasoning
   details: Run the architecture specification command, then fill the generated template
     with the required updates.
@@ -32,7 +30,6 @@ steps:
     - "<type>"
 - description: Validate the updated architecture specification and confirm it is still
     consistent.
-  prompt_catalogs: []
   llm_type: fast_iteration
   details: >-
     Invoke the generic evaluator exactly once after the specification

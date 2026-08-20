@@ -115,8 +115,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             "steps" if path.parent.name == "skill-definitions" else "task_templates"
         )
         for index, step in enumerate(document[step_key]):
-            assert "prompt_catalogs" in step, f"{path}:{step_key}[{index}]"
-            assert set(step["prompt_catalogs"]) <= {"context_types", "skills"}
+            if "prompt_catalogs" in step:
+                assert step["prompt_catalogs"], f"{path}:{step_key}[{index}]"
+                assert set(step["prompt_catalogs"]) <= {"context_types", "skills"}
 
 
 def test_skill_step_contracts_round_trip_and_validate() -> None:
@@ -204,6 +205,20 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
+
+
+def test_skill_validation_rejects_empty_prompt_catalogs() -> None:
+    report = build_skill_validation_report(
+        "name: empty-catalogs\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- description: Review\n"
+        "  prompt_catalogs: []\n",
+        source_path=Path("empty-catalogs.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["empty_prompt_catalogs"]
 
 
 def test_skill_directory_validation_accepts_references(tmp_path: Path) -> None:

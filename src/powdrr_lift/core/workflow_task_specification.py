@@ -466,6 +466,23 @@ def build_workflow_task_validation_report(
         subject="workflow task",
     )
 
+    prompt_catalogs = raw_task.get("prompt_catalogs")
+    if (
+        isinstance(prompt_catalogs, Sequence)
+        and not isinstance(prompt_catalogs, (str, bytes, bytearray))
+        and not prompt_catalogs
+    ):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="empty_prompt_catalogs",
+                message=(
+                    "Workflow task prompt_catalogs must omit the field when no "
+                    "prompt catalog is needed."
+                ),
+                path=_format_child_path(source_path, "prompt_catalogs"),
+            )
+        )
+
     task_id = _optional_string(raw_task.get("task_id"))
     if task_id is None:
         issues.append(

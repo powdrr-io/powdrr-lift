@@ -6,7 +6,6 @@ when_to_use:
 - When the fix should finish with the repository's PR-preparation workflow and a pushed PR branch.
 steps:
 - id: inspect-ci
-  prompt_catalogs: []
   description: Resolve the pull request and inspect its failing GitHub Actions checks.
   llm_type: simple_task
   details: >-
@@ -53,7 +52,6 @@ steps:
     - <run-id>
     - --log-failed
 - id: extract-failures
-  prompt_catalogs: []
   description: Extract a structured failure record from each CI log.
   llm_type: high_reasoning
   details: >-
@@ -82,7 +80,6 @@ steps:
     - <failure-signature>
     - <relevant-files-or-log>
 - id: reproduce-failures
-  prompt_catalogs: []
   description: Reproduce every root failure locally using the CI command.
   llm_type: fast_iteration
   details: >-
@@ -100,7 +97,6 @@ steps:
   - tool: ref
     label: pr-prep
 - id: research-solutions
-  prompt_catalogs: []
   description: Search Stack Overflow for evidence-backed solutions.
   llm_type: standard_reasoning
   details: >-
@@ -130,7 +126,6 @@ steps:
     - --data-urlencode
     - filter=withbody
 - id: implement-fix
-  prompt_catalogs: []
   description: Map candidate solutions to the local codebase and implement the fix.
   llm_type: high_reasoning
   details: >-
@@ -144,7 +139,6 @@ steps:
     and explain the CI-only assumptions being addressed. Keep each edit
     traceable to a failure record and preserve unrelated user changes.
 - id: verify-failures
-  prompt_catalogs: []
   description: Iterate until the failures are fixed and regression checks pass.
   llm_type: fast_iteration
   details: >-
@@ -161,7 +155,6 @@ steps:
   - tool: ref
     label: pr-prep
 - description: Run the PR-preparation workflow on the final change set.
-  prompt_catalogs: []
   llm_type: simple_task
   uses_skills:
   - finish-pr-prep
@@ -172,7 +165,6 @@ steps:
     and test commands. Do not push or update the PR until finish-pr-prep
     reports that the staged change set is ready.
 - description: Commit and push the fixed branch to the existing pull request.
-  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `ci-fix`, commit message `Fix CI

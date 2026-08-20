@@ -517,6 +517,17 @@ def build_skill_validation_report(
                         )
                     )
                 else:
+                    if not prompt_catalogs:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="empty_prompt_catalogs",
+                                message=(
+                                    "Skill step prompt_catalogs must omit the field "
+                                    "when no prompt catalog is needed."
+                                ),
+                                path=_child_path(step_path, "prompt_catalogs"),
+                            )
+                        )
                     seen_catalogs: set[str] = set()
                     for catalog_index, catalog_value in enumerate(prompt_catalogs):
                         normalized_catalog = _optional_string(catalog_value)
@@ -1167,6 +1178,11 @@ def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
         return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step prompt_catalogs must be an array.")
+    if not value:
+        raise ValueError(
+            "Skill step prompt_catalogs must omit the field when no prompt catalog "
+            "is needed."
+        )
     result = tuple(_required_string({"value": item}, "value") for item in value)
     unsupported = sorted(set(result) - SUPPORTED_PROMPT_CATALOGS)
     if unsupported:

@@ -500,6 +500,23 @@ def build_workflow_template_validation_report(
             subject="workflow task template",
         )
 
+        prompt_catalogs = raw_task_template_mapping.get("prompt_catalogs")
+        if (
+            isinstance(prompt_catalogs, Sequence)
+            and not isinstance(prompt_catalogs, (str, bytes, bytearray))
+            and not prompt_catalogs
+        ):
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="empty_prompt_catalogs",
+                    message=(
+                        "Workflow task template prompt_catalogs must omit the field "
+                        "when no prompt catalog is needed."
+                    ),
+                    path=_child_path(task_template_path, "prompt_catalogs"),
+                )
+            )
+
         description = _optional_string(raw_task_template_mapping.get("description"))
         if description is None:
             issues.append(

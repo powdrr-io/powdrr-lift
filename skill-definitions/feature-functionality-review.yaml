@@ -6,7 +6,6 @@ when_to_use:
 - When the review must report findings directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the referenced pull request and its feature relationship.
-  prompt_catalogs: []
   llm_type: long_context
   details: >-
     Inspect the referenced PR's title, body, labels, commits, changed files,
@@ -55,7 +54,6 @@ steps:
     Use the returned records to determine the ordered proposed-PR set and
     status rather than relying only on PR prose.
 - description: Review the current PR against the selected functionality scope.
-  prompt_catalogs: []
   llm_type: high_reasoning
   details: >-
     For an intermediate PR, compare the complete diff and surrounding code
@@ -80,7 +78,6 @@ steps:
     explicit gap. This deterministic matrix is the basis for deciding whether
     the feature is complete.
 - description: Post every actionable finding as an inline pull-request comment.
-  prompt_catalogs: []
   llm_type: simple_task
   details: >-
     Post each actionable finding directly to the referenced PR using the
@@ -122,7 +119,6 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
-  prompt_catalogs: []
   llm_type: standard_reasoning
   details: >-
     Confirm that every intended finding exists on the target PR, is attached

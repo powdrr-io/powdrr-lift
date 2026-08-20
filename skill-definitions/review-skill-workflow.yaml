@@ -120,12 +120,33 @@ steps:
     result in workflow context for the pull-request steps. Do not create or
     update a pull request in this step.
 
+- id: verify-target-change
+  description: Confirm the reviewed definition changed before preparing a pull request.
+  llm_type: simple_task
+  details: >-
+    Invoke the declared shell command to list changes for the exact target
+    definition. If the command returns no target path, the review produced no
+    file change; choose `complete` with a concise no-change result and do not
+    invoke staging, pull-request preparation, or pull-request creation. If the
+    target path is listed, preserve that path as `files_to_publish` and choose
+    `next_step` to continue. Do not treat an unchanged existing file as a
+    publishable artifact.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --name-only
+    - --
+    - <target-definition-path>
+
 - id: stage-for-pull-request
   description: Stage the reviewed definition for pull-request preparation.
   llm_type: simple_task
   details: >-
-    Set `files_to_publish` in workflow context to the exact target-definition
-    path, then invoke `git add <target-definition-path>` with that path only.
+    Use the target path confirmed by `verify-target-change` as
+    `files_to_publish`, then invoke `git add <target-definition-path>` with that
+    path only.
     Verify the staged names with `git diff --cached --name-only`; do not stage
     logs, caches, or unrelated files. Do not create or update a pull request in
     this step.

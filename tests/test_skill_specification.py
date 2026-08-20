@@ -394,6 +394,27 @@ def test_checked_in_review_skill_definitions_exist() -> None:
     assert (skills_dir / "review-system.yaml").is_file()
 
 
+def test_review_skill_workflow_ends_with_pull_request_creation() -> None:
+    skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
+    skill = load_skill(skills_dir / "review-skill-workflow.yaml")
+
+    assert [step.description for step in skill.steps[-4:]] == [
+        "Apply and validate the accepted definition.",
+        "Stage the reviewed definition for pull-request preparation.",
+        "Run final pull-request preparation checks.",
+        "Create or update the pull request for the reviewed definition.",
+    ]
+    assert skill.steps[-3].tool_invocations[0].command == (
+        "git",
+        "add",
+        "<target-definition-path>",
+    )
+    assert skill.steps[-2].uses_skills == ("finish-pr-prep",)
+    assert skill.steps[-1].uses_skills == ("create-pull-request",)
+    assert "skill-workflow-review" in (skill.steps[-1].details or "")
+    assert "pull-request URL" in (skill.steps[-1].details or "")
+
+
 def test_pr_description_generators_are_used_by_pr_skills() -> None:
     skills_dir = Path(__file__).resolve().parents[1] / "skill-definitions"
     expected_kinds = {

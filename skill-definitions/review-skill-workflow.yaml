@@ -116,11 +116,46 @@ steps:
     fails, correct the target and rerun validation only after a change; never
     repeat the same validation command unchanged. Report the final per-step
     counts, remaining justified exceptions, validation result, and exact file
-    changed. Then invoke create-pull-request with pr-kind
-    `skill-workflow-review`, a concise commit message, and a pull-request title
-    that identifies the target. Pass the changed definition, final review
-    report, and validation result as context. Do not report completion until
-    the nested skill returns a pull-request URL; never merge the PR or push
-    directly to main.
+    changed. Keep the changed definition, final review report, and validation
+    result in workflow context for the pull-request steps. Do not create or
+    update a pull request in this step.
+
+- id: stage-for-pull-request
+  description: Stage the reviewed definition for pull-request preparation.
+  llm_type: simple_task
+  details: >-
+    Set `files_to_publish` in workflow context to the exact target-definition
+    path, then invoke `git add <target-definition-path>` with that path only.
+    Verify the staged names with `git diff --cached --name-only`; do not stage
+    logs, caches, or unrelated files. Do not create or update a pull request in
+    this step.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - add
+    - <target-definition-path>
+
+- id: finish-pull-request-prep
+  description: Run final pull-request preparation checks.
+  llm_type: simple_task
+  details: >-
+    Invoke `finish-pr-prep` with the staged target definition and the validation
+    result from `apply-and-publish`. Do not create or update a pull request in
+    this step; continue only when the nested skill confirms the final staged
+    scope and required checks are clean.
+  uses_skills:
+  - finish-pr-prep
+
+- id: create-pull-request
+  description: Create or update the pull request for the reviewed definition.
+  llm_type: simple_task
+  details: >-
+    Invoke `create-pull-request` with pr-kind `skill-workflow-review`, a concise
+    commit message, a pull-request title that identifies the target, and the
+    completed PR description context. Pass the exact `files_to_publish` list,
+    final review report, and validation result to the nested skill. Do not
+    report completion until it returns a pull-request URL. Never merge the PR
+    or push directly to main.
   uses_skills:
   - create-pull-request

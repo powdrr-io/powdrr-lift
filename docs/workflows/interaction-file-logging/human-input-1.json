@@ -1,0 +1,33 @@
+{
+  "task_id": "human-input-1",
+  "status": "open",
+  "upstream_task_ids": [],
+  "dependent_state": [],
+  "complexity": "low",
+  "input_state": {
+    "question": "The proposed PR specification for 'interaction-file-logging-core' was not found in docs/proposed/interaction-file-logging; should I search the broader repository for the specification file, or is there a different location where it should be?",
+    "task": {
+      "task_id": "interaction-file-logging-core-task-001",
+      "status": "locked",
+      "upstream_task_ids": [],
+      "dependent_state": [
+        "proposed-pr-context-gathered"
+      ],
+      "complexity": "high",
+      "input_state": {
+        "proposed_pr": "interaction-file-logging-core",
+        "feature_id": "interaction-file-logging"
+      },
+      "assignee_type": "agent",
+      "assignee_role": "architect",
+      "output_state_type": "proposed-pr-context-state",
+      "description": "Gather context about the proposed PR",
+      "details": "First resolve the proposed PR identified by input_state.proposed_pr to the exact proposed PR specification. Set the gather_context action's feature_id to the value of input_state.feature_id and its keywords to a list containing the value of input_state.proposed_pr. The feature_id value scopes proposal discovery to docs/proposals/<feature_id>, and the keyword value must be the exact proposed PR ID from input_state.proposed_pr. Do not use a semantic feature ID, an implementation-specification filename, or a keyword-only fuzzy lookup as feature_id. Use the gathered context to identify the proposed PR, its goals, scope, acceptance criteria, tests, dependencies, risks, and related requirements. Use read_document only when a specific section of a known document is needed. Do not guess a path when gathered context provides the path. Record the exact specification path and all relevant implementation context in output_state. If the lookup is ambiguous or returns no match, choose prompt_user with one precise question instead of guessing.\n\nInstantiation context: work item name is 'interaction-file-logging'; workflow instance name is 'interaction-file-logging-core'. Use these values as search context and verify repository documents before deciding what they identify.",
+      "llm_type": "long_context"
+    }
+  },
+  "assignee_type": "human",
+  "assignee_role": "reviewer",
+  "output_state_type": "human-response-state",
+  "description": "The proposed PR specification for 'interaction-file-logging-core' was not found in docs/proposed/interaction-file-logging; should I search the broader repository for the specification file, or is there a different location where it should be?"
+}

@@ -1,0 +1,18 @@
+{
+  "task_id": "human-input-1-follow-up",
+  "status": "open",
+  "upstream_task_ids": [
+    "human-input-1"
+  ],
+  "dependent_state": [],
+  "complexity": "medium",
+  "input_state": {
+    "proposed_pr": "interaction-file-logging-core",
+    "feature_id": "interaction-file-logging"
+  },
+  "assignee_type": "agent",
+  "assignee_role": "architect",
+  "output_state_type": "proposed-pr-context-state",
+  "description": "Gather context about the proposed PR",
+  "details": "The fuzzy-match search in docs/proposed/interaction-file-logging returned no matches for the proposed PR specification, and repeated gather_context attempts also found nothing. I need to know whether to search elsewhere or if the specification is missing."
+}

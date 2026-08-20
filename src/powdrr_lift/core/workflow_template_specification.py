@@ -575,6 +575,13 @@ def build_workflow_template_validation_report(
                     path=_child_path(task_template_path, "input_state"),
                 )
             )
+        else:
+            _validate_detail_input_placeholders(
+                raw_task_template_mapping.get("details"),
+                raw_task_template_mapping.get("input_state"),
+                issues,
+                path=_child_path(task_template_path, "details"),
+            )
 
         output_state_type = _optional_string(
             raw_task_template_mapping.get("output_state_type")
@@ -1039,6 +1046,43 @@ def _validate_unknown_keys(
                 code="unknown_key",
                 message=f"{subject.title()} contains unknown field {key!r}.",
                 path=f"{path}.{key}" if path else key,
+            )
+        )
+
+
+def _validate_detail_input_placeholders(
+    details: object,
+    input_state: object,
+    issues: list[WorkflowTemplateValidationIssue],
+    *,
+    path: str | None,
+) -> None:
+    if not isinstance(details, str) or not isinstance(input_state, Mapping):
+        return
+
+    declared_inputs = {str(key) for key in input_state}
+    upstream_inputs = {
+        f"upstream-task-{index}"
+        for index in _upstream_task_template_indexes(input_state)
+    }
+    seen: set[str] = set()
+    for match in re.finditer(r"<([^<>]+)>", details):
+        placeholder = match.group(1)
+        if placeholder in seen or placeholder in declared_inputs:
+            seen.add(placeholder)
+            continue
+        if placeholder in upstream_inputs:
+            seen.add(placeholder)
+            continue
+        seen.add(placeholder)
+        issues.append(
+            WorkflowTemplateValidationIssue(
+                code="undeclared_detail_input",
+                message=(
+                    f"Workflow task details reference placeholder "
+                    f"<{placeholder}> but {placeholder!r} is not listed in input_state."
+                ),
+                path=path,
             )
         )
 

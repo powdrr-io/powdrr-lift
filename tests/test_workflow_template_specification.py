@@ -174,6 +174,70 @@ def test_workflow_template_validation_rejects_unknown_generation_target() -> Non
     assert report.issues[0].path == "task_templates[0]"
 
 
+def test_workflow_template_validation_rejects_undeclared_detail_placeholders() -> None:
+    json_text = json.dumps(
+        {
+            "when_to_use": ["When a workflow needs an input."],
+            "how_to_fill_this_out": ["Declare every detail input."],
+            "task_templates": [
+                {
+                    "description": "Use the input.",
+                    "complexity": "low",
+                    "input_state": {"feature_id": "<feature-id>"},
+                    "details": "Use <feature_id> and <missing_input>.",
+                    "assignee_type": "agent",
+                    "assignee_role": "coder",
+                    "output_state_type": "state",
+                    "dependent_state": [],
+                }
+            ],
+        }
+    )
+
+    report = build_workflow_template_validation_report(json_text)
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["undeclared_detail_input"]
+    assert report.issues[0].path == "task_templates[0].details"
+    assert "missing_input" in report.issues[0].message
+
+
+def test_workflow_template_validation_accepts_declared_detail_placeholders() -> None:
+    json_text = json.dumps(
+        {
+            "when_to_use": ["When a workflow has dependent tasks."],
+            "how_to_fill_this_out": ["Declare detail inputs."],
+            "task_templates": [
+                {
+                    "description": "Create the input.",
+                    "complexity": "low",
+                    "input_state": {"feature_id": "<feature-id>"},
+                    "details": "Use <feature_id>.",
+                    "assignee_type": "agent",
+                    "assignee_role": "coder",
+                    "output_state_type": "state",
+                    "dependent_state": [],
+                },
+                {
+                    "description": "Use the upstream result.",
+                    "complexity": "low",
+                    "input_state": {"result": "<upstream-task-0>.state"},
+                    "details": "Use <upstream-task-0>.",
+                    "assignee_type": "agent",
+                    "assignee_role": "coder",
+                    "output_state_type": "state",
+                    "dependent_state": [],
+                },
+            ],
+        }
+    )
+
+    report = build_workflow_template_validation_report(json_text)
+
+    assert report.validation_successful is True
+    assert report.issues == []
+
+
 def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
     template = WorkflowTemplate(
         when_to_use=("When the workflow is simple.",),
@@ -219,12 +283,15 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[0].llm_type == "long_context"
     assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
     assert "gather_context action" in (template.task_templates[0].details or "")
-    assert '"feature_id":"<work-item-name>"' in (
-        template.task_templates[0].details or ""
-    )
-    assert "feature_id scopes proposal discovery" in (
-        template.task_templates[0].details or ""
-    )
+    assert "input_state.feature_id" in (template.task_templates[0].details or "")
+    assert "input_state.proposed_pr" in (template.task_templates[0].details or "")
+    assert "<work-item-name>" not in (template.task_templates[0].details or "")
+    assert "<proposed-pr-id>" not in (template.task_templates[0].details or "")
+    assert "feature_id value" in (template.task_templates[0].details or "")
+    assert "scopes proposal discovery" in (template.task_templates[0].details or "")
+    report = build_workflow_template_validation_report(template.to_json())
+    assert report.validation_successful is True
+    assert report.issues == []
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates

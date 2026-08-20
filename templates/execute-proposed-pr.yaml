@@ -25,14 +25,15 @@ task_templates:
     # feature entity ID from feature_ids or a nested features section.
     feature_id: <work-item-name>
   details: >-
-    First resolve proposed_pr to the exact proposed PR specification. The
-    use the proposal directory from input_state as feature_id in the first
-    gather_context action:
-    {"kind":"gather_context","feature_id":"<work-item-name>","types":["proposed_prs","requirements","approach","invariants","guidance","features","acceptance_criteria","expected_tests","required_test_cases","risks","decisions"],"keywords":["<proposed-pr-id>"]}.
-    feature_id scopes proposal discovery to docs/proposals/<work-item-name> and
-    keywords identify the proposed PR within that directory. Do not use a
-    semantic feature ID, the proposed PR ID, or a keyword-only fuzzy lookup as
-    feature_id. Use the gathered context to identify the proposed PR, its goals,
+    First resolve the proposed PR identified by input_state.proposed_pr to the
+    exact proposed PR specification. Set the gather_context action's
+    feature_id to the value of input_state.feature_id and its keywords to a
+    list containing the value of input_state.proposed_pr. The feature_id value
+    scopes proposal discovery to docs/proposals/<feature_id>, and the keyword
+    value must be the exact proposed PR ID from input_state.proposed_pr. Do not use a semantic
+    feature ID, an implementation-specification filename, or a keyword-only
+    fuzzy lookup as feature_id. Use the gathered context to identify the
+    proposed PR, its goals,
     scope, acceptance criteria, tests, dependencies, risks, and related
     requirements. Use read_document only when a specific section of a known
     document is needed. Do not guess a path when gathered context provides the
@@ -242,11 +243,12 @@ task_templates:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     implementation_diffs: <upstream-task-4>.generated-product-code-state
     completeness_review: <upstream-task-6>.specification-completeness-state
+    feature_id: <work-item-name>
     promoted_documents: {}
   details: >-
     After implementation and validation are complete, move the feature's
-    specification directory from docs/proposals/<work-item-name>/ to
-    docs/current/<work-item-name>/. Use git mv so the committed implementation
+    specification directory from docs/proposals/<feature_id>/ to
+    docs/current/<feature_id>/. Use git mv so the committed implementation
     records the transition and preserves history. Move only the documents for
     the completed feature; leave unrelated proposals in place. If the proposal
     directory does not exist or the current directory already exists, inspect

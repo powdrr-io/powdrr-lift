@@ -24,6 +24,7 @@ from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
     _handle_exhausted_timeout,
+    _task_events_for_prompt,
     _workflow_file_command_error,
     run_workflow_task,
 )
@@ -142,6 +143,48 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
     assert "<work-item-name>" not in prompt
     assert "input_state.feature_id" not in prompt
     assert "input_state.proposed_pr" not in prompt
+
+
+def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None:
+    events = [
+        {
+            "kind": "invoke_tool",
+            "parameters": {"command": "cat a very large file"},
+            "result": {"stdout": "old output"},
+        },
+        {
+            "kind": "action_error",
+            "action_kind": "edit",
+            "error": "the requested range is outside the document",
+        },
+        {
+            "kind": "read_document",
+            "file_path": "docs/example.md",
+            "result": {"content": "current output"},
+        },
+    ]
+
+    prompt_events = _task_events_for_prompt(events)
+
+    assert prompt_events["recent"][0] == {
+        "kind": "invoke_tool",
+    }
+    assert prompt_events["recent"][1]["error"] == (
+        "the requested range is outside the document"
+    )
+    assert prompt_events["latest_result"]["value"] == {"content": "current output"}
+    assert "parameters" not in prompt_events["recent"][0]
+    assert "result" not in prompt_events["recent"][0]
+
+
+def test_task_prompt_bounds_event_metadata() -> None:
+    prompt_events = _task_events_for_prompt(
+        [{"kind": "read_document", "result": {"line": index}} for index in range(20)]
+    )
+
+    assert len(prompt_events["recent"]) == 12
+    assert prompt_events["omitted_event_count"] == 8
+    assert prompt_events["latest_result"]["value"] == {"line": 19}
 
 
 def test_process_workflow_task_runs_nested_skill_in_same_worktree(

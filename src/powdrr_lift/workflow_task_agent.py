@@ -1357,10 +1357,8 @@ def _build_task_messages(
     context_data: dict[str, Any]
     if compacted_context is None:
         context_data = {
-            "task_context": _resolve_task_prompt_data(
-                workflow.task_context(task.task_id), task.input_state
-            ),
-            "events": prune_execution_events(events, include_results=True),
+            "task_context": _task_context_prompt_data(workflow, task),
+            "events": _task_events_for_prompt(events),
         }
     else:
         context_data = {"compacted_context": compacted_context}
@@ -1417,8 +1415,9 @@ def _build_task_messages(
                     "available_skills": [
                         {
                             "name": entry.skill.name,
-                            "path": str(entry.path),
-                            "when_to_use": list(entry.skill.when_to_use),
+                            "when_to_use": list(entry.skill.when_to_use)
+                            if entry.skill.name in task.uses_skills
+                            else [],
                         }
                         for entry in skill_catalog
                     ],
@@ -1613,6 +1612,84 @@ def _workflow_file_names(workflow_dir: Path) -> list[str]:
         for path in workflow_dir.glob("*.json")
         if path.is_file() and path.name != ".workflow-git.json"
     )
+
+
+_TASK_PROMPT_EVENT_KEYS = (
+    "kind",
+    "action_kind",
+    "tool",
+    "skill",
+    "step_id",
+    "step_index",
+    "feature_id",
+    "types",
+    "keywords",
+    "file_path",
+    "operations",
+    "error",
+    "message",
+    "decisions_and_context",
+)
+
+
+def _task_context_prompt_data(
+    workflow: WorkflowInstance, task: WorkflowTask
+) -> dict[str, Any]:
+    """Return only durable context needed to continue the current task.
+
+    The workflow files and complete event log remain the source of truth. This
+    projection is deliberately smaller because it is sent on every LLM
+    roundtrip and upstream outputs are already the only cross-task values the
+    task can consume.
+    """
+    context = workflow.task_context(task.task_id)
+    return _resolve_task_prompt_data(
+        {
+            "input_state": context.get("input_state", {}),
+            "upstream_outputs": context.get("upstream_outputs", {}),
+        },
+        task.input_state,
+    )
+
+
+def _task_event_metadata(event: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: event[key]
+        for key in _TASK_PROMPT_EVENT_KEYS
+        if key in event and event[key] not in (None, [], {}, "")
+    }
+
+
+def _task_events_for_prompt(events: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Build a compact event view without discarding durable execution data.
+
+    Action parameters and results can contain whole files or command output.
+    Older results are not useful once the next action has succeeded, while the
+    most recent result is still important for choosing the next action. Errors
+    remain attached to their event so a repair response has its cause.
+    """
+    recent_events = list(events[-12:])
+    metadata = [_task_event_metadata(event) for event in recent_events]
+    latest_result: Any = None
+    latest_result_event: dict[str, Any] | None = None
+    for event in reversed(recent_events):
+        if "result" in event:
+            latest_result = event["result"]
+            latest_result_event = _task_event_metadata(event)
+            break
+    prompt_data: dict[str, Any] = {"recent": metadata}
+    if latest_result_event is not None:
+        compact_result = prune_execution_events(
+            [{"kind": latest_result_event.get("kind"), "result": latest_result}],
+            include_results=True,
+        )[0].get("result")
+        prompt_data["latest_result"] = {
+            "event": latest_result_event,
+            "value": compact_result,
+        }
+    if len(events) > len(recent_events):
+        prompt_data["omitted_event_count"] = len(events) - len(recent_events)
+    return prompt_data
 
 
 def _workflow_file_command_error(

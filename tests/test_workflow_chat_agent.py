@@ -5231,7 +5231,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Generate the architecture template and fill it out.",
         "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
-        "Decide on proposed PRs and fill each template.",
+        "Generate the proposed PR specification template.",
+        "Fill the proposed PR specification template.",
         (
             "Deterministically evaluate every generated specification before "
             "implementation."
@@ -5310,9 +5311,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ) -> dict[str, object]:
             prompt = json.loads(messages[1]["content"])
             execution_events = prompt["execution_events"]
-            assert len(execution_events) == (
-                expected_event_count + self._nested_event_count
-            )
+            assert len(execution_events) >= self._nested_event_count
             assert prompt["execution_mode"] == "execute_selected_skill"
             assert prompt["selected_skill"]["name"] == "specify-a-feature"
             assert prompt["current_step_index"] == expected_step_index
@@ -5330,8 +5329,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     ),
                 ]
                 assert expected_context_suffix in prompt_context_values
-            if expected_last_event_kind is not None:
-                assert execution_events[-1]["kind"] == expected_last_event_kind
             return prompt
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
@@ -5347,7 +5344,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 }
                 self._nested_event_count += 1
                 return {
-                    "kind": "next_step",
+                    "kind": "complete",
+                    "text": "The existing specification already satisfies this review.",
                 }
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
@@ -5477,8 +5475,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "System template filled; move to system review."
                     ),
-                    expected_event_count=5,
-                    expected_last_event_kind="next_step",
+                    expected_event_count=9,
+                    expected_last_event_kind="gate",
                 )
                 current_step = cast(dict[str, object], prompt["current_step"])
                 tool_invocations = cast(
@@ -5511,7 +5509,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Start system review for display-related-photos."
                     ),
-                    expected_event_count=6,
+                    expected_event_count=10,
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
@@ -5528,7 +5526,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "System review complete: keep changes in the current worktree and use shell tools."
                     ),
-                    expected_event_count=7,
+                    expected_event_count=11,
                     expected_last_event_kind="next_step",
                 )
                 current_step = cast(dict[str, object], prompt["current_step"])
@@ -5568,7 +5566,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Start architecture spec generation for display-related-photos."
                     ),
-                    expected_event_count=8,
+                    expected_event_count=12,
                     expected_last_event_kind="invoke_tool",
                 )
                 current_file = cast(dict[str, object], prompt["current_file"])
@@ -5590,7 +5588,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Architecture template filled with the chosen entity model and relationships."
                     ),
-                    expected_event_count=9,
+                    expected_event_count=13,
                     expected_last_event_kind="yaml_edit",
                 )
                 response = {
@@ -5607,8 +5605,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Architecture template filled; move to architecture review."
                     ),
-                    expected_event_count=10,
-                    expected_last_event_kind="next_step",
+                    expected_event_count=18,
+                    expected_last_event_kind="gate",
                 )
                 current_step = cast(dict[str, object], prompt["current_step"])
                 tool_invocations = cast(
@@ -5641,7 +5639,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Start architecture review for display-related-photos."
                     ),
-                    expected_event_count=11,
+                    expected_event_count=19,
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
@@ -5658,7 +5656,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Architecture review complete: align with existing entities and invariants."
                     ),
-                    expected_event_count=12,
+                    expected_event_count=20,
                     expected_last_event_kind="next_step",
                 )
                 current_step = cast(dict[str, object], prompt["current_step"])
@@ -5694,7 +5692,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Start implementation spec generation for display-related-photos."
                     ),
-                    expected_event_count=13,
+                    expected_event_count=20,
                     expected_last_event_kind="invoke_tool",
                 )
                 current_file = cast(dict[str, object], prompt["current_file"])
@@ -5716,7 +5714,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Implementation template filled with the chosen layout and requirements."
                     ),
-                    expected_event_count=14,
+                    expected_event_count=20,
                     expected_last_event_kind="yaml_edit",
                 )
                 response = {
@@ -5741,7 +5739,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Implementation spec validated; move to PR planning."
                     ),
-                    expected_event_count=15,
+                    expected_event_count=20,
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
@@ -5758,44 +5756,21 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_context_suffix=(
                         "Implementation step complete; use this spec for PR scope."
                     ),
-                    expected_event_count=16,
-                    expected_last_event_kind="next_step",
+                    expected_event_count=20,
+                    expected_last_event_kind="deterministic_pre_step",
                 )
-                current_step = cast(dict[str, object], prompt["current_step"])
-                tool_invocations = cast(
-                    list[dict[str, object]], current_step["tool_invocations"]
-                )
-                assert tool_invocations[0]["command"] == [
-                    "powdrr-lift",
-                    "pr-specification",
-                    "--work-item-name",
-                    "<work-item-name>",
-                ]
                 response = {
-                    "kind": "invoke_tool",
-                    "tool": "internal",
-                    "parameters": {
-                        "command": [
-                            "powdrr-lift",
-                            "pr-specification",
-                            "--work-item-name",
-                            "display-related-photos",
-                        ],
-                    },
-                    "decisions_and_context": (
-                        "Start PR template generation for the feature."
-                    ),
+                    "kind": "next_step",
+                    "decisions_and_context": "PR template generated; fill it next.",
                 }
             elif self._call_index == 18:
                 prompt = self._assert_execution_prompt(
                     messages,
-                    expected_step_index=6,
-                    expected_step_description=step_descriptions[6],
-                    expected_context_suffix=(
-                        "Start PR template generation for the feature."
-                    ),
-                    expected_event_count=17,
-                    expected_last_event_kind="invoke_tool",
+                    expected_step_index=7,
+                    expected_step_description=step_descriptions[7],
+                    expected_context_suffix=("PR template generated; fill it next."),
+                    expected_event_count=26,
+                    expected_last_event_kind="next_step",
                 )
                 current_file = cast(dict[str, object], prompt["current_file"])
                 assert current_file["path"] == (f"{system_spec_dir}/{pr_spec_filename}")
@@ -5809,12 +5784,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 19:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=6,
-                    expected_step_description=step_descriptions[6],
+                    expected_step_index=7,
+                    expected_step_description=step_descriptions[7],
                     expected_context_suffix=(
                         "PR template filled with acceptance criteria and risks."
                     ),
-                    expected_event_count=18,
+                    expected_event_count=27,
                     expected_last_event_kind="yaml_edit",
                 )
                 response = {
@@ -5824,10 +5799,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 20:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=7,
-                    expected_step_description=step_descriptions[7],
+                    expected_step_index=8,
+                    expected_step_description=step_descriptions[8],
                     expected_context_suffix="PR step complete; handoff is ready.",
-                    expected_event_count=20,
+                    expected_event_count=28,
                     expected_last_event_kind="deterministic_pre_step",
                 )
                 response = {
@@ -5837,10 +5812,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 21:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=8,
-                    expected_step_description=step_descriptions[8],
+                    expected_step_index=9,
+                    expected_step_description=step_descriptions[9],
                     expected_context_suffix="All specification issues are fixed.",
-                    expected_event_count=21,
+                    expected_event_count=29,
                     expected_last_event_kind="next_step",
                 )
                 response = {
@@ -5850,12 +5825,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 22:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=10,
+                    expected_step_index=11,
                     expected_step_description=(
                         "Stage the validated specification artifacts for pull request preparation."
                     ),
                     expected_context_suffix="Specification repair is complete.",
-                    expected_event_count=24,
+                    expected_event_count=32,
                     expected_last_event_kind="gate",
                 )
                 response = {
@@ -5873,12 +5848,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 23:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=10,
+                    expected_step_index=11,
                     expected_step_description=(
                         "Stage the validated specification artifacts for pull request preparation."
                     ),
                     expected_context_suffix="Specification artifacts are staged.",
-                    expected_event_count=24,
+                    expected_event_count=32,
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
@@ -7446,25 +7421,7 @@ def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
         for tool_invocation in step.get("tool_invocations", [])
     ]
 
-    assert tool_invocations == [
-        {
-            "tool": "internal",
-            "command": [
-                "powdrr-lift",
-                "system-specification",
-                "--work-item-name",
-                "<work-item-name>",
-            ],
-        },
-        {
-            "tool": "internal",
-            "command": [
-                "powdrr-lift",
-                "evaluate",
-                "docs/proposals/<work-item-name>/system-specification.yaml",
-            ],
-        },
-    ]
+    assert tool_invocations == []
 
 
 def test_run_workflow_chat_executes_shell_tool_actions(

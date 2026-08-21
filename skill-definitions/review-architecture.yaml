@@ -9,41 +9,82 @@ steps:
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
-  details: Use the architecture context to understand the current model before judging
-    whether it needs to change.
+  details: >-
+    Use gather_context with exactly the types entities, entity-relationships,
+    invariants, and guidance to understand the current architecture model before
+    judging whether it needs to change. Do not use architecture or relationships
+    as context types; those are not valid catalog tokens.
 - description: Decide whether the current architecture specification needs to change.
   step_type: freeform
   llm_type: high_reasoning
-  details: Compare the gathered entity model against the new needs. If the existing
-    spec already covers them, report that no update is needed and stop.
-- description: Generate and fill the architecture specification template only when
-    changes are required.
+  details: >-
+    Compare the gathered entity model against the new needs. If the existing
+    specification already covers them, return the complete action, for example
+    {"action":"complete","text":"The existing architecture covers the new needs."};
+    otherwise choose next_step to generate and fill an update.
+- id: generate-architecture
+  description: Deterministically generate the architecture specification template.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the declared generator exactly once; do not edit the generated file.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - architecture-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+      - "--all-entity-types"
+- id: fill-architecture
+  description: Fill the architecture specification with the required updates.
   step_type: freeform
   llm_type: high_reasoning
-  details: Run the architecture specification command, then fill the generated template
-    with the required updates.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
-- description: Validate the updated architecture specification and confirm it is still
-    consistent.
+  details: >-
+    Use yaml_edit for every YAML change. Include complete operations using
+    set_value paths or upsert_item section, id, and value fields. Do not use
+    invoke_tool for YAML edits.
+- id: evaluate-architecture
+  description: Deterministically evaluate the updated architecture specification.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the evaluator exactly once; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/architecture-specification.yaml
+- id: repair-architecture
+  description: Repair every reported architecture specification issue.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Invoke the generic evaluator exactly once after the specification
-    edits. If it succeeds, use its result to confirm that no inconsistencies
-    remain and choose `next_step` immediately. If it reports validation errors,
-    edit the specification to address them before invoking the validator again;
-    never repeat the same validation command unchanged.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - docs/proposals/<work-item-name>/architecture-specification.yaml
+    Use yaml_edit actions to fix every issue reported by evaluation. If there
+    are no issues, choose next_step without changing the file. Do not use
+    invoke_tool in this freeform repair step; the next deterministic step reruns
+    the evaluator.
+- id: gate-architecture
+  description: Confirm that architecture evaluation reports zero issues.
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when evaluation exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/architecture-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-architecture
+    retry_context: >-
+      The gate failed because evaluation still reports issues. Repair every
+      issue with yaml_edit, then let the deterministic evaluator run again.

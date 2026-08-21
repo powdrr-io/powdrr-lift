@@ -488,8 +488,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--entity-type",
         dest="entity_types",
         action="append",
-        required=True,
         help="Allowed entity type. May be repeated.",
+    )
+    architecture_specification_parser.add_argument(
+        "--all-entity-types",
+        action="store_true",
+        help="Allow every entity type from the repository taxonomy.",
     )
     architecture_specification_parser.add_argument(
         "--output",
@@ -1544,8 +1548,21 @@ def _run_current_state(args: argparse.Namespace) -> int:
 
 def _run_architecture_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+    entity_types = args.entity_types
+    if args.all_entity_types:
+        try:
+            entity_types = tuple(load_entity_taxonomy(repo_root).entity_types)
+        except (OSError, ValueError) as exc:
+            print(f"Unable to load the entity taxonomy: {exc}", file=sys.stderr)
+            return 1
+    if not entity_types:
+        print(
+            "Provide --entity-type at least once or use --all-entity-types.",
+            file=sys.stderr,
+        )
+        return 2
     output_path = create_architecture_specification_template(
-        args.entity_types,
+        entity_types,
         work_item_name=args.work_item_name,
         output_path=args.output,
         repo_root=repo_root,

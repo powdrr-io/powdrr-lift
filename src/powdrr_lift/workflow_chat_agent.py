@@ -746,6 +746,24 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stderr=self.stderr,
                     verbose=self.config.verbose,
                 )
+                pre_step_event = _latest_deterministic_pre_step(
+                    self.state.execution_events,
+                    skill_name=self.selected_skill.skill.name,
+                    step_index=self.state.step_index,
+                )
+                pre_step_template = (
+                    pre_step_event.get("template")
+                    if pre_step_event is not None
+                    else None
+                )
+                generated_file_path = _resolve_generated_file_path_from_command(
+                    pre_step_template.get("command")
+                    if isinstance(pre_step_template, Mapping)
+                    else None,
+                    worktree_root=self.state.worktree_root,
+                )
+                if generated_file_path is not None:
+                    self.state.current_file_path = generated_file_path
             step_mapping = (
                 _resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,
@@ -3936,6 +3954,10 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "narrow results and filters for exact fields; never use "
             "filters.work_item_name. Supported context types:\n"
             f"{context_type_lines}\n"
+            "Use the exact token entity-relationships when requesting entity "
+            "relationships; do not abbreviate it as relationships. Architecture "
+            "context is requested with entities, entity-relationships, invariants, "
+            "and guidance; do not use architecture as a context type.\n"
             'Example: {"action":"gather_context","feature_id":"display-related-photos",'
             '"types":["requirements"],"keywords":["photo"]}.\n'
         )
@@ -3967,8 +3989,9 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         prompt += (
             "Deterministic context: the resolved pre_step template has already run. "
             "The deterministic_context field is the context for this step; do not "
-            "invoke the pre-step again. Use it and the current step details before "
-            "choosing next_step or complete.\n"
+            "invoke the pre-step again. invoke_tool is not allowed in this step. "
+            "Use the result and choose next_step; choose complete only when the "
+            "skill itself is finished.\n"
         )
     if _validation_gate_enabled(current_step):
         prompt += (
@@ -4015,7 +4038,19 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         )
     prompt += (
         "A yaml_edit action uses the exact fields file_path and operations; each "
-        "upsert_item uses section, id, and value.\n"
+        "operation must be complete. A set_value operation is exactly "
+        '{"op":"set_value","path":["title"],"value":"..."}; an upsert_item '
+        "operation is exactly "
+        '{"op":"upsert_item","section":"requirements","id":"req-1",'
+        '"value":{"description":"...","state":"added"}}. Do not omit '
+        "path, section, id, or value. A set_value path must be a non-empty array "
+        "of mapping keys and non-negative list indexes; use upsert_item with the "
+        "section, existing-or-new item id, and complete mapping when replacing a "
+        "whole list item. The only supported operation names are "
+        "set_value, upsert_item, and remove_item; never use remove or replace. "
+        "Use remove_item only for an existing item id from the current document. "
+        "Template comments and boilerplate disappear when a valid yaml_edit "
+        "rewrites the file; do not model comments as list items.\n"
         "When a validation result contains corrective_action, apply it before "
         "retrying; do not repeat the same failed validation unchanged. Use edit "
         "only when current "
@@ -5766,17 +5801,21 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
                 (str, bytes, bytearray),
             )
             or not raw_path
-            or not all(isinstance(item, str) and item.strip() for item in raw_path)
+            or not all(
+                (isinstance(item, str) and item.strip())
+                or (isinstance(item, int) and not isinstance(item, bool) and item >= 0)
+                for item in raw_path
+            )
         ):
             raise RuntimeError(
                 "yaml_edit set_value requires a non-empty path array of mapping "
-                'keys, for example ["title"].'
+                'keys or non-negative list indexes, for example ["title"].'
             )
         if "value" not in value:
             raise RuntimeError("yaml_edit set_value requires value.")
         return SkillChatYamlOperation(
             operation=operation,
-            path=tuple(item.strip() for item in raw_path),
+            path=tuple(str(item).strip() for item in raw_path),
             value=value["value"],
         )
 
@@ -7840,7 +7879,9 @@ def _action_repair_prompt(
             'If the correction is a YAML edit, use exactly {"action":"yaml_edit",'
             '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
             '"path":["id"],"value":"feature-id"}]}; include all required '
-            "fields in the operation. "
+            'fields in the operation. For list items, use {"op":"upsert_item",'
+            '"section":"requirements","id":"req-1","value":{"description":'
+            '"...","state":"added"}}. '
         )
         if invocations:
             prompt += (

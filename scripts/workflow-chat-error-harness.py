@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +21,15 @@ DEFAULT_ANSWER = (
     "writes safely, avoid secrets, and add unit and integration tests."
 )
 DEFAULT_ERROR_LOG = Path("workflow-llm-errors.jsonl")
+DEFAULT_TRANSCRIPT = Path("workflow-chat-harness.log")
+
+
+def _text_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def _parse_args() -> argparse.Namespace:
@@ -53,6 +63,12 @@ def _parse_args() -> argparse.Namespace:
         help="JSONL error log path, relative to --repo-root by default.",
     )
     parser.add_argument(
+        "--transcript",
+        type=Path,
+        default=DEFAULT_TRANSCRIPT,
+        help="Combined workflow stdout/stderr transcript path.",
+    )
+    parser.add_argument(
         "--keep-log",
         action="store_true",
         help="Keep existing records and report only errors added by this run.",
@@ -68,6 +84,12 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=8,
         help="Maximum workflow-chat turns.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=900.0,
+        help="Maximum seconds for the workflow subprocess (default: 900).",
     )
     return parser.parse_args()
 
@@ -108,6 +130,10 @@ def main() -> int:
     error_log = args.error_log
     if not error_log.is_absolute():
         error_log = _log_root(repo_root) / error_log
+    transcript = args.transcript
+    if not transcript.is_absolute():
+        transcript = _log_root(repo_root) / transcript
+    transcript.parent.mkdir(parents=True, exist_ok=True)
     previous_error_count = len(_read_errors(error_log)) if args.keep_log else 0
     if not args.keep_log:
         error_log.unlink(missing_ok=True)
@@ -123,17 +149,54 @@ def main() -> int:
         str(args.max_turns),
         *args.workflow_arg,
     ]
-    answers = args.answer or [DEFAULT_ANSWER]
-    completed = subprocess.run(
+    # A workflow may ask more than one follow-up question while repairing a
+    # specification. Keep the default harness input available for every turn so
+    # an unexpected prompt is captured in the transcript instead of terminating
+    # the child with EOFError. Explicit answers remain a finite caller contract.
+    answers = args.answer or [DEFAULT_ANSWER] * args.max_turns
+    process = subprocess.Popen(
         command,
         cwd=repo_root,
-        input="\n".join([args.prompt, *answers]) + "\n",
         text=True,
-        capture_output=True,
-        check=False,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
-    sys.stdout.write(completed.stdout)
-    sys.stderr.write(completed.stderr)
+    timed_out = False
+    interrupted = False
+    try:
+        output, _ = process.communicate(
+            input="\n".join([args.prompt, *answers]) + "\n",
+            timeout=args.timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        process.kill()
+        output, _ = process.communicate()
+        output = _text_output(exc.output) + _text_output(output)
+    except KeyboardInterrupt:
+        interrupted = True
+        process.kill()
+        output, _ = process.communicate()
+        output = _text_output(output)
+    else:
+        output = _text_output(output)
+    transcript.write_text(output, encoding="utf-8")
+    sys.stdout.write(output)
+    sys.stdout.flush()
+
+    return_code = process.returncode
+    termination = (
+        "timed out"
+        if timed_out
+        else "interrupted"
+        if interrupted
+        else f"exit code {return_code}"
+    )
+    print(
+        f"Harness transcript: {transcript} ({termination})",
+        file=sys.stderr,
+    )
 
     errors = _read_errors(error_log)[previous_error_count:]
     if errors:
@@ -148,12 +211,21 @@ def main() -> int:
                 file=sys.stderr,
             )
         return 1
-    if completed.returncode != 0:
+    if timed_out or interrupted:
+        print(
+            f"workflow-chat {termination}; inspect {transcript} for final output.",
+            file=sys.stderr,
+        )
+        return 124 if timed_out else 130
+    if return_code != 0:
         print(
             "workflow-chat exited non-zero without a structured LLM error.",
             file=sys.stderr,
         )
-    return completed.returncode
+    if return_code < 0:
+        signal_name = signal.Signals(-return_code).name
+        print(f"workflow-chat terminated by {signal_name}.", file=sys.stderr)
+    return return_code
 
 
 if __name__ == "__main__":

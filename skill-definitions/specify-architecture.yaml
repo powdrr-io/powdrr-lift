@@ -66,8 +66,7 @@ steps:
     YAML file_path and a non-empty operations array. Use set_value with a JSON
     path array for scalar or top-level list changes; use upsert_item with section,
     id, and a complete value mapping for entity, relationship, invariant, or
-    guidance entries. Do not use edit or rewrite the YAML as prose. If there are
-    no issues, choose next_step without changing the file.
+    guidance entries. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"architecture-id"},{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"Service","name":"Example","description":"..."}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file.
 - id: gate-architecture
   description: Confirm that architecture evaluation reports zero issues.
   step_type: gate

@@ -62,9 +62,7 @@ steps:
     with yaml_edit actions. Each action must include the YAML file_path and a
     non-empty operations array. Use set_value with a JSON path array for scalar
     changes; use upsert_item with section, id, and a complete value mapping for
-    entities, relationships, modules, tools, features, or decisions. Do not use
-    edit or rewrite the YAML as prose. If there are no issues, choose next_step
-    without changing the file.
+    entities, relationships, modules, tools, features, or decisions. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"architecture-id"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file.
 - id: gate-implementation
   description: Confirm that implementation evaluation reports zero issues.
   step_type: gate

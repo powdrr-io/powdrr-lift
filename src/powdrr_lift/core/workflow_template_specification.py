@@ -279,7 +279,7 @@ def instantiate_workflow_template(
             ),
             dependent_state=task_template.dependent_state,
         )
-        task_path = output_directory / f"{task.task_id}.json"
+        task_path = output_directory / f"{task.task_id}.yaml"
         if task_path.exists():
             raise FileExistsError(
                 f"Workflow task already exists: {task_path}. Choose a new "

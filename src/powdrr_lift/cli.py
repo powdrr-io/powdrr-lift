@@ -1283,7 +1283,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             {
                 "workflow_directory": str(output_directory),
                 "task_count": len(tasks),
-                "first_task": str(output_directory / f"{tasks[0].task_id}.json"),
+                "first_task": str(output_directory / f"{tasks[0].task_id}.yaml"),
                 "first_task_id": tasks[0].task_id,
                 "integration_branch": integration_branch,
                 "integration_worktree": (

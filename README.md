@@ -242,7 +242,7 @@ continue to handle Command shortcuts itself.
 
 ### Skill flows
 
-Skills are reusable workflow definitions. They are checked in as YAML or JSON
+Skills are reusable workflow definitions. They are checked in as YAML
 files under `skill-definitions/` and can be selected by workflow chat, composed
 as nested skills by another skill, or used as the definition behind durable
 agent-workflow tasks. Every invocation resolves a worktree context first: it

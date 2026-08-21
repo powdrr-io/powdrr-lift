@@ -6052,7 +6052,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     )
             save_workflow_task(
                 replace(task, status=TaskStatus.COMPLETED),
-                workflow_root / ready_task.work_item_name / f"{task.task_id}.json",
+                workflow_root / ready_task.work_item_name / f"{task.task_id}.yaml",
             )
 
     assert assignment_batches == [

@@ -7,6 +7,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, cast
 
+import yaml
+
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_STEP_TYPES,
     SkillStepPreStep,
@@ -129,6 +131,9 @@ class WorkflowTask:
     def to_json(self) -> str:
         return workflow_task_to_json(self)
 
+    def to_yaml(self) -> str:
+        return workflow_task_to_yaml(self)
+
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> WorkflowTask:
         return workflow_task_from_data(data)
@@ -136,6 +141,10 @@ class WorkflowTask:
     @classmethod
     def from_json(cls, json_content: str) -> WorkflowTask:
         return workflow_task_from_json(json_content)
+
+    @classmethod
+    def from_yaml(cls, yaml_content: str) -> WorkflowTask:
+        return workflow_task_from_yaml(yaml_content)
 
     @classmethod
     def from_file(cls, path: str | Path) -> WorkflowTask:
@@ -198,7 +207,7 @@ class WorkflowInstance:
                 f"{', '.join(missing_upstreams)}"
             )
         self.directory.mkdir(parents=True, exist_ok=True)
-        save_workflow_task(task, self.directory / f"{task.task_id}.json")
+        save_workflow_task(task, self.directory / f"{task.task_id}.yaml")
         self._tasks[task.task_id] = task
         return task
 
@@ -214,7 +223,7 @@ class WorkflowInstance:
             status=TaskStatus.COMPLETED,
             output_state=output_state,
         )
-        save_workflow_task(completed_task, self.directory / f"{task_id}.json")
+        save_workflow_task(completed_task, self.directory / f"{task_id}.yaml")
         self._tasks[task_id] = completed_task
         return completed_task
 
@@ -233,7 +242,7 @@ class WorkflowInstance:
                 self._tasks,
             ),
         )
-        save_workflow_task(claimed_task, self.directory / f"{task_id}.json")
+        save_workflow_task(claimed_task, self.directory / f"{task_id}.yaml")
         self._tasks[task_id] = claimed_task
         return claimed_task
 
@@ -274,6 +283,17 @@ def workflow_task_from_json(json_content: str) -> WorkflowTask:
     return workflow_task_from_data(cast("Mapping[str, Any]", loaded_content))
 
 
+def workflow_task_to_yaml(task: WorkflowTask) -> str:
+    return yaml.safe_dump(task.to_data(), sort_keys=False)
+
+
+def workflow_task_from_yaml(yaml_content: str) -> WorkflowTask:
+    loaded_content = yaml.safe_load(yaml_content)
+    if not isinstance(loaded_content, Mapping):
+        raise ValueError("Workflow task YAML must decode to an object.")
+    return workflow_task_from_data(cast("Mapping[str, Any]", loaded_content))
+
+
 def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     task_id = _required_string(data, "task_id")
     status = _required_status(data, "status")
@@ -310,13 +330,22 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
 
 
 def load_workflow_task(path: str | Path) -> WorkflowTask:
-    return workflow_task_from_json(Path(path).read_text(encoding="utf-8"))
+    task_path = Path(path)
+    content = task_path.read_text(encoding="utf-8")
+    if task_path.suffix.lower() in {".yaml", ".yml"}:
+        return workflow_task_from_yaml(content)
+    return workflow_task_from_json(content)
 
 
 def save_workflow_task(task: WorkflowTask, path: str | Path) -> Path:
     resolved_path = Path(path)
     resolved_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_path.write_text(workflow_task_to_json(task), encoding="utf-8")
+    content = (
+        workflow_task_to_yaml(task)
+        if resolved_path.suffix.lower() in {".yaml", ".yml"}
+        else workflow_task_to_json(task)
+    )
+    resolved_path.write_text(content, encoding="utf-8")
     return resolved_path
 
 
@@ -349,14 +378,29 @@ def load_workflow_tasks(directory: str | Path) -> tuple[WorkflowTask, ...]:
     directory_path = Path(directory)
     return tuple(
         load_workflow_task(task_path)
-        for task_path in sorted(directory_path.glob("*.json"))
+        for task_path in _workflow_task_paths(directory_path)
         if _is_workflow_task_path(task_path)
     )
 
 
 def _is_workflow_task_path(path: Path) -> bool:
     """Keep workflow metadata files out of the task document collection."""
-    return path.is_file() and path.name != ".workflow-git.json"
+    return (
+        path.is_file()
+        and path.suffix.lower() in {".json", ".yaml", ".yml"}
+        and path.name != ".workflow-git.json"
+    )
+
+
+def _workflow_task_paths(directory: Path) -> tuple[Path, ...]:
+    return tuple(
+        sorted(
+            path
+            for suffix in ("*.yaml", "*.yml", "*.json")
+            for path in directory.glob(suffix)
+            if _is_workflow_task_path(path)
+        )
+    )
 
 
 def select_ready_workflow_tasks(
@@ -413,21 +457,24 @@ def load_ready_workflow_tasks(
 
 
 def build_workflow_task_validation_report(
-    json_content: str,
+    content: str,
     *,
     source_path: str | Path | None = None,
 ) -> WorkflowTaskValidationReport:
+    source_suffix = Path(source_path).suffix.lower() if source_path is not None else ""
+    parser = yaml.safe_load if source_suffix in {".yaml", ".yml"} else json.loads
     try:
-        loaded_content = json.loads(json_content)
+        loaded_content = parser(content)
     except Exception as exc:  # noqa: BLE001
+        format_name = "YAML" if source_suffix in {".yaml", ".yml"} else "JSON"
         return WorkflowTaskValidationReport(
             validation_successful=False,
             task_ids=[],
             task_paths=_task_paths_list(source_path),
             issues=[
                 WorkflowTaskValidationIssue(
-                    code="invalid_json",
-                    message=f"Could not parse workflow task JSON: {exc}",
+                    code=f"invalid_{format_name.lower()}",
+                    message=f"Could not parse workflow task {format_name}: {exc}",
                     path=_format_path(source_path),
                 )
             ],
@@ -441,7 +488,11 @@ def build_workflow_task_validation_report(
             issues=[
                 WorkflowTaskValidationIssue(
                     code="invalid_root_type",
-                    message="Workflow task JSON must decode to an object.",
+                    message=(
+                        "Workflow task YAML must decode to an object."
+                        if source_suffix in {".yaml", ".yml"}
+                        else "Workflow task JSON must decode to an object."
+                    ),
                     path=_format_path(source_path),
                 )
             ],
@@ -820,7 +871,7 @@ def build_workflow_task_directory_validation_report(
     task_paths_by_id: dict[str, Path] = {}
     upstream_references: list[tuple[Path, WorkflowTask]] = []
 
-    for task_path in sorted(directory_path.glob("*.json")):
+    for task_path in _workflow_task_paths(directory_path):
         if not _is_workflow_task_path(task_path):
             continue
         task_paths.append(str(task_path))
@@ -833,7 +884,7 @@ def build_workflow_task_directory_validation_report(
         if not file_report.validation_successful or not file_report.task_ids:
             continue
 
-        task = workflow_task_from_json(raw_content)
+        task = load_workflow_task(task_path)
         task_id = task.task_id
         upstream_references.append((task_path, task))
         if task_id in tasks_by_id:
@@ -920,6 +971,26 @@ def validate_workflow_task_json_file(path: str | Path) -> str:
     return validate_workflow_task_json(Path(path).read_text(encoding="utf-8"))
 
 
+def validate_workflow_task_yaml(yaml_content: str) -> str:
+    return (
+        json.dumps(
+            _report_to_data(
+                build_workflow_task_validation_report(
+                    yaml_content,
+                    source_path="workflow.yaml",
+                )
+            ),
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
+
+
+def validate_workflow_task_yaml_file(path: str | Path) -> str:
+    return validate_workflow_task_yaml(Path(path).read_text(encoding="utf-8"))
+
+
 def validate_workflow_task_directory(directory: str | Path) -> str:
     return (
         json.dumps(
@@ -934,6 +1005,8 @@ def validate_workflow_task_directory(directory: str | Path) -> str:
 workflow_task_document_to_json = workflow_task_to_json
 workflow_task_document_from_json = workflow_task_from_json
 workflow_task_document_from_data = workflow_task_from_data
+workflow_task_document_to_yaml = workflow_task_to_yaml
+workflow_task_document_from_yaml = workflow_task_from_yaml
 load_workflow_task_document = load_workflow_task
 save_workflow_task_document = save_workflow_task
 load_workflow_task_documents = load_workflow_tasks

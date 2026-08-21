@@ -578,7 +578,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         if repaired_parameters is not None:
             print(
-                "Corrected malformed workflow filename suffix to the exact .json "
+                "Corrected malformed workflow filename suffix to the exact workflow "
                 "filename.",
                 file=self.stderr,
             )
@@ -1651,7 +1651,8 @@ def _task_system_prompt() -> str:
 def _workflow_file_names(workflow_dir: Path) -> list[str]:
     return sorted(
         path.name
-        for path in workflow_dir.glob("*.json")
+        for pattern in ("*.yaml", "*.yml", "*.json")
+        for path in workflow_dir.glob(pattern)
         if path.is_file() and path.name != ".workflow-git.json"
     )
 
@@ -1795,8 +1796,8 @@ def _workflow_file_command_error(
     valid_paths = ", ".join(str(workflow_dir / name) for name in valid_files)
     return (
         "Rejected workflow shell command because it referenced nonexistent "
-        f"filename(s): {', '.join(missing_references)}. Use the exact .json "
-        f"filenames from workflow_files: {valid_paths}."
+        f"filename(s): {', '.join(missing_references)}. Use the exact filenames "
+        f"from workflow_files: {valid_paths}."
     )
 
 
@@ -1812,7 +1813,7 @@ def _repair_workflow_file_command(
     def repair_text(text: str) -> str:
         repaired = text
         for filename in valid_files:
-            exact_stem = str(workflow_dir.resolve() / filename.removesuffix(".json"))
+            exact_stem = str(workflow_dir.resolve() / Path(filename).stem)
             repaired = re.sub(
                 re.escape(exact_stem) + r"\.+(?=[\s'\";&|()]|$)",
                 str(workflow_dir.resolve() / filename),

@@ -934,9 +934,9 @@ def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     assert exit_code == 0
     assert "Corrected malformed workflow filename suffix" in stderr.getvalue()
     assert "Rejected workflow shell command" not in stderr.getvalue()
-    assert "agent-task.json" in stdout.getvalue()
+    assert "agent-task.yaml" in stdout.getvalue()
     assert "workflow_files" in client.messages[0][1]["content"]
-    assert "agent-task.json" in client.messages[0][1]["content"]
+    assert "agent-task.yaml" in client.messages[0][1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED
     )
@@ -949,7 +949,7 @@ def test_workflow_file_command_error_is_not_reported_for_exact_filename(
 
     assert (
         _workflow_file_command_error(
-            {"command": f"cat {workflow.directory / 'agent-task.json'}"},
+            {"command": f"cat {workflow.directory / 'agent-task.yaml'}"},
             workflow.directory,
         )
         is None

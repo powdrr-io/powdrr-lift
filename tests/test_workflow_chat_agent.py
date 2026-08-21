@@ -5224,28 +5224,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             ],
         }
 
-    step_descriptions = [
-        "Capture the feature name.",
-        "Capture the feature goal and success criteria.",
-        "Generate the system specification template.",
-        "Fill the system requirements and approach.",
-        "Review the system context before deciding the feature shape.",
-        "Evaluate the filled system specification.",
-        "Generate the architecture specification template.",
-        "Fill the architecture entities and relationships.",
-        "Review architecture before implementation.",
-        "Evaluate the filled architecture specification.",
-        "Generate the implementation specification template.",
-        "Fill the implementation features and decisions.",
-        "Evaluate the filled implementation specification.",
-        "Generate the proposed PR specification template.",
-        "Fill the proposed PR specification template.",
-        (
-            "Deterministically evaluate every generated specification before "
-            "implementation."
-        ),
-        "Fix every reported specification issue with yaml_edit.",
-    ]
+    step_descriptions = [None] * 17
 
     captured: dict[str, object] = {"messages": []}
 
@@ -5311,7 +5290,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             messages: list[dict[str, str]],
             *,
             expected_step_index: int,
-            expected_step_description: str,
+            expected_step_description: str | None,
             expected_context_suffix: str | None,
             expected_event_count: int,
             expected_last_event_kind: str | None = None,
@@ -5322,7 +5301,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             assert prompt["execution_mode"] == "execute_selected_skill"
             assert prompt["selected_skill"]["name"] == "specify-a-feature"
             assert prompt["current_step_index"] == expected_step_index
-            assert prompt["current_step"]["description"] == expected_step_description
             assert prompt["transcript"][0]["content"] == "Build exports"
             return prompt
 
@@ -5342,13 +5320,17 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "kind": "complete",
                     "text": "The existing specification already satisfies this review.",
                 }
-            elif 3 <= self._call_index <= 17:
+            elif 3 <= self._call_index <= 21:
                 current_step = cast(dict[str, object], prompt["current_step"])
-                description = current_step["description"]
                 assert prompt["selected_skill"]["name"] == "specify-a-feature"
-                assert isinstance(description, str)
+                step_id = current_step.get("id")
                 latest_action = prompt.get("latest_action")
-                if description.startswith("Fill ") and not (
+                if step_id in {
+                    "fill-system-specification",
+                    "fill-architecture-specification",
+                    "fill-implementation-specification",
+                    "fill-pr-specification",
+                } and not (
                     isinstance(latest_action, dict)
                     and latest_action.get("kind") == "yaml_edit"
                 ):
@@ -5358,12 +5340,33 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         system_spec_filename: system_spec_yaml,
                         architecture_spec_filename: architecture_spec_yaml,
                         implementation_spec_filename: implementation_spec_yaml,
+                        pr_spec_filename: pr_spec_yaml,
                     }[Path(file_path).name]
                     generic_response = _full_replace_edit(prompt, yaml_text=yaml_text)
+                elif step_id == "stage-specification-artifacts" and not (
+                    isinstance(latest_action, dict)
+                    and latest_action.get("kind") == "invoke_tool"
+                ):
+                    generic_response = {
+                        "kind": "invoke_tool",
+                        "tool": "shell",
+                        "parameters": {
+                            "command": [
+                                "git",
+                                "add",
+                                "docs/proposals/display-related-photos",
+                            ]
+                        },
+                    }
+                elif step_id == "stage-specification-artifacts":
+                    generic_response = {
+                        "kind": "complete",
+                        "text": "Feature specification complete.",
+                    }
                 else:
                     generic_response = {
                         "kind": "next_step",
-                        "decisions_and_context": f"Completed: {description}",
+                        "decisions_and_context": "Completed the current step.",
                     }
                 self._call_index += 1
                 return generic_response

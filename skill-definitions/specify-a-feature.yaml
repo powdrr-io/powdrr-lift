@@ -8,7 +8,12 @@ steps:
   description: Capture the feature name.
   step_type: freeform
   llm_type: high_reasoning
-  details: Choose a stable kebab-case feature name and reuse this exact name as the work-item name for every generated document.
+  details: >-
+    Choose a stable kebab-case feature name and reuse this exact name as the
+    work-item name for every generated document. For example, name a request
+    to record human and LLM interactions in a file `interaction-file-log`.
+    If the name is unclear, ask: "What short kebab-case name should identify
+    this feature in its specification files?"
   outputs:
   - name: work_item_name
     type: string
@@ -17,7 +22,10 @@ steps:
   description: Capture the feature goal and success criteria.
   step_type: freeform
   llm_type: high_reasoning
-  details: Ask about outcomes, edge cases, tests, and constraints for the named feature.
+  details: >-
+    Ask the user about outcomes, edge cases, tests, and constraints for the
+    named feature. For example: "What should interaction-file-log record,
+    what should happen when logging fails, and how will we test the log?"
 - id: generate-system-specification
   description: Generate the system specification template.
   step_type: invoke_tool
@@ -36,20 +44,25 @@ steps:
   description: Fill the system requirements and approach.
   step_type: freeform
   llm_type: standard_reasoning
-  details: Use yaml_edit to fill the generated YAML; do not invoke tools or rewrite the YAML as prose, then choose next_step.
-- description: Review the system context before deciding the feature shape.
+  details: >-
+    Use yaml_edit to fill the generated YAML with the feature's requirements
+    and approach; do not invoke tools or rewrite the YAML as prose, then choose
+    next_step. For example, add a requirement describing durable interaction
+    records and an approach describing the log writer.
+- id: review-system-context
+  description: Review the system context before deciding the feature shape.
   step_type: freeform
-  llm_type: high_reasoning
+  llm_type: simple_task
   details: >-
     Run the nested system review skill and use its result to decide whether the
     current system context remains appropriate.
   uses_skills:
   - review-system
 - id: evaluate-system-specification
-  description: Evaluate the filled system specification.
-  step_type: invoke_tool
+  description: Gate the filled system specification.
+  step_type: gate
   llm_type: simple_task
-  details: Invoke the system evaluator exactly once; do not edit the file in this step.
+  details: The gate passes only when the system evaluator reports zero issues.
   pre_step:
     action: invoke_tool
     template:
@@ -58,6 +71,14 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/system-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: repair-feature-specifications
+    retry_context: >-
+      System evaluation reported issues. Repair the affected YAML with yaml_edit,
+      then rerun the complete specification evaluation gate.
 - id: generate-architecture-specification
   description: Generate the architecture specification template.
   step_type: invoke_tool
@@ -77,8 +98,14 @@ steps:
   description: Fill the architecture entities and relationships.
   step_type: freeform
   llm_type: high_reasoning
-  details: Use yaml_edit to capture the entity model before review; do not invoke tools or rewrite the YAML as prose, then choose next_step.
-- description: Review architecture before implementation.
+  details: >-
+    Use yaml_edit to capture the entity model before review; do not invoke tools
+    or rewrite the YAML as prose, then choose next_step. Keep the model small:
+    for example, define `related-photo` and `gallery-photo` entities plus one
+    `groups_with` relationship, and add invariants or guidance only when they
+    constrain those entities or that relationship.
+- id: review-architecture-context
+  description: Review architecture before implementation.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -87,10 +114,10 @@ steps:
   uses_skills:
   - review-architecture
 - id: evaluate-architecture-specification
-  description: Evaluate the filled architecture specification.
-  step_type: invoke_tool
+  description: Gate the filled architecture specification.
+  step_type: gate
   llm_type: simple_task
-  details: Invoke the architecture evaluator exactly once; do not edit the file in this step.
+  details: The gate passes only when the architecture evaluator reports zero issues.
   pre_step:
     action: invoke_tool
     template:
@@ -99,6 +126,14 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/architecture-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: repair-feature-specifications
+    retry_context: >-
+      Architecture evaluation reported issues. Repair the affected YAML with
+      yaml_edit, then rerun the complete specification evaluation gate.
 - id: generate-implementation-specification
   description: Generate the implementation specification template.
   step_type: invoke_tool
@@ -119,10 +154,10 @@ steps:
   llm_type: standard_reasoning
   details: Use yaml_edit to complete the generated implementation template; do not invoke tools or rewrite the YAML as prose, then choose next_step.
 - id: evaluate-implementation-specification
-  description: Evaluate the filled implementation specification.
-  step_type: invoke_tool
+  description: Gate the filled implementation specification.
+  step_type: gate
   llm_type: simple_task
-  details: Invoke the implementation evaluator exactly once; do not edit the file in this step.
+  details: The gate passes only when the implementation evaluator reports zero issues.
   pre_step:
     action: invoke_tool
     template:
@@ -131,6 +166,14 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/implementation-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: repair-feature-specifications
+    retry_context: >-
+      Implementation evaluation reported issues. Repair the affected YAML with
+      yaml_edit, then rerun the complete specification evaluation gate.
 - id: generate-pr-specification
   description: Generate the proposed PR specification template.
   step_type: invoke_tool
@@ -201,7 +244,8 @@ steps:
       The specification gate failed because one or more spec-v1 files still have
       validation issues. Inspect the latest evaluator result, repair the affected
       YAML with yaml_edit, and rerun deterministic evaluation before continuing.
-- description: Stage the validated specification artifacts for pull request preparation.
+- id: stage-specification-artifacts
+  description: Stage the validated specification artifacts for pull request preparation.
   step_type: freeform
   llm_type: simple_task
   details: Inspect the worktree and stage only the validated specification
@@ -217,7 +261,8 @@ steps:
     - git
     - add
     - docs/proposals/<work-item-name>
-- description: Run finish-pr-prep before creating the pull request.
+- id: prepare-pull-request
+  description: Run finish-pr-prep before creating the pull request.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -228,7 +273,8 @@ steps:
     implementation in this skill.
   uses_skills:
   - finish-pr-prep
-- description: Create or update the pull request for the validated feature.
+- id: create-feature-pull-request
+  description: Create or update the pull request for the validated feature.
   step_type: freeform
   llm_type: simple_task
   details: >-

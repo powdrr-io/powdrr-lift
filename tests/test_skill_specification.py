@@ -1091,12 +1091,14 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
         "choose next_step in that case. Otherwise choose next_step to generate "
         "and fill an update."
     )
+    assert skill.steps[2].pre_step is not None
     assert tuple(skill.steps[2].pre_step.template["command"]) == (
         "powdrr-lift",
         "system-specification",
         "--work-item-name",
         "<work-item-name>",
     )
+    assert skill.steps[4].pre_step is not None
     assert tuple(skill.steps[4].pre_step.template["command"]) == (
         "powdrr-lift",
         "evaluate",
@@ -1144,6 +1146,7 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "generate and fill an update."
     )
     assert "Do not use invoke_tool" in (skill.steps[5].details or "")
+    assert skill.steps[2].pre_step is not None
     assert tuple(skill.steps[2].pre_step.template["command"]) == (
         "powdrr-lift",
         "architecture-specification",
@@ -1151,6 +1154,7 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "<work-item-name>",
         "--all-entity-types",
     )
+    assert skill.steps[4].pre_step is not None
     assert tuple(skill.steps[4].pre_step.template["command"]) == (
         "powdrr-lift",
         "evaluate",

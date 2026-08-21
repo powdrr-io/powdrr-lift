@@ -123,6 +123,7 @@ _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
+_ENABLE_LLM_EXCHANGE_LOGGING = False
 _MAX_PROMPT_TRANSCRIPT_ENTRIES = 12
 _MAX_PROMPT_TRANSCRIPT_CHARS = 12000
 _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
@@ -1238,6 +1239,16 @@ class _LLMExchangeRecordingClient:
         )
 
 
+def _maybe_record_llm_exchanges(
+    client: WorkflowLLMClient,
+    repo_root: Path,
+) -> WorkflowLLMClient:
+    """Apply exchange recording only while the hardcoded diagnostic flag is enabled."""
+    if not _ENABLE_LLM_EXCHANGE_LOGGING:
+        return client
+    return _LLMExchangeRecordingClient(client, repo_root)
+
+
 def _serialize_exchange(
     exchange: Mapping[str, Any],
     *,
@@ -1874,7 +1885,7 @@ def run_workflow_chat(
     ) -> WorkflowLLMClient:
         key = (selected_provider, selected_model)
         if key not in clients:
-            clients[key] = _LLMExchangeRecordingClient(
+            clients[key] = _maybe_record_llm_exchanges(
                 _build_chat_client(
                     selected_credentials,
                     model=selected_model,
@@ -3638,7 +3649,11 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         '{"action":"next_step","decisions_and_context":"The current step "'
         '"is complete."}.\n'
         "prompt_user is always allowed when a specific human decision or fact is "
-        "needed; it requires one clear English question ending in '?'.\n"
+        "needed. It requires the question in the text field; never use prompt, "
+        "question, or action_input. For example: "
+        '{"action":"prompt_user","text":"What specific success criteria '
+        'should this feature meet?","decisions_and_context":"More information '
+        'is required before continuing."}.\n'
         "Use goto_step only with a declared step id and include the progress requiring "
         "another pass. Use next_step when the current details are complete and "
         "complete when the skill is finished.\n"
@@ -5238,7 +5253,10 @@ def _parse_workflow_action_prompt_user(
 ) -> SkillChatAction:
     text = payload.get("text")
     if not isinstance(text, str):
-        raise RuntimeError("Workflow prompt_user action text must be a string.")
+        raise RuntimeError(
+            "Workflow prompt_user action requires a string text field; use "
+            '"text", not "prompt", "question", or "action_input".'
+        )
     text = _validate_user_question(
         text,
         field_name="Workflow prompt_user action text",
@@ -6963,7 +6981,9 @@ def _action_repair_prompt(
         "parameters.command for invoke_tool, skill for invoke_skill, file_path "
         "with positive start_line "
         "and end_line for read_document, non-empty types for gather_context, "
-        "and a clear English question ending in '?' for prompt_user. Do not "
+        'and text containing a clear English question ending in "?" for '
+        "prompt_user; never use prompt, question, or action_input for that "
+        "action. Do not "
         "combine actions or output markdown. For yaml_edit, combine all "
         "independent corrections for the same file in one operations array."
     )
@@ -6984,6 +7004,20 @@ def _action_repair_prompt(
             prompt += (
                 "This step declares no tool invocations; do not return invoke_tool. "
             )
+        prompt += (
+            "For this repair, these are the exact prompt_user and next_step "
+            "action shapes allowed for the current step: "
+            '{"action":"prompt_user","text":"One clear English question?",'
+            '"decisions_and_context":"More information is required."} or '
+            '{"action":"next_step","decisions_and_context":"The current step '
+            'is complete."}. '
+        )
+        if invocations:
+            prompt += (
+                "invoke_tool is also allowed only with one of the declared tool "
+                "templates shown above; do not invent another tool or parameter "
+                "shape. "
+            )
     if validation_error is not None:
         prompt += (
             "\nThe previous action returned a validation_error and was not "
@@ -6991,6 +7025,15 @@ def _action_repair_prompt(
             "message and return an action that matches the current step's "
             "declared tool template exactly."
         )
+        if "prompt_user action" in validation_error.lower() and "text" in (
+            validation_error.lower()
+        ):
+            prompt += (
+                " The previous response used the wrong prompt_user field. "
+                'prompt_user requires a string in "text"; rename "prompt" to '
+                '"text" and return the complete corrected action. Do not use '
+                '"prompt", "question", or "action_input".'
+            )
     if failed_action is not None:
         prompt += (
             "\nThe previous edit action failed and was not applied. don't do this "

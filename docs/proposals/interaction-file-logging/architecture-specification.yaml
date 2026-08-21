@@ -1,0 +1,29 @@
+# Architecture specification template.
+#
+# Instructions:
+# - Use the proposal folder `docs/proposals/interaction-file-logging`.
+# - Fill in the sections below with the intended architecture.
+# - Set `id` to a date-based identifier, for example 2026-06-19.
+# - Choose each entity type from the allowed entity types listed here.
+# - Write each rationale in English, but quote the requirement or
+#   approach ids it relies on, for example "req-single-command-install".
+# - Every entity and every entity relationship rationale must cite at
+#   least one current requirement or approach id in quotes.
+# - Every invariant and guidance rationale must cite at least one
+#   current requirement or approach id in quotes.
+# - Use `related.entities` and `related.entity_relationships` in
+#   invariants and guidance whenever they refer to a specific entity
+#   or relationship, and keep at least one current entity or
+#   relationship listed in each item's related block.
+# - Keep every entity mentioned in a relationship, invariant, or
+#   guidance item present in the `entities` section.
+# - Use `action: added`, `removed`, or `changed` for every entity,
+#   module, and tool.
+# - Every related_modules reference must name an id declared in the
+#   modules section; omit related_modules when it is empty.
+# - Delete these instructions and replace them with this comment at the top:
+#   "# This file is read-only and should never be edited by a tool or agent."
+#
+schema: https://powdrr.io/schemas/specification-v1
+# Allowed entity types:
+# - system

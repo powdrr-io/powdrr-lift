@@ -1,0 +1,18 @@
+# System specification template.
+#
+# Instructions:
+# - Use the proposal folder `docs/proposals/interaction-file-logging`.
+# - Fill in the requirements and approach sections.
+# - Delete these instructions and replace them with this comment at the top:
+#   "# This file is read-only and should never be edited by a tool or agent."
+# - Set `id` to a unique identifier for this system description.
+# - Use `state: added` for new items and include a description.
+# - Use `state: removed` for retired items and leave description empty.
+# - Use `state: supercedes` when an item replaces same-section ids.
+# - `supercedes` is optional; omit it unless the item replaces ids.
+# - Keep ids unique across both sections.
+# - Reference only same-section ids in `supercedes`.
+#
+schema: https://powdrr.io/schemas/specification-v1
+# Optional title:
+# - Set `title` if a human-readable summary is helpful.

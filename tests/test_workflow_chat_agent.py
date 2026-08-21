@@ -421,6 +421,81 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Nested-skill guidance:" in gather_system_prompt
 
 
+def test_execution_event_prompt_uses_only_current_step_events() -> None:
+    events = [
+        {
+            "kind": "invoke_tool",
+            "tool": "internal",
+            "parameters": {"command": ["powdrr-lift", "system-specification"]},
+            "step_index": 0,
+        },
+        {
+            "kind": "invoke_tool",
+            "tool": "internal",
+            "parameters": {"command": ["powdrr-lift", "evaluate"]},
+            "step_index": 1,
+        },
+    ]
+
+    current = _execution_events_for_prompt(events, 1)
+    latest = _latest_execution_event_for_prompt(events, 1)
+
+    assert len(current) == 2
+    assert "parameters" not in current[0]
+    assert current[1]["parameters"]["command"] == ["powdrr-lift", "evaluate"]
+    assert latest is not None
+    assert latest["parameters"]["command"] == ["powdrr-lift", "evaluate"]
+
+
+def test_modular_action_prompt_requires_invoke_skill_for_nested_steps() -> None:
+    prompt = _modular_action_system_prompt(
+        SkillStep(
+            description="Run the preparation skill.", uses_skills=("finish-pr-prep",)
+        )
+    )
+
+    assert "use invoke_skill, not invoke_tool or an internal CLI command" in prompt
+    assert '"skill":"finish-pr-prep"' in prompt
+
+
+def test_deterministic_shell_pre_step_accepts_empty_successful_result(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=tmp_path,
+        check=True,
+    )
+    step = SkillStep(
+        description="Inspect staged files.",
+        step_type="invoke_tool",
+        pre_step=SkillStepPreStep(
+            action="invoke_tool",
+            template={
+                "tool": "shell",
+                "command": ["git", "diff", "--cached", "--name-only"],
+            },
+        ),
+    )
+    events: list[dict[str, Any]] = []
+
+    _run_deterministic_pre_step(
+        step,
+        skill_name="finish-pr-prep",
+        worktree_root=tmp_path,
+        execution_events=events,
+        execution_context=[],
+        handoff_records={},
+        step_index=0,
+        workflow_context=None,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert events[0]["result"]["returncode"] == 0
+    assert events[0]["result"]["stdout"].strip() == ""
+
+
 def test_invoke_tool_runs_gather_context_pre_step_once(
     tmp_path: Path,
 ) -> None:
@@ -5739,7 +5814,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     step_index = int(prompt["current_step_index"])
-                    assert step_index < 3
+                    assert step_index < 4
                     shell_invocations = [
                         invocation
                         for invocation in prompt["current_step"].get(

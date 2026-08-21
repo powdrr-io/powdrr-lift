@@ -23,8 +23,8 @@ steps:
   details: >-
     Run the system specification command, then fill the generated template with
     the required updates. Use the first-class `yaml_edit` action directly for
-    edits; never route `powdrr-lift yaml-edit` through `invoke_tool`, `tool:
-    internal`, or `tool: shell`. For example:
+    edits; never route YAML edits through `invoke_tool`, `tool: internal`, or
+    `tool: shell`. For example:
     {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["title"],"value":"Updated title"}]}.
   tool_invocations:
   - tool: internal

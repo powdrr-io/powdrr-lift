@@ -20,8 +20,11 @@ steps:
     changes are required.
   step_type: freeform
   llm_type: high_reasoning
-  details: Run the architecture specification command, then fill the generated template
-    with the required updates.
+  details: >-
+    Run the architecture specification command, then fill the generated template
+    with the required updates using the first-class yaml_edit action. Return
+    complete operations with set_value paths or upsert_item section, id, and
+    value fields; do not use invoke_tool for YAML edits.
   tool_invocations:
   - tool: internal
     command:

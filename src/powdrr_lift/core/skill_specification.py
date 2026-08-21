@@ -19,6 +19,9 @@ SUPPORTED_SKILL_TOOL_TYPES = (
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
 SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate"})
+SUPPORTED_INTERACTION_STYLES = frozenset(
+    {"engineering", "observational_review", "devils_advocate"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +132,7 @@ class SkillStep:
     description: str
     details: str | None = None
     llm_type: str | None = None
+    interaction_style: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
@@ -151,6 +155,8 @@ class SkillStep:
             data["details"] = self.details
         if self.llm_type is not None:
             data["llm_type"] = self.llm_type
+        if self.interaction_style is not None:
+            data["interaction_style"] = self.interaction_style
         if self.uses_skills:
             data["uses_skills"] = list(self.uses_skills)
         if self.tool_invocations:
@@ -178,12 +184,18 @@ class Skill:
     when_to_use: tuple[str, ...]
     steps: tuple[SkillStep, ...]
     adversarial: bool | None = None
+    interaction_style: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "when_to_use": list(self.when_to_use),
             "steps": [step.to_data() for step in self.steps],
+            **(
+                {"interaction_style": self.interaction_style}
+                if self.interaction_style is not None
+                else {}
+            ),
             **(
                 {"adversarial": self.adversarial}
                 if self.adversarial is not None
@@ -242,11 +254,20 @@ def skill_from_data(data: Mapping[str, Any]) -> Skill:
     adversarial = data.get("adversarial")
     if adversarial is not None and not isinstance(adversarial, bool):
         raise ValueError("Skill adversarial must be a boolean.")
+    raw_interaction_style = data.get("interaction_style")
+    interaction_style = _optional_interaction_style(raw_interaction_style)
+    if raw_interaction_style is not None and interaction_style is None:
+        raise ValueError(
+            "Skill interaction_style must be one of: "
+            + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+            + "."
+        )
     return Skill(
         name=name,
         when_to_use=when_to_use,
         steps=steps,
         adversarial=adversarial,
+        interaction_style=interaction_style,
     )
 
 
@@ -331,7 +352,7 @@ def build_skill_validation_report(
 
     _validate_unknown_keys(
         raw_skill,
-        {"name", "when_to_use", "steps", "adversarial"},
+        {"name", "when_to_use", "steps", "adversarial", "interaction_style"},
         issues,
         path=_path_prefix(source_path) or "",
         subject="skill",
@@ -356,6 +377,22 @@ def build_skill_validation_report(
                 path=_child_path(source_path, "adversarial"),
             )
         )
+
+    interaction_style = raw_skill.get("interaction_style")
+    if interaction_style is not None:
+        normalized_style = _optional_interaction_style(interaction_style)
+        if normalized_style is None:
+            issues.append(
+                SkillValidationIssue(
+                    code="invalid_interaction_style",
+                    message=(
+                        "Skill interaction_style must be one of: "
+                        + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+                        + "."
+                    ),
+                    path=_child_path(source_path, "interaction_style"),
+                )
+            )
 
     when_to_use = raw_skill.get("when_to_use")
     if not isinstance(when_to_use, Sequence) or isinstance(
@@ -427,6 +464,7 @@ def build_skill_validation_report(
                     "step_type",
                     "details",
                     "llm_type",
+                    "interaction_style",
                     "uses_skills",
                     "tool_invocations",
                     "prompt_catalogs",
@@ -494,6 +532,22 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "llm_type"),
                     )
                 )
+
+            interaction_style = step_mapping.get("interaction_style")
+            if interaction_style is not None:
+                normalized_style = _optional_interaction_style(interaction_style)
+                if normalized_style is None:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_interaction_style",
+                            message=(
+                                "Skill step interaction_style must be one of: "
+                                + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+                                + "."
+                            ),
+                            path=_child_path(step_path, "interaction_style"),
+                        )
+                    )
 
             step_type = step_mapping.get("step_type", "freeform")
             normalized_step_type = _optional_string(step_type)
@@ -1326,6 +1380,14 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         raise ValueError("Skill step step_type must be freeform, invoke_tool, or gate.")
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
+    raw_interaction_style = data.get("interaction_style")
+    interaction_style = _optional_interaction_style(raw_interaction_style)
+    if raw_interaction_style is not None and interaction_style is None:
+        raise ValueError(
+            "Skill step interaction_style must be one of: "
+            + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+            + "."
+        )
     uses_skills = _optional_string_sequence(data.get("uses_skills"))
     tool_invocations = _optional_tool_invocations(
         data.get("tool_invocations"),
@@ -1391,6 +1453,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         step_type=step_type,
         details=details,
         llm_type=llm_type,
+        interaction_style=interaction_style,
         uses_skills=uses_skills,
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
@@ -1744,6 +1807,13 @@ def _optional_string(value: object) -> str | None:
         return None
     normalized_value = value.strip()
     return normalized_value or None
+
+
+def _optional_interaction_style(value: object) -> str | None:
+    normalized_value = _optional_string(value)
+    if normalized_value not in SUPPORTED_INTERACTION_STYLES:
+        return None
+    return normalized_value
 
 
 def _validate_unknown_keys(

@@ -3525,6 +3525,37 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert 'action":"yaml_edit"' in prompt
 
 
+def test_step_prompt_includes_interaction_style_guidance(tmp_path: Path) -> None:
+    step = SkillStep(description="Review the implementation.")
+    skill_entry = SkillCatalogEntry(
+        tmp_path / "review.yaml",
+        Skill(
+            name="review",
+            when_to_use=("Review changes.",),
+            steps=(step,),
+            interaction_style="observational_review",
+        ),
+    )
+
+    system_prompt = _build_step_execution_messages(
+        selected_skill=skill_entry,
+        current_step=step,
+        current_step_index=0,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        current_file_path=None,
+        worktree_root=tmp_path,
+        catalog=(skill_entry,),
+    )[0]["content"]
+
+    assert "Interaction style: observational_review." in system_prompt
+    assert "Separate observations, inferences, risks, and recommendations." in (
+        system_prompt
+    )
+    assert "current step contract" in system_prompt
+
+
 def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
     action = _parse_action_response(
         {

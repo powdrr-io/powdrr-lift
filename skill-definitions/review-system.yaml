@@ -1,5 +1,6 @@
 ---
 name: review-system
+interaction_style: observational_review
 when_to_use:
 - When new needs may require updating the current system specification.
 - When the TUI should evaluate whether the system requirements and approach still

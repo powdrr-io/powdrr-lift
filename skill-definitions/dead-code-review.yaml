@@ -1,5 +1,6 @@
 ---
 name: dead-code-review
+interaction_style: observational_review
 when_to_use:
 - When the user asks whether a pull request leaves dead, obsolete, or unreachable code behind.
 - When a pull request may duplicate existing behavior, helpers, configuration, tests, or

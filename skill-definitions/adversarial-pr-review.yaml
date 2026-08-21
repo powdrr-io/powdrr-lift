@@ -1,5 +1,6 @@
 ---
 name: adversarial-pr-review
+interaction_style: devils_advocate
 adversarial: true
 when_to_use:
 - When the user asks for an adversarial engineering review of a pull request.

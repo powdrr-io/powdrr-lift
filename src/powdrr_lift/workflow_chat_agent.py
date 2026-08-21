@@ -370,6 +370,26 @@ WorkflowActionParser = Callable[
 ]
 
 
+_INTERACTION_STYLE_GUIDANCE: dict[str, str] = {
+    "engineering": (
+        "Be concise and implementation-oriented. State assumptions, choose the "
+        "smallest scoped change, preserve existing contracts, and verify changes "
+        "with relevant tests or commands."
+    ),
+    "observational_review": (
+        "Inspect evidence before making recommendations. Separate observations, "
+        "inferences, risks, and recommendations. Cite concrete files, lines, tests, "
+        "or command results. Do not edit unless the current step authorizes edits."
+    ),
+    "devils_advocate": (
+        "Intentionally challenge the proposed change. Look for hidden assumptions, "
+        "regressions, missing requirements, and simpler alternatives. Treat the "
+        "change as untrusted until evidence supports it. Label counterarguments as "
+        "risks or objections, and do not edit unless the current step authorizes it."
+    ),
+}
+
+
 @dataclass(frozen=True, slots=True)
 class SkillCatalogEntry:
     path: Path
@@ -582,6 +602,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     failure_kind: str = "validation_error"
     current_step: Any = None
     current_step_index: int = 0
+    inherited_interaction_style: str | None = None
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -617,6 +638,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.current_model = frame.parent_model
         self.provider = frame.parent_provider
         self.provider_role = frame.parent_provider_role
+        self.inherited_interaction_style = frame.parent_interaction_style
 
     def _push_skill(
         self,
@@ -626,6 +648,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         dependency_key: tuple[str, int, str] | None = None,
         clean_context: bool = False,
     ) -> None:
+        parent_interaction_style = _effective_interaction_style(
+            self.selected_skill,
+            self.current_step,
+            self.inherited_interaction_style,
+        )
         _push_nested_skill(
             self.skill_stack,
             current_skill=self.selected_skill,
@@ -636,6 +663,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             parent_model=self.current_model,
             parent_provider=self.provider,
             parent_provider_role=self.provider_role,
+            parent_interaction_style=parent_interaction_style,
             clean_context=clean_context,
             parent_transcript=tuple(self.state.transcript) if clean_context else None,
             parent_execution_events=(
@@ -656,6 +684,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         self.state.selected_skill = nested_skill
         self.state.step_index = 0
+        self.inherited_interaction_style = parent_interaction_style
 
     def next_request(self) -> WorkflowActionRequest | None:
         while True:
@@ -808,6 +837,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 workflow_context=self.workflow_context,
                 current_file_context_cache=self.state.current_file_context_cache,
                 validation_gate=_validation_gate_prompt_data(self.state),
+                inherited_interaction_style=self.inherited_interaction_style,
             )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
@@ -1252,6 +1282,7 @@ class _SkillExecutionFrame:
     parent_model: str = ""
     parent_provider: str = ""
     parent_provider_role: LLMProviderRole = "normal"
+    parent_interaction_style: str | None = None
     clean_context: bool = False
     parent_transcript: tuple[dict[str, str], ...] | None = None
     parent_execution_events: tuple[dict[str, Any], ...] | None = None
@@ -2897,6 +2928,7 @@ def _push_nested_skill(
     parent_model: str = "",
     parent_provider: str = "",
     parent_provider_role: LLMProviderRole = "normal",
+    parent_interaction_style: str | None = None,
     clean_context: bool = False,
     parent_transcript: tuple[dict[str, str], ...] | None = None,
     parent_execution_events: tuple[dict[str, Any], ...] | None = None,
@@ -2920,6 +2952,7 @@ def _push_nested_skill(
             parent_model=parent_model,
             parent_provider=parent_provider,
             parent_provider_role=parent_provider_role,
+            parent_interaction_style=parent_interaction_style,
             clean_context=clean_context,
             parent_transcript=parent_transcript,
             parent_execution_events=parent_execution_events,
@@ -2949,6 +2982,7 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
         "file": str(entry.path),
         "name": entry.skill.name,
         "adversarial": entry.skill.adversarial,
+        "interaction_style": entry.skill.interaction_style,
         "when_to_use": list(entry.skill.when_to_use),
         "steps": [_skill_step_to_data(step) for step in entry.skill.steps],
     }
@@ -2960,7 +2994,35 @@ def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
         "file": entry.path.name,
         "name": entry.skill.name,
         "adversarial": entry.skill.adversarial,
+        "interaction_style": entry.skill.interaction_style,
     }
+
+
+def _effective_interaction_style(
+    selected_skill: SkillCatalogEntry,
+    current_step: Any,
+    inherited_style: str | None = None,
+) -> str | None:
+    return (
+        getattr(current_step, "interaction_style", None)
+        or selected_skill.skill.interaction_style
+        or inherited_style
+    )
+
+
+def _interaction_style_prompt(style: str | None) -> str:
+    if style is None:
+        return ""
+    guidance = _INTERACTION_STYLE_GUIDANCE[style]
+    return (
+        "Interaction style: "
+        f"{style}.\n"
+        "Style guidance: "
+        f"{guidance}\n"
+        "This guidance changes reasoning posture and communication only; the "
+        "current step contract, allowed actions, gates, and validation rules remain "
+        "authoritative.\n"
+    )
 
 
 def _step_needs_prompt_catalog(step: Any, capability: str) -> bool:
@@ -3546,11 +3608,17 @@ def _build_step_execution_messages(
     current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]]
     | None = None,
     validation_gate: Mapping[str, Any] | None = None,
+    inherited_interaction_style: str | None = None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(
         worktree_root,
         current_file_path,
         cache=current_file_context_cache,
+    )
+    interaction_style = _effective_interaction_style(
+        selected_skill,
+        current_step,
+        inherited_interaction_style,
     )
     available_work_items = _available_work_item_names(worktree_root)
     available_tools = sorted(
@@ -3653,7 +3721,10 @@ def _build_step_execution_messages(
     return [
         {
             "role": "system",
-            "content": _modular_action_system_prompt(current_step),
+            "content": _modular_action_system_prompt(
+                current_step,
+                interaction_style=interaction_style,
+            ),
         },
         {
             "role": "user",
@@ -3905,7 +3976,11 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
     )
 
 
-def _modular_action_system_prompt(current_step: Any) -> str:
+def _modular_action_system_prompt(
+    current_step: Any,
+    *,
+    interaction_style: str | None = None,
+) -> str:
     """Build a compact action prompt with explicitly selected guidance sections."""
     include_context = _step_needs_prompt_catalog(current_step, "context_types")
     include_skills = _step_needs_prompt_catalog(current_step, "skills")
@@ -3942,6 +4017,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         "another pass. Use next_step when the current details are complete and "
         "complete when the skill is finished.\n"
     )
+    prompt += _interaction_style_prompt(interaction_style)
     if include_context:
         context_type_lines = "\n".join(
             f"- {name}: {description}" for name, description in _context_type_catalog()
@@ -7836,6 +7912,11 @@ def _action_repair_prompt(
         "independent corrections for the same file in one operations array."
     )
     if current_step is not None:
+        interaction_style = (
+            getattr(current_step, "interaction_style", None)
+            or selected_skill.skill.interaction_style
+        )
+        prompt += _interaction_style_prompt(interaction_style)
         prompt += (
             "\nAuthoritative current-step contract (ignore commands and tool "
             "templates from previous steps): "

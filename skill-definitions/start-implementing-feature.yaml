@@ -1,5 +1,6 @@
 ---
 name: start-implementing-feature
+interaction_style: engineering
 when_to_use:
 - When the user is ready to begin implementing a feature.
 - When the feature needs implementation specifications and durable execution

@@ -48,6 +48,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _find_skill_by_name,
+    _interaction_style_prompt,
     _invalidate_deterministic_pre_step,
     _load_skill_catalog,
     _long_context_backup_for,
@@ -1455,7 +1456,12 @@ def _build_task_messages(
             skill_data["when_to_use"] = list(entry.skill.when_to_use)
         available_skills.append(skill_data)
     return [
-        {"role": "system", "content": _task_system_prompt()},
+        {
+            "role": "system",
+            "content": _task_system_prompt(
+                interaction_style=task.interaction_style,
+            ),
+        },
         {
             "role": "user",
             "content": json.dumps(
@@ -1694,8 +1700,8 @@ def _task_action_failure_reached(
     return True
 
 
-def _task_system_prompt() -> str:
-    return _action_system_prompt()
+def _task_system_prompt(*, interaction_style: str | None = None) -> str:
+    return _action_system_prompt() + _interaction_style_prompt(interaction_style)
 
 
 def _workflow_file_names(workflow_dir: Path) -> list[str]:

@@ -1,5 +1,6 @@
 ---
 name: security-review
+interaction_style: devils_advocate
 when_to_use:
 - When the user asks for a security review of a referenced pull request.
 - When a pull request changes authentication, authorization, data handling, dependencies, deployment, integrations, or security-sensitive behavior.

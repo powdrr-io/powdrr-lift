@@ -110,6 +110,40 @@ def test_skill_round_trips_through_json() -> None:
     }
 
 
+def test_skill_interaction_style_round_trips_and_validates() -> None:
+    skill = Skill(
+        name="review",
+        when_to_use=("Review changes.",),
+        interaction_style="observational_review",
+        steps=(
+            SkillStep(
+                description="Challenge the proposal.",
+                interaction_style="devils_advocate",
+            ),
+        ),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+
+    assert parsed == skill
+    assert parsed.interaction_style == "observational_review"
+    assert parsed.steps[0].interaction_style == "devils_advocate"
+
+    report = build_skill_validation_report(
+        yaml.safe_dump(
+            {
+                "name": "invalid-style",
+                "when_to_use": ["Review changes."],
+                "interaction_style": "invented",
+                "steps": [{"description": "Review."}],
+            }
+        ),
+        source_path="skill.yaml",
+    )
+    assert not report.validation_successful
+    assert any(issue.code == "invalid_interaction_style" for issue in report.issues)
+
+
 def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
     repository_root = Path(__file__).parents[1]
     definition_paths = sorted((repository_root / "skill-definitions").glob("*.yaml"))

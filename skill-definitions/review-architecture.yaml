@@ -1,5 +1,6 @@
 ---
 name: review-architecture
+interaction_style: observational_review
 when_to_use:
 - When new needs may require updating the current architecture specification.
 - When the TUI should evaluate whether the architecture still fits the system needs.

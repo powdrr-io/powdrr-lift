@@ -23,6 +23,7 @@ from powdrr_lift.workflow_chat_agent import LLMModelLimits, _action_system_promp
 from powdrr_lift.workflow_llm import WorkflowLLMHTTPError
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
+    _build_task_messages,
     _build_workflow_client,
     _handle_exhausted_timeout,
     _task_events_for_prompt,
@@ -146,6 +147,33 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
     assert "<work-item-name>" not in prompt
     assert "input_state.feature_id" not in prompt
     assert "input_state.proposed_pr" not in prompt
+
+
+def test_workflow_task_prompt_includes_task_interaction_style(
+    tmp_path: Path,
+) -> None:
+    task = WorkflowTask(
+        task_id="review-task",
+        status=TaskStatus.OPEN,
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"scope": "the proposed change"},
+        description="Challenge the proposed change.",
+        interaction_style="observational_review",
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.REVIEWER,
+    )
+    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
+
+    messages = _build_task_messages(workflow, task, [], repo_root=tmp_path)
+
+    assert "Interaction style: observational_review." in messages[0]["content"]
+    assert (
+        "Separate observations, inferences, risks, and recommendations."
+        in (messages[0]["content"])
+    )
+    assert json.loads(messages[1]["content"])["task"]["interaction_style"] == (
+        "observational_review"
+    )
 
 
 def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None:

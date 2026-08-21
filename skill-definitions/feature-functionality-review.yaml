@@ -1,5 +1,6 @@
 ---
 name: feature-functionality-review
+interaction_style: observational_review
 when_to_use:
 - When the user asks for a functionality or completeness review of a referenced pull request.
 - When a pull request implements one or more proposed PRs from a feature specification.

@@ -14,11 +14,14 @@ steps:
   details: >-
     First invoke the declared system-specification command successfully. Then
     fill the generated YAML using one or more yaml_edit actions; never use edit
-    or invoke_tool to rewrite the YAML file. The yaml_edit action must contain
+    or invoke_tool to rewrite the YAML file. yaml_edit is a workflow action,
+    not an internal CLI tool, and remains allowed even though the declared
+    tool_invocations list contains only the generator command. The yaml_edit action must contain
     an operations array. Use set_value with a JSON array of mapping keys, such
     as ["title"] or ["id"], never a JSON-pointer string such as "/title".
     Use one upsert_item operation per requirement or approach item, with the
-    section name, item id, and complete value mapping. Do not replace an entire
+    section name, `id` field, and complete value mapping. The top-level field is
+    `operations`; never use `yaml_operations` or `item_id`. Do not replace an entire
     list section with set_value. After the structural edits succeed, continue
     to the review step.
   tool_invocations:
@@ -36,6 +39,9 @@ steps:
     for the current file. If it succeeds, record that the requirements,
     approach, and constraints remain valid and choose `next_step` immediately;
     rerun only after editing the file to address a reported validation error.
+    If validation reports an issue, use the yaml_edit workflow action; do not
+    invoke the evaluator again unchanged and do not use an internal yaml-edit
+    command.
   uses_skills:
   - review-system
   tool_invocations:

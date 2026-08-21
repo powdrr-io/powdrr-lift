@@ -4001,6 +4001,14 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "additional reasoning or edits in this step.\n"
         )
     prompt += (
+        "Available workflow actions also include edit, yaml_edit, and "
+        "read_document even when the step's declared tool_invocations list "
+        "contains only internal commands. Declared tool_invocations restrict "
+        "invoke_tool only; they do not prohibit yaml_edit or edit when the "
+        "step details require a file correction. yaml_edit is a workflow "
+        "action, not an internal CLI command. A yaml_edit action uses the exact "
+        "fields file_path and operations; each upsert_item uses section, id, "
+        "and value. Never use yaml_operations or item_id.\n"
         "When a validation result contains corrective_action, apply it before "
         "retrying; do not repeat the same failed validation unchanged. Use edit "
         "only when current "
@@ -7241,19 +7249,35 @@ def _apply_yaml_operations(
                 )
             target: Any = updated
             for key in operation.path[:-1]:
-                if not isinstance(target, dict) or key not in target:
+                if isinstance(target, dict) and key in target:
+                    target = target[key]
+                    continue
+                if isinstance(target, list) and key.isdigit():
+                    index = int(key)
+                    if 0 <= index < len(target):
+                        target = target[index]
+                        continue
+                raise _WorkflowYamlEditError(
+                    f"set_value path {list(operation.path)!r} cannot find "
+                    f"mapping key or list index {key!r}. Re-read the YAML and "
+                    "use the exact path from the current document."
+                )
+            final_key = operation.path[-1]
+            if isinstance(target, dict):
+                target[final_key] = operation.value
+            elif isinstance(target, list) and final_key.isdigit():
+                index = int(final_key)
+                if not 0 <= index < len(target):
                     raise _WorkflowYamlEditError(
-                        f"set_value path {list(operation.path)!r} cannot find "
-                        f"mapping key {key!r}. Re-read the YAML and use existing "
-                        "mapping keys in the path."
+                        f"set_value list index {final_key!r} is outside the "
+                        f"current list of length {len(target)}."
                     )
-                target = target[key]
-            if not isinstance(target, dict):
+                target[index] = operation.value
+            else:
                 raise _WorkflowYamlEditError(
                     f"set_value path {list(operation.path)!r} does not resolve "
-                    "to a YAML mapping."
+                    "to a YAML mapping or list index."
                 )
-            target[operation.path[-1]] = operation.value
             continue
 
         if operation.section is None or operation.item_id is None:
@@ -7641,7 +7665,17 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
-    allowed_actions = ["prompt_user", "next_step"]
+    # Freeform steps may still need to repair files after a declared command
+    # reports a validation error. Keep those structural actions in the
+    # authoritative contract; otherwise the model follows the prose guidance
+    # but sees an apparently contradictory machine-readable action list.
+    allowed_actions = [
+        "edit",
+        "yaml_edit",
+        "read_document",
+        "prompt_user",
+        "next_step",
+    ]
     if invocations:
         allowed_actions.insert(0, "invoke_tool")
     if nested_skills:
@@ -7743,6 +7777,12 @@ def _action_repair_prompt(
             '"decisions_and_context":"More information is required."} or '
             '{"action":"next_step","decisions_and_context":"The current step '
             'is complete."}. '
+        )
+        prompt += (
+            'If the correction is a YAML edit, use exactly {"action":"yaml_edit",'
+            '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
+            '"path":["id"],"value":"feature-id"}]}; use "id" rather than '
+            '"item_id" and "operations" rather than "yaml_operations". '
         )
         if invocations:
             prompt += (

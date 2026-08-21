@@ -4271,6 +4271,30 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
     assert "Do not use line numbers" in feedback
 
 
+def test_yaml_edit_set_value_supports_validator_list_indices() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/architecture.yaml",
+            "operations": [
+                {
+                    "op": "set_value",
+                    "path": ["entities", "0", "type"],
+                    "value": "Log",
+                }
+            ],
+        }
+    )
+
+    updated = _apply_yaml_operations(
+        Path("docs/architecture.yaml"),
+        "entities:\n  - id: log-entry\n    type: log\n",
+        action.yaml_operations,
+    )
+
+    assert yaml.safe_load(updated)["entities"][0]["type"] == "Log"
+
+
 def test_edit_action_can_update_multiple_files_in_one_response(
     tmp_path: Path,
 ) -> None:

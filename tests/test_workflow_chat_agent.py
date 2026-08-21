@@ -5396,7 +5396,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_step_index=1,
                     expected_step_description=step_descriptions[1],
                     expected_context_suffix=(
-                        "System template filled with the captured goal and success criteria."
+                        "Goal captured: display related photos; success criteria: "
+                        "show related photos in the UI."
                     ),
                     expected_event_count=4,
                     expected_last_event_kind="yaml_edit",
@@ -5840,15 +5841,34 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         _capture_worktree_context,
     )
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
-        lambda parameters, **_: {
-            "command": parameters.get("command"),
-            "cwd": str(repo_root),
+
+    def _fake_shell_tool(
+        parameters: dict[str, object], *, worktree_root: Path, **_: object
+    ) -> dict[str, object]:
+        command = parameters.get("command")
+        if isinstance(command, (list, tuple)) and len(command) >= 2:
+            generated_name = {
+                "system-specification": system_spec_filename,
+                "architecture-specification": architecture_spec_filename,
+                "implementation-specification": implementation_spec_filename,
+                "pr-specification": pr_spec_filename,
+            }.get(str(command[1]))
+            if generated_name is not None:
+                generated_path = worktree_root / system_spec_dir / generated_name
+                generated_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_path.write_text("{}\n", encoding="utf-8")
+        return {
+            "command": command,
+            "cwd": str(worktree_root),
             "returncode": 0,
             "stdout": "",
             "stderr": "",
-        },
+            "status": "success",
+            "validation_successful": True,
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool", _fake_shell_tool
     )
 
     stdout = io.StringIO()
@@ -6088,7 +6108,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         return {
                             "kind": "gather_context",
                             "types": ["tools"],
-                            "filters": {"labels": ["pr-prep"]},
+                            "filters": {
+                                "labels": ["pr-prep"],
+                                "keywords": ["test-no-match"],
+                            },
                         }
                     if step_index == 2:
                         validation_gate = cast(

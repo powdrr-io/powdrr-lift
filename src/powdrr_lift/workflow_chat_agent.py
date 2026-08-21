@@ -4762,7 +4762,10 @@ def _workflow_action_data(action: SkillChatAction) -> dict[str, Any]:
         "parameters": dict(action.parameters),
         "types": list(action.types),
         "keywords": list(action.keywords),
-        "filters": dict(action.filters),
+        "filters": {
+            key: list(value) if isinstance(value, tuple) else value
+            for key, value in action.filters.items()
+        },
         "feature_id": action.feature_id,
     }
 
@@ -4958,6 +4961,8 @@ def _validate_dynamic_validation_gate_action(
     config = _validation_gate_config(step) or {}
     correction_actions = config.get("correction_actions", ["edit", "yaml_edit"])
     if isinstance(correction_actions, Sequence) and action.kind in correction_actions:
+        return
+    if action.kind in {"next_step", "goto_step", "complete"}:
         return
     obligations = gate_state.obligations.values()
     if not any(obligation.expected_action == actual for obligation in obligations):

@@ -48,9 +48,9 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _find_skill_by_name,
-    _LLMExchangeRecordingClient,
     _load_skill_catalog,
     _long_context_backup_for,
+    _maybe_record_llm_exchanges,
     _model_limits_for,
     _parse_action_response,
     _print_waiting_for_model,
@@ -884,7 +884,7 @@ def run_workflow_task(
     )
     if config.verbose:
         client = _WorkflowTaskDisplayClient(client, stderr=stderr)
-    client = _LLMExchangeRecordingClient(client, dump_root)
+    client = _maybe_record_llm_exchanges(client, dump_root)
     compaction_client = client
     long_context_backup = _long_context_backup_for(
         model,
@@ -901,10 +901,7 @@ def run_workflow_task(
                 backup_client,
                 stderr=stderr,
             )
-        compaction_client = _LLMExchangeRecordingClient(
-            backup_client,
-            dump_root,
-        )
+        compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
 
     driver_events: list[dict[str, Any]] = []
     driver = WorkflowLLMExecutionDriver(

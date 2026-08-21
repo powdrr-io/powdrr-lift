@@ -93,6 +93,7 @@ from powdrr_lift.workflow_chat_agent import (
     _load_workflow_context,
     _long_context_backup_for,
     _match_work_item_names,
+    _modular_action_system_prompt,
     _normalize_cache_usage,
     _parse_action_response,
     _parse_json_object,
@@ -4181,6 +4182,35 @@ def test_action_repair_prompt_explains_validation_errors() -> None:
 
     assert "returned a validation_error" in prompt
     assert "matches the current step's declared tool template exactly" in prompt
+
+
+def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None:
+    step = SkillStep(
+        description="Ask for the missing success criteria.",
+        details="Collect the answer before continuing.",
+    )
+    prompt = _action_repair_prompt(
+        SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
+        current_step=step,
+        validation_error=(
+            "Workflow prompt_user action requires a string text field; use "
+            '"text", not "prompt", "question", or "action_input".'
+        ),
+    )
+
+    assert '"action":"prompt_user"' in prompt
+    assert '"text":"One clear English question?"' in prompt
+    assert '"action":"next_step"' in prompt
+    assert 'rename "prompt" to "text"' in prompt
+    assert "This step declares no tool invocations; do not return invoke_tool" in prompt
+
+
+def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
+    prompt = _modular_action_system_prompt(SkillStep(description="Ask a question."))
+
+    assert '"action":"prompt_user"' in prompt
+    assert '"text":"What specific success criteria should this feature meet?"' in prompt
+    assert "never use prompt, question, or action_input" in prompt
 
 
 def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) -> None:

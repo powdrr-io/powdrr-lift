@@ -90,6 +90,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMExecutionDriver,
     WorkflowLLMTimeoutExhausted,
     complete_json_with_timeout_retry,
+    prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
     workflow_action_summary,
@@ -278,6 +279,15 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 file=self.stderr,
                 flush=True,
             )
+            if self.config.verbose:
+                prompt_breakdown = json.dumps(
+                    prompt_size_breakdown(messages), indent=2, sort_keys=True
+                )
+                print(
+                    f"Workflow task prompt size breakdown:\n{prompt_breakdown}",
+                    file=self.stderr,
+                    flush=True,
+                )
             if estimated_input_tokens + 1024 < limits.context_window:
                 _print_waiting_for_model(self.stderr, self.model)
                 return WorkflowActionRequest(

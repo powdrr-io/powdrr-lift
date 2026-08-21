@@ -11,9 +11,30 @@ from powdrr_lift.workflow_llm import (
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMExecutionDriver,
+    prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
 )
+
+
+def test_prompt_size_breakdown_reports_execution_mode_and_top_level_fields() -> None:
+    messages = [
+        {"role": "system", "content": "rules"},
+        {
+            "role": "user",
+            "content": '{"execution_mode":"execute_selected_skill",'
+            '"current_step":{"description":"Inspect"},"events":[1,2,3]}',
+        },
+    ]
+
+    breakdown = prompt_size_breakdown(messages)
+
+    assert breakdown["execution_mode"] == "execute_selected_skill"
+    assert breakdown["estimated_input_tokens"] > 0
+    fields = breakdown["fields"]
+    assert fields["system_prompt"] == 2
+    assert fields["message_1.current_step"] > 0
+    assert fields["message_1.events"] > 0
 
 
 @dataclass(frozen=True)

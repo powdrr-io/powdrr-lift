@@ -52,6 +52,7 @@ ActionT = TypeVar("ActionT")
 StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
 _MAX_PROMPT_EVENT_CHARS = 8_000
+_PROMPT_SIZE_CHARS_PER_TOKEN = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +82,53 @@ class WorkflowYamlOperation:
     item_id: str | None = None
     path: tuple[str, ...] = field(default_factory=tuple)
     value: Any = None
+
+
+def prompt_size_breakdown(messages: Sequence[Mapping[str, str]]) -> dict[str, Any]:
+    """Estimate prompt size by top-level field without changing the prompt.
+
+    Workflow prompts deliberately keep their execution mode and state in the
+    JSON user message. Measuring those fields independently makes prompt
+    reduction work evidence-based while retaining the exact message payload
+    sent to the provider.
+    """
+    fields: dict[str, int] = {}
+    execution_mode: str | None = None
+    serialized_messages = json.dumps(
+        list(messages), ensure_ascii=False, separators=(",", ":")
+    )
+    for index, message in enumerate(messages):
+        content = message.get("content", "")
+        if index == 0:
+            fields["system_prompt"] = _prompt_size_tokens(content)
+            continue
+        try:
+            decoded = json.loads(content)
+        except (TypeError, ValueError):
+            fields[f"message_{index}"] = _prompt_size_tokens(content)
+            continue
+        if not isinstance(decoded, Mapping):
+            fields[f"message_{index}"] = _prompt_size_tokens(content)
+            continue
+        mode = decoded.get("execution_mode")
+        if isinstance(mode, str):
+            execution_mode = mode
+        for key, value in decoded.items():
+            fields[f"message_{index}.{key}"] = _prompt_size_tokens(
+                json.dumps({key: value}, ensure_ascii=False, separators=(",", ":"))
+            )
+    return {
+        "execution_mode": execution_mode or "unknown",
+        "estimated_input_tokens": _prompt_size_tokens(serialized_messages),
+        "fields": fields,
+    }
+
+
+def _prompt_size_tokens(value: str) -> int:
+    return max(
+        1,
+        (len(value) + _PROMPT_SIZE_CHARS_PER_TOKEN - 1) // _PROMPT_SIZE_CHARS_PER_TOKEN,
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -5563,8 +5563,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 20:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=8,
-                    expected_step_description=step_descriptions[8],
+                    expected_step_index=7,
+                    expected_step_description=step_descriptions[7],
                     expected_context_suffix="PR step complete; handoff is ready.",
                     expected_event_count=20,
                     expected_last_event_kind="deterministic_pre_step",
@@ -5576,13 +5576,49 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 21:
                 self._assert_execution_prompt(
                     messages,
+                    expected_step_index=8,
+                    expected_step_description=step_descriptions[8],
+                    expected_context_suffix="All specification issues are fixed.",
+                    expected_event_count=21,
+                    expected_last_event_kind="next_step",
+                )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": "Specification repair is complete.",
+                }
+            elif self._call_index == 22:
+                self._assert_execution_prompt(
+                    messages,
                     expected_step_index=10,
                     expected_step_description=(
                         "Stage the validated specification artifacts for pull request preparation."
                     ),
-                    expected_context_suffix="All specification issues are fixed.",
-                    expected_event_count=23,
+                    expected_context_suffix="Specification repair is complete.",
+                    expected_event_count=24,
                     expected_last_event_kind="gate",
+                )
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "git",
+                            "add",
+                            "docs/proposals/display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": "Specification artifacts are staged.",
+                }
+            elif self._call_index == 23:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=10,
+                    expected_step_description=(
+                        "Stage the validated specification artifacts for pull request preparation."
+                    ),
+                    expected_context_suffix="Specification artifacts are staged.",
+                    expected_event_count=25,
+                    expected_last_event_kind="invoke_tool",
                 )
                 response = {
                     "kind": "complete",

@@ -66,11 +66,7 @@ steps:
       item_path: item
       section: tools
       id_field: id
-      obligation_action:
-        kind: invoke_tool
-        tool: shell
-        parameters:
-          command: "$template"
+      action_field: validation_action
   llm_type: fast_iteration
   details: >-
     Run every validation command returned by the matching tool references for

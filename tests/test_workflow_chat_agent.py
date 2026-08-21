@@ -82,6 +82,7 @@ from powdrr_lift.workflow_chat_agent import (
     _command_matches_invocation,
     _complete_json_with_model_fallback,
     _current_file_context,
+    _discover_validation_obligations,
     _empty_pull_request_error,
     _execute_shell_tool,
     _execution_events_for_prompt,
@@ -894,6 +895,70 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
             state,
             step,
         )
+
+
+def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
+    first_step = SkillStep(
+        description="Run repository checks.",
+        validation_gate={
+            "id": "repository-checks",
+            "discovery": {
+                "action": "gather_context",
+                "action_field": "validation_action",
+            },
+        },
+    )
+    second_step = SkillStep(
+        description="Run deployment checks.",
+        validation_gate={
+            "id": "deployment-checks",
+            "discovery": {
+                "action": "gather_context",
+                "action_field": "validation_action",
+            },
+        },
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"),
+            Skill(name="validation", when_to_use=(), steps=(first_step, second_step)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+    result = {
+        "matches": [
+            {
+                "section": "checks",
+                "item": {
+                    "id": "check-one",
+                    "validation_action": {
+                        "kind": "invoke_tool",
+                        "tool": "internal",
+                        "parameters": {"command": ["repository-state"]},
+                    },
+                },
+            }
+        ]
+    }
+
+    _discover_validation_obligations(
+        result, state=state, gate=first_step, gate_step_index=0
+    )
+    _discover_validation_obligations(
+        result, state=state, gate=second_step, gate_step_index=1
+    )
+
+    assert set(state.validation_gates) == {"repository-checks", "deployment-checks"}
+    assert (
+        state.validation_gates["deployment-checks"]
+        .obligations["check-one"]
+        .expected_action["tool"]
+        == "internal"
+    )
 
 
 def test_action_schema_uses_action_and_internal_tool_must_be_declared() -> None:

@@ -10,6 +10,17 @@ The plan applies to both interactive workflow chat and durable workflow-task
 execution. It does not change the action contract or the complete execution
 summary retained for diagnostics.
 
+## Implementation status
+
+The implementation sequence in this plan is complete. The runners now use
+bounded file and event context, active-step and declared-handoff prompts,
+durable facts, conditional capability catalogs, relative workflow metadata,
+and shared prompt-size instrumentation. Durable-task compaction also runs at a
+proactive configurable threshold and explicitly preserves the latest
+actionable result or failure. The full execution history remains available for
+diagnostics and recovery, and the test suite covers prompt bounds, handoff
+selection, compaction preservation, and both execution modes.
+
 ## Prompt information that must remain
 
 Every execution request should retain:

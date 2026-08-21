@@ -310,6 +310,35 @@ def test_gate_step_round_trips_and_validates() -> None:
     assert build_skill_validation_report(skill_to_json(skill)).validation_successful
 
 
+def test_dynamic_validation_gate_round_trips() -> None:
+    skill = Skill(
+        name="dynamic-validation",
+        when_to_use=("When all discovered checks must pass.",),
+        steps=(
+            SkillStep(
+                description="Run every discovered check.",
+                validation_gate={
+                    "id": "checks",
+                    "discovery": {
+                        "action": {"kind": "gather_context", "types": ["tools"]}
+                    },
+                    "obligations": {
+                        "source": "matches",
+                        "filter": {"section": "tools"},
+                        "id": "item.id",
+                        "action": "item.validation_action",
+                    },
+                },
+            ),
+        ),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+
+    assert parsed == skill
+    assert build_skill_validation_report(skill_to_json(skill)).validation_successful
+
+
 def test_skill_validation_rejects_invoke_tool_without_pre_step() -> None:
     report = build_skill_validation_report(
         yaml.safe_dump(

@@ -82,6 +82,7 @@ from powdrr_lift.workflow_chat_agent import (
     _command_matches_invocation,
     _complete_json_with_model_fallback,
     _current_file_context,
+    _discover_validation_obligations,
     _empty_pull_request_error,
     _execute_shell_tool,
     _execution_events_for_prompt,
@@ -117,11 +118,14 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_for_request,
     _run_deterministic_pre_step,
     _serialize_messages,
+    _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
+    _ValidationGateState,
+    _ValidationObligation,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
@@ -799,6 +803,177 @@ def test_workflow_can_advance_after_empty_gather_context_result() -> None:
         SkillStep(description="Discover optional PR-preparation tools."),
         [{"kind": "gather_context", "result": {"matches": []}}],
         0,
+    )
+
+
+def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
+    step = SkillStep(
+        description="Run discovered checks.",
+        validation_gate={
+            "id": "checks",
+            "discovery": {"action": {"kind": "gather_context"}},
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
+        },
+    )
+    selected_skill = SkillCatalogEntry(
+        Path("skill.yaml"),
+        Skill(name="validation", when_to_use=(), steps=(step,)),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+    next_step = _parse_action_response({"kind": "next_step"})
+
+    with pytest.raises(RuntimeError, match="cannot be skipped"):
+        _validate_workflow_step_transition(
+            next_step,
+            step,
+            [],
+            0,
+            state=state,
+        )
+
+    state.validation_gates["checks"] = _ValidationGateState(
+        step_index=0,
+        discovered=True,
+        epoch=1,
+        obligations={
+            "pytest": _ValidationObligation(
+                obligation_id="pytest",
+                expected_action={
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["uv", "run", "pytest"]},
+                },
+                source={"id": "pytest", "template": "uv run pytest"},
+            )
+        },
+    )
+    with pytest.raises(RuntimeError, match="Still pending: pytest"):
+        _validate_workflow_step_transition(
+            next_step,
+            step,
+            [],
+            0,
+            state=state,
+        )
+
+    state.validation_gates["checks"].correction_required = True
+    with pytest.raises(RuntimeError, match="Apply corrective steps"):
+        _validate_workflow_step_transition(
+            next_step,
+            step,
+            [],
+            0,
+            state=state,
+        )
+
+    state.validation_gates["checks"].correction_required = False
+    obligation = state.validation_gates["checks"].obligations["pytest"]
+    obligation.status = "passed"
+    _validate_workflow_step_transition(
+        next_step,
+        step,
+        [],
+        0,
+        state=state,
+    )
+
+    with pytest.raises(RuntimeError, match="not one of the discovered obligations"):
+        _validate_dynamic_validation_gate_action(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["uv", "run", "ruff"]},
+                }
+            ),
+            state,
+            step,
+        )
+
+
+def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
+    first_step = SkillStep(
+        description="Run repository checks.",
+        validation_gate={
+            "id": "repository-checks",
+            "discovery": {
+                "action": {"kind": "gather_context"},
+            },
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
+        },
+    )
+    second_step = SkillStep(
+        description="Run deployment checks.",
+        validation_gate={
+            "id": "deployment-checks",
+            "discovery": {
+                "action": {"kind": "gather_context"},
+            },
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
+        },
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"),
+            Skill(name="validation", when_to_use=(), steps=(first_step, second_step)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+    result = {
+        "matches": [
+            {
+                "section": "tools",
+                "item": {
+                    "id": "check-one",
+                    "validation_action": {
+                        "kind": "invoke_tool",
+                        "tool": "internal",
+                        "parameters": {"command": ["repository-state"]},
+                    },
+                },
+            }
+        ]
+    }
+
+    _discover_validation_obligations(
+        result, state=state, gate=first_step, gate_step_index=0
+    )
+    _discover_validation_obligations(
+        result, state=state, gate=second_step, gate_step_index=1
+    )
+
+    assert set(state.validation_gates) == {"repository-checks", "deployment-checks"}
+    assert (
+        state.validation_gates["deployment-checks"]
+        .obligations["check-one"]
+        .expected_action["tool"]
+        == "internal"
     )
 
 
@@ -5221,7 +5396,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_step_index=1,
                     expected_step_description=step_descriptions[1],
                     expected_context_suffix=(
-                        "System template filled with the captured goal and success criteria."
+                        "Goal captured: display related photos; success criteria: "
+                        "show related photos in the UI."
                     ),
                     expected_event_count=4,
                     expected_last_event_kind="yaml_edit",
@@ -5665,41 +5841,34 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         _capture_worktree_context,
     )
-    real_execute_shell_tool = _execute_shell_tool
 
-    def _fake_evaluate_shell_tool(
-        parameters: dict[str, object],
-        *,
-        worktree_root: Path,
-        stdout: TextIO,
-        stderr: TextIO,
-        verbose: bool,
-        announce: bool = True,
-        print_stdout: bool = True,
+    def _fake_shell_tool(
+        parameters: dict[str, object], *, worktree_root: Path, **_: object
     ) -> dict[str, object]:
         command = parameters.get("command")
-        command_items = list(command) if isinstance(command, list) else []
-        if command_items[:2] == ["powdrr-lift", "evaluate"]:
-            return {
-                "command": " ".join(str(item) for item in command_items),
-                "cwd": str(worktree_root),
-                "returncode": 0,
-                "stdout": "No specification issues found.\n",
-                "stderr": "",
-            }
-        return real_execute_shell_tool(
-            parameters,
-            worktree_root=worktree_root,
-            stdout=stdout,
-            stderr=stderr,
-            verbose=verbose,
-            announce=announce,
-            print_stdout=print_stdout,
-        )
+        if isinstance(command, (list, tuple)) and len(command) >= 2:
+            generated_name = {
+                "system-specification": system_spec_filename,
+                "architecture-specification": architecture_spec_filename,
+                "implementation-specification": implementation_spec_filename,
+                "pr-specification": pr_spec_filename,
+            }.get(str(command[1]))
+            if generated_name is not None:
+                generated_path = worktree_root / system_spec_dir / generated_name
+                generated_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_path.write_text("{}\n", encoding="utf-8")
+        return {
+            "command": command,
+            "cwd": str(worktree_root),
+            "returncode": 0,
+            "stdout": "",
+            "stderr": "",
+            "status": "success",
+            "validation_successful": True,
+        }
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
-        _fake_evaluate_shell_tool,
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool", _fake_shell_tool
     )
 
     stdout = io.StringIO()
@@ -5888,6 +6057,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._start_invoked_steps: set[int] = set()
             self._bootstrap_invoked_steps: set[int] = set()
             self._finish_invoked_steps: set[int] = set()
+            self._finish_validation_commands: list[list[str]] | None = None
+            self._finish_validation_index = 0
+            self._finish_context_gathered = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -5930,6 +6102,52 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     step_index = int(prompt["current_step_index"])
                     assert step_index < 4
+                    if step_index == 1 and not self._finish_context_gathered:
+                        self._finish_context_gathered = True
+                        self._call_index += 1
+                        return {
+                            "kind": "gather_context",
+                            "types": ["tools"],
+                            "filters": {
+                                "labels": ["pr-prep"],
+                                "keywords": ["test-no-match"],
+                            },
+                        }
+                    if step_index == 2:
+                        validation_gate = cast(
+                            dict[str, object], prompt.get("validation_gate", {})
+                        )
+                        obligations = cast(
+                            list[dict[str, object]],
+                            validation_gate.get("obligations", []),
+                        )
+                        if self._finish_validation_commands is None:
+                            self._finish_validation_commands = [
+                                cast(
+                                    list[str],
+                                    cast(
+                                        dict[str, object],
+                                        cast(
+                                            dict[str, object],
+                                            obligation["expected_action"],
+                                        )["parameters"],
+                                    )["command"],
+                                )
+                                for obligation in obligations
+                            ]
+                        if self._finish_validation_index < len(
+                            self._finish_validation_commands
+                        ):
+                            command = self._finish_validation_commands[
+                                self._finish_validation_index
+                            ]
+                            self._finish_validation_index += 1
+                            self._call_index += 1
+                            return {
+                                "kind": "invoke_tool",
+                                "tool": "shell",
+                                "parameters": {"command": command},
+                            }
                     shell_invocations = [
                         invocation
                         for invocation in prompt["current_step"].get(

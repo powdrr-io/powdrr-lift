@@ -74,7 +74,7 @@ class WorkflowTaskTemplate:
     output_state_type: str = "state"
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
-    step_type: str = "freeform-skill-invoke"
+    step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
 
     def __post_init__(self) -> None:
@@ -511,40 +511,45 @@ def build_workflow_template_validation_report(
             subject="workflow task template",
         )
 
-        step_type = raw_task_template_mapping.get("step_type", "freeform-skill-invoke")
+        step_type = raw_task_template_mapping.get("step_type", "freeform")
         if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="invalid_step_type_value",
                     message=(
                         "Workflow task template step_type must be "
-                        "freeform-skill-invoke or gather_context_and_filter."
+                        "freeform or invoke_tool."
                     ),
                     path=_child_path(task_template_path, "step_type"),
                 )
             )
         pre_step = raw_task_template_mapping.get("pre_step")
-        if step_type == "gather_context_and_filter" and not isinstance(
-            pre_step, Mapping
-        ):
+        if step_type == "invoke_tool" and not isinstance(pre_step, Mapping):
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="missing_pre_step",
-                    message=(
-                        "gather_context_and_filter task templates must declare "
-                        "a pre_step object."
-                    ),
+                    message="invoke_tool task templates must declare a pre_step.",
                     path=_child_path(task_template_path, "pre_step"),
                 )
             )
-        elif step_type == "freeform-skill-invoke" and pre_step is not None:
+        elif step_type == "invoke_tool" and raw_task_template_mapping.get(
+            "tool_invocations"
+        ):
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="unexpected_tool_invocations",
+                    message=(
+                        "invoke_tool task templates must use pre_step instead of "
+                        "tool_invocations."
+                    ),
+                    path=_child_path(task_template_path, "tool_invocations"),
+                )
+            )
+        elif step_type == "freeform" and pre_step is not None:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="unexpected_pre_step",
-                    message=(
-                        "Only gather_context_and_filter task templates may "
-                        "declare pre_step."
-                    ),
+                    message=("Only invoke_tool task templates may declare pre_step."),
                     path=_child_path(task_template_path, "pre_step"),
                 )
             )

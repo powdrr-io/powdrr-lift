@@ -78,13 +78,13 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
-                "step_type": "freeform-skill-invoke",
+                "step_type": "freeform",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
             {
                 "description": "Pull in the system context.",
-                "step_type": "freeform-skill-invoke",
+                "step_type": "freeform",
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
                 "prompt_catalogs": ["context_types", "skills"],
@@ -102,7 +102,7 @@ def test_skill_round_trips_through_json() -> None:
             },
             {
                 "description": "Summarize the result.",
-                "step_type": "freeform-skill-invoke",
+                "step_type": "freeform",
             },
         ],
     }
@@ -120,10 +120,18 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             "steps" if path.parent.name == "skill-definitions" else "task_templates"
         )
         for index, step in enumerate(document[step_key]):
+            expected_invoke_tool_steps = {
+                ("finish-pr-prep.yaml", 2),
+                ("create-pull-request.yaml", 0),
+                ("specify-system.yaml", 1),
+                ("specify-architecture.yaml", 1),
+                ("specify-implementation.yaml", 1),
+                ("execute-proposed-pr.yaml", 0),
+            }
             expected_step_type = (
-                "gather_context_and_filter"
-                if path.name == "execute-proposed-pr.yaml" and index == 0
-                else "freeform-skill-invoke"
+                "invoke_tool"
+                if (path.name, index) in expected_invoke_tool_steps
+                else "freeform"
             )
             assert step["step_type"] == expected_step_type, (
                 f"{path}:{step_key}[{index}]"
@@ -220,7 +228,7 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
     assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
 
 
-def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
+def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> None:
     report = build_skill_validation_report(
         yaml.safe_dump(
             {
@@ -229,7 +237,7 @@ def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
                 "steps": [
                     {
                         "description": "Filter gathered requirements.",
-                        "step_type": "gather_context_and_filter",
+                        "step_type": "invoke_tool",
                         "pre_step": {
                             "action": "gather_context",
                             "template": {
@@ -251,6 +259,27 @@ def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
     )
 
     assert report.validation_successful is True
+
+
+def test_skill_validation_rejects_invoke_tool_without_pre_step() -> None:
+    report = build_skill_validation_report(
+        yaml.safe_dump(
+            {
+                "name": "missing-tool",
+                "when_to_use": ["When a tool is required."],
+                "steps": [
+                    {
+                        "description": "Invoke the tool.",
+                        "step_type": "invoke_tool",
+                    }
+                ],
+            }
+        ),
+        source_path=Path("missing-tool.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["missing_pre_step"]
 
 
 def test_skill_validation_rejects_unknown_step_type() -> None:
@@ -617,12 +646,14 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "Create a draft pull request when none exists.",
         "Update the existing pull request.",
     ]
-    assert skill.steps[0].tool_invocations[0].command == (
+    assert skill.steps[0].pre_step is not None
+    assert skill.steps[0].pre_step.action == "invoke_tool"
+    assert skill.steps[0].pre_step.template["command"] == [
         "powdrr-lift",
         "pull-request-description",
         "--kind",
-        "<pr-kind>",
-    )
+        "feature",
+    ]
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()
     assert "files_to_publish" in (skill.steps[2].details or "")
@@ -748,6 +779,8 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
         for invocation in skill.steps[0].tool_invocations
     ][:1] == [("ref", "pr-prep")]
     assert skill.steps[1].tool_invocations == ()
+    assert skill.steps[2].pre_step is not None
+    assert skill.steps[2].pre_step.action == "invoke_tool"
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:

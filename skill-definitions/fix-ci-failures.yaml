@@ -6,7 +6,7 @@ when_to_use:
 - When the fix should finish with the repository's PR-preparation workflow and a pushed PR branch.
 steps:
 - id: inspect-ci
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Resolve the pull request and inspect its failing GitHub Actions checks.
   llm_type: simple_task
   details: >-
@@ -53,7 +53,7 @@ steps:
     - <run-id>
     - --log-failed
 - id: extract-failures
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Extract a structured failure record from each CI log.
   llm_type: high_reasoning
   details: >-
@@ -82,7 +82,7 @@ steps:
     - <failure-signature>
     - <relevant-files-or-log>
 - id: reproduce-failures
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Reproduce every root failure locally using the CI command.
   llm_type: fast_iteration
   details: >-
@@ -100,7 +100,7 @@ steps:
   - tool: ref
     label: pr-prep
 - id: research-solutions
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Search Stack Overflow for evidence-backed solutions.
   llm_type: standard_reasoning
   details: >-
@@ -130,7 +130,7 @@ steps:
     - --data-urlencode
     - filter=withbody
 - id: implement-fix
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Map candidate solutions to the local codebase and implement the fix.
   llm_type: high_reasoning
   details: >-
@@ -144,7 +144,7 @@ steps:
     and explain the CI-only assumptions being addressed. Keep each edit
     traceable to a failure record and preserve unrelated user changes.
 - id: verify-failures
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Iterate until the failures are fixed and regression checks pass.
   llm_type: fast_iteration
   details: >-
@@ -161,7 +161,7 @@ steps:
   - tool: ref
     label: pr-prep
 - description: Run the PR-preparation workflow on the final change set.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   uses_skills:
   - finish-pr-prep
@@ -172,7 +172,7 @@ steps:
     and test commands. Do not push or update the PR until finish-pr-prep
     reports that the staged change set is ready.
 - description: Commit and push the fixed branch to the existing pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `ci-fix`, commit message `Fix CI

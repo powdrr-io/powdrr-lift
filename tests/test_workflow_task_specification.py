@@ -55,7 +55,7 @@ def test_workflow_task_round_trips_through_json() -> None:
         "assignee_role": "coder",
         "output_state_type": "state",
         "description": "Prepare the deployment environment.",
-        "step_type": "freeform-skill-invoke",
+        "step_type": "freeform",
     }
 
 
@@ -75,7 +75,7 @@ def test_workflow_task_round_trips_through_yaml() -> None:
 
     assert parsed == task
     assert "task_id: task-1" in yaml_text
-    assert "step_type: freeform-skill-invoke" in yaml_text
+    assert "step_type: freeform" in yaml_text
 
 
 def test_workflow_task_round_trips_executable_step_fields() -> None:

@@ -660,7 +660,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 self.provider_role = nested_role
                 continue
-            if self.current_step.step_type == "gather_context_and_filter":
+            if (
+                self.current_step.step_type == "invoke_tool"
+                and self.current_step.pre_step is not None
+            ):
                 _run_deterministic_pre_step(
                     self.current_step,
                     skill_name=self.selected_skill.skill.name,
@@ -670,6 +673,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     handoff_records=self.state.handoff_records,
                     step_index=self.state.step_index,
                     workflow_context=self.workflow_context,
+                    stdout=self.stdout,
+                    stderr=self.stderr,
+                    verbose=self.config.verbose,
                 )
             step_mapping = (
                 _resolve_llm_mapping(
@@ -3136,6 +3142,9 @@ def _run_deterministic_pre_step(
     handoff_records: Mapping[str, Mapping[str, Any]],
     step_index: int,
     workflow_context: WorkflowContext | None,
+    stdout: TextIO = sys.stdout,
+    stderr: TextIO = sys.stderr,
+    verbose: bool = False,
 ) -> None:
     if _latest_deterministic_pre_step(
         execution_events,
@@ -3144,16 +3153,63 @@ def _run_deterministic_pre_step(
     ):
         return
     pre_step = step.pre_step
-    if pre_step is None or pre_step.action != "gather_context":
-        raise RuntimeError(
-            "gather_context_and_filter requires a gather_context pre_step."
-        )
+    if pre_step is None:
+        raise RuntimeError("invoke_tool steps require a pre_step.")
     template = _resolve_pre_step_template(
         pre_step.template,
         _pre_step_context_values(handoff_records, workflow_context),
     )
     if not isinstance(template, Mapping):
         raise RuntimeError("Deterministic pre-step template must resolve to an object.")
+    if pre_step.action == "invoke_tool":
+        tool = template.get("tool")
+        if not isinstance(tool, str):
+            raise RuntimeError("Invoke tool pre-step template requires a tool.")
+        parameters = dict(template)
+        parameters.pop("tool", None)
+        if tool == "fuzzy-match":
+            result = _execute_fuzzy_match_tool(
+                parameters,
+                worktree_root=worktree_root,
+            )
+        elif tool in {"shell", _INTERNAL_TOOL}:
+            if tool == _INTERNAL_TOOL:
+                _validate_internal_command(parameters.get("command"))
+            result = _execute_shell_tool(
+                parameters,
+                worktree_root=worktree_root,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=verbose,
+                announce=False,
+            )
+        elif is_basedpyright_tool(tool):
+            result = execute_basedpyright_tool(
+                tool,
+                parameters,
+                worktree_root=worktree_root,
+            )
+        else:
+            raise RuntimeError(f"Unsupported invoke_tool pre-step tool: {tool!r}")
+        event = {
+            "kind": "deterministic_pre_step",
+            "step_type": step.step_type,
+            "action": pre_step.action,
+            "tool": tool,
+            "template": template,
+            "result": result,
+            "step_index": step_index,
+        }
+        execution_events.append(event)
+        execution_context.append(
+            "Deterministic invoke_tool result:\n"
+            + json.dumps(result, ensure_ascii=False)
+        )
+        return
+    if pre_step.action != "gather_context":
+        raise RuntimeError(
+            "invoke_tool pre-steps must use gather_context or invoke_tool."
+        )
     raw_types = template.get("types")
     if (
         not isinstance(raw_types, Sequence)
@@ -3545,11 +3601,10 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "invalid until a declared tool has been invoked successfully for that "
         "step.\n"
         "Use complete when the skill is finished.\n"
-        "For gather_context_and_filter steps, the deterministic gather_context "
-        "pre-step already ran. The deterministic_context field in the step prompt "
-        "is the context for this step. Do not gather again; use that context and "
-        "the current step details to assign filtered or summarized values to the "
-        "declared outputs before choosing next_step or complete.\n"
+        "For invoke_tool steps with a deterministic pre-step, the pre-step already "
+        "ran. The deterministic_context field in the step prompt contains its "
+        "result; do not invoke the pre-step again. Use the result and current step "
+        "details before choosing next_step or complete.\n"
         "Always include decisions_and_context with the concise information "
         "future steps will need. Keep it to one short sentence explaining why "
         "you chose this action or what it enables next; it is shown in progress "
@@ -3612,16 +3667,15 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             'Example: {"action":"invoke_skill","skill":"adversarial-review",'
             '"provider_role":"adversarial","clean":true}.\n'
         )
-    if getattr(current_step, "step_type", "freeform-skill-invoke") == (
-        "gather_context_and_filter"
+    if (
+        getattr(current_step, "step_type", "freeform") == "invoke_tool"
+        and getattr(current_step, "pre_step", None) is not None
     ):
         prompt += (
-            "Deterministic context: gather_context has already run using the "
-            "resolved pre_step template. The deterministic_context field is the "
-            "context for this step; do not invoke gather_context again. Use it and "
-            "the current step details to put filtered or summarized values in "
-            "outputs using exactly "
-            "the declared output names before choosing next_step or complete.\n"
+            "Deterministic context: the resolved pre_step template has already run. "
+            "The deterministic_context field is the context for this step; do not "
+            "invoke the pre-step again. Use it and the current step details before "
+            "choosing next_step or complete.\n"
         )
     if getattr(current_step, "prompt_catalogs", None) is None or include_context:
         prompt += (
@@ -3643,6 +3697,15 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         prompt += (
             "Tool guidance: invoke one of the declared tool_invocations successfully "
             "before next_step or complete. A prose summary is not a tool invocation.\n"
+        )
+    if (
+        getattr(current_step, "step_type", "freeform") == "invoke_tool"
+        and getattr(current_step, "pre_step", None) is None
+    ):
+        prompt += (
+            "This is an atomic invoke_tool step. Invoke its single declared tool, "
+            "then choose next_step after the successful result; do not perform "
+            "additional reasoning or edits in this step.\n"
         )
     prompt += (
         "When a validation result contains corrective_action, apply it before "
@@ -5372,7 +5435,7 @@ def _validate_internal_command(command: object) -> None:
 def _skill_step_to_data(step: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "description": step.description,
-        "step_type": getattr(step, "step_type", "freeform-skill-invoke"),
+        "step_type": getattr(step, "step_type", "freeform"),
         "details": step.details,
         "uses_skills": list(step.uses_skills),
     }

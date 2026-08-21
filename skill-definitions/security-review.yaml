@@ -6,7 +6,7 @@ when_to_use:
 - When security findings must be reported directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the pull request, feature scope, and security-relevant change surface.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: long_context
   details: >-
@@ -38,7 +38,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Build a threat model for the changed behavior.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Use OWASP's methodology-neutral four questions: what are we working on,
@@ -63,7 +63,7 @@ steps:
     - "auth|permission|role|scope|token|secret|password|credential|encrypt|decrypt|upload|download|deserialize|subprocess|shell|eval|exec|url|redirect|sql|query|template|cookie|session|cors|csrf|rate.limit|audit|log"
     - <changed-files-or-repository>
 - description: Review identity, access control, and session boundaries.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Check authentication flows, token and session lifecycle, password or key
@@ -78,7 +78,7 @@ steps:
     Require negative tests for unauthenticated, cross-user, cross-tenant, and
     insufficient-privilege cases where applicable.
 - description: Review input, output, and execution safety.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Trace every untrusted source, including HTTP parameters and headers,
@@ -93,7 +93,7 @@ steps:
     input. Look for unsafe dynamic evaluation, shell construction, format
     strings, and confused-deputy behavior.
 - description: Review cryptography, secrets, privacy, and data lifecycle.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Check that cryptography uses approved, authenticated algorithms and safe
@@ -106,7 +106,7 @@ steps:
     validation, certificate handling, and whether analytics or third-party
     integrations receive more data than intended.
 - description: Review configuration, dependencies, and supply-chain controls.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Check secure defaults, production configuration, debug behavior, CORS,
@@ -128,7 +128,7 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Review resilience, observability, and security test evidence.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Check denial-of-service surfaces: unbounded input, expensive parsing or
@@ -148,7 +148,7 @@ steps:
   - tool: ref
     label: security-review
 - description: Evaluate findings against current OWASP guidance and severity.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Use OWASP ASVS 5.0.0 as the detailed verification baseline and cite the
@@ -180,7 +180,7 @@ steps:
     - -sS
     - https://owasp.org/www-project-threat-modeling/
 - description: Post actionable security findings as inline pull-request comments.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Check existing unresolved review threads before posting. Post every
@@ -220,7 +220,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the security review and report residual risk.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: standard_reasoning
   details: >-
     Confirm every intended finding is posted to the current PR diff, each

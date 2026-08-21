@@ -8,7 +8,7 @@ when_to_use:
   pull request.
 steps:
 - description: Inspect the pull request and collect its review comments.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: long_context
   details: >-
     Resolve the current pull request from the worktree branch and inspect its
@@ -43,7 +43,7 @@ steps:
     - -f
     - query=<review-thread-query>
 - id: classify-comments
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Classify each comment against the feature contract.
   llm_type: high_reasoning
   details: >-
@@ -58,7 +58,7 @@ steps:
     or another comment, identify the conflict and resolve it from the most
     authoritative specification rather than silently guessing.
 - id: update-specifications
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Update the v1 specification for design-level feedback.
   llm_type: standard_reasoning
   details: >-
@@ -87,7 +87,7 @@ steps:
     - --work-item-name
     - <work-item-name>
 - id: implement-corrections
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Implement and test every actionable review correction.
   llm_type: high_reasoning
   details: >-
@@ -111,7 +111,7 @@ steps:
     - powdrr-lift
     - repository-state
 - id: validate-corrections
-  step_type: freeform-skill-invoke
+  step_type: freeform
   description: Run finish-pr-prep on the final staged changes.
   llm_type: fast_iteration
   details: >-
@@ -123,7 +123,7 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Commit and push the addressed changes to the existing pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `review-comments`, commit message

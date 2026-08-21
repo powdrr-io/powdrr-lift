@@ -4,22 +4,24 @@ when_to_use:
 - When an existing pull request for the current branch must receive the prescribed description and updated commit.
 steps:
 - description: Generate the pull request description template.
-  step_type: freeform-skill-invoke
+  step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    Invoke `powdrr-lift pull-request-description --kind <pr-kind>` exactly once.
+    Invoke `powdrr-lift pull-request-description --kind feature` exactly once.
     Keep the returned template in workflow context for the next step. Do not
     print the template, its sections, or a draft body to the chat or status
     window. Preserve the current branch and existing pull request context.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - pull-request-description
-    - --kind
-    - <pr-kind>
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - pull-request-description
+      - --kind
+      - feature
 - description: Fill in the pull request description template.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Fill every section of the returned template using the validated work item,
@@ -34,7 +36,7 @@ steps:
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
 - description: Stage the exact files that belong in the pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Read the `files_to_publish` list from workflow context. It is authoritative
@@ -50,7 +52,7 @@ steps:
     - add
     - <files-to-publish>
 - description: Commit the validated changes.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Confirm with `git diff --cached --name-only` that the exact
@@ -71,7 +73,7 @@ steps:
     - -m
     - <commit-message>
 - description: Push the committed changes.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Push the current feature branch with its upstream set. Verify that the
@@ -87,7 +89,7 @@ steps:
     - origin
     - HEAD
 - description: Create a draft pull request when none exists.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     First verify that the current branch has at least one committed change
@@ -115,7 +117,7 @@ steps:
     - --body
     - <populated-pr-description>
 - description: Update the existing pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Use this step only when a pull request already exists for the current

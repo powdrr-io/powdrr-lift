@@ -6,7 +6,7 @@ when_to_use:
   proposed skill or workflow rewrite.
 steps:
 - description: Compare the original and proposed definitions without bias.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Read the supplied target goal, original step text, proposed replacement,
@@ -15,7 +15,7 @@ steps:
     review's findings as evidence and do not propose improvements merely because
     your wording differs.
 - description: Report omissions and execution risks.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Return one finding per omitted goal, dependency, input, output, safety

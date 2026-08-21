@@ -5,7 +5,7 @@ when_to_use:
 - When the TUI should guide the user through a synchronous implementation flow.
 steps:
 - description: Review the system and architecture context first.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: Confirm the source architecture id and the relevant entities before drafting
     implementation detail.
@@ -13,26 +13,30 @@ steps:
   - review-system
   - review-architecture
 - description: Generate the implementation specification template.
-  step_type: freeform-skill-invoke
+  step_type: invoke_tool
   llm_type: simple_task
-  details: Use the generated implementation template as the canonical place to capture
-    feature and decision detail.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+  details: >-
+    Invoke the declared implementation-specification tool exactly once. Pass its
+    generated file to the next step for completion; do not edit the file in this
+    step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - implementation-specification
+      - "--work-item-name"
+      - "<work-item-name>"
 - description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: standard_reasoning
   details: Keep the implementation spec aligned with the source architecture version
     and do not invent new ids.
 - description: Validate the filled implementation template and resolve any reported
     issues.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Invoke the generic evaluator once for the current file. If it

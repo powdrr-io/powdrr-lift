@@ -6,7 +6,7 @@ when_to_use:
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
 - description: Check whether the project-structure artifact already exists.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
   details: >-
@@ -20,7 +20,7 @@ steps:
     does not exist, record that result and choose next_step so the discovery
     step can begin.
 - description: Discover the project-wide modules, tools, tests, and development commands.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: long_context
   details: >-
     Treat the repository as the scope. Do not ask the user to identify a
@@ -63,7 +63,7 @@ steps:
     - scripts
     - README.md
 - description: Reuse an existing project-structure artifact or create its template.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
   details: >-
@@ -85,7 +85,7 @@ steps:
     - powdrr-lift
     - project-structure
 - description: Populate the project-structure artifact from codebase evidence.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Compare the discovered repository structure with the existing artifact or
@@ -111,7 +111,7 @@ steps:
     verified syntax instead of guessing. Use the edit action to write the
     artifact and pass the changed path and edit summary onward.
 - description: Validate the project-structure artifact and discovery evidence.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Run [powdrr-lift, validate-project-structure, --input,
@@ -152,7 +152,7 @@ steps:
     - powdrr-lift
     - repository-state
 - description: Stage the validated project-structure artifact.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Confirm that the validated project-structure artifact is the only intended
@@ -170,7 +170,7 @@ steps:
     - add
     - docs/project_structure/project-structure.yaml
 - description: Run finish-pr-prep on the validated project-structure artifact.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Run finish-pr-prep after the validated project-structure artifact is
@@ -180,7 +180,7 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Commit the project-structure artifact and open a draft pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `project-structure`, commit

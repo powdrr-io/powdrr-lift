@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -157,6 +158,35 @@ def test_action_engine_uses_the_same_state_aware_no_progress_rule() -> None:
     assert repeated.correction is not None
     assert threshold.decision is ProgressDecision.THRESHOLD
     assert "Do not invoke this action unchanged again" in (threshold.correction or "")
+
+
+def test_action_failure_guard_ignores_narrative_changes() -> None:
+    engine = WorkflowLLMActionEngine(max_stalled_roundtrips=2)
+
+    def signature(action: dict[str, object]) -> str:
+        return json.dumps(action)
+
+    first_action: dict[str, object] = {
+        "action": "invoke_tool",
+        "parameters": {"command": ["powdrr-lift", "yaml-edit"]},
+        "decisions_and_context": "first explanation",
+    }
+    second_action: dict[str, object] = {
+        "action": "invoke_tool",
+        "parameters": {"command": ["powdrr-lift", "yaml-edit"]},
+        "decisions_and_context": "different explanation",
+    }
+    first = engine.record_action_failure(
+        first_action,
+        signature=signature,
+    )
+    threshold = engine.record_action_failure(
+        second_action,
+        signature=signature,
+    )
+
+    assert first is ProgressDecision.CONTINUE
+    assert threshold is ProgressDecision.THRESHOLD
 
 
 def test_action_engine_treats_repeated_gather_context_as_no_progress() -> None:

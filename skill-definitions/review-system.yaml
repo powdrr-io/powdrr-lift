@@ -20,8 +20,12 @@ steps:
     are required.
   step_type: freeform
   llm_type: standard_reasoning
-  details: Run the system specification command, then fill the generated template
-    with the required updates.
+  details: >-
+    Run the system specification command, then fill the generated template with
+    the required updates. Use the first-class `yaml_edit` action directly for
+    edits; never route `powdrr-lift yaml-edit` through `invoke_tool`, `tool:
+    internal`, or `tool: shell`. For example:
+    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["title"],"value":"Updated title"}]}.
   tool_invocations:
   - tool: internal
     command:
@@ -36,8 +40,10 @@ steps:
     Invoke the generic evaluator exactly once after the specification
     edits. If it succeeds, use its result to confirm that no inconsistencies
     remain and choose `next_step` immediately. If it reports validation errors,
-    edit the specification to address them before invoking the validator again;
-    never repeat the same validation command unchanged.
+    use the first-class `yaml_edit` action to address them before invoking the
+    validator again; never route YAML edits through `invoke_tool` or repeat the
+    same validation command unchanged. For example:
+    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}.
   tool_invocations:
   - tool: internal
     command:

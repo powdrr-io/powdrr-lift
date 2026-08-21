@@ -498,7 +498,9 @@ class WorkflowLLMActionEngine:
         signature: Callable[[ActionT], str],
     ) -> ProgressDecision:
         """Count a rejected action with the same threshold as stalled actions."""
-        return self._controller.record_failure(signature(action))
+        return self._controller.record_failure(
+            workflow_action_failure_signature(action, signature=signature)
+        )
 
     def reset_progress(self) -> None:
         self._controller.reset()
@@ -512,6 +514,24 @@ def workflow_action_signature(action: object) -> str:
         value: object = asdict(cast(Any, action))
     else:
         value = action
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def workflow_action_failure_signature[ActionT](
+    action: ActionT,
+    *,
+    signature: Callable[[ActionT], str],
+) -> str:
+    """Normalize rejected actions so narrative changes do not evade the guard."""
+    serialized = signature(action)
+    try:
+        value = json.loads(serialized)
+    except (TypeError, ValueError):
+        return serialized
+    if not isinstance(value, dict):
+        return serialized
+    for field_name in ("decisions_and_context", "llm_type", "outputs"):
+        value.pop(field_name, None)
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
 
 

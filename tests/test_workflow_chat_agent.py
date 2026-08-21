@@ -27,6 +27,7 @@ from powdrr_lift.cli import main
 from powdrr_lift.core import (
     Skill,
     SkillStep,
+    SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
     SkillStepPreStep,
@@ -118,6 +119,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _resolve_worktree_for_request,
     _run_deterministic_pre_step,
+    _run_gate,
     _serialize_messages,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
@@ -499,6 +501,52 @@ def test_deterministic_shell_pre_step_accepts_empty_successful_result(
 
     assert events[0]["result"]["returncode"] == 0
     assert events[0]["result"]["stdout"].strip() == ""
+
+
+def test_gate_reports_fresh_result_separately_from_llm_commentary(
+    tmp_path: Path,
+) -> None:
+    step = SkillStep(
+        id="evaluate-specification",
+        description="Evaluate the specification.",
+        step_type="gate",
+        pre_step=SkillStepPreStep(
+            action="invoke_tool",
+            template={
+                "tool": "shell",
+                "command": ["printf", "issues remain"],
+            },
+        ),
+        gate=SkillStepGate(
+            outcome={"path": "returncode", "equals": 0},
+            goto_step="repair-specification",
+            retry_context="Repair the reported issues.",
+        ),
+    )
+    stderr = io.StringIO()
+
+    passed = _run_gate(
+        step,
+        skill_name="specify-a-feature",
+        worktree_root=tmp_path,
+        execution_events=[],
+        execution_context=[],
+        handoff_records={},
+        step_index=3,
+        workflow_context=None,
+        stdout=io.StringIO(),
+        stderr=stderr,
+        verbose=False,
+    )
+
+    assert passed is True
+    output = stderr.getvalue()
+    assert (
+        "Workflow gate evaluation (specify-a-feature/evaluate-specification): passed"
+        in output
+    )
+    assert '"returncode": 0' in output
+    assert "issues remain" in output
 
 
 def test_invoke_tool_runs_gather_context_pre_step_once(

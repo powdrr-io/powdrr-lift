@@ -138,7 +138,7 @@ class SkillStep:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
-    validation_gate: str | None = None
+    validation_gate: Mapping[str, Any] | None = None
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -631,14 +631,39 @@ def build_skill_validation_report(
                 )
             raw_validation_gate = step_mapping.get("validation_gate")
             if raw_validation_gate is not None:
-                if _optional_string(raw_validation_gate) != "all_discovered_tools":
+                if not isinstance(raw_validation_gate, Mapping):
                     issues.append(
                         SkillValidationIssue(
                             code="invalid_validation_gate",
-                            message=("validation_gate must be all_discovered_tools."),
+                            message="validation_gate must be an object.",
                             path=_child_path(step_path, "validation_gate"),
                         )
                     )
+                else:
+                    gate_id = raw_validation_gate.get("id")
+                    discovery = raw_validation_gate.get("discovery")
+                    if not isinstance(gate_id, str) or not gate_id.strip():
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_validation_gate_id",
+                                message="validation_gate.id must be non-empty.",
+                                path=_child_path(step_path, "validation_gate.id"),
+                            )
+                        )
+                    if not isinstance(discovery, Mapping) or not isinstance(
+                        discovery.get("action"), str
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_validation_gate_discovery",
+                                message=(
+                                    "validation_gate.discovery must declare an action."
+                                ),
+                                path=_child_path(
+                                    step_path, "validation_gate.discovery"
+                                ),
+                            )
+                        )
 
             uses_skills = step_mapping.get("uses_skills")
             if uses_skills is None:
@@ -1278,9 +1303,25 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
-    validation_gate = _optional_string(data.get("validation_gate"))
-    if validation_gate is not None and validation_gate != "all_discovered_tools":
-        raise ValueError("Skill step validation_gate must be all_discovered_tools.")
+    raw_validation_gate = data.get("validation_gate")
+    if raw_validation_gate is not None and not isinstance(raw_validation_gate, Mapping):
+        raise ValueError("Skill step validation_gate must be an object.")
+    validation_gate = (
+        dict(cast("Mapping[str, Any]", raw_validation_gate))
+        if raw_validation_gate is not None
+        else None
+    )
+    if validation_gate is not None:
+        gate_id = validation_gate.get("id")
+        discovery = validation_gate.get("discovery")
+        if not isinstance(gate_id, str) or not gate_id.strip():
+            raise ValueError("Skill step validation_gate.id must be non-empty.")
+        if not isinstance(discovery, Mapping) or not isinstance(
+            discovery.get("action"), str
+        ):
+            raise ValueError(
+                "Skill step validation_gate.discovery must declare an action."
+            )
     if step_type in {"invoke_tool", "gate"}:
         if pre_step is None:
             raise ValueError(

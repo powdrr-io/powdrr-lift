@@ -123,6 +123,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_action_for_step,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
+    _ValidationGateState,
     _ValidationObligation,
     _workflow_action_material_state,
     _workflow_action_progress_status,
@@ -807,7 +808,10 @@ def test_workflow_can_advance_after_empty_gather_context_result() -> None:
 def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
     step = SkillStep(
         description="Run discovered checks.",
-        validation_gate="all_discovered_tools",
+        validation_gate={
+            "id": "checks",
+            "discovery": {"action": "gather_context"},
+        },
     )
     selected_skill = SkillCatalogEntry(
         Path("skill.yaml"),
@@ -832,15 +836,22 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
             state=state,
         )
 
-    state.validation_gate_discovered = True
-    state.validation_gate_epoch = 1
-    state.validation_obligations = {
-        "pytest": _ValidationObligation(
-            tool_id="pytest",
-            command=("uv", "run", "pytest"),
-            tool={"id": "pytest", "template": "uv run pytest"},
-        )
-    }
+    state.validation_gates["checks"] = _ValidationGateState(
+        step_index=0,
+        discovered=True,
+        epoch=1,
+        obligations={
+            "pytest": _ValidationObligation(
+                obligation_id="pytest",
+                expected_action={
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["uv", "run", "pytest"]},
+                },
+                source={"id": "pytest", "template": "uv run pytest"},
+            )
+        },
+    )
     with pytest.raises(RuntimeError, match="Still pending: pytest"):
         _validate_workflow_step_transition(
             next_step,
@@ -850,7 +861,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
             state=state,
         )
 
-    state.validation_gate_correction_required = True
+    state.validation_gates["checks"].correction_required = True
     with pytest.raises(RuntimeError, match="Apply corrective steps"):
         _validate_workflow_step_transition(
             next_step,
@@ -860,8 +871,8 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
             state=state,
         )
 
-    state.validation_gate_correction_required = False
-    obligation = state.validation_obligations["pytest"]
+    state.validation_gates["checks"].correction_required = False
+    obligation = state.validation_gates["checks"].obligations["pytest"]
     obligation.status = "passed"
     _validate_workflow_step_transition(
         next_step,
@@ -871,7 +882,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         state=state,
     )
 
-    with pytest.raises(RuntimeError, match="not one of the discovered tools"):
+    with pytest.raises(RuntimeError, match="not one of the discovered obligations"):
         _validate_dynamic_validation_gate_action(
             _parse_action_response(
                 {
@@ -5669,6 +5680,15 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         _capture_worktree_context,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        lambda parameters, **_: {
+            "command": parameters.get("command"),
+            "returncode": 0,
+            "stdout": "",
+            "stderr": "",
+        },
+    )
 
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -5919,7 +5939,16 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         )
                         if self._finish_validation_commands is None:
                             self._finish_validation_commands = [
-                                cast(list[str], obligation["command"])
+                                cast(
+                                    list[str],
+                                    cast(
+                                        dict[str, object],
+                                        cast(
+                                            dict[str, object],
+                                            obligation["expected_action"],
+                                        )["parameters"],
+                                    )["command"],
+                                )
                                 for obligation in obligations
                             ]
                         if self._finish_validation_index < len(

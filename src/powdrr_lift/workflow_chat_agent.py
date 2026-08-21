@@ -454,9 +454,9 @@ WorkflowChatSelection = SkillChatSelection
 
 @dataclass(slots=True)
 class _ValidationObligation:
-    tool_id: str
-    command: tuple[str, ...]
-    tool: Mapping[str, Any]
+    obligation_id: str
+    expected_action: Mapping[str, Any]
+    source: Mapping[str, Any]
     epoch: int = 1
     status: str = "pending"
     attempts: int = 0
@@ -464,14 +464,23 @@ class _ValidationObligation:
 
     def to_data(self) -> dict[str, Any]:
         return {
-            "tool_id": self.tool_id,
-            "command": list(self.command),
-            "tool": dict(self.tool),
+            "obligation_id": self.obligation_id,
+            "expected_action": dict(self.expected_action),
+            "source": dict(self.source),
             "epoch": self.epoch,
             "status": self.status,
             "attempts": self.attempts,
             "last_result": self.last_result,
         }
+
+
+@dataclass(slots=True)
+class _ValidationGateState:
+    step_index: int
+    discovered: bool = False
+    epoch: int = 0
+    obligations: dict[str, _ValidationObligation] = field(default_factory=dict)
+    correction_required: bool = False
 
 
 @dataclass(slots=True)
@@ -492,13 +501,7 @@ class _WorkflowExecutionState:
     fuzzy_match_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] = field(
         default_factory=dict
     )
-    validation_gate_step_index: int | None = None
-    validation_gate_discovered: bool = False
-    validation_gate_epoch: int = 0
-    validation_obligations: dict[str, _ValidationObligation] = field(
-        default_factory=dict
-    )
-    validation_gate_correction_required: bool = False
+    validation_gates: dict[str, _ValidationGateState] = field(default_factory=dict)
 
 
 def _record_durable_fact(
@@ -1085,7 +1088,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def record_action_error(self, action: SkillChatAction, error: Exception) -> None:
         if _validation_gate_enabled(self.current_step) and action.kind == "invoke_tool":
-            self.state.validation_gate_correction_required = True
+            _validation_gate_state(
+                self.state, self.current_step
+            ).correction_required = True
         signature = _workflow_action_signature(action)
         feedback = _workflow_edit_failure_feedback(
             action,
@@ -3935,11 +3940,11 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         )
     if _validation_gate_enabled(current_step):
         prompt += (
-            "This step has a runtime validation gate. Run every obligation in "
-            "validation_gate using its exact command. You cannot choose next_step, "
+            "This step has a runtime validation gate. Run every discovered obligation "
+            "using the exact action in validation_gate. You cannot choose next_step, "
             "goto_step, or complete until every obligation passes in the current "
-            "epoch. If any tool fails, apply its corrective action; the runtime "
-            "will reset the epoch and require every tool to run again.\n"
+            "epoch. If any obligation fails, apply its corrective action; the runtime "
+            "will reset the epoch and require every obligation to run again.\n"
         )
     if getattr(current_step, "prompt_catalogs", None) is None or include_context:
         prompt += (
@@ -4688,12 +4693,45 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
         ) from exc
 
 
+def _validation_gate_config(step: Any) -> Mapping[str, Any] | None:
+    value = getattr(step, "validation_gate", None)
+    return value if isinstance(value, Mapping) else None
+
+
 def _validation_gate_enabled(step: Any) -> bool:
-    return getattr(step, "validation_gate", None) == "all_discovered_tools"
+    return _validation_gate_config(step) is not None
 
 
-def _validation_tool_command(item: Mapping[str, Any]) -> tuple[str, ...]:
-    raw_template = item.get("template")
+def _validation_gate_id(step: Any) -> str:
+    config = _validation_gate_config(step)
+    gate_id = config.get("id") if config is not None else None
+    if not isinstance(gate_id, str) or not gate_id.strip():
+        raise RuntimeError("Every validation gate must have a non-empty id.")
+    return gate_id.strip()
+
+
+def _validation_gate_state(
+    state: _WorkflowExecutionState,
+    step: Any,
+) -> _ValidationGateState:
+    gate_id = _validation_gate_id(step)
+    gate_state = state.validation_gates.get(gate_id)
+    if gate_state is None:
+        gate_state = _ValidationGateState(step_index=state.step_index)
+        state.validation_gates[gate_id] = gate_state
+    return gate_state
+
+
+def _nested_value(value: Any, path: str) -> Any:
+    current = value
+    for part in path.split("."):
+        if not isinstance(current, Mapping):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _validation_command(raw_template: Any) -> tuple[str, ...]:
     if isinstance(raw_template, str):
         command = shlex.split(raw_template)
     elif isinstance(raw_template, Sequence) and not isinstance(
@@ -4713,39 +4751,74 @@ def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
     state: _WorkflowExecutionState,
+    gate: Any,
     gate_step_index: int,
 ) -> None:
-    matches = result.get("matches")
+    config = _validation_gate_config(gate)
+    assert config is not None
+    discovery = config.get("discovery")
+    if not isinstance(discovery, Mapping):
+        raise RuntimeError("Validation gate discovery must be an object.")
+    matches = _nested_value(result, str(discovery.get("result_path", "matches")))
     if not isinstance(matches, Sequence) or isinstance(
         matches, (str, bytes, bytearray)
     ):
         raise RuntimeError("Validation tool discovery did not return matches.")
     obligations: dict[str, _ValidationObligation] = {}
+    item_path = str(discovery.get("item_path", "item"))
+    id_field = str(discovery.get("id_field", "id"))
+    action_field = discovery.get("action_field")
+    action_template = discovery.get("obligation_action")
+    required_section = discovery.get("section")
     for match in matches:
-        if not isinstance(match, Mapping) or match.get("section") != "tools":
+        if not isinstance(match, Mapping):
             continue
-        raw_item = match.get("item")
+        if required_section is not None and match.get("section") != required_section:
+            continue
+        raw_item = _nested_value(match, item_path)
         if not isinstance(raw_item, Mapping):
-            raise RuntimeError("Validation tool discovery returned a non-object tool.")
-        tool_id = raw_item.get("id")
-        if not isinstance(tool_id, str) or not tool_id.strip():
-            raise RuntimeError("Every discovered validation tool must have an id.")
-        normalized_id = tool_id.strip()
+            raise RuntimeError("Validation discovery returned a non-object item.")
+        raw_id = raw_item.get(id_field)
+        if not isinstance(raw_id, str) or not raw_id.strip():
+            raise RuntimeError("Every discovered validation item must have an id.")
+        normalized_id = raw_id.strip()
         if normalized_id in obligations:
             raise RuntimeError(
-                "Validation tool discovery returned duplicate tool id "
+                "Validation discovery returned duplicate obligation id "
                 f"{normalized_id!r}."
             )
+        if isinstance(action_field, str):
+            expected_action = raw_item.get(action_field)
+            if not isinstance(expected_action, Mapping):
+                raise RuntimeError(
+                    f"Validation item {normalized_id!r} must provide {action_field}."
+                )
+            expected_action = dict(expected_action)
+        elif isinstance(action_template, Mapping):
+            expected_action = dict(action_template)
+            parameters = expected_action.get("parameters")
+            if isinstance(parameters, Mapping):
+                expected_action["parameters"] = {
+                    key: (
+                        _nested_value(raw_item, str(value)[1:])
+                        if isinstance(value, str) and value.startswith("$")
+                        else value
+                    )
+                    for key, value in parameters.items()
+                }
+        else:
+            raise RuntimeError("Validation gate discovery must define an action.")
         obligations[normalized_id] = _ValidationObligation(
-            tool_id=normalized_id,
-            command=_validation_tool_command(raw_item),
-            tool=dict(raw_item),
+            obligation_id=normalized_id,
+            expected_action=expected_action,
+            source=dict(raw_item),
         )
-    state.validation_gate_step_index = gate_step_index
-    state.validation_gate_discovered = True
-    state.validation_gate_epoch = 1
-    state.validation_obligations = obligations
-    state.validation_gate_correction_required = False
+    gate_state = _validation_gate_state(state, gate)
+    gate_state.step_index = gate_step_index
+    gate_state.discovered = True
+    gate_state.epoch = 1
+    gate_state.obligations = obligations
+    gate_state.correction_required = False
 
 
 def _register_validation_gate_discovery(
@@ -4754,28 +4827,40 @@ def _register_validation_gate_discovery(
 ) -> None:
     if action.kind != "gather_context":
         return
-    steps = state.selected_skill.skill.steps
-    gate_step_index = next(
-        (
-            index
-            for index in range(state.step_index + 1, len(steps))
-            if _validation_gate_enabled(steps[index])
-        ),
-        None,
-    )
-    if gate_step_index is None:
-        return
     event = state.execution_events[-1] if state.execution_events else None
     if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
         raise RuntimeError("Validation tool discovery did not produce a result.")
-    _discover_validation_obligations(
-        event["result"],
-        state=state,
-        gate_step_index=gate_step_index,
-    )
+    for gate_step_index, gate in enumerate(state.selected_skill.skill.steps):
+        config = _validation_gate_config(gate)
+        if gate_step_index <= state.step_index or config is None:
+            continue
+        discovery = config.get("discovery")
+        if not isinstance(discovery, Mapping) or discovery.get("action") != action.kind:
+            continue
+        gate_state = _validation_gate_state(state, gate)
+        if not gate_state.discovered:
+            _discover_validation_obligations(
+                event["result"],
+                state=state,
+                gate=gate,
+                gate_step_index=gate_step_index,
+            )
 
 
-def _validation_result_passed(result: Mapping[str, Any]) -> bool:
+def _validation_result_passed(
+    result: Mapping[str, Any],
+    gate: Any,
+) -> bool:
+    config = _validation_gate_config(gate) or {}
+    success = config.get("success")
+    if isinstance(success, Mapping):
+        field = success.get("result_field")
+        accepted = success.get("accepted_values")
+        value = result.get(field) if isinstance(field, str) else None
+        if isinstance(accepted, Sequence) and not isinstance(
+            accepted, (str, bytes, bytearray)
+        ):
+            return value in accepted
     if result.get("returncode") not in (None, 0):
         return False
     if result.get("validation_successful") is False:
@@ -4785,12 +4870,13 @@ def _validation_result_passed(result: Mapping[str, Any]) -> bool:
 
 def _validation_gate_incomplete(
     state: _WorkflowExecutionState,
+    gate: Any,
 ) -> list[_ValidationObligation]:
+    gate_state = _validation_gate_state(state, gate)
     return [
         obligation
-        for obligation in state.validation_obligations.values()
-        if obligation.epoch != state.validation_gate_epoch
-        or obligation.status != "passed"
+        for obligation in gate_state.obligations.values()
+        if obligation.epoch != gate_state.epoch or obligation.status != "passed"
     ]
 
 
@@ -4799,20 +4885,23 @@ def _validate_dynamic_validation_gate_action(
     state: _WorkflowExecutionState,
     step: Any,
 ) -> None:
-    if not _validation_gate_enabled(step) or action.kind != "invoke_tool":
+    if not _validation_gate_enabled(step):
         return
-    if not state.validation_gate_discovered:
+    gate_state = _validation_gate_state(state, step)
+    if not gate_state.discovered:
         raise _WorkflowToolValidationError(
             ValidationError(
-                code="validation_tools_not_discovered",
+                code="validation_obligations_not_discovered",
                 message=(
-                    "Validation tools have not been discovered. Run the required "
-                    "gather_context action before invoking validation tools."
+                    "Validation obligations have not been discovered. Run the "
+                    "configured discovery action before invoking obligations."
                 ),
                 path="action",
             )
         )
-    if state.validation_gate_correction_required:
+    if state.step_index != gate_state.step_index:
+        return
+    if state.validation_gates[_validation_gate_id(step)].correction_required:
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="validation_correction_required",
@@ -4823,31 +4912,33 @@ def _validate_dynamic_validation_gate_action(
                 path="action",
             )
         )
-    if action.tool != "shell":
+    actual = {
+        "kind": action.kind,
+        "tool": action.tool,
+        "parameters": dict(action.parameters),
+    }
+    if action.kind == "invoke_tool" and action.tool is None:
         raise _WorkflowToolValidationError(
             ValidationError(
-                code="validation_tool_must_be_shell",
-                message="Discovered validation tools must be invoked with shell.",
+                code="validation_action_invalid",
+                message="A discovered obligation action must name its tool.",
                 path="tool",
             )
         )
-    command = tuple(_command_items_for_validation(action.parameters.get("command")))
-    if not any(
-        _command_matches_invocation(command, obligation.command)
-        for obligation in state.validation_obligations.values()
-    ):
+    obligations = gate_state.obligations.values()
+    if not any(obligation.expected_action == actual for obligation in obligations):
         declared = "; ".join(
-            " ".join(obligation.command)
-            for obligation in state.validation_obligations.values()
+            json.dumps(obligation.expected_action, sort_keys=True)
+            for obligation in gate_state.obligations.values()
         )
         raise _WorkflowToolValidationError(
             ValidationError(
-                code="validation_tool_not_discovered",
+                code="validation_action_not_discovered",
                 message=(
-                    "The validation command is not one of the discovered tools. "
+                    "The action is not one of the discovered obligations. "
                     f"Use one of: {declared or 'none'}."
                 ),
-                path="parameters.command",
+                path="action",
             )
         )
 
@@ -4858,19 +4949,23 @@ def _record_dynamic_validation_result(
 ) -> None:
     if state.step_index >= len(state.selected_skill.skill.steps):
         return
-    if not _validation_gate_enabled(state.selected_skill.skill.steps[state.step_index]):
-        return
-    if action.kind != "invoke_tool":
+    step = state.selected_skill.skill.steps[state.step_index]
+    if not _validation_gate_enabled(step):
         return
     event = state.execution_events[-1] if state.execution_events else None
     if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
         return
-    command = tuple(_command_items_for_validation(action.parameters.get("command")))
+    actual = {
+        "kind": action.kind,
+        "tool": action.tool,
+        "parameters": dict(action.parameters),
+    }
+    gate_state = _validation_gate_state(state, step)
     obligation = next(
         (
             item
-            for item in state.validation_obligations.values()
-            if _command_matches_invocation(command, item.command)
+            for item in gate_state.obligations.values()
+            if item.expected_action == actual
         ),
         None,
     )
@@ -4879,14 +4974,14 @@ def _record_dynamic_validation_result(
     result = dict(event["result"])
     obligation.attempts += 1
     obligation.last_result = result
-    if _validation_result_passed(result):
+    if _validation_result_passed(result, step):
         obligation.status = "passed"
     else:
         obligation.status = "failed"
-        state.validation_gate_correction_required = True
+        gate_state.correction_required = True
         state.execution_context.append(
             "Validation failed for "
-            f"{obligation.tool_id}; apply the reported corrective action, then "
+            f"{obligation.obligation_id}; apply the reported corrective action, then "
             "rerun every discovered validation tool."
         )
 
@@ -4897,23 +4992,26 @@ def _reset_validation_gate_after_correction(
 ) -> None:
     if state.step_index >= len(state.selected_skill.skill.steps):
         return
-    if not _validation_gate_enabled(state.selected_skill.skill.steps[state.step_index]):
+    step = state.selected_skill.skill.steps[state.step_index]
+    if not _validation_gate_enabled(step):
         return
     if action.kind not in {"edit", "yaml_edit"}:
         return
-    if not state.validation_gate_correction_required:
+    gate_state = _validation_gate_state(state, step)
+    if not gate_state.correction_required:
         return
-    state.validation_gate_epoch += 1
-    state.validation_gate_correction_required = False
-    for obligation in state.validation_obligations.values():
-        obligation.epoch = state.validation_gate_epoch
+    gate_state.epoch += 1
+    gate_state.correction_required = False
+    for obligation in gate_state.obligations.values():
+        obligation.epoch = gate_state.epoch
         obligation.status = "pending"
         obligation.attempts = 0
         obligation.last_result = None
     state.execution_events.append(
         {
             "kind": "validation_gate_epoch",
-            "epoch": state.validation_gate_epoch,
+            "gate_id": _validation_gate_id(step),
+            "epoch": gate_state.epoch,
             "step_index": state.step_index,
             "reason": "correction_applied",
         }
@@ -4923,15 +5021,23 @@ def _reset_validation_gate_after_correction(
 def _validation_gate_prompt_data(
     state: _WorkflowExecutionState,
 ) -> dict[str, Any] | None:
-    if not state.validation_gate_discovered:
+    if state.step_index >= len(state.selected_skill.skill.steps):
         return None
-    incomplete = _validation_gate_incomplete(state)
+    step = state.selected_skill.skill.steps[state.step_index]
+    if not _validation_gate_enabled(step):
+        return None
+    gate_state = _validation_gate_state(state, step)
+    if not gate_state.discovered:
+        return {"gate_id": _validation_gate_id(step), "discovered": False}
+    incomplete = _validation_gate_incomplete(state, step)
     return {
-        "epoch": state.validation_gate_epoch,
-        "correction_required": state.validation_gate_correction_required,
-        "can_advance": not state.validation_gate_correction_required and not incomplete,
+        "gate_id": _validation_gate_id(step),
+        "discovered": True,
+        "epoch": gate_state.epoch,
+        "correction_required": gate_state.correction_required,
+        "can_advance": not gate_state.correction_required and not incomplete,
         "obligations": [
-            obligation.to_data() for obligation in state.validation_obligations.values()
+            obligation.to_data() for obligation in gate_state.obligations.values()
         ],
     }
 
@@ -5096,37 +5202,40 @@ def _validate_workflow_step_transition(
     if action.kind not in {"next_step", "goto_step", "complete"}:
         return
     if _validation_gate_enabled(step):
-        if state is None or not state.validation_gate_discovered:
+        gate_state = _validation_gate_state(state, step) if state is not None else None
+        if gate_state is None or not gate_state.discovered:
             raise _WorkflowToolValidationError(
                 ValidationError(
-                    code="validation_tools_not_discovered",
+                    code="validation_obligations_not_discovered",
                     message=(
-                        "Validation tools have not been discovered; the validation "
-                        "gate cannot be skipped."
+                        "Validation obligations have not been discovered; the "
+                        "validation gate cannot be skipped."
                     ),
                     path="kind",
                 )
             )
-        if state.validation_gate_correction_required:
+        if gate_state.correction_required:
             raise _WorkflowToolValidationError(
                 ValidationError(
                     code="validation_correction_required",
                     message=(
-                        "A validation tool failed. Apply corrective steps and "
-                        "rerun every discovered validation tool before advancing."
+                        "A validation obligation failed. Apply corrective steps "
+                        "and rerun every discovered obligation before advancing."
                     ),
                     path="kind",
                 )
             )
-        incomplete = _validation_gate_incomplete(state)
+        assert state is not None
+        incomplete = _validation_gate_incomplete(state, step)
         if incomplete:
             raise _WorkflowToolValidationError(
                 ValidationError(
                     code="validation_tools_incomplete",
                     message=(
-                        "Every discovered validation tool must pass before advancing. "
+                        "Every discovered validation obligation must pass before "
+                        "advancing. "
                         "Still pending: "
-                        + ", ".join(item.tool_id for item in incomplete)
+                        + ", ".join(item.obligation_id for item in incomplete)
                     ),
                     path="kind",
                 )
@@ -7498,7 +7607,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         allowed_actions.insert(0, "invoke_tool")
     if nested_skills:
         allowed_actions.insert(0, "invoke_skill")
-    if getattr(step, "validation_gate", None) == "all_discovered_tools":
+    if _validation_gate_enabled(step):
         allowed_actions = [
             "invoke_tool",
             "edit",
@@ -7571,9 +7680,11 @@ def _action_repair_prompt(
         if _validation_gate_enabled(current_step):
             prompt += (
                 "This step has a runtime validation gate. Never return next_step, "
-                "goto_step, or complete until every discovered validation tool has "
+                "goto_step, or complete until every discovered validation obligation "
+                "has "
                 "passed in the current epoch. After any correction, rerun every "
-                "discovered tool; the runtime validation_gate object is authoritative. "
+                "discovered obligation; the runtime validation_gate object is "
+                "authoritative. "
             )
         invocations = tuple(current_step.tool_invocations)
         if invocations:

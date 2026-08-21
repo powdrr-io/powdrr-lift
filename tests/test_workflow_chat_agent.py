@@ -87,6 +87,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execution_events_for_prompt,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
+    _latest_deterministic_pre_step,
     _latest_execution_event_for_prompt,
     _LLMExchangeRecordingClient,
     _load_workflow_context,
@@ -455,6 +456,7 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
 
     _run_deterministic_pre_step(
         step,
+        skill_name="filter",
         worktree_root=state.worktree_root,
         execution_events=state.execution_events,
         execution_context=state.execution_context,
@@ -464,6 +466,7 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
     )
     _run_deterministic_pre_step(
         step,
+        skill_name="filter",
         worktree_root=state.worktree_root,
         execution_events=state.execution_events,
         execution_context=state.execution_context,
@@ -475,6 +478,15 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
     assert len(state.execution_events) == 1
     event = state.execution_events[0]
     assert event["kind"] == "deterministic_pre_step"
+    assert event["skill_name"] == "filter"
+    assert (
+        _latest_deterministic_pre_step(
+            state.execution_events,
+            skill_name="different-skill",
+            step_index=0,
+        )
+        is None
+    )
     assert event["template"]["feature_id"] == "display-related-photos"
     assert event["result"]["matches"]
 

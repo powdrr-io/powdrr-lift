@@ -660,6 +660,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.current_step.step_type == "gather_context_and_filter":
                 _run_deterministic_pre_step(
                     self.current_step,
+                    skill_name=self.selected_skill.skill.name,
                     worktree_root=self.state.worktree_root,
                     execution_events=self.state.execution_events,
                     execution_context=self.state.execution_context,
@@ -2912,11 +2913,15 @@ _PRE_STEP_PLACEHOLDER = re.compile(r"<([^<>]+)>")
 
 
 def _latest_deterministic_pre_step(
-    execution_events: Sequence[Mapping[str, Any]], step_index: int
+    execution_events: Sequence[Mapping[str, Any]],
+    *,
+    skill_name: str,
+    step_index: int,
 ) -> Mapping[str, Any] | None:
     for event in reversed(execution_events):
         if (
             event.get("kind") == "deterministic_pre_step"
+            and event.get("skill_name") == skill_name
             and event.get("step_index") == step_index
         ):
             return event
@@ -2992,6 +2997,7 @@ def _resolve_pre_step_template(
 def _run_deterministic_pre_step(
     step: Any,
     *,
+    skill_name: str,
     worktree_root: Path,
     execution_events: list[dict[str, Any]],
     execution_context: list[str],
@@ -2999,7 +3005,11 @@ def _run_deterministic_pre_step(
     step_index: int,
     workflow_context: WorkflowContext | None,
 ) -> None:
-    if _latest_deterministic_pre_step(execution_events, step_index):
+    if _latest_deterministic_pre_step(
+        execution_events,
+        skill_name=skill_name,
+        step_index=step_index,
+    ):
         return
     pre_step = step.pre_step
     if pre_step is None or pre_step.action != "gather_context":
@@ -3039,6 +3049,7 @@ def _run_deterministic_pre_step(
     result = json.loads(render_gather_context_report(gathered_context))
     event = {
         "kind": "deterministic_pre_step",
+        "skill_name": skill_name,
         "step_type": step.step_type,
         "action": pre_step.action,
         "template": template,
@@ -3155,7 +3166,9 @@ def _build_step_execution_messages(
             for entry in catalog
         ]
     pre_step_event = _latest_deterministic_pre_step(
-        execution_events, current_step_index
+        execution_events,
+        skill_name=selected_skill.skill.name,
+        step_index=current_step_index,
     )
     if pre_step_event is not None:
         prompt_data["deterministic_pre_step"] = {

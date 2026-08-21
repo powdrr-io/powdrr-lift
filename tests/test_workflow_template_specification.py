@@ -310,13 +310,14 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[0].input_state["feature_id"] == "<work-item-name>"
     assert template.task_templates[0].llm_type == "long_context"
     assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
-    assert "gather_context action" in (template.task_templates[0].details or "")
+    assert template.task_templates[0].step_type == "gather_context_and_filter"
+    assert template.task_templates[0].pre_step is not None
+    assert template.task_templates[0].pre_step.action == "gather_context"
+    assert "gather_context result" in (template.task_templates[0].details or "")
     assert "input_state.feature_id" in (template.task_templates[0].details or "")
     assert "input_state.proposed_pr" in (template.task_templates[0].details or "")
     assert "<work-item-name>" not in (template.task_templates[0].details or "")
     assert "<proposed-pr-id>" not in (template.task_templates[0].details or "")
-    assert "feature_id value" in (template.task_templates[0].details or "")
-    assert "scopes proposal discovery" in (template.task_templates[0].details or "")
     report = build_workflow_template_validation_report(template.to_json())
     assert report.validation_successful is True
     assert report.issues == []

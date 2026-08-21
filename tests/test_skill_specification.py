@@ -120,7 +120,12 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             "steps" if path.parent.name == "skill-definitions" else "task_templates"
         )
         for index, step in enumerate(document[step_key]):
-            assert step["step_type"] == "freeform-skill-invoke", (
+            expected_step_type = (
+                "gather_context_and_filter"
+                if path.name == "execute-proposed-pr.yaml" and index == 0
+                else "freeform-skill-invoke"
+            )
+            assert step["step_type"] == expected_step_type, (
                 f"{path}:{step_key}[{index}]"
             )
             if "prompt_catalogs" in step:

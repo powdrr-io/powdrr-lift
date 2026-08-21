@@ -1780,6 +1780,7 @@ def _run_skill_for_agent(
         if step.step_type == "gather_context_and_filter":
             _run_deterministic_pre_step(
                 step,
+                skill_name=current_skill.skill.name,
                 worktree_root=repo_root,
                 execution_events=execution_events,
                 execution_context=execution_context,

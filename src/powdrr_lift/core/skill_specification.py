@@ -102,13 +102,11 @@ class SkillStepOutput:
 class SkillStepPreStep:
     action: str
     template: Mapping[str, Any]
-    instructions: str
 
     def to_data(self) -> dict[str, Any]:
         return {
             "action": self.action,
             "template": dict(self.template),
-            "instructions": self.instructions,
         }
 
 
@@ -1217,11 +1215,9 @@ def _parse_pre_step(value: object) -> SkillStepPreStep | None:
         raise ValueError(
             "Gather context templates must include a non-empty types array."
         )
-    instructions = _required_string(value, "instructions")
     return SkillStepPreStep(
         action=action,
         template=dict(template),
-        instructions=instructions,
     )
 
 
@@ -1340,7 +1336,7 @@ def _validate_gather_context_pre_step(
         return
     _validate_unknown_keys(
         value,
-        {"action", "template", "instructions"},
+        {"action", "template"},
         issues,
         path=pre_step_path or "",
         subject="skill step pre_step",
@@ -1352,18 +1348,6 @@ def _validate_gather_context_pre_step(
                 code="invalid_pre_step_action",
                 message="Skill step pre_step action must be gather_context.",
                 path=_child_path(pre_step_path, "action"),
-            )
-        )
-    instructions = _optional_string(value.get("instructions"))
-    if instructions is None:
-        issues.append(
-            SkillValidationIssue(
-                code="missing_pre_step_instructions",
-                message=(
-                    "Skill step pre_step must include non-empty instructions for "
-                    "interpreting the gathered result."
-                ),
-                path=_child_path(pre_step_path, "instructions"),
             )
         )
     template = value.get("template")

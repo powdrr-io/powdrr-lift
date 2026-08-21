@@ -423,10 +423,6 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
                 "types": ["requirements"],
                 "keywords": ["selected"],
             },
-            instructions=(
-                "Keep only matches whose description states that the requirement "
-                "should be retained. Assign them to filtered_requirements."
-            ),
         ),
         outputs=(
             SkillStepOutput(
@@ -504,7 +500,8 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
             catalog=(state.selected_skill,),
         )[1]["content"]
     )
-    assert prompt["deterministic_pre_step"]["instructions"].startswith("Keep only")
+    assert "instructions" not in prompt["deterministic_pre_step"]
+    assert "details" in prompt["current_step"]
     assert prompt["deterministic_pre_step"]["result"]["matches"]
 
 

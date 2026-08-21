@@ -3053,7 +3053,6 @@ def _run_deterministic_pre_step(
         "step_type": step.step_type,
         "action": pre_step.action,
         "template": template,
-        "instructions": pre_step.instructions,
         "result": result,
         "step_index": step_index,
     }
@@ -3174,7 +3173,6 @@ def _build_step_execution_messages(
         prompt_data["deterministic_pre_step"] = {
             "action": pre_step_event["action"],
             "template": pre_step_event["template"],
-            "instructions": pre_step_event["instructions"],
             "result": pre_step_event["result"],
         }
     return [
@@ -3416,7 +3414,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "Use complete when the skill is finished.\n"
         "For gather_context_and_filter steps, the deterministic gather_context "
         "pre-step already ran. Do not gather again; evaluate its result using the "
-        "pre-step instructions and assign filtered or summarized values to the "
+        "current step details and assign filtered or summarized values to the "
         "declared outputs before choosing next_step or complete.\n"
         "Always include decisions_and_context with the concise information "
         "future steps will need. Keep it to one short sentence explaining why "
@@ -3476,7 +3474,8 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         prompt += (
             "Deterministic pre-step guidance: gather_context has already run using "
             "the resolved pre_step template. Do not invoke gather_context again. "
-            "Evaluate deterministic_pre_step.result according to its instructions, "
+            "Evaluate deterministic_pre_step.result according to the current step "
+            "details, "
             "then put the filtered or summarized values in outputs using exactly "
             "the declared output names before choosing next_step or complete.\n"
         )

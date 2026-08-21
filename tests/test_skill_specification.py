@@ -236,7 +236,6 @@ def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
                                 "feature_id": "<feature-id>",
                                 "types": ["requirements"],
                             },
-                            "instructions": "Keep matching requirements.",
                         },
                         "outputs": [
                             {

@@ -56,8 +56,10 @@ steps:
     `next_step` immediately; do not invoke `repository-state` again unless a
     file or staging state changed after the first check. Do not create or
     update the pull request in this skill.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - repository-state

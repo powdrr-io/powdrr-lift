@@ -18,13 +18,15 @@ steps:
   details: >-
     Invoke the declared system-specification tool exactly once. Pass its generated
     file to the next step for completion; do not edit the file in this step.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - system-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - system-specification
+      - "--work-item-name"
+      - "<work-item-name>"
 - description: Fill out the requirements and approach sections with concise, testable
     statements.
   step_type: freeform-skill-invoke

@@ -1978,6 +1978,9 @@ def _run_skill_for_agent(
                 handoff_records=handoff_records,
                 step_index=step_index,
                 workflow_context=None,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=False,
             )
         messages = _build_step_execution_messages(
             selected_skill=current_skill,

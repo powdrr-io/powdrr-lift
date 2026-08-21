@@ -19,15 +19,17 @@ steps:
     Invoke the declared architecture-specification tool exactly once with the full
     allowed entity type set. Pass its generated file to the next step; do not edit
     the file in this step.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - architecture-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+      - "--entity-type"
+      - "<type>"
 - description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
   step_type: freeform-skill-invoke

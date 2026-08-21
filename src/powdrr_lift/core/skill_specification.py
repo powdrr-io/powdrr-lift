@@ -499,28 +499,24 @@ def build_skill_validation_report(
             elif normalized_step_type == "invoke_tool" and isinstance(
                 pre_step, Mapping
             ):
-                _validate_gather_context_pre_step(
-                    pre_step,
-                    step_path,
-                    issues,
-                )
-                outputs = step_mapping.get("outputs")
-                if (
-                    not isinstance(outputs, Sequence)
-                    or isinstance(outputs, (str, bytes, bytearray))
-                    or not outputs
-                ):
-                    issues.append(
-                        SkillValidationIssue(
-                            code="missing_pre_step_outputs",
-                            message=(
-                                "invoke_tool steps with a pre_step must declare "
-                                "at least "
-                                "one output."
-                            ),
-                            path=_child_path(step_path, "outputs"),
+                _validate_gather_context_pre_step(pre_step, step_path, issues)
+                if pre_step.get("action") == "gather_context":
+                    outputs = step_mapping.get("outputs")
+                    if (
+                        not isinstance(outputs, Sequence)
+                        or isinstance(outputs, (str, bytes, bytearray))
+                        or not outputs
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="missing_pre_step_outputs",
+                                message=(
+                                    "gather_context invoke_tool steps must declare "
+                                    "at least one output."
+                                ),
+                                path=_child_path(step_path, "outputs"),
+                            )
                         )
-                    )
             elif pre_step is not None:
                 issues.append(
                     SkillValidationIssue(
@@ -533,28 +529,23 @@ def build_skill_validation_report(
             raw_tool_invocations = step_mapping.get("tool_invocations")
             if normalized_step_type == "invoke_tool":
                 if pre_step is None:
-                    if (
-                        not isinstance(raw_tool_invocations, Sequence)
-                        or isinstance(raw_tool_invocations, (str, bytes, bytearray))
-                        or len(raw_tool_invocations) != 1
-                    ):
-                        issues.append(
-                            SkillValidationIssue(
-                                code="invalid_invoke_tool_invocations",
-                                message=(
-                                    "invoke_tool steps without pre_step must declare "
-                                    "exactly one tool_invocation."
-                                ),
-                                path=_child_path(step_path, "tool_invocations"),
-                            )
-                        )
-                elif raw_tool_invocations:
                     issues.append(
                         SkillValidationIssue(
-                            code="conflicting_invoke_tool_sources",
+                            code="missing_pre_step",
                             message=(
-                                "invoke_tool steps may declare either pre_step or "
-                                "tool_invocations, not both."
+                                "invoke_tool steps must declare an invoke_tool or "
+                                "gather_context pre_step."
+                            ),
+                            path=_child_path(step_path, "pre_step"),
+                        )
+                    )
+                if raw_tool_invocations:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="unexpected_tool_invocations",
+                            message=(
+                                "invoke_tool steps must use pre_step instead of "
+                                "tool_invocations."
                             ),
                             path=_child_path(step_path, "tool_invocations"),
                         )
@@ -1200,15 +1191,14 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     pre_step = _parse_pre_step(data.get("pre_step"))
     if step_type == "invoke_tool":
-        if pre_step is not None and tool_invocations:
+        if pre_step is None:
             raise ValueError(
-                "invoke_tool steps may declare either pre_step or tool_invocations, "
-                "not both."
+                "invoke_tool steps must declare an invoke_tool or gather_context "
+                "pre_step."
             )
-        if pre_step is None and len(tool_invocations) != 1:
+        if tool_invocations:
             raise ValueError(
-                "invoke_tool steps without pre_step must declare exactly one "
-                "tool_invocation."
+                "invoke_tool steps must use pre_step instead of tool_invocations."
             )
     if step_type == "freeform-skill-invoke" and pre_step is not None:
         raise ValueError("Only invoke_tool steps may declare pre_step.")
@@ -1235,11 +1225,16 @@ def _parse_pre_step(value: object) -> SkillStepPreStep | None:
     if not isinstance(value, Mapping):
         raise ValueError("Skill step pre_step must be an object.")
     action = _required_string(value, "action")
-    if action != "gather_context":
-        raise ValueError("Skill step pre_step action must be gather_context.")
+    if action not in {"gather_context", "invoke_tool"}:
+        raise ValueError(
+            "Skill step pre_step action must be gather_context or invoke_tool."
+        )
     template = value.get("template")
     if not isinstance(template, Mapping):
         raise ValueError("Skill step pre_step template must be an object.")
+    if action == "invoke_tool":
+        _parse_tool_invocation(template)
+        return SkillStepPreStep(action=action, template=dict(template))
     feature_id = _optional_string(template.get("feature_id"))
     if feature_id is None:
         raise ValueError("Gather context templates must include feature_id.")
@@ -1379,14 +1374,76 @@ def _validate_gather_context_pre_step(
         subject="skill step pre_step",
     )
     action = _optional_string(value.get("action"))
-    if action != "gather_context":
+    if action not in {"gather_context", "invoke_tool"}:
         issues.append(
             SkillValidationIssue(
                 code="invalid_pre_step_action",
-                message="Skill step pre_step action must be gather_context.",
+                message=(
+                    "Skill step pre_step action must be gather_context or invoke_tool."
+                ),
                 path=_child_path(pre_step_path, "action"),
             )
         )
+    if action == "invoke_tool":
+        template = value.get("template")
+        if not isinstance(template, Mapping):
+            issues.append(
+                SkillValidationIssue(
+                    code="invalid_pre_step_template",
+                    message="Invoke tool pre-steps must include a template object.",
+                    path=_child_path(pre_step_path, "template"),
+                )
+            )
+            return
+        _validate_unknown_keys(
+            template,
+            {"tool", "command", "cwd", "env"},
+            issues,
+            path=_child_path(pre_step_path, "template") or "",
+            subject="invoke_tool pre-step template",
+        )
+        tool = _optional_string(template.get("tool"))
+        if tool is None or tool not in SUPPORTED_SKILL_TOOL_TYPES - {"ref"}:
+            issues.append(
+                SkillValidationIssue(
+                    code="invalid_pre_step_tool",
+                    message=(
+                        "Invoke tool pre-steps must use a supported executable tool."
+                    ),
+                    path=_child_path(_child_path(pre_step_path, "template"), "tool"),
+                )
+            )
+        command = template.get("command")
+        if (
+            not isinstance(command, Sequence)
+            or isinstance(command, (str, bytes, bytearray))
+            or not command
+            or any(_optional_string(item) is None for item in command)
+        ):
+            issues.append(
+                SkillValidationIssue(
+                    code="invalid_pre_step_command",
+                    message=(
+                        "Invoke tool pre-step templates must include a non-empty "
+                        "command array."
+                    ),
+                    path=_child_path(_child_path(pre_step_path, "template"), "command"),
+                )
+            )
+        if tool == "internal" and (
+            not isinstance(command, Sequence)
+            or isinstance(command, (str, bytes, bytearray))
+            or not command
+            or command[0] != "powdrr-lift"
+        ):
+            issues.append(
+                SkillValidationIssue(
+                    code="invalid_internal_command",
+                    message="Internal pre-step commands must invoke powdrr-lift.",
+                    path=_child_path(_child_path(pre_step_path, "template"), "command"),
+                )
+            )
+        return
     template = value.get("template")
     if not isinstance(template, Mapping):
         issues.append(

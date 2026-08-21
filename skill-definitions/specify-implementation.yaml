@@ -19,13 +19,15 @@ steps:
     Invoke the declared implementation-specification tool exactly once. Pass its
     generated file to the next step for completion; do not edit the file in this
     step.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - implementation-specification
+      - "--work-item-name"
+      - "<work-item-name>"
 - description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
   step_type: freeform-skill-invoke

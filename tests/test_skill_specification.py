@@ -261,7 +261,7 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
     assert report.validation_successful is True
 
 
-def test_skill_validation_rejects_invoke_tool_without_exactly_one_tool() -> None:
+def test_skill_validation_rejects_invoke_tool_without_pre_step() -> None:
     report = build_skill_validation_report(
         yaml.safe_dump(
             {
@@ -279,9 +279,7 @@ def test_skill_validation_rejects_invoke_tool_without_exactly_one_tool() -> None
     )
 
     assert report.validation_successful is False
-    assert [issue.code for issue in report.issues] == [
-        "invalid_invoke_tool_invocations"
-    ]
+    assert [issue.code for issue in report.issues] == ["missing_pre_step"]
 
 
 def test_skill_validation_rejects_unknown_step_type() -> None:
@@ -648,12 +646,14 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "Create a draft pull request when none exists.",
         "Update the existing pull request.",
     ]
-    assert skill.steps[0].tool_invocations[0].command == (
+    assert skill.steps[0].pre_step is not None
+    assert skill.steps[0].pre_step.action == "invoke_tool"
+    assert skill.steps[0].pre_step.template["command"] == [
         "powdrr-lift",
         "pull-request-description",
         "--kind",
         "<pr-kind>",
-    )
+    ]
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()
     assert "files_to_publish" in (skill.steps[2].details or "")
@@ -779,6 +779,8 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
         for invocation in skill.steps[0].tool_invocations
     ][:1] == [("ref", "pr-prep")]
     assert skill.steps[1].tool_invocations == ()
+    assert skill.steps[2].pre_step is not None
+    assert skill.steps[2].pre_step.action == "invoke_tool"
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:

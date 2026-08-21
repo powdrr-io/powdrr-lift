@@ -11,13 +11,15 @@ steps:
     Keep the returned template in workflow context for the next step. Do not
     print the template, its sections, or a draft body to the chat or status
     window. Preserve the current branch and existing pull request context.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - pull-request-description
-    - --kind
-    - <pr-kind>
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - pull-request-description
+      - --kind
+      - <pr-kind>
 - description: Fill in the pull request description template.
   step_type: freeform-skill-invoke
   llm_type: high_reasoning

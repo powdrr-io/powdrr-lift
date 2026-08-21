@@ -525,35 +525,26 @@ def build_workflow_template_validation_report(
             )
         pre_step = raw_task_template_mapping.get("pre_step")
         if step_type == "invoke_tool" and not isinstance(pre_step, Mapping):
-            tool_invocations = raw_task_template_mapping.get("tool_invocations")
-            if (
-                not isinstance(tool_invocations, Sequence)
-                or isinstance(tool_invocations, (str, bytes, bytearray))
-                or len(tool_invocations) != 1
-            ):
-                issues.append(
-                    WorkflowTemplateValidationIssue(
-                        code="invalid_invoke_tool_invocations",
-                        message=(
-                            "invoke_tool task templates without pre_step must "
-                            "declare exactly one tool_invocation."
-                        ),
-                        path=_child_path(task_template_path, "tool_invocations"),
-                    )
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="missing_pre_step",
+                    message="invoke_tool task templates must declare a pre_step.",
+                    path=_child_path(task_template_path, "pre_step"),
                 )
-        elif step_type == "invoke_tool" and isinstance(pre_step, Mapping):
-            tool_invocations = raw_task_template_mapping.get("tool_invocations")
-            if tool_invocations:
-                issues.append(
-                    WorkflowTemplateValidationIssue(
-                        code="conflicting_invoke_tool_sources",
-                        message=(
-                            "invoke_tool task templates may declare either pre_step "
-                            "or tool_invocations, not both."
-                        ),
-                        path=_child_path(task_template_path, "tool_invocations"),
-                    )
+            )
+        elif step_type == "invoke_tool" and raw_task_template_mapping.get(
+            "tool_invocations"
+        ):
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="unexpected_tool_invocations",
+                    message=(
+                        "invoke_tool task templates must use pre_step instead of "
+                        "tool_invocations."
+                    ),
+                    path=_child_path(task_template_path, "tool_invocations"),
                 )
+            )
         elif step_type == "freeform-skill-invoke" and pre_step is not None:
             issues.append(
                 WorkflowTemplateValidationIssue(

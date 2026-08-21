@@ -3569,6 +3569,8 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         "action that makes progress without asking for information already present.\n"
         "Return exactly one JSON action. Include decisions_and_context when a later "
         "step needs it, and include outputs using the declared names.\n"
+        "prompt_user is always allowed when a specific human decision or fact is "
+        "needed; it requires one clear English question ending in '?'.\n"
         "Use goto_step only with a declared step id and include the progress requiring "
         "another pass. Use next_step when the current details are complete and "
         "complete when the skill is finished.\n"
@@ -3587,7 +3589,6 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             f"{context_type_lines}\n"
             'Example: {"kind":"gather_context","feature_id":"display-related-photos",'
             '"types":["requirements"],"keywords":["photo"]}.\n'
-            "prompt_user requires one clear English question ending in '?'.\n"
         )
     if include_skills:
         prompt += (

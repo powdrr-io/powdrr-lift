@@ -313,7 +313,9 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[0].step_type == "gather_context_and_filter"
     assert template.task_templates[0].pre_step is not None
     assert template.task_templates[0].pre_step.action == "gather_context"
-    assert "gather_context result" in (template.task_templates[0].details or "")
+    assert "deterministic gathered context" in (
+        template.task_templates[0].details or ""
+    )
     assert "input_state.feature_id" in (template.task_templates[0].details or "")
     assert "input_state.proposed_pr" in (template.task_templates[0].details or "")
     assert "<work-item-name>" not in (template.task_templates[0].details or "")

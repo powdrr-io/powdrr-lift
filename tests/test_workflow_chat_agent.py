@@ -500,9 +500,12 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
             catalog=(state.selected_skill,),
         )[1]["content"]
     )
-    assert "instructions" not in prompt["deterministic_pre_step"]
+    assert prompt["deterministic_context"]["source"] == "gather_context"
+    assert prompt["deterministic_context"]["scope"]["feature_id"] == (
+        "display-related-photos"
+    )
     assert "details" in prompt["current_step"]
-    assert prompt["deterministic_pre_step"]["result"]["matches"]
+    assert prompt["deterministic_context"]["result"]["matches"]
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(

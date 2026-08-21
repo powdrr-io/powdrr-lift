@@ -40,9 +40,10 @@ task_templates:
       - risks
       - decisions
   details: >-
-    Evaluate the deterministic gather_context result. Use input_state.feature_id
-    as the proposal directory scope and input_state.proposed_pr to filter the
-    returned proposed_prs matches and identify the canonical proposed PR. Then
+    Use the deterministic gathered context as the input for this step. Treat
+    input_state.feature_id as the proposal directory scope and
+    input_state.proposed_pr as the candidate to filter against the returned
+    proposed_prs matches and identify the canonical proposed PR. Then
     summarize its goals, scope, acceptance criteria, tests, dependencies, risks,
     and related requirements into the declared task output. If the candidate is
     a workflow label, resolve it to the canonical proposed PR id from the

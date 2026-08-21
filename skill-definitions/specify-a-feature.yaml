@@ -11,7 +11,16 @@ steps:
 - description: Generate the system template and fill it out.
   step_type: freeform-skill-invoke
   llm_type: simple_task
-  details: Fill the system template before review.
+  details: >-
+    First invoke the declared system-specification command successfully. Then
+    fill the generated YAML using one or more yaml_edit actions; never use edit
+    or invoke_tool to rewrite the YAML file. The yaml_edit action must contain
+    an operations array. Use set_value with a JSON array of mapping keys, such
+    as ["title"] or ["id"], never a JSON-pointer string such as "/title".
+    Use one upsert_item operation per requirement or approach item, with the
+    section name, item id, and complete value mapping. Do not replace an entire
+    list section with set_value. After the structural edits succeed, continue
+    to the review step.
   tool_invocations:
   - tool: internal
     command:

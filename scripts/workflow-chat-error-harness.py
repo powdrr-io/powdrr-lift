@@ -149,7 +149,11 @@ def main() -> int:
         str(args.max_turns),
         *args.workflow_arg,
     ]
-    answers = args.answer or [DEFAULT_ANSWER]
+    # A workflow may ask more than one follow-up question while repairing a
+    # specification. Keep the default harness input available for every turn so
+    # an unexpected prompt is captured in the transcript instead of terminating
+    # the child with EOFError. Explicit answers remain a finite caller contract.
+    answers = args.answer or [DEFAULT_ANSWER] * args.max_turns
     process = subprocess.Popen(
         command,
         cwd=repo_root,

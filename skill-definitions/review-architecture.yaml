@@ -9,8 +9,11 @@ steps:
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
-  details: Use the architecture context to understand the current model before judging
-    whether it needs to change.
+  details: >-
+    Use gather_context with exactly the types entities, entity-relationships,
+    invariants, and guidance to understand the current architecture model before
+    judging whether it needs to change. Do not use architecture or relationships
+    as context types; those are not valid catalog tokens.
 - description: Decide whether the current architecture specification needs to change.
   step_type: freeform
   llm_type: high_reasoning
@@ -33,8 +36,7 @@ steps:
       - architecture-specification
       - "--work-item-name"
       - "<work-item-name>"
-      - "--entity-type"
-      - "<type>"
+      - "--all-entity-types"
 - id: fill-architecture
   description: Fill the architecture specification with the required updates.
   step_type: freeform
@@ -62,7 +64,9 @@ steps:
   llm_type: fast_iteration
   details: >-
     Use yaml_edit actions to fix every issue reported by evaluation. If there
-    are no issues, choose next_step without changing the file.
+    are no issues, choose next_step without changing the file. Do not use
+    invoke_tool in this freeform repair step; the next deterministic step reruns
+    the evaluator.
 - id: gate-architecture
   description: Confirm that architecture evaluation reports zero issues.
   step_type: gate

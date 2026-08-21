@@ -3936,6 +3936,10 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "narrow results and filters for exact fields; never use "
             "filters.work_item_name. Supported context types:\n"
             f"{context_type_lines}\n"
+            "Use the exact token entity-relationships when requesting entity "
+            "relationships; do not abbreviate it as relationships. Architecture "
+            "context is requested with entities, entity-relationships, invariants, "
+            "and guidance; do not use architecture as a context type.\n"
             'Example: {"action":"gather_context","feature_id":"display-related-photos",'
             '"types":["requirements"],"keywords":["photo"]}.\n'
         )
@@ -4021,7 +4025,10 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         "operation is exactly "
         '{"op":"upsert_item","section":"requirements","id":"req-1",'
         '"value":{"description":"...","state":"added"}}. Do not omit '
-        "path, section, id, or value. The only supported operation names are "
+        "path, section, id, or value. A set_value path must be a non-empty array "
+        "of mapping keys and non-negative list indexes; use upsert_item with the "
+        "section, existing-or-new item id, and complete mapping when replacing a "
+        "whole list item. The only supported operation names are "
         "set_value, upsert_item, and remove_item; never use remove or replace. "
         "Use remove_item only for an existing item id from the current document. "
         "Template comments and boilerplate disappear when a valid yaml_edit "
@@ -5776,17 +5783,21 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
                 (str, bytes, bytearray),
             )
             or not raw_path
-            or not all(isinstance(item, str) and item.strip() for item in raw_path)
+            or not all(
+                (isinstance(item, str) and item.strip())
+                or (isinstance(item, int) and not isinstance(item, bool) and item >= 0)
+                for item in raw_path
+            )
         ):
             raise RuntimeError(
                 "yaml_edit set_value requires a non-empty path array of mapping "
-                'keys, for example ["title"].'
+                'keys or non-negative list indexes, for example ["title"].'
             )
         if "value" not in value:
             raise RuntimeError("yaml_edit set_value requires value.")
         return SkillChatYamlOperation(
             operation=operation,
-            path=tuple(item.strip() for item in raw_path),
+            path=tuple(str(item).strip() for item in raw_path),
             value=value["value"],
         )
 

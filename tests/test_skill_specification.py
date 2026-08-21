@@ -1125,8 +1125,11 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "Confirm that architecture evaluation reports zero issues.",
     ]
     assert skill.steps[0].details == (
-        "Use the architecture context to understand the current model before "
-        "judging whether it needs to change."
+        "Use gather_context with exactly the types entities, "
+        "entity-relationships, invariants, and guidance to understand the "
+        "current architecture model before judging whether it needs to change. "
+        "Do not use architecture or relationships as context types; those are "
+        "not valid catalog tokens."
     )
     assert skill.steps[1].details == (
         "Compare the gathered entity model against the new needs. If the "
@@ -1135,13 +1138,13 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "architecture covers the new needs.\"}; otherwise choose next_step to "
         "generate and fill an update."
     )
+    assert "Do not use invoke_tool" in (skill.steps[5].details or "")
     assert tuple(skill.steps[2].pre_step.template["command"]) == (
         "powdrr-lift",
         "architecture-specification",
         "--work-item-name",
         "<work-item-name>",
-        "--entity-type",
-        "<type>",
+        "--all-entity-types",
     )
     assert tuple(skill.steps[4].pre_step.template["command"]) == (
         "powdrr-lift",

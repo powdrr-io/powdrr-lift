@@ -103,7 +103,11 @@ steps:
 - description: Decide on proposed PRs and fill each template.
   step_type: freeform
   llm_type: high_reasoning
-  details: Fill PR templates with intent, criteria, tests, and risks.
+  details: >-
+    Invoke the declared pr-specification generator once, then fill its generated
+    template with intent, criteria, tests, and risks. Do not invoke evaluate in
+    this step; after the YAML edit choose next_step and let the later deterministic
+    evaluation step validate the specification.
   tool_invocations:
   - tool: internal
     command:
@@ -136,7 +140,7 @@ steps:
     yaml_edit. Each action must include the YAML file_path and a non-empty
     operations array. Use set_value with a JSON path array for scalar changes and
     upsert_item with section, id, and a complete value mapping for list entries.
-    For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid.
+    For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not use gather_context or invoke_tool in this repair step; the evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use read_document, then apply yaml_edit without guessing.
 - id: gate-feature-specifications
   description: Confirm that every generated specification evaluates cleanly.
   step_type: gate

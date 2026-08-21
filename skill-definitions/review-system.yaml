@@ -65,7 +65,9 @@ steps:
     set_value, upsert_item, and remove_item operations; never use remove or
     replace. Use remove_item only for an existing item id from the current
     document. Template comments and boilerplate are removed as a side effect of
-    any valid yaml_edit rewrite; do not treat comments as list items.
+    any valid yaml_edit rewrite; do not treat comments as list items. Do not use
+    invoke_tool in this freeform repair step; the next deterministic step reruns
+    the evaluator.
 - id: gate-system
   description: Confirm that system evaluation reports zero issues.
   step_type: gate

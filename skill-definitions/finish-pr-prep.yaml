@@ -51,8 +51,17 @@ steps:
     Choose next_step after the gather_context result is returned; that result
     seeds both the validation tools shown to the next step and its runtime
     obligations.
+  outputs:
+  - name: validation_tools
+    type: any
+    required_for_next_step: true
 - description: Run the final formatting, lint, type-check, and test passes.
   step_type: freeform
+  inputs:
+  - name: validation_tools
+    type: any
+    required: true
+    source: previous_step
   validation_gate:
     id: pr-prep-validation
     discovery:
@@ -61,6 +70,7 @@ steps:
         types:
         - tools
       filters_from_action: true
+      discovery_output: validation_tools
       result_path: matches
     obligations:
       source: matches
@@ -74,10 +84,10 @@ steps:
     the staged pull-request scope. The runtime validation gate is authoritative:
     First perform the filtered gather_context discovery action exactly once,
     using types [tools] and labels containing pr-prep plus the language labels
-    derived from the staged files. The discovery result supplies both
-    discovered_tools, which are the only validation actions to invoke, and the
-    matching runtime obligations. Only after that discovery succeeds may you
-    invoke its returned discovered_tools.
+    derived from the staged files. Use the required validation_tools handoff
+    input as the only validation actions to invoke. The same discovery result
+    seeds the matching runtime obligations, so every action in validation_tools
+    must pass before this step can advance.
     invoke every discovered obligation and do not choose next_step, goto_step, or
     complete until all obligations pass in the current validation epoch. If any
     obligation fails, apply its corrective action, then rerun every discovered

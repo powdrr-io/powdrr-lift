@@ -4908,6 +4908,24 @@ def _discover_validation_obligations(
     gate_state.discovery_action = (
         dict(discovery_action) if discovery_action is not None else None
     )
+    output_name = discovery.get("discovery_output")
+    if isinstance(output_name, str) and output_name.strip():
+        state.handoff_records[output_name.strip()] = {
+            "name": output_name.strip(),
+            "type": "any",
+            "value": [
+                {
+                    "obligation_id": obligation.obligation_id,
+                    "action": dict(obligation.expected_action),
+                }
+                for obligation in obligations.values()
+            ],
+            "produced_by": {
+                "step_index": state.step_index,
+                "action": "gather_context",
+            },
+            "scope": "skill",
+        }
 
 
 def _register_validation_gate_discovery(

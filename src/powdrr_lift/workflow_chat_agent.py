@@ -746,6 +746,24 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stderr=self.stderr,
                     verbose=self.config.verbose,
                 )
+                pre_step_event = _latest_deterministic_pre_step(
+                    self.state.execution_events,
+                    skill_name=self.selected_skill.skill.name,
+                    step_index=self.state.step_index,
+                )
+                pre_step_template = (
+                    pre_step_event.get("template")
+                    if pre_step_event is not None
+                    else None
+                )
+                generated_file_path = _resolve_generated_file_path_from_command(
+                    pre_step_template.get("command")
+                    if isinstance(pre_step_template, Mapping)
+                    else None,
+                    worktree_root=self.state.worktree_root,
+                )
+                if generated_file_path is not None:
+                    self.state.current_file_path = generated_file_path
             step_mapping = (
                 _resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,

@@ -140,13 +140,14 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
-                ("specify-a-feature.yaml", 7),
+                ("specify-a-feature.yaml", 6),
+                ("specify-a-feature.yaml", 8),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
-                ("specify-a-feature.yaml", 9),
+                ("specify-a-feature.yaml", 10),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
             }
@@ -540,7 +541,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Generate the architecture template and fill it out.",
         "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
-        "Decide on proposed PRs and fill each template.",
+        "Generate the proposed PR specification template.",
+        "Fill the proposed PR specification template.",
         (
             "Deterministically evaluate every generated specification before "
             "implementation."
@@ -580,14 +582,14 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert "choose `next_step` immediately" in (skill.steps[2].details or "")
     assert "choose `next_step` immediately" in (skill.steps[4].details or "")
     assert "invoke its validator once" in (skill.steps[5].details or "")
-    assert skill.steps[7].pre_step is not None
-    assert skill.steps[7].pre_step.template["command"] == [
+    assert skill.steps[8].pre_step is not None
+    assert skill.steps[8].pre_step.template["command"] == [
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<work-item-name>",
     ]
-    assert skill.steps[9].gate is not None
-    assert skill.steps[9].gate.goto_step == "evaluate-feature-specifications"
+    assert skill.steps[10].gate is not None
+    assert skill.steps[10].gate.goto_step == "evaluate-feature-specifications"
     assert skill.steps[4].tool_invocations[0].command == (
         "powdrr-lift",
         "evaluate",
@@ -599,20 +601,23 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     )
-    assert skill.steps[6].tool_invocations[0].command == (
+    assert skill.steps[6].pre_step is not None
+    assert skill.steps[6].pre_step.template["command"] == [
         "powdrr-lift",
         "pr-specification",
         "--work-item-name",
         "<work-item-name>",
-    )
-    assert [invocation.command for invocation in skill.steps[10].tool_invocations] == [
+    ]
+    assert skill.steps[7].tool_invocations == ()
+    assert skill.steps[8].tool_invocations == ()
+    assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
         ("powdrr-lift", "repository-state"),
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
-    assert skill.steps[11].uses_skills == ("finish-pr-prep",)
-    assert "invoke_skill" in (skill.steps[11].details or "")
-    assert "create-pull-request" in (skill.steps[12].details or "")
-    assert skill.steps[12].uses_skills == ("create-pull-request",)
+    assert skill.steps[12].uses_skills == ("finish-pr-prep",)
+    assert "invoke_skill" in (skill.steps[12].details or "")
+    assert "create-pull-request" in (skill.steps[13].details or "")
+    assert skill.steps[13].uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -1081,8 +1086,8 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
     assert skill.steps[1].details == (
         "Compare the gathered requirements and approach against the new needs. "
         "If the existing specification already covers them, end this skill by "
-        "returning the complete action, for example {\"action\":\"complete\","
-        "\"text\":\"The existing system covers the new needs.\"}; do not "
+        'returning the complete action, for example {"action":"complete",'
+        '"text":"The existing system covers the new needs."}; do not '
         "choose next_step in that case. Otherwise choose next_step to generate "
         "and fill an update."
     )
@@ -1134,8 +1139,8 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
     assert skill.steps[1].details == (
         "Compare the gathered entity model against the new needs. If the "
         "existing specification already covers them, return the complete action, "
-        "for example {\"action\":\"complete\",\"text\":\"The existing "
-        "architecture covers the new needs.\"}; otherwise choose next_step to "
+        'for example {"action":"complete","text":"The existing '
+        'architecture covers the new needs."}; otherwise choose next_step to '
         "generate and fill an update."
     )
     assert "Do not use invoke_tool" in (skill.steps[5].details or "")

@@ -100,21 +100,28 @@ steps:
     - powdrr-lift
     - evaluate
     - docs/proposals/<work-item-name>
-- description: Decide on proposed PRs and fill each template.
+- id: generate-pr-specification
+  description: Generate the proposed PR specification template.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the declared pr-specification generator exactly once; do not edit the generated file.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - pr-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+- id: fill-pr-specification
+  description: Fill the proposed PR specification template.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Invoke the declared pr-specification generator once, then fill its generated
-    template with intent, criteria, tests, and risks. Do not invoke evaluate in
-    this step; after the YAML edit choose next_step and let the later deterministic
-    evaluation step validate the specification.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - pr-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+    Fill the generated PR template with intent, criteria, tests, and risks using
+    yaml_edit. Do not invoke tools in this step; after the YAML edit choose
+    next_step and let the later deterministic evaluation step validate the file.
 - id: evaluate-feature-specifications
   description: Deterministically evaluate every generated specification before implementation.
   step_type: invoke_tool

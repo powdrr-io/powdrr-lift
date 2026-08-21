@@ -4972,7 +4972,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
         "Decide on proposed PRs and fill each template.",
-        "Validate every generated specification before implementation.",
+        (
+            "Deterministically evaluate every generated specification before "
+            "implementation."
+        ),
+        "Fix every reported specification issue with yaml_edit.",
     ]
 
     captured: dict[str, object] = {"messages": []}
@@ -5559,11 +5563,26 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 20:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=7,
-                    expected_step_description=step_descriptions[7],
+                    expected_step_index=8,
+                    expected_step_description=step_descriptions[8],
                     expected_context_suffix="PR step complete; handoff is ready.",
-                    expected_event_count=19,
-                    expected_last_event_kind="next_step",
+                    expected_event_count=20,
+                    expected_last_event_kind="deterministic_pre_step",
+                )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": "All specification issues are fixed.",
+                }
+            elif self._call_index == 21:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=10,
+                    expected_step_description=(
+                        "Stage the validated specification artifacts for pull request preparation."
+                    ),
+                    expected_context_suffix="All specification issues are fixed.",
+                    expected_event_count=23,
+                    expected_last_event_kind="gate",
                 )
                 response = {
                     "kind": "complete",

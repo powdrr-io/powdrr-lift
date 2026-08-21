@@ -3967,8 +3967,9 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         prompt += (
             "Deterministic context: the resolved pre_step template has already run. "
             "The deterministic_context field is the context for this step; do not "
-            "invoke the pre-step again. Use it and the current step details before "
-            "choosing next_step or complete.\n"
+            "invoke the pre-step again. invoke_tool is not allowed in this step. "
+            "Use the result and choose next_step; choose complete only when the "
+            "skill itself is finished.\n"
         )
     if _validation_gate_enabled(current_step):
         prompt += (
@@ -4020,7 +4021,11 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         "operation is exactly "
         '{"op":"upsert_item","section":"requirements","id":"req-1",'
         '"value":{"description":"...","state":"added"}}. Do not omit '
-        "path, section, id, or value.\n"
+        "path, section, id, or value. The only supported operation names are "
+        "set_value, upsert_item, and remove_item; never use remove or replace. "
+        "Use remove_item only for an existing item id from the current document. "
+        "Template comments and boilerplate disappear when a valid yaml_edit "
+        "rewrites the file; do not model comments as list items.\n"
         "When a validation result contains corrective_action, apply it before "
         "retrying; do not repeat the same failed validation unchanged. Use edit "
         "only when current "

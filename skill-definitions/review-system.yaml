@@ -61,7 +61,11 @@ steps:
   llm_type: fast_iteration
   details: >-
     Use yaml_edit actions to fix every issue reported by evaluation. If there
-    are no issues, choose next_step without changing the file.
+    are no issues, choose next_step without changing the file. Use only
+    set_value, upsert_item, and remove_item operations; never use remove or
+    replace. Use remove_item only for an existing item id from the current
+    document. Template comments and boilerplate are removed as a side effect of
+    any valid yaml_edit rewrite; do not treat comments as list items.
 - id: gate-system
   description: Confirm that system evaluation reports zero issues.
   step_type: gate

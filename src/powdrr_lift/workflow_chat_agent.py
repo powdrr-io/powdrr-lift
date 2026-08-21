@@ -4850,9 +4850,17 @@ def _discover_validation_obligations(
     discovery = config.get("discovery")
     if not isinstance(discovery, Mapping):
         raise RuntimeError("Validation gate discovery must be an object.")
-    discovery_action = discovery.get("action")
-    if not isinstance(discovery_action, Mapping):
+    configured_discovery_action = discovery.get("action")
+    if configured_discovery_action is not None and not isinstance(
+        configured_discovery_action, Mapping
+    ):
         raise RuntimeError("Validation gate discovery.action must be an action object.")
+    if configured_discovery_action is None and not isinstance(
+        discovery.get("handoff_input"), str
+    ):
+        raise RuntimeError(
+            "Validation gate discovery must declare an action or handoff_input."
+        )
     obligation_config = config.get("obligations")
     if not isinstance(obligation_config, Mapping):
         raise RuntimeError("Validation gate obligations must be an object.")
@@ -4940,9 +4948,18 @@ def _register_validation_gate_discovery(
         if not isinstance(discovery, Mapping):
             continue
         discovery_action = discovery.get("action")
-        if not isinstance(discovery_action, Mapping) or not _action_template_matches(
-            discovery_action, _workflow_action_data(action)
-        ):
+        handoff_input = discovery.get("handoff_input")
+        matches_discovery = (
+            isinstance(discovery_action, Mapping)
+            and _action_template_matches(
+                discovery_action, _workflow_action_data(action)
+            )
+        ) or (
+            isinstance(handoff_input, str)
+            and handoff_input.strip()
+            and action.kind == "gather_context"
+        )
+        if not matches_discovery:
             continue
         gate_state = _validation_gate_state(state, gate)
         if not gate_state.discovered:
@@ -4953,13 +4970,6 @@ def _register_validation_gate_discovery(
                 raise RuntimeError(
                     "Validation discovery action did not produce a result."
                 )
-            if discovery.get("filters_from_action") is True:
-                actual = _workflow_action_data(action)
-                filters = actual.get("filters")
-                if not isinstance(filters, Mapping) or not filters.get("labels"):
-                    raise RuntimeError(
-                        "Validation discovery must provide a non-empty labels filter."
-                    )
             _discover_validation_obligations(
                 event["result"],
                 state=state,

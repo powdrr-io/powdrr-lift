@@ -650,14 +650,21 @@ def build_skill_validation_report(
                                 path=_child_path(step_path, "validation_gate.id"),
                             )
                         )
-                    if not isinstance(discovery, Mapping) or not isinstance(
-                        discovery.get("action"), Mapping
+                    discovery_handoff = (
+                        discovery.get("handoff_input")
+                        if isinstance(discovery, Mapping)
+                        else None
+                    )
+                    if not isinstance(discovery, Mapping) or (
+                        not isinstance(discovery.get("action"), Mapping)
+                        and not isinstance(discovery_handoff, str)
                     ):
                         issues.append(
                             SkillValidationIssue(
                                 code="invalid_validation_gate_discovery",
                                 message=(
-                                    "validation_gate.discovery must declare an action."
+                                    "validation_gate.discovery must declare an action "
+                                    "or handoff_input."
                                 ),
                                 path=_child_path(
                                     step_path, "validation_gate.discovery"
@@ -1346,11 +1353,16 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         discovery = validation_gate.get("discovery")
         if not isinstance(gate_id, str) or not gate_id.strip():
             raise ValueError("Skill step validation_gate.id must be non-empty.")
-        if not isinstance(discovery, Mapping) or not isinstance(
-            discovery.get("action"), Mapping
+        discovery_handoff = (
+            discovery.get("handoff_input") if isinstance(discovery, Mapping) else None
+        )
+        if not isinstance(discovery, Mapping) or (
+            not isinstance(discovery.get("action"), Mapping)
+            and not isinstance(discovery_handoff, str)
         ):
             raise ValueError(
-                "Skill step validation_gate.discovery must declare an action."
+                "Skill step validation_gate.discovery must declare an action "
+                "or handoff_input."
             )
         if not isinstance(validation_gate.get("obligations"), Mapping):
             raise ValueError(

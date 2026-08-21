@@ -65,11 +65,7 @@ steps:
   validation_gate:
     id: pr-prep-validation
     discovery:
-      action:
-        kind: gather_context
-        types:
-        - tools
-      filters_from_action: true
+      handoff_input: validation_tools
       discovery_output: validation_tools
       result_path: matches
     obligations:

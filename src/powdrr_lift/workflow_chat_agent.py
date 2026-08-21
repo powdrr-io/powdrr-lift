@@ -772,6 +772,24 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _llm_error_context(self) -> dict[str, Any]:
         step = self.current_step
+        current_step_events = [
+            event
+            for event in self.state.execution_events
+            if event.get("step_index") == self.current_step_index
+        ]
+        recent_events = prune_execution_events(
+            current_step_events[-6:],
+            include_results=False,
+        )
+        last_successful_action = next(
+            (
+                event
+                for event in reversed(recent_events)
+                if event.get("kind")
+                not in {"validation_error", "action_error", "deterministic_pre_step"}
+            ),
+            None,
+        )
         context: dict[str, Any] = {
             "skill": {
                 "name": self.selected_skill.skill.name,
@@ -784,6 +802,13 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "worktree_root": str(self.state.worktree_root),
             "provider": self.provider,
             "model": self.current_model,
+            "current_step_contract": _current_step_contract(step),
+            "recent_current_step_events": recent_events,
+            "last_successful_action": last_successful_action,
+            "current_step_error_count": sum(
+                event.get("kind") in {"validation_error", "action_error"}
+                for event in current_step_events
+            ),
         }
         if self.workflow_context is not None:
             context["workflow"] = self.workflow_context.to_data()
@@ -2924,6 +2949,8 @@ def _build_skill_execution_summary(
 
 def _execution_events_for_prompt(
     execution_events: Sequence[dict[str, Any]],
+    *,
+    current_step_index: int | None = None,
 ) -> list[dict[str, Any]]:
     """Return the event metadata needed for the next action decision.
 
@@ -2934,16 +2961,33 @@ def _execution_events_for_prompt(
     event stream as metadata while leaving the complete event stream intact
     for persistence and diagnostics.
     """
+    events = execution_events
+    if current_step_index is not None:
+        events = [
+            _sanitize_prior_step_event(event)
+            if event.get("step_index") != current_step_index
+            else event
+            for event in execution_events
+        ]
     return [
         {key: value for key, value in event.items() if key != "decisions_and_context"}
-        for event in prune_execution_events(execution_events, include_results=False)
+        for event in prune_execution_events(events, include_results=False)
     ]
 
 
 def _latest_execution_event_for_prompt(
     execution_events: Sequence[dict[str, Any]],
+    *,
+    current_step_index: int | None = None,
 ) -> dict[str, Any] | None:
     """Retain the latest result separately from the compact event metadata."""
+    if current_step_index is not None:
+        execution_events = [
+            _sanitize_prior_step_event(event)
+            if event.get("step_index") != current_step_index
+            else event
+            for event in execution_events
+        ]
     if not execution_events:
         return None
     latest = prune_execution_events(execution_events[-1:], include_results=True)
@@ -2952,6 +2996,20 @@ def _latest_execution_event_for_prompt(
     return {
         key: value for key, value in latest[0].items() if key != "decisions_and_context"
     }
+
+
+def _sanitize_prior_step_event(event: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep prior-step progress while hiding reusable command payloads."""
+    hidden_keys = {
+        "command",
+        "parameters",
+        "file_edits",
+        "edits",
+        "operations",
+        "result",
+        "template",
+    }
+    return {key: value for key, value in event.items() if key not in hidden_keys}
 
 
 _PROMPT_OBSERVATION_RESULT_KEYS = {
@@ -3342,8 +3400,14 @@ def _build_step_execution_messages(
         },
         "selected_skill": _selected_skill_prompt_data(selected_skill),
         "transcript": _prompt_transcript(transcript),
-        "execution_events": _execution_events_for_prompt(execution_events),
-        "latest_action": _latest_execution_event_for_prompt(execution_events),
+        "execution_events": _execution_events_for_prompt(
+            execution_events,
+            current_step_index=current_step_index,
+        ),
+        "latest_action": _latest_execution_event_for_prompt(
+            execution_events,
+            current_step_index=current_step_index,
+        ),
         "current_file": current_file_context,
     }
     if _step_needs_prompt_catalog(current_step, "context_types"):
@@ -3681,6 +3745,18 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "skill should receive only explicit context.\n"
             'Example: {"action":"invoke_skill","skill":"adversarial-review",'
             '"provider_role":"adversarial","clean":true}.\n'
+        )
+    nested_skills = tuple(getattr(current_step, "uses_skills", ()) or ())
+    if nested_skills:
+        prompt += (
+            "This step delegates to a nested skill; use invoke_skill, "
+            "not invoke_tool or an internal CLI command. The only listed nested "
+            f"skills for this step are {json.dumps(list(nested_skills))}. For "
+            "example: "
+            '{"action":"invoke_skill","skill":'
+            f"{json.dumps(nested_skills[0])}"
+            ',"decisions_and_context":"The nested skill should perform its '
+            'declared work."}.\n'
         )
     if (
         getattr(current_step, "step_type", "freeform") == "invoke_tool"
@@ -6953,6 +7029,32 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
     )
 
 
+def _current_step_contract(step: Any | None) -> dict[str, Any]:
+    """Describe the current step's authoritative action and tool contract."""
+    if step is None:
+        return {}
+    invocations = tuple(getattr(step, "tool_invocations", ()) or ())
+    nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
+    allowed_actions = ["prompt_user", "next_step"]
+    if invocations:
+        allowed_actions.insert(0, "invoke_tool")
+    if nested_skills:
+        allowed_actions.insert(0, "invoke_skill")
+    if getattr(step, "step_type", "freeform") == "invoke_tool":
+        allowed_actions = ["next_step"]
+    return {
+        "step_type": getattr(step, "step_type", "freeform"),
+        "allowed_actions": allowed_actions,
+        "declared_tool_invocations": [
+            _tool_invocation_to_data(invocation) for invocation in invocations
+        ],
+        "declared_nested_skills": list(nested_skills),
+        "requires_successful_declared_tool_before_next_step": any(
+            invocation.tool == "shell" for invocation in invocations
+        ),
+    }
+
+
 def _action_repair_prompt(
     selected_skill: SkillCatalogEntry,
     *,
@@ -6988,6 +7090,12 @@ def _action_repair_prompt(
         "independent corrections for the same file in one operations array."
     )
     if current_step is not None:
+        prompt += (
+            "\nAuthoritative current-step contract (ignore commands and tool "
+            "templates from previous steps): "
+            + json.dumps(_current_step_contract(current_step), ensure_ascii=False)
+            + ". "
+        )
         prompt += (
             "\nThe current step is the only authority for what may be done. "
             f"Step description: {current_step.description}. "

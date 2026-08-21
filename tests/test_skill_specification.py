@@ -121,7 +121,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
         )
         for index, step in enumerate(document[step_key]):
             expected_invoke_tool_steps = {
-                ("finish-pr-prep.yaml", 2),
+                ("finish-pr-prep.yaml", 0),
+                ("finish-pr-prep.yaml", 3),
                 ("create-pull-request.yaml", 0),
                 ("specify-system.yaml", 1),
                 ("specify-architecture.yaml", 1),
@@ -525,6 +526,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
     assert skill.steps[10].uses_skills == ("finish-pr-prep",)
+    assert "invoke_skill" in (skill.steps[10].details or "")
     assert "create-pull-request" in (skill.steps[11].details or "")
     assert skill.steps[11].uses_skills == ("create-pull-request",)
 
@@ -770,17 +772,25 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
         ),
     )
     assert [step.description for step in skill.steps] == [
+        "Deterministically inspect the staged file set.",
         "Confirm the staged pull request scope and validation commands.",
         "Run the final formatting, lint, type-check, and test passes.",
         "Leave the branch ready for pull request creation.",
     ]
+    assert skill.steps[0].pre_step is not None
+    assert skill.steps[0].pre_step.template["command"] == [
+        "git",
+        "diff",
+        "--cached",
+        "--name-only",
+    ]
     assert [
         (invocation.tool, invocation.label)
-        for invocation in skill.steps[0].tool_invocations
+        for invocation in skill.steps[1].tool_invocations
     ][:1] == [("ref", "pr-prep")]
-    assert skill.steps[1].tool_invocations == ()
-    assert skill.steps[2].pre_step is not None
-    assert skill.steps[2].pre_step.action == "invoke_tool"
+    assert skill.steps[2].tool_invocations == ()
+    assert skill.steps[3].pre_step is not None
+    assert skill.steps[3].pre_step.action == "invoke_tool"
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:

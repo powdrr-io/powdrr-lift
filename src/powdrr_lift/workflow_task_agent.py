@@ -357,6 +357,16 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         return _task_action_material_state(action, self.repo_root)
 
     def _llm_error_context(self) -> dict[str, Any]:
+        recent_events = self.events[-8:]
+        last_successful_action = next(
+            (
+                event
+                for event in reversed(recent_events)
+                if event.get("kind")
+                not in {"validation_error", "action_error", "tool_error", "no_progress"}
+            ),
+            None,
+        )
         return {
             "task": {
                 "task_id": self.task.task_id,
@@ -371,6 +381,23 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "worktree_root": str(self.repo_root),
             "provider": self.mapping_provider,
             "model": self.model,
+            "action_contract": {
+                "allowed_actions": [
+                    "invoke_tool",
+                    "invoke_skill",
+                    "get-human-input",
+                    "next_step",
+                    "complete",
+                ],
+                "declared_nested_skills": list(self.task.uses_skills),
+            },
+            "recent_events": recent_events,
+            "last_successful_action": last_successful_action,
+            "error_count": sum(
+                event.get("kind")
+                in {"validation_error", "action_error", "tool_error", "no_progress"}
+                for event in self.events
+            ),
         }
 
     def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:

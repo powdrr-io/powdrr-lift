@@ -145,9 +145,12 @@ steps:
 - description: Run finish-pr-prep before creating the pull request.
   step_type: freeform
   llm_type: fast_iteration
-  details: Run finish-pr-prep after the intended specification artifacts are staged.
-    If cleanup changes files, restage only the validated specification artifacts
-    before continuing. Do not begin implementation in this skill.
+  details: >-
+    Run finish-pr-prep after the intended specification artifacts are staged by
+    returning an invoke_skill action for the listed finish-pr-prep skill. Do not
+    invoke it through the internal CLI tool. If cleanup changes files, restage
+    only the validated specification artifacts before continuing. Do not begin
+    implementation in this skill.
   uses_skills:
   - finish-pr-prep
 - description: Create or update the pull request for the validated feature.

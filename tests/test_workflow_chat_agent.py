@@ -4517,6 +4517,20 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
     assert '"action":"prompt_user"' in prompt
     assert '"text":"What specific success criteria should this feature meet?"' in prompt
     assert "never use prompt, question, or action_input" in prompt
+    for action_name in (
+        "gather_context",
+        "prompt_user",
+        "edit",
+        "yaml_edit",
+        "invoke_skill",
+        "invoke_tool",
+        "read_document",
+        "goto_step",
+        "next_step",
+        "complete",
+    ):
+        assert action_name in prompt
+    assert "powdrr-lift yaml-edit" not in prompt
 
 
 def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) -> None:

@@ -3893,8 +3893,16 @@ def _modular_action_system_prompt(current_step: Any) -> str:
     include_skills = _step_needs_prompt_catalog(current_step, "skills")
     prompt = (
         "Task: execute the supplied details using the handoff inputs, latest action "
-        "result, and allowed tools. Choose one "
+        "result, and available actions. Choose one "
         "action that makes progress without asking for information already present.\n"
+        "Available actions (choose exactly one): gather_context discovers checked-in "
+        "specifications; prompt_user asks one necessary human question; edit applies "
+        "line-based edits to non-YAML files; yaml_edit applies structural YAML "
+        "operations; invoke_skill runs a listed nested skill; invoke_tool runs one "
+        "declared command; read_document reads a bounded file range; goto_step "
+        "repeats a declared step; next_step advances after completion; complete ends "
+        "the skill. "
+        "The current-step contract below further restricts these options.\n"
         "Return exactly one JSON object with a top-level action field. The action "
         "field is the discriminator: never use kind or action_input. Include "
         "decisions_and_context when a later step needs it, and include outputs "
@@ -3987,8 +3995,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "the whole list with set_value.\n"
             "yaml_edit is a first-class action, not a command. Return it directly "
             'with action="yaml_edit", file_path, and operations; never wrap it in '
-            'action="invoke_tool" or route `powdrr-lift yaml-edit` through the '
-            "internal or shell tool. Example: "
+            'action="invoke_tool" through the internal or shell tool. Example: '
             '{"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml",'
             '"operations":[{"op":"set_value","path":["title"],"value":"..."}]}\n'
         )
@@ -4007,14 +4014,9 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "additional reasoning or edits in this step.\n"
         )
     prompt += (
-        "Available workflow actions also include edit, yaml_edit, and "
-        "read_document even when the step's declared tool_invocations list "
-        "contains only internal commands. Declared tool_invocations restrict "
-        "invoke_tool only; they do not prohibit yaml_edit or edit when the "
-        "step details require a file correction. yaml_edit is a workflow "
-        "action, not an internal CLI command. A yaml_edit action uses the exact "
-        "fields file_path and operations; each upsert_item uses section, id, "
-        "and value. Never use yaml_operations or item_id.\n"
+        "A yaml_edit action uses the exact fields file_path and operations; each "
+        "upsert_item uses section, id, and value. Never use yaml_operations or "
+        "item_id.\n"
         "When a validation result contains corrective_action, apply it before "
         "retrying; do not repeat the same failed validation unchanged. Use edit "
         "only when current "
@@ -7724,10 +7726,8 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
-    # Freeform steps may still need to repair files after a declared command
-    # reports a validation error. Keep those structural actions in the
-    # authoritative contract; otherwise the model follows the prose guidance
-    # but sees an apparently contradictory machine-readable action list.
+    # Keep the complete first-class action catalog in the contract. The declared
+    # tool list constrains invoke_tool; it does not hide file/context actions.
     allowed_actions = [
         "edit",
         "yaml_edit",

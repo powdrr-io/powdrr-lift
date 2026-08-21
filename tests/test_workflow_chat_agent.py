@@ -387,6 +387,7 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Context guidance:" not in ordinary_system_prompt
     assert "Nested-skill guidance:" not in ordinary_system_prompt
     assert "entity-relationships" not in ordinary_system_prompt
+    assert "prompt_user is always allowed" in ordinary_system_prompt
 
     gather_prompt = json.loads(
         _build_step_execution_messages(

@@ -68,10 +68,11 @@ steps:
     matching feature directory and workflow directories. If exactly one
     feature specification and workflow set are the best matches, select them
     without asking. If a match is uncertain, ask one specific question that
-    identifies the correct feature or workflow. Do not ask whether documents
-    exist before searching. Pass the selected specification documents, workflow
-    documents, canonical feature name, and missing-document findings to the
-    next step.
+    identifies the correct feature or workflow, for example:
+    {"action":"prompt_user","text":"Which feature or workflow should I use from these candidates: <candidate-names>?"}
+    Do not ask whether documents exist before searching. Pass the selected
+    specification documents, workflow documents, canonical feature name, and
+    missing-document findings to the next step.
   outputs:
   - name: feature_name
     type: string
@@ -85,9 +86,25 @@ steps:
   details: Invoke bootstrap-code-structure with the selected feature context. The nested skill is project-wide and must not ask for a feature or target module.
 - id: confirm-project-structure
   description: Confirm the project-structure artifact is available.
-  step_type: freeform
+  step_type: gate
   llm_type: simple_task
-  details: Confirm from the nested bootstrap result that the project-structure artifact is available, then pass its exact path and evidence to the next step.
+  details: The gate passes only when the project-structure artifact exists in the active worktree.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - test
+      - -f
+      - docs/project_structure/project-structure.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: bootstrap-project-structure
+    retry_context: >-
+      The project-structure artifact is not available in the active worktree.
+      Rerun bootstrap-code-structure, then retry this gate.
 - id: plan-proposed-prs
   description: Plan the proposed PR implementation sequence.
   step_type: freeform
@@ -103,16 +120,29 @@ steps:
     read_document action to inspect templates/execute-proposed-pr.yaml; do not
     use shell commands to read the template. Do not generate or edit
     implementation-specification files in this step.
+  outputs:
+  - name: proposed_pr_names
+    type: any
+    required_for_next_step: true
 - id: generate-implementation-specifications
   description: Generate one implementation specification per proposed PR.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    For each planned proposed PR that lacks an implementation specification,
+    For each name in proposed_pr_names that lacks an implementation
+    specification,
     invoke the declared implementation-specification command exactly once with
     its stable proposed-PR name and output path. Reuse existing files. Generate
     only the templates; do not fill, validate, instantiate, stage, or commit
     them. Pass every generated path and proposed-PR relationship onward.
+  inputs:
+  - name: proposed_pr_names
+    type: any
+    source: previous_step
+  outputs:
+  - name: implementation_specification_paths
+    type: any
+    required_for_next_step: true
   tool_invocations:
   - tool: internal
     command:
@@ -127,7 +157,7 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    For each generated implementation-specification file, replace every
+    For each path in implementation_specification_paths, replace every
     placeholder and fill every required field using the selected feature,
     project-structure, and proposed-PR context. Remove generator instructions
     and instructional comments. Do not leave null, empty, example, or TODO
@@ -136,6 +166,10 @@ steps:
     this active worktree. Do not validate or instantiate workflows until every
     file is populated. Pass the exact filled paths and proposed-PR mapping
     onward.
+  inputs:
+  - name: implementation_specification_paths
+    type: any
+    source: previous_step
 - id: evaluate-implementation-specifications
   description: Evaluate all implementation specifications deterministically.
   step_type: invoke_tool

@@ -187,6 +187,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
+                ("start-implementing-feature.yaml", 5),
                 ("start-implementing-feature.yaml", 11),
                 ("specify-a-feature.yaml", 5),
                 ("specify-a-feature.yaml", 9),
@@ -979,6 +980,20 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "bootstrap-code-structure",
     )
     assert step("generate-implementation-specifications").step_type == "freeform"
+    assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
+    assert step("plan-proposed-prs").outputs[0].required_for_next_step
+    assert step("generate-implementation-specifications").inputs[0].name == (
+        "proposed_pr_names"
+    )
+    assert step("generate-implementation-specifications").outputs[0].name == (
+        "implementation_specification_paths"
+    )
+    assert (
+        step("generate-implementation-specifications").outputs[0].required_for_next_step
+    )
+    assert step("fill-implementation-specifications").inputs[0].name == (
+        "implementation_specification_paths"
+    )
     assert step("generate-implementation-specifications").tool_invocations[
         0
     ].command == (

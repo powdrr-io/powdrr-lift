@@ -4788,6 +4788,24 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "rationale": architecture_gallery_photo_rationale,
                 },
             ],
+            "modules": [
+                {
+                    "id": "related-photos-module",
+                    "action": "added",
+                    "relative_location": "src/related_photos",
+                    "purpose": "Render related photos in the feature view.",
+                },
+            ],
+            "tools": [
+                {
+                    "id": "related-photos-check",
+                    "action": "added",
+                    "related_modules": ["related-photos-module"],
+                    "when_to_use": "Validate the related photos implementation.",
+                    "template": "powdrr-lift evaluate",
+                    "how_to_use": "Run the evaluator before review.",
+                },
+            ],
             "entity_relationships": [
                 {
                     "id": "related-photo-groups-with-gallery-photo",

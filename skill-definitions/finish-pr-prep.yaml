@@ -79,13 +79,7 @@ steps:
       source: matches
       filter:
         section: tools
-      language_filter:
-        labels_by_id:
-          ruff-format: [python]
-          ruff-format-check: [python]
-          ruff-lint: [python]
-          pytest: [python]
-          mypy: [python]
+      language_filter: true
       id: item.id
       action: item.validation_action
   llm_type: fast_iteration

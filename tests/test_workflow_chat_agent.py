@@ -1018,7 +1018,8 @@ def test_validation_discovery_filters_tools_by_staged_file_language(
                 "section": "tools",
                 "item": {
                     "id": "pytest",
-                    "labels": ["test", "pr-prep", "python"],
+                    "labels": ["test", "pr-prep"],
+                    "when_to_use": "Run the Python test suite.",
                     "validation_action": {
                         "kind": "invoke_tool",
                         "tool": "shell",
@@ -1030,7 +1031,8 @@ def test_validation_discovery_filters_tools_by_staged_file_language(
                 "section": "tools",
                 "item": {
                     "id": "yaml-check",
-                    "labels": ["lint", "pr-prep", "yaml"],
+                    "labels": ["lint", "pr-prep"],
+                    "when_to_use": "Lint YAML documents.",
                     "validation_action": {
                         "kind": "invoke_tool",
                         "tool": "shell",

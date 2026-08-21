@@ -4867,6 +4867,21 @@ def _staged_file_language_labels(worktree_root: Path) -> set[str]:
     return labels
 
 
+def _validation_item_language_labels(item: Mapping[str, Any]) -> set[str]:
+    labels = item.get("labels", [])
+    language_values = (
+        labels if isinstance(labels, Sequence) and not isinstance(labels, str) else []
+    )
+    metadata = json.dumps(item, ensure_ascii=False, default=str).casefold()
+    known_languages = set(_STAGED_FILE_LANGUAGE_SUFFIXES.values())
+    return {
+        language
+        for language in known_languages
+        if language in {str(value).casefold() for value in language_values}
+        or re.search(rf"\b{re.escape(language)}\b", metadata) is not None
+    }
+
+
 def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
@@ -4903,19 +4918,7 @@ def _discover_validation_obligations(
         raise RuntimeError(
             "Validation gate obligations must declare id and action projections."
         )
-    language_filter = obligation_config.get("language_filter")
-    language_filter_enabled = language_filter is True or isinstance(
-        language_filter, Mapping
-    )
-    labels_by_id = (
-        language_filter.get("labels_by_id", {})
-        if isinstance(language_filter, Mapping)
-        else {}
-    )
-    if not isinstance(labels_by_id, Mapping):
-        raise RuntimeError(
-            "Validation gate language_filter.labels_by_id must be an object."
-        )
+    language_filter_enabled = obligation_config.get("language_filter") is True
     staged_languages = (
         _staged_file_language_labels(state.worktree_root)
         if language_filter_enabled
@@ -4931,18 +4934,9 @@ def _discover_validation_obligations(
             if not isinstance(raw_id, str) or not raw_id.strip():
                 raise RuntimeError("Every discovered validation item must have an id.")
             item = match.get("item")
-            labels = (
-                labels_by_id.get(raw_id, [])
-                if labels_by_id
-                else item.get("labels")
-                if isinstance(item, Mapping)
-                else None
-            )
-            if not isinstance(labels, Sequence) or isinstance(
-                labels, (str, bytes, bytearray)
-            ):
+            if not isinstance(item, Mapping):
                 continue
-            normalized_labels = {str(label).casefold() for label in labels}
+            normalized_labels = _validation_item_language_labels(item)
             if not staged_languages.intersection(normalized_labels):
                 continue
         raw_id = _nested_value(match, id_path)

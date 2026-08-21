@@ -265,6 +265,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.workflow,
                 self.task,
                 self.events,
+                repo_root=self.repo_root,
                 skill_catalog=self.skill_catalog,
                 response_correction=self.response_correction,
                 compacted_context=self.compacted_context,
@@ -1349,6 +1350,7 @@ def _build_task_messages(
     task: WorkflowTask,
     events: list[dict[str, Any]],
     *,
+    repo_root: Path | None = None,
     response_correction: str | None = None,
     compacted_context: dict[str, Any] | None = None,
     skill_catalog: tuple[SkillCatalogEntry, ...] = (),
@@ -1362,6 +1364,18 @@ def _build_task_messages(
         }
     else:
         context_data = {"compacted_context": compacted_context}
+    workflow_dir = str(workflow.directory)
+    if repo_root is not None:
+        try:
+            workflow_dir = str(workflow.directory.relative_to(repo_root))
+        except ValueError:
+            pass
+    available_skills: list[dict[str, Any]] = []
+    for entry in skill_catalog:
+        skill_data: dict[str, Any] = {"name": entry.skill.name}
+        if entry.skill.name in task.uses_skills:
+            skill_data["when_to_use"] = list(entry.skill.when_to_use)
+        available_skills.append(skill_data)
     return [
         {"role": "system", "content": _task_system_prompt()},
         {
@@ -1374,7 +1388,7 @@ def _build_task_messages(
                     "step_context": (
                         [response_correction] if response_correction is not None else []
                     ),
-                    "workflow_dir": str(workflow.directory),
+                    "workflow_dir": workflow_dir,
                     "workflow_files": _workflow_file_names(workflow.directory),
                     "available_tools": [
                         {
@@ -1412,15 +1426,7 @@ def _build_task_messages(
                             ),
                         },
                     ],
-                    "available_skills": [
-                        {
-                            "name": entry.skill.name,
-                            "when_to_use": list(entry.skill.when_to_use)
-                            if entry.skill.name in task.uses_skills
-                            else [],
-                        }
-                        for entry in skill_catalog
-                    ],
+                    "available_skills": available_skills,
                 },
                 ensure_ascii=False,
                 separators=(",", ":"),

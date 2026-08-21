@@ -2700,7 +2700,7 @@ def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
 def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
     """Return only skill identity; the active step carries execution details."""
     return {
-        "file": str(entry.path),
+        "file": entry.path.name,
         "name": entry.skill.name,
         "adversarial": entry.skill.adversarial,
     }
@@ -2718,13 +2718,14 @@ def _workflow_context_prompt_data(
 ) -> dict[str, object] | None:
     if workflow_context is None:
         return None
-    return {
+    data = {
         "branch_name": workflow_context.branch_name,
         "pr_number": workflow_context.pr_number,
         "pr_url": workflow_context.pr_url,
         "skill_name": workflow_context.skill_name,
         "request": workflow_context.request,
     }
+    return {key: value for key, value in data.items() if value is not None}
 
 
 def _selection_system_prompt() -> str:
@@ -3026,7 +3027,7 @@ def _build_step_execution_messages(
         prompt_data["available_skills"] = [
             {
                 "name": entry.skill.name,
-                "path": str(entry.path),
+                "path": entry.path.name,
                 "adversarial": entry.skill.adversarial,
             }
             for entry in catalog

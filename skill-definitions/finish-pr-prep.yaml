@@ -23,37 +23,31 @@ steps:
       - diff
       - --cached
       - --name-only
-- description: Confirm the staged pull request scope and validation commands.
+- description: Confirm the staged pull request scope.
   step_type: freeform
-  prompt_catalogs: [context_types]
-  llm_type: high_reasoning
+  llm_type: simple_task
   details: >-
-    Inspect the staged and unstaged diff before final validation. Confirm that
-    the intended pull-request files are staged and remove unrelated files from
-    the staged set. First invoke the declared `git diff --cached --stat` shell
-    command and use its result; do not substitute `git diff --cached --name-only`
-    or another Git command. Then derive the programming-language labels
-    represented by the staged files from deterministic_context and invoke
-    gather_context exactly once with types [tools] and a combined labels filter
-    containing pr-prep plus every discovered language label. Do not hard-code a
-    language or a tool. Use the returned tool references and their
-    templates/how_to_use fields to determine the exact validation commands. If
-    no staged language labels are present, use only pr-prep so the result is an
-    explicit empty tool set. Choose next_step only after the filtered discovery
-    succeeds.
+    Invoke the declared `git diff --cached --stat` command once. Confirm from
+    its result that the staged set is the intended pull-request scope, then
+    choose next_step. Do not invoke another Git command in this step.
   tool_invocations:
-  - tool: ref
-    label: pr-prep
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
   - tool: shell
     command:
     - git
     - diff
     - --cached
     - --stat
+- description: Discover validation tools for the staged languages.
+  step_type: freeform
+  prompt_catalogs: [context_types]
+  llm_type: high_reasoning
+  details: >-
+    Read the staged file names from deterministic_context and derive every
+    programming-language label they represent. Invoke gather_context exactly
+    once with types [tools] and a labels filter containing pr-prep plus those
+    language labels. If no language labels are present, use only pr-prep. Do
+    not hard-code a language, tool, or command. Choose next_step after the
+    gather_context result is returned.
 - description: Run the final formatting, lint, type-check, and test passes.
   step_type: freeform
   validation_gate:

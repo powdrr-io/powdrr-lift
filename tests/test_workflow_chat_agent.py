@@ -6158,6 +6158,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._finish_invoked_steps: set[int] = set()
             self._finish_validation_commands: list[list[str]] | None = None
             self._finish_validation_index = 0
+            self._finish_scope_invoked = False
             self._finish_context_gathered = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
@@ -6200,8 +6201,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     step_index = int(prompt["current_step_index"])
-                    assert step_index < 4
-                    if step_index == 1 and not self._finish_context_gathered:
+                    assert step_index < 5
+                    if step_index == 1 and not self._finish_scope_invoked:
+                        self._finish_scope_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": ["git", "diff", "--cached", "--stat"]
+                            },
+                        }
+                    if step_index == 2 and not self._finish_context_gathered:
                         self._finish_context_gathered = True
                         self._call_index += 1
                         return {
@@ -6211,7 +6222,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                                 "labels": ["pr-prep", "python"],
                             },
                         }
-                    if step_index == 2:
+                    if step_index == 3:
                         validation_gate = cast(
                             dict[str, object], prompt.get("validation_gate", {})
                         )

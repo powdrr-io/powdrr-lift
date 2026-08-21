@@ -13,10 +13,12 @@ steps:
   - review-system
   - review-architecture
 - description: Generate the implementation specification template.
-  step_type: freeform-skill-invoke
+  step_type: invoke_tool
   llm_type: simple_task
-  details: Use the generated implementation template as the canonical place to capture
-    feature and decision detail.
+  details: >-
+    Invoke the declared implementation-specification tool exactly once. Pass its
+    generated file to the next step for completion; do not edit the file in this
+    step.
   tool_invocations:
   - tool: internal
     command:

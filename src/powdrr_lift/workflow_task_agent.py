@@ -1968,7 +1968,7 @@ def _run_skill_for_agent(
                 handoff_records = parent_handoff_records
             continue
         step = current_skill.skill.steps[step_index]
-        if step.step_type == "gather_context_and_filter":
+        if step.step_type == "invoke_tool" and step.pre_step is not None:
             _run_deterministic_pre_step(
                 step,
                 skill_name=current_skill.skill.name,

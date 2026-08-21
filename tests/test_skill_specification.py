@@ -120,9 +120,17 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             "steps" if path.parent.name == "skill-definitions" else "task_templates"
         )
         for index, step in enumerate(document[step_key]):
+            expected_invoke_tool_steps = {
+                ("finish-pr-prep.yaml", 2),
+                ("create-pull-request.yaml", 0),
+                ("specify-system.yaml", 1),
+                ("specify-architecture.yaml", 1),
+                ("specify-implementation.yaml", 1),
+                ("execute-proposed-pr.yaml", 0),
+            }
             expected_step_type = (
-                "gather_context_and_filter"
-                if path.name == "execute-proposed-pr.yaml" and index == 0
+                "invoke_tool"
+                if (path.name, index) in expected_invoke_tool_steps
                 else "freeform-skill-invoke"
             )
             assert step["step_type"] == expected_step_type, (
@@ -220,7 +228,7 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
     assert [issue.code for issue in report.issues] == ["duplicate_step_id"]
 
 
-def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
+def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> None:
     report = build_skill_validation_report(
         yaml.safe_dump(
             {
@@ -229,7 +237,7 @@ def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
                 "steps": [
                     {
                         "description": "Filter gathered requirements.",
-                        "step_type": "gather_context_and_filter",
+                        "step_type": "invoke_tool",
                         "pre_step": {
                             "action": "gather_context",
                             "template": {
@@ -251,6 +259,29 @@ def test_skill_validation_accepts_gather_context_and_filter_step() -> None:
     )
 
     assert report.validation_successful is True
+
+
+def test_skill_validation_rejects_invoke_tool_without_exactly_one_tool() -> None:
+    report = build_skill_validation_report(
+        yaml.safe_dump(
+            {
+                "name": "missing-tool",
+                "when_to_use": ["When a tool is required."],
+                "steps": [
+                    {
+                        "description": "Invoke the tool.",
+                        "step_type": "invoke_tool",
+                    }
+                ],
+            }
+        ),
+        source_path=Path("missing-tool.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == [
+        "invalid_invoke_tool_invocations"
+    ]
 
 
 def test_skill_validation_rejects_unknown_step_type() -> None:

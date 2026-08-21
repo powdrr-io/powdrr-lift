@@ -310,7 +310,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[0].input_state["feature_id"] == "<work-item-name>"
     assert template.task_templates[0].llm_type == "long_context"
     assert "listed tool invocations" in " ".join(template.how_to_fill_this_out)
-    assert template.task_templates[0].step_type == "gather_context_and_filter"
+    assert template.task_templates[0].step_type == "invoke_tool"
     assert template.task_templates[0].pre_step is not None
     assert template.task_templates[0].pre_step.action == "gather_context"
     assert "deterministic gathered context" in (

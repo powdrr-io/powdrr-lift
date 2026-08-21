@@ -13,10 +13,12 @@ steps:
   uses_skills:
   - review-system
 - description: Generate the architecture specification template.
-  step_type: freeform-skill-invoke
+  step_type: invoke_tool
   llm_type: simple_task
-  details: Generate the architecture template with the full allowed entity type set
-    so validation can enforce the schema.
+  details: >-
+    Invoke the declared architecture-specification tool exactly once with the full
+    allowed entity type set. Pass its generated file to the next step; do not edit
+    the file in this step.
   tool_invocations:
   - tool: internal
     command:

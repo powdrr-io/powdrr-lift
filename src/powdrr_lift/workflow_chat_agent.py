@@ -660,7 +660,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 self.provider_role = nested_role
                 continue
-            if self.current_step.step_type == "gather_context_and_filter":
+            if (
+                self.current_step.step_type == "invoke_tool"
+                and self.current_step.pre_step is not None
+            ):
                 _run_deterministic_pre_step(
                     self.current_step,
                     skill_name=self.selected_skill.skill.name,
@@ -3143,7 +3146,7 @@ def _run_deterministic_pre_step(
     pre_step = step.pre_step
     if pre_step is None or pre_step.action != "gather_context":
         raise RuntimeError(
-            "gather_context_and_filter requires a gather_context pre_step."
+            "invoke_tool steps with a pre_step require a gather_context action."
         )
     template = _resolve_pre_step_template(
         pre_step.template,
@@ -3541,7 +3544,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "invalid until a declared tool has been invoked successfully for that "
         "step.\n"
         "Use complete when the skill is finished.\n"
-        "For gather_context_and_filter steps, the deterministic gather_context "
+        "For invoke_tool steps with a deterministic pre-step, the gather_context "
         "pre-step already ran. The deterministic_context field in the step prompt "
         "is the context for this step. Do not gather again; use that context and "
         "the current step details to assign filtered or summarized values to the "
@@ -3598,8 +3601,9 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             'Example: {"kind":"invoke_skill","skill":"adversarial-review",'
             '"provider_role":"adversarial","clean":true}.\n'
         )
-    if getattr(current_step, "step_type", "freeform-skill-invoke") == (
-        "gather_context_and_filter"
+    if (
+        getattr(current_step, "step_type", "freeform-skill-invoke") == "invoke_tool"
+        and getattr(current_step, "pre_step", None) is not None
     ):
         prompt += (
             "Deterministic context: gather_context has already run using the "
@@ -3625,6 +3629,15 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         prompt += (
             "Tool guidance: invoke one of the declared tool_invocations successfully "
             "before next_step or complete. A prose summary is not a tool invocation.\n"
+        )
+    if (
+        getattr(current_step, "step_type", "freeform-skill-invoke") == "invoke_tool"
+        and getattr(current_step, "pre_step", None) is None
+    ):
+        prompt += (
+            "This is an atomic invoke_tool step. Invoke its single declared tool, "
+            "then choose next_step after the successful result; do not perform "
+            "additional reasoning or edits in this step.\n"
         )
     prompt += (
         "When a validation result contains corrective_action, apply it before "

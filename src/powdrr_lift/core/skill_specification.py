@@ -18,7 +18,7 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
-SUPPORTED_STEP_TYPES = frozenset({"freeform-skill-invoke", "gather_context_and_filter"})
+SUPPORTED_STEP_TYPES = frozenset({"freeform-skill-invoke", "invoke_tool"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -481,7 +481,7 @@ def build_skill_validation_report(
                         code="invalid_step_type_value",
                         message=(
                             "Skill step step_type must be freeform-skill-invoke or "
-                            "gather_context_and_filter."
+                            "invoke_tool."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -496,9 +496,11 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "pre_step"),
                     )
                 )
-            elif normalized_step_type == "gather_context_and_filter":
+            elif normalized_step_type == "invoke_tool" and isinstance(
+                pre_step, Mapping
+            ):
                 _validate_gather_context_pre_step(
-                    cast("Mapping[str, Any]", pre_step),
+                    pre_step,
                     step_path,
                     issues,
                 )
@@ -512,7 +514,8 @@ def build_skill_validation_report(
                         SkillValidationIssue(
                             code="missing_pre_step_outputs",
                             message=(
-                                "gather_context_and_filter steps must declare at least "
+                                "invoke_tool steps with a pre_step must declare "
+                                "at least "
                                 "one output."
                             ),
                             path=_child_path(step_path, "outputs"),
@@ -522,12 +525,40 @@ def build_skill_validation_report(
                 issues.append(
                     SkillValidationIssue(
                         code="unexpected_pre_step",
-                        message=(
-                            "Only gather_context_and_filter steps may declare pre_step."
-                        ),
+                        message=("Only invoke_tool steps may declare pre_step."),
                         path=_child_path(step_path, "pre_step"),
                     )
                 )
+
+            raw_tool_invocations = step_mapping.get("tool_invocations")
+            if normalized_step_type == "invoke_tool":
+                if pre_step is None:
+                    if (
+                        not isinstance(raw_tool_invocations, Sequence)
+                        or isinstance(raw_tool_invocations, (str, bytes, bytearray))
+                        or len(raw_tool_invocations) != 1
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_invoke_tool_invocations",
+                                message=(
+                                    "invoke_tool steps without pre_step must declare "
+                                    "exactly one tool_invocation."
+                                ),
+                                path=_child_path(step_path, "tool_invocations"),
+                            )
+                        )
+                elif raw_tool_invocations:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="conflicting_invoke_tool_sources",
+                            message=(
+                                "invoke_tool steps may declare either pre_step or "
+                                "tool_invocations, not both."
+                            ),
+                            path=_child_path(step_path, "tool_invocations"),
+                        )
+                    )
 
             uses_skills = step_mapping.get("uses_skills")
             if uses_skills is None:
@@ -1158,8 +1189,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     step_type = _optional_string(data.get("step_type")) or "freeform-skill-invoke"
     if step_type not in SUPPORTED_STEP_TYPES:
         raise ValueError(
-            "Skill step step_type must be freeform-skill-invoke or "
-            "gather_context_and_filter."
+            "Skill step step_type must be freeform-skill-invoke or invoke_tool."
         )
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
@@ -1169,12 +1199,19 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     pre_step = _parse_pre_step(data.get("pre_step"))
-    if step_type == "gather_context_and_filter" and pre_step is None:
-        raise ValueError(
-            "gather_context_and_filter requires a gather_context pre_step."
-        )
+    if step_type == "invoke_tool":
+        if pre_step is not None and tool_invocations:
+            raise ValueError(
+                "invoke_tool steps may declare either pre_step or tool_invocations, "
+                "not both."
+            )
+        if pre_step is None and len(tool_invocations) != 1:
+            raise ValueError(
+                "invoke_tool steps without pre_step must declare exactly one "
+                "tool_invocation."
+            )
     if step_type == "freeform-skill-invoke" and pre_step is not None:
-        raise ValueError("Only gather_context_and_filter steps may declare pre_step.")
+        raise ValueError("Only invoke_tool steps may declare pre_step.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     return SkillStep(
@@ -1328,7 +1365,7 @@ def _validate_gather_context_pre_step(
             SkillValidationIssue(
                 code="missing_pre_step",
                 message=(
-                    "gather_context_and_filter steps must declare a pre_step object."
+                    "invoke_tool steps with a pre_step must declare a valid pre_step."
                 ),
                 path=pre_step_path,
             )

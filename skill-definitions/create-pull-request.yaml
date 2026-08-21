@@ -4,7 +4,7 @@ when_to_use:
 - When an existing pull request for the current branch must receive the prescribed description and updated commit.
 steps:
 - description: Generate the pull request description template.
-  step_type: freeform-skill-invoke
+  step_type: invoke_tool
   llm_type: simple_task
   details: >-
     Invoke `powdrr-lift pull-request-description --kind <pr-kind>` exactly once.

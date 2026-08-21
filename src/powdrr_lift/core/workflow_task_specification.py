@@ -535,31 +535,47 @@ def build_workflow_task_validation_report(
                 code="invalid_step_type_value",
                 message=(
                     "Workflow task step_type must be freeform-skill-invoke or "
-                    "gather_context_and_filter."
+                    "invoke_tool."
                 ),
                 path=_format_child_path(source_path, "step_type"),
             )
         )
     pre_step = raw_task.get("pre_step")
-    if step_type == "gather_context_and_filter" and not isinstance(pre_step, Mapping):
-        issues.append(
-            WorkflowTaskValidationIssue(
-                code="missing_pre_step",
-                message=(
-                    "gather_context_and_filter workflow tasks must declare a "
-                    "pre_step object."
-                ),
-                path=_format_child_path(source_path, "pre_step"),
+    if step_type == "invoke_tool" and not isinstance(pre_step, Mapping):
+        tool_invocations = raw_task.get("tool_invocations")
+        if (
+            not isinstance(tool_invocations, Sequence)
+            or isinstance(tool_invocations, (str, bytes, bytearray))
+            or len(tool_invocations) != 1
+        ):
+            issues.append(
+                WorkflowTaskValidationIssue(
+                    code="invalid_invoke_tool_invocations",
+                    message=(
+                        "invoke_tool workflow tasks without pre_step must declare "
+                        "exactly one tool_invocation."
+                    ),
+                    path=_format_child_path(source_path, "tool_invocations"),
+                )
             )
-        )
+    elif step_type == "invoke_tool" and isinstance(pre_step, Mapping):
+        tool_invocations = raw_task.get("tool_invocations")
+        if tool_invocations:
+            issues.append(
+                WorkflowTaskValidationIssue(
+                    code="conflicting_invoke_tool_sources",
+                    message=(
+                        "invoke_tool workflow tasks may declare either pre_step or "
+                        "tool_invocations, not both."
+                    ),
+                    path=_format_child_path(source_path, "tool_invocations"),
+                )
+            )
     elif step_type == "freeform-skill-invoke" and pre_step is not None:
         issues.append(
             WorkflowTaskValidationIssue(
                 code="unexpected_pre_step",
-                message=(
-                    "Only gather_context_and_filter workflow tasks may declare "
-                    "pre_step."
-                ),
+                message=("Only invoke_tool workflow tasks may declare pre_step."),
                 path=_format_child_path(source_path, "pre_step"),
             )
         )

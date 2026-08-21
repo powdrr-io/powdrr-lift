@@ -419,7 +419,7 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Nested-skill guidance:" in gather_system_prompt
 
 
-def test_gather_context_and_filter_runs_deterministic_pre_step_once(
+def test_invoke_tool_runs_gather_context_pre_step_once(
     tmp_path: Path,
 ) -> None:
     current_root = tmp_path / "docs" / "current"
@@ -432,7 +432,7 @@ def test_gather_context_and_filter_runs_deterministic_pre_step_once(
     )
     step = SkillStep(
         description="Filter the gathered requirements.",
-        step_type="gather_context_and_filter",
+        step_type="invoke_tool",
         pre_step=SkillStepPreStep(
             action="gather_context",
             template={

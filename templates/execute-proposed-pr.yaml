@@ -15,7 +15,7 @@ how_to_fill_this_out:
   and review tasks complete.
 task_templates:
 - description: Gather context about the proposed PR
-  step_type: gather_context_and_filter
+  step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high
   assignee_type: agent

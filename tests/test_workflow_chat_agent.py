@@ -812,7 +812,12 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         validation_gate={
             "id": "checks",
             "discovery": {"action": {"kind": "gather_context"}},
-            "obligations": {"action_field": "validation_action"},
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
         },
     )
     selected_skill = SkillCatalogEntry(
@@ -906,7 +911,12 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
             "discovery": {
                 "action": {"kind": "gather_context"},
             },
-            "obligations": {"action_field": "validation_action"},
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
         },
     )
     second_step = SkillStep(
@@ -916,7 +926,12 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
             "discovery": {
                 "action": {"kind": "gather_context"},
             },
-            "obligations": {"action_field": "validation_action"},
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
         },
     )
     state = _WorkflowExecutionState(
@@ -933,7 +948,7 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
     result = {
         "matches": [
             {
-                "section": "checks",
+                "section": "tools",
                 "item": {
                     "id": "check-one",
                     "validation_action": {

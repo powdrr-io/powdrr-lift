@@ -70,10 +70,11 @@ steps:
           - pr-prep
       result_path: matches
     obligations:
-      item_path: item
-      section: tools
-      id_field: id
-      action_field: validation_action
+      source: matches
+      filter:
+        section: tools
+      id: item.id
+      action: item.validation_action
   llm_type: fast_iteration
   details: >-
     Run every validation command returned by the matching tool references for

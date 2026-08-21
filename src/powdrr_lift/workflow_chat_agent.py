@@ -4774,28 +4774,33 @@ def _discover_validation_obligations(
     discovery_action = discovery.get("action")
     if not isinstance(discovery_action, Mapping):
         raise RuntimeError("Validation gate discovery.action must be an action object.")
-    matches = _nested_value(result, str(discovery.get("result_path", "matches")))
+    obligation_config = config.get("obligations")
+    if not isinstance(obligation_config, Mapping):
+        raise RuntimeError("Validation gate obligations must be an object.")
+    matches = _nested_value(
+        result,
+        str(obligation_config.get("source", discovery.get("result_path", "matches"))),
+    )
     if not isinstance(matches, Sequence) or isinstance(
         matches, (str, bytes, bytearray)
     ):
         raise RuntimeError("Validation tool discovery did not return matches.")
     obligations: dict[str, _ValidationObligation] = {}
-    obligation_config = config.get("obligations")
-    if not isinstance(obligation_config, Mapping):
-        raise RuntimeError("Validation gate obligations must be an object.")
-    item_path = str(obligation_config.get("item_path", "item"))
-    id_field = str(obligation_config.get("id_field", "id"))
-    action_field = obligation_config.get("action_field")
-    required_section = obligation_config.get("section")
+    filter_values = obligation_config.get("filter", {})
+    if not isinstance(filter_values, Mapping):
+        raise RuntimeError("Validation gate obligations.filter must be an object.")
+    id_path = obligation_config.get("id")
+    action_path = obligation_config.get("action")
+    if not isinstance(id_path, str) or not isinstance(action_path, str):
+        raise RuntimeError(
+            "Validation gate obligations must declare id and action projections."
+        )
     for match in matches:
         if not isinstance(match, Mapping):
             continue
-        if required_section is not None and match.get("section") != required_section:
+        if any(match.get(key) != expected for key, expected in filter_values.items()):
             continue
-        raw_item = _nested_value(match, item_path)
-        if not isinstance(raw_item, Mapping):
-            raise RuntimeError("Validation discovery returned a non-object item.")
-        raw_id = raw_item.get(id_field)
+        raw_id = _nested_value(match, id_path)
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise RuntimeError("Every discovered validation item must have an id.")
         normalized_id = raw_id.strip()
@@ -4804,19 +4809,16 @@ def _discover_validation_obligations(
                 "Validation discovery returned duplicate obligation id "
                 f"{normalized_id!r}."
             )
-        if isinstance(action_field, str):
-            expected_action = raw_item.get(action_field)
-            if not isinstance(expected_action, Mapping):
-                raise RuntimeError(
-                    f"Validation item {normalized_id!r} must provide {action_field}."
-                )
-            expected_action = dict(expected_action)
-        else:
-            raise RuntimeError("Validation gate obligations must define action_field.")
+        expected_action = _nested_value(match, action_path)
+        if not isinstance(expected_action, Mapping):
+            raise RuntimeError(
+                f"Validation item {normalized_id!r} must provide action at "
+                f"{action_path}."
+            )
         obligations[normalized_id] = _ValidationObligation(
             obligation_id=normalized_id,
-            expected_action=expected_action,
-            source=dict(raw_item),
+            expected_action=dict(expected_action),
+            source=dict(match),
         )
     gate_state = _validation_gate_state(state, gate)
     gate_state.step_index = gate_step_index

@@ -322,7 +322,12 @@ def test_dynamic_validation_gate_round_trips() -> None:
                     "discovery": {
                         "action": {"kind": "gather_context", "types": ["tools"]}
                     },
-                    "obligations": {"action_field": "validation_action"},
+                    "obligations": {
+                        "source": "matches",
+                        "filter": {"section": "tools"},
+                        "id": "item.id",
+                        "action": "item.validation_action",
+                    },
                 },
             ),
         ),

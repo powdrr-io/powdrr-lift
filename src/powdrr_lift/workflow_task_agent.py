@@ -174,7 +174,16 @@ class WorkflowTaskAgentConfig:
     max_stalled_roundtrips: int = 3
     max_timeout_retries: int = 8
     timeout_backoff_seconds: float = 10.0
+    context_compaction_threshold: float = 0.75
     verbose: bool = False
+
+
+def _context_compaction_threshold(context_window: int, fraction: float) -> int:
+    if not 0 < fraction <= 1:
+        raise ValueError(
+            "context_compaction_threshold must be greater than 0 and at most 1."
+        )
+    return max(1, int(context_window * fraction))
 
 
 @dataclass(slots=True)
@@ -288,7 +297,14 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     file=self.stderr,
                     flush=True,
                 )
-            if estimated_input_tokens + 1024 < limits.context_window:
+            compaction_threshold = _context_compaction_threshold(
+                limits.context_window,
+                self.config.context_compaction_threshold,
+            )
+            if (
+                estimated_input_tokens < compaction_threshold
+                and estimated_input_tokens + 1024 < limits.context_window
+            ):
                 _print_waiting_for_model(self.stderr, self.model)
                 return WorkflowActionRequest(
                     client=self.client,
@@ -303,7 +319,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             print(
                 "Compacting workflow task context before the next LLM call: "
                 f"{estimated_input_tokens} estimated input tokens would exceed "
-                f"the {limits.context_window}-token context window.",
+                f"the {compaction_threshold}-token proactive threshold or the "
+                f"{limits.context_window}-token context window.",
                 file=self.stderr,
                 flush=True,
             )
@@ -1456,6 +1473,7 @@ def _compact_workflow_task_context(
     timeout_backoff_seconds: float,
 ) -> tuple[dict[str, Any], int, int]:
     resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
+    actionable_context = _task_events_for_prompt(events)
     compaction_messages = [
         {
             "role": "system",
@@ -1481,6 +1499,7 @@ def _compact_workflow_task_context(
                             workflow.task_context(task.task_id), task.input_state
                         ),
                         "events": events,
+                        "latest_actionable": actionable_context,
                     },
                     "response_shape": {
                         "compacted_context": (
@@ -1512,6 +1531,12 @@ def _compact_workflow_task_context(
         raise RuntimeError(
             "Context compaction response must include a compacted_context object."
         )
+    # The compaction model may summarize aggressively, but it must never be
+    # allowed to discard the latest repairable result or failure.
+    compacted_context = {
+        **compacted_context,
+        "latest_actionable": actionable_context,
+    }
     after_tokens = _estimate_message_tokens(
         [
             {
@@ -1676,6 +1701,28 @@ def _task_event_metadata(event: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _task_event_has_failure(event: Mapping[str, Any]) -> bool:
+    if event.get("kind") in {
+        "action_error",
+        "tool_error",
+        "llm_response_error",
+        "no_progress",
+    }:
+        return True
+    if event.get("error"):
+        return True
+    result = event.get("result")
+    return isinstance(result, Mapping) and result.get("returncode", 0) != 0
+
+
+def _task_event_result_for_prompt(event: Mapping[str, Any]) -> Any:
+    compacted = prune_execution_events(
+        [{"kind": event.get("kind"), "result": event.get("result")}],
+        include_results=True,
+    )
+    return compacted[0].get("result") if compacted else None
+
+
 def _task_events_for_prompt(events: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Build a compact event view without discarding durable execution data.
 
@@ -1686,22 +1733,32 @@ def _task_events_for_prompt(events: Sequence[Mapping[str, Any]]) -> dict[str, An
     """
     recent_events = list(events[-12:])
     metadata = [_task_event_metadata(event) for event in recent_events]
-    latest_result: Any = None
     latest_result_event: dict[str, Any] | None = None
-    for event in reversed(recent_events):
+    latest_failure_event: dict[str, Any] | None = None
+    latest_failure_result: Any = None
+    for event in reversed(events):
         if "result" in event:
-            latest_result = event["result"]
-            latest_result_event = _task_event_metadata(event)
+            if latest_result_event is None:
+                latest_result_event = _task_event_metadata(event)
+            if _task_event_has_failure(event) and latest_failure_event is None:
+                latest_failure_event = _task_event_metadata(event)
+                latest_failure_result = _task_event_result_for_prompt(event)
+        elif _task_event_has_failure(event) and latest_failure_event is None:
+            latest_failure_event = _task_event_metadata(event)
+        if latest_result_event is not None and latest_failure_event is not None:
             break
     prompt_data: dict[str, Any] = {"recent": metadata}
     if latest_result_event is not None:
-        compact_result = prune_execution_events(
-            [{"kind": latest_result_event.get("kind"), "result": latest_result}],
-            include_results=True,
-        )[0].get("result")
         prompt_data["latest_result"] = {
             "event": latest_result_event,
-            "value": compact_result,
+            "value": _task_event_result_for_prompt(
+                next(event for event in reversed(events) if "result" in event)
+            ),
+        }
+    if latest_failure_event is not None:
+        prompt_data["latest_failure"] = {
+            "event": latest_failure_event,
+            "value": latest_failure_result,
         }
     if len(events) > len(recent_events):
         prompt_data["omitted_event_count"] = len(events) - len(recent_events)

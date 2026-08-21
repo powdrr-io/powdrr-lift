@@ -180,6 +180,23 @@ def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None
     assert "result" not in prompt_events["recent"][0]
 
 
+def test_task_prompt_preserves_latest_failed_result_separately() -> None:
+    prompt_events = _task_events_for_prompt(
+        [
+            {
+                "kind": "invoke_tool",
+                "result": {"returncode": 2, "stderr": "validation failed"},
+            },
+            {"kind": "next_step"},
+        ]
+    )
+
+    assert prompt_events["latest_failure"]["value"] == {
+        "returncode": 2,
+        "stderr": "validation failed",
+    }
+
+
 def test_task_prompt_bounds_event_metadata() -> None:
     prompt_events = _task_events_for_prompt(
         [{"kind": "read_document", "result": {"line": index}} for index in range(20)]
@@ -534,11 +551,56 @@ def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
     assert compaction_prompt["task_description"] == "Choose an API version."
     assert compaction_prompt["task_details"] is None
     compacted_prompt = json.loads(client.messages[1][1]["content"])
-    assert compacted_prompt["compacted_context"] == {"necessary": ["keep this"]}
+    assert compacted_prompt["compacted_context"]["necessary"] == ["keep this"]
+    assert "latest_actionable" in compacted_prompt["compacted_context"]
     status = stderr.getvalue()
     assert "Compacting workflow task context" in status
     assert "waiting for context compaction LLM response" in status
     assert "Compacted workflow task context" in status
+
+
+def test_process_workflow_task_compacts_at_proactive_threshold(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"compacted_context": {"necessary": ["keep this"]}},
+            {"kind": "complete", "output_state": {"version": "v2"}},
+        ]
+    )
+
+    def _estimate(messages: list[dict[str, str]]) -> int:
+        if "compacting context" in messages[0]["content"]:
+            return 10
+        payload = json.loads(messages[1]["content"])
+        return 10 if "compacted_context" in payload else 3_000
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._estimate_message_tokens", _estimate
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._model_limits_for",
+        lambda *_args, **_kwargs: LLMModelLimits(
+            context_window=5_000,
+            max_output_tokens=500,
+        ),
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+            context_compaction_threshold=0.75,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 2
 
 
 def test_process_workflow_task_retries_llm_timeouts_with_backoff(

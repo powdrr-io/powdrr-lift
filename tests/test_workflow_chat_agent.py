@@ -121,6 +121,7 @@ from powdrr_lift.workflow_chat_agent import (
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
+    _workflow_handoff_inputs,
     _WorkflowEditRangeError,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
@@ -3193,6 +3194,30 @@ def test_workflow_handoff_requires_declared_outputs_and_matching_inputs() -> Non
         },
         current_step_index=0,
     )
+
+
+def test_workflow_handoff_prompt_excludes_unrelated_records() -> None:
+    step = SkillStep(
+        description="Consume the validation result.",
+        inputs=(SkillStepInput(name="validation_result", type="validation_result"),),
+    )
+    records: dict[str, dict[str, Any]] = {
+        "validation_result": {
+            "name": "validation_result",
+            "type": "validation_result",
+            "value": {"ok": True},
+        },
+        "unrelated": {
+            "name": "unrelated",
+            "type": "string",
+            "value": "must not leak",
+        },
+    }
+
+    handoff = _workflow_handoff_inputs(step, records)
+
+    assert list(handoff["resolved"]) == ["validation_result"]
+    assert "must not leak" not in json.dumps(handoff)
 
 
 def test_action_outputs_are_preserved_in_the_parsed_action() -> None:

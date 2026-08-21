@@ -217,6 +217,8 @@ def test_cli_process_workflow_task_wires_configuration(
                 "task-1",
                 "--max-roundtrips",
                 "4",
+                "--context-compaction-threshold",
+                "0.6",
             ]
         )
         == 0
@@ -227,6 +229,7 @@ def test_cli_process_workflow_task_wires_configuration(
     assert config.repo_root == tmp_path
     assert config.task_id == "task-1"
     assert config.max_roundtrips == 4
+    assert config.context_compaction_threshold == 0.6
 
 
 def test_cli_process_human_task_wires_configuration(

@@ -1055,6 +1055,15 @@ def build_parser() -> argparse.ArgumentParser:
             "Optional maximum LLM action roundtrips; by default progress is unlimited."
         ),
     )
+    process_workflow_task_parser.add_argument(
+        "--context-compaction-threshold",
+        type=float,
+        default=0.75,
+        help=(
+            "Compact durable-task context proactively at this fraction of the "
+            "model context window (default: 0.75)."
+        ),
+    )
     process_workflow_task_parser.add_argument("--verbose", action="store_true")
     process_workflow_task_parser.set_defaults(func=_run_process_workflow_task)
 
@@ -1301,6 +1310,7 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
             api_key=args.api_key,
             base_url=args.base_url,
             max_roundtrips=args.max_roundtrips,
+            context_compaction_threshold=args.context_compaction_threshold,
             verbose=args.verbose,
         ),
         stdout=sys.stdout,

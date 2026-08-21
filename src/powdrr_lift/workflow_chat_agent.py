@@ -746,6 +746,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stdout=self.stdout,
             stderr=self.stderr,
             provider=self.provider,
+            error_recorder=self._record_repair_error,
             model_mappings=tuple(ZAI_LLM_MAPPINGS.items())
             + tuple(
                 _active_llm_mappings(
@@ -779,6 +780,26 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         if self.workflow_context is not None:
             context["workflow"] = self.workflow_context.to_data()
         return context
+
+    def _record_repair_error(
+        self,
+        error: RuntimeError,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        """Record failures handled inside the automatic response-repair loop."""
+        record_workflow_llm_error(
+            self.state.error_log_root,
+            execution_mode="execute_selected_skill",
+            phase="llm_output_repair",
+            error=error,
+            context=self._llm_error_context(),
+            llm_output=payload,
+            guidance=_action_repair_prompt(
+                self.selected_skill,
+                failed_action=self.last_failed_action,
+                validation_error=str(error),
+            ),
+        )
 
     def report_roundtrip(self, roundtrip: int, action: SkillChatAction) -> None:
         print(
@@ -5824,6 +5845,7 @@ def _complete_json_with_repair(
                         repair_instructions=repair_instructions,
                         stderr=stderr,
                         verbose=config.verbose,
+                        error_recorder=error_recorder,
                     )
                 except _EmptyProviderResponseError as empty_exc:
                     empty_response_reprompts += 1
@@ -5985,6 +6007,7 @@ def _complete_json_with_repair(
                     previous_payload=payload,
                     stderr=stderr,
                     verbose=config.verbose,
+                    error_recorder=error_recorder,
                 )
             except _EmptyProviderResponseError as empty_exc:
                 empty_response_reprompts += 1
@@ -6668,6 +6691,7 @@ def _attempt_json_repair(
     stderr: TextIO,
     verbose: bool,
     previous_payload: dict[str, Any] | None = None,
+    error_recorder: Callable[[RuntimeError, dict[str, Any] | None], None] | None = None,
 ) -> dict[str, Any] | None:
     repair_messages = _build_json_repair_messages(
         messages,
@@ -6693,6 +6717,8 @@ def _attempt_json_repair(
         )
         return repaired_payload
     except RuntimeError as exc:
+        if error_recorder is not None:
+            error_recorder(exc, None)
         if isinstance(exc, LocalModelRuntimeError):
             raise
         if _is_empty_response_error(exc):

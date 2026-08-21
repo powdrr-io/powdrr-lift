@@ -4478,6 +4478,17 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
     assert exit_code == 0
     assert "Workflow invoke_tool action failed" in stderr.getvalue()
     assert len(captured_messages) == 4
+    error_records = [
+        json.loads(line)
+        for line in (repo_root / "workflow-llm-errors.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert any(
+        record["phase"] == "action_validation_or_execution"
+        and record["attempted_action"]["kind"] == "invoke_tool"
+        for record in error_records
+    )
 
 
 def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_calls(
@@ -6607,6 +6618,17 @@ def test_run_workflow_chat_repairs_missing_action_fields(
     assert cast(int, captured["calls"]) == 3
     assert "response needs repair" in stderr.getvalue()
     assert (worktree_root / "generated" / "skill-execution.json").exists()
+    error_records = [
+        json.loads(line)
+        for line in (repo_root / "workflow-llm-errors.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert any(
+        record["phase"] == "llm_output_repair"
+        and record["context"]["skill"]["step_index"] == 0
+        for record in error_records
+    )
 
 
 def test_empty_prompt_user_action_is_reprompted_until_question_is_present(

@@ -221,11 +221,12 @@ steps:
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Review the deterministic evaluator result and fix every reported issue with
-    yaml_edit. Each action must include the YAML file_path and a non-empty
+    Review only the latest deterministic evaluator result and fix every reported
+    issue with yaml_edit; do not reuse an older LLM explanation after the gate
+    has rerun. Each action must include the YAML file_path and a non-empty
     operations array. Use set_value with a JSON path array for scalar changes and
     upsert_item with section, id, and a complete value mapping for list entries.
-    For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not use gather_context or invoke_tool in this repair step; the evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use read_document, then apply yaml_edit without guessing.
+    For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not use gather_context or invoke_tool in this repair step; the evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use read_document, then apply yaml_edit without guessing. For entity_type_not_allowed, use the exact allowed_entity_types list from the latest evaluator result and edit only the reported entities[N].type path. Never confuse that field with entity_relationships[*].source or target: those fields contain entity ids and must not be changed to entity type names. Never alternate between File and Source file, change a different entity, or modify a value that already matches the latest allowed list. After the edit, choose next_step so deterministic evaluation can verify the current file; do not claim that your own reasoning proves validation passed.
 - id: gate-feature-specifications
   description: Confirm that every generated specification evaluates cleanly.
   step_type: gate

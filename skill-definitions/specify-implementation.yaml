@@ -5,7 +5,7 @@ when_to_use:
 - When the TUI should guide the user through a synchronous implementation flow.
 steps:
 - description: Review the system and architecture context first.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: Confirm the source architecture id and the relevant entities before drafting
     implementation detail.
@@ -30,13 +30,13 @@ steps:
       - "<work-item-name>"
 - description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: standard_reasoning
   details: Keep the implementation spec aligned with the source architecture version
     and do not invent new ids.
 - description: Validate the filled implementation template and resolve any reported
     issues.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Invoke the generic evaluator once for the current file. If it

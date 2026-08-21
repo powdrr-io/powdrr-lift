@@ -7,7 +7,7 @@ when_to_use:
   staged file set is known.
 steps:
 - description: Confirm the staged pull request scope and validation commands.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
@@ -37,7 +37,7 @@ steps:
     - --cached
     - --stat
 - description: Run the final formatting, lint, type-check, and test passes.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Run every validation command returned by the matching tool references for

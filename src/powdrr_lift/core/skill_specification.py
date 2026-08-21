@@ -18,7 +18,7 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
-SUPPORTED_STEP_TYPES = frozenset({"freeform-skill-invoke", "invoke_tool"})
+SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,7 +121,7 @@ class SkillStep:
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
-    step_type: str = "freeform-skill-invoke"
+    step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
 
     def to_data(self) -> dict[str, Any]:
@@ -473,14 +473,14 @@ def build_skill_validation_report(
                     )
                 )
 
-            step_type = step_mapping.get("step_type", "freeform-skill-invoke")
+            step_type = step_mapping.get("step_type", "freeform")
             normalized_step_type = _optional_string(step_type)
             if normalized_step_type not in SUPPORTED_STEP_TYPES:
                 issues.append(
                     SkillValidationIssue(
                         code="invalid_step_type_value",
                         message=(
-                            "Skill step step_type must be freeform-skill-invoke or "
+                            "Skill step step_type must be freeform or "
                             "invoke_tool."
                         ),
                         path=_child_path(step_path, "step_type"),
@@ -1177,10 +1177,10 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     """Parse the reusable executable-step shape used by skills and workflows."""
     step_id = _optional_string(data.get("id"))
     description = _required_string(data, "description")
-    step_type = _optional_string(data.get("step_type")) or "freeform-skill-invoke"
+    step_type = _optional_string(data.get("step_type")) or "freeform"
     if step_type not in SUPPORTED_STEP_TYPES:
         raise ValueError(
-            "Skill step step_type must be freeform-skill-invoke or invoke_tool."
+            "Skill step step_type must be freeform or invoke_tool."
         )
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
@@ -1200,7 +1200,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
             raise ValueError(
                 "invoke_tool steps must use pre_step instead of tool_invocations."
             )
-    if step_type == "freeform-skill-invoke" and pre_step is not None:
+    if step_type == "freeform" and pre_step is not None:
         raise ValueError("Only invoke_tool steps may declare pre_step.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))

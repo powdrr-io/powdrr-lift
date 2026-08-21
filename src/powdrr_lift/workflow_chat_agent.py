@@ -3654,7 +3654,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             '"provider_role":"adversarial","clean":true}.\n'
         )
     if (
-        getattr(current_step, "step_type", "freeform-skill-invoke") == "invoke_tool"
+        getattr(current_step, "step_type", "freeform") == "invoke_tool"
         and getattr(current_step, "pre_step", None) is not None
     ):
         prompt += (
@@ -3681,7 +3681,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "before next_step or complete. A prose summary is not a tool invocation.\n"
         )
     if (
-        getattr(current_step, "step_type", "freeform-skill-invoke") == "invoke_tool"
+        getattr(current_step, "step_type", "freeform") == "invoke_tool"
         and getattr(current_step, "pre_step", None) is None
     ):
         prompt += (
@@ -5383,7 +5383,7 @@ def _validate_internal_command(command: object) -> None:
 def _skill_step_to_data(step: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "description": step.description,
-        "step_type": getattr(step, "step_type", "freeform-skill-invoke"),
+        "step_type": getattr(step, "step_type", "freeform"),
         "details": step.details,
         "uses_skills": list(step.uses_skills),
     }

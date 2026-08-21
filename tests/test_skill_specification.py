@@ -78,13 +78,13 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
-                "step_type": "freeform-skill-invoke",
+                "step_type": "freeform",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
             {
                 "description": "Pull in the system context.",
-                "step_type": "freeform-skill-invoke",
+                "step_type": "freeform",
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
                 "prompt_catalogs": ["context_types", "skills"],
@@ -102,7 +102,7 @@ def test_skill_round_trips_through_json() -> None:
             },
             {
                 "description": "Summarize the result.",
-                "step_type": "freeform-skill-invoke",
+                "step_type": "freeform",
             },
         ],
     }
@@ -131,7 +131,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             expected_step_type = (
                 "invoke_tool"
                 if (path.name, index) in expected_invoke_tool_steps
-                else "freeform-skill-invoke"
+                else "freeform"
             )
             assert step["step_type"] == expected_step_type, (
                 f"{path}:{step_key}[{index}]"

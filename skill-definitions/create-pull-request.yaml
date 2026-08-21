@@ -21,7 +21,7 @@ steps:
       - --kind
       - <pr-kind>
 - description: Fill in the pull request description template.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Fill every section of the returned template using the validated work item,
@@ -36,7 +36,7 @@ steps:
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
 - description: Stage the exact files that belong in the pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Read the `files_to_publish` list from workflow context. It is authoritative
@@ -52,7 +52,7 @@ steps:
     - add
     - <files-to-publish>
 - description: Commit the validated changes.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Confirm with `git diff --cached --name-only` that the exact
@@ -73,7 +73,7 @@ steps:
     - -m
     - <commit-message>
 - description: Push the committed changes.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Push the current feature branch with its upstream set. Verify that the
@@ -89,7 +89,7 @@ steps:
     - origin
     - HEAD
 - description: Create a draft pull request when none exists.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     First verify that the current branch has at least one committed change
@@ -117,7 +117,7 @@ steps:
     - --body
     - <populated-pr-description>
 - description: Update the existing pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Use this step only when a pull request already exists for the current

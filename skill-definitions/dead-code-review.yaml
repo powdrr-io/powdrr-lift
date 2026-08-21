@@ -8,7 +8,7 @@ when_to_use:
   as inline pull-request comments.
 steps:
 - description: Discover the pull request and establish the exact change surface.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: long_context
   details: >-
     Inspect the referenced pull request's title, body, labels, commits, complete
@@ -46,7 +46,7 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Identify code made dead or duplicative by the pull request.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     For every candidate, trace definitions to all call sites, imports, registrations,
@@ -90,7 +90,7 @@ steps:
     command:
     - path=<candidate-python-file>
 - description: Validate each candidate and prepare precise inline findings.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Validate the candidate with the narrowest useful checks: inspect call-graph or
@@ -120,7 +120,7 @@ steps:
     - <candidate-symbol>
     - <repository-paths>
 - description: Post every actionable dead-code or duplication finding inline.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Check the target PR's existing review threads and inline comments before
@@ -160,7 +160,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
-  step_type: freeform-skill-invoke
+  step_type: freeform
   llm_type: standard_reasoning
   details: >-
     Re-read the target PR's inline comments after posting and verify every intended

@@ -74,7 +74,7 @@ class WorkflowTaskTemplate:
     output_state_type: str = "state"
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
-    step_type: str = "freeform-skill-invoke"
+    step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
 
     def __post_init__(self) -> None:
@@ -511,14 +511,14 @@ def build_workflow_template_validation_report(
             subject="workflow task template",
         )
 
-        step_type = raw_task_template_mapping.get("step_type", "freeform-skill-invoke")
+        step_type = raw_task_template_mapping.get("step_type", "freeform")
         if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="invalid_step_type_value",
                     message=(
                         "Workflow task template step_type must be "
-                        "freeform-skill-invoke or invoke_tool."
+                        "freeform or invoke_tool."
                     ),
                     path=_child_path(task_template_path, "step_type"),
                 )
@@ -545,7 +545,7 @@ def build_workflow_template_validation_report(
                     path=_child_path(task_template_path, "tool_invocations"),
                 )
             )
-        elif step_type == "freeform-skill-invoke" and pre_step is not None:
+        elif step_type == "freeform" and pre_step is not None:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="unexpected_pre_step",

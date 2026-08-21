@@ -11,6 +11,7 @@ import yaml
 
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_STEP_TYPES,
+    SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
     skill_step_from_data,
@@ -76,6 +77,7 @@ class WorkflowTaskTemplate:
     generation: WorkflowTaskTemplateGeneration | None = None
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
+    gate: SkillStepGate | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -107,6 +109,8 @@ class WorkflowTaskTemplate:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.pre_step is not None:
             step_data["pre_step"] = self.pre_step.to_data()
+        if self.gate is not None:
+            step_data["gate"] = self.gate.to_data()
         data.update({key: value for key, value in step_data.items() if value})
         if self.generation is not None:
             data["generation"] = self.generation.to_data()
@@ -505,6 +509,7 @@ def build_workflow_template_validation_report(
                 "output_state_type",
                 "dependent_state",
                 "generation",
+                "gate",
             },
             issues,
             path=task_template_path or "",
@@ -518,17 +523,19 @@ def build_workflow_template_validation_report(
                     code="invalid_step_type_value",
                     message=(
                         "Workflow task template step_type must be "
-                        "freeform or invoke_tool."
+                        "freeform, invoke_tool, or gate."
                     ),
                     path=_child_path(task_template_path, "step_type"),
                 )
             )
         pre_step = raw_task_template_mapping.get("pre_step")
-        if step_type == "invoke_tool" and not isinstance(pre_step, Mapping):
+        if step_type in {"invoke_tool", "gate"} and not isinstance(pre_step, Mapping):
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="missing_pre_step",
-                    message="invoke_tool task templates must declare a pre_step.",
+                    message=(
+                        "invoke_tool and gate task templates must declare a pre_step."
+                    ),
                     path=_child_path(task_template_path, "pre_step"),
                 )
             )
@@ -549,7 +556,9 @@ def build_workflow_template_validation_report(
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="unexpected_pre_step",
-                    message=("Only invoke_tool task templates may declare pre_step."),
+                    message=(
+                        "Only invoke_tool and gate task templates may declare pre_step."
+                    ),
                     path=_child_path(task_template_path, "pre_step"),
                 )
             )
@@ -918,6 +927,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         prompt_catalogs=step.prompt_catalogs,
         step_type=step.step_type,
         pre_step=step.pre_step,
+        gate=step.gate,
         output_state_type=output_state_type,
         dependent_state=dependent_state,
         generation=parsed_generation,

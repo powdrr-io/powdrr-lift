@@ -48,6 +48,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _find_skill_by_name,
+    _invalidate_deterministic_pre_step,
     _load_skill_catalog,
     _long_context_backup_for,
     _maybe_record_llm_exchanges,
@@ -63,6 +64,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_context,
     _resolve_worktree_file_path,
     _run_deterministic_pre_step,
+    _run_gate,
     _step_index_by_id,
     _validate_internal_command,
     _validate_workflow_action_outputs,
@@ -1949,6 +1951,49 @@ def _run_skill_for_agent(
                 handoff_records = parent_handoff_records
             continue
         step = current_skill.skill.steps[step_index]
+        if step.step_type == "gate":
+            if step.gate is None:
+                raise RuntimeError("gate steps require gate settings.")
+            passed = _run_gate(
+                step,
+                skill_name=current_skill.skill.name,
+                worktree_root=repo_root,
+                execution_events=execution_events,
+                execution_context=execution_context,
+                handoff_records=handoff_records,
+                step_index=step_index,
+                workflow_context=None,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=False,
+            )
+            target_index = step_index + 1
+            if not passed:
+                target_index = _step_index_by_id(current_skill, step.gate.goto_step)
+                _invalidate_deterministic_pre_step(
+                    execution_events,
+                    skill_name=current_skill.skill.name,
+                    step_index=target_index,
+                )
+                execution_events.append(
+                    {
+                        "kind": "goto_step",
+                        "skill": current_skill.skill.name,
+                        "step_id": step.gate.goto_step,
+                        "target_step_index": target_index,
+                        "source": "gate",
+                    }
+                )
+            stack[-1] = (
+                current_skill,
+                target_index,
+                clean_context,
+                parent_transcript,
+                parent_events,
+                parent_context,
+                handoff_records,
+            )
+            continue
         if step.step_type == "invoke_tool" and step.pre_step is not None:
             _run_deterministic_pre_step(
                 step,

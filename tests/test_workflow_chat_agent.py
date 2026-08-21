@@ -6408,6 +6408,29 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "kind": "next_step",
                         "outputs": {"feature_name": "display-related-photos"},
                     }
+                if prompt["current_step"].get("id") == "plan-proposed-prs":
+                    self._call_index += 1
+                    return {
+                        "kind": "next_step",
+                        "outputs": {
+                            "proposed_pr_names": ["display-related-photos-pr-001"]
+                        },
+                    }
+                if (
+                    prompt["current_step"].get("id")
+                    == "generate-implementation-specifications"
+                    and step_index in self._start_invoked_steps
+                ):
+                    self._call_index += 1
+                    return {
+                        "kind": "next_step",
+                        "outputs": {
+                            "implementation_specification_paths": [
+                                "docs/proposals/display-related-photos/"
+                                "display-related-photos-pr-001-implementation-specification.yaml"
+                            ]
+                        },
+                    }
                 self._call_index += 1
                 return {"kind": "next_step"}
             response = next(start_responses)

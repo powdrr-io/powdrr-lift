@@ -1089,7 +1089,11 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
         "remain and choose `next_step` immediately. If it reports validation "
         "errors, use the first-class `yaml_edit` action to address them before "
         "invoking the validator again; never route YAML edits through "
-        "`invoke_tool` or repeat the same validation command unchanged."
+        "`invoke_tool` or repeat the same validation command unchanged. For "
+        'example: {"action":"yaml_edit","file_path":"docs/proposals/'
+        '<work-item-name>/system-specification.yaml","operations":[{"op":'
+        '"upsert_item","section":"requirements","id":"requirement-id",'
+        '"value":{"description":"...","state":"added"}}]}.'
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",

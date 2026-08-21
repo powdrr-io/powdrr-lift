@@ -42,6 +42,8 @@ steps:
     rerun only after editing the file to address a reported validation error. If
     a repair is needed, use the first-class `yaml_edit` action directly; never
     invoke `powdrr-lift yaml-edit` through `invoke_tool` or an internal command.
+    For example:
+    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}.
   uses_skills:
   - review-system
   tool_invocations:

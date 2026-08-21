@@ -3741,9 +3741,6 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "the beginning of the document, and an end_line beyond EOF is clamped; "
         "complete may include a human-readable text; any action may include an "
         "outputs object when the current step declares outputs.\n"
-        "yaml_edit is a first-class action, not a command. Return it directly "
-        'with action="yaml_edit"; never wrap it in action="invoke_tool" or route '
-        "powdrr-lift yaml-edit through the internal or shell tool.\n"
         '{"action":"gather_context","feature_id":"display-related-photos",'
         '"types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
@@ -5855,12 +5852,13 @@ def _parse_workflow_action_invoke_tool(
             llm_type=llm_type,
         )
     command = parameters.get("command")
-    if normalized_tool in {"internal", "shell"} and _is_yaml_edit_command(command):
+    first_class_action = _first_class_action_from_command(command)
+    if normalized_tool in {"internal", "shell"} and first_class_action is not None:
         raise RuntimeError(
-            "YAML edits must use the first-class action `yaml_edit`, not "
-            "`invoke_tool` with an internal or shell command. Return an action "
-            'shaped like {"action":"yaml_edit","file_path":"...",'
-            '"operations":[...]}.'
+            f"Use the first-class action `{first_class_action}`, not "
+            f"`invoke_tool` with a {normalized_tool} command. Return this "
+            "kind of action directly: "
+            f"{_first_class_action_example(first_class_action)}"
         )
     if isinstance(command, str):
         normalized_parameters = dict(parameters)
@@ -5896,23 +5894,49 @@ def _parse_workflow_action_invoke_tool(
     raise RuntimeError("Workflow invoke_tool action command must be a string or array.")
 
 
-def _is_yaml_edit_command(command: object) -> bool:
+def _first_class_action_from_command(command: object) -> str | None:
     if isinstance(command, str):
         try:
             command_items = shlex.split(command)
         except ValueError:
-            return False
+            return None
     elif isinstance(command, Sequence) and not isinstance(
         command, (str, bytes, bytearray)
     ):
         command_items = list(command)
     else:
-        return False
-    return (
-        len(command_items) >= 2
-        and command_items[0] == "powdrr-lift"
-        and command_items[1] == "yaml-edit"
-    )
+        return None
+    if (
+        len(command_items) < 2
+        or not isinstance(command_items[0], str)
+        or not isinstance(command_items[1], str)
+        or command_items[0] != "powdrr-lift"
+    ):
+        return None
+    action_name = command_items[1].replace("-", "_")
+    if action_name in _workflow_action_parsers() and action_name != "invoke_tool":
+        return action_name
+    return None
+
+
+def _first_class_action_example(action_name: str) -> str:
+    examples = {
+        "gather_context": '{"action":"gather_context","types":["requirements"]}',
+        "prompt_user": '{"action":"prompt_user","text":"What is the decision?"}',
+        "edit": '{"action":"edit","file_path":"src/example.py","edits":[...]}',
+        "yaml_edit": (
+            '{"action":"yaml_edit","file_path":"docs/example.yaml","operations":[...]}'
+        ),
+        "invoke_skill": '{"action":"invoke_skill","skill":"skill-name"}',
+        "goto_step": '{"action":"goto_step","step_id":"step-id"}',
+        "read_document": (
+            '{"action":"read_document","file_path":"docs/example.md",'
+            '"start_line":0,"end_line":20}'
+        ),
+        "next_step": '{"action":"next_step"}',
+        "complete": '{"action":"complete"}',
+    }
+    return examples[action_name]
 
 
 def _parse_workflow_action_read_document(

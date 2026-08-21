@@ -3523,7 +3523,6 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "never use kind or action_input" in prompt
     assert "multiple independent edits" in prompt
     assert 'action":"yaml_edit"' in prompt
-    assert "never wrap it in" in prompt
 
 
 def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
@@ -4274,20 +4273,23 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
 
 
 @pytest.mark.parametrize("tool", ["internal", "shell"])
-def test_yaml_edit_command_must_use_first_class_action(tool: str) -> None:
-    with pytest.raises(RuntimeError, match="first-class action.*yaml_edit"):
+@pytest.mark.parametrize(
+    ("command", "expected_action"),
+    [
+        (["powdrr-lift", "yaml-edit"], "yaml_edit"),
+        (["powdrr-lift", "gather-context"], "gather_context"),
+        (["powdrr-lift", "next-step"], "next_step"),
+    ],
+)
+def test_first_class_command_must_use_first_class_action(
+    tool: str, command: list[str], expected_action: str
+) -> None:
+    with pytest.raises(RuntimeError, match=f"first-class action `{expected_action}`"):
         _parse_action_response(
             {
                 "action": "invoke_tool",
                 "tool": tool,
-                "parameters": {
-                    "command": [
-                        "powdrr-lift",
-                        "yaml-edit",
-                        "--file",
-                        "docs/proposals/example/system-specification.yaml",
-                    ]
-                },
+                "parameters": {"command": command},
             }
         )
 

@@ -1087,8 +1087,9 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
         "Invoke the generic evaluator exactly once after the specification "
         "edits. If it succeeds, use its result to confirm that no inconsistencies "
         "remain and choose `next_step` immediately. If it reports validation "
-        "errors, edit the specification to address them before invoking the "
-        "validator again; never repeat the same validation command unchanged."
+        "errors, use the first-class `yaml_edit` action to address them before "
+        "invoking the validator again; never route YAML edits through "
+        "`invoke_tool` or repeat the same validation command unchanged."
     )
     assert skill.steps[3].tool_invocations[0].command == (
         "powdrr-lift",

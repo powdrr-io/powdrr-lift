@@ -3741,6 +3741,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "the beginning of the document, and an end_line beyond EOF is clamped; "
         "complete may include a human-readable text; any action may include an "
         "outputs object when the current step declares outputs.\n"
+        "yaml_edit is a first-class action, not a command. Return it directly "
+        'with action="yaml_edit"; never wrap it in action="invoke_tool" or route '
+        "powdrr-lift yaml-edit through the internal or shell tool.\n"
         '{"action":"gather_context","feature_id":"display-related-photos",'
         '"types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
@@ -3985,6 +3988,12 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "pointer such as /title. For list sections, use one upsert_item per "
             "item with section, id, and a complete value mapping; do not replace "
             "the whole list with set_value.\n"
+            "yaml_edit is a first-class action, not a command. Return it directly "
+            'with action="yaml_edit", file_path, and operations; never wrap it in '
+            'action="invoke_tool" or route `powdrr-lift yaml-edit` through the '
+            "internal or shell tool. Example: "
+            '{"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml",'
+            '"operations":[{"op":"set_value","path":["title"],"value":"..."}]}\n'
         )
     if current_step.tool_invocations:
         prompt += (
@@ -5846,6 +5855,13 @@ def _parse_workflow_action_invoke_tool(
             llm_type=llm_type,
         )
     command = parameters.get("command")
+    if normalized_tool in {"internal", "shell"} and _is_yaml_edit_command(command):
+        raise RuntimeError(
+            "YAML edits must use the first-class action `yaml_edit`, not "
+            "`invoke_tool` with an internal or shell command. Return an action "
+            'shaped like {"action":"yaml_edit","file_path":"...",'
+            '"operations":[...]}.'
+        )
     if isinstance(command, str):
         normalized_parameters = dict(parameters)
         normalized_command = command.strip()
@@ -5878,6 +5894,25 @@ def _parse_workflow_action_invoke_tool(
             llm_type=llm_type,
         )
     raise RuntimeError("Workflow invoke_tool action command must be a string or array.")
+
+
+def _is_yaml_edit_command(command: object) -> bool:
+    if isinstance(command, str):
+        try:
+            command_items = shlex.split(command)
+        except ValueError:
+            return False
+    elif isinstance(command, Sequence) and not isinstance(
+        command, (str, bytes, bytearray)
+    ):
+        command_items = list(command)
+    else:
+        return False
+    return (
+        len(command_items) >= 2
+        and command_items[0] == "powdrr-lift"
+        and command_items[1] == "yaml-edit"
+    )
 
 
 def _parse_workflow_action_read_document(

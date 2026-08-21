@@ -3522,6 +3522,8 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "top-level action field" in prompt
     assert "never use kind or action_input" in prompt
     assert "multiple independent edits" in prompt
+    assert 'action":"yaml_edit"' in prompt
+    assert "never wrap it in" in prompt
 
 
 def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
@@ -4269,6 +4271,25 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
     assert "upsert_item" in feedback
     assert "multiple independent operations" in feedback
     assert "Do not use line numbers" in feedback
+
+
+@pytest.mark.parametrize("tool", ["internal", "shell"])
+def test_yaml_edit_command_must_use_first_class_action(tool: str) -> None:
+    with pytest.raises(RuntimeError, match="first-class action.*yaml_edit"):
+        _parse_action_response(
+            {
+                "action": "invoke_tool",
+                "tool": tool,
+                "parameters": {
+                    "command": [
+                        "powdrr-lift",
+                        "yaml-edit",
+                        "--file",
+                        "docs/proposals/example/system-specification.yaml",
+                    ]
+                },
+            }
+        )
 
 
 def test_edit_action_can_update_multiple_files_in_one_response(

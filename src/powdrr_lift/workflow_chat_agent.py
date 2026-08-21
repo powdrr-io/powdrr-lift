@@ -3893,8 +3893,16 @@ def _modular_action_system_prompt(current_step: Any) -> str:
     include_skills = _step_needs_prompt_catalog(current_step, "skills")
     prompt = (
         "Task: execute the supplied details using the handoff inputs, latest action "
-        "result, and allowed tools. Choose one "
+        "result, and available actions. Choose one "
         "action that makes progress without asking for information already present.\n"
+        "Available actions (choose exactly one): gather_context discovers checked-in "
+        "specifications; prompt_user asks one necessary human question; edit applies "
+        "line-based edits to non-YAML files; yaml_edit applies structural YAML "
+        "operations; invoke_skill runs a listed nested skill; invoke_tool runs one "
+        "declared command; read_document reads a bounded file range; goto_step "
+        "repeats a declared step; next_step advances after completion; complete ends "
+        "the skill. "
+        "The current-step contract below further restricts these options.\n"
         "Return exactly one JSON object with a top-level action field. The action "
         "field is the discriminator: never use kind or action_input. Include "
         "decisions_and_context when a later step needs it, and include outputs "
@@ -3987,8 +3995,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "the whole list with set_value.\n"
             "yaml_edit is a first-class action, not a command. Return it directly "
             'with action="yaml_edit", file_path, and operations; never wrap it in '
-            'action="invoke_tool" or route `powdrr-lift yaml-edit` through the '
-            "internal or shell tool. Example: "
+            'action="invoke_tool" through the internal or shell tool. Example: '
             '{"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml",'
             '"operations":[{"op":"set_value","path":["title"],"value":"..."}]}\n'
         )
@@ -4007,6 +4014,8 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "additional reasoning or edits in this step.\n"
         )
     prompt += (
+        "A yaml_edit action uses the exact fields file_path and operations; each "
+        "upsert_item uses section, id, and value.\n"
         "When a validation result contains corrective_action, apply it before "
         "retrying; do not repeat the same failed validation unchanged. Use edit "
         "only when current "
@@ -7300,19 +7309,35 @@ def _apply_yaml_operations(
                 )
             target: Any = updated
             for key in operation.path[:-1]:
-                if not isinstance(target, dict) or key not in target:
+                if isinstance(target, dict) and key in target:
+                    target = target[key]
+                    continue
+                if isinstance(target, list) and key.isdigit():
+                    index = int(key)
+                    if 0 <= index < len(target):
+                        target = target[index]
+                        continue
+                raise _WorkflowYamlEditError(
+                    f"set_value path {list(operation.path)!r} cannot find "
+                    f"mapping key or list index {key!r}. Re-read the YAML and "
+                    "use the exact path from the current document."
+                )
+            final_key = operation.path[-1]
+            if isinstance(target, dict):
+                target[final_key] = operation.value
+            elif isinstance(target, list) and final_key.isdigit():
+                index = int(final_key)
+                if not 0 <= index < len(target):
                     raise _WorkflowYamlEditError(
-                        f"set_value path {list(operation.path)!r} cannot find "
-                        f"mapping key {key!r}. Re-read the YAML and use existing "
-                        "mapping keys in the path."
+                        f"set_value list index {final_key!r} is outside the "
+                        f"current list of length {len(target)}."
                     )
-                target = target[key]
-            if not isinstance(target, dict):
+                target[index] = operation.value
+            else:
                 raise _WorkflowYamlEditError(
                     f"set_value path {list(operation.path)!r} does not resolve "
-                    "to a YAML mapping."
+                    "to a YAML mapping or list index."
                 )
-            target[operation.path[-1]] = operation.value
             continue
 
         if operation.section is None or operation.item_id is None:
@@ -7700,7 +7725,15 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
-    allowed_actions = ["prompt_user", "next_step"]
+    # Keep the complete first-class action catalog in the contract. The declared
+    # tool list constrains invoke_tool; it does not hide file/context actions.
+    allowed_actions = [
+        "edit",
+        "yaml_edit",
+        "read_document",
+        "prompt_user",
+        "next_step",
+    ]
     if invocations:
         allowed_actions.insert(0, "invoke_tool")
     if nested_skills:
@@ -7802,6 +7835,12 @@ def _action_repair_prompt(
             '"decisions_and_context":"More information is required."} or '
             '{"action":"next_step","decisions_and_context":"The current step '
             'is complete."}. '
+        )
+        prompt += (
+            'If the correction is a YAML edit, use exactly {"action":"yaml_edit",'
+            '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
+            '"path":["id"],"value":"feature-id"}]}; include all required '
+            "fields in the operation. "
         )
         if invocations:
             prompt += (

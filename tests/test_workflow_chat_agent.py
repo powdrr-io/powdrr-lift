@@ -4272,6 +4272,30 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
     assert "Do not use line numbers" in feedback
 
 
+def test_yaml_edit_set_value_supports_validator_list_indices() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/architecture.yaml",
+            "operations": [
+                {
+                    "op": "set_value",
+                    "path": ["entities", "0", "type"],
+                    "value": "Log",
+                }
+            ],
+        }
+    )
+
+    updated = _apply_yaml_operations(
+        Path("docs/architecture.yaml"),
+        "entities:\n  - id: log-entry\n    type: log\n",
+        action.yaml_operations,
+    )
+
+    assert yaml.safe_load(updated)["entities"][0]["type"] == "Log"
+
+
 @pytest.mark.parametrize("tool", ["internal", "shell"])
 @pytest.mark.parametrize(
     ("command", "expected_action"),
@@ -4493,6 +4517,20 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
     assert '"action":"prompt_user"' in prompt
     assert '"text":"What specific success criteria should this feature meet?"' in prompt
     assert "never use prompt, question, or action_input" in prompt
+    for action_name in (
+        "gather_context",
+        "prompt_user",
+        "edit",
+        "yaml_edit",
+        "invoke_skill",
+        "invoke_tool",
+        "read_document",
+        "goto_step",
+        "next_step",
+        "complete",
+    ):
+        assert action_name in prompt
+    assert "powdrr-lift yaml-edit" not in prompt
 
 
 def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) -> None:

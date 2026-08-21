@@ -319,7 +319,9 @@ def test_dynamic_validation_gate_round_trips() -> None:
                 description="Run every discovered check.",
                 validation_gate={
                     "id": "checks",
-                    "discovery": {"action": "gather_context"},
+                    "discovery": {
+                        "action": {"kind": "gather_context", "types": ["tools"]}
+                    },
                     "obligations": {"action_field": "validation_action"},
                 },
             ),

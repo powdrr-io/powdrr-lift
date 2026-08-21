@@ -651,7 +651,7 @@ def build_skill_validation_report(
                             )
                         )
                     if not isinstance(discovery, Mapping) or not isinstance(
-                        discovery.get("action"), str
+                        discovery.get("action"), Mapping
                     ):
                         issues.append(
                             SkillValidationIssue(
@@ -1345,7 +1345,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         if not isinstance(gate_id, str) or not gate_id.strip():
             raise ValueError("Skill step validation_gate.id must be non-empty.")
         if not isinstance(discovery, Mapping) or not isinstance(
-            discovery.get("action"), str
+            discovery.get("action"), Mapping
         ):
             raise ValueError(
                 "Skill step validation_gate.discovery must declare an action."

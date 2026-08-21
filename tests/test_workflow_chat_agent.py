@@ -811,7 +811,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         description="Run discovered checks.",
         validation_gate={
             "id": "checks",
-            "discovery": {"action": "gather_context"},
+            "discovery": {"action": {"kind": "gather_context"}},
             "obligations": {"action_field": "validation_action"},
         },
     )
@@ -904,7 +904,7 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
         validation_gate={
             "id": "repository-checks",
             "discovery": {
-                "action": "gather_context",
+                "action": {"kind": "gather_context"},
             },
             "obligations": {"action_field": "validation_action"},
         },
@@ -914,7 +914,7 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
         validation_gate={
             "id": "deployment-checks",
             "discovery": {
-                "action": "gather_context",
+                "action": {"kind": "gather_context"},
             },
             "obligations": {"action_field": "validation_action"},
         },

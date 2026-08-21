@@ -61,7 +61,13 @@ steps:
   validation_gate:
     id: pr-prep-validation
     discovery:
-      action: gather_context
+      action:
+        kind: gather_context
+        types:
+        - tools
+        filters:
+          labels:
+          - pr-prep
       result_path: matches
     obligations:
       item_path: item

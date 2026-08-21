@@ -4731,6 +4731,34 @@ def _nested_value(value: Any, path: str) -> Any:
     return current
 
 
+def _workflow_action_data(action: SkillChatAction) -> dict[str, Any]:
+    return {
+        "kind": action.kind,
+        "tool": action.tool,
+        "parameters": dict(action.parameters),
+        "types": list(action.types),
+        "keywords": list(action.keywords),
+        "filters": dict(action.filters),
+        "feature_id": action.feature_id,
+    }
+
+
+def _action_template_matches(
+    template: Mapping[str, Any],
+    actual: Mapping[str, Any],
+) -> bool:
+    for key, expected in template.items():
+        value = actual.get(key)
+        if isinstance(expected, Mapping):
+            if not isinstance(value, Mapping) or not _action_template_matches(
+                expected, value
+            ):
+                return False
+        elif value != expected:
+            return False
+    return True
+
+
 def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
@@ -4743,6 +4771,9 @@ def _discover_validation_obligations(
     discovery = config.get("discovery")
     if not isinstance(discovery, Mapping):
         raise RuntimeError("Validation gate discovery must be an object.")
+    discovery_action = discovery.get("action")
+    if not isinstance(discovery_action, Mapping):
+        raise RuntimeError("Validation gate discovery.action must be an action object.")
     matches = _nested_value(result, str(discovery.get("result_path", "matches")))
     if not isinstance(matches, Sequence) or isinstance(
         matches, (str, bytes, bytearray)
@@ -4804,7 +4835,12 @@ def _register_validation_gate_discovery(
         if gate_step_index <= state.step_index or config is None:
             continue
         discovery = config.get("discovery")
-        if not isinstance(discovery, Mapping) or discovery.get("action") != action.kind:
+        if not isinstance(discovery, Mapping):
+            continue
+        discovery_action = discovery.get("action")
+        if not isinstance(discovery_action, Mapping) or not _action_template_matches(
+            discovery_action, _workflow_action_data(action)
+        ):
             continue
         gate_state = _validation_gate_state(state, gate)
         if not gate_state.discovered:

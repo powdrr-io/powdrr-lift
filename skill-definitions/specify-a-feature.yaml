@@ -23,10 +23,12 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Ask the user about outcomes, edge cases, tests, and constraints for the
-    named feature. If the request already provides this information, continue
-    without asking. Otherwise ask one focused question with a prompt_user
-    action, for example:
+    Parse the request and conversation for the named feature's outcomes, edge
+    cases, tests, constraints, and any other details needed for a properly
+    detailed plan. Use your best judgment to identify what is still missing.
+    If the request already provides a detail, retain it without asking again.
+    Otherwise ask one focused question with a prompt_user action; repeat this
+    step after each answer until the plan has enough context. For example:
     {"action":"prompt_user","text":"What should this feature record, what should happen when it fails, and how will we test it?"}
 - id: generate-system-specification
   description: Generate the system specification template.

@@ -134,6 +134,7 @@ from powdrr_lift.core.skill_specification import (
     Skill,
     SkillDocument,
     SkillStep,
+    SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
     SkillStepPreStep,

@@ -8,8 +8,10 @@ import yaml
 from powdrr_lift.core import (
     Skill,
     SkillStep,
+    SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
+    SkillStepPreStep,
     SkillToolInvocation,
     build_skill_directory_validation_report,
     build_skill_validation_report,
@@ -125,13 +127,30 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("finish-pr-prep.yaml", 3),
                 ("create-pull-request.yaml", 0),
                 ("specify-system.yaml", 1),
+                ("specify-system.yaml", 3),
+                ("specify-system.yaml", 3),
                 ("specify-architecture.yaml", 1),
+                ("specify-architecture.yaml", 3),
+                ("specify-architecture.yaml", 3),
                 ("specify-implementation.yaml", 1),
+                ("specify-implementation.yaml", 3),
+                ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
+                ("specify-architecture.yaml", 3),
+            }
+            expected_gate_steps = {("specify-architecture.yaml", 5)}
+            expected_gate_steps = {
+                ("specify-system.yaml", 5),
+                ("specify-architecture.yaml", 5),
+                ("specify-implementation.yaml", 5),
             }
             expected_step_type = (
                 "invoke_tool"
                 if (path.name, index) in expected_invoke_tool_steps
+                else "gate"
+                if (path.name, index) in expected_gate_steps
+                else "gate"
+                if (path.name, index) in expected_gate_steps
                 else "freeform"
             )
             assert step["step_type"] == expected_step_type, (
@@ -260,6 +279,35 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
     )
 
     assert report.validation_successful is True
+
+
+def test_gate_step_round_trips_and_validates() -> None:
+    skill = Skill(
+        name="gated-work",
+        when_to_use=("When work needs an automated verification loop.",),
+        steps=(
+            SkillStep(id="repair", description="Repair the result."),
+            SkillStep(
+                id="verify",
+                description="Verify the result.",
+                step_type="gate",
+                pre_step=SkillStepPreStep(
+                    action="invoke_tool",
+                    template={"tool": "shell", "command": ["true"]},
+                ),
+                gate=SkillStepGate(
+                    outcome={"path": "returncode", "equals": 0},
+                    goto_step="repair",
+                    retry_context="Repair the result and run the verification again.",
+                ),
+            ),
+        ),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+
+    assert parsed == skill
+    assert build_skill_validation_report(skill_to_json(skill)).validation_successful
 
 
 def test_skill_validation_rejects_invoke_tool_without_pre_step() -> None:

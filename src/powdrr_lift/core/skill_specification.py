@@ -18,7 +18,7 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
-SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool"})
+SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +111,20 @@ class SkillStepPreStep:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillStepGate:
+    outcome: Mapping[str, Any]
+    goto_step: str
+    retry_context: str
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "outcome": dict(self.outcome),
+            "goto_step": self.goto_step,
+            "retry_context": self.retry_context,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -123,6 +137,7 @@ class SkillStep:
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
+    gate: SkillStepGate | None = None
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -145,6 +160,8 @@ class SkillStep:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
+        if self.gate is not None:
+            data["gate"] = self.gate.to_data()
         if self.inputs:
             data["inputs"] = [item.to_data() for item in self.inputs]
         if self.outputs:
@@ -411,6 +428,7 @@ def build_skill_validation_report(
                     "tool_invocations",
                     "prompt_catalogs",
                     "pre_step",
+                    "gate",
                     "inputs",
                     "outputs",
                 },
@@ -480,7 +498,8 @@ def build_skill_validation_report(
                     SkillValidationIssue(
                         code="invalid_step_type_value",
                         message=(
-                            "Skill step step_type must be freeform or invoke_tool."
+                            "Skill step step_type must be freeform, invoke_tool, "
+                            "or gate."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -495,7 +514,7 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "pre_step"),
                     )
                 )
-            elif normalized_step_type == "invoke_tool" and isinstance(
+            elif normalized_step_type in {"invoke_tool", "gate"} and isinstance(
                 pre_step, Mapping
             ):
                 _validate_gather_context_pre_step(pre_step, step_path, issues)
@@ -520,19 +539,22 @@ def build_skill_validation_report(
                 issues.append(
                     SkillValidationIssue(
                         code="unexpected_pre_step",
-                        message=("Only invoke_tool steps may declare pre_step."),
+                        message=(
+                            "Only invoke_tool and gate steps may declare pre_step."
+                        ),
                         path=_child_path(step_path, "pre_step"),
                     )
                 )
 
             raw_tool_invocations = step_mapping.get("tool_invocations")
-            if normalized_step_type == "invoke_tool":
+            if normalized_step_type in {"invoke_tool", "gate"}:
                 if pre_step is None:
                     issues.append(
                         SkillValidationIssue(
                             code="missing_pre_step",
                             message=(
-                                "invoke_tool steps must declare an invoke_tool or "
+                                "invoke_tool and gate steps must declare an "
+                                "invoke_tool or "
                                 "gather_context pre_step."
                             ),
                             path=_child_path(step_path, "pre_step"),
@@ -543,12 +565,66 @@ def build_skill_validation_report(
                         SkillValidationIssue(
                             code="unexpected_tool_invocations",
                             message=(
-                                "invoke_tool steps must use pre_step instead of "
+                                "invoke_tool and gate steps must use pre_step "
+                                "instead of "
                                 "tool_invocations."
                             ),
                             path=_child_path(step_path, "tool_invocations"),
                         )
                     )
+
+            raw_gate = step_mapping.get("gate")
+            if normalized_step_type == "gate":
+                if not isinstance(raw_gate, Mapping):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="missing_gate",
+                            message="gate steps must declare a gate object.",
+                            path=_child_path(step_path, "gate"),
+                        )
+                    )
+                else:
+                    outcome = raw_gate.get("outcome")
+                    outcome_path = (
+                        outcome.get("path") if isinstance(outcome, Mapping) else None
+                    )
+                    if (
+                        not isinstance(outcome, Mapping)
+                        or not isinstance(outcome_path, str)
+                        or not outcome_path.strip()
+                        or "equals" not in outcome
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_gate_outcome",
+                                message="gate outcome must declare path and equals.",
+                                path=_child_path(step_path, "gate.outcome"),
+                            )
+                        )
+                    if _optional_string(raw_gate.get("goto_step")) is None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="missing_gate_goto_step",
+                                message="gate must declare a non-empty goto_step.",
+                                path=_child_path(step_path, "gate.goto_step"),
+                            )
+                        )
+                    if _optional_string(raw_gate.get("retry_context")) is None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="missing_gate_retry_context",
+                                message="gate must declare non-empty retry_context.",
+                                path=_child_path(step_path, "gate.retry_context"),
+                            )
+                        )
+            elif raw_gate is not None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="unexpected_gate",
+                        message="Only gate steps may declare gate.",
+                        path=_child_path(step_path, "gate"),
+                    )
+                )
 
             uses_skills = step_mapping.get("uses_skills")
             if uses_skills is None:
@@ -1178,7 +1254,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     description = _required_string(data, "description")
     step_type = _optional_string(data.get("step_type")) or "freeform"
     if step_type not in SUPPORTED_STEP_TYPES:
-        raise ValueError("Skill step step_type must be freeform or invoke_tool.")
+        raise ValueError("Skill step step_type must be freeform, invoke_tool, or gate.")
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
     uses_skills = _optional_string_sequence(data.get("uses_skills"))
@@ -1187,11 +1263,12 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     pre_step = _parse_pre_step(data.get("pre_step"))
-    if step_type == "invoke_tool":
+    gate = _parse_gate(data.get("gate"))
+    if step_type in {"invoke_tool", "gate"}:
         if pre_step is None:
             raise ValueError(
-                "invoke_tool steps must declare an invoke_tool or gather_context "
-                "pre_step."
+                "invoke_tool and gate steps must declare an invoke_tool or "
+                "gather_context pre_step."
             )
         if tool_invocations:
             raise ValueError(
@@ -1199,6 +1276,10 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
             )
     if step_type == "freeform" and pre_step is not None:
         raise ValueError("Only invoke_tool steps may declare pre_step.")
+    if step_type == "gate" and gate is None:
+        raise ValueError("gate steps must declare a gate object.")
+    if step_type != "gate" and gate is not None:
+        raise ValueError("Only gate steps may declare gate.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     return SkillStep(
@@ -1211,6 +1292,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
         pre_step=pre_step,
+        gate=gate,
         inputs=inputs,
         outputs=outputs,
     )
@@ -1247,6 +1329,24 @@ def _parse_pre_step(value: object) -> SkillStepPreStep | None:
     return SkillStepPreStep(
         action=action,
         template=dict(template),
+    )
+
+
+def _parse_gate(value: object) -> SkillStepGate | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("Skill step gate must be an object.")
+    outcome = value.get("outcome")
+    if not isinstance(outcome, Mapping):
+        raise ValueError("Gate outcome must be an object.")
+    path = _optional_string(outcome.get("path"))
+    if path is None or "equals" not in outcome:
+        raise ValueError("Gate outcome must declare path and equals.")
+    return SkillStepGate(
+        outcome={**outcome, "path": path},
+        goto_step=_required_string(value, "goto_step"),
+        retry_context=_required_string(value, "retry_context"),
     )
 
 

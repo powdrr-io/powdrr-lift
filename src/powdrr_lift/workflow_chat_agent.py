@@ -661,6 +661,42 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 self.provider_role = nested_role
                 continue
+            if self.current_step.step_type == "gate":
+                passed = _run_gate(
+                    self.current_step,
+                    skill_name=self.selected_skill.skill.name,
+                    worktree_root=self.state.worktree_root,
+                    execution_events=self.state.execution_events,
+                    execution_context=self.state.execution_context,
+                    handoff_records=self.state.handoff_records,
+                    step_index=self.state.step_index,
+                    workflow_context=self.workflow_context,
+                    stdout=self.stdout,
+                    stderr=self.stderr,
+                    verbose=self.config.verbose,
+                )
+                if passed:
+                    self.state.step_index += 1
+                else:
+                    target_index = _step_index_by_id(
+                        self.selected_skill, self.current_step.gate.goto_step
+                    )
+                    _invalidate_deterministic_pre_step(
+                        self.state.execution_events,
+                        skill_name=self.selected_skill.skill.name,
+                        step_index=target_index,
+                    )
+                    self.state.step_index = target_index
+                    self.state.execution_events.append(
+                        {
+                            "kind": "goto_step",
+                            "step_id": self.current_step.gate.goto_step,
+                            "target_step_index": target_index,
+                            "source": "gate",
+                            "step_index": self.current_step_index,
+                        }
+                    )
+                continue
             if (
                 self.current_step.step_type == "invoke_tool"
                 and self.current_step.pre_step is not None
@@ -3133,6 +3169,23 @@ def _latest_deterministic_pre_step(
     return None
 
 
+def _invalidate_deterministic_pre_step(
+    execution_events: list[dict[str, Any]],
+    *,
+    skill_name: str,
+    step_index: int,
+) -> None:
+    execution_events[:] = [
+        event
+        for event in execution_events
+        if not (
+            event.get("kind") == "deterministic_pre_step"
+            and event.get("skill_name") == skill_name
+            and event.get("step_index") == step_index
+        )
+    ]
+
+
 def _pre_step_context_values(
     handoff_records: Mapping[str, Mapping[str, Any]],
     workflow_context: WorkflowContext | None,
@@ -3212,8 +3265,9 @@ def _run_deterministic_pre_step(
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
     verbose: bool = False,
+    force: bool = False,
 ) -> None:
-    if _latest_deterministic_pre_step(
+    if not force and _latest_deterministic_pre_step(
         execution_events,
         skill_name=skill_name,
         step_index=step_index,
@@ -3260,6 +3314,7 @@ def _run_deterministic_pre_step(
             raise RuntimeError(f"Unsupported invoke_tool pre-step tool: {tool!r}")
         event = {
             "kind": "deterministic_pre_step",
+            "skill_name": skill_name,
             "step_type": step.step_type,
             "action": pre_step.action,
             "tool": tool,
@@ -3316,6 +3371,69 @@ def _run_deterministic_pre_step(
         "Deterministic pre-step gather_context result:\n"
         + json.dumps(result, ensure_ascii=False)
     )
+
+
+def _gate_outcome_matches(
+    result: Mapping[str, Any], outcome: Mapping[str, Any]
+) -> bool:
+    value: Any = result
+    for component in str(outcome["path"]).split("."):
+        if not isinstance(value, Mapping) or component not in value:
+            return False
+        value = value[component]
+    return value == outcome["equals"]
+
+
+def _run_gate(
+    step: Any,
+    *,
+    skill_name: str,
+    worktree_root: Path,
+    execution_events: list[dict[str, Any]],
+    execution_context: list[str],
+    handoff_records: Mapping[str, Mapping[str, Any]],
+    step_index: int,
+    workflow_context: WorkflowContext | None,
+    stdout: TextIO,
+    stderr: TextIO,
+    verbose: bool,
+) -> bool:
+    if step.gate is None or step.pre_step is None:
+        raise RuntimeError("gate steps require gate and invoke_tool pre_step settings.")
+    before = len(execution_events)
+    _run_deterministic_pre_step(
+        step,
+        skill_name=skill_name,
+        worktree_root=worktree_root,
+        execution_events=execution_events,
+        execution_context=execution_context,
+        handoff_records=handoff_records,
+        step_index=step_index,
+        workflow_context=workflow_context,
+        stdout=stdout,
+        stderr=stderr,
+        verbose=verbose,
+        force=True,
+    )
+    event = execution_events[-1] if len(execution_events) > before else None
+    if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
+        raise RuntimeError("Gate tool did not produce a structured result.")
+    passed = _gate_outcome_matches(event["result"], step.gate.outcome)
+    gate_event = {
+        "kind": "gate",
+        "skill_name": skill_name,
+        "step_index": step_index,
+        "passed": passed,
+        "outcome": dict(step.gate.outcome),
+        "result": event["result"],
+    }
+    execution_events.append(gate_event)
+    if not passed:
+        execution_context.append(
+            f"Gate failed: {json.dumps(event['result'], ensure_ascii=False)}. "
+            + step.gate.retry_context
+        )
+    return passed
 
 
 def _build_step_execution_messages(

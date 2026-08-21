@@ -11,6 +11,7 @@ import yaml
 
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_STEP_TYPES,
+    SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
     skill_step_from_data,
@@ -88,6 +89,7 @@ class WorkflowTask:
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
+    gate: SkillStepGate | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -125,6 +127,8 @@ class WorkflowTask:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.pre_step is not None:
             step_data["pre_step"] = self.pre_step.to_data()
+        if self.gate is not None:
+            step_data["gate"] = self.gate.to_data()
         data.update({key: value for key, value in step_data.items() if value})
         return data
 
@@ -323,6 +327,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         prompt_catalogs=step.prompt_catalogs,
         step_type=step.step_type,
         pre_step=step.pre_step,
+        gate=step.gate,
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
@@ -522,6 +527,7 @@ def build_workflow_task_validation_report(
             "tool_invocations",
             "prompt_catalogs",
             "pre_step",
+            "gate",
         },
         issues,
         path=_format_path(source_path) or "",
@@ -538,11 +544,11 @@ def build_workflow_task_validation_report(
             )
         )
     pre_step = raw_task.get("pre_step")
-    if step_type == "invoke_tool" and not isinstance(pre_step, Mapping):
+    if step_type in {"invoke_tool", "gate"} and not isinstance(pre_step, Mapping):
         issues.append(
             WorkflowTaskValidationIssue(
                 code="missing_pre_step",
-                message="invoke_tool workflow tasks must declare a pre_step.",
+                message="invoke_tool and gate workflow tasks must declare a pre_step.",
                 path=_format_child_path(source_path, "pre_step"),
             )
         )

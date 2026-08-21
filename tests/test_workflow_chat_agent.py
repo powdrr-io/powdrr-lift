@@ -4864,6 +4864,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "rationale": "Add the gallery-photo entity from the architecture.",
                 },
             ],
+            "modules": [
+                {"id": "related-photos-module", "action": "added"},
+            ],
+            "tools": [
+                {"id": "related-photos-check", "action": "added"},
+            ],
             "entity_relationships": [
                 {
                     "id": "related-photo-groups-with-gallery-photo",

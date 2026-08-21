@@ -126,15 +126,28 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("finish-pr-prep.yaml", 2),
                 ("create-pull-request.yaml", 0),
                 ("specify-system.yaml", 1),
+                ("specify-system.yaml", 3),
+                ("specify-system.yaml", 3),
                 ("specify-architecture.yaml", 1),
+                ("specify-architecture.yaml", 3),
+                ("specify-architecture.yaml", 3),
                 ("specify-implementation.yaml", 1),
+                ("specify-implementation.yaml", 3),
+                ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
                 ("specify-architecture.yaml", 3),
             }
             expected_gate_steps = {("specify-architecture.yaml", 5)}
+            expected_gate_steps = {
+                ("specify-system.yaml", 5),
+                ("specify-architecture.yaml", 5),
+                ("specify-implementation.yaml", 5),
+            }
             expected_step_type = (
                 "invoke_tool"
                 if (path.name, index) in expected_invoke_tool_steps
+                else "gate"
+                if (path.name, index) in expected_gate_steps
                 else "gate"
                 if (path.name, index) in expected_gate_steps
                 else "freeform"

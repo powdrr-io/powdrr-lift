@@ -501,6 +501,7 @@ class _ValidationGateState:
     epoch: int = 0
     obligations: dict[str, _ValidationObligation] = field(default_factory=dict)
     correction_required: bool = False
+    discovery_action: Mapping[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -4918,15 +4919,24 @@ def _discover_validation_obligations(
     state: _WorkflowExecutionState,
     gate: Any,
     gate_step_index: int,
+    discovery_action: Mapping[str, Any] | None = None,
 ) -> None:
     config = _validation_gate_config(gate)
     assert config is not None
     discovery = config.get("discovery")
     if not isinstance(discovery, Mapping):
         raise RuntimeError("Validation gate discovery must be an object.")
-    discovery_action = discovery.get("action")
-    if not isinstance(discovery_action, Mapping):
+    configured_discovery_action = discovery.get("action")
+    if configured_discovery_action is not None and not isinstance(
+        configured_discovery_action, Mapping
+    ):
         raise RuntimeError("Validation gate discovery.action must be an action object.")
+    if configured_discovery_action is None and not isinstance(
+        discovery.get("input_ref"), str
+    ):
+        raise RuntimeError(
+            "Validation gate discovery must declare an action or input_ref."
+        )
     obligation_config = config.get("obligations")
     if not isinstance(obligation_config, Mapping):
         raise RuntimeError("Validation gate obligations must be an object.")
@@ -4979,6 +4989,27 @@ def _discover_validation_obligations(
     gate_state.epoch = 1
     gate_state.obligations = obligations
     gate_state.correction_required = False
+    gate_state.discovery_action = (
+        dict(discovery_action) if discovery_action is not None else None
+    )
+    output_name = discovery.get("output_ref")
+    if isinstance(output_name, str) and output_name.strip():
+        state.handoff_records[output_name.strip()] = {
+            "name": output_name.strip(),
+            "type": "any",
+            "value": [
+                {
+                    "obligation_id": obligation.obligation_id,
+                    "action": dict(obligation.expected_action),
+                }
+                for obligation in obligations.values()
+            ],
+            "produced_by": {
+                "step_index": state.step_index,
+                "action": "gather_context",
+            },
+            "scope": "skill",
+        }
 
 
 def _register_validation_gate_discovery(
@@ -4993,9 +5024,18 @@ def _register_validation_gate_discovery(
         if not isinstance(discovery, Mapping):
             continue
         discovery_action = discovery.get("action")
-        if not isinstance(discovery_action, Mapping) or not _action_template_matches(
-            discovery_action, _workflow_action_data(action)
-        ):
+        input_ref = discovery.get("input_ref")
+        matches_discovery = (
+            isinstance(discovery_action, Mapping)
+            and _action_template_matches(
+                discovery_action, _workflow_action_data(action)
+            )
+        ) or (
+            isinstance(input_ref, str)
+            and input_ref.strip()
+            and action.kind == "gather_context"
+        )
+        if not matches_discovery:
             continue
         gate_state = _validation_gate_state(state, gate)
         if not gate_state.discovered:
@@ -5011,6 +5051,7 @@ def _register_validation_gate_discovery(
                 state=state,
                 gate=gate,
                 gate_step_index=gate_step_index,
+                discovery_action=_workflow_action_data(action),
             )
 
 
@@ -5146,8 +5187,10 @@ def _record_dynamic_validation_result(
         gate_state.correction_required = True
         state.execution_context.append(
             "Validation failed for "
-            f"{obligation.obligation_id}; apply the reported corrective action, then "
-            "rerun every discovered validation obligation."
+            f"{obligation.obligation_id}. Exact result: "
+            f"{json.dumps(result, ensure_ascii=False, default=str)}. "
+            "Apply the corrective action indicated by that result, then rerun every "
+            "discovered validation obligation."
         )
 
 
@@ -5201,6 +5244,14 @@ def _validation_gate_prompt_data(
         "epoch": gate_state.epoch,
         "correction_required": gate_state.correction_required,
         "can_advance": not gate_state.correction_required and not incomplete,
+        "discovery_action": gate_state.discovery_action,
+        "discovered_tools": [
+            {
+                "obligation_id": obligation.obligation_id,
+                "action": dict(obligation.expected_action),
+            }
+            for obligation in gate_state.obligations.values()
+        ],
         "obligations": [
             obligation.to_data() for obligation in gate_state.obligations.values()
         ],
@@ -5395,7 +5446,7 @@ def _validate_workflow_step_transition(
         if incomplete:
             raise _WorkflowToolValidationError(
                 ValidationError(
-                    code="validation_tools_incomplete",
+                    code="validation_tool_obligations_incomplete",
                     message=(
                         "Every discovered validation obligation must pass before "
                         "advancing. "

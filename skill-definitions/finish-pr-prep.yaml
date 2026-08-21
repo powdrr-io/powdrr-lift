@@ -23,57 +23,49 @@ steps:
       - diff
       - --cached
       - --name-only
-- description: Confirm the staged pull request scope and validation commands.
+- description: Confirm the staged pull request scope.
   step_type: freeform
-  prompt_catalogs: [context_types]
-  llm_type: high_reasoning
+  llm_type: simple_task
   details: >-
-    Inspect the staged and unstaged diff before final validation. Confirm that
-    the intended pull-request files are staged and remove unrelated files from
-    the staged set. First invoke the declared `git diff --cached --stat` shell
-    command and use its result; do not substitute `git diff --cached --name-only`
-    or another Git command. Then use the gather_context action with type `tools` and filters
-    for label `pr-prep` and for every programming-language label represented by
-    the changed code. Discover those language labels from the staged files and
-    repository context; do not hard-code a language. Use the returned tool
-    references and their templates/how_to_use fields to determine the exact
-    test, formatting, lint, and type-check commands. The label filters must be
-    combined so each selected tool has the `pr-prep` label and every touched
-    language label. Do not infer commands from convention or hard-code
-    repository tooling. The deterministic_context from the prior step is
-    authoritative for the staged file names; an empty staged-file list is valid
-    and must not be treated as a command failure. If the intended scope or
-    applicable tool references are unclear, ask one precise question before
-    continuing. Before choosing next_step, perform the validation discovery
-    action exactly once as {"action":"gather_context","types":["tools"],
-    "filters":{"labels":["pr-prep"]}}; do not vary the filter key or add
-    keywords, because this discovery must register the next step's validation
-    obligations.
+    Invoke the declared `git diff --cached --stat` command once. Confirm from
+    its result that the staged set is the intended pull-request scope, then
+    choose next_step. Do not invoke another Git command in this step.
   tool_invocations:
-  - tool: ref
-    label: pr-prep
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
   - tool: shell
     command:
     - git
     - diff
     - --cached
     - --stat
+- description: Discover validation tools for the staged languages.
+  step_type: freeform
+  prompt_catalogs: [context_types]
+  llm_type: high_reasoning
+  details: >-
+    Read the staged file names from deterministic_context and derive every
+    programming-language label they represent. Invoke gather_context exactly
+    once with types [tools] and a labels filter containing pr-prep plus those
+    language labels. If no language labels are present, use only pr-prep. Do
+    not hard-code a language, tool, or command. For example, the action shape
+    is {"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep","<language-label>"]}}.
+    Choose next_step after the gather_context result is returned; that result
+    seeds both the validation tools shown to the next step and its runtime
+    obligations.
+  outputs:
+  - name: validation_tool_obligations
+    type: any
+    required_for_next_step: true
 - description: Run the final formatting, lint, type-check, and test passes.
   step_type: freeform
+  inputs:
+  - name: validation_tool_obligations
+    type: any
+    required: true
   validation_gate:
     id: pr-prep-validation
     discovery:
-      action:
-        kind: gather_context
-        types:
-        - tools
-        filters:
-          labels:
-          - pr-prep
+      input_ref: validation_tool_obligations
+      output_ref: validation_tool_obligations
       result_path: matches
     obligations:
       source: matches
@@ -83,19 +75,13 @@ steps:
       action: item.validation_action
   llm_type: fast_iteration
   details: >-
-    Run every validation command returned by the matching tool references for
-    the staged pull-request scope. The runtime validation gate is authoritative:
-    First perform its exact discovery action once as
-    {"action":"gather_context","types":["tools"],"filters":{"labels":["pr-prep"]}};
-    do not vary the filter key, use a singular label key, or add keywords.
-    Only after that discovery succeeds may you invoke its returned obligations.
-    invoke every discovered obligation and do not choose next_step, goto_step, or
-    complete until all obligations pass in the current validation epoch. If any
-    obligation fails, apply its corrective action, then rerun every discovered
-    obligation; a previously passing obligation must also be rerun after a correction.
-    If no obligations are discovered, the gate passes explicitly with an empty set. If any
-    formatter or cleanup step changes files, inspect those edits, restage only
-    the intended files, and rerun the complete discovered tool set.
+    Use the validation_tool_obligations handoff input as the sole validation action list.
+    Invoke every listed action and satisfy its corresponding runtime obligation
+    before choosing next_step, goto_step, or complete. If an obligation fails,
+    apply its corrective action and rerun every listed action, including actions
+    that passed previously. An empty validation_tool_obligations list is a valid passing
+    result. If a formatter or cleanup action changes files, inspect the edits,
+    restage only the intended files, and rerun the complete validation_tool_obligations list.
 - description: Leave the branch ready for pull request creation.
   step_type: invoke_tool
   llm_type: simple_task

@@ -103,6 +103,7 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_transcript,
     _prompt_user,
     _record_durable_fact,
+    _record_dynamic_validation_result,
     _request_token_budget,
     _resolve_api_key,
     _resolve_base_url,
@@ -975,6 +976,68 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
         .expected_action["tool"]
         == "internal"
     )
+
+
+def test_validation_failure_context_contains_exact_tool_result() -> None:
+    step = SkillStep(
+        description="Run discovered checks.",
+        validation_gate={"id": "checks"},
+    )
+    selected_skill = SkillCatalogEntry(
+        Path("skill.yaml"),
+        Skill(name="validation", when_to_use=(), steps=(step,)),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=[],
+        execution_events=[
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["uv", "run", "mypy"]},
+                "result": {
+                    "command": "uv run mypy",
+                    "returncode": 1,
+                    "stdout": "src/example.py:1: error",
+                    "stderr": "Found 1 error",
+                },
+            }
+        ],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+    state.validation_gates["checks"] = _ValidationGateState(
+        step_index=0,
+        discovered=True,
+        epoch=1,
+        obligations={
+            "mypy": _ValidationObligation(
+                obligation_id="mypy",
+                expected_action={
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["uv", "run", "mypy"]},
+                },
+                source={"id": "mypy"},
+            )
+        },
+    )
+
+    _record_dynamic_validation_result(
+        _parse_action_response(
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["uv", "run", "mypy"]},
+            }
+        ),
+        state,
+    )
+
+    assert '"returncode": 1' in state.execution_context[-1]
+    assert "src/example.py:1: error" in state.execution_context[-1]
+    assert "Found 1 error" in state.execution_context[-1]
 
 
 def test_action_schema_uses_action_and_internal_tool_must_be_declared() -> None:
@@ -6149,6 +6212,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._finish_invoked_steps: set[int] = set()
             self._finish_validation_commands: list[list[str]] | None = None
             self._finish_validation_index = 0
+            self._finish_scope_invoked = False
             self._finish_context_gathered = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
@@ -6191,19 +6255,28 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     return {"kind": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     step_index = int(prompt["current_step_index"])
-                    assert step_index < 4
-                    if step_index == 1 and not self._finish_context_gathered:
+                    assert step_index < 5
+                    if step_index == 1 and not self._finish_scope_invoked:
+                        self._finish_scope_invoked = True
+                        self._call_index += 1
+                        return {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {
+                                "command": ["git", "diff", "--cached", "--stat"]
+                            },
+                        }
+                    if step_index == 2 and not self._finish_context_gathered:
                         self._finish_context_gathered = True
                         self._call_index += 1
                         return {
                             "kind": "gather_context",
                             "types": ["tools"],
                             "filters": {
-                                "labels": ["pr-prep"],
-                                "keywords": ["test-no-match"],
+                                "labels": ["pr-prep", "python"],
                             },
                         }
-                    if step_index == 2:
+                    if step_index == 3:
                         validation_gate = cast(
                             dict[str, object], prompt.get("validation_gate", {})
                         )

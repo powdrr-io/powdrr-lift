@@ -23,7 +23,9 @@ from powdrr_lift.core.workflow_task_specification import (
     select_ready_workflow_tasks,
     validate_workflow_task_directory,
     workflow_task_from_json,
+    workflow_task_from_yaml,
     workflow_task_to_json,
+    workflow_task_to_yaml,
 )
 
 
@@ -55,6 +57,25 @@ def test_workflow_task_round_trips_through_json() -> None:
         "description": "Prepare the deployment environment.",
         "step_type": "freeform-skill-invoke",
     }
+
+
+def test_workflow_task_round_trips_through_yaml() -> None:
+    task = WorkflowTask(
+        task_id="task-1",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.LOW,
+        input_state={"environment": "staging"},
+        description="Prepare the deployment environment.",
+    )
+
+    yaml_text = workflow_task_to_yaml(task)
+    parsed = workflow_task_from_yaml(yaml_text)
+
+    assert parsed == task
+    assert "task_id: task-1" in yaml_text
+    assert "step_type: freeform-skill-invoke" in yaml_text
 
 
 def test_workflow_task_round_trips_executable_step_fields() -> None:

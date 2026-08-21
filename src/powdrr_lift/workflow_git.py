@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 WORKFLOW_GIT_STATE_FILENAME = ".workflow-git.json"
 
 
@@ -311,12 +313,21 @@ def inspect_workflow_run(
     tasks: list[dict[str, Any]] = []
     if state is not None:
         workflow_directory = integration_worktree / state.workflow_relative_directory
-        for task_path in sorted(workflow_directory.glob("*.json")):
+        for task_path in sorted(
+            path
+            for pattern in ("*.yaml", "*.yml", "*.json")
+            for path in workflow_directory.glob(pattern)
+        ):
             if task_path.name == WORKFLOW_GIT_STATE_FILENAME:
                 continue
             try:
-                task = json.loads(task_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
+                content = task_path.read_text(encoding="utf-8")
+                task = (
+                    yaml.safe_load(content)
+                    if task_path.suffix.lower() in {".yaml", ".yml"}
+                    else json.loads(content)
+                )
+            except (OSError, json.JSONDecodeError, yaml.YAMLError):
                 task = {"error": "could not read task file"}
             tasks.append(
                 {

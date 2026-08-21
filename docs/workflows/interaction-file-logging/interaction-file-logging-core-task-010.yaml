@@ -1,0 +1,37 @@
+task_id: interaction-file-logging-core-task-010
+status: open
+upstream_task_ids:
+- interaction-file-logging-core-task-005
+- interaction-file-logging-core-task-006
+- interaction-file-logging-core-task-007
+- interaction-file-logging-core-task-008
+- interaction-file-logging-core-task-009
+dependent_state:
+- staged-for-pull-request
+complexity: medium
+input_state:
+  implementation_diffs: interaction-file-logging-core-task-005.generated-product-code-state
+  test_results: interaction-file-logging-core-task-006.all-tests-passing-state
+  completeness_review: interaction-file-logging-core-task-007.specification-completeness-state
+  lint_results: interaction-file-logging-core-task-008.linted-and-cleaned-state
+  promoted_documents: interaction-file-logging-core-task-009.promoted-current-state-documents
+  staged_changes: {}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: staged-pull-request-state
+description: Stage the pull request changes
+details: 'Inspect the final diff and stage only the intended pull-request files. Ensure
+  the staged set matches the approved scope and record the staged paths in output_state
+  before final pull-request preparation.
+
+
+  Instantiation context: work item name is ''interaction-file-logging''; workflow
+  instance name is ''interaction-file-logging-core''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: simple_task
+tool_invocations:
+- tool: shell
+  command:
+  - git
+  - status
+  - --short

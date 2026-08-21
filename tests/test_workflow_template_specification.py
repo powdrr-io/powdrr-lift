@@ -488,8 +488,8 @@ def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
     assert first_directory == second_directory == output_root / "example-feature"
     assert first_tasks[0].task_id == "first-pr-task-001"
     assert second_tasks[0].task_id == "second-pr-task-001"
-    assert (first_directory / "first-pr-task-001.json").is_file()
-    assert (second_directory / "second-pr-task-001.json").is_file()
+    assert (first_directory / "first-pr-task-001.yaml").is_file()
+    assert (second_directory / "second-pr-task-001.yaml").is_file()
 
 
 def test_instantiate_execute_proposed_pr_fills_proposed_pr_context(

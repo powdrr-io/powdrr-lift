@@ -29,6 +29,7 @@ from powdrr_lift.core import (
     SkillStep,
     SkillStepInput,
     SkillStepOutput,
+    SkillStepPreStep,
     SkillToolInvocation,
     load_skill,
     save_skill,
@@ -86,6 +87,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execution_events_for_prompt,
     _handle_workflow_action_edit,
     _handle_workflow_action_read_document,
+    _latest_deterministic_pre_step,
     _latest_execution_event_for_prompt,
     _LLMExchangeRecordingClient,
     _load_workflow_context,
@@ -112,6 +114,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
+    _run_deterministic_pre_step,
     _serialize_messages,
     _validate_internal_command,
     _validate_user_question,
@@ -414,6 +417,112 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     )[0]["content"]
     assert "Context guidance:" in gather_system_prompt
     assert "Nested-skill guidance:" in gather_system_prompt
+
+
+def test_gather_context_and_filter_runs_deterministic_pre_step_once(
+    tmp_path: Path,
+) -> None:
+    current_root = tmp_path / "docs" / "current"
+    current_root.mkdir(parents=True)
+    (current_root / "requirements.yaml").write_text(
+        "requirements:\n"
+        "- id: requirement-1\n"
+        "  description: Keep the selected requirement.\n",
+        encoding="utf-8",
+    )
+    step = SkillStep(
+        description="Filter the gathered requirements.",
+        step_type="gather_context_and_filter",
+        pre_step=SkillStepPreStep(
+            action="gather_context",
+            template={
+                "feature_id": "<feature-id>",
+                "types": ["requirements"],
+                "keywords": ["selected"],
+            },
+        ),
+        outputs=(
+            SkillStepOutput(
+                name="filtered_requirements",
+                type="any",
+                required_for_next_step=True,
+            ),
+        ),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="filter", when_to_use=(), steps=(step,)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "feature_id": {
+                "name": "feature_id",
+                "value": "display-related-photos",
+            }
+        },
+    )
+
+    _run_deterministic_pre_step(
+        step,
+        skill_name="filter",
+        worktree_root=state.worktree_root,
+        execution_events=state.execution_events,
+        execution_context=state.execution_context,
+        handoff_records=state.handoff_records,
+        step_index=state.step_index,
+        workflow_context=WorkflowContext(worktree_root=tmp_path),
+    )
+    _run_deterministic_pre_step(
+        step,
+        skill_name="filter",
+        worktree_root=state.worktree_root,
+        execution_events=state.execution_events,
+        execution_context=state.execution_context,
+        handoff_records=state.handoff_records,
+        step_index=state.step_index,
+        workflow_context=WorkflowContext(worktree_root=tmp_path),
+    )
+
+    assert len(state.execution_events) == 1
+    event = state.execution_events[0]
+    assert event["kind"] == "deterministic_pre_step"
+    assert event["skill_name"] == "filter"
+    assert (
+        _latest_deterministic_pre_step(
+            state.execution_events,
+            skill_name="different-skill",
+            step_index=0,
+        )
+        is None
+    )
+    assert event["template"]["feature_id"] == "display-related-photos"
+    assert event["result"]["matches"]
+
+    prompt = json.loads(
+        _build_step_execution_messages(
+            selected_skill=state.selected_skill,
+            current_step=step,
+            current_step_index=0,
+            transcript=[],
+            execution_events=state.execution_events,
+            execution_context=state.execution_context,
+            handoff_records=state.handoff_records,
+            current_file_path=None,
+            worktree_root=tmp_path,
+            catalog=(state.selected_skill,),
+        )[1]["content"]
+    )
+    assert prompt["deterministic_context"]["source"] == "gather_context"
+    assert prompt["deterministic_context"]["scope"]["feature_id"] == (
+        "display-related-photos"
+    )
+    assert "details" in prompt["current_step"]
+    assert prompt["deterministic_context"]["result"]["matches"]
 
 
 def test_local_llama_client_errors_without_gpu_offload_support(
@@ -4746,6 +4855,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         relative_paths = (
             Path("templates") / "execute-proposed-pr.yaml",
             Path("src") / "powdrr_lift" / "core" / "workflow_template_specification.py",
+            Path("src") / "powdrr_lift" / "core" / "workflow_task_specification.py",
             Path("src") / "powdrr_lift" / "core" / "skill_specification.py",
             Path("src") / "powdrr_lift" / "core" / "spec_paths.py",
             Path("src") / "powdrr_lift" / "core" / "__init__.py",

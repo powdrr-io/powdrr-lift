@@ -15,6 +15,7 @@ how_to_fill_this_out:
   and review tasks complete.
 task_templates:
 - description: Gather context about the proposed PR
+  step_type: gather_context_and_filter
   prompt_catalogs: [context_types]
   complexity: high
   assignee_type: agent
@@ -25,34 +26,38 @@ task_templates:
     # This is the proposal directory under docs/proposals, not a semantic
     # feature entity ID from feature_ids or a nested features section.
     feature_id: <work-item-name>
+  pre_step:
+    action: gather_context
+    template:
+      feature_id: <feature_id>
+      types:
+      - proposed_prs
+      - requirements
+      - features
+      - acceptance_criteria
+      - expected_tests
+      - intent
+      - risks
+      - decisions
   details: >-
-    Resolve the proposed PR identified by input_state.proposed_pr within the
-    proposal directory identified by input_state.feature_id. Set the
-    gather_context action's feature_id to input_state.feature_id. The feature_id
-    value scopes proposal discovery to one proposal directory; request
-    the proposed_prs, requirements, features, acceptance_criteria, expected
-    tests, intent, risks, and decisions types. Treat input_state.proposed_pr
-    as a candidate identifier and verify it against the returned document; use
-    keywords only when the exact document ID is known. Do not use a semantic
-    feature ID or an implementation-specification filename as feature_id. For
-    example, use feature_id: interaction-file-logging with
-    proposed_pr: pr-interaction-capture-17 as
-    gather_context(feature_id: interaction-file-logging,
-    keywords: [pr-interaction-capture-17], types: [proposed_prs, requirements,
-    acceptance_criteria]). If proposed_pr is instead a workflow label such as
-    interaction-file-logging-core, omit keywords, inspect the returned
-    proposed_prs item, and use its canonical id.
-    the gathered context to identify the proposed PR, its goals,
-    scope, acceptance criteria, tests, dependencies, risks, and related
-    requirements. Use read_document only when a specific section of a known
-    document is needed. Do not guess a path when gathered context provides the
-    path. Record the exact specification path and all relevant implementation
-    context in output_state. If the lookup is ambiguous or returns no match,
-    choose prompt_user with one precise question instead of guessing.
+    Use the deterministic gathered context as the input for this step. Treat
+    input_state.feature_id as the proposal directory scope and
+    input_state.proposed_pr as the candidate to filter against the returned
+    proposed_prs matches and identify the canonical proposed PR. Then
+    summarize its goals, scope, acceptance criteria, tests, dependencies, risks,
+    and related requirements into the declared task output. If the candidate is
+    a workflow label, resolve it to the canonical proposed PR id from the
+    gathered matches. Preserve the exact specification path and record only the
+    relevant implementation context in output_state. Use read_document only
+    when a specific section of a known document is needed. If the result is
+    ambiguous or has no matching proposed PR, choose prompt_user with one
+    precise question instead of guessing. Do not invoke gather_context again or
+    guess a path.
   output_state_type: proposed-pr-context-state
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create a detailed execution plan
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -80,6 +85,7 @@ task_templates:
   dependent_state:
   - execution-plan-created
 - description: Generate tests that will validate the new functionality
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -105,6 +111,7 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Validate the tests do not pass
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -130,6 +137,7 @@ task_templates:
   dependent_state:
   - tests-proven-failing
 - description: Generate product code changes
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -158,6 +166,7 @@ task_templates:
   dependent_state:
   - product-code-generated
 - description: Validate all tests pass
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -180,6 +189,7 @@ task_templates:
   dependent_state:
   - all-tests-passing
 - description: Confirm functional completeness against the specification
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -209,6 +219,7 @@ task_templates:
   dependent_state:
   - specification-complete
 - description: Run lint, type checks, and cleanup
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -244,6 +255,7 @@ task_templates:
   dependent_state:
   - lint-and-cleanup-complete
 - description: Promote the implemented feature documents to current state
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -274,6 +286,7 @@ task_templates:
   dependent_state:
   - current-state-documents-promoted
 - description: Stage the pull request changes
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -299,6 +312,7 @@ task_templates:
   dependent_state:
   - staged-for-pull-request
 - description: Finish pull request preparation
+  step_type: freeform-skill-invoke
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -328,6 +342,7 @@ task_templates:
   dependent_state:
   - pull-request-prep-complete
 - description: Create the pull request
+  step_type: freeform-skill-invoke
   complexity: high
   assignee_type: human
   assignee_role: reviewer

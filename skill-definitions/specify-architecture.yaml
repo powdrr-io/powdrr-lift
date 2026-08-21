@@ -6,12 +6,14 @@ when_to_use:
 - When the TUI should guide the user through a synchronous architecture flow.
 steps:
 - description: Review the system context first.
+  step_type: freeform-skill-invoke
   llm_type: high_reasoning
   details: Use the system review flow to confirm the requirements, approach, and current
     constraints.
   uses_skills:
   - review-system
 - description: Generate the architecture specification template.
+  step_type: freeform-skill-invoke
   llm_type: simple_task
   details: Generate the architecture template with the full allowed entity type set
     so validation can enforce the schema.
@@ -26,10 +28,12 @@ steps:
     - "<type>"
 - description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
+  step_type: freeform-skill-invoke
   llm_type: high_reasoning
   details: Keep references explicit and make sure every invariant or guidance item
     points at listed entities or relationships.
 - description: Validate the filled architecture template and fix any validation errors.
+  step_type: freeform-skill-invoke
   llm_type: fast_iteration
   details: >-
     Invoke the generic evaluator once for the current file. If it

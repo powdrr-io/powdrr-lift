@@ -8,6 +8,7 @@ when_to_use:
   pull request for user review.
 steps:
 - description: Discover the feature specification and execution workflows.
+  step_type: freeform-skill-invoke
   llm_type: standard_reasoning
   details: >-
     Invoke the fuzzy-match tool first to discover candidates for the feature
@@ -60,6 +61,7 @@ steps:
     - "3"
     - -print
 - description: Bootstrap the project-wide module and tool structure from codebase evidence.
+  step_type: freeform-skill-invoke
   llm_type: standard_reasoning
   uses_skills:
   - bootstrap-code-structure
@@ -70,6 +72,7 @@ steps:
     from its returned context that the staged project-structure artifact is
     available before continuing.
 - description: Generate implementation specification templates for the proposed PRs.
+  step_type: freeform-skill-invoke
   llm_type: high_reasoning
   details: >-
     If proposed PR specifications or implementation specifications already
@@ -97,6 +100,7 @@ steps:
     - --output
     - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
 - description: Fill every generated implementation specification completely.
+  step_type: freeform-skill-invoke
   llm_type: high_reasoning
   details: >-
     For each generated implementation-specification file, replace every
@@ -109,6 +113,7 @@ steps:
     validate or instantiate workflows until every file is fully populated.
     Pass the exact filled paths and proposed-PR mapping to the validation step.
 - description: Validate every implementation specification before creating execution workflows.
+  step_type: freeform-skill-invoke
   llm_type: fast_iteration
   details: >-
     Run the single evaluate command once on the selected feature specification
@@ -127,6 +132,7 @@ steps:
     - evaluate
     - docs/proposals/<feature-name>
 - description: Instantiate an execution workflow for every validated proposed PR.
+  step_type: freeform-skill-invoke
   llm_type: simple_task
   details: >-
     If an execution workflow already exists for every proposed PR, inspect the
@@ -173,6 +179,7 @@ steps:
     - --template
     - templates/execute-proposed-pr.yaml
 - description: Verify workflow artifacts are in the active worktree.
+  step_type: freeform-skill-invoke
   llm_type: fast_iteration
   details: >-
     Inspect the instantiate-workflow result and the active repository state.
@@ -188,6 +195,7 @@ steps:
     - powdrr-lift
     - repository-state
 - description: Stage the validated artifacts for pull request preparation.
+  step_type: freeform-skill-invoke
   llm_type: simple_task
   details: >-
     Inspect the worktree and stage the validated implementation specifications
@@ -206,6 +214,7 @@ steps:
     - docs/proposals/<feature-name>
     - docs/workflows
 - description: Run finish-pr-prep before creating the draft pull request.
+  step_type: freeform-skill-invoke
   llm_type: fast_iteration
   details: >-
     Run finish-pr-prep after the validated planning artifacts are staged. If
@@ -214,6 +223,7 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Commit the validated artifacts and open a draft pull request.
+  step_type: freeform-skill-invoke
   llm_type: simple_task
   details: >-
     You must invoke create-pull-request with pr-kind `feature`, commit message
@@ -229,6 +239,7 @@ steps:
   uses_skills:
   - create-pull-request
 - description: Hand the draft pull request to the user for review.
+  step_type: freeform-skill-invoke
   llm_type: standard_reasoning
   details: >-
     Show the pull request URL. Summarize the feature specification used, every

@@ -18,6 +18,7 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
+SUPPORTED_STEP_TYPES = frozenset({"freeform-skill-invoke", "gather_context_and_filter"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +99,18 @@ class SkillStepOutput:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillStepPreStep:
+    action: str
+    template: Mapping[str, Any]
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "action": self.action,
+            "template": dict(self.template),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -108,9 +121,14 @@ class SkillStep:
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
+    step_type: str = "freeform-skill-invoke"
+    pre_step: SkillStepPreStep | None = None
 
     def to_data(self) -> dict[str, Any]:
-        data: dict[str, Any] = {"description": self.description}
+        data: dict[str, Any] = {
+            "description": self.description,
+            "step_type": self.step_type,
+        }
         if self.id is not None:
             data["id"] = self.id
         if self.details is not None:
@@ -125,6 +143,8 @@ class SkillStep:
             ]
         if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
+        if self.pre_step is not None:
+            data["pre_step"] = self.pre_step.to_data()
         if self.inputs:
             data["inputs"] = [item.to_data() for item in self.inputs]
         if self.outputs:
@@ -384,11 +404,13 @@ def build_skill_validation_report(
                 {
                     "id",
                     "description",
+                    "step_type",
                     "details",
                     "llm_type",
                     "uses_skills",
                     "tool_invocations",
                     "prompt_catalogs",
+                    "pre_step",
                     "inputs",
                     "outputs",
                 },
@@ -448,6 +470,62 @@ def build_skill_validation_report(
                         code="invalid_llm_type",
                         message="Skill step llm_type must be a non-empty string.",
                         path=_child_path(step_path, "llm_type"),
+                    )
+                )
+
+            step_type = step_mapping.get("step_type", "freeform-skill-invoke")
+            normalized_step_type = _optional_string(step_type)
+            if normalized_step_type not in SUPPORTED_STEP_TYPES:
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_step_type_value",
+                        message=(
+                            "Skill step step_type must be freeform-skill-invoke or "
+                            "gather_context_and_filter."
+                        ),
+                        path=_child_path(step_path, "step_type"),
+                    )
+                )
+
+            pre_step = step_mapping.get("pre_step")
+            if pre_step is not None and not isinstance(pre_step, Mapping):
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_pre_step_type",
+                        message="Skill step pre_step must be an object.",
+                        path=_child_path(step_path, "pre_step"),
+                    )
+                )
+            elif normalized_step_type == "gather_context_and_filter":
+                _validate_gather_context_pre_step(
+                    cast("Mapping[str, Any]", pre_step),
+                    step_path,
+                    issues,
+                )
+                outputs = step_mapping.get("outputs")
+                if (
+                    not isinstance(outputs, Sequence)
+                    or isinstance(outputs, (str, bytes, bytearray))
+                    or not outputs
+                ):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="missing_pre_step_outputs",
+                            message=(
+                                "gather_context_and_filter steps must declare at least "
+                                "one output."
+                            ),
+                            path=_child_path(step_path, "outputs"),
+                        )
+                    )
+            elif pre_step is not None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="unexpected_pre_step",
+                        message=(
+                            "Only gather_context_and_filter steps may declare pre_step."
+                        ),
+                        path=_child_path(step_path, "pre_step"),
                     )
                 )
 
@@ -1077,6 +1155,12 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     """Parse the reusable executable-step shape used by skills and workflows."""
     step_id = _optional_string(data.get("id"))
     description = _required_string(data, "description")
+    step_type = _optional_string(data.get("step_type")) or "freeform-skill-invoke"
+    if step_type not in SUPPORTED_STEP_TYPES:
+        raise ValueError(
+            "Skill step step_type must be freeform-skill-invoke or "
+            "gather_context_and_filter."
+        )
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
     uses_skills = _optional_string_sequence(data.get("uses_skills"))
@@ -1084,18 +1168,56 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         data.get("tool_invocations"),
     )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
+    pre_step = _parse_pre_step(data.get("pre_step"))
+    if step_type == "gather_context_and_filter" and pre_step is None:
+        raise ValueError(
+            "gather_context_and_filter requires a gather_context pre_step."
+        )
+    if step_type == "freeform-skill-invoke" and pre_step is not None:
+        raise ValueError("Only gather_context_and_filter steps may declare pre_step.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     return SkillStep(
         id=step_id,
         description=description,
+        step_type=step_type,
         details=details,
         llm_type=llm_type,
         uses_skills=uses_skills,
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
+        pre_step=pre_step,
         inputs=inputs,
         outputs=outputs,
+    )
+
+
+def _parse_pre_step(value: object) -> SkillStepPreStep | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("Skill step pre_step must be an object.")
+    action = _required_string(value, "action")
+    if action != "gather_context":
+        raise ValueError("Skill step pre_step action must be gather_context.")
+    template = value.get("template")
+    if not isinstance(template, Mapping):
+        raise ValueError("Skill step pre_step template must be an object.")
+    feature_id = _optional_string(template.get("feature_id"))
+    if feature_id is None:
+        raise ValueError("Gather context templates must include feature_id.")
+    types = template.get("types")
+    if (
+        not isinstance(types, Sequence)
+        or isinstance(types, (str, bytes, bytearray))
+        or not types
+    ):
+        raise ValueError(
+            "Gather context templates must include a non-empty types array."
+        )
+    return SkillStepPreStep(
+        action=action,
+        template=dict(template),
     )
 
 
@@ -1193,6 +1315,81 @@ def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
     if len(result) != len(set(result)):
         raise ValueError("Skill step prompt_catalogs must not contain duplicates.")
     return result
+
+
+def _validate_gather_context_pre_step(
+    value: object,
+    step_path: str,
+    issues: list[SkillValidationIssue],
+) -> None:
+    pre_step_path = _child_path(step_path, "pre_step")
+    if not isinstance(value, Mapping):
+        issues.append(
+            SkillValidationIssue(
+                code="missing_pre_step",
+                message=(
+                    "gather_context_and_filter steps must declare a pre_step object."
+                ),
+                path=pre_step_path,
+            )
+        )
+        return
+    _validate_unknown_keys(
+        value,
+        {"action", "template"},
+        issues,
+        path=pre_step_path or "",
+        subject="skill step pre_step",
+    )
+    action = _optional_string(value.get("action"))
+    if action != "gather_context":
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_pre_step_action",
+                message="Skill step pre_step action must be gather_context.",
+                path=_child_path(pre_step_path, "action"),
+            )
+        )
+    template = value.get("template")
+    if not isinstance(template, Mapping):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_pre_step_template",
+                message="Skill step pre_step template must be an object.",
+                path=_child_path(pre_step_path, "template"),
+            )
+        )
+        return
+    _validate_unknown_keys(
+        template,
+        {"feature_id", "types", "keywords", "filters"},
+        issues,
+        path=_child_path(pre_step_path, "template") or "",
+        subject="skill step pre_step template",
+    )
+    if _optional_string(template.get("feature_id")) is None:
+        issues.append(
+            SkillValidationIssue(
+                code="missing_pre_step_feature_id",
+                message="Gather context templates must include feature_id.",
+                path=_child_path(_child_path(pre_step_path, "template"), "feature_id"),
+            )
+        )
+    types = template.get("types")
+    if (
+        not isinstance(types, Sequence)
+        or isinstance(types, (str, bytes, bytearray))
+        or not types
+    ):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_pre_step_types",
+                message=(
+                    "Gather context templates must include a non-empty types array."
+                ),
+                path=_child_path(_child_path(pre_step_path, "template"), "types"),
+            )
+        )
 
 
 def _optional_tool_invocations(value: object) -> tuple[SkillToolInvocation, ...]:

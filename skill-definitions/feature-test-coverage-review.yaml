@@ -8,6 +8,7 @@ when_to_use:
   pull-request comments.
 steps:
 - description: Discover the referenced pull request and its feature relationship.
+  step_type: freeform-skill-invoke
   llm_type: long_context
   details: >-
     Inspect the referenced PR's title, body, labels, commits, changed files,
@@ -37,6 +38,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Select the feature test scope for the current pull request.
+  step_type: freeform-skill-invoke
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
@@ -52,6 +54,7 @@ steps:
     only on PR prose. Record the exact requested
     test cases, acceptance criteria that require tests, and validation commands.
 - description: Build the requested-test coverage matrix.
+  step_type: freeform-skill-invoke
   llm_type: high_reasoning
   details: >-
     Read the feature definition and selected proposed-PR specifications, then
@@ -70,6 +73,7 @@ steps:
     as an unjustified scope finding. Do not demand tests for behavior explicitly
     outside the feature's scope. The matrix is the basis for findings.
 - description: Post every actionable test coverage finding inline.
+  step_type: freeform-skill-invoke
   llm_type: simple_task
   details: >-
     Check existing unresolved review threads before posting. Post each actionable
@@ -107,6 +111,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted coverage review and report the audit result.
+  step_type: freeform-skill-invoke
   llm_type: standard_reasoning
   details: >-
     Confirm that every intended finding exists on the target PR, is attached to

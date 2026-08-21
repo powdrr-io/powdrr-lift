@@ -53,6 +53,7 @@ def test_workflow_task_round_trips_through_json() -> None:
         "assignee_role": "coder",
         "output_state_type": "state",
         "description": "Prepare the deployment environment.",
+        "step_type": "freeform-skill-invoke",
     }
 
 

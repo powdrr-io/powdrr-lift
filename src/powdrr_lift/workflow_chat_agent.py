@@ -658,6 +658,17 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 self.provider_role = nested_role
                 continue
+            if self.current_step.step_type == "gather_context_and_filter":
+                _run_deterministic_pre_step(
+                    self.current_step,
+                    skill_name=self.selected_skill.skill.name,
+                    worktree_root=self.state.worktree_root,
+                    execution_events=self.state.execution_events,
+                    execution_context=self.state.execution_context,
+                    handoff_records=self.state.handoff_records,
+                    step_index=self.state.step_index,
+                    workflow_context=self.workflow_context,
+                )
             step_mapping = (
                 _resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,
@@ -2932,6 +2943,160 @@ def _truncate_prompt_content(content: str) -> str:
     )
 
 
+_PRE_STEP_PLACEHOLDER = re.compile(r"<([^<>]+)>")
+
+
+def _latest_deterministic_pre_step(
+    execution_events: Sequence[Mapping[str, Any]],
+    *,
+    skill_name: str,
+    step_index: int,
+) -> Mapping[str, Any] | None:
+    for event in reversed(execution_events):
+        if (
+            event.get("kind") == "deterministic_pre_step"
+            and event.get("skill_name") == skill_name
+            and event.get("step_index") == step_index
+        ):
+            return event
+    return None
+
+
+def _pre_step_context_values(
+    handoff_records: Mapping[str, Mapping[str, Any]],
+    workflow_context: WorkflowContext | None,
+) -> dict[str, Any]:
+    values: dict[str, Any] = {}
+
+    def add(name: object, value: object) -> None:
+        if not isinstance(name, str) or value is None:
+            return
+        normalized = re.sub(r"[-\s]+", "_", name.strip().lower())
+        if normalized:
+            values[normalized] = value
+
+    if workflow_context is not None:
+        for name, value in workflow_context.to_data().items():
+            add(name, value)
+    for name, record in handoff_records.items():
+        if isinstance(record, Mapping):
+            add(name, record.get("value"))
+    return values
+
+
+def _resolve_pre_step_template(
+    value: Any,
+    context_values: Mapping[str, Any],
+) -> Any:
+    if isinstance(value, str):
+        exact = _PRE_STEP_PLACEHOLDER.fullmatch(value.strip())
+        if exact is not None:
+            key = re.sub(r"[-\s]+", "_", exact.group(1).strip().lower())
+            if key not in context_values:
+                raise RuntimeError(
+                    f"Deterministic pre-step placeholder <{exact.group(1)}> "
+                    "is not present in the input context."
+                )
+            return context_values[key]
+
+        def replace_match(match: re.Match[str]) -> str:
+            key = re.sub(r"[-\s]+", "_", match.group(1).strip().lower())
+            if key not in context_values:
+                raise RuntimeError(
+                    f"Deterministic pre-step placeholder <{match.group(1)}> "
+                    "is not present in the input context."
+                )
+            replacement = context_values[key]
+            if isinstance(replacement, (Mapping, Sequence)) and not isinstance(
+                replacement, (str, bytes, bytearray)
+            ):
+                raise RuntimeError(
+                    f"Deterministic pre-step placeholder <{match.group(1)}> "
+                    "must be the complete template value when its context value "
+                    "is structured."
+                )
+            return str(replacement)
+
+        return _PRE_STEP_PLACEHOLDER.sub(replace_match, value)
+    if isinstance(value, Mapping):
+        return {
+            key: _resolve_pre_step_template(item, context_values)
+            for key, item in value.items()
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_resolve_pre_step_template(item, context_values) for item in value]
+    return value
+
+
+def _run_deterministic_pre_step(
+    step: Any,
+    *,
+    skill_name: str,
+    worktree_root: Path,
+    execution_events: list[dict[str, Any]],
+    execution_context: list[str],
+    handoff_records: Mapping[str, Mapping[str, Any]],
+    step_index: int,
+    workflow_context: WorkflowContext | None,
+) -> None:
+    if _latest_deterministic_pre_step(
+        execution_events,
+        skill_name=skill_name,
+        step_index=step_index,
+    ):
+        return
+    pre_step = step.pre_step
+    if pre_step is None or pre_step.action != "gather_context":
+        raise RuntimeError(
+            "gather_context_and_filter requires a gather_context pre_step."
+        )
+    template = _resolve_pre_step_template(
+        pre_step.template,
+        _pre_step_context_values(handoff_records, workflow_context),
+    )
+    if not isinstance(template, Mapping):
+        raise RuntimeError("Deterministic pre-step template must resolve to an object.")
+    raw_types = template.get("types")
+    if (
+        not isinstance(raw_types, Sequence)
+        or isinstance(raw_types, (str, bytes, bytearray))
+        or not raw_types
+    ):
+        raise RuntimeError("Deterministic gather_context template requires types.")
+    feature_id = template.get("feature_id")
+    if not isinstance(feature_id, str) or not feature_id.strip():
+        raise RuntimeError("Deterministic gather_context template requires feature_id.")
+    keywords = template.get("keywords")
+    filters = template.get("filters")
+    gathered_context = gather_specification_context(
+        worktree_root,
+        types=[str(value) for value in raw_types],
+        keywords=(
+            [str(value) for value in keywords]
+            if isinstance(keywords, Sequence)
+            and not isinstance(keywords, (str, bytes, bytearray))
+            else None
+        ),
+        filters=dict(filters) if isinstance(filters, Mapping) else None,
+        feature_id=feature_id,
+    )
+    result = json.loads(render_gather_context_report(gathered_context))
+    event = {
+        "kind": "deterministic_pre_step",
+        "skill_name": skill_name,
+        "step_type": step.step_type,
+        "action": pre_step.action,
+        "template": template,
+        "result": result,
+        "step_index": step_index,
+    }
+    execution_events.append(event)
+    execution_context.append(
+        "Deterministic pre-step gather_context result:\n"
+        + json.dumps(result, ensure_ascii=False)
+    )
+
+
 def _build_step_execution_messages(
     *,
     selected_skill: SkillCatalogEntry,
@@ -3033,6 +3198,17 @@ def _build_step_execution_messages(
             }
             for entry in catalog
         ]
+    pre_step_event = _latest_deterministic_pre_step(
+        execution_events,
+        skill_name=selected_skill.skill.name,
+        step_index=current_step_index,
+    )
+    if pre_step_event is not None:
+        prompt_data["deterministic_context"] = {
+            "source": pre_step_event["action"],
+            "scope": pre_step_event["template"],
+            "result": pre_step_event["result"],
+        }
     return [
         {
             "role": "system",
@@ -3270,6 +3446,11 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "invalid until a declared tool has been invoked successfully for that "
         "step.\n"
         "Use complete when the skill is finished.\n"
+        "For gather_context_and_filter steps, the deterministic gather_context "
+        "pre-step already ran. The deterministic_context field in the step prompt "
+        "is the context for this step. Do not gather again; use that context and "
+        "the current step details to assign filtered or summarized values to the "
+        "declared outputs before choosing next_step or complete.\n"
         "Always include decisions_and_context with the concise information "
         "future steps will need. Keep it to one short sentence explaining why "
         "you chose this action or what it enables next; it is shown in progress "
@@ -3321,6 +3502,17 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "skill should receive only explicit context.\n"
             'Example: {"kind":"invoke_skill","skill":"adversarial-review",'
             '"provider_role":"adversarial","clean":true}.\n'
+        )
+    if getattr(current_step, "step_type", "freeform-skill-invoke") == (
+        "gather_context_and_filter"
+    ):
+        prompt += (
+            "Deterministic context: gather_context has already run using the "
+            "resolved pre_step template. The deterministic_context field is the "
+            "context for this step; do not invoke gather_context again. Use it and "
+            "the current step details to put filtered or summarized values in "
+            "outputs using exactly "
+            "the declared output names before choosing next_step or complete.\n"
         )
     if getattr(current_step, "prompt_catalogs", None) is None or include_context:
         prompt += (
@@ -5033,6 +5225,7 @@ def _validate_internal_command(command: object) -> None:
 def _skill_step_to_data(step: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "description": step.description,
+        "step_type": getattr(step, "step_type", "freeform-skill-invoke"),
         "details": step.details,
         "uses_skills": list(step.uses_skills),
     }
@@ -5043,6 +5236,8 @@ def _skill_step_to_data(step: Any) -> dict[str, Any]:
             _tool_invocation_to_data(tool_invocation)
             for tool_invocation in step.tool_invocations
         ]
+    if getattr(step, "pre_step", None) is not None:
+        data["pre_step"] = step.pre_step.to_data()
     return data
 
 

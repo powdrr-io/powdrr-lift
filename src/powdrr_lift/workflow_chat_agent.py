@@ -66,6 +66,7 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
+from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
     WorkflowActionObservation,
@@ -458,6 +459,7 @@ class _WorkflowExecutionState:
     execution_context: list[str]
     step_index: int
     worktree_root: Path
+    error_log_root: Path = Path(".")
     handoff_records: dict[str, dict[str, Any]] = field(default_factory=dict)
     durable_facts: dict[str, dict[str, Any]] = field(default_factory=dict)
     current_file_path: Path | None = None
@@ -759,6 +761,25 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     def material_state(self, action: SkillChatAction) -> object:
         return _workflow_action_material_state(action, self.state)
 
+    def _llm_error_context(self) -> dict[str, Any]:
+        step = self.current_step
+        context: dict[str, Any] = {
+            "skill": {
+                "name": self.selected_skill.skill.name,
+                "path": str(self.selected_skill.path),
+                "step_index": self.current_step_index,
+                "step_id": getattr(step, "id", None),
+                "description": getattr(step, "description", None),
+                "details": getattr(step, "details", None),
+            },
+            "worktree_root": str(self.state.worktree_root),
+            "provider": self.provider,
+            "model": self.current_model,
+        }
+        if self.workflow_context is not None:
+            context["workflow"] = self.workflow_context.to_data()
+        return context
+
     def report_roundtrip(self, roundtrip: int, action: SkillChatAction) -> None:
         print(
             f"Workflow chat LLM action:\n{_workflow_action_signature(action)}",
@@ -911,7 +932,19 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         error: RuntimeError,
         payload: dict[str, Any] | None,
     ) -> None:
-        _ = payload
+        record_workflow_llm_error(
+            self.state.error_log_root,
+            execution_mode="execute_selected_skill",
+            phase="llm_output_parse",
+            error=error,
+            context=self._llm_error_context(),
+            llm_output=payload,
+            guidance=_action_repair_prompt(
+                self.selected_skill,
+                failed_action=self.last_failed_action,
+                validation_error=str(error),
+            ),
+        )
         raise error
 
     def record_action_error(self, action: SkillChatAction, error: Exception) -> None:
@@ -927,6 +960,15 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _write_agent_error(
             self.state.worktree_root,
             feedback + _rejected_edit_guidance(action),
+        )
+        record_workflow_llm_error(
+            self.state.error_log_root,
+            execution_mode="execute_selected_skill",
+            phase="action_validation_or_execution",
+            error=error,
+            context=self._llm_error_context(),
+            attempted_action=json.loads(signature),
+            guidance=feedback + _rejected_edit_guidance(action),
         )
         self.last_failed_action = action
         self.state.transcript.extend(
@@ -1775,6 +1817,7 @@ def run_workflow_chat(
     | None = None,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
+    error_log_root = _resolve_project_root(configured_repo_root, configured_repo_root)
     project_root = configured_repo_root
     workflow_context = _load_workflow_context(project_root)
     skills_dir = config.skills_dir
@@ -1853,6 +1896,35 @@ def run_workflow_chat(
     selection: SkillChatSelection | None = None
     skill_announced = False
 
+    def record_selection_error(
+        error: RuntimeError,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        record_workflow_llm_error(
+            error_log_root,
+            execution_mode="select_skill",
+            phase="llm_output_parse",
+            error=error,
+            context={
+                "request": user_request,
+                "skills_dir": str(skills_dir),
+                "available_skills": [
+                    {
+                        "name": entry.skill.name,
+                        "path": str(entry.path),
+                    }
+                    for entry in catalog
+                ],
+                "provider": provider,
+                "model": current_model,
+                "workflow": (
+                    workflow_context.to_data() if workflow_context is not None else None
+                ),
+            },
+            llm_output=payload,
+            guidance=_selection_repair_prompt(catalog),
+        )
+
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
         selection, current_model, provider = _complete_json_with_model_fallback(
@@ -1872,6 +1944,7 @@ def run_workflow_chat(
             stdout=stdout,
             stderr=stderr,
             provider=provider,
+            error_recorder=record_selection_error,
             model_mappings=_active_llm_mappings(config, provider_roles, provider_role),
         )
         if selection is None:
@@ -1961,6 +2034,7 @@ def run_workflow_chat(
         execution_context=[],
         step_index=0,
         worktree_root=worktree_root,
+        error_log_root=project_root,
         handoff_records=_workflow_context_handoff_records(workflow_context),
     )
     root_skill = selected_skill
@@ -5535,6 +5609,7 @@ def _complete_json_with_model_fallback(
     model_mappings: Sequence[tuple[str, LLMModelMapping]],
     provider: str,
     empty_response_fallback_payload: dict[str, Any] | None = None,
+    error_recorder: Callable[[RuntimeError, dict[str, Any] | None], None] | None = None,
 ) -> tuple[Any | None, str, str]:
     active_model = model
     active_provider = provider
@@ -5585,6 +5660,7 @@ def _complete_json_with_model_fallback(
                     _backup_model_for(active_model, model_mappings) is not None
                 ),
                 empty_response_fallback_payload=empty_response_fallback_payload,
+                error_recorder=error_recorder,
             )
             return result, active_model, active_provider
         except _ModelUnavailableError as exc:
@@ -5645,6 +5721,7 @@ def _complete_json_with_repair(
     stderr: TextIO,
     fallback_on_transient_exhaustion: bool = False,
     empty_response_fallback_payload: dict[str, Any] | None = None,
+    error_recorder: Callable[[RuntimeError, dict[str, Any] | None], None] | None = None,
 ) -> Any | None:
     empty_question_reprompts = 0
     empty_response_reprompts = 0
@@ -5666,6 +5743,8 @@ def _complete_json_with_repair(
                 payload,
             )
         except RuntimeError as exc:
+            if error_recorder is not None:
+                error_recorder(exc, None)
             if isinstance(exc, LocalModelRuntimeError):
                 raise
             if _is_model_unavailable_error(exc):
@@ -5694,6 +5773,8 @@ def _complete_json_with_repair(
                         )
                         break
                     except RuntimeError as retry_exc:
+                        if error_recorder is not None:
+                            error_recorder(retry_exc, None)
                         if _is_model_unavailable_error(retry_exc):
                             raise _ModelUnavailableError(
                                 f"provider reported that model {model!r} is unavailable"
@@ -5706,6 +5787,8 @@ def _complete_json_with_repair(
                     try:
                         return parser(payload)
                     except RuntimeError as retry_parse_exc:
+                        if error_recorder is not None:
+                            error_recorder(retry_parse_exc, payload)
                         print(
                             f"{context} retry response needs repair: {retry_parse_exc}",
                             file=stderr,
@@ -5805,6 +5888,8 @@ def _complete_json_with_repair(
                     try:
                         return parser(repaired_payload)
                     except RuntimeError as repair_exc:
+                        if error_recorder is not None:
+                            error_recorder(repair_exc, repaired_payload)
                         print(
                             "Repaired "
                             f"{context} response was still invalid: {repair_exc}",
@@ -5875,6 +5960,8 @@ def _complete_json_with_repair(
         try:
             return parser(payload)
         except RuntimeError as exc:
+            if error_recorder is not None:
+                error_recorder(exc, payload)
             print(f"{context} response needs repair: {exc}", file=stderr)
             _verbose_print(
                 stderr,
@@ -5954,6 +6041,8 @@ def _complete_json_with_repair(
                 try:
                     return parser(repaired_payload)
                 except RuntimeError as repair_exc:
+                    if error_recorder is not None:
+                        error_recorder(repair_exc, repaired_payload)
                     print(
                         f"{context} repaired response was still invalid: {repair_exc}",
                         file=stderr,

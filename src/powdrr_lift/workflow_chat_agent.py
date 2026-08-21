@@ -4582,22 +4582,6 @@ def _validate_workflow_step_transition(
     """Prevent the LLM from skipping a step's required tool invocation."""
     if action.kind not in {"next_step", "goto_step", "complete"}:
         return
-    if execution_events and execution_events[-1].get("kind") == "gather_context":
-        result = execution_events[-1].get("result")
-        if isinstance(result, Mapping) and not result.get("matches"):
-            raise _WorkflowToolValidationError(
-                ValidationError(
-                    code="workflow_context_lookup_empty",
-                    message=(
-                        "Cannot advance after gather_context returned no matches. "
-                        "Use the proposal directory under docs/proposals as "
-                        "feature_id, remove overly narrow keywords, and gather "
-                        "context again. An empty result does not "
-                        "prove that the specification is absent."
-                    ),
-                    path="kind",
-                )
-            )
     invocations = tuple(
         invocation for invocation in step.tool_invocations if invocation.tool != "ref"
     )

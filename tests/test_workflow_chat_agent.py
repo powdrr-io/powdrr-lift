@@ -717,6 +717,15 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         )
 
 
+def test_workflow_can_advance_after_empty_gather_context_result() -> None:
+    _validate_workflow_step_transition(
+        _parse_action_response({"kind": "next_step"}),
+        SkillStep(description="Discover optional PR-preparation tools."),
+        [{"kind": "gather_context", "result": {"matches": []}}],
+        0,
+    )
+
+
 def test_action_schema_uses_action_and_internal_tool_must_be_declared() -> None:
     action = _parse_action_response(
         {

@@ -467,14 +467,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
-            if _last_gather_context_was_empty(self.events):
-                raise RuntimeError(
-                    "Cannot advance after gather_context returned no matches. "
-                    "Verify that feature_id is the proposal directory under "
-                    "docs/proposals, remove overly narrow keywords, and run "
-                    "gather_context again. An empty result does "
-                    "not prove that the specification is absent."
-                )
             self.events.append(
                 {
                     "kind": action.kind,
@@ -784,14 +776,6 @@ def _record_task_pull_request(
             "observed before the agent created the pull request."
         ),
     )
-
-
-def _last_gather_context_was_empty(events: Sequence[Mapping[str, Any]]) -> bool:
-    """Detect an attempted step transition immediately after an empty lookup."""
-    if not events or events[-1].get("kind") != "gather_context":
-        return False
-    result = events[-1].get("result")
-    return isinstance(result, Mapping) and not result.get("matches")
 
 
 def run_workflow_task(

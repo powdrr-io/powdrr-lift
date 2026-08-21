@@ -6066,6 +6066,15 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "The project structure bootstrap is complete.",
             },
             {
+                "kind": "next_step",
+                "decisions_and_context": "The workflow candidates are discovered.",
+            },
+            {
+                "kind": "next_step",
+                "outputs": {"feature_name": "display-related-photos"},
+                "decisions_and_context": "The canonical feature context is selected.",
+            },
+            {
                 "kind": "read_document",
                 "file_path": "templates/execute-proposed-pr.yaml",
                 "start_line": 1,
@@ -6392,6 +6401,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "kind": "invoke_tool",
                         "tool": invocation["tool"],
                         "parameters": {"command": command},
+                    }
+                if prompt["current_step"].get("id") == "select-feature-context":
+                    self._call_index += 1
+                    return {
+                        "kind": "next_step",
+                        "outputs": {"feature_name": "display-related-photos"},
                     }
                 self._call_index += 1
                 return {"kind": "next_step"}

@@ -8,25 +8,11 @@ when_to_use:
 - When the generated planning artifacts and first task should be placed in a
   pull request for user review.
 steps:
-- description: Discover the feature specification and execution workflows.
+- id: discover-proposed-feature
+  description: Discover proposed feature specification candidates.
   step_type: freeform
   llm_type: standard_reasoning
-  details: >-
-    Invoke the fuzzy-match tool first to discover candidates for the feature
-    specification and its execution workflows. Search docs/proposals and
-    docs/current and
-    docs/workflows using the feature name from the user's request. Filter the
-    results to the best matching feature directory and workflow directories.
-    Treat an absent search root or an empty result as "no matches", not as a
-    tool failure. If exactly one feature specification is the best match, use
-    it. If exactly one workflow set is the best match, use it. If the best
-    match is uncertain, ask the user one specific question that identifies the
-    correct feature or workflow. Do not ask whether documents exist before
-    searching for them. If the matches are sufficiently certain, do not ask a
-    question: pass the selected specification documents, workflow documents,
-    canonical feature name, and any uncertainty or missing-document findings
-    as context to the next step. The next step invokes
-    bootstrap-code-structure with this feature context.
+  details: Invoke the declared fuzzy-match command once for docs/proposals using the feature name from the user's request. Treat a missing root or empty result as no matches; do not select the feature yet.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -39,6 +25,12 @@ steps:
     - -maxdepth
     - "2"
     - -print
+- id: discover-current-feature
+  description: Discover current feature specification candidates.
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: Invoke the declared fuzzy-match command once for docs/current using the feature name from the user's request. Treat a missing root or empty result as no matches; do not select the feature yet.
+  tool_invocations:
   - tool: fuzzy-match
     command:
     - fuzzy-match
@@ -50,6 +42,12 @@ steps:
     - -maxdepth
     - "2"
     - -print
+- id: discover-feature-workflows
+  description: Discover execution workflow candidates.
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: Invoke the declared fuzzy-match command once for docs/workflows using the feature name from the user's request. Treat a missing root or empty result as no matches; do not select the workflow yet.
+  tool_invocations:
   - tool: fuzzy-match
     command:
     - fuzzy-match
@@ -61,36 +59,60 @@ steps:
     - -maxdepth
     - "3"
     - -print
-- description: Bootstrap the project-wide module and tool structure from codebase evidence.
+- id: select-feature-context
+  description: Select the canonical feature and workflow context.
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: >-
+    Review all three deterministic search results. Filter them to the best
+    matching feature directory and workflow directories. If exactly one
+    feature specification and workflow set are the best matches, select them
+    without asking. If a match is uncertain, ask one specific question that
+    identifies the correct feature or workflow. Do not ask whether documents
+    exist before searching. Pass the selected specification documents, workflow
+    documents, canonical feature name, and missing-document findings to the
+    next step.
+  outputs:
+  - name: feature_name
+    type: string
+    required_for_next_step: true
+- id: bootstrap-project-structure
+  description: Bootstrap the project-wide module and tool structure.
   step_type: freeform
   llm_type: standard_reasoning
   uses_skills:
   - bootstrap-code-structure
-  details: >-
-    Invoke bootstrap-code-structure using the repository context from the
-    preceding discovery step. The nested skill is project-wide and must not
-    ask for a feature or target module. Wait for it to complete, then confirm
-    from its returned context that the staged project-structure artifact is
-    available before continuing.
-- description: Generate implementation specification templates for the proposed PRs.
+  details: Invoke bootstrap-code-structure with the selected feature context. The nested skill is project-wide and must not ask for a feature or target module.
+- id: confirm-project-structure
+  description: Confirm the project-structure artifact is available.
+  step_type: freeform
+  llm_type: simple_task
+  details: Confirm from the nested bootstrap result that the project-structure artifact is available, then pass its exact path and evidence to the next step.
+- id: plan-proposed-prs
+  description: Plan the proposed PR implementation sequence.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
     If proposed PR specifications or implementation specifications already
-    exist in the selected feature context, inspect them, reuse them, and skip
-    this step. Otherwise analyze the feature specification to determine a set
-    of proposed PRs that implement the feature as ordered steps with
-    incremental validation, clear boundaries, and low risk. For each proposed
-    PR, define its goal, implementation scope, files, tests, acceptance
-    criteria, validation commands, dependencies, and risks. Invoke the
-    implementation-specification tool once for each proposed PR. This step
-    only generates the files; do not fill in, validate, instantiate, stage, or
-    commit them. Keep each PR's specification separate and give each one a
-    stable proposed-PR name. Record every generated path and its proposed-PR
-    relationship for the next step.
-    Use the always-available read_document action to inspect
-    templates/execute-proposed-pr.yaml; do not invoke sed or another shell
-    command to read the file.
+    exist in the selected feature context, inspect them, reuse them, and pass
+    their stable names and paths onward. Otherwise analyze the feature
+    specification and the project structure to define ordered proposed PRs
+    with incremental validation, clear boundaries, low risk, dependencies, and
+    stable names. For each proposed PR, record its goal, scope, files, tests,
+    acceptance criteria, validation commands, dependencies, and risks. Use the
+    read_document action to inspect templates/execute-proposed-pr.yaml; do not
+    use shell commands to read the template. Do not generate or edit
+    implementation-specification files in this step.
+- id: generate-implementation-specifications
+  description: Generate one implementation specification per proposed PR.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    For each planned proposed PR that lacks an implementation specification,
+    invoke the declared implementation-specification command exactly once with
+    its stable proposed-PR name and output path. Reuse existing files. Generate
+    only the templates; do not fill, validate, instantiate, stage, or commit
+    them. Pass every generated path and proposed-PR relationship onward.
   tool_invocations:
   - tool: internal
     command:
@@ -100,62 +122,95 @@ steps:
     - <feature-name>
     - --output
     - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
-- description: Fill every generated implementation specification completely.
+- id: fill-implementation-specifications
+  description: Fill every implementation specification.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
     For each generated implementation-specification file, replace every
     placeholder and fill every required field using the selected feature,
-    project-structure, and proposed-PR context. Remove all generator
-    instructions and instructional comments from the resulting YAML. Do not
-    leave null, empty, example, or TODO values in a required field. Keep each
-    proposed PR in its own file and preserve its stable proposed-PR id. Use
-    yaml_edit for edits and make all edits in this active worktree. Do not
-    validate or instantiate workflows until every file is fully populated.
-    Pass the exact filled paths and proposed-PR mapping to the validation step.
-- description: Validate every implementation specification before creating execution workflows.
+    project-structure, and proposed-PR context. Remove generator instructions
+    and instructional comments. Do not leave null, empty, example, or TODO
+    values in required fields. Keep each proposed PR in its own file and
+    preserve its stable proposed-PR id. Use yaml_edit for all YAML changes in
+    this active worktree. Do not validate or instantiate workflows until every
+    file is populated. Pass the exact filled paths and proposed-PR mapping
+    onward.
+- id: evaluate-implementation-specifications
+  description: Evaluate all implementation specifications deterministically.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the evaluator exactly once for the selected feature directory; do not edit files in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<feature-name>
+- id: repair-implementation-specifications
+  description: Repair every reported implementation specification issue.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Run the single evaluate command once on the selected feature specification
-    directory. It discovers every recognized spec-v1 YAML file and validates
-    each file against its schema and cross-document rules. If it reports an
-    error, use its corrective guidance to edit the affected document with
-    yaml_edit, then rerun evaluate only after the document has changed. Do not
-    instantiate workflows, stage artifacts, request approval, or create a pull
-    request while any spec-v1 document is invalid. Confirm that validation
-    passed for every filled implementation-specification path and record the
-    successful results before continuing.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - docs/proposals/<feature-name>
-- description: Instantiate an execution workflow for every validated proposed PR.
+    Review the deterministic evaluator result and repair every reported issue
+    with yaml_edit. Use the evaluator's corrective guidance and exact file
+    paths. Do not instantiate workflows, stage artifacts, request approval, or
+    create a pull request while any specification is invalid. After changing
+    the affected YAML, choose next_step so the deterministic evaluation step
+    runs again; if no repair is needed, proceed to the validation gate.
+- id: gate-implementation-specifications
+  description: Confirm all implementation specifications are valid.
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when the directory evaluator exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<feature-name>
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: repair-implementation-specifications
+    retry_context: >-
+      The implementation-specification gate failed. Inspect the latest
+      evaluator result, repair every affected YAML with yaml_edit, and rerun
+      deterministic evaluation before continuing.
+- id: plan-workflow-instantiation
+  description: Plan execution workflow instantiation.
   step_type: freeform
   llm_type: simple_task
   details: >-
-    If an execution workflow already exists for every proposed PR, inspect the
-    matching workflow directories, reuse them, and skip this step. Otherwise
-    invoke the workflow instantiation tool once for each validated proposed PR
-    that does not already have a workflow. Before invoking it, inspect the
-    selected workflow template and identify every placeholder used in task
-    input_state. Resolve each placeholder from the matching validated
-    proposed-PR specification and pass every template-specific value
-    explicitly with a repeated --template-value NAME=VALUE option. Use the
-    fixed templates/execute-proposed-pr.yaml template, the canonical feature
-    name as the shared work-item name, and a distinct workflow instance name
-    derived from each proposed PR. Preserve the proposed-PR order and encode
-    each dependency in the workflow task dependencies and input state. Never
-    leave a required input_state placeholder empty. Never ask the user for a
-    template path. Do not overwrite an existing workflow instance without
-    user approval. The command must create the powdrr/<proposed-pr-id>
-    integration branch, while writing the generated workflow files into this
-    active worktree so they are included in this PR. Treat a returned workflow
-    directory outside the active worktree as an inconsistency and stop.
-    Pass every created or reused workflow file and its proposed-PR relationship
-    as context to the next step.
+    For each validated proposed PR, inspect whether its matching workflow
+    already exists and reuse it when present. For each missing workflow,
+    inspect templates/execute-proposed-pr.yaml with read_document, resolve
+    every task input_state placeholder from the matching validated
+    implementation specification, and prepare the complete instantiation
+    values. Use the fixed template, canonical feature name, distinct workflow
+    instance names, proposed-PR order, and dependency relationships. Never ask
+    the user for a template path, leave a required placeholder empty, or
+    overwrite an existing workflow without approval. Pass an invocation plan
+    containing every created or reused workflow and its proposed-PR relationship
+    onward.
+- id: instantiate-execution-workflows
+  description: Instantiate each missing execution workflow.
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    Invoke instantiate-workflow once for each missing workflow using the
+    invocation plan. Use templates/execute-proposed-pr.yaml, pass every
+    template-specific value with repeated --template-value NAME=VALUE options,
+    and use the canonical feature name as the shared work-item name. The
+    command must create the powdrr/<proposed-pr-id> integration branch while
+    writing workflow files into this active worktree. Stop if a returned
+    workflow directory is outside the active worktree. Pass every created or
+    reused workflow path onward.
   tool_invocations:
   - tool: internal
     command:
@@ -169,81 +224,77 @@ steps:
     - proposed-pr-id=<proposed-pr-name>
     - --template
     - templates/execute-proposed-pr.yaml
-  - tool: internal
-    command:
-    - powdrr-lift
-    - instantiate-workflow
-    - --work-item-name
-    - <feature-name>
-    - --template-value
-    - proposed-pr-id=<proposed-pr-name>
-    - --template
-    - templates/execute-proposed-pr.yaml
-- description: Verify workflow artifacts are in the active worktree.
+- id: inspect-workflow-repository-state
+  description: Inspect generated workflow repository state.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Inspect the active repository state after workflow instantiation.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - repository-state
+- id: verify-workflow-artifacts
+  description: Verify workflow artifacts are in the active worktree.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Inspect the instantiate-workflow result and the active repository state.
-    Confirm that every generated workflow JSON file and .workflow-git.json is
-    present under docs/workflows/ in this active worktree, that the integration
-    branch is powdrr/<proposed-pr-id>, and that no required artifact exists
-    only below .worktrees/. If any file is missing or the paths are outside the
-    active worktree, stop and report the inconsistency; do not stage or create
-    a pull request.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
-- description: Stage the validated artifacts for pull request preparation.
+    Confirm from the repository-state result that every generated workflow JSON
+    file and .workflow-git.json is under docs/workflows/ in this active
+    worktree, that each integration branch is powdrr/<proposed-pr-id>, and that
+    no required artifact exists only below .worktrees/. If any file is missing
+    or outside the active worktree, stop and report the inconsistency; do not
+    stage or create a pull request.
+- id: stage-validated-artifacts
+  description: Stage the validated implementation and workflow artifacts.
   step_type: freeform
   llm_type: simple_task
-  details: >-
-    Inspect the worktree and stage the validated implementation specifications
-    under docs/proposals/<feature-name>/ and execution workflows under
-    docs/workflows/. Review the staged paths and do not commit or create a pull
-    request yet.
+  details: Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the shell tool, review the staged paths, and do not commit or create a pull request yet.
   tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
   - tool: shell
     command:
     - git
     - add
     - docs/proposals/<feature-name>
     - docs/workflows
-- description: Run finish-pr-prep before creating the draft pull request.
+- id: verify-staged-artifacts
+  description: Verify the staged artifact set.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Confirm that only the validated planning artifacts are staged before pull request preparation.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - repository-state
+- id: prepare-feature-pull-request
+  description: Run finish-pr-prep on the validated planning artifacts.
   step_type: freeform
   llm_type: fast_iteration
-  details: >-
-    Run finish-pr-prep after the validated planning artifacts are staged. If
-    cleanup changes files, restage only the validated planning artifacts before
-    continuing. Do not implement any proposed PR in this skill.
+  details: Run finish-pr-prep after the validated planning artifacts are staged. If cleanup changes files, restage only those artifacts before continuing. Do not implement any proposed PR in this skill.
   uses_skills:
   - finish-pr-prep
-- description: Commit the validated artifacts and open a draft pull request.
+- id: create-feature-pull-request
+  description: Commit the validated artifacts and open a draft pull request.
   step_type: freeform
   llm_type: simple_task
   details: >-
-    You must invoke create-pull-request with pr-kind `feature`, commit message
-    `Add <feature-name> implementation workflow`, and pull-request title
-    `<pull-request-title>`. Pass a `files_to_publish` context list containing
-    every validated file under `docs/proposals/<feature-name>/` and
-    `docs/workflows/`, plus the validated planning artifacts and Feature Plan
-    context. The nested skill must stage exactly that list. Do not summarize or print a proposed PR description,
-    and do not advance to the handoff step until the nested skill has actually
-    committed, pushed, and created or updated a pull request successfully. If
-    the nested skill reports an error, continue its corrective steps or stop
-    with the error; never claim that a PR is ready without a returned PR URL.
+    Invoke create-pull-request with pr-kind `feature`, commit message `Add
+    <feature-name> implementation workflow`, and pull-request title
+    `<pull-request-title>`. Pass files_to_publish containing exactly every
+    validated file under docs/proposals/<feature-name>/ and docs/workflows/,
+    plus the validated planning artifacts and Feature Plan context. The nested
+    skill must stage exactly that list. Do not advance until it has committed,
+    pushed, and created or updated a pull request successfully. Never claim a
+    PR is ready without a returned PR URL.
   uses_skills:
   - create-pull-request
-- description: Hand the draft pull request to the user for review.
+- id: handoff-feature-pull-request
+  description: Hand the draft pull request to the user for review.
   step_type: freeform
   llm_type: standard_reasoning
-  details: >-
-    Show the pull request URL. Summarize the feature specification used, every
-    proposed PR implementation-specification, every execution workflow, and
-    their dependency relationships. State that implementation has not begun;
-    the draft pull request is ready for the user's review.
+  details: Show the pull request URL. Summarize the selected feature specification, every proposed-PR implementation specification, every execution workflow, and their dependency relationships. State that implementation has not begun and the draft pull request is ready for review.

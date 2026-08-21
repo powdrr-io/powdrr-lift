@@ -4006,6 +4006,12 @@ def _modular_action_system_prompt(
         "repeats a declared step; next_step advances after completion; complete ends "
         "the skill. "
         "The current-step contract below further restricts these options.\n"
+        "If the current-step contract lists required outputs, the advancing action "
+        "must also include an outputs object containing every required output under "
+        "its exact declared name. A statement in decisions_and_context is not an "
+        "output. For example, a step requiring work_item_name must return: "
+        '{"action":"next_step","outputs":{"work_item_name":"interaction-file-log"},'
+        '"decisions_and_context":"Captured the feature name."}.\n'
         "Return exactly one JSON object with a top-level action field. The action "
         "field is the discriminator: never use kind or action_input. Include "
         "decisions_and_context when a later step needs it, and include outputs "
@@ -7925,6 +7931,9 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         allowed_actions = ["next_step"]
     return {
         "step_type": getattr(step, "step_type", "freeform"),
+        "outputs": [
+            output.to_data() for output in (getattr(step, "outputs", ()) or ())
+        ],
         "allowed_actions": allowed_actions,
         "declared_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in invocations

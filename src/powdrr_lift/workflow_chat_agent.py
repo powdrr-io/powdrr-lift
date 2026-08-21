@@ -3584,6 +3584,15 @@ def _run_gate(
         "result": event["result"],
     }
     execution_events.append(gate_event)
+    step_id = getattr(step, "id", None) or f"step-{step_index + 1}"
+    status = "passed" if passed else "failed"
+    print(
+        f"Workflow gate evaluation ({skill_name}/{step_id}): {status}\n"
+        "Workflow gate result: "
+        + json.dumps(event["result"], ensure_ascii=False, sort_keys=True),
+        file=stderr,
+        flush=True,
+    )
     if not passed:
         execution_context.append(
             f"Gate failed: {json.dumps(event['result'], ensure_ascii=False)}. "

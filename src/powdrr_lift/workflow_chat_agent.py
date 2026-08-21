@@ -4856,10 +4856,10 @@ def _discover_validation_obligations(
     ):
         raise RuntimeError("Validation gate discovery.action must be an action object.")
     if configured_discovery_action is None and not isinstance(
-        discovery.get("handoff_input"), str
+        discovery.get("input_ref"), str
     ):
         raise RuntimeError(
-            "Validation gate discovery must declare an action or handoff_input."
+            "Validation gate discovery must declare an action or input_ref."
         )
     obligation_config = config.get("obligations")
     if not isinstance(obligation_config, Mapping):
@@ -4916,7 +4916,7 @@ def _discover_validation_obligations(
     gate_state.discovery_action = (
         dict(discovery_action) if discovery_action is not None else None
     )
-    output_name = discovery.get("discovery_output")
+    output_name = discovery.get("output_ref")
     if isinstance(output_name, str) and output_name.strip():
         state.handoff_records[output_name.strip()] = {
             "name": output_name.strip(),
@@ -4948,15 +4948,15 @@ def _register_validation_gate_discovery(
         if not isinstance(discovery, Mapping):
             continue
         discovery_action = discovery.get("action")
-        handoff_input = discovery.get("handoff_input")
+        input_ref = discovery.get("input_ref")
         matches_discovery = (
             isinstance(discovery_action, Mapping)
             and _action_template_matches(
                 discovery_action, _workflow_action_data(action)
             )
         ) or (
-            isinstance(handoff_input, str)
-            and handoff_input.strip()
+            isinstance(input_ref, str)
+            and input_ref.strip()
             and action.kind == "gather_context"
         )
         if not matches_discovery:

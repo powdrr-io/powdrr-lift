@@ -65,8 +65,8 @@ steps:
   validation_gate:
     id: pr-prep-validation
     discovery:
-      handoff_input: validation_tools
-      discovery_output: validation_tools
+      input_ref: validation_tools
+      output_ref: validation_tools
       result_path: matches
     obligations:
       source: matches

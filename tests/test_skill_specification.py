@@ -124,7 +124,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
         for index, step in enumerate(document[step_key]):
             expected_invoke_tool_steps = {
                 ("finish-pr-prep.yaml", 0),
-                ("finish-pr-prep.yaml", 3),
+                ("finish-pr-prep.yaml", 4),
                 ("create-pull-request.yaml", 0),
                 ("specify-system.yaml", 1),
                 ("specify-system.yaml", 3),
@@ -862,7 +862,8 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
     )
     assert [step.description for step in skill.steps] == [
         "Deterministically inspect the staged file set.",
-        "Confirm the staged pull request scope and validation commands.",
+        "Confirm the staged pull request scope.",
+        "Discover validation tools for the staged languages.",
         "Run the final formatting, lint, type-check, and test passes.",
         "Leave the branch ready for pull request creation.",
     ]
@@ -873,13 +874,18 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
         "--cached",
         "--name-only",
     ]
-    assert [
-        (invocation.tool, invocation.label)
-        for invocation in skill.steps[1].tool_invocations
-    ][:1] == [("ref", "pr-prep")]
+    assert skill.steps[1].tool_invocations[0].tool == "shell"
+    assert skill.steps[1].tool_invocations[0].command == (
+        "git",
+        "diff",
+        "--cached",
+        "--stat",
+    )
     assert skill.steps[2].tool_invocations == ()
-    assert skill.steps[3].pre_step is not None
-    assert skill.steps[3].pre_step.action == "invoke_tool"
+    assert skill.steps[3].inputs[0].name == "validation_tools"
+    assert skill.steps[3].validation_gate is not None
+    assert skill.steps[4].pre_step is not None
+    assert skill.steps[4].pre_step.action == "invoke_tool"
 
 
 def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -> None:

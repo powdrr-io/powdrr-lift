@@ -32,23 +32,15 @@ steps:
     the intended pull-request files are staged and remove unrelated files from
     the staged set. First invoke the declared `git diff --cached --stat` shell
     command and use its result; do not substitute `git diff --cached --name-only`
-    or another Git command. Then use the gather_context action with type `tools` and filters
-    for label `pr-prep` and for every programming-language label represented by
-    the changed code. Discover those language labels from the staged files and
-    repository context; do not hard-code a language. Use the returned tool
-    references and their templates/how_to_use fields to determine the exact
-    test, formatting, lint, and type-check commands. The label filters must be
-    combined so each selected tool has the `pr-prep` label and every touched
-    language label. Do not infer commands from convention or hard-code
-    repository tooling. The deterministic_context from the prior step is
-    authoritative for the staged file names; an empty staged-file list is valid
-    and must not be treated as a command failure. If the intended scope or
-    applicable tool references are unclear, ask one precise question before
-    continuing. Before choosing next_step, perform the validation discovery
-    action exactly once as {"action":"gather_context","types":["tools"],
-    "filters":{"labels":["pr-prep"]}}; do not vary the filter key or add
-    keywords, because this discovery must register the next step's validation
-    obligations.
+    or another Git command. Then derive the programming-language labels
+    represented by the staged files from deterministic_context and invoke
+    gather_context exactly once with types [tools] and a combined labels filter
+    containing pr-prep plus every discovered language label. Do not hard-code a
+    language or a tool. Use the returned tool references and their
+    templates/how_to_use fields to determine the exact validation commands. If
+    no staged language labels are present, use only pr-prep so the result is an
+    explicit empty tool set. Choose next_step only after the filtered discovery
+    succeeds.
   tool_invocations:
   - tool: ref
     label: pr-prep
@@ -71,25 +63,21 @@ steps:
         kind: gather_context
         types:
         - tools
-        filters:
-          labels:
-          - pr-prep
       result_path: matches
     obligations:
       source: matches
       filter:
         section: tools
-      language_filter: true
       id: item.id
       action: item.validation_action
   llm_type: fast_iteration
   details: >-
     Run every validation command returned by the matching tool references for
     the staged pull-request scope. The runtime validation gate is authoritative:
-    First perform its exact discovery action once as
-    {"action":"gather_context","types":["tools"],"filters":{"labels":["pr-prep"]}};
-    do not vary the filter key, use a singular label key, or add keywords.
-    Only after that discovery succeeds may you invoke its returned obligations.
+    First perform the filtered gather_context discovery action exactly once,
+    using types [tools] and labels containing pr-prep plus the language labels
+    derived from the staged files. Only after that discovery succeeds may you
+    invoke its returned obligations.
     invoke every discovered obligation and do not choose next_step, goto_step, or
     complete until all obligations pass in the current validation epoch. If any
     obligation fails, apply its corrective action, then rerun every discovered

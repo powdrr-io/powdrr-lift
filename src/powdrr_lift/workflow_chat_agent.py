@@ -4836,52 +4836,6 @@ def _action_template_matches(
     return True
 
 
-_STAGED_FILE_LANGUAGE_SUFFIXES = {
-    ".py": "python",
-    ".pyi": "python",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".json": "json",
-    ".toml": "toml",
-    ".md": "markdown",
-    ".rst": "restructuredtext",
-}
-
-
-def _staged_file_language_labels(worktree_root: Path) -> set[str]:
-    result = subprocess.run(
-        ["git", "diff", "--cached", "--name-only"],
-        cwd=worktree_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return set()
-    labels: set[str] = set()
-    for raw_path in result.stdout.splitlines():
-        suffix = Path(raw_path).suffix.casefold()
-        language = _STAGED_FILE_LANGUAGE_SUFFIXES.get(suffix)
-        if language is not None:
-            labels.add(language)
-    return labels
-
-
-def _validation_item_language_labels(item: Mapping[str, Any]) -> set[str]:
-    labels = item.get("labels", [])
-    language_values = (
-        labels if isinstance(labels, Sequence) and not isinstance(labels, str) else []
-    )
-    metadata = json.dumps(item, ensure_ascii=False, default=str).casefold()
-    known_languages = set(_STAGED_FILE_LANGUAGE_SUFFIXES.values())
-    return {
-        language
-        for language in known_languages
-        if language in {str(value).casefold() for value in language_values}
-        or re.search(rf"\b{re.escape(language)}\b", metadata) is not None
-    }
-
-
 def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
@@ -4918,27 +4872,11 @@ def _discover_validation_obligations(
         raise RuntimeError(
             "Validation gate obligations must declare id and action projections."
         )
-    language_filter_enabled = obligation_config.get("language_filter") is True
-    staged_languages = (
-        _staged_file_language_labels(state.worktree_root)
-        if language_filter_enabled
-        else set()
-    )
     for match in matches:
         if not isinstance(match, Mapping):
             continue
         if any(match.get(key) != expected for key, expected in filter_values.items()):
             continue
-        if language_filter_enabled:
-            raw_id = _nested_value(match, str(id_path))
-            if not isinstance(raw_id, str) or not raw_id.strip():
-                raise RuntimeError("Every discovered validation item must have an id.")
-            item = match.get("item")
-            if not isinstance(item, Mapping):
-                continue
-            normalized_labels = _validation_item_language_labels(item)
-            if not staged_languages.intersection(normalized_labels):
-                continue
         raw_id = _nested_value(match, id_path)
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise RuntimeError("Every discovered validation item must have an id.")

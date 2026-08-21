@@ -119,7 +119,6 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_for_request,
     _run_deterministic_pre_step,
     _serialize_messages,
-    _staged_file_language_labels,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
@@ -977,76 +976,6 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
         .expected_action["tool"]
         == "internal"
     )
-
-
-def test_validation_discovery_filters_tools_by_staged_file_language(
-    tmp_path: Path,
-) -> None:
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    (tmp_path / "spec.yaml").write_text("name: example\n", encoding="utf-8")
-    subprocess.run(["git", "add", "spec.yaml"], cwd=tmp_path, check=True)
-
-    step = SkillStep(
-        description="Run discovered checks.",
-        validation_gate={
-            "id": "checks",
-            "discovery": {"action": {"kind": "gather_context"}},
-            "obligations": {
-                "source": "matches",
-                "filter": {"section": "tools"},
-                "language_filter": True,
-                "id": "item.id",
-                "action": "item.validation_action",
-            },
-        },
-    )
-    selected_skill = SkillCatalogEntry(
-        Path("skill.yaml"),
-        Skill(name="validation", when_to_use=(), steps=(step,)),
-    )
-    state = _WorkflowExecutionState(
-        selected_skill=selected_skill,
-        transcript=[],
-        execution_events=[],
-        execution_context=[],
-        step_index=0,
-        worktree_root=tmp_path,
-    )
-    result = {
-        "matches": [
-            {
-                "section": "tools",
-                "item": {
-                    "id": "pytest",
-                    "labels": ["test", "pr-prep"],
-                    "when_to_use": "Run the Python test suite.",
-                    "validation_action": {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {"command": ["uv", "run", "pytest"]},
-                    },
-                },
-            },
-            {
-                "section": "tools",
-                "item": {
-                    "id": "yaml-check",
-                    "labels": ["lint", "pr-prep"],
-                    "when_to_use": "Lint YAML documents.",
-                    "validation_action": {
-                        "kind": "invoke_tool",
-                        "tool": "shell",
-                        "parameters": {"command": ["yaml-check"]},
-                    },
-                },
-            },
-        ]
-    }
-
-    assert _staged_file_language_labels(tmp_path) == {"yaml"}
-    _discover_validation_obligations(result, state=state, gate=step, gate_step_index=0)
-
-    assert set(state.validation_gates["checks"].obligations) == {"yaml-check"}
 
 
 def test_validation_failure_context_contains_exact_tool_result() -> None:
@@ -6279,8 +6208,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             "kind": "gather_context",
                             "types": ["tools"],
                             "filters": {
-                                "labels": ["pr-prep"],
-                                "keywords": ["test-no-match"],
+                                "labels": ["pr-prep", "python"],
                             },
                         }
                     if step_index == 2:

@@ -7,7 +7,7 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    Invoke `powdrr-lift pull-request-description --kind <pr-kind>` exactly once.
+    Invoke `powdrr-lift pull-request-description --kind feature` exactly once.
     Keep the returned template in workflow context for the next step. Do not
     print the template, its sections, or a draft body to the chat or status
     window. Preserve the current branch and existing pull request context.
@@ -19,7 +19,7 @@ steps:
       - powdrr-lift
       - pull-request-description
       - --kind
-      - <pr-kind>
+      - feature
 - description: Fill in the pull request description template.
   step_type: freeform
   llm_type: high_reasoning

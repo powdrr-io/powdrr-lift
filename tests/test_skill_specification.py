@@ -652,7 +652,7 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "powdrr-lift",
         "pull-request-description",
         "--kind",
-        "<pr-kind>",
+        "feature",
     ]
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()

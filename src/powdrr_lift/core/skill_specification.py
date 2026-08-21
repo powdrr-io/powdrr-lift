@@ -664,6 +664,34 @@ def build_skill_validation_report(
                                 ),
                             )
                         )
+                    if not isinstance(raw_validation_gate.get("obligations"), Mapping):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_validation_gate_obligations",
+                                message=(
+                                    "validation_gate.obligations must be an object."
+                                ),
+                                path=_child_path(
+                                    step_path, "validation_gate.obligations"
+                                ),
+                            )
+                        )
+                    elif not isinstance(
+                        raw_validation_gate["obligations"].get("action_field"), str
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_validation_gate_action_field",
+                                message=(
+                                    "validation_gate.obligations.action_field must "
+                                    "be a non-empty string."
+                                ),
+                                path=_child_path(
+                                    step_path,
+                                    "validation_gate.obligations.action_field",
+                                ),
+                            )
+                        )
 
             uses_skills = step_mapping.get("uses_skills")
             if uses_skills is None:
@@ -1321,6 +1349,15 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         ):
             raise ValueError(
                 "Skill step validation_gate.discovery must declare an action."
+            )
+        if not isinstance(validation_gate.get("obligations"), Mapping):
+            raise ValueError(
+                "Skill step validation_gate.obligations must be an object."
+            )
+        action_field = validation_gate["obligations"].get("action_field")
+        if not isinstance(action_field, str) or not action_field.strip():
+            raise ValueError(
+                "Skill step validation_gate.obligations.action_field must be non-empty."
             )
     if step_type in {"invoke_tool", "gate"}:
         if pre_step is None:

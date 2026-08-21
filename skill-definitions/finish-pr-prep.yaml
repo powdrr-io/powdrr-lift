@@ -63,6 +63,7 @@ steps:
     discovery:
       action: gather_context
       result_path: matches
+    obligations:
       item_path: item
       section: tools
       id_field: id

@@ -320,6 +320,7 @@ def test_dynamic_validation_gate_round_trips() -> None:
                 validation_gate={
                     "id": "checks",
                     "discovery": {"action": "gather_context"},
+                    "obligations": {"action_field": "validation_action"},
                 },
             ),
         ),

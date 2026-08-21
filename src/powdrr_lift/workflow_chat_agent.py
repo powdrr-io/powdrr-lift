@@ -4731,22 +4731,6 @@ def _nested_value(value: Any, path: str) -> Any:
     return current
 
 
-def _validation_command(raw_template: Any) -> tuple[str, ...]:
-    if isinstance(raw_template, str):
-        command = shlex.split(raw_template)
-    elif isinstance(raw_template, Sequence) and not isinstance(
-        raw_template, (str, bytes, bytearray)
-    ):
-        command = [str(part) for part in raw_template]
-    else:
-        raise RuntimeError(
-            "Discovered validation tool must include a string or array template."
-        )
-    if not command or any(not part.strip() for part in command):
-        raise RuntimeError("Discovered validation tool template must not be empty.")
-    return tuple(part.strip() for part in command)
-
-
 def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
@@ -4765,11 +4749,13 @@ def _discover_validation_obligations(
     ):
         raise RuntimeError("Validation tool discovery did not return matches.")
     obligations: dict[str, _ValidationObligation] = {}
-    item_path = str(discovery.get("item_path", "item"))
-    id_field = str(discovery.get("id_field", "id"))
-    action_field = discovery.get("action_field")
-    action_template = discovery.get("obligation_action")
-    required_section = discovery.get("section")
+    obligation_config = config.get("obligations")
+    if not isinstance(obligation_config, Mapping):
+        raise RuntimeError("Validation gate obligations must be an object.")
+    item_path = str(obligation_config.get("item_path", "item"))
+    id_field = str(obligation_config.get("id_field", "id"))
+    action_field = obligation_config.get("action_field")
+    required_section = obligation_config.get("section")
     for match in matches:
         if not isinstance(match, Mapping):
             continue
@@ -4794,20 +4780,8 @@ def _discover_validation_obligations(
                     f"Validation item {normalized_id!r} must provide {action_field}."
                 )
             expected_action = dict(expected_action)
-        elif isinstance(action_template, Mapping):
-            expected_action = dict(action_template)
-            parameters = expected_action.get("parameters")
-            if isinstance(parameters, Mapping):
-                expected_action["parameters"] = {
-                    key: (
-                        _nested_value(raw_item, str(value)[1:])
-                        if isinstance(value, str) and value.startswith("$")
-                        else value
-                    )
-                    for key, value in parameters.items()
-                }
         else:
-            raise RuntimeError("Validation gate discovery must define an action.")
+            raise RuntimeError("Validation gate obligations must define action_field.")
         obligations[normalized_id] = _ValidationObligation(
             obligation_id=normalized_id,
             expected_action=expected_action,
@@ -4825,11 +4799,6 @@ def _register_validation_gate_discovery(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
 ) -> None:
-    if action.kind != "gather_context":
-        return
-    event = state.execution_events[-1] if state.execution_events else None
-    if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
-        raise RuntimeError("Validation tool discovery did not produce a result.")
     for gate_step_index, gate in enumerate(state.selected_skill.skill.steps):
         config = _validation_gate_config(gate)
         if gate_step_index <= state.step_index or config is None:
@@ -4839,6 +4808,13 @@ def _register_validation_gate_discovery(
             continue
         gate_state = _validation_gate_state(state, gate)
         if not gate_state.discovered:
+            event = state.execution_events[-1] if state.execution_events else None
+            if not isinstance(event, Mapping) or not isinstance(
+                event.get("result"), Mapping
+            ):
+                raise RuntimeError(
+                    "Validation discovery action did not produce a result."
+                )
             _discover_validation_obligations(
                 event["result"],
                 state=state,
@@ -4901,7 +4877,7 @@ def _validate_dynamic_validation_gate_action(
         )
     if state.step_index != gate_state.step_index:
         return
-    if state.validation_gates[_validation_gate_id(step)].correction_required:
+    if gate_state.correction_required:
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="validation_correction_required",
@@ -4917,14 +4893,10 @@ def _validate_dynamic_validation_gate_action(
         "tool": action.tool,
         "parameters": dict(action.parameters),
     }
-    if action.kind == "invoke_tool" and action.tool is None:
-        raise _WorkflowToolValidationError(
-            ValidationError(
-                code="validation_action_invalid",
-                message="A discovered obligation action must name its tool.",
-                path="tool",
-            )
-        )
+    config = _validation_gate_config(step) or {}
+    correction_actions = config.get("correction_actions", ["edit", "yaml_edit"])
+    if isinstance(correction_actions, Sequence) and action.kind in correction_actions:
+        return
     obligations = gate_state.obligations.values()
     if not any(obligation.expected_action == actual for obligation in obligations):
         declared = "; ".join(
@@ -4982,7 +4954,7 @@ def _record_dynamic_validation_result(
         state.execution_context.append(
             "Validation failed for "
             f"{obligation.obligation_id}; apply the reported corrective action, then "
-            "rerun every discovered validation tool."
+            "rerun every discovered validation obligation."
         )
 
 

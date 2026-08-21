@@ -437,8 +437,8 @@ def test_execution_event_prompt_uses_only_current_step_events() -> None:
         },
     ]
 
-    current = _execution_events_for_prompt(events, current_step_index=1)
-    latest = _latest_execution_event_for_prompt(events, current_step_index=1)
+    current = _execution_events_for_prompt(events, 1)
+    latest = _latest_execution_event_for_prompt(events, 1)
 
     assert len(current) == 2
     assert "parameters" not in current[0]

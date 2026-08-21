@@ -2949,7 +2949,6 @@ def _build_skill_execution_summary(
 
 def _execution_events_for_prompt(
     execution_events: Sequence[dict[str, Any]],
-    *,
     current_step_index: int | None = None,
 ) -> list[dict[str, Any]]:
     """Return the event metadata needed for the next action decision.
@@ -2977,7 +2976,6 @@ def _execution_events_for_prompt(
 
 def _latest_execution_event_for_prompt(
     execution_events: Sequence[dict[str, Any]],
-    *,
     current_step_index: int | None = None,
 ) -> dict[str, Any] | None:
     """Retain the latest result separately from the compact event metadata."""
@@ -3402,11 +3400,11 @@ def _build_step_execution_messages(
         "transcript": _prompt_transcript(transcript),
         "execution_events": _execution_events_for_prompt(
             execution_events,
-            current_step_index=current_step_index,
+            current_step_index,
         ),
         "latest_action": _latest_execution_event_for_prompt(
             execution_events,
-            current_step_index=current_step_index,
+            current_step_index,
         ),
         "current_file": current_file_context,
     }

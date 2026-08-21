@@ -1081,6 +1081,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         else:
             _validate_workflow_action_for_step(action, self.current_step)
         _validate_workflow_action_outputs(action, self.current_step)
+        _record_workflow_action_outputs(action, self.state, self.current_step)
         if action.kind == "next_step":
             next_step = (
                 self.selected_skill.skill.steps[self.state.step_index + 1]
@@ -1108,7 +1109,6 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _register_validation_gate_discovery(action, self.state)
         _record_dynamic_validation_result(action, self.state)
         _reset_validation_gate_after_correction(action, self.state)
-        _record_workflow_action_outputs(action, self.state, self.current_step)
         self.last_failed_action = None
         self.last_validation_error = None
         return WorkflowActionOutcome(continue_running=should_continue)

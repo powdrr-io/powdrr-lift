@@ -22,7 +22,7 @@ steps:
     Compare the gathered entity model against the new needs. If the existing
     specification already covers them, return the complete action, for example
     {"action":"complete","text":"The existing architecture covers the new needs."};
-    otherwise choose next_step to generate and fill an update.
+    otherwise choose next_step.
 - id: generate-architecture
   description: Deterministically generate the architecture specification template.
   step_type: invoke_tool

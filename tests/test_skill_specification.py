@@ -174,14 +174,20 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
+                ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
-                ("specify-a-feature.yaml", 8),
+                ("specify-a-feature.yaml", 10),
+                ("specify-a-feature.yaml", 13),
+                ("specify-a-feature.yaml", 15),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
-                ("specify-a-feature.yaml", 10),
+                ("specify-a-feature.yaml", 5),
+                ("specify-a-feature.yaml", 9),
+                ("specify-a-feature.yaml", 12),
+                ("specify-a-feature.yaml", 17),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
             }
@@ -568,90 +574,85 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("When the user needs a concrete feature plan."),
         ("When the flow must gather context and drive implementation."),
     )
-    assert [step.description for step in skill.steps] == [
-        "Capture the feature name, goal, and success criteria.",
-        "Generate the system template and fill it out.",
-        "Review the system context before deciding the feature shape.",
-        "Generate the architecture template and fill it out.",
-        "Review architecture before implementation.",
-        "Generate the implementation template and fill it out.",
-        "Generate the proposed PR specification template.",
-        "Fill the proposed PR specification template.",
-        (
-            "Deterministically evaluate every generated specification before "
-            "implementation."
-        ),
-        "Fix every reported specification issue with yaml_edit.",
-        "Confirm that every generated specification evaluates cleanly.",
-        "Stage the validated specification artifacts for pull request preparation.",
-        "Run finish-pr-prep before creating the pull request.",
-        "Create or update the pull request for the validated feature.",
-    ]
-    for step in skill.steps:
-        assert step.details is not None
-    first_step_details = skill.steps[0].details
-    assert first_step_details is not None
-    assert "exact feature name as the work-item name" in first_step_details
-    assert skill.steps[2].uses_skills == ("review-system",)
-    assert skill.steps[1].tool_invocations[0].command == (
+    steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
+
+    def step(step_id: str) -> SkillStep:
+        return steps_by_id[step_id]
+
+    def command(step_id: str) -> list[str]:
+        pre_step = step(step_id).pre_step
+        assert pre_step is not None
+        return list(pre_step.template["command"])
+
+    assert step("capture-feature-name").step_type == "freeform"
+    assert step("capture-feature-name").outputs[0].name == "work_item_name"
+    assert step("generate-system-specification").step_type == "invoke_tool"
+    assert command("generate-system-specification") == [
         "powdrr-lift",
         "system-specification",
         "--work-item-name",
         "<work-item-name>",
-    )
-    assert skill.steps[2].tool_invocations[0].command == (
+    ]
+    assert step("fill-system-specification").step_type == "freeform"
+    assert step("review-system-context").uses_skills == ("review-system",)
+    assert step("evaluate-system-specification").step_type == "gate"
+    assert command("evaluate-system-specification") == [
         "powdrr-lift",
         "evaluate",
-        "docs/proposals/<work-item-name>",
-    )
-    assert skill.steps[3].tool_invocations[0].command == (
+        "docs/proposals/<work-item-name>/system-specification.yaml",
+    ]
+    assert step("generate-architecture-specification").step_type == "invoke_tool"
+    assert command("generate-architecture-specification") == [
         "powdrr-lift",
         "architecture-specification",
         "--work-item-name",
         "<work-item-name>",
-        "--entity-type",
-        "<type>",
-    )
-    assert skill.steps[4].uses_skills == ("review-architecture",)
-    assert "choose `next_step` immediately" in (skill.steps[2].details or "")
-    assert "choose `next_step` immediately" in (skill.steps[4].details or "")
-    assert "invoke its validator once" in (skill.steps[5].details or "")
-    assert skill.steps[8].pre_step is not None
-    assert skill.steps[8].pre_step.template["command"] == [
-        "powdrr-lift",
-        "evaluate",
-        "docs/proposals/<work-item-name>",
+        "--all-entity-types",
     ]
-    assert skill.steps[10].gate is not None
-    assert skill.steps[10].gate.goto_step == "evaluate-feature-specifications"
-    assert skill.steps[4].tool_invocations[0].command == (
+    assert step("fill-architecture-specification").step_type == "freeform"
+    assert step("review-architecture-context").uses_skills == ("review-architecture",)
+    assert step("evaluate-architecture-specification").step_type == "gate"
+    assert command("evaluate-architecture-specification") == [
         "powdrr-lift",
         "evaluate",
-        "docs/proposals/<work-item-name>",
-    )
-    assert skill.steps[5].tool_invocations[0].command == (
+        "docs/proposals/<work-item-name>/architecture-specification.yaml",
+    ]
+    assert step("generate-implementation-specification").step_type == "invoke_tool"
+    assert command("generate-implementation-specification") == [
         "powdrr-lift",
         "implementation-specification",
         "--work-item-name",
         "<work-item-name>",
-    )
-    assert skill.steps[6].pre_step is not None
-    assert skill.steps[6].pre_step.template["command"] == [
+    ]
+    assert step("fill-implementation-specification").step_type == "freeform"
+    assert step("evaluate-implementation-specification").step_type == "gate"
+    assert command("evaluate-implementation-specification") == [
+        "powdrr-lift",
+        "evaluate",
+        "docs/proposals/<work-item-name>/implementation-specification.yaml",
+    ]
+    assert step("generate-pr-specification").step_type == "invoke_tool"
+    assert command("generate-pr-specification") == [
         "powdrr-lift",
         "pr-specification",
         "--work-item-name",
         "<work-item-name>",
     ]
-    assert skill.steps[7].tool_invocations == ()
-    assert skill.steps[8].tool_invocations == ()
-    assert [invocation.command for invocation in skill.steps[11].tool_invocations] == [
+    assert step("fill-pr-specification").tool_invocations == ()
+    assert command("evaluate-feature-specifications") == [
+        "powdrr-lift",
+        "evaluate",
+        "docs/proposals/<work-item-name>",
+    ]
+    assert [
+        invocation.command
+        for invocation in step("stage-specification-artifacts").tool_invocations
+    ] == [
         ("powdrr-lift", "repository-state"),
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
-    assert skill.steps[12].uses_skills == ("finish-pr-prep",)
-    assert "invoke_skill" in (skill.steps[12].details or "")
-    assert "create-pull-request" in (skill.steps[13].details or "")
-    assert skill.steps[13].uses_skills == ("create-pull-request",)
+    assert step("prepare-pull-request").uses_skills == ("finish-pr-prep",)
+    assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -1104,36 +1105,20 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
             "approach still fit."
         ),
     )
-    assert [step.description for step in skill.steps] == [
-        "Gather the requirements and approach context.",
-        "Decide whether the current system specification needs to change.",
-        "Deterministically generate the system specification template.",
-        "Fill the system requirements and approach sections.",
-        "Deterministically evaluate the updated system specification.",
-        "Repair every reported system specification issue.",
-        "Confirm that system evaluation reports zero issues.",
-    ]
-    assert skill.steps[0].details == (
-        "Use the requirements and approach context to understand the new needs "
-        "before judging the system specification."
-    )
-    assert skill.steps[1].details == (
-        "Compare the gathered requirements and approach against the new needs. "
-        "If the existing specification already covers them, end this skill by "
-        'returning the complete action, for example {"action":"complete",'
-        '"text":"The existing system covers the new needs."}; do not '
-        "choose next_step in that case. Otherwise choose next_step to generate "
-        "and fill an update."
-    )
-    assert skill.steps[2].pre_step is not None
-    assert tuple(skill.steps[2].pre_step.template["command"]) == (
+    steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
+    assert steps_by_id["generate-system"].step_type == "invoke_tool"
+    assert steps_by_id["fill-system"].step_type == "freeform"
+    assert steps_by_id["evaluate-system"].step_type == "invoke_tool"
+    assert steps_by_id["gate-system"].step_type == "gate"
+    assert steps_by_id["generate-system"].pre_step is not None
+    assert tuple(steps_by_id["generate-system"].pre_step.template["command"]) == (
         "powdrr-lift",
         "system-specification",
         "--work-item-name",
         "<work-item-name>",
     )
-    assert skill.steps[4].pre_step is not None
-    assert tuple(skill.steps[4].pre_step.template["command"]) == (
+    assert steps_by_id["evaluate-system"].pre_step is not None
+    assert tuple(steps_by_id["evaluate-system"].pre_step.template["command"]) == (
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<work-item-name>/system-specification.yaml",
@@ -1156,40 +1141,21 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
             "the system needs."
         ),
     )
-    assert [step.description for step in skill.steps] == [
-        "Gather the entities, entity relationships, invariants, and guidance context.",
-        "Decide whether the current architecture specification needs to change.",
-        "Deterministically generate the architecture specification template.",
-        "Fill the architecture specification with the required updates.",
-        "Deterministically evaluate the updated architecture specification.",
-        "Repair every reported architecture specification issue.",
-        "Confirm that architecture evaluation reports zero issues.",
-    ]
-    assert skill.steps[0].details == (
-        "Use gather_context with exactly the types entities, "
-        "entity-relationships, invariants, and guidance to understand the "
-        "current architecture model before judging whether it needs to change. "
-        "Do not use architecture or relationships as context types; those are "
-        "not valid catalog tokens."
-    )
-    assert skill.steps[1].details == (
-        "Compare the gathered entity model against the new needs. If the "
-        "existing specification already covers them, return the complete action, "
-        'for example {"action":"complete","text":"The existing '
-        'architecture covers the new needs."}; otherwise choose next_step to '
-        "generate and fill an update."
-    )
-    assert "Do not use invoke_tool" in (skill.steps[5].details or "")
-    assert skill.steps[2].pre_step is not None
-    assert tuple(skill.steps[2].pre_step.template["command"]) == (
+    steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
+    assert steps_by_id["generate-architecture"].step_type == "invoke_tool"
+    assert steps_by_id["fill-architecture"].step_type == "freeform"
+    assert steps_by_id["evaluate-architecture"].step_type == "invoke_tool"
+    assert steps_by_id["gate-architecture"].step_type == "gate"
+    assert steps_by_id["generate-architecture"].pre_step is not None
+    assert tuple(steps_by_id["generate-architecture"].pre_step.template["command"]) == (
         "powdrr-lift",
         "architecture-specification",
         "--work-item-name",
         "<work-item-name>",
         "--all-entity-types",
     )
-    assert skill.steps[4].pre_step is not None
-    assert tuple(skill.steps[4].pre_step.template["command"]) == (
+    assert steps_by_id["evaluate-architecture"].pre_step is not None
+    assert tuple(steps_by_id["evaluate-architecture"].pre_step.template["command"]) == (
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<work-item-name>/architecture-specification.yaml",

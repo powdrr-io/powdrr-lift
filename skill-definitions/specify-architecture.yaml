@@ -18,9 +18,9 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    Invoke the declared architecture-specification tool exactly once with the full
-    allowed entity type set. Pass its generated file to the next step; do not edit
-    the file in this step.
+    Invoke the declared architecture-specification tool exactly once with all
+    entity types. Pass its generated file to the next step; do not edit the file
+    in this step.
   pre_step:
     action: invoke_tool
     template:
@@ -30,8 +30,7 @@ steps:
       - architecture-specification
       - "--work-item-name"
       - "<work-item-name>"
-      - "--entity-type"
-      - "<type>"
+      - "--all-entity-types"
 - id: fill-architecture
   description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.

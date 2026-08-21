@@ -58,13 +58,18 @@ steps:
     - --stat
 - description: Run the final formatting, lint, type-check, and test passes.
   step_type: freeform
+  validation_gate: all_discovered_tools
   llm_type: fast_iteration
   details: >-
     Run every validation command returned by the matching tool references for
-    the staged pull-request scope. If any formatter or cleanup step changes
-    files, inspect those edits, restage only the intended files, and rerun every
-    affected command until the final state is clean. Do not continue while any
-    required check is failing.
+    the staged pull-request scope. The runtime validation gate is authoritative:
+    invoke every discovered tool and do not choose next_step, goto_step, or
+    complete until all tools pass in the current validation epoch. If any tool
+    fails, apply its corrective action, then rerun every discovered tool; a
+    previously passing tool must also be rerun after a correction. If no tools
+    are discovered, the gate passes explicitly with an empty tool set. If any
+    formatter or cleanup step changes files, inspect those edits, restage only
+    the intended files, and rerun the complete discovered tool set.
 - description: Leave the branch ready for pull request creation.
   step_type: invoke_tool
   llm_type: simple_task

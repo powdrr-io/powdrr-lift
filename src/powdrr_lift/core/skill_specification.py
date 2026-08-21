@@ -138,6 +138,7 @@ class SkillStep:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    validation_gate: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -162,6 +163,8 @@ class SkillStep:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             data["gate"] = self.gate.to_data()
+        if self.validation_gate is not None:
+            data["validation_gate"] = self.validation_gate
         if self.inputs:
             data["inputs"] = [item.to_data() for item in self.inputs]
         if self.outputs:
@@ -429,6 +432,7 @@ def build_skill_validation_report(
                     "prompt_catalogs",
                     "pre_step",
                     "gate",
+                    "validation_gate",
                     "inputs",
                     "outputs",
                 },
@@ -625,6 +629,16 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "gate"),
                     )
                 )
+            raw_validation_gate = step_mapping.get("validation_gate")
+            if raw_validation_gate is not None:
+                if _optional_string(raw_validation_gate) != "all_discovered_tools":
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_validation_gate",
+                            message=("validation_gate must be all_discovered_tools."),
+                            path=_child_path(step_path, "validation_gate"),
+                        )
+                    )
 
             uses_skills = step_mapping.get("uses_skills")
             if uses_skills is None:
@@ -1264,6 +1278,9 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
+    validation_gate = _optional_string(data.get("validation_gate"))
+    if validation_gate is not None and validation_gate != "all_discovered_tools":
+        raise ValueError("Skill step validation_gate must be all_discovered_tools.")
     if step_type in {"invoke_tool", "gate"}:
         if pre_step is None:
             raise ValueError(
@@ -1293,6 +1310,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         prompt_catalogs=prompt_catalogs,
         pre_step=pre_step,
         gate=gate,
+        validation_gate=validation_gate,
         inputs=inputs,
         outputs=outputs,
     )

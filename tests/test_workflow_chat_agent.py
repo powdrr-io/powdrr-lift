@@ -117,11 +117,13 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_worktree_for_request,
     _run_deterministic_pre_step,
     _serialize_messages,
+    _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
+    _ValidationObligation,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
@@ -800,6 +802,87 @@ def test_workflow_can_advance_after_empty_gather_context_result() -> None:
         [{"kind": "gather_context", "result": {"matches": []}}],
         0,
     )
+
+
+def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
+    step = SkillStep(
+        description="Run discovered checks.",
+        validation_gate="all_discovered_tools",
+    )
+    selected_skill = SkillCatalogEntry(
+        Path("skill.yaml"),
+        Skill(name="validation", when_to_use=(), steps=(step,)),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+    next_step = _parse_action_response({"kind": "next_step"})
+
+    with pytest.raises(RuntimeError, match="cannot be skipped"):
+        _validate_workflow_step_transition(
+            next_step,
+            step,
+            [],
+            0,
+            state=state,
+        )
+
+    state.validation_gate_discovered = True
+    state.validation_gate_epoch = 1
+    state.validation_obligations = {
+        "pytest": _ValidationObligation(
+            tool_id="pytest",
+            command=("uv", "run", "pytest"),
+            tool={"id": "pytest", "template": "uv run pytest"},
+        )
+    }
+    with pytest.raises(RuntimeError, match="Still pending: pytest"):
+        _validate_workflow_step_transition(
+            next_step,
+            step,
+            [],
+            0,
+            state=state,
+        )
+
+    state.validation_gate_correction_required = True
+    with pytest.raises(RuntimeError, match="Apply corrective steps"):
+        _validate_workflow_step_transition(
+            next_step,
+            step,
+            [],
+            0,
+            state=state,
+        )
+
+    state.validation_gate_correction_required = False
+    obligation = state.validation_obligations["pytest"]
+    obligation.status = "passed"
+    _validate_workflow_step_transition(
+        next_step,
+        step,
+        [],
+        0,
+        state=state,
+    )
+
+    with pytest.raises(RuntimeError, match="not one of the discovered tools"):
+        _validate_dynamic_validation_gate_action(
+            _parse_action_response(
+                {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["uv", "run", "ruff"]},
+                }
+            ),
+            state,
+            step,
+        )
 
 
 def test_action_schema_uses_action_and_internal_tool_must_be_declared() -> None:
@@ -5773,6 +5856,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._start_invoked_steps: set[int] = set()
             self._bootstrap_invoked_steps: set[int] = set()
             self._finish_invoked_steps: set[int] = set()
+            self._finish_validation_commands: list[list[str]] | None = None
+            self._finish_validation_index = 0
+            self._finish_context_gathered = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -5815,6 +5901,40 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     step_index = int(prompt["current_step_index"])
                     assert step_index < 4
+                    if step_index == 1 and not self._finish_context_gathered:
+                        self._finish_context_gathered = True
+                        self._call_index += 1
+                        return {
+                            "kind": "gather_context",
+                            "types": ["tools"],
+                            "filters": {"labels": ["pr-prep"]},
+                        }
+                    if step_index == 2:
+                        validation_gate = cast(
+                            dict[str, object], prompt.get("validation_gate", {})
+                        )
+                        obligations = cast(
+                            list[dict[str, object]],
+                            validation_gate.get("obligations", []),
+                        )
+                        if self._finish_validation_commands is None:
+                            self._finish_validation_commands = [
+                                cast(list[str], obligation["command"])
+                                for obligation in obligations
+                            ]
+                        if self._finish_validation_index < len(
+                            self._finish_validation_commands
+                        ):
+                            command = self._finish_validation_commands[
+                                self._finish_validation_index
+                            ]
+                            self._finish_validation_index += 1
+                            self._call_index += 1
+                            return {
+                                "kind": "invoke_tool",
+                                "tool": "shell",
+                                "parameters": {"command": command},
+                            }
                     shell_invocations = [
                         invocation
                         for invocation in prompt["current_step"].get(

@@ -5641,6 +5641,42 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         _capture_worktree_context,
     )
+    real_execute_shell_tool = _execute_shell_tool
+
+    def _fake_evaluate_shell_tool(
+        parameters: dict[str, object],
+        *,
+        worktree_root: Path,
+        stdout: TextIO,
+        stderr: TextIO,
+        verbose: bool,
+        announce: bool = True,
+        print_stdout: bool = True,
+    ) -> dict[str, object]:
+        command = parameters.get("command")
+        command_items = list(command) if isinstance(command, list) else []
+        if command_items[:2] == ["powdrr-lift", "evaluate"]:
+            return {
+                "command": " ".join(str(item) for item in command_items),
+                "cwd": str(worktree_root),
+                "returncode": 0,
+                "stdout": "No specification issues found.\n",
+                "stderr": "",
+            }
+        return real_execute_shell_tool(
+            parameters,
+            worktree_root=worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=verbose,
+            announce=announce,
+            print_stdout=print_stdout,
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        _fake_evaluate_shell_tool,
+    )
 
     stdout = io.StringIO()
     stderr = io.StringIO()

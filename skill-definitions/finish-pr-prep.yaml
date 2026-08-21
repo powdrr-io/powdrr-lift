@@ -80,21 +80,13 @@ steps:
       action: item.validation_action
   llm_type: fast_iteration
   details: >-
-    Run every validation command returned by the matching tool references for
-    the staged pull-request scope. The runtime validation gate is authoritative:
-    First perform the filtered gather_context discovery action exactly once,
-    using types [tools] and labels containing pr-prep plus the language labels
-    derived from the staged files. Use the required validation_tools handoff
-    input as the only validation actions to invoke. The same discovery result
-    seeds the matching runtime obligations, so every action in validation_tools
-    must pass before this step can advance.
-    invoke every discovered obligation and do not choose next_step, goto_step, or
-    complete until all obligations pass in the current validation epoch. If any
-    obligation fails, apply its corrective action, then rerun every discovered
-    obligation; a previously passing obligation must also be rerun after a correction.
-    If no obligations are discovered, the gate passes explicitly with an empty set. If any
-    formatter or cleanup step changes files, inspect those edits, restage only
-    the intended files, and rerun the complete discovered tool set.
+    Use the validation_tools handoff input as the sole validation action list.
+    Invoke every listed action and satisfy its corresponding runtime obligation
+    before choosing next_step, goto_step, or complete. If an obligation fails,
+    apply its corrective action and rerun every listed action, including actions
+    that passed previously. An empty validation_tools list is a valid passing
+    result. If a formatter or cleanup action changes files, inspect the edits,
+    restage only the intended files, and rerun the complete validation_tools list.
 - description: Leave the branch ready for pull request creation.
   step_type: invoke_tool
   llm_type: simple_task

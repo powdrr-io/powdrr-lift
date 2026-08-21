@@ -105,27 +105,54 @@ steps:
     - pr-specification
     - "--work-item-name"
     - "<work-item-name>"
-- description: Validate every generated specification before implementation.
+- id: evaluate-feature-specifications
+  description: Deterministically evaluate every generated specification before implementation.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared evaluator exactly once for the specification directory.
+    It discovers every recognized spec-v1 YAML file. Pass the complete result to
+    the repair step; do not edit files here.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>
+- id: repair-feature-specifications
+  description: Fix every reported specification issue with yaml_edit.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Run the generic evaluator below once for the specification directory. If it
-    reports a validation error, edit the affected document before rerunning it;
-    never repeat an unchanged validation command. After all documents succeed
-    and agree, record the results and choose `next_step`
-    immediately.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - docs/proposals/<work-item-name>
-- description: If any specification validation fails, fix it and return to the validation
-    step.
-  step_type: freeform
-  llm_type: fast_iteration
-  details: Do not begin implementation or create a pull request while any required
-    specification remains invalid.
+    Review the deterministic evaluator result and fix every reported issue with
+    yaml_edit. Each action must include the YAML file_path and a non-empty
+    operations array. Use set_value with a JSON path array for scalar changes and
+    upsert_item with section, id, and a complete value mapping for list entries.
+    For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid.
+- id: gate-feature-specifications
+  description: Confirm that every generated specification evaluates cleanly.
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when the directory evaluator exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-feature-specifications
+    retry_context: >-
+      The specification gate failed because one or more spec-v1 files still have
+      validation issues. Inspect the latest evaluator result, repair the affected
+      YAML with yaml_edit, and rerun deterministic evaluation before continuing.
 - description: Stage the validated specification artifacts for pull request preparation.
   step_type: freeform
   llm_type: simple_task

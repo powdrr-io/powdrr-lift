@@ -4788,6 +4788,24 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "rationale": architecture_gallery_photo_rationale,
                 },
             ],
+            "modules": [
+                {
+                    "id": "related-photos-module",
+                    "action": "added",
+                    "relative_location": "src/related_photos",
+                    "purpose": "Render related photos in the feature view.",
+                },
+            ],
+            "tools": [
+                {
+                    "id": "related-photos-check",
+                    "action": "added",
+                    "related_modules": ["related-photos-module"],
+                    "when_to_use": "Validate the related photos implementation.",
+                    "template": "powdrr-lift evaluate",
+                    "how_to_use": "Run the evaluator before review.",
+                },
+            ],
             "entity_relationships": [
                 {
                     "id": "related-photo-groups-with-gallery-photo",
@@ -4845,6 +4863,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "action": "added",
                     "rationale": "Add the gallery-photo entity from the architecture.",
                 },
+            ],
+            "modules": [
+                {"id": "related-photos-module", "action": "added"},
+            ],
+            "tools": [
+                {"id": "related-photos-check", "action": "added"},
             ],
             "entity_relationships": [
                 {
@@ -4972,7 +4996,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
         "Decide on proposed PRs and fill each template.",
-        "Validate every generated specification before implementation.",
+        (
+            "Deterministically evaluate every generated specification before "
+            "implementation."
+        ),
+        "Fix every reported specification issue with yaml_edit.",
     ]
 
     captured: dict[str, object] = {"messages": []}
@@ -5562,8 +5590,59 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_step_index=7,
                     expected_step_description=step_descriptions[7],
                     expected_context_suffix="PR step complete; handoff is ready.",
-                    expected_event_count=19,
+                    expected_event_count=20,
+                    expected_last_event_kind="deterministic_pre_step",
+                )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": "All specification issues are fixed.",
+                }
+            elif self._call_index == 21:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=8,
+                    expected_step_description=step_descriptions[8],
+                    expected_context_suffix="All specification issues are fixed.",
+                    expected_event_count=21,
                     expected_last_event_kind="next_step",
+                )
+                response = {
+                    "kind": "next_step",
+                    "decisions_and_context": "Specification repair is complete.",
+                }
+            elif self._call_index == 22:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=10,
+                    expected_step_description=(
+                        "Stage the validated specification artifacts for pull request preparation."
+                    ),
+                    expected_context_suffix="Specification repair is complete.",
+                    expected_event_count=24,
+                    expected_last_event_kind="gate",
+                )
+                response = {
+                    "kind": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {
+                        "command": [
+                            "git",
+                            "add",
+                            "docs/proposals/display-related-photos",
+                        ],
+                    },
+                    "decisions_and_context": "Specification artifacts are staged.",
+                }
+            elif self._call_index == 23:
+                self._assert_execution_prompt(
+                    messages,
+                    expected_step_index=10,
+                    expected_step_description=(
+                        "Stage the validated specification artifacts for pull request preparation."
+                    ),
+                    expected_context_suffix="Specification artifacts are staged.",
+                    expected_event_count=24,
+                    expected_last_event_kind="invoke_tool",
                 )
                 response = {
                     "kind": "complete",
@@ -5585,6 +5664,42 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         _capture_worktree_context,
+    )
+    real_execute_shell_tool = _execute_shell_tool
+
+    def _fake_evaluate_shell_tool(
+        parameters: dict[str, object],
+        *,
+        worktree_root: Path,
+        stdout: TextIO,
+        stderr: TextIO,
+        verbose: bool,
+        announce: bool = True,
+        print_stdout: bool = True,
+    ) -> dict[str, object]:
+        command = parameters.get("command")
+        command_items = list(command) if isinstance(command, list) else []
+        if command_items[:2] == ["powdrr-lift", "evaluate"]:
+            return {
+                "command": " ".join(str(item) for item in command_items),
+                "cwd": str(worktree_root),
+                "returncode": 0,
+                "stdout": "No specification issues found.\n",
+                "stderr": "",
+            }
+        return real_execute_shell_tool(
+            parameters,
+            worktree_root=worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            verbose=verbose,
+            announce=announce,
+            print_stdout=print_stdout,
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        _fake_evaluate_shell_tool,
     )
 
     stdout = io.StringIO()

@@ -3189,6 +3189,7 @@ def _invalidate_deterministic_pre_step(
 def _pre_step_context_values(
     handoff_records: Mapping[str, Mapping[str, Any]],
     workflow_context: WorkflowContext | None,
+    execution_events: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     values: dict[str, Any] = {}
 
@@ -3205,6 +3206,25 @@ def _pre_step_context_values(
     for name, record in handoff_records.items():
         if isinstance(record, Mapping):
             add(name, record.get("value"))
+    for event in execution_events:
+        parameters = event.get("parameters")
+        if not isinstance(parameters, Mapping):
+            continue
+        command = parameters.get("command")
+        if not isinstance(command, Sequence) or isinstance(
+            command, (str, bytes, bytearray)
+        ):
+            continue
+        command_items = [item for item in command if isinstance(item, str)]
+        if "--work-item-name" in command_items:
+            option_index = command_items.index("--work-item-name")
+            if option_index + 1 < len(command_items):
+                add("work-item-name", command_items[option_index + 1])
+        for item in command_items:
+            proposal_prefix = "docs/proposals/"
+            if item.startswith(proposal_prefix):
+                proposal_name = item[len(proposal_prefix) :].split("/", 1)[0]
+                add("work-item-name", proposal_name)
     return values
 
 
@@ -3278,7 +3298,11 @@ def _run_deterministic_pre_step(
         raise RuntimeError("invoke_tool steps require a pre_step.")
     template = _resolve_pre_step_template(
         pre_step.template,
-        _pre_step_context_values(handoff_records, workflow_context),
+        _pre_step_context_values(
+            handoff_records,
+            workflow_context,
+            execution_events=execution_events,
+        ),
     )
     if not isinstance(template, Mapping):
         raise RuntimeError("Deterministic pre-step template must resolve to an object.")

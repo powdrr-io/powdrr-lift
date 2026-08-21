@@ -101,6 +101,31 @@ def test_workflow_task_round_trips_executable_step_fields() -> None:
     ]
 
 
+def test_workflow_task_interaction_style_round_trips_and_validates() -> None:
+    task = WorkflowTask(
+        task_id="review-task",
+        status=TaskStatus.OPEN,
+        complexity=TaskComplexity.MEDIUM,
+        input_state={"scope": "the proposed change"},
+        description="Challenge the proposed change.",
+        interaction_style="devils_advocate",
+    )
+
+    parsed = workflow_task_from_json(workflow_task_to_json(task))
+
+    assert parsed == task
+    assert parsed.to_data()["interaction_style"] == "devils_advocate"
+
+    invalid_report = build_workflow_task_validation_report(
+        json.dumps(task.to_data() | {"interaction_style": "invented"})
+    )
+
+    assert invalid_report.validation_successful is False
+    assert [issue.code for issue in invalid_report.issues] == [
+        "invalid_interaction_style"
+    ]
+
+
 def test_workflow_task_directory_loader_reads_all_json_files(
     tmp_path: Path,
 ) -> None:

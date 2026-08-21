@@ -34,6 +34,7 @@ def test_workflow_template_round_trips_through_json() -> None:
                 description="Generate one task per changed file.",
                 complexity=TaskComplexity.MEDIUM,
                 input_state={"files": []},
+                interaction_style="engineering",
                 dependent_state=("files-discovered",),
                 generation=WorkflowTaskTemplateGeneration(
                     for_each="each changed file",
@@ -66,6 +67,7 @@ def test_workflow_template_round_trips_through_json() -> None:
             {
                 "description": "Generate one task per changed file.",
                 "step_type": "freeform",
+                "interaction_style": "engineering",
                 "complexity": "medium",
                 "input_state": {"files": []},
                 "assignee_type": "agent",

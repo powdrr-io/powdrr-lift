@@ -10,6 +10,7 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.core.skill_specification import (
+    SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
     SkillStepGate,
     SkillStepPreStep,
@@ -81,6 +82,7 @@ class WorkflowTask:
     assignee_role: AssigneeRole = AgentRole.CODER
     details: str | None = None
     llm_type: str | None = None
+    interaction_style: str | None = None
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
@@ -118,6 +120,7 @@ class WorkflowTask:
             "step_type": self.step_type,
             "details": self.details,
             "llm_type": self.llm_type,
+            "interaction_style": self.interaction_style,
             "uses_skills": list(self.uses_skills),
             "tool_invocations": [
                 invocation.to_data() for invocation in self.tool_invocations
@@ -322,6 +325,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         assignee_role=assignee_role,
         details=step.details,
         llm_type=step.llm_type,
+        interaction_style=step.interaction_style,
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
@@ -523,6 +527,7 @@ def build_workflow_task_validation_report(
             "assignee_role",
             "details",
             "llm_type",
+            "interaction_style",
             "uses_skills",
             "tool_invocations",
             "prompt_catalogs",
@@ -541,6 +546,22 @@ def build_workflow_task_validation_report(
                 code="invalid_step_type_value",
                 message=("Workflow task step_type must be freeform or invoke_tool."),
                 path=_format_child_path(source_path, "step_type"),
+            )
+        )
+    interaction_style = raw_task.get("interaction_style")
+    if interaction_style is not None and (
+        not isinstance(interaction_style, str)
+        or interaction_style.strip() not in SUPPORTED_INTERACTION_STYLES
+    ):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_interaction_style",
+                message=(
+                    "Workflow task interaction_style must be one of: "
+                    + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+                    + "."
+                ),
+                path=_format_child_path(source_path, "interaction_style"),
             )
         )
     pre_step = raw_task.get("pre_step")

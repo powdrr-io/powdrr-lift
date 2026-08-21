@@ -52,21 +52,20 @@ steps:
     seeds both the validation tools shown to the next step and its runtime
     obligations.
   outputs:
-  - name: validation_tools
+  - name: validation_tool_obligations
     type: any
     required_for_next_step: true
 - description: Run the final formatting, lint, type-check, and test passes.
   step_type: freeform
   inputs:
-  - name: validation_tools
+  - name: validation_tool_obligations
     type: any
     required: true
-    source: previous_step
   validation_gate:
     id: pr-prep-validation
     discovery:
-      input_ref: validation_tools
-      output_ref: validation_tools
+      input_ref: validation_tool_obligations
+      output_ref: validation_tool_obligations
       result_path: matches
     obligations:
       source: matches
@@ -76,13 +75,13 @@ steps:
       action: item.validation_action
   llm_type: fast_iteration
   details: >-
-    Use the validation_tools handoff input as the sole validation action list.
+    Use the validation_tool_obligations handoff input as the sole validation action list.
     Invoke every listed action and satisfy its corresponding runtime obligation
     before choosing next_step, goto_step, or complete. If an obligation fails,
     apply its corrective action and rerun every listed action, including actions
-    that passed previously. An empty validation_tools list is a valid passing
+    that passed previously. An empty validation_tool_obligations list is a valid passing
     result. If a formatter or cleanup action changes files, inspect the edits,
-    restage only the intended files, and rerun the complete validation_tools list.
+    restage only the intended files, and rerun the complete validation_tool_obligations list.
 - description: Leave the branch ready for pull request creation.
   step_type: invoke_tool
   llm_type: simple_task

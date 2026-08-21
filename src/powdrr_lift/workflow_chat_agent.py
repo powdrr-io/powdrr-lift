@@ -5370,7 +5370,7 @@ def _validate_workflow_step_transition(
         if incomplete:
             raise _WorkflowToolValidationError(
                 ValidationError(
-                    code="validation_tools_incomplete",
+                    code="validation_tool_obligations_incomplete",
                     message=(
                         "Every discovered validation obligation must pass before "
                         "advancing. "

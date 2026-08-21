@@ -882,7 +882,7 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
         "--stat",
     )
     assert skill.steps[2].tool_invocations == ()
-    assert skill.steps[3].inputs[0].name == "validation_tools"
+    assert skill.steps[3].inputs[0].name == "validation_tool_obligations"
     assert skill.steps[3].validation_gate is not None
     assert skill.steps[4].pre_step is not None
     assert skill.steps[4].pre_step.action == "invoke_tool"

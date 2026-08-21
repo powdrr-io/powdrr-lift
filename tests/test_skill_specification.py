@@ -136,13 +136,13 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
-                ("specify-architecture.yaml", 3),
+                ("specify-a-feature.yaml", 7),
             }
-            expected_gate_steps = {("specify-architecture.yaml", 5)}
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
+                ("specify-a-feature.yaml", 9),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -506,11 +506,12 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "Review architecture before implementation.",
         "Generate the implementation template and fill it out.",
         "Decide on proposed PRs and fill each template.",
-        "Validate every generated specification before implementation.",
         (
-            "If any specification validation fails, fix it and return to the "
-            "validation step."
+            "Deterministically evaluate every generated specification before "
+            "implementation."
         ),
+        "Fix every reported specification issue with yaml_edit.",
+        "Confirm that every generated specification evaluates cleanly.",
         "Stage the validated specification artifacts for pull request preparation.",
         "Run finish-pr-prep before creating the pull request.",
         "Create or update the pull request for the validated feature.",
@@ -544,7 +545,14 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     assert "choose `next_step` immediately" in (skill.steps[2].details or "")
     assert "choose `next_step` immediately" in (skill.steps[4].details or "")
     assert "invoke its validator once" in (skill.steps[5].details or "")
-    assert "choose `next_step` immediately" in (skill.steps[7].details or "")
+    assert skill.steps[7].pre_step is not None
+    assert skill.steps[7].pre_step.template["command"] == [
+        "powdrr-lift",
+        "evaluate",
+        "docs/proposals/<work-item-name>",
+    ]
+    assert skill.steps[9].gate is not None
+    assert skill.steps[9].gate.goto_step == "evaluate-feature-specifications"
     assert skill.steps[4].tool_invocations[0].command == (
         "powdrr-lift",
         "evaluate",
@@ -562,21 +570,14 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     )
-    assert [invocation.command for invocation in skill.steps[7].tool_invocations] == [
-        (
-            "powdrr-lift",
-            "evaluate",
-            "docs/proposals/<work-item-name>",
-        ),
-    ]
-    assert [invocation.command for invocation in skill.steps[9].tool_invocations] == [
+    assert [invocation.command for invocation in skill.steps[10].tool_invocations] == [
         ("powdrr-lift", "repository-state"),
         ("git", "add", "docs/proposals/<work-item-name>"),
     ]
-    assert skill.steps[10].uses_skills == ("finish-pr-prep",)
-    assert "invoke_skill" in (skill.steps[10].details or "")
-    assert "create-pull-request" in (skill.steps[11].details or "")
-    assert skill.steps[11].uses_skills == ("create-pull-request",)
+    assert skill.steps[11].uses_skills == ("finish-pr-prep",)
+    assert "invoke_skill" in (skill.steps[11].details or "")
+    assert "create-pull-request" in (skill.steps[12].details or "")
+    assert skill.steps[12].uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:

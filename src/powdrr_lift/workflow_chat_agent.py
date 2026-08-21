@@ -4015,8 +4015,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         )
     prompt += (
         "A yaml_edit action uses the exact fields file_path and operations; each "
-        "upsert_item uses section, id, and value. Never use yaml_operations or "
-        "item_id.\n"
+        "upsert_item uses section, id, and value.\n"
         "When a validation result contains corrective_action, apply it before "
         "retrying; do not repeat the same failed validation unchanged. Use edit "
         "only when current "
@@ -7840,8 +7839,8 @@ def _action_repair_prompt(
         prompt += (
             'If the correction is a YAML edit, use exactly {"action":"yaml_edit",'
             '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
-            '"path":["id"],"value":"feature-id"}]}; use "id" rather than '
-            '"item_id" and "operations" rather than "yaml_operations". '
+            '"path":["id"],"value":"feature-id"}]}; include all required '
+            "fields in the operation. "
         )
         if invocations:
             prompt += (

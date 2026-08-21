@@ -4836,6 +4836,37 @@ def _action_template_matches(
     return True
 
 
+_STAGED_FILE_LANGUAGE_SUFFIXES = {
+    ".py": "python",
+    ".pyi": "python",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".json": "json",
+    ".toml": "toml",
+    ".md": "markdown",
+    ".rst": "restructuredtext",
+}
+
+
+def _staged_file_language_labels(worktree_root: Path) -> set[str]:
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return set()
+    labels: set[str] = set()
+    for raw_path in result.stdout.splitlines():
+        suffix = Path(raw_path).suffix.casefold()
+        language = _STAGED_FILE_LANGUAGE_SUFFIXES.get(suffix)
+        if language is not None:
+            labels.add(language)
+    return labels
+
+
 def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
@@ -4872,11 +4903,48 @@ def _discover_validation_obligations(
         raise RuntimeError(
             "Validation gate obligations must declare id and action projections."
         )
+    language_filter = obligation_config.get("language_filter")
+    language_filter_enabled = language_filter is True or isinstance(
+        language_filter, Mapping
+    )
+    labels_by_id = (
+        language_filter.get("labels_by_id", {})
+        if isinstance(language_filter, Mapping)
+        else {}
+    )
+    if not isinstance(labels_by_id, Mapping):
+        raise RuntimeError(
+            "Validation gate language_filter.labels_by_id must be an object."
+        )
+    staged_languages = (
+        _staged_file_language_labels(state.worktree_root)
+        if language_filter_enabled
+        else set()
+    )
     for match in matches:
         if not isinstance(match, Mapping):
             continue
         if any(match.get(key) != expected for key, expected in filter_values.items()):
             continue
+        if language_filter_enabled:
+            raw_id = _nested_value(match, str(id_path))
+            if not isinstance(raw_id, str) or not raw_id.strip():
+                raise RuntimeError("Every discovered validation item must have an id.")
+            item = match.get("item")
+            labels = (
+                labels_by_id.get(raw_id, [])
+                if labels_by_id
+                else item.get("labels")
+                if isinstance(item, Mapping)
+                else None
+            )
+            if not isinstance(labels, Sequence) or isinstance(
+                labels, (str, bytes, bytearray)
+            ):
+                continue
+            normalized_labels = {str(label).casefold() for label in labels}
+            if not staged_languages.intersection(normalized_labels):
+                continue
         raw_id = _nested_value(match, id_path)
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise RuntimeError("Every discovered validation item must have an id.")
@@ -5070,8 +5138,10 @@ def _record_dynamic_validation_result(
         gate_state.correction_required = True
         state.execution_context.append(
             "Validation failed for "
-            f"{obligation.obligation_id}; apply the reported corrective action, then "
-            "rerun every discovered validation obligation."
+            f"{obligation.obligation_id}. Exact result: "
+            f"{json.dumps(result, ensure_ascii=False, default=str)}. "
+            "Apply the corrective action indicated by that result, then rerun every "
+            "discovered validation obligation."
         )
 
 

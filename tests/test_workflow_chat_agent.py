@@ -5617,7 +5617,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "Stage the validated specification artifacts for pull request preparation."
                     ),
                     expected_context_suffix="Specification artifacts are staged.",
-                    expected_event_count=25,
+                    expected_event_count=24,
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {

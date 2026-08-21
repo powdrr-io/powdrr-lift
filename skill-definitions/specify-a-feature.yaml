@@ -4,102 +4,133 @@ when_to_use:
 - When the user needs a concrete feature plan.
 - When the flow must gather context and drive implementation.
 steps:
-- description: Capture the feature name, goal, and success criteria.
+- id: capture-feature-name
+  description: Capture the feature name.
   step_type: freeform
   llm_type: high_reasoning
-  details: Choose a stable kebab-case feature name and ask about outcomes, edge cases, tests, and constraints. Reuse this exact feature name as the work-item name for every generated document.
-- description: Generate the system template and fill it out.
+  details: Choose a stable kebab-case feature name and reuse this exact name as the work-item name for every generated document.
+  outputs:
+  - name: work_item_name
+    type: string
+    required_for_next_step: true
+- id: capture-feature-context
+  description: Capture the feature goal and success criteria.
   step_type: freeform
+  llm_type: high_reasoning
+  details: Ask about outcomes, edge cases, tests, and constraints for the named feature.
+- id: generate-system-specification
+  description: Generate the system specification template.
+  step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    First invoke the declared system-specification command successfully. Then
-    fill the generated YAML using one or more yaml_edit actions; yaml_edit is a
-    first-class action, not a command. Return it directly with action: yaml_edit;
-    never wrap it in invoke_tool, tool: internal, or tool: shell. For example:
-    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["title"],"value":"..."}]}.
-    Never use edit or invoke_tool to rewrite the YAML file. The yaml_edit action must contain
-    an operations array. Use set_value with a JSON array of mapping keys, such
-    as ["title"] or ["id"], never a JSON-pointer string such as "/title".
-    Use one upsert_item operation per requirement or approach item, with the
-    section name, `id` field, and complete value mapping. The top-level field is
-    `operations`. Do not replace an entire
-    list section with set_value. After the structural edits succeed, continue
-    to the review step.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - system-specification
-    - "--work-item-name"
-    - "<work-item-name>"
+  details: Invoke the declared system-specification generator exactly once; do not edit the generated file.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - system-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+- id: fill-system-specification
+  description: Fill the system requirements and approach.
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: Use yaml_edit to fill the generated YAML; do not invoke tools or rewrite the YAML as prose, then choose next_step.
 - description: Review the system context before deciding the feature shape.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    After the nested system review completes, invoke the system validator once
-    for the current file. If it succeeds, record that the requirements,
-    approach, and constraints remain valid and choose `next_step` immediately;
-    rerun only after editing the file to address a reported validation error. If
-    a repair is needed, use the first-class yaml_edit action directly. For example:
-    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}.
+    Run the nested system review skill and use its result to decide whether the
+    current system context remains appropriate.
   uses_skills:
   - review-system
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - docs/proposals/<work-item-name>
-- description: Generate the architecture template and fill it out.
-  step_type: freeform
+- id: evaluate-system-specification
+  description: Evaluate the filled system specification.
+  step_type: invoke_tool
   llm_type: simple_task
-  details: Capture the entity model before review.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - architecture-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-    - "--entity-type"
-    - "<type>"
+  details: Invoke the system evaluator exactly once; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/system-specification.yaml
+- id: generate-architecture-specification
+  description: Generate the architecture specification template.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the declared architecture-specification generator exactly once with all entity types; do not edit the generated file.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - architecture-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+      - "--all-entity-types"
+- id: fill-architecture-specification
+  description: Fill the architecture entities and relationships.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: Use yaml_edit to capture the entity model before review; do not invoke tools or rewrite the YAML as prose, then choose next_step.
 - description: Review architecture before implementation.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    After the nested architecture review completes, invoke the architecture
-    validator once for the current file. If it succeeds, record that the model,
-    relationships, invariants, and guidance remain valid and choose `next_step`
-    immediately; rerun only after editing the file to address a reported
-    validation error.
+    Run the nested architecture review skill and use its result to decide
+    whether the current architecture remains appropriate.
   uses_skills:
   - review-architecture
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - docs/proposals/<work-item-name>
-- description: Generate the implementation template and fill it out.
-  step_type: freeform
+- id: evaluate-architecture-specification
+  description: Evaluate the filled architecture specification.
+  step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Invoke the implementation-specification tool once, complete the generated
-    template with decisions and reasoning, then invoke its validator once. If
-    validation succeeds, choose `next_step` immediately; rerun validation only
-    after editing the file to address a reported error.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - implementation-specification
-    - "--work-item-name"
-    - "<work-item-name>"
-  - tool: internal
-    command:
-    - powdrr-lift
-    - evaluate
-    - docs/proposals/<work-item-name>
+  details: Invoke the architecture evaluator exactly once; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/architecture-specification.yaml
+- id: generate-implementation-specification
+  description: Generate the implementation specification template.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the declared implementation-specification generator exactly once; do not edit the generated file.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - implementation-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+- id: fill-implementation-specification
+  description: Fill the implementation features and decisions.
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: Use yaml_edit to complete the generated implementation template; do not invoke tools or rewrite the YAML as prose, then choose next_step.
+- id: evaluate-implementation-specification
+  description: Evaluate the filled implementation specification.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the implementation evaluator exactly once; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/implementation-specification.yaml
 - id: generate-pr-specification
   description: Generate the proposed PR specification template.
   step_type: invoke_tool

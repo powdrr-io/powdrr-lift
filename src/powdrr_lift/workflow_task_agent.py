@@ -69,6 +69,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_handoff,
     resolve_workflow_provider,
 )
+from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
@@ -259,6 +260,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     task: WorkflowTask
     skill_catalog: tuple[SkillCatalogEntry, ...]
     repo_root: Path
+    error_log_root: Path
     client: WorkflowLLMClient
     compaction_client: WorkflowLLMClient
     model: str
@@ -354,6 +356,23 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     def material_state(self, action: WorkflowAction) -> object:
         return _task_action_material_state(action, self.repo_root)
 
+    def _llm_error_context(self) -> dict[str, Any]:
+        return {
+            "task": {
+                "task_id": self.task.task_id,
+                "description": self.task.description,
+                "details": self.task.details,
+                "uses_skills": list(self.task.uses_skills),
+            },
+            "workflow": {
+                "directory": str(self.workflow.directory),
+                "task_id": self.task.task_id,
+            },
+            "worktree_root": str(self.repo_root),
+            "provider": self.mapping_provider,
+            "model": self.model,
+        }
+
     def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:
         print(
             f"Workflow task LLM action:\n{workflow_action_signature(action)}",
@@ -384,23 +403,34 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         error: RuntimeError,
         payload: dict[str, Any] | None,
     ) -> None:
-        if not _is_repairable_task_response_error(error):
-            raise error
         response_details = (
             json.dumps(payload, indent=2, ensure_ascii=False)
             if payload is not None
             else f"<no parsed response; client error: {error}>"
         )
+        guidance = (
+            "Return exactly one complete JSON object matching one of the "
+            "documented workflow-task action shapes. Do not return markdown, "
+            "prose, or an empty response."
+        )
+        record_workflow_llm_error(
+            self.error_log_root,
+            execution_mode="process_workflow_task",
+            phase="llm_output_parse",
+            error=error,
+            context=self._llm_error_context(),
+            llm_output=payload,
+            guidance=guidance,
+        )
+        if not _is_repairable_task_response_error(error):
+            raise error
         print(
             f"Workflow task LLM response requiring repair:\n{response_details}",
             file=self.stderr,
             flush=True,
         )
         self.response_correction = (
-            "The previous response was invalid: "
-            f"{error} Return exactly one complete JSON object matching one of "
-            "the documented action shapes. Do not return markdown, prose, "
-            "or an empty response."
+            f"The previous response was invalid: {error} {guidance}"
         )
         print(
             "Workflow task response needs repair; requesting a corrected "
@@ -644,6 +674,15 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
         self.response_correction = _action_response_correction(action, error)
+        record_workflow_llm_error(
+            self.error_log_root,
+            execution_mode="process_workflow_task",
+            phase="action_validation_or_execution",
+            error=error,
+            context=self._llm_error_context(),
+            attempted_action=json.loads(workflow_action_signature(action)),
+            guidance=self.response_correction,
+        )
         self.events.append(
             {
                 "kind": (
@@ -877,6 +916,7 @@ def run_workflow_task(
         task=task,
         skill_catalog=skill_catalog,
         repo_root=repo_root,
+        error_log_root=dump_root,
         client=client,
         compaction_client=compaction_client,
         model=model,

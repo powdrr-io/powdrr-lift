@@ -6256,6 +6256,12 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
     assert "skill selection response needs repair" in stderr.getvalue()
     assert "Internal reason not shown to users." not in output
     assert str(skills_dir) not in output
+    error_log = repo_root / "workflow-llm-errors.jsonl"
+    assert error_log.exists()
+    selection_error = json.loads(error_log.read_text(encoding="utf-8").splitlines()[0])
+    assert selection_error["execution_mode"] == "select_skill"
+    assert selection_error["context"]["request"] == "Build exports"
+    assert selection_error["llm_output"]["next_question"] == "   "
 
 
 def test_run_workflow_chat_uses_anthropic_provider(

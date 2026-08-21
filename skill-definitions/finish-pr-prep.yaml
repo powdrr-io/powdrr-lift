@@ -46,8 +46,11 @@ steps:
     programming-language label they represent. Invoke gather_context exactly
     once with types [tools] and a labels filter containing pr-prep plus those
     language labels. If no language labels are present, use only pr-prep. Do
-    not hard-code a language, tool, or command. Choose next_step after the
-    gather_context result is returned.
+    not hard-code a language, tool, or command. For example, the action shape
+    is {"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep","<language-label>"]}}.
+    Choose next_step after the gather_context result is returned; that result
+    seeds both the validation tools shown to the next step and its runtime
+    obligations.
 - description: Run the final formatting, lint, type-check, and test passes.
   step_type: freeform
   validation_gate:
@@ -57,6 +60,7 @@ steps:
         kind: gather_context
         types:
         - tools
+      filters_from_action: true
       result_path: matches
     obligations:
       source: matches
@@ -70,8 +74,10 @@ steps:
     the staged pull-request scope. The runtime validation gate is authoritative:
     First perform the filtered gather_context discovery action exactly once,
     using types [tools] and labels containing pr-prep plus the language labels
-    derived from the staged files. Only after that discovery succeeds may you
-    invoke its returned obligations.
+    derived from the staged files. The discovery result supplies both
+    discovered_tools, which are the only validation actions to invoke, and the
+    matching runtime obligations. Only after that discovery succeeds may you
+    invoke its returned discovered_tools.
     invoke every discovered obligation and do not choose next_step, goto_step, or
     complete until all obligations pass in the current validation epoch. If any
     obligation fails, apply its corrective action, then rerun every discovered

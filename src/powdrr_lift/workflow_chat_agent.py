@@ -481,6 +481,7 @@ class _ValidationGateState:
     epoch: int = 0
     obligations: dict[str, _ValidationObligation] = field(default_factory=dict)
     correction_required: bool = False
+    discovery_action: Mapping[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -4842,6 +4843,7 @@ def _discover_validation_obligations(
     state: _WorkflowExecutionState,
     gate: Any,
     gate_step_index: int,
+    discovery_action: Mapping[str, Any] | None = None,
 ) -> None:
     config = _validation_gate_config(gate)
     assert config is not None
@@ -4903,6 +4905,9 @@ def _discover_validation_obligations(
     gate_state.epoch = 1
     gate_state.obligations = obligations
     gate_state.correction_required = False
+    gate_state.discovery_action = (
+        dict(discovery_action) if discovery_action is not None else None
+    )
 
 
 def _register_validation_gate_discovery(
@@ -4930,11 +4935,19 @@ def _register_validation_gate_discovery(
                 raise RuntimeError(
                     "Validation discovery action did not produce a result."
                 )
+            if discovery.get("filters_from_action") is True:
+                actual = _workflow_action_data(action)
+                filters = actual.get("filters")
+                if not isinstance(filters, Mapping) or not filters.get("labels"):
+                    raise RuntimeError(
+                        "Validation discovery must provide a non-empty labels filter."
+                    )
             _discover_validation_obligations(
                 event["result"],
                 state=state,
                 gate=gate,
                 gate_step_index=gate_step_index,
+                discovery_action=_workflow_action_data(action),
             )
 
 
@@ -5127,6 +5140,14 @@ def _validation_gate_prompt_data(
         "epoch": gate_state.epoch,
         "correction_required": gate_state.correction_required,
         "can_advance": not gate_state.correction_required and not incomplete,
+        "discovery_action": gate_state.discovery_action,
+        "discovered_tools": [
+            {
+                "obligation_id": obligation.obligation_id,
+                "action": dict(obligation.expected_action),
+            }
+            for obligation in gate_state.obligations.values()
+        ],
         "obligations": [
             obligation.to_data() for obligation in gate_state.obligations.values()
         ],

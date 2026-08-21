@@ -387,6 +387,7 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Context guidance:" not in ordinary_system_prompt
     assert "Nested-skill guidance:" not in ordinary_system_prompt
     assert "entity-relationships" not in ordinary_system_prompt
+    assert "prompt_user is always allowed" in ordinary_system_prompt
 
     gather_prompt = json.loads(
         _build_step_execution_messages(
@@ -716,15 +717,28 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         )
 
 
-def test_internal_tool_is_always_allowed_but_only_runs_powdrr_lift() -> None:
+def test_action_schema_uses_action_and_internal_tool_must_be_declared() -> None:
     action = _parse_action_response(
         {
-            "kind": "invoke_tool",
+            "action": "invoke_tool",
             "tool": "internal",
-            "parameters": {"command": ["powdrr-lift", "--help"]},
+            "parameters": {"command": ["powdrr-lift", "repository-state"]},
         }
     )
-    _validate_workflow_action_for_step(action, SkillStep(description="Report."))
+    with pytest.raises(RuntimeError, match="internal tool is not declared"):
+        _validate_workflow_action_for_step(action, SkillStep(description="Report."))
+
+    _validate_workflow_action_for_step(
+        action,
+        SkillStep(
+            description="Inspect the repository.",
+            tool_invocations=(
+                SkillToolInvocation(
+                    tool="internal", command=("powdrr-lift", "repository-state")
+                ),
+            ),
+        ),
+    )
 
     with pytest.raises(RuntimeError, match="only the powdrr-lift binary"):
         _validate_internal_command(["git", "status"])
@@ -3245,6 +3259,8 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "read_document" in prompt
     assert "start_line" in prompt
     assert "end_line" in prompt
+    assert "top-level action field" in prompt
+    assert "never use kind or action_input" in prompt
     assert "multiple independent edits" in prompt
 
 
@@ -6952,7 +6968,30 @@ def test_run_workflow_chat_executes_shell_tool_actions(
     worktree_root = repo_root / ".worktrees" / "skill-chat-test"
     skills_dir = worktree_root / "skill-definitions"
     skills_dir.mkdir(parents=True)
-    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
+    skill = _build_skill()
+    save_skill(
+        replace(
+            skill,
+            steps=(
+                replace(
+                    skill.steps[0],
+                    tool_invocations=(
+                        SkillToolInvocation(
+                            tool="internal",
+                            command=(
+                                "powdrr-lift",
+                                "system-specification",
+                                "--work-item-name",
+                                "<work-item-name>",
+                            ),
+                        ),
+                    ),
+                ),
+                *skill.steps[1:],
+            ),
+        ),
+        skills_dir / "specify-a-feature.json",
+    )
 
     responses: Iterator[dict[str, object]] = iter(
         [

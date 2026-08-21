@@ -744,6 +744,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             model=self.current_model,
             repair_instructions=_action_repair_prompt(
                 self.selected_skill,
+                current_step=self.current_step,
                 failed_action=self.last_failed_action,
                 validation_error=self.last_validation_error,
             ),
@@ -759,7 +760,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     self.config, self.provider_roles, self.provider_role
                 )
             ),
-            empty_response_fallback_payload={"kind": "next_step"},
+            empty_response_fallback_payload={"action": "next_step"},
         )
         if action is None:
             raise WorkflowLLMExecutionAborted(1)
@@ -802,6 +803,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             llm_output=payload,
             guidance=_action_repair_prompt(
                 self.selected_skill,
+                current_step=self.current_step,
                 failed_action=self.last_failed_action,
                 validation_error=str(error),
             ),
@@ -968,6 +970,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             llm_output=payload,
             guidance=_action_repair_prompt(
                 self.selected_skill,
+                current_step=self.current_step,
                 failed_action=self.last_failed_action,
                 validation_error=str(error),
             ),
@@ -2958,7 +2961,7 @@ def _is_prompt_observation_message(message: Mapping[str, str]) -> bool:
     if not isinstance(decoded, Mapping):
         return False
     if message.get("role") == "assistant":
-        return isinstance(decoded.get("kind"), str)
+        return isinstance(decoded.get("action", decoded.get("kind")), str)
     return bool(_PROMPT_OBSERVATION_RESULT_KEYS.intersection(decoded))
 
 
@@ -3443,8 +3446,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "in an outputs object using exactly those declared names. A later step "
         "receives only validated handoff inputs; do not rely on hidden transcript "
         "history.\n"
-        "Response: return exactly one JSON object matching exactly one of these "
-        "outcome shapes. Include decisions_and_context when there is information "
+        "Response: return exactly one JSON object with a top-level action field, "
+        "matching exactly one of these outcome shapes. never use kind or "
+        "action_input. Include decisions_and_context when there is information "
         "a later step needs. Include llm_type only when the next roundtrip needs "
         "a different capability; otherwise use null or omit it.\n"
         "Response field requirements by outcome: gather_context requires a non-"
@@ -3468,38 +3472,38 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "the beginning of the document, and an end_line beyond EOF is clamped; "
         "complete may include a human-readable text; any action may include an "
         "outputs object when the current step declares outputs.\n"
-        '{"kind":"gather_context","feature_id":"display-related-photos",'
+        '{"action":"gather_context","feature_id":"display-related-photos",'
         '"types":["requirements"],"keywords":["photo"],"filters":{"entity_type":["Service"]},'
         '"decisions_and_context":"...","llm_type":"simple_task"}\n'
-        '{"kind":"prompt_user","text":"...","decisions_and_context":"...",'
+        '{"action":"prompt_user","text":"...","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
-        '{"kind":"edit","file_path":"src/example.py",'
+        '{"action":"edit","file_path":"src/example.py",'
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
         "For edits across multiple files, use one edit action with "
         '"file_edits":[{"file_path":"...","edits":[...]}].\n'
-        '{"kind":"yaml_edit","file_path":"docs/proposals/example/implementation-specification.yaml",'
+        '{"action":"yaml_edit","file_path":"docs/proposals/example/implementation-specification.yaml",'
         '"operations":[{"op":"upsert_item","section":"features",'
         '"id":"feature-capture","value":{"action":"added",'
         '"description":"Capture interactions",'
         '"functional_requirements":["Store input and output"]}}],'
         '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
-        '{"kind":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
+        '{"action":"invoke_tool","tool":"shell","parameters":{"command":["..."],"cwd":"...","env":{...}},"decisions_and_context":"...",'
         '"llm_type":"simple_task"}\n'
-        '{"kind":"invoke_skill","skill":"bootstrap-code-structure",'
+        '{"action":"invoke_skill","skill":"bootstrap-code-structure",'
         '"decisions_and_context":"...","llm_type":"standard_reasoning"}\n'
-        '{"kind":"invoke_skill","skill":"adversarial-review",'
+        '{"action":"invoke_skill","skill":"adversarial-review",'
         '"provider_role":"adversarial","clean":true,'
         '"context":["Review only this diff."],"decisions_and_context":"..."}\n'
-        '{"kind":"goto_step","step_id":"process-next-item",'
+        '{"action":"goto_step","step_id":"process-next-item",'
         '"decisions_and_context":"More items remain; continue with the next item."}\n'
-        '{"kind":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
+        '{"action":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
         '"llm_type":"long_context"}\n'
-        '{"kind":"next_step","decisions_and_context":"...",'
+        '{"action":"next_step","decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
-        '{"kind":"complete","text":"...","decisions_and_context":"...",'
+        '{"action":"complete","text":"...","decisions_and_context":"...",'
         '"llm_type":"high_reasoning"}\n'
         "Use gather_context when you need to discover information already "
         "specified in checked-in specs before deciding the next action.\n"
@@ -3622,8 +3626,19 @@ def _modular_action_system_prompt(current_step: Any) -> str:
         "Task: execute the supplied details using the handoff inputs, latest action "
         "result, and allowed tools. Choose one "
         "action that makes progress without asking for information already present.\n"
-        "Return exactly one JSON action. Include decisions_and_context when a later "
-        "step needs it, and include outputs using the declared names.\n"
+        "Return exactly one JSON object with a top-level action field. The action "
+        "field is the discriminator: never use kind or action_input. Include "
+        "decisions_and_context when a later step needs it, and include outputs "
+        "using the declared names. For example, a declared internal command is "
+        "represented as: "
+        '{"action":"invoke_tool","tool":"internal","parameters":{"command":'
+        '["powdrr-lift","system-specification","--work-item-name",'
+        '"example-feature"]},"decisions_and_context":"Generated the system template."}.'
+        " A completed step is represented as: "
+        '{"action":"next_step","decisions_and_context":"The current step "'
+        '"is complete."}.\n'
+        "prompt_user is always allowed when a specific human decision or fact is "
+        "needed; it requires one clear English question ending in '?'.\n"
         "Use goto_step only with a declared step id and include the progress requiring "
         "another pass. Use next_step when the current details are complete and "
         "complete when the skill is finished.\n"
@@ -3640,9 +3655,8 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "narrow results and filters for exact fields; never use "
             "filters.work_item_name. Supported context types:\n"
             f"{context_type_lines}\n"
-            'Example: {"kind":"gather_context","feature_id":"display-related-photos",'
+            'Example: {"action":"gather_context","feature_id":"display-related-photos",'
             '"types":["requirements"],"keywords":["photo"]}.\n'
-            "prompt_user requires one clear English question ending in '?'.\n"
         )
     if include_skills:
         prompt += (
@@ -3650,7 +3664,7 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "inherits the current provider role by default; set provider_role to "
             "adversarial or normal when needed. Set clean=true only when the nested "
             "skill should receive only explicit context.\n"
-            'Example: {"kind":"invoke_skill","skill":"adversarial-review",'
+            'Example: {"action":"invoke_skill","skill":"adversarial-review",'
             '"provider_role":"adversarial","clean":true}.\n'
         )
     if (
@@ -3673,7 +3687,11 @@ def _modular_action_system_prompt(current_step: Any) -> str:
             "end_line past "
             "EOF clamped.\n"
             "edit requires valid line edits and must not target YAML; use yaml_edit "
-            "for YAML.\n"
+            "for YAML. A yaml_edit set_value path is a JSON array of mapping keys, "
+            'such as ["title"] or ["metadata","owner"], never a JSON '
+            "pointer such as /title. For list sections, use one upsert_item per "
+            "item with section, id, and a complete value mapping; do not replace "
+            "the whole list with set_value.\n"
         )
     if current_step.tool_invocations:
         prompt += (
@@ -4645,7 +4663,33 @@ def _validate_workflow_action_for_step_unwrapped(
         invocation for invocation in step.tool_invocations if invocation.tool != "ref"
     )
     if action.tool == _INTERNAL_TOOL:
+        internal_invocations = tuple(
+            invocation
+            for invocation in supported_invocations
+            if invocation.tool in {_INTERNAL_TOOL, "shell"}
+        )
+        if not internal_invocations:
+            supported_tools = sorted(
+                {invocation.tool for invocation in supported_invocations}
+            )
+            supported_tools_text = ", ".join(supported_tools) or "none"
+            raise RuntimeError(
+                "The internal tool is not declared by the current workflow step. "
+                f"The step explicitly supports: {supported_tools_text}."
+            )
         _validate_internal_command(action.parameters.get("command"))
+        command_items = _command_items_for_validation(action.parameters.get("command"))
+        if not any(
+            _command_matches_invocation(command_items, invocation.command)
+            for invocation in internal_invocations
+        ):
+            declared = "; ".join(
+                " ".join(invocation.command) for invocation in internal_invocations
+            )
+            raise RuntimeError(
+                "The internal command is not declared by the current workflow "
+                f"step. Use one of: {declared}."
+            )
         return
     matching_invocations = tuple(
         invocation
@@ -4818,17 +4862,25 @@ def _handle_workflow_action_gather_context(
 
 
 def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
-    kind = payload.get("kind")
-    if not isinstance(kind, str):
-        raise RuntimeError("Workflow action response must include kind.")
-    normalized_kind = kind.strip()
+    action = payload.get("action")
+    legacy_kind = payload.get("kind")
+    if action is None and legacy_kind is not None:
+        action = legacy_kind
+    if action is None:
+        raise RuntimeError(
+            "Workflow action response must include action. Return one JSON object "
+            'with a top-level "action" field; do not use action_input.'
+        )
+    if not isinstance(action, str):
+        raise RuntimeError("Workflow action response action must be a string.")
+    normalized_kind = action.strip()
     if not normalized_kind:
-        raise RuntimeError("Workflow action response must include kind.")
+        raise RuntimeError("Workflow action response action must not be empty.")
     decisions_and_context = _optional_string(payload.get("decisions_and_context"))
     llm_type = _optional_llm_type(payload.get("llm_type"))
     parser = _workflow_action_parsers().get(normalized_kind)
     if parser is None:
-        raise RuntimeError(f"Unknown workflow action kind: {normalized_kind!r}")
+        raise RuntimeError(f"Unknown workflow action: {normalized_kind!r}")
     raw_outputs = payload.get("outputs", {})
     if not isinstance(raw_outputs, Mapping) or any(
         not isinstance(name, str) or not name.strip() for name in raw_outputs
@@ -6902,6 +6954,7 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
 def _action_repair_prompt(
     selected_skill: SkillCatalogEntry,
     *,
+    current_step: Any | None = None,
     failed_action: SkillChatAction | None = None,
     validation_error: str | None = None,
 ) -> str:
@@ -6919,8 +6972,9 @@ def _action_repair_prompt(
         "current step is complete instead of returning an empty response. If "
         "this corrective response is also empty, the system will interpret it "
         "as next_step.\n"
-        "Return exactly one JSON object with a kind and the fields required by "
-        "that action. Use file_path and edits or file_edits for edit, file_path "
+        'Return exactly one JSON object with a top-level "action" field and the '
+        "fields required by that action. Never use kind or action_input. Use "
+        "file_path and edits or file_edits for edit, file_path "
         "and operations for yaml_edit, tool and "
         "parameters.command for invoke_tool, skill for invoke_skill, file_path "
         "with positive start_line "
@@ -6929,6 +6983,23 @@ def _action_repair_prompt(
         "combine actions or output markdown. For yaml_edit, combine all "
         "independent corrections for the same file in one operations array."
     )
+    if current_step is not None:
+        prompt += (
+            "\nThe current step is the only authority for what may be done. "
+            f"Step description: {current_step.description}. "
+            f"Step details: {current_step.details}. "
+        )
+        invocations = tuple(current_step.tool_invocations)
+        if invocations:
+            declared_tools = json.dumps(
+                [_tool_invocation_to_data(item) for item in invocations],
+                ensure_ascii=False,
+            )
+            prompt += f"Use only these declared tool invocations: {declared_tools}. "
+        else:
+            prompt += (
+                "This step declares no tool invocations; do not return invoke_tool. "
+            )
     if validation_error is not None:
         prompt += (
             "\nThe previous action returned a validation_error and was not "

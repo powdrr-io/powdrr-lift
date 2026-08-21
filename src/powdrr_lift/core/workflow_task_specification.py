@@ -533,10 +533,7 @@ def build_workflow_task_validation_report(
         issues.append(
             WorkflowTaskValidationIssue(
                 code="invalid_step_type_value",
-                message=(
-                    "Workflow task step_type must be freeform or "
-                    "invoke_tool."
-                ),
+                message=("Workflow task step_type must be freeform or invoke_tool."),
                 path=_format_child_path(source_path, "step_type"),
             )
         )

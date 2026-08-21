@@ -480,8 +480,7 @@ def build_skill_validation_report(
                     SkillValidationIssue(
                         code="invalid_step_type_value",
                         message=(
-                            "Skill step step_type must be freeform or "
-                            "invoke_tool."
+                            "Skill step step_type must be freeform or invoke_tool."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -1179,9 +1178,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     description = _required_string(data, "description")
     step_type = _optional_string(data.get("step_type")) or "freeform"
     if step_type not in SUPPORTED_STEP_TYPES:
-        raise ValueError(
-            "Skill step step_type must be freeform or invoke_tool."
-        )
+        raise ValueError("Skill step step_type must be freeform or invoke_tool.")
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
     uses_skills = _optional_string_sequence(data.get("uses_skills"))

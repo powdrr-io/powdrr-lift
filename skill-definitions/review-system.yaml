@@ -16,9 +16,10 @@ steps:
   llm_type: high_reasoning
   details: >-
     Compare the gathered requirements and approach against the new needs. If
-    the existing specification already covers them, return the complete action,
-    for example {"action":"complete","text":"The existing system covers the new needs."};
-    otherwise choose next_step to generate and fill an update.
+    the existing specification already covers them, end this skill by returning
+    the complete action, for example {"action":"complete","text":"The existing
+    system covers the new needs."}; do not choose next_step in that case.
+    Otherwise choose next_step to generate and fill an update.
 - id: generate-system
   description: Deterministically generate the system specification template.
   step_type: invoke_tool

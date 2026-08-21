@@ -1080,9 +1080,10 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
     )
     assert skill.steps[1].details == (
         "Compare the gathered requirements and approach against the new needs. "
-        "If the existing specification already covers them, return the complete "
-        "action, for example {\"action\":\"complete\",\"text\":\"The existing "
-        "system covers the new needs.\"}; otherwise choose next_step to generate "
+        "If the existing specification already covers them, end this skill by "
+        "returning the complete action, for example {\"action\":\"complete\","
+        "\"text\":\"The existing system covers the new needs.\"}; do not "
+        "choose next_step in that case. Otherwise choose next_step to generate "
         "and fill an update."
     )
     assert tuple(skill.steps[2].pre_step.template["command"]) == (

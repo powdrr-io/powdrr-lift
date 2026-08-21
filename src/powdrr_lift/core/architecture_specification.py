@@ -422,13 +422,20 @@ def _collect_entity_ids(
             )
             continue
 
-        if entity_type not in allowed_entity_types:
+        canonical_entity_type = _canonical_allowed_entity_type(
+            entity_type, allowed_entity_types
+        )
+        if canonical_entity_type is None:
             issues.append(
                 ArchitectureSpecificationValidationIssue(
                     code="entity_type_not_allowed",
                     message=(
-                        f"Entity type {entity_type!r} is not in the allowed "
-                        "entity types."
+                        f"Entity type {entity_type!r} is not allowed. Use exactly "
+                        "one of: "
+                        f"{', '.join(repr(value) for value in allowed_entity_types)}. "
+                        "This applies to entities[].type only; relationship "
+                        "source and target fields must contain entity ids, not "
+                        "entity type names."
                     ),
                     path=f"entities[{index}].type",
                 )
@@ -991,6 +998,21 @@ def _normalize_entity_types(entity_types: Sequence[str]) -> list[str]:
         normalized_entity_types.append(entity_type)
 
     return normalized_entity_types
+
+
+def _canonical_allowed_entity_type(
+    entity_type: str,
+    allowed_entity_types: Sequence[str],
+) -> str | None:
+    normalized_value = " ".join(entity_type.split()).casefold()
+    return next(
+        (
+            allowed_type
+            for allowed_type in allowed_entity_types
+            if " ".join(allowed_type.split()).casefold() == normalized_value
+        ),
+        None,
+    )
 
 
 def _resolve_output_path(

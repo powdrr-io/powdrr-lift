@@ -190,6 +190,37 @@ def test_validate_architecture_specification_accepts_modules_and_tools(
     assert report.tool_ids == ["formatter"]
 
 
+def test_validate_architecture_specification_accepts_case_insensitive_entity_type(
+    tmp_path: Path,
+) -> None:
+    _write_system_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: 2026-06-19
+    entities:
+      - id: source
+        type: source file
+        action: added
+        summary: A source file.
+        rationale: Keep the source representation aligned with
+          "app-canonical-authoring".
+    modules: []
+    tools: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = build_architecture_specification_validation_report(
+        proposed_spec,
+        entity_types=["Source file"],
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is True
+
+
 def test_validate_architecture_specification_rejects_unknown_module_references(
     tmp_path: Path,
 ) -> None:

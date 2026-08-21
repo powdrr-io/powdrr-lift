@@ -10,10 +10,10 @@ steps:
   llm_type: high_reasoning
   details: >-
     Choose a stable kebab-case feature name and reuse this exact name as the
-    work-item name for every generated document. For example, name a request
-    to record human and LLM interactions in a file `interaction-file-log`.
-    If the name is unclear, ask: "What short kebab-case name should identify
-    this feature in its specification files?"
+    work-item name for every generated document. If the name is clear from the
+    request, choose it directly. Otherwise ask the user with a prompt_user
+    action, for example:
+    {"action":"prompt_user","text":"What short kebab-case name should identify this feature in its specification files?"}
   outputs:
   - name: work_item_name
     type: string
@@ -24,8 +24,10 @@ steps:
   llm_type: high_reasoning
   details: >-
     Ask the user about outcomes, edge cases, tests, and constraints for the
-    named feature. For example: "What should interaction-file-log record,
-    what should happen when logging fails, and how will we test the log?"
+    named feature. If the request already provides this information, continue
+    without asking. Otherwise ask one focused question with a prompt_user
+    action, for example:
+    {"action":"prompt_user","text":"What should this feature record, what should happen when it fails, and how will we test it?"}
 - id: generate-system-specification
   description: Generate the system specification template.
   step_type: invoke_tool

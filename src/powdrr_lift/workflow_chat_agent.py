@@ -77,6 +77,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMExecutionAborted,
     WorkflowLLMExecutionDriver,
     WorkflowLLMHTTPError,
+    prompt_size_breakdown,
     prune_execution_events,
     workflow_action_summary,
 )
@@ -5349,6 +5350,12 @@ def _complete_json_with_model_fallback(
             model_mappings,
         )
         estimated_input_tokens = _estimate_message_tokens(messages)
+        _verbose_json(
+            stderr,
+            config.verbose,
+            "Prompt size breakdown",
+            prompt_size_breakdown(messages),
+        )
         active_limits = _model_limits_for(active_provider, active_model)
         if (
             long_context_backup is not None

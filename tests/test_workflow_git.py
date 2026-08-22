@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import powdrr_lift.workflow_git as workflow_git
 from powdrr_lift.workflow_git import (
     WorkflowGitState,
     claim_workflow_task,
@@ -17,6 +18,7 @@ from powdrr_lift.workflow_git import (
     resolve_git_repository_root,
     save_workflow_git_state,
     task_branch_name,
+    workflow_dependencies_completion,
 )
 
 
@@ -80,6 +82,44 @@ def test_workflow_git_state_loads_by_workflow_id_when_directory_is_shared(
         == integration_state
     )
     assert load_workflow_git_state(workflow_dir) is None
+
+
+def test_workflow_git_state_round_trips_workflow_dependencies() -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+    )
+
+    assert WorkflowGitState.from_data(state.to_data()) == state
+
+
+def test_workflow_dependency_requires_merged_integration_pull_request(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+    )
+    responses = [[{"state": "OPEN"}], [{"state": "MERGED"}]]
+
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_pull_requests",
+        lambda _repo_root, _branches: (responses.pop(0), None),
+    )
+
+    assert workflow_dependencies_completion(tmp_path, state) == (
+        False,
+        ("core: integration PR for powdrr/core is not merged",),
+    )
+    assert workflow_dependencies_completion(tmp_path, state) == (True, ())
 
 
 def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> None:

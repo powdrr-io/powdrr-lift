@@ -1015,6 +1015,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME=VALUE",
         help=("Value for a template input-state placeholder; may be repeated."),
     )
+    instantiate_workflow_parser.add_argument(
+        "--depends-on-workflow",
+        action="append",
+        default=[],
+        metavar="WORKFLOW-ID",
+        help=(
+            "Workflow id whose integration pull request must be merged before "
+            "this workflow can start; may be repeated."
+        ),
+    )
     instantiate_workflow_parser.set_defaults(func=_run_instantiate_workflow)
 
     process_workflow_task_parser = subparsers.add_parser(
@@ -1270,6 +1280,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             base_branch="main",
             integration_branch=integration_branch,
             workflow_relative_directory=str(relative_workflow),
+            depends_on_workflows=tuple(args.depends_on_workflow),
         )
         save_workflow_git_state(output_directory, state)
         commit_and_push_workflow_initialization(

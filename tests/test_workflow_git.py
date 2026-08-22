@@ -192,6 +192,9 @@ def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
     )
     _git(integration_worktree, "add", "docs/workflows/feature-17")
     _git(integration_worktree, "commit", "-m", "initialize workflow")
+    task_worktree, task_branch = create_task_worktree(tmp_path, state, "task-001")
+    claim_workflow_task(tmp_path, state, "task-001")
+    _git(tmp_path, "worktree", "remove", "--force", str(task_worktree))
     _git(tmp_path, "worktree", "remove", "--force", str(integration_worktree))
 
     report = inspect_workflow_run(tmp_path, "feature-17")
@@ -202,6 +205,7 @@ def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
     assert report["workflow_git_state_source"] == (
         "docs/workflows/feature-17/.workflow-git.json"
     )
+    assert report["task_branches"] == [{"branch": task_branch, "integrated": True}]
     assert report["tasks"] == [
         {
             "path": f"{integration_branch}:docs/workflows/feature-17/task-001.json",
@@ -214,6 +218,24 @@ def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
 
     assert cleaned["integration_checkpoint_preserved"] is True
     assert cleaned["integration_worktree_exists"] is False
+    assert (
+        not subprocess.run(
+            ["git", "show-ref", "--verify", f"refs/heads/{task_branch}"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
+    assert (
+        not subprocess.run(
+            ["git", "show-ref", "--verify", "refs/agents/claims/feature-17/task-001"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
 
 
 def test_inspection_follows_registered_nested_integration_worktree(

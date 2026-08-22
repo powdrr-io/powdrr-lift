@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -144,27 +145,38 @@ _ACTIONS: tuple[CorrectiveAction, ...] = (
 )
 
 
+_GATHER_CONTEXT_TYPES = frozenset(
+    {
+        "requirements",
+        "approach",
+        "entities",
+        "entity-relationships",
+        "features",
+        "decisions",
+        "risks",
+        "proposed_prs",
+    }
+)
+
+
 def _gather_context_example(error: ValidationError) -> str:
     """Return a concrete context-discovery action for an ID validation error."""
     path = error.path or ""
     match = re.match(r"([A-Za-z_][A-Za-z0-9_-]*)", path)
-    section = match.group(1) if match else "requirements"
-    context_type = {
-        "requirements": "requirements",
-        "approach": "approach",
-        "entities": "entities",
-        "relationships": "entity-relationships",
-        "entity_relationships": "entity-relationships",
-        "features": "features",
-        "decisions": "decisions",
-        "risks": "risks",
-        "proposed_prs": "proposed_prs",
-    }.get(section, "requirements")
+    field_name = match.group(1) if match else error.code.removesuffix("_missing")
+    normalized_field = field_name.replace("_", "-")
+    if normalized_field == "relationships":
+        normalized_field = "entity-relationships"
+    if normalized_field in _GATHER_CONTEXT_TYPES:
+        context_types = [normalized_field]
+    else:
+        context_types = sorted(_GATHER_CONTEXT_TYPES)
+    types_json = json.dumps(context_types, separators=(",", ":"))
     return (
-        '{"action":"gather_context","types":["'
-        f"{context_type}"
-        '"],"keywords":["'
-        f"{section}"
+        '{"action":"gather_context","types":'
+        f"{types_json}"
+        ',"keywords":["'
+        f"{field_name}"
         '"]}'
     )
 

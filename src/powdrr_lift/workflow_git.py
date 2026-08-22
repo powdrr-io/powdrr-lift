@@ -281,6 +281,55 @@ def synchronize_workflow_initialization(
     )
 
 
+def _load_workflow_git_state_from_branch(
+    repo_root: Path,
+    branch: str,
+) -> tuple[WorkflowGitState | None, str | None]:
+    result = _git(repo_root, ["ls-tree", "-r", "--name-only", branch])
+    if result.returncode != 0:
+        return None, None
+    state_paths = sorted(
+        path
+        for path in result.stdout.splitlines()
+        if Path(path).name == WORKFLOW_GIT_STATE_FILENAME
+    )
+    for state_path in state_paths:
+        contents = _git(repo_root, ["show", f"{branch}:{state_path}"])
+        if contents.returncode != 0:
+            continue
+        try:
+            state = WorkflowGitState.from_data(json.loads(contents.stdout))
+        except (json.JSONDecodeError, ValueError):
+            continue
+        return state, state_path
+    return None, None
+
+
+def _workflow_task_files_from_branch(
+    repo_root: Path,
+    branch: str,
+    workflow_directory: str,
+) -> list[tuple[str, str]]:
+    result = _git(
+        repo_root, ["ls-tree", "-r", "--name-only", branch, "--", workflow_directory]
+    )
+    if result.returncode != 0:
+        return []
+    task_paths = sorted(
+        path
+        for path in result.stdout.splitlines()
+        if Path(path).parent.as_posix() == workflow_directory
+        and Path(path).suffix.lower() in {".yaml", ".yml", ".json"}
+        and Path(path).name != WORKFLOW_GIT_STATE_FILENAME
+    )
+    files: list[tuple[str, str]] = []
+    for task_path in task_paths:
+        contents = _git(repo_root, ["show", f"{branch}:{task_path}"])
+        if contents.returncode == 0:
+            files.append((f"{branch}:{task_path}", contents.stdout))
+    return files
+
+
 def inspect_workflow_run(
     repo_root: str | Path,
     proposed_pr_id: str,
@@ -310,28 +359,46 @@ def inspect_workflow_run(
         else []
     )
     state = load_workflow_git_state(state_paths[0].parent) if state_paths else None
+    branch_state_path: str | None = None
+    if state is None and _branch_exists(repo_root_path, integration_branch):
+        state, branch_state_path = _load_workflow_git_state_from_branch(
+            repo_root_path, integration_branch
+        )
     tasks: list[dict[str, Any]] = []
     if state is not None:
-        workflow_directory = integration_worktree / state.workflow_relative_directory
-        for task_path in sorted(
-            path
-            for pattern in ("*.yaml", "*.yml", "*.json")
-            for path in workflow_directory.glob(pattern)
-        ):
-            if task_path.name == WORKFLOW_GIT_STATE_FILENAME:
-                continue
+        if integration_worktree.is_dir():
+            workflow_directory = (
+                integration_worktree / state.workflow_relative_directory
+            )
+            task_paths = sorted(
+                path
+                for pattern in ("*.yaml", "*.yml", "*.json")
+                for path in workflow_directory.glob(pattern)
+            )
+            task_contents = [
+                (str(task_path), task_path.read_text(encoding="utf-8"))
+                for task_path in task_paths
+                if task_path.name != WORKFLOW_GIT_STATE_FILENAME
+            ]
+        else:
+            task_contents = _workflow_task_files_from_branch(
+                repo_root_path,
+                integration_branch,
+                state.workflow_relative_directory,
+            )
+        for task_path, content in task_contents:
             try:
-                content = task_path.read_text(encoding="utf-8")
+                suffix = Path(task_path).suffix.lower()
                 task = (
                     yaml.safe_load(content)
-                    if task_path.suffix.lower() in {".yaml", ".yml"}
+                    if suffix in {".yaml", ".yml"}
                     else json.loads(content)
                 )
             except (OSError, json.JSONDecodeError, yaml.YAMLError):
                 task = {"error": "could not read task file"}
             tasks.append(
                 {
-                    "path": str(task_path),
+                    "path": task_path,
                     "task_id": task.get("task_id") if isinstance(task, dict) else None,
                     "status": task.get("status") if isinstance(task, dict) else None,
                 }
@@ -343,6 +410,11 @@ def inspect_workflow_run(
         "integration_worktree": str(integration_worktree),
         "integration_worktree_exists": integration_worktree.is_dir(),
         "workflow_git_state": state.to_data() if state is not None else None,
+        "workflow_git_state_source": (
+            branch_state_path
+            if branch_state_path is not None
+            else (str(state_paths[0]) if state_paths else None)
+        ),
         "task_branches": [
             {
                 "branch": branch,
@@ -461,7 +533,7 @@ def cleanup_workflow_run(
         "errors": [*state_report.get("errors", []), *errors],
         "integration_checkpoint_preserved": bool(
             state_report["integration_branch_exists"]
-            and state_report["integration_worktree_exists"]
+            and state_report.get("workflow_git_state") is not None
         ),
     }
 

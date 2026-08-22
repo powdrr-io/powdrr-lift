@@ -4523,6 +4523,63 @@ def test_yaml_edit_set_value_supports_validator_list_indices() -> None:
     assert yaml.safe_load(updated)["entities"][0]["type"] == "Log"
 
 
+def test_yaml_edit_remove_item_supports_validator_list_indices() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/system-specification.yaml",
+            "operations": [
+                {
+                    "op": "remove_item",
+                    "section": "requirements",
+                    "index": 0,
+                }
+            ],
+        }
+    )
+
+    updated = _apply_yaml_operations(
+        Path("docs/system-specification.yaml"),
+        "requirements:\n  - id: null\n    description: null\n  - id: req-1\n",
+        action.yaml_operations,
+    )
+
+    assert yaml.safe_load(updated) == {"requirements": [{"id": "req-1"}]}
+
+
+def test_yaml_edit_index_errors_include_repair_guidance() -> None:
+    with pytest.raises(RuntimeError, match="Corrective action"):
+        _parse_action_response(
+            {
+                "kind": "yaml_edit",
+                "file_path": "docs/system-specification.yaml",
+                "operations": [
+                    {
+                        "op": "remove_item",
+                        "section": "requirements",
+                        "index": -1,
+                    }
+                ],
+            }
+        )
+
+    with pytest.raises(RuntimeError, match="exactly one of id or index"):
+        _parse_action_response(
+            {
+                "kind": "yaml_edit",
+                "file_path": "docs/system-specification.yaml",
+                "operations": [
+                    {
+                        "op": "remove_item",
+                        "section": "requirements",
+                        "id": "req-1",
+                        "index": 0,
+                    }
+                ],
+            }
+        )
+
+
 @pytest.mark.parametrize("tool", ["internal", "shell"])
 @pytest.mark.parametrize(
     ("command", "expected_action"),

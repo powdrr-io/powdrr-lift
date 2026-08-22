@@ -17,3 +17,17 @@ def test_validation_error_only_includes_yaml_edit_for_yaml_files() -> None:
     assert '"path":["title"]' in yaml_data["yaml_edit_guidance"]
     assert "yaml_edit" not in json_data
     assert "yaml_edit_guidance" not in json_data
+
+
+def test_boilerplate_issue_includes_indexed_yaml_removal() -> None:
+    error = ValidationError(
+        "boilerplate_not_removed",
+        "Remove the requirements boilerplate placeholder entry.",
+        "requirements[0]",
+    )
+
+    data = validation_error_to_data(error, file_path="system-specification.yaml")
+
+    assert data["yaml_edit"]["operations"] == [
+        {"op": "remove_item", "section": "requirements", "index": 0}
+    ]

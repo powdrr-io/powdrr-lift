@@ -80,6 +80,7 @@ class WorkflowYamlOperation:
     operation: str
     section: str | None = None
     item_id: str | None = None
+    item_index: int | None = None
     path: tuple[str, ...] = field(default_factory=tuple)
     value: Any = None
 

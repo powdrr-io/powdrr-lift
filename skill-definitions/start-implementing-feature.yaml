@@ -300,8 +300,8 @@ steps:
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Confirm from the repository-state result that every generated workflow JSON
-    file and .workflow-git.json is under docs/workflows/ in this active
+    Confirm from the repository-state result that every generated workflow task
+    file and <workflow-id>-workflow.yaml is under docs/workflows/ in this active
     worktree, that each integration branch is powdrr/<proposed-pr-id>, and that
     no required artifact exists only below .worktrees/. If any file is missing
     or outside the active worktree, stop and report the inconsistency; do not

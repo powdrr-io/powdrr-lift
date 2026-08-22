@@ -397,7 +397,7 @@ def _is_workflow_task_path(path: Path) -> bool:
     return (
         path.is_file()
         and path.suffix.lower() in {".json", ".yaml", ".yml"}
-        and path.name != ".workflow-git.json"
+        and not path.name.endswith("-workflow.yaml")
     )
 
 

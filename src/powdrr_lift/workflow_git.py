@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-WORKFLOW_GIT_STATE_FILENAME = ".workflow-git.json"
+WORKFLOW_GIT_STATE_SUFFIX = "-workflow.yaml"
 
 
 class WorkflowGitInconsistency(RuntimeError):
@@ -53,15 +53,37 @@ class WorkflowGitState:
         return cls(**values)
 
 
-def workflow_git_state_path(workflow_directory: str | Path) -> Path:
-    return Path(workflow_directory) / WORKFLOW_GIT_STATE_FILENAME
+def workflow_git_state_filename(workflow_id: str) -> str:
+    return f"{slugify_workflow_id(workflow_id)}{WORKFLOW_GIT_STATE_SUFFIX}"
 
 
-def load_workflow_git_state(workflow_directory: str | Path) -> WorkflowGitState | None:
-    path = workflow_git_state_path(workflow_directory)
+def workflow_id_from_task_id(task_id: str) -> str | None:
+    workflow_id, separator, _task_number = task_id.rpartition("-task-")
+    return workflow_id if separator and workflow_id else None
+
+
+def workflow_git_state_path(
+    workflow_directory: str | Path,
+    workflow_id: str,
+) -> Path:
+    return Path(workflow_directory) / workflow_git_state_filename(workflow_id)
+
+
+def load_workflow_git_state(
+    workflow_directory: str | Path,
+    workflow_id: str | None = None,
+) -> WorkflowGitState | None:
+    directory = Path(workflow_directory)
+    paths = (
+        [workflow_git_state_path(directory, workflow_id)]
+        if workflow_id is not None
+        else sorted(directory.glob(f"*{WORKFLOW_GIT_STATE_SUFFIX}"))
+    )
+    if len(paths) != 1:
+        return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        data = yaml.safe_load(paths[0].read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
         return None
     try:
         return WorkflowGitState.from_data(data)
@@ -73,9 +95,9 @@ def save_workflow_git_state(
     workflow_directory: str | Path,
     state: WorkflowGitState,
 ) -> Path:
-    path = workflow_git_state_path(workflow_directory)
+    path = workflow_git_state_path(workflow_directory, state.proposed_pr_id)
     path.write_text(
-        json.dumps(state.to_data(), indent=2, ensure_ascii=False) + "\n",
+        yaml.safe_dump(state.to_data(), sort_keys=False),
         encoding="utf-8",
     )
     return path
@@ -284,6 +306,7 @@ def synchronize_workflow_initialization(
 def _load_workflow_git_state_from_branch(
     repo_root: Path,
     branch: str,
+    expected_workflow_id: str | None = None,
 ) -> tuple[WorkflowGitState | None, str | None]:
     result = _git(repo_root, ["ls-tree", "-r", "--name-only", branch])
     if result.returncode != 0:
@@ -291,17 +314,18 @@ def _load_workflow_git_state_from_branch(
     state_paths = sorted(
         path
         for path in result.stdout.splitlines()
-        if Path(path).name == WORKFLOW_GIT_STATE_FILENAME
+        if Path(path).name.endswith(WORKFLOW_GIT_STATE_SUFFIX)
     )
     for state_path in state_paths:
         contents = _git(repo_root, ["show", f"{branch}:{state_path}"])
         if contents.returncode != 0:
             continue
         try:
-            state = WorkflowGitState.from_data(json.loads(contents.stdout))
-        except (json.JSONDecodeError, ValueError):
+            state = WorkflowGitState.from_data(yaml.safe_load(contents.stdout))
+        except (yaml.YAMLError, ValueError):
             continue
-        return state, state_path
+        if expected_workflow_id is None or state.proposed_pr_id == expected_workflow_id:
+            return state, state_path
     return None, None
 
 
@@ -320,7 +344,7 @@ def _workflow_task_files_from_branch(
         for path in result.stdout.splitlines()
         if Path(path).parent.as_posix() == workflow_directory
         and Path(path).suffix.lower() in {".yaml", ".yml", ".json"}
-        and Path(path).name != WORKFLOW_GIT_STATE_FILENAME
+        and not Path(path).name.endswith(WORKFLOW_GIT_STATE_SUFFIX)
     )
     files: list[tuple[str, str]] = []
     for task_path in task_paths:
@@ -354,15 +378,19 @@ def inspect_workflow_run(
         else workflow_worktree_path(repo_root_path, proposed_pr_id)
     )
     state_paths = (
-        sorted(integration_worktree.rglob(WORKFLOW_GIT_STATE_FILENAME))
+        sorted(integration_worktree.rglob(f"*{WORKFLOW_GIT_STATE_SUFFIX}"))
         if integration_worktree.is_dir()
         else []
     )
-    state = load_workflow_git_state(state_paths[0].parent) if state_paths else None
+    state = (
+        load_workflow_git_state(state_paths[0].parent, proposed_pr_id)
+        if state_paths
+        else None
+    )
     branch_state_path: str | None = None
     if state is None and _branch_exists(repo_root_path, integration_branch):
         state, branch_state_path = _load_workflow_git_state_from_branch(
-            repo_root_path, integration_branch
+            repo_root_path, integration_branch, proposed_pr_id
         )
     tasks: list[dict[str, Any]] = []
     if state is not None:
@@ -378,7 +406,7 @@ def inspect_workflow_run(
             task_contents = [
                 (str(task_path), task_path.read_text(encoding="utf-8"))
                 for task_path in task_paths
-                if task_path.name != WORKFLOW_GIT_STATE_FILENAME
+                if not task_path.name.endswith(WORKFLOW_GIT_STATE_SUFFIX)
             ]
         else:
             task_contents = _workflow_task_files_from_branch(
@@ -649,7 +677,8 @@ def _find_inconsistencies(report: dict[str, Any]) -> list[str]:
             errors.append(f"task worktree {branch!r} has no local task branch")
     if report["integration_branch_exists"] and not report["workflow_git_state"]:
         errors.append(
-            "integration branch exists but .workflow-git.json is missing or invalid"
+            "integration branch exists but its <workflow-id>-workflow.yaml "
+            "metadata file is missing or invalid"
         )
     for task in report["tasks"]:
         if "error" in task:

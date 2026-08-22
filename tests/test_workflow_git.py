@@ -51,6 +51,37 @@ def test_workflow_git_state_round_trips_and_names_branches(tmp_path: Path) -> No
     )
 
 
+def test_workflow_git_state_loads_by_workflow_id_when_directory_is_shared(
+    tmp_path: Path,
+) -> None:
+    workflow_dir = tmp_path / "docs" / "workflows" / "feature"
+    workflow_dir.mkdir(parents=True)
+    core_state = WorkflowGitState(
+        proposed_pr_id="feature-core",
+        base_branch="main",
+        integration_branch="powdrr/feature-core",
+        workflow_relative_directory="docs/workflows/feature",
+    )
+    integration_state = WorkflowGitState(
+        proposed_pr_id="feature-integration",
+        base_branch="main",
+        integration_branch="powdrr/feature-integration",
+        workflow_relative_directory="docs/workflows/feature",
+    )
+
+    core_path = save_workflow_git_state(workflow_dir, core_state)
+    integration_path = save_workflow_git_state(workflow_dir, integration_state)
+
+    assert core_path.name == "feature-core-workflow.yaml"
+    assert integration_path.name == "feature-integration-workflow.yaml"
+    assert load_workflow_git_state(workflow_dir, "feature-core") == core_state
+    assert (
+        load_workflow_git_state(workflow_dir, "feature-integration")
+        == integration_state
+    )
+    assert load_workflow_git_state(workflow_dir) is None
+
+
 def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> None:
     _git(tmp_path, "init", "-b", "main")
     _git(tmp_path, "config", "user.email", "test@example.com")
@@ -203,7 +234,7 @@ def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
     assert report["integration_worktree_exists"] is False
     assert report["workflow_git_state"] == state.to_data()
     assert report["workflow_git_state_source"] == (
-        "docs/workflows/feature-17/.workflow-git.json"
+        "docs/workflows/feature-17/feature-17-workflow.yaml"
     )
     assert report["task_branches"] == [{"branch": task_branch, "integrated": True}]
     assert report["tasks"] == [

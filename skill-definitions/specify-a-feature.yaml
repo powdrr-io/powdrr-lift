@@ -14,6 +14,10 @@ steps:
     request, choose it directly. Otherwise ask the user with a prompt_user
     action, for example:
     {"action":"prompt_user","text":"What short kebab-case name should identify this feature in its specification files?"}
+    This step declares the required output work_item_name. When the name is
+    clear, advance only with an outputs object containing that exact field, for
+    example:
+    {"action":"next_step","outputs":{"work_item_name":"interaction-file-log"},"decisions_and_context":"Captured the feature name."}
   outputs:
   - name: work_item_name
     type: string

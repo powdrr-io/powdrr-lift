@@ -381,6 +381,20 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Use complete when the skill is finished" in ordinary_system_prompt
     assert "apply to every step" in ordinary_system_prompt
 
+    output_step = SkillStep(
+        description="Capture the feature name.",
+        outputs=(
+            SkillStepOutput(
+                name="work_item_name",
+                type="string",
+                required_for_next_step=True,
+            ),
+        ),
+    )
+    output_prompt = _modular_action_system_prompt(output_step)
+    assert '"outputs"' in output_prompt
+    assert '"work_item_name":"interaction-file-log"' in output_prompt
+
     ordinary_system_prompt = _build_step_execution_messages(
         selected_skill=ordinary_skill,
         current_step=ordinary_step,

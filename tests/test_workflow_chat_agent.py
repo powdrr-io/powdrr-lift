@@ -127,6 +127,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_action_for_step,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
+    _validation_issue_fingerprint,
     _ValidationGateState,
     _ValidationObligation,
     _workflow_action_material_state,
@@ -1102,6 +1103,64 @@ def test_validation_failure_context_contains_exact_tool_result() -> None:
     assert '"returncode": 1' in state.execution_context[-1]
     assert "src/example.py:1: error" in state.execution_context[-1]
     assert "Found 1 error" in state.execution_context[-1]
+
+
+def test_validation_fingerprint_detects_repeated_and_regressed_issues() -> None:
+    result = {
+        "returncode": 1,
+        "stdout": (
+            "validation_successful: false\n"
+            "issues:\n"
+            "- code: missing_id\n"
+            "  path: entities[0].id\n"
+        ),
+    }
+    fingerprint = _validation_issue_fingerprint(result)
+    assert len(fingerprint) == 1
+
+    step = SkillStep(
+        description="Run validation.",
+        validation_gate={"id": "checks"},
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"), Skill(name="validation", when_to_use=(), steps=(step,))
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+    action = _parse_action_response(
+        {
+            "action": "invoke_tool",
+            "tool": "shell",
+            "parameters": {"command": ["uv", "run", "evaluate"]},
+        }
+    )
+    obligation = _ValidationObligation(
+        obligation_id="evaluate",
+        expected_action={
+            "kind": "invoke_tool",
+            "tool": "shell",
+            "parameters": {"command": ["uv", "run", "evaluate"]},
+        },
+        source={"id": "evaluate"},
+    )
+    state.validation_gates["checks"] = _ValidationGateState(
+        step_index=0,
+        discovered=True,
+        epoch=1,
+        obligations={"evaluate": obligation},
+    )
+
+    for _ in range(2):
+        state.execution_events.append({"result": result})
+        _record_dynamic_validation_result(action, state)
+
+    assert obligation.semantic_stalls == 1
+    assert len(obligation.issue_history) == 1
 
 
 def test_action_schema_uses_action_and_internal_tool_must_be_declared() -> None:
@@ -4689,6 +4748,28 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
     ):
         assert action_name in prompt
     assert "powdrr-lift yaml-edit" not in prompt
+
+
+def test_validation_gate_prompt_requires_a_different_repair_strategy() -> None:
+    step = SkillStep(
+        description="Repair the generated YAML and pass all checks.",
+        validation_gate={"id": "yaml-checks"},
+    )
+
+    prompt = _modular_action_system_prompt(step)
+
+    assert (
+        "failed result is a diagnosis, not permission to repeat the same edit" in prompt
+    )
+    assert "Never repeat an operation or semantically equivalent operation" in prompt
+    assert "change the target or repair strategy" in prompt
+    assert "wait for the deterministic obligation rerun" in prompt
+
+    repair_prompt = _action_repair_prompt(
+        SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
+        current_step=step,
+    )
+    assert "choose a materially different target or strategy" in repair_prompt
 
 
 def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) -> None:

@@ -1,0 +1,35 @@
+task_id: interaction-file-log-integration-execute-task-003
+status: open
+upstream_task_ids:
+- interaction-file-log-integration-execute-task-001
+- interaction-file-log-integration-execute-task-002
+dependent_state:
+- tests-generated
+complexity: high
+input_state:
+  proposed_pr_context: interaction-file-log-integration-execute-task-001.proposed-pr-context-state
+  execution_plan: interaction-file-log-integration-execute-task-002.detailed-execution-plan-state
+  test_plan: []
+assignee_type: agent
+assignee_role: coder
+output_state_type: generated-test-diffs-state
+description: Generate tests that will validate the new functionality
+step_type: freeform
+details: 'Implement only the tests described by the execution plan. Add focused tests
+  for the required behavior, edge cases, and acceptance criteria. Keep the tests deterministic
+  and consistent with existing repository conventions. Do not implement product behavior
+  yet. Inspect the changed test files and record the test paths, test names, and expected
+  failure reasons in output_state. Use the shell tool for repository inspection and
+  edits.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-integration-execute''. Use these values as search
+  context and verify repository documents before deciding what they identify.'
+llm_type: standard_reasoning
+tool_invocations:
+- tool: shell
+  command:
+  - git
+  - status
+  - --short

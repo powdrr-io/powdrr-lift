@@ -485,6 +485,9 @@ class _ValidationObligation:
     status: str = "pending"
     attempts: int = 0
     last_result: Mapping[str, Any] | None = None
+    last_issue_fingerprint: tuple[str, ...] | None = None
+    issue_history: set[tuple[str, ...]] = field(default_factory=set)
+    semantic_stalls: int = 0
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -495,6 +498,8 @@ class _ValidationObligation:
             "status": self.status,
             "attempts": self.attempts,
             "last_result": self.last_result,
+            "last_issue_fingerprint": list(self.last_issue_fingerprint or ()),
+            "semantic_stalls": self.semantic_stalls,
         }
 
 
@@ -1220,6 +1225,32 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         observation: WorkflowActionObservation,
         outcome: WorkflowActionOutcome,
     ) -> WorkflowActionOutcome:
+        if action.kind == "invoke_tool" and _validation_gate_enabled(self.current_step):
+            gate_state = _validation_gate_state(self.state, self.current_step)
+            actual = {
+                "kind": action.kind,
+                "tool": action.tool,
+                "parameters": dict(action.parameters),
+            }
+            stalled_obligation = next(
+                (
+                    item
+                    for item in gate_state.obligations.values()
+                    if item.expected_action == actual and item.semantic_stalls >= 2
+                ),
+                None,
+            )
+            if stalled_obligation is not None:
+                warning = (
+                    "Workflow stopped: validation obligation "
+                    f"{stalled_obligation.obligation_id!r} repeated or worsened "
+                    "the semantic validation state twice. The repair loop is "
+                    "cycling; inspect the recorded issue fingerprints and choose "
+                    "a different correction."
+                )
+                print(warning, file=self.stderr)
+                _write_agent_error(self.state.worktree_root, warning)
+                return WorkflowActionOutcome(exit_code=1)
         if not observation.made_progress:
             if observation.decision == ProgressDecision.THRESHOLD:
                 if action.kind != "invoke_tool":
@@ -4222,6 +4253,25 @@ def _current_file_contents(state: _WorkflowExecutionState) -> str | None:
     return state.current_file_path.read_text(encoding="utf-8")
 
 
+def _material_file_contents(path: Path) -> str | None:
+    """Return semantic file contents for progress comparisons.
+
+    YAML comments, key ordering, and whitespace are not workflow progress.
+    Invalid YAML falls back to raw text so a repair can still make the file
+    parseable.
+    """
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if path.suffix.casefold() not in {".yaml", ".yml"}:
+        return raw
+    try:
+        return json.dumps(yaml.safe_load(raw), sort_keys=True, default=str)
+    except yaml.YAMLError:
+        return raw
+
+
 def _last_user_message(state: _WorkflowExecutionState) -> str | None:
     if not state.transcript or state.transcript[-1]["role"] != "user":
         return None
@@ -4249,7 +4299,7 @@ def _workflow_action_material_state(
             (
                 file_path,
                 (
-                    target_path.read_text(encoding="utf-8")
+                    _material_file_contents(target_path)
                     if (
                         target_path := _resolve_worktree_file_path(
                             file_path,
@@ -5095,6 +5145,46 @@ def _validation_result_passed(
     return result.get("status") not in {"failed", "failure", "error"}
 
 
+def _validation_issue_fingerprint(result: Mapping[str, Any]) -> tuple[str, ...]:
+    """Return a stable semantic fingerprint for a validation result.
+
+    Validators commonly return YAML in ``stdout`` rather than structured JSON.
+    Fingerprinting the parsed issue records lets us distinguish a real repair
+    from formatting churn or an edit that merely changes the error wording.
+    """
+    payload: Any = result
+    stdout = result.get("stdout")
+    if isinstance(stdout, str) and stdout.strip():
+        try:
+            parsed = yaml.safe_load(stdout)
+        except yaml.YAMLError:
+            parsed = None
+        if isinstance(parsed, Mapping):
+            payload = parsed
+    issues = payload.get("issues") if isinstance(payload, Mapping) else None
+    if isinstance(issues, Sequence) and not isinstance(issues, (str, bytes, bytearray)):
+        return tuple(
+            sorted(
+                json.dumps(issue, sort_keys=True, ensure_ascii=False, default=str)
+                for issue in issues
+            )
+        )
+    if _validation_result_passed(result, None):
+        return ()
+    return (
+        json.dumps(
+            {
+                "returncode": result.get("returncode"),
+                "stderr": result.get("stderr", ""),
+                "stdout": result.get("stdout", ""),
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        ),
+    )
+
+
 def _validation_gate_incomplete(
     state: _WorkflowExecutionState,
     gate: Any,
@@ -5201,15 +5291,36 @@ def _record_dynamic_validation_result(
     obligation.last_result = result
     if _validation_result_passed(result, step):
         obligation.status = "passed"
+        obligation.last_issue_fingerprint = ()
     else:
         obligation.status = "failed"
+        fingerprint = _validation_issue_fingerprint(result)
+        previous_fingerprint = obligation.last_issue_fingerprint
+        previous_issues = set(previous_fingerprint or ())
+        current_issues = set(fingerprint)
+        if (
+            previous_fingerprint == fingerprint
+            or fingerprint in obligation.issue_history
+            or (previous_issues and not current_issues < previous_issues)
+        ):
+            obligation.semantic_stalls += 1
+        else:
+            obligation.semantic_stalls = 0
+        obligation.last_issue_fingerprint = fingerprint
+        obligation.issue_history.add(fingerprint)
         gate_state.correction_required = True
+        progress_note = (
+            " The repair made no semantic improvement or repeated a prior "
+            "validation state; choose a materially different correction."
+            if obligation.semantic_stalls
+            else ""
+        )
         state.execution_context.append(
             "Validation failed for "
             f"{obligation.obligation_id}. Exact result: "
             f"{json.dumps(result, ensure_ascii=False, default=str)}. "
             "Apply the corrective action indicated by that result, then rerun every "
-            "discovered validation obligation."
+            "discovered validation obligation." + progress_note
         )
 
 

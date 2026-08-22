@@ -4103,8 +4103,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; do not use edit for .yaml or .yml files; use yaml_edit "
-        "instead. invoke_tool requires a tool listed in the current step's "
+        "line numbers; prefer yaml_edit for .yaml or .yml files, but use edit as "
+        "a fallback when a structural operation cannot express the repair. "
+        "invoke_tool requires a tool listed in the current step's "
         "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
@@ -4181,11 +4182,13 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
-        "Use yaml_edit for YAML specification files. It preserves section keys "
+        "Prefer yaml_edit for YAML specification files. It preserves section keys "
         "and edits list items structurally: upsert_item uses section, id, and a "
         "complete value mapping; remove_item uses section and id, or section and "
         "index for a validator-reported boilerplate list entry; set_value uses "
-        "a mapping-key path and value. Try to combine multiple independent edits "
+        "a mapping-key path and value. Use edit as a fallback when direct textual "
+        "repair is necessary, and validate the resulting YAML afterward. Try to "
+        "combine multiple independent edits "
         "to the same YAML file into one yaml_edit operations array. If yaml_edit "
         "reports a usage error, "
         "follow its corrective instructions and retry with the corrected shape.\n"
@@ -4279,7 +4282,8 @@ def _modular_action_system_prompt(
         "action that makes progress without asking for information already present.\n"
         "Available actions (choose exactly one): gather_context discovers checked-in "
         "specifications; prompt_user asks one necessary human question; edit applies "
-        "line-based edits to non-YAML files; yaml_edit applies structural YAML "
+        "line-based edits to files, including YAML as a fallback; yaml_edit applies "
+        "structural YAML "
         "operations; invoke_skill runs a listed nested skill; invoke_tool runs one "
         "declared command; read_document reads a bounded file range; goto_step "
         "repeats a declared step; next_step advances after completion; complete ends "
@@ -4391,8 +4395,9 @@ def _modular_action_system_prompt(
             "for at most 2000 lines, with line 0 meaning the beginning and an "
             "end_line past "
             "EOF clamped.\n"
-            "edit requires valid line edits and must not target YAML; use yaml_edit "
-            "for YAML. A yaml_edit set_value path is a JSON array of mapping keys, "
+            "edit requires valid line edits; prefer yaml_edit for YAML, but edit is "
+            "allowed as a fallback when structural operations cannot express the "
+            "repair. A yaml_edit set_value path is a JSON array of mapping keys, "
             'such as ["title"] or ["metadata","owner"], never a JSON '
             "pointer such as /title. For list sections, use one upsert_item per "
             "item with section, id, and a complete value mapping; do not replace "
@@ -4666,7 +4671,6 @@ def _handle_workflow_action_edit(
     pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
     for file_edit in file_edits:
-        _reject_line_edit_for_yaml(file_edit.file_path)
         target_path = _resolve_worktree_file_path(
             file_edit.file_path,
             state.worktree_root,
@@ -5473,7 +5477,7 @@ def _validate_dynamic_validation_gate_action(
         )
     if state.step_index != gate_state.step_index:
         return
-    if gate_state.correction_required:
+    if gate_state.correction_required and action.kind != "gather_context":
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="validation_correction_required",
@@ -5489,8 +5493,12 @@ def _validate_dynamic_validation_gate_action(
         "tool": action.tool,
         "parameters": dict(action.parameters),
     }
+    if action.kind == "gather_context":
+        return
     config = _validation_gate_config(step) or {}
-    correction_actions = config.get("correction_actions", ["edit", "yaml_edit"])
+    correction_actions = config.get(
+        "correction_actions", ["edit", "yaml_edit", "gather_context"]
+    )
     if isinstance(correction_actions, Sequence) and action.kind in correction_actions:
         return
     if action.kind in {"next_step", "goto_step", "complete"}:
@@ -6241,7 +6249,6 @@ def _parse_workflow_action_edit(
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
         raise RuntimeError("Workflow edit action must include file_path.")
-    _reject_line_edit_for_yaml(file_path)
     edits = _required_edit_operations(payload.get("edits"))
     return SkillChatAction(
         kind="edit",
@@ -6250,15 +6257,6 @@ def _parse_workflow_action_edit(
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
-
-
-def _reject_line_edit_for_yaml(file_path: str) -> None:
-    if file_path.strip().lower().endswith((".yaml", ".yml")):
-        raise RuntimeError(
-            f"Workflow edit action cannot target YAML file {file_path.strip()!r}. "
-            "Use yaml_edit with structural operations: upsert_item, "
-            "remove_item, or set_value."
-        )
 
 
 def _parse_workflow_action_yaml_edit(
@@ -6992,7 +6990,6 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
             raise RuntimeError(
                 "Workflow edit action file_edits entries must include file_path."
             )
-        _reject_line_edit_for_yaml(file_path)
         file_edits.append(
             SkillChatFileEdits(
                 file_path=file_path.strip(),
@@ -8098,13 +8095,15 @@ def _workflow_edit_failure_feedback(
         )
     elif isinstance(error, _WorkflowYamlEditError):
         feedback += (
-            " Use yaml_edit only for .yaml or .yml files. Its operations are "
+            " Prefer yaml_edit for .yaml or .yml files. Its operations are "
             "structural: upsert_item replaces or appends a list item by section "
             "and id, remove_item deletes one by section and id (or by an exact "
             "validator-reported list index for boilerplate), and set_value "
             "updates a mapping value by path. Include multiple independent "
             "operations in one yaml_edit action when correcting the same file. "
-            "Do not use line numbers or replace section headers."
+            "If the structural operations cannot express the repair, use a normal "
+            "edit with exact line ranges, preserve YAML indentation and section "
+            "headers, and rerun the validator."
         )
     return feedback
 
@@ -8544,8 +8543,9 @@ def _action_repair_prompt(
             "\nThe previous edit action failed and was not applied. don't do this "
             "again; do not repeat it "
             "unchanged; reread the current file and return a corrected action. "
-            "For YAML, use yaml_edit with upsert_item, remove_item, or set_value "
-            "instead of line numbers. The "
+            "For YAML, prefer yaml_edit with upsert_item, remove_item, or "
+            "set_value; use a normal edit with exact line ranges when those "
+            "operations cannot express the repair. The "
             "rejected edit was:\n"
             f"{_workflow_action_signature(failed_action)}"
         )

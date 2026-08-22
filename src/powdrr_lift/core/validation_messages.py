@@ -33,9 +33,8 @@ class RationaleReferenceAction(CorrectiveAction):
         subject = self._CODES[error.code.casefold()]
         return (
             "First use the workflow gather_context action exactly like "
-            '`{"kind":"gather_context","types":["requirements"],'
-            '"keywords":["<work-item-name>"],"filters":{}}` to retrieve '
-            "the current requirement ids. Then reason about which returned "
+            f"{_gather_context_example(error)} to retrieve current ids. Then reason "
+            "about which returned "
             f"requirement drives this {subject}, edit its rationale to cite "
             "an exact returned requirement id in quotes, and rerun the same "
             "evaluate command. Replace any unknown or outdated id; do not "
@@ -52,9 +51,10 @@ class UnknownReferenceAction(CorrectiveAction):
         location = f" at `{error.path}`" if error.path else ""
         return (
             f"The unknown id is identified by the validator{location}: "
-            f"{error.message} Use gather_context to discover the current ids "
-            "in the referenced section, then replace that id with an exact "
-            "current id and rerun the same evaluate command."
+            f"{error.message} First call {_gather_context_example(error)} to "
+            "discover the current ids in the referenced section. Then replace "
+            "the wrong id with an exact returned id and rerun the same evaluate "
+            "command; do not invent or guess an id."
         )
 
 
@@ -78,11 +78,19 @@ class MissingValueAction(CorrectiveAction):
 
     def instructions(self, error: ValidationError) -> str:
         location = f" at `{error.path}`" if error.path else ""
-        return (
+        guidance = (
             f"Add the missing field identified by the validator{location}: "
             f"{error.message} Use the expected type and a valid value, then "
             "rerun the same evaluate command."
         )
+        if "id" in error.code.casefold():
+            guidance = (
+                f"{error.message} First call {_gather_context_example(error)} to "
+                "discover the current ids relevant to this field. Use an exact "
+                "returned id rather than a placeholder or invented value, then "
+                "rerun the same evaluate command."
+            )
+        return guidance
 
 
 class ParseAction(CorrectiveAction):
@@ -134,6 +142,31 @@ _ACTIONS: tuple[CorrectiveAction, ...] = (
     WorkflowToolAction(),
     GenericValidationAction(),
 )
+
+
+def _gather_context_example(error: ValidationError) -> str:
+    """Return a concrete context-discovery action for an ID validation error."""
+    path = error.path or ""
+    match = re.match(r"([A-Za-z_][A-Za-z0-9_-]*)", path)
+    section = match.group(1) if match else "requirements"
+    context_type = {
+        "requirements": "requirements",
+        "approach": "approach",
+        "entities": "entities",
+        "relationships": "entity-relationships",
+        "entity_relationships": "entity-relationships",
+        "features": "features",
+        "decisions": "decisions",
+        "risks": "risks",
+        "proposed_prs": "proposed_prs",
+    }.get(section, "requirements")
+    return (
+        '{"action":"gather_context","types":["'
+        f"{context_type}"
+        '"],"keywords":["'
+        f"{section}"
+        '"]}'
+    )
 
 
 def _action_for(code: str) -> CorrectiveAction:

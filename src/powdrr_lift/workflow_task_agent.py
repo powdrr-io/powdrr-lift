@@ -1682,16 +1682,17 @@ def _task_action_material_state(
     if action.kind not in {"edit", "file_management"}:
         return None
     if action.kind == "file_management":
-        return (
-            action.file_operation,
-            action.file_path,
-            action.destination_path,
+        file_paths = tuple(
+            path
+            for path in (action.file_path, action.destination_path)
+            if path is not None
         )
-    file_paths = (
-        tuple(group.file_path for group in action.file_edits)
-        if action.file_edits
-        else ((action.file_path,) if action.file_path is not None else ())
-    )
+    else:
+        file_paths = (
+            tuple(group.file_path for group in action.file_edits)
+            if action.file_edits
+            else ((action.file_path,) if action.file_path is not None else ())
+        )
     if not file_paths:
         return None
     material_state: list[tuple[str, str | None]] = []

@@ -26,14 +26,18 @@ class WorkflowGitState:
     base_branch: str
     integration_branch: str
     workflow_relative_directory: str
+    depends_on_workflows: tuple[str, ...] = ()
 
-    def to_data(self) -> dict[str, str]:
-        return {
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
             "proposed_pr_id": self.proposed_pr_id,
             "base_branch": self.base_branch,
             "integration_branch": self.integration_branch,
             "workflow_relative_directory": self.workflow_relative_directory,
         }
+        if self.depends_on_workflows:
+            data["depends_on_workflows"] = list(self.depends_on_workflows)
+        return data
 
     @classmethod
     def from_data(cls, data: object) -> WorkflowGitState:
@@ -50,7 +54,17 @@ class WorkflowGitState:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"Workflow Git state requires {key!r}.")
             values[key] = value.strip()
-        return cls(**values)
+        dependencies = data.get("depends_on_workflows", [])
+        if not isinstance(dependencies, list) or not all(
+            isinstance(item, str) and item.strip() for item in dependencies
+        ):
+            raise ValueError(
+                "Workflow Git state depends_on_workflows must be an array."
+            )
+        return cls(
+            **values,
+            depends_on_workflows=tuple(item.strip() for item in dependencies),
+        )
 
 
 def workflow_git_state_path(workflow_directory: str | Path) -> Path:
@@ -90,6 +104,26 @@ def slugify_workflow_id(value: str) -> str:
 
 def integration_branch_name(proposed_pr_id: str) -> str:
     return f"powdrr/{slugify_workflow_id(proposed_pr_id)}"
+
+
+def workflow_dependencies_completion(
+    repo_root: str | Path,
+    state: WorkflowGitState,
+) -> tuple[bool, tuple[str, ...]]:
+    """Return whether every predecessor workflow has a merged integration PR."""
+    incomplete: list[str] = []
+    repo_root_path = Path(repo_root).resolve()
+    for dependency in state.depends_on_workflows:
+        branch = integration_branch_name(dependency)
+        pull_requests, error = _related_pull_requests(repo_root_path, [branch])
+        if error:
+            incomplete.append(f"{dependency}: could not inspect pull request: {error}")
+            continue
+        if not any(item.get("state") == "MERGED" for item in pull_requests):
+            incomplete.append(
+                f"{dependency}: integration PR for {branch} is not merged"
+            )
+    return not incomplete, tuple(incomplete)
 
 
 def task_branch_name(proposed_pr_id: str, task_id: str) -> str:

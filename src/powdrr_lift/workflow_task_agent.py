@@ -81,6 +81,7 @@ from powdrr_lift.workflow_git import (
     load_workflow_git_state,
     task_branch_name,
     validate_workflow_git_state,
+    workflow_dependencies_completion,
 )
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
@@ -838,8 +839,23 @@ def run_workflow_task(
     configured_workflow_dir = config.workflow_dir.resolve()
     try:
         configured_workflow = WorkflowInstance.from_directory(configured_workflow_dir)
-        configured_task = _select_task(configured_workflow, config.task_id)
         configured_git_state = load_workflow_git_state(configured_workflow_dir)
+        if configured_git_state is not None:
+            dependencies_complete, incomplete_dependencies = (
+                workflow_dependencies_completion(
+                    configured_repo_root,
+                    configured_git_state,
+                )
+            )
+            if not dependencies_complete:
+                print(
+                    "Workflow dependencies are not complete; no task work was started.",
+                    file=stderr,
+                )
+                for dependency in incomplete_dependencies:
+                    print(f"  - {dependency}", file=stderr)
+                return 1
+        configured_task = _select_task(configured_workflow, config.task_id)
         if configured_git_state is not None and configured_task is not None:
             project_root = _resolve_project_root(
                 configured_repo_root,

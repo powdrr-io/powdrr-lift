@@ -1,0 +1,25 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: interaction-file-log-spec
+title: Interaction File Log
+requirements:
+- description: Log every human and LLM input and output, including errors, the active
+    skill, and the current workflow step, as JSONL at the repository root.
+  state: added
+  id: req-1
+- description: Handle logging failures without crashing the workflow.
+  state: added
+  id: req-2
+approach:
+- description: Implement a log writer that appends JSONL entries to a file at the
+    repository root, capturing timestamp, actor, message content, error details, active
+    skill, and workflow step.
+  state: added
+  id: app-1
+- description: Wrap log writes in error handling that catches and ignores failures,
+    ensuring the workflow continues.
+  state: added
+  id: app-2
+- description: Add unit tests for the log writer and an end-to-end workflow run to
+    verify logging behavior.
+  state: added
+  id: app-3

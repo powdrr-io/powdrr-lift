@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: pr-interaction-file-log
+feature_ids:
+- feature-interaction-logging
+intent:
+  goal: Record every human and LLM interaction, including inputs, outputs, errors,
+    active skill, and workflow step, to a JSONL file at the repository root.
+  reasoning: Provides a durable audit trail of all interactions for debugging, replay,
+    and analysis without disrupting workflow execution.
+  problem: Human and LLM interactions are not recorded, making debugging and analysis
+    difficult.
+acceptance_criteria:
+- description: Every human and LLM input and output is written to a JSONL file at
+    the repository root.
+  id: ac-1
+- description: Each log entry includes the active skill and current workflow step.
+  id: ac-2
+- description: Logging failures are handled without crashing the workflow.
+  id: ac-3
+expected_tests:
+- description: Unit tests verify the log writer serializes interaction entries as
+    JSONL.
+  id: et-1
+- description: Unit tests verify the error handler catches logging failures without
+    crashing.
+  id: et-2
+- description: An end-to-end workflow run verifies the log file is created at the
+    repository root.
+  id: et-3
+required_test_cases:
+- description: Verify a successful interaction writes a JSONL entry with input, output,
+    skill, and step.
+  id: tc-1
+- description: Verify an error interaction writes an entry including the error details.
+  id: tc-2
+- description: Verify a logging failure does not crash the workflow and is handled
+    gracefully.
+  id: tc-3
+expected_outcomes:
+- description: A JSONL log file exists at the repository root after interactions.
+  id: eo-1
+- description: The workflow continues normally when logging fails.
+  id: eo-2
+non_goals:
+- description: No log rotation or archival is implemented in this PR.
+  id: ng-1
+- description: No log analysis or reporting is included.
+  id: ng-2
+risks:
+- description: Large log files may grow unboundedly during long workflows.
+  id: risk-1
+- description: Sensitive interaction content may be written to disk.
+  id: risk-2

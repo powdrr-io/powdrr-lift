@@ -71,3 +71,16 @@ def test_unknown_top_level_id_uses_field_name_without_wrong_default() -> None:
 
     assert '"keywords":["id"]' in data["corrective_action"]
     assert '"types":["approach","decisions"' in data["corrective_action"]
+
+
+def test_unknown_field_includes_remove_key_yaml_edit() -> None:
+    error = ValidationError(
+        "unknown_field",
+        "Unknown field '0'.",
+        "0",
+    )
+
+    data = validation_error_to_data(error, file_path="system-specification.yaml")
+
+    assert data["yaml_edit"]["operations"] == [{"op": "remove_key", "path": ["0"]}]
+    assert "set_value with null" in data["corrective_action"]

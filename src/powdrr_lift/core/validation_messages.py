@@ -43,6 +43,20 @@ class RationaleReferenceAction(CorrectiveAction):
         )
 
 
+class UnknownFieldAction(CorrectiveAction):
+    def applies_to(self, code: str) -> bool:
+        return code.casefold() == "unknown_field"
+
+    def instructions(self, error: ValidationError) -> str:
+        location = f" at `{error.path}`" if error.path else ""
+        return (
+            f"Remove the unknown field identified by the validator{location}: "
+            f"{error.message} Use the exact remove_key yaml_edit operation "
+            "provided in this report; never use set_value with null to delete "
+            "a key. Then rerun the same evaluate command."
+        )
+
+
 class UnknownReferenceAction(CorrectiveAction):
     def applies_to(self, code: str) -> bool:
         normalized = code.casefold()
@@ -136,6 +150,7 @@ class GenericValidationAction(CorrectiveAction):
 
 _ACTIONS: tuple[CorrectiveAction, ...] = (
     RationaleReferenceAction(),
+    UnknownFieldAction(),
     UnknownReferenceAction(),
     DuplicateIdAction(),
     MissingValueAction(),
@@ -179,6 +194,22 @@ def _gather_context_example(error: ValidationError) -> str:
         f"{field_name}"
         '"]}'
     )
+
+
+def _yaml_path_from_error(path: str | None) -> list[str] | None:
+    if not path:
+        return None
+    if path.isdigit():
+        return [path]
+    parts: list[str] = []
+    position = 0
+    pattern = re.compile(r"(?:^|\.)([A-Za-z_][A-Za-z0-9_-]*)|\[(\d+)\]")
+    for match in pattern.finditer(path):
+        if match.start() != position:
+            return None
+        parts.append(match.group(1) or match.group(2))
+        position = match.end()
+    return parts if position == len(path) else None
 
 
 def _action_for(code: str) -> CorrectiveAction:
@@ -238,7 +269,16 @@ def validation_error_to_data(
             '"value":"system-1"},{"op":"set_value",'
             '"path":["title"],"value":"System"}]}'
         )
-        if error.path is not None and re.fullmatch(
+        yaml_path = _yaml_path_from_error(error.path)
+        if error.code.casefold() == "unknown_field" and yaml_path is not None:
+            data["yaml_edit"] = {
+                "kind": "yaml_edit",
+                "file_path": file_path,
+                "operations": [
+                    {"op": "remove_key", "path": yaml_path},
+                ],
+            }
+        elif error.path is not None and re.fullmatch(
             r"[A-Za-z_][A-Za-z0-9_-]*", error.path
         ):
             data["yaml_edit"] = {

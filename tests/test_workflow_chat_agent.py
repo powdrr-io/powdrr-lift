@@ -4471,7 +4471,9 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
             {"kind": "yaml_edit", "file_path": "docs/specification.yaml"}
         )
 
-    with pytest.raises(RuntimeError, match="upsert_item, remove_item, or set_value"):
+    with pytest.raises(
+        RuntimeError, match="upsert_item, remove_item, remove_key, or set_value"
+    ):
         _parse_action_response(
             {
                 "kind": "yaml_edit",
@@ -4556,6 +4558,24 @@ def test_yaml_edit_remove_item_supports_validator_list_indices() -> None:
     )
 
     assert yaml.safe_load(updated) == {"requirements": [{"id": "req-1"}]}
+
+
+def test_yaml_edit_remove_key_deletes_top_level_key() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/system-specification.yaml",
+            "operations": [{"op": "remove_key", "path": ["0"]}],
+        }
+    )
+
+    updated = _apply_yaml_operations(
+        Path("docs/system-specification.yaml"),
+        "schema: v1\n'0': null\nrequirements: []\n",
+        action.yaml_operations,
+    )
+
+    assert yaml.safe_load(updated) == {"schema": "v1", "requirements": []}
 
 
 def test_yaml_edit_index_errors_include_repair_guidance() -> None:

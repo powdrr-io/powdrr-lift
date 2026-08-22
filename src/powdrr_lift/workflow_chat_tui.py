@@ -181,6 +181,7 @@ class WorkflowChatApp(App[None]):
     #status-container {
         width: 100%;
         height: 1fr;
+        max-height: 1fr;
         min-height: 0;
         border: round $success;
         padding: 0 1;
@@ -188,11 +189,11 @@ class WorkflowChatApp(App[None]):
     }
     #status {
         width: 100%;
-        visibility: hidden;
+        display: none;
     }
     #status-text {
         width: 100%;
-        height: 1fr;
+        height: auto;
         min-height: 1;
         border: none;
         padding: 0;
@@ -267,22 +268,26 @@ class WorkflowChatApp(App[None]):
         OSC 52, which made copy appear to work in tests (the in-process buffer
         was populated) while nothing reached the user's clipboard.
         """
+        if sys.platform == "darwin":
+            try:
+                subprocess.run(
+                    ["pbcopy"],
+                    input=text,
+                    text=True,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except (OSError, subprocess.SubprocessError):
+                # Textual's in-process clipboard remains available if pbcopy
+                # is unavailable.
+                pass
+            else:
+                # Apple Terminal does not consume OSC 52. Avoid sending an
+                # unsupported escape sequence after the native copy succeeds.
+                self._clipboard = text
+                return
         super().copy_to_clipboard(text)
-        if sys.platform != "darwin":
-            return
-        try:
-            subprocess.run(
-                ["pbcopy"],
-                input=text,
-                text=True,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except (OSError, subprocess.SubprocessError):
-            # OSC 52 / Textual's in-process clipboard remains available as a
-            # fallback if pbcopy is unavailable.
-            return
 
     def action_quit_workflow(self) -> None:
         self._stop_requested.set()
@@ -375,6 +380,17 @@ class WorkflowChatApp(App[None]):
             max(1, ceil(len(line) / width)) for line in text_area.text.split("\n")
         )
         text_area.styles.height = max(3, line_count + 2)
+
+    @staticmethod
+    def _resize_status_text_area(text_area: TextArea) -> None:
+        """Keep selectable status output in the scrollable content height."""
+        width = max(text_area.size.width, 20)
+        line_count = sum(
+            max(1, ceil(len(line) / width)) for line in text_area.text.split("\n")
+        )
+        # Leave enough room for the container's padding while retaining a
+        # scrollable virtual height when the history fills the viewport.
+        text_area.styles.height = max(1, line_count + 3)
 
     def _submit_response(self) -> None:
         if self._response is None or self._response.disabled:
@@ -638,6 +654,7 @@ class WorkflowChatApp(App[None]):
         content = self._status_content()
         status_widget.update(self._status_text(content))
         status_text.text = content
+        self._resize_status_text_area(status_text)
         status_container.scroll_end(animate=False)
         status_container.call_after_refresh(status_container.scroll_end, animate=False)
         status_widget.refresh(repaint=True)

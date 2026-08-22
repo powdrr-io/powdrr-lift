@@ -1470,6 +1470,20 @@ def test_textual_response_grows_beyond_previous_thirty_row_cap() -> None:
     assert scroll_y == 0
 
 
+def test_textual_status_textarea_does_not_reserve_hidden_label_row() -> None:
+    async def exercise() -> tuple[int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            status_container = app.query_one("#status-container", ScrollableContainer)
+            status = app.query_one("#status-text", TextArea)
+            return status.region.y, status_container.region.y
+
+    status_y, container_y = asyncio.run(exercise())
+    assert status_y == container_y + 1
+
+
 def test_textual_startup_shows_initial_question(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2277,6 +2291,25 @@ def test_textual_response_supports_copy() -> None:
             return response.read_only, app.clipboard
 
     assert asyncio.run(exercise()) == (False, "copy this output")
+
+
+def test_textual_copy_uses_native_macos_clipboard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+    monkeypatch.setattr(sys, "platform", "darwin")
+    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
+        app.copy_to_clipboard("copy this output")
+
+    assert app.clipboard == "copy this output"
+    run.assert_called_once_with(
+        ["pbcopy"],
+        input="copy this output",
+        text=True,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def test_textual_response_supports_cut_through_app_action() -> None:

@@ -3295,12 +3295,14 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
     )
 
 
-def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
+def test_workflow_execution_retries_stalled_step_with_clean_context(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+    (repo_root / "step-change.txt").write_text("before\n", encoding="utf-8")
     skills_dir = repo_root / "skill-definitions"
     skills_dir.mkdir()
     skill_path = skills_dir / "one-step.json"
@@ -3312,9 +3314,6 @@ def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
                 SkillStep(
                     description="Do the work.",
                     details="Do it.",
-                    tool_invocations=(
-                        SkillToolInvocation(tool="shell", command=("printf", "same")),
-                    ),
                 ),
             ),
         ),
@@ -3338,11 +3337,25 @@ def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
                     "next_question": None,
                     "ready_to_execute": True,
                 }
-            return {
-                "kind": "invoke_tool",
-                "tool": "shell",
-                "parameters": {"command": "printf same"},
-            }
+            if self.call_index <= 5:
+                return {
+                    "kind": "edit",
+                    "file_path": "step-change.txt",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "end_line": 1,
+                            "text": "same\n",
+                        }
+                    ],
+                    **(
+                        {"decisions_and_context": "Different explanation."}
+                        if self.call_index == 5
+                        else {}
+                    ),
+                }
+            return {"kind": "complete", "text": "Recovered."}
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
@@ -3353,17 +3366,8 @@ def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
         "powdrr_lift.workflow_chat_agent._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
-        lambda *_args, **_kwargs: {
-            "command": "rtk printf same",
-            "cwd": str(repo_root),
-            "returncode": 0,
-            "stdout": "same",
-            "stderr": "",
-        },
-    )
 
+    stdout = io.StringIO()
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
@@ -3375,22 +3379,28 @@ def test_workflow_execution_stops_on_repeated_no_progress_required_tool_step(
             max_stalled_roundtrips=2,
         ),
         input_func=lambda: "Build the feature",
-        stdout=io.StringIO(),
+        stdout=stdout,
         stderr=stderr,
         progress_callback=lambda _skill, _step, status, _parent, _parent_step: (
             progress_statuses.append(status)
         ),
     )
 
-    assert exit_code == 1
-    assert "required tool step made no progress" in stderr.getvalue()
-    assert any(
-        status.startswith("roundtrip 1: invoke_tool (shell)")
-        for status in progress_statuses
-    )
+    assert exit_code == 0
+    assert "Retrying step after stall" in stderr.getvalue()
+    assert "already identified as stalled" in stderr.getvalue()
+    assert (repo_root / "step-change.txt").read_text(encoding="utf-8") == "before\n"
+    assert "Recovered." in stdout.getvalue()
+    assert any(status.startswith("roundtrip 1: edit") for status in progress_statuses)
     assert "made no progress" in "\n".join(
         message["content"]
         for exchange in captured_messages
+        for message in exchange
+        if message["role"] == "user"
+    )
+    assert any(
+        '"stalled_step_context":[{' in message["content"]
+        for exchange in captured_messages[2:]
         for message in exchange
         if message["role"] == "user"
     )

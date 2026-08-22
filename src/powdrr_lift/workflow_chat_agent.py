@@ -7,6 +7,7 @@ import os
 import re
 import select
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMHTTPError,
     prompt_size_breakdown,
     prune_execution_events,
+    workflow_action_failure_signature,
     workflow_action_summary,
 )
 from powdrr_lift.workflow_llm import (
@@ -527,6 +529,201 @@ class _WorkflowExecutionState:
         default_factory=dict
     )
     validation_gates: dict[str, _ValidationGateState] = field(default_factory=dict)
+    step_checkpoint: _WorkflowStepCheckpoint | None = None
+    stalled_step_context: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class _WorkflowStepCheckpoint:
+    identity: tuple[str, int]
+    transcript: list[dict[str, str]]
+    execution_events: list[dict[str, Any]]
+    execution_context: list[str]
+    handoff_records: dict[str, dict[str, Any]]
+    durable_facts: dict[str, dict[str, Any]]
+    current_file_path: Path | None
+    validation_gates: dict[str, _ValidationGateState]
+    worktree_files: dict[str, tuple[bool, bytes | None, int | None]]
+
+
+def _git_changed_paths(worktree_root: Path) -> set[str]:
+    if not (worktree_root / ".git").exists():
+        return set()
+    paths: set[str] = set()
+    for command in (
+        ["git", "diff", "--name-only", "-z", "HEAD"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+    ):
+        result = subprocess.run(
+            command,
+            cwd=worktree_root,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            continue
+        output = result.stdout
+        parts = output.split(b"\0") if isinstance(output, bytes) else output.split("\0")
+        paths.update(
+            os.fsdecode(path) if isinstance(path, bytes) else path
+            for path in parts
+            if path
+        )
+    return paths
+
+
+def _is_git_tracked(worktree_root: Path, relative_path: str) -> bool:
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", relative_path],
+        cwd=worktree_root,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _snapshot_worktree_files(
+    worktree_root: Path,
+) -> dict[str, tuple[bool, bytes | None, int | None]]:
+    snapshot: dict[str, tuple[bool, bytes | None, int | None]] = {}
+    for relative_path in _git_changed_paths(worktree_root):
+        path = worktree_root / relative_path
+        if path.is_file():
+            stat = path.stat()
+            snapshot[relative_path] = (
+                _is_git_tracked(worktree_root, relative_path),
+                path.read_bytes(),
+                stat.st_mode & 0o777,
+            )
+        else:
+            snapshot[relative_path] = (
+                _is_git_tracked(worktree_root, relative_path),
+                None,
+                None,
+            )
+    return snapshot
+
+
+def _remove_worktree_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+def _restore_step_worktree(
+    worktree_root: Path,
+    baseline: Mapping[str, tuple[bool, bytes | None, int | None]],
+) -> None:
+    current_paths = _git_changed_paths(worktree_root)
+    for relative_path in sorted(current_paths | set(baseline)):
+        path = worktree_root / relative_path
+        snapshot = baseline.get(relative_path)
+        if snapshot is None:
+            if _is_git_tracked(worktree_root, relative_path):
+                subprocess.run(
+                    [
+                        "git",
+                        "restore",
+                        "--source=HEAD",
+                        "--staged",
+                        "--worktree",
+                        "--",
+                        relative_path,
+                    ],
+                    cwd=worktree_root,
+                    check=False,
+                )
+            else:
+                _remove_worktree_path(path)
+            continue
+
+        tracked, content, mode = snapshot
+        if tracked:
+            subprocess.run(
+                [
+                    "git",
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    relative_path,
+                ],
+                cwd=worktree_root,
+                check=False,
+            )
+        if content is None:
+            _remove_worktree_path(path)
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        if mode is not None:
+            path.chmod(mode)
+
+
+def _begin_step_checkpoint(
+    state: _WorkflowExecutionState,
+    *,
+    skill: SkillCatalogEntry,
+    step_index: int,
+) -> None:
+    state.step_checkpoint = _WorkflowStepCheckpoint(
+        identity=(str(skill.path), step_index),
+        transcript=list(state.transcript),
+        execution_events=list(state.execution_events),
+        execution_context=list(state.execution_context),
+        handoff_records={
+            name: dict(record) for name, record in state.handoff_records.items()
+        },
+        durable_facts={
+            name: dict(record) for name, record in state.durable_facts.items()
+        },
+        current_file_path=state.current_file_path,
+        validation_gates={
+            gate_id: _ValidationGateState(
+                step_index=gate_state.step_index,
+                discovered=gate_state.discovered,
+                epoch=gate_state.epoch,
+                obligations={
+                    obligation_id: _ValidationObligation(
+                        obligation_id=obligation.obligation_id,
+                        expected_action=dict(obligation.expected_action),
+                        source=dict(obligation.source),
+                        status=obligation.status,
+                        epoch=obligation.epoch,
+                        attempts=obligation.attempts,
+                        last_result=obligation.last_result,
+                    )
+                    for obligation_id, obligation in gate_state.obligations.items()
+                },
+                correction_required=gate_state.correction_required,
+                discovery_action=gate_state.discovery_action,
+            )
+            for gate_id, gate_state in state.validation_gates.items()
+        },
+        worktree_files=_snapshot_worktree_files(state.worktree_root),
+    )
+
+
+def _restore_step_checkpoint(state: _WorkflowExecutionState) -> None:
+    checkpoint = state.step_checkpoint
+    if checkpoint is None:
+        return
+    _restore_step_worktree(state.worktree_root, checkpoint.worktree_files)
+    state.transcript = list(checkpoint.transcript)
+    state.execution_events = list(checkpoint.execution_events)
+    state.execution_context = list(checkpoint.execution_context)
+    state.handoff_records = {
+        name: dict(record) for name, record in checkpoint.handoff_records.items()
+    }
+    state.durable_facts = {
+        name: dict(record) for name, record in checkpoint.durable_facts.items()
+    }
+    state.current_file_path = checkpoint.current_file_path
+    state.validation_gates = checkpoint.validation_gates
+    state.current_file_context_cache.clear()
+    state.fuzzy_match_cache.clear()
 
 
 def _record_durable_fact(
@@ -727,6 +924,20 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 self.provider_role = nested_role
                 continue
+            checkpoint_identity = (
+                str(self.selected_skill.path),
+                self.current_step_index,
+            )
+            if (
+                self.state.step_checkpoint is None
+                or self.state.step_checkpoint.identity != checkpoint_identity
+            ):
+                self.state.stalled_step_context = []
+                _begin_step_checkpoint(
+                    self.state,
+                    skill=self.selected_skill,
+                    step_index=self.current_step_index,
+                )
             if self.current_step.step_type == "gate":
                 passed = _run_gate(
                     self.current_step,
@@ -842,6 +1053,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 workflow_context=self.workflow_context,
                 current_file_context_cache=self.state.current_file_context_cache,
                 validation_gate=_validation_gate_prompt_data(self.state),
+                stalled_step_context=self.state.stalled_step_context,
                 inherited_interaction_style=self.inherited_interaction_style,
             )
             return WorkflowActionRequest(
@@ -927,6 +1139,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "current_step_contract": _current_step_contract(step),
             "recent_current_step_events": recent_events,
             "last_successful_action": last_successful_action,
+            "stalled_step_context": list(self.state.stalled_step_context),
             "current_step_error_count": sum(
                 event.get("kind") in {"validation_error", "action_error"}
                 for event in current_step_events
@@ -983,6 +1196,19 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _ChatActionProgressStrategy(self.state).record_no_progress(action, observation)
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
+        action_failure_signature = workflow_action_failure_signature(
+            action,
+            signature=_workflow_action_signature,
+        )
+        if any(
+            record.get("action_signature") == action_failure_signature
+            for record in self.state.stalled_step_context
+        ):
+            raise RuntimeError(
+                "This action was already identified as stalled for the current "
+                "step. Choose a materially different action; changing only "
+                "decisions_and_context is not sufficient."
+            )
         if action.llm_type is not None and _provider_supports_llm_mappings(
             self.provider
         ):
@@ -1214,6 +1440,54 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         print("Workflow stopped after repeated action failures.", file=self.stderr)
         return 1
 
+    def _retry_stalled_step(
+        self,
+        action: SkillChatAction,
+        observation: WorkflowActionObservation,
+    ) -> WorkflowActionOutcome:
+        _restore_step_checkpoint(self.state)
+        retry_number = len(self.state.stalled_step_context) + 1
+        stall_record = {
+            "retry_number": retry_number,
+            "action_signature": workflow_action_failure_signature(
+                action,
+                signature=_workflow_action_signature,
+            ),
+            "stalled_action": json.loads(observation.signature),
+            "reason": (
+                observation.correction
+                or "The action repeated without changing workflow state."
+            ),
+        }
+        self.state.stalled_step_context.append(stall_record)
+        self.state.execution_events.append(
+            {
+                "kind": "stalled_step_retry",
+                "step_index": self.state.step_index,
+                "retry_number": retry_number,
+                "stalled_action": stall_record["stalled_action"],
+                "reason": stall_record["reason"],
+            }
+        )
+        self.last_failed_action = None
+        self.last_validation_error = None
+        self.driver.action_engine.reset_progress()
+        parent_skill, parent_step_index = self._parent_progress()
+        status = (
+            f"Retrying step after stall (attempt {retry_number + 1}); "
+            "previous step actions were discarded"
+        )
+        self.progress.update(
+            self.selected_skill,
+            current_step_index=self.state.step_index,
+            status=status,
+            parent_skill=parent_skill,
+            parent_step_index=parent_step_index,
+        )
+        print(status, file=self.stderr)
+        _ = action
+        return WorkflowActionOutcome()
+
     def observe_outcome(
         self,
         action: SkillChatAction,
@@ -1222,45 +1496,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     ) -> WorkflowActionOutcome:
         if not observation.made_progress:
             if observation.decision == ProgressDecision.THRESHOLD:
-                if action.kind != "invoke_tool":
-                    print(
-                        "Workflow stopped after repeated roundtrips without progress.",
-                        file=self.stderr,
-                    )
-                    return WorkflowActionOutcome(exit_code=1)
-                if self.current_step.tool_invocations:
-                    warning = (
-                        "Workflow stopped: a required tool step made no progress; "
-                        "the step cannot be skipped."
-                    )
-                    print(warning, file=self.stderr)
-                    return WorkflowActionOutcome(exit_code=1)
-                if _workflow_step_requires_pull_request(self.current_step):
-                    warning = (
-                        "Warning: a required pull-request creation step made no "
-                        "progress; the workflow cannot skip PR creation."
-                    )
-                    print(warning, file=self.stderr)
-                    return WorkflowActionOutcome(exit_code=1)
-                warning = (
-                    "Warning: repeated tool action made no progress; skipping to "
-                    "the next workflow step."
-                )
-                parent_skill, parent_step_index = self._parent_progress()
-                self.progress.update(
-                    self.selected_skill,
-                    current_step_index=self.state.step_index,
-                    status=warning,
-                    parent_skill=parent_skill,
-                    parent_step_index=parent_step_index,
-                )
-                print(warning, file=self.stderr)
-                self.state.step_index = self.current_step_index + 1
-                self.driver.action_engine.reset_progress()
-                if not self.skill_stack and self.state.step_index >= len(
-                    self.selected_skill.skill.steps
-                ):
-                    outcome = WorkflowActionOutcome(continue_running=False)
+                return self._retry_stalled_step(action, observation)
         if self.state.step_index != self.current_step_index:
             self.driver.action_engine.reset_progress()
         if not outcome.continue_running:
@@ -3622,6 +3858,7 @@ def _build_step_execution_messages(
     current_file_context_cache: dict[tuple[str, int, int], dict[str, Any]]
     | None = None,
     validation_gate: Mapping[str, Any] | None = None,
+    stalled_step_context: Sequence[Mapping[str, Any]] = (),
     inherited_interaction_style: str | None = None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(
@@ -3700,6 +3937,7 @@ def _build_step_execution_messages(
             execution_events,
             current_step_index,
         ),
+        "stalled_step_context": [dict(item) for item in stalled_step_context],
         "current_file": current_file_context,
     }
     if _step_needs_prompt_catalog(current_step, "context_types"):
@@ -3770,6 +4008,11 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "Choose the single next action "
         "that makes the most progress without asking for information already "
         "available.\n"
+        "If stalled_step_context is non-empty, the current step is a fresh retry "
+        "after its prior actions were discarded. Treat each recorded stalled "
+        "action and its reason as a hard constraint: do not return the same action "
+        "again, even with different narrative context. Choose a materially "
+        "different action or a different valid route through the current step.\n"
         "When current_step.uses_skills is non-empty, those skills run automatically "
         "in the same worktree before you continue the current step. Use invoke_skill "
         "only for an additional listed skill that the current step discovers it "

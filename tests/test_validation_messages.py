@@ -70,7 +70,7 @@ def test_unknown_top_level_id_uses_field_name_without_wrong_default() -> None:
     data = validation_error_to_data(error, file_path="architecture-specification.yaml")
 
     assert '"keywords":["id"]' in data["corrective_action"]
-    assert '"types":["approach","decisions"' in data["corrective_action"]
+    assert '"types":["requirements","approach","entities"' in data["corrective_action"]
 
 
 def test_unknown_field_includes_remove_key_yaml_edit() -> None:

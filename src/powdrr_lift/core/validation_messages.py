@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from powdrr_lift.core.spec_context import supported_context_types
+
 
 class CorrectiveAction(ABC):
     """Typed repair behavior owned by a validation error category."""
@@ -160,20 +162,6 @@ _ACTIONS: tuple[CorrectiveAction, ...] = (
 )
 
 
-_GATHER_CONTEXT_TYPES = frozenset(
-    {
-        "requirements",
-        "approach",
-        "entities",
-        "entity-relationships",
-        "features",
-        "decisions",
-        "risks",
-        "proposed_prs",
-    }
-)
-
-
 def _gather_context_example(error: ValidationError) -> str:
     """Return a concrete context-discovery action for an ID validation error."""
     path = error.path or ""
@@ -182,10 +170,11 @@ def _gather_context_example(error: ValidationError) -> str:
     normalized_field = field_name.replace("_", "-")
     if normalized_field == "relationships":
         normalized_field = "entity-relationships"
-    if normalized_field in _GATHER_CONTEXT_TYPES:
+    supported_types = supported_context_types()
+    if normalized_field in supported_types:
         context_types = [normalized_field]
     else:
-        context_types = sorted(_GATHER_CONTEXT_TYPES)
+        context_types = list(supported_types)
     types_json = json.dumps(context_types, separators=(",", ":"))
     return (
         '{"action":"gather_context","types":'

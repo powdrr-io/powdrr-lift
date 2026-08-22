@@ -6441,6 +6441,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     def _fake_start_subprocess_run(*args: Any, **kwargs: Any) -> Any:
         command = args[0] if args else kwargs.get("args")
+        if command == [
+            "rtk",
+            "powdrr-lift",
+            "evaluate",
+            "docs/proposals/display-related-photos",
+        ]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="Implementation specifications are valid.\n",
+                stderr="",
+            )
         if isinstance(command, list) and command[:2] == ["rtk", "gh"]:
             return subprocess.CompletedProcess(
                 command,

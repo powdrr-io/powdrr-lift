@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 from powdrr_lift.core import (
     AgentRole,
@@ -16,7 +17,7 @@ from powdrr_lift.core import (
 )
 
 
-def _harness_module():
+def _harness_module() -> ModuleType:
     path = Path(__file__).parents[1] / "scripts" / "workflow-task-error-harness.py"
     specification = importlib.util.spec_from_file_location(
         "workflow_task_harness", path

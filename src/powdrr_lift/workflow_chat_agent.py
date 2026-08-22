@@ -523,6 +523,8 @@ class _WorkflowExecutionState:
     execution_context: list[str]
     step_index: int
     worktree_root: Path
+    audit_events: list[dict[str, Any]] = field(default_factory=list)
+    root_skill: SkillCatalogEntry | None = None
     error_log_root: Path = Path(".")
     handoff_records: dict[str, dict[str, Any]] = field(default_factory=dict)
     durable_facts: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -927,6 +929,14 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         dependency_name,
                     ),
                 )
+                self.state.audit_events.append(
+                    {
+                        "kind": "invoke_skill",
+                        "skill": dependency_name,
+                        "step_index": self.current_step_index,
+                        "source": "uses_skills",
+                    }
+                )
                 self.provider_role = nested_role
                 continue
             checkpoint_identity = (
@@ -1253,6 +1263,14 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "kind": action.kind,
                     "skill": action.skill_name,
                     "step_index": self.current_step_index,
+                }
+            )
+            self.state.audit_events.append(
+                {
+                    "kind": action.kind,
+                    "skill": action.skill_name,
+                    "step_index": self.current_step_index,
+                    "clean": action.clean,
                 }
             )
             if action.clean:
@@ -2501,17 +2519,19 @@ def run_workflow_chat(
         output_dir = repo_root / output_dir
 
     progress = _WorkflowProgressDisplay(stderr, on_update=progress_callback)
+    root_skill = selected_skill
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
+        root_skill=root_skill,
         transcript=transcript,
         execution_events=[],
+        audit_events=[],
         execution_context=[],
         step_index=0,
         worktree_root=worktree_root,
         error_log_root=project_root,
         handoff_records=_workflow_context_handoff_records(workflow_context),
     )
-    root_skill = selected_skill
     driver = WorkflowLLMExecutionDriver(
         max_stalled_roundtrips=config.max_stalled_roundtrips
     )
@@ -5076,16 +5096,16 @@ def _handle_workflow_action_invoke_tool(
             kind="decision",
             source=action.kind,
         )
-    state.execution_events.append(
-        {
-            "kind": action.kind,
-            "tool": action.tool,
-            "parameters": action.parameters,
-            "result": tool_result,
-            "decisions_and_context": action.decisions_and_context,
-            "step_index": state.step_index,
-        }
-    )
+    event = {
+        "kind": action.kind,
+        "tool": action.tool,
+        "parameters": action.parameters,
+        "result": tool_result,
+        "decisions_and_context": action.decisions_and_context,
+        "step_index": state.step_index,
+    }
+    state.execution_events.append(event)
+    state.audit_events.append(event)
     return True
 
 
@@ -5098,8 +5118,9 @@ def _record_chat_pull_request(
         action,
         state.worktree_root,
         state.selected_skill,
-        state.execution_events,
+        state.audit_events,
         tool_result,
+        root_skill=state.root_skill or state.selected_skill,
         step_index=state.step_index,
     )
 
@@ -5110,6 +5131,7 @@ def _record_skill_pull_request(
     skill: SkillCatalogEntry,
     events: Sequence[Mapping[str, Any]],
     tool_result: Mapping[str, Any],
+    root_skill: SkillCatalogEntry | None = None,
     step_index: int | None = None,
 ) -> None:
     command = _command_items_for_validation(action.parameters.get("command"))
@@ -5134,6 +5156,7 @@ def _record_skill_pull_request(
         "decisions_and_context": action.decisions_and_context,
         "step_index": step_index,
     }
+    record_skill = root_skill or skill
     branch_result = subprocess.run(
         ["git", "branch", "--show-current"],
         cwd=repo_root,
@@ -5150,9 +5173,9 @@ def _record_skill_pull_request(
         branch=branch,
         base_branch="main",
         title="Agent-created pull request",
-        workflow_name=skill.skill.name,
-        workflow_path=str(skill.path),
-        steps=[step.to_data() for step in skill.skill.steps],
+        workflow_name=record_skill.skill.name,
+        workflow_path=str(record_skill.path),
+        steps=[step.to_data() for step in record_skill.skill.steps],
         events=[*events, event],
         explanation=(
             "This record documents the selected skill steps and the tool calls "

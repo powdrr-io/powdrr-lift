@@ -4750,6 +4750,28 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
     assert "powdrr-lift yaml-edit" not in prompt
 
 
+def test_validation_gate_prompt_requires_a_different_repair_strategy() -> None:
+    step = SkillStep(
+        description="Repair the generated YAML and pass all checks.",
+        validation_gate={"id": "yaml-checks"},
+    )
+
+    prompt = _modular_action_system_prompt(step)
+
+    assert (
+        "failed result is a diagnosis, not permission to repeat the same edit" in prompt
+    )
+    assert "Never repeat an operation or semantically equivalent operation" in prompt
+    assert "change the target or repair strategy" in prompt
+    assert "wait for the deterministic obligation rerun" in prompt
+
+    repair_prompt = _action_repair_prompt(
+        SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
+        current_step=step,
+    )
+    assert "choose a materially different target or strategy" in repair_prompt
+
+
 def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) -> None:
     json_path = tmp_path / "settings.json"
     json_path.write_text('{"name": "original"}\n', encoding="utf-8")

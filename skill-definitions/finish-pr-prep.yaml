@@ -82,6 +82,13 @@ steps:
     that passed previously. An empty validation_tool_obligations list is a valid passing
     result. If a formatter or cleanup action changes files, inspect the edits,
     restage only the intended files, and rerun the complete validation_tool_obligations list.
+    Treat each failed result as a diagnosis, not as a reason to repeat the same command or
+    repair. Read the exact current file and full result, map the reported issue to its exact
+    path, and choose a materially different correction when the issue state is unchanged or
+    worse. Never claim progress from a whitespace-only or semantically equivalent edit;
+    preserve valid fields and do not alter unrelated files. After every correction, rerun
+    every obligation. Do not choose next_step, goto_step, or complete until the runtime gate
+    reports that every obligation passed in the current epoch.
 - description: Leave the branch ready for pull request creation.
   step_type: invoke_tool
   llm_type: simple_task

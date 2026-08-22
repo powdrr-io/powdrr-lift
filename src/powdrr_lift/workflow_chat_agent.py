@@ -4127,6 +4127,16 @@ def _modular_action_system_prompt(
             "goto_step, or complete until every obligation passes in the current "
             "epoch. If any obligation fails, apply its corrective action; the runtime "
             "will reset the epoch and require every obligation to run again.\n"
+            "Validation repair protocol: a failed result is a diagnosis, not "
+            "permission to repeat the same edit. First inspect the exact current "
+            "file and full validator result, map each issue to its reported path, "
+            "and apply a structural correction at that path. Never repeat an "
+            "operation or semantically equivalent operation that produced the same "
+            "issue fingerprint. Preserve fields not named by an issue, combine "
+            "independent fixes in one yaml_edit, and wait for the deterministic "
+            "obligation rerun before claiming progress. If the latest issue state "
+            "is unchanged or worse, change the target or repair strategy; do not keep "
+            "retrying the same action.\n"
         )
     if getattr(current_step, "prompt_catalogs", None) is None or include_context:
         prompt += (
@@ -5385,6 +5395,15 @@ def _validation_gate_prompt_data(
         "obligations": [
             obligation.to_data() for obligation in gate_state.obligations.values()
         ],
+        "repair_guidance": (
+            "For every failed obligation, inspect the exact current file and validator "
+            "result before editing. Use the reported issue path and a structural YAML "
+            "operation, preserve valid fields, and combine independent fixes in one "
+            "yaml_edit. Never repeat an operation or semantically equivalent operation "
+            "that produced the same issue fingerprint. If the issue fingerprint is "
+            "unchanged or worse, choose a different target or repair strategy; do not "
+            "retry the same action. Rerun every obligation after any correction."
+        ),
     }
 
 
@@ -8179,7 +8198,12 @@ def _action_repair_prompt(
                 "has "
                 "passed in the current epoch. After any correction, rerun every "
                 "discovered obligation; the runtime validation_gate object is "
-                "authoritative. "
+                "authoritative. Do not repeat an operation or semantically equivalent "
+                "repair that produced the same validation issue. Inspect the exact "
+                "current file and reported issue path first, preserve valid fields, "
+                "choose a materially different target or strategy when the issue state "
+                "is unchanged or worse. Apply independent YAML fixes in one yaml_edit "
+                "and wait for the deterministic rerun before claiming progress. "
             )
         invocations = tuple(current_step.tool_invocations)
         if invocations:

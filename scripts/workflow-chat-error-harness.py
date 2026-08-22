@@ -5,10 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import selectors
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Any, cast
 
 DEFAULT_PROMPT = (
     "I want to specify a feature where all human and LLM interactions are "
@@ -91,6 +95,12 @@ def _parse_args() -> argparse.Namespace:
         default=900.0,
         help="Maximum seconds for the workflow subprocess (default: 900).",
     )
+    parser.add_argument(
+        "--progress-interval",
+        type=float,
+        default=15.0,
+        help="Seconds between heartbeat messages when the child emits no output.",
+    )
     return parser.parse_args()
 
 
@@ -157,33 +167,64 @@ def main() -> int:
     process = subprocess.Popen(
         command,
         cwd=repo_root,
-        text=True,
+        start_new_session=(os.name != "nt"),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
     timed_out = False
     interrupted = False
+    output_chunks: list[bytes] = []
+    input_data = ("\n".join([args.prompt, *answers]) + "\n").encode()
+    assert process.stdin is not None
+    process.stdin.write(input_data)
+    process.stdin.close()
+    assert process.stdout is not None
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    started_at = time.monotonic()
+    next_heartbeat_at = started_at + args.progress_interval
     try:
-        output, _ = process.communicate(
-            input="\n".join([args.prompt, *answers]) + "\n",
-            timeout=args.timeout,
-        )
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        process.kill()
-        output, _ = process.communicate()
-        output = _text_output(exc.output) + _text_output(output)
+        while process.poll() is None or selector.get_map():
+            now = time.monotonic()
+            remaining = args.timeout - (now - started_at)
+            if remaining <= 0:
+                timed_out = True
+                break
+            for key, _ in selector.select(
+                timeout=min(remaining, max(0.1, next_heartbeat_at - now))
+            ):
+                stream = cast(Any, key.fileobj)
+                chunk = stream.read1(65536)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                output_chunks.append(chunk)
+                sys.stdout.buffer.write(chunk)
+                sys.stdout.buffer.flush()
+            now = time.monotonic()
+            if now >= next_heartbeat_at and process.poll() is None:
+                captured = sum(len(chunk) for chunk in output_chunks)
+                print(
+                    f"Harness progress: workflow-chat still running after "
+                    f"{now - started_at:.0f}s; captured={captured} bytes.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                next_heartbeat_at = now + args.progress_interval
     except KeyboardInterrupt:
         interrupted = True
-        process.kill()
-        output, _ = process.communicate()
-        output = _text_output(output)
-    else:
-        output = _text_output(output)
-    transcript.write_text(output, encoding="utf-8")
-    sys.stdout.write(output)
-    sys.stdout.flush()
+    finally:
+        selector.close()
+        if process.poll() is None:
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        output = b"".join(output_chunks)
+    output_text = _text_output(output)
+    transcript.write_text(output_text, encoding="utf-8")
 
     return_code = process.returncode
     termination = (

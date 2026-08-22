@@ -174,6 +174,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
+                ("start-implementing-feature.yaml", 9),
+                ("start-implementing-feature.yaml", 14),
+                ("start-implementing-feature.yaml", 17),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -184,6 +187,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
+                ("start-implementing-feature.yaml", 5),
+                ("start-implementing-feature.yaml", 11),
                 ("specify-a-feature.yaml", 5),
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
@@ -194,8 +199,6 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             expected_step_type = (
                 "invoke_tool"
                 if (path.name, index) in expected_invoke_tool_steps
-                else "gate"
-                if (path.name, index) in expected_gate_steps
                 else "gate"
                 if (path.name, index) in expected_gate_steps
                 else "freeform"
@@ -928,43 +931,21 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     skill = load_skill(skills_dir / "start-implementing-feature.yaml")
 
     assert skill.name == "start-implementing-feature"
-    first_step_details = skill.steps[0].details
-    assert first_step_details is not None
-    assert "docs/proposals" in first_step_details
-    assert "canonical feature name" in first_step_details
-    assert "fuzzy-match tool" in first_step_details
-    bootstrap_step_details = skill.steps[1].details
-    assert bootstrap_step_details is not None
-    assert "bootstrap-code-structure" in bootstrap_step_details
-    assert skill.steps[1].uses_skills == ("bootstrap-code-structure",)
-    assert "Filter the results to the best matching" in first_step_details
-    assert "If the best match is uncertain" in first_step_details
-    assert "Do not ask whether documents exist before searching" in first_step_details
-    implementation_step_details = skill.steps[2].details
-    assert implementation_step_details is not None
-    assert "only generates the files" in implementation_step_details
-    fill_step_details = skill.steps[3].details
-    assert fill_step_details is not None
-    assert "yaml_edit" in fill_step_details
-    assert "Remove all generator instructions" in fill_step_details
-    validation_step_details = skill.steps[4].details
-    assert validation_step_details is not None
-    assert "spec-v1" in validation_step_details
-    assert "yaml_edit" in validation_step_details
-    workflow_step_details = skill.steps[5].details
-    assert workflow_step_details is not None
-    assert "templates/execute-proposed-pr.yaml" in workflow_step_details
-    assert "active worktree" in workflow_step_details
-    verify_step_details = skill.steps[6].details
-    assert verify_step_details is not None
-    assert "only below .worktrees/" in verify_step_details
-    pr_step_details = skill.steps[9].details
-    assert pr_step_details is not None
-    assert "must invoke create-pull-request" in pr_step_details
-    assert "returned PR URL" in pr_step_details
+    steps = {step.id: step for step in skill.steps if step.id is not None}
 
-    assert skill.steps[0].tool_invocations[0].tool == "fuzzy-match"
-    assert skill.steps[0].tool_invocations[0].command == (
+    def step(step_id: str) -> SkillStep:
+        return steps[step_id]
+
+    def pre_step_command(step_id: str) -> tuple[str, ...]:
+        pre_step = step(step_id).pre_step
+        assert pre_step is not None
+        return tuple(pre_step.template["command"])
+
+    def tool_command(step_id: str) -> tuple[str, ...]:
+        assert len(step(step_id).tool_invocations) == 1
+        return step(step_id).tool_invocations[0].command
+
+    assert tool_command("discover-proposed-feature") == (
         "fuzzy-match",
         "docs/proposals",
         "-name",
@@ -975,7 +956,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "2",
         "-print",
     )
-    assert skill.steps[0].tool_invocations[1].command == (
+    assert tool_command("discover-current-feature") == (
         "fuzzy-match",
         "docs/current",
         "-name",
@@ -986,7 +967,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "2",
         "-print",
     )
-    assert skill.steps[0].tool_invocations[2].command == (
+    assert tool_command("discover-feature-workflows") == (
         "fuzzy-match",
         "docs/workflows",
         "-name",
@@ -997,36 +978,31 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "3",
         "-print",
     )
-    assert [step.description for step in skill.steps] == [
-        "Discover the feature specification and execution workflows.",
-        "Bootstrap the project-wide module and tool structure from codebase evidence.",
-        "Generate implementation specification templates for the proposed PRs.",
-        "Fill every generated implementation specification completely.",
-        (
-            "Validate every implementation specification before creating "
-            "execution workflows."
-        ),
-        "Instantiate an execution workflow for every validated proposed PR.",
-        "Verify workflow artifacts are in the active worktree.",
-        "Stage the validated artifacts for pull request preparation.",
-        "Run finish-pr-prep before creating the draft pull request.",
-        "Commit the validated artifacts and open a draft pull request.",
-        "Hand the draft pull request to the user for review.",
-    ]
-    assert [step.llm_type for step in skill.steps] == [
-        "standard_reasoning",
-        "standard_reasoning",
-        "high_reasoning",
-        "high_reasoning",
-        "fast_iteration",
-        "simple_task",
-        "fast_iteration",
-        "simple_task",
-        "fast_iteration",
-        "simple_task",
-        "standard_reasoning",
-    ]
-    assert skill.steps[2].tool_invocations[0].command == (
+    assert step("discover-proposed-feature").step_type == "freeform"
+    assert step("select-feature-context").step_type == "freeform"
+    assert step("select-feature-context").outputs[0].name == "feature_name"
+    assert step("select-feature-context").outputs[0].required_for_next_step
+    assert step("bootstrap-project-structure").uses_skills == (
+        "bootstrap-code-structure",
+    )
+    assert step("generate-implementation-specifications").step_type == "freeform"
+    assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
+    assert step("plan-proposed-prs").outputs[0].required_for_next_step
+    assert step("generate-implementation-specifications").inputs[0].name == (
+        "proposed_pr_names"
+    )
+    assert step("generate-implementation-specifications").outputs[0].name == (
+        "implementation_specification_paths"
+    )
+    assert (
+        step("generate-implementation-specifications").outputs[0].required_for_next_step
+    )
+    assert step("fill-implementation-specifications").inputs[0].name == (
+        "implementation_specification_paths"
+    )
+    assert step("generate-implementation-specifications").tool_invocations[
+        0
+    ].command == (
         "powdrr-lift",
         "implementation-specification",
         "--work-item-name",
@@ -1034,12 +1010,17 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--output",
         "docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml",
     )
-    assert skill.steps[4].tool_invocations[0].command == (
+    assert step("evaluate-implementation-specifications").step_type == "invoke_tool"
+    assert pre_step_command("evaluate-implementation-specifications") == (
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<feature-name>",
     )
-    assert skill.steps[5].tool_invocations[0].command == (
+    assert step("gate-implementation-specifications").step_type == "gate"
+    gate = step("gate-implementation-specifications").gate
+    assert gate is not None
+    assert gate.goto_step == "repair-implementation-specifications"
+    assert step("instantiate-execution-workflows").tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
         "--work-item-name",
@@ -1051,17 +1032,22 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
-    assert "dependencies" in (skill.steps[5].details or "")
-    assert "If an execution workflow already exists for every proposed PR" in (
-        skill.steps[5].details or ""
+    assert pre_step_command("inspect-workflow-repository-state") == (
+        "powdrr-lift",
+        "repository-state",
     )
-    assert "invoke the workflow instantiation tool" in (skill.steps[5].details or "")
-    assert [invocation.command for invocation in skill.steps[7].tool_invocations] == [
-        ("powdrr-lift", "repository-state"),
-        ("git", "add", "docs/proposals/<feature-name>", "docs/workflows"),
-    ]
-    assert skill.steps[8].uses_skills == ("finish-pr-prep",)
-    assert skill.steps[9].uses_skills == ("create-pull-request",)
+    assert step("stage-validated-artifacts").tool_invocations[0].command == (
+        "git",
+        "add",
+        "docs/proposals/<feature-name>",
+        "docs/workflows",
+    )
+    assert pre_step_command("verify-staged-artifacts") == (
+        "powdrr-lift",
+        "repository-state",
+    )
+    assert step("prepare-feature-pull-request").uses_skills == ("finish-pr-prep",)
+    assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
 
 
 def test_checked_in_bootstrap_skill_verifies_discovered_tools() -> None:

@@ -6191,6 +6191,15 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "The project structure bootstrap is complete.",
             },
             {
+                "kind": "next_step",
+                "decisions_and_context": "The workflow candidates are discovered.",
+            },
+            {
+                "kind": "next_step",
+                "outputs": {"feature_name": "display-related-photos"},
+                "decisions_and_context": "The canonical feature context is selected.",
+            },
+            {
                 "kind": "read_document",
                 "file_path": "templates/execute-proposed-pr.yaml",
                 "start_line": 1,
@@ -6528,6 +6537,35 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "tool": invocation["tool"],
                         "parameters": {"command": command},
                     }
+                if prompt["current_step"].get("id") == "select-feature-context":
+                    self._call_index += 1
+                    return {
+                        "kind": "next_step",
+                        "outputs": {"feature_name": "display-related-photos"},
+                    }
+                if prompt["current_step"].get("id") == "plan-proposed-prs":
+                    self._call_index += 1
+                    return {
+                        "kind": "next_step",
+                        "outputs": {
+                            "proposed_pr_names": ["display-related-photos-pr-001"]
+                        },
+                    }
+                if (
+                    prompt["current_step"].get("id")
+                    == "generate-implementation-specifications"
+                    and step_index in self._start_invoked_steps
+                ):
+                    self._call_index += 1
+                    return {
+                        "kind": "next_step",
+                        "outputs": {
+                            "implementation_specification_paths": [
+                                "docs/proposals/display-related-photos/"
+                                "display-related-photos-pr-001-implementation-specification.yaml"
+                            ]
+                        },
+                    }
                 self._call_index += 1
                 return {"kind": "next_step"}
             response = next(start_responses)
@@ -6538,6 +6576,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     def _fake_start_subprocess_run(*args: Any, **kwargs: Any) -> Any:
         command = args[0] if args else kwargs.get("args")
+        if command == [
+            "rtk",
+            "powdrr-lift",
+            "evaluate",
+            "docs/proposals/display-related-photos",
+        ]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="Implementation specifications are valid.\n",
+                stderr="",
+            )
         if isinstance(command, list) and command[:2] == ["rtk", "gh"]:
             return subprocess.CompletedProcess(
                 command,

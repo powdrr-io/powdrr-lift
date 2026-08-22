@@ -51,6 +51,10 @@ from powdrr_lift.core import (
     system_map_specification_default_output_path,
     system_specification_default_output_path,
 )
+from powdrr_lift.core.python_tool_commands import (
+    dependency_backed_command_variants,
+    missing_executable_output,
+)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     normalize_context_type,
@@ -6212,11 +6216,18 @@ def _execute_shell_tool(
 ) -> dict[str, Any]:
     command = parameters.get("command")
     validation_command: str | Sequence[str]
+    retry_command_source: list[str] | None = None
     if isinstance(command, str):
         command_display = _rtk_command_display(command)
         run_command: str | list[str] = _wrap_shell_command(command)
         use_shell = True
         validation_command = command
+        try:
+            command_items = shlex.split(command)
+        except ValueError:
+            command_items = []
+        if not any(item in {"&&", ";", "|", ">", "<"} for item in command_items):
+            retry_command_source = command_items
     elif isinstance(command, Sequence) and not isinstance(
         command,
         (str, bytes, bytearray),
@@ -6227,6 +6238,7 @@ def _execute_shell_tool(
         run_command = wrapped_command
         use_shell = False
         validation_command = normalized_command
+        retry_command_source = normalized_command
     else:
         raise RuntimeError(
             "Workflow invoke_tool action parameters must include a command."
@@ -6288,6 +6300,55 @@ def _execute_shell_tool(
         cwd=resolved_cwd,
         env=env,
     )
+    attempted_commands = [command_display]
+    if (
+        process.returncode != 0
+        and retry_command_source is not None
+        and missing_executable_output(
+            stdout=process.stdout,
+            stderr=process.stderr,
+        )
+    ):
+        for variant in dependency_backed_command_variants(
+            retry_command_source,
+            project_root=resolved_cwd,
+        ):
+            retry_command = list(variant.command)
+            if use_shell:
+                retry_run_command: str | list[str] = _wrap_shell_command(
+                    shlex.join(retry_command)
+                )
+                retry_shell = True
+            else:
+                retry_run_command = _wrap_argument_command(retry_command)
+                retry_shell = False
+            retry_display = (
+                retry_run_command
+                if isinstance(retry_run_command, str)
+                else " ".join(shlex.quote(item) for item in retry_run_command)
+            )
+            _verbose_print(
+                stderr,
+                verbose,
+                f"Retrying shell tool with project dependency metadata: "
+                f"{retry_display} ({variant.reason})",
+            )
+            process = subprocess.run(
+                retry_run_command,
+                shell=retry_shell,
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=resolved_cwd,
+                env=env,
+            )
+            attempted_commands.append(retry_display)
+            command_display = retry_display
+            if process.returncode == 0 or not missing_executable_output(
+                stdout=process.stdout,
+                stderr=process.stderr,
+            ):
+                break
     if process.stdout:
         if print_stdout:
             print(process.stdout, end="", file=stdout)
@@ -6301,13 +6362,16 @@ def _execute_shell_tool(
         verbose,
         f"Shell tool exited with code {process.returncode}",
     )
-    return {
+    result = {
         "command": command_display,
         "cwd": str(resolved_cwd),
         "returncode": process.returncode,
         "stdout": process.stdout,
         "stderr": process.stderr,
     }
+    if len(attempted_commands) > 1:
+        result["attempted_commands"] = attempted_commands
+    return result
 
 
 def _empty_pull_request_error(

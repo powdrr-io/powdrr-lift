@@ -139,7 +139,9 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowStructuredDocumentError,
     _WorkflowYamlEditError,
     _worktree_reuse_decision,
+    dependency_backed_command_variants,
     download_local_qwen_model,
+    missing_executable_output,
     run_workflow_chat,
 )
 from powdrr_lift.workflow_chat_tui import (
@@ -7826,6 +7828,96 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
     assert run.call_args.kwargs["cwd"] == tmp_path.resolve()
     assert "Invoking" not in stdout.getvalue()
     assert "Invoking" not in stderr.getvalue()
+
+
+def test_python_tool_variants_follow_declared_dependency_groups(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example"
+[project.optional-dependencies]
+dev = ["pytest", "ruff>=0.8"]
+[dependency-groups]
+quality = ["mypy"]
+""",
+        encoding="utf-8",
+    )
+
+    assert dependency_backed_command_variants(
+        ["uv", "run", "ruff", "format", "--check", "."],
+        project_root=tmp_path,
+    )[0].command == ("uv", "run", "--extra", "dev", "ruff", "format", "--check", ".")
+    assert dependency_backed_command_variants(
+        ["uv", "run", "mypy", "src"],
+        project_root=tmp_path,
+    )[0].command == ("uv", "run", "--group", "quality", "mypy", "src")
+    assert (
+        dependency_backed_command_variants(
+            ["uv", "run", "ruff", "format", "--check", ".", "--extra", "dev"],
+            project_root=tmp_path,
+        )
+        == ()
+    )
+
+
+def test_execute_shell_tool_retries_missing_uv_tool_with_declared_extra(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "example"
+[project.optional-dependencies]
+dev = ["ruff>=0.8"]
+""",
+        encoding="utf-8",
+    )
+    missing = subprocess.CompletedProcess(
+        ["rtk", "uv", "run", "ruff"],
+        1,
+        stdout="",
+        stderr="error: Failed to spawn: ruff\n",
+    )
+    success = subprocess.CompletedProcess(
+        ["rtk", "uv", "run", "--extra", "dev", "ruff"],
+        0,
+        stdout="ruff passed\n",
+        stderr="",
+    )
+
+    with patch(
+        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        side_effect=[missing, success],
+    ) as run:
+        result = _execute_shell_tool(
+            {"command": ["uv", "run", "ruff", "format", "--check", "."]},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+            announce=False,
+        )
+
+    assert result["returncode"] == 0
+    assert result["command"] == "rtk uv run --extra dev ruff format --check ."
+    assert result["attempted_commands"] == [
+        "rtk uv run ruff format --check .",
+        "rtk uv run --extra dev ruff format --check .",
+    ]
+    assert missing_executable_output(stdout="", stderr="Failed to spawn: ruff")
+    assert run.call_args_list[1].args[0] == [
+        "rtk",
+        "uv",
+        "run",
+        "--extra",
+        "dev",
+        "ruff",
+        "format",
+        "--check",
+        ".",
+    ]
 
 
 def test_command_invocation_accepts_multiple_publish_files() -> None:

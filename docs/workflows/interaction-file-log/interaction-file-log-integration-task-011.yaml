@@ -1,0 +1,44 @@
+task_id: interaction-file-log-integration-task-011
+status: open
+upstream_task_ids:
+- interaction-file-log-integration-task-001
+- interaction-file-log-integration-task-005
+- interaction-file-log-integration-task-006
+- interaction-file-log-integration-task-007
+- interaction-file-log-integration-task-008
+- interaction-file-log-integration-task-009
+- interaction-file-log-integration-task-010
+dependent_state:
+- pull-request-prep-complete
+complexity: medium
+input_state:
+  proposed_pr_context: interaction-file-log-integration-task-001.proposed-pr-context-state
+  implementation_diffs: interaction-file-log-integration-task-005.generated-product-code-state
+  test_results: interaction-file-log-integration-task-006.all-tests-passing-state
+  completeness_review: interaction-file-log-integration-task-007.specification-completeness-state
+  lint_results: interaction-file-log-integration-task-008.linted-and-cleaned-state
+  promoted_documents: interaction-file-log-integration-task-009.promoted-current-state-documents
+  staged_changes: interaction-file-log-integration-task-010.staged-pull-request-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: pull-request-prep-state
+description: Finish pull request preparation
+step_type: freeform
+details: 'Run finish-pr-prep after the intended pull-request files are staged. If
+  the prep step changes files, restage only the approved files and rerun any affected
+  checks before continuing. Record the final validation evidence in output_state for
+  the pull-request handoff.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-integration''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: fast_iteration
+uses_skills:
+- finish-pr-prep
+tool_invocations:
+- tool: shell
+  command:
+  - git
+  - status
+  - --short

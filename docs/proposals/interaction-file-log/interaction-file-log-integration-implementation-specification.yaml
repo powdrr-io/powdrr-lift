@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Integration Implementation
+architecture_id: '2026-08-22'
+entities:
+- id: interaction-log
+  action: added
+  rationale: Central log file storing all interaction entries.
+- id: interaction-entry
+  action: added
+  rationale: A single recorded interaction with input and output.
+- id: log-writer
+  action: added
+  rationale: Writes interaction entries to the log file.
+- id: interaction-source
+  action: added
+  rationale: Origin of an interaction, human or LLM.
+modules:
+- id: mod-log-writer
+  action: changed
+  relative_location: src/log_writer/
+  purpose: Writes interaction entries to the JSON log file in the hidden .powdrr directory.
+tools:
+- id: tool-log-writer
+  action: changed
+  when_to_use: Whenever an interaction with a human or LLM occurs and needs to be
+    logged.
+  template: interaction-log-writer
+  how_to_use: Invoke the log writer to append the interaction input and output to
+    the log file.
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  rationale: The log writer appends entries to the log.
+- id: rel-log-contains
+  action: added
+  rationale: The log contains interaction entries.
+- id: rel-source-feeds
+  action: added
+  rationale: Interaction sources feed entries to the writer.
+features:
+- id: feat-integration-wiring
+  action: added
+  description: Wire the log writer into human and LLM interaction flows.
+  functional_requirements:
+  - Invoke the log writer after each human interaction completes.
+  - Invoke the log writer after each LLM interaction completes.
+  - Ensure the log file is created and appended without disrupting the interaction
+    flow.
+decisions:
+- id: dec-integration-points
+  action: added
+  description: Integrate the log writer at the existing interaction completion points
+    for both human and LLM sources.

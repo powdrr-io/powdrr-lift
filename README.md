@@ -205,7 +205,8 @@ This requires a terminal that supports the Kitty keyboard protocol, such as
 recent iTerm2, Kitty, WezTerm, or Alacritty. In iTerm2, enable “Report
 modifiers using CSI u” in the profile's Keys preferences if Command keys are
 not being delivered. Apple Terminal does not support this protocol and will
-continue to handle Command shortcuts itself.
+continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
+`Ctrl+V`, or use a Kitty-compatible terminal instead.
 
 - The command uses `OPENAI_API_KEY` by default and also accepts `CODEX_API_KEY`.
 - If those are unset, it falls back to the local Codex auth cache in

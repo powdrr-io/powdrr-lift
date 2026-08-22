@@ -141,6 +141,8 @@ class WorkflowAction:
     skill_name: str | None = None
     step_id: str | None = None
     file_path: str | None = None
+    destination_path: str | None = None
+    file_operation: str | None = None
     start_line: int | None = None
     end_line: int | None = None
     text: str | None = None
@@ -544,6 +546,10 @@ def workflow_action_summary(action: object) -> str:
         "prompt_user": getattr(action, "text", None),
         "edit": getattr(action, "file_path", None),
         "yaml_edit": getattr(action, "file_path", None),
+        "file_management": (
+            f"{getattr(action, 'file_operation', None)} "
+            f"{getattr(action, 'file_path', None)}"
+        ),
         "invoke_skill": getattr(action, "skill_name", None),
         "goto_step": getattr(action, "step_id", None),
         "invoke_tool": getattr(action, "tool", None),

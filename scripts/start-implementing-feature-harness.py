@@ -7,8 +7,11 @@ import argparse
 import json
 import os
 import shlex
+import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +26,13 @@ DEFAULT_ANSWER = (
 DEFAULT_ERROR_LOG = Path("workflow-llm-errors.jsonl")
 DEFAULT_TRANSCRIPT_DIR = Path("workflow-start-feature-harness")
 DEFAULT_REPORT = Path("workflow-start-feature-harness-report.json")
+DEFAULT_FEATURE_NAME = "interaction-file-log"
+_FEATURE_DOCUMENTS = (
+    "architecture-specification.yaml",
+    "implementation-specification.yaml",
+    "proposed-pr-specification.yaml",
+    "system-specification.yaml",
+)
 _FAILURE_MARKERS = (
     "action failed",
     "validation_error",
@@ -31,6 +41,14 @@ _FAILURE_MARKERS = (
     "workflow stopped",
     "repair failed",
 )
+
+
+def _text_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def _parse_args() -> argparse.Namespace:
@@ -54,10 +72,152 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-turns", type=int, default=40)
     parser.add_argument("--timeout", type=float, default=1800.0)
     parser.add_argument("--workflow-arg", action="append", default=[])
+    parser.add_argument(
+        "--feature-name",
+        default=DEFAULT_FEATURE_NAME,
+        help=(
+            "Feature directory to seed from repository history when it is absent "
+            "(default: interaction-file-log)."
+        ),
+    )
+    parser.add_argument(
+        "--no-seed-feature",
+        action="store_true",
+        help="Do not restore a missing feature fixture from repository history.",
+    )
+    parser.add_argument(
+        "--no-isolate-run-worktree",
+        action="store_true",
+        help="Run directly in --repo-root instead of an ephemeral harness worktree.",
+    )
     parser.add_argument("--error-log", type=Path, default=DEFAULT_ERROR_LOG)
     parser.add_argument("--transcript-dir", type=Path, default=DEFAULT_TRANSCRIPT_DIR)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     return parser.parse_args()
+
+
+def _feature_path(repo_root: Path, feature_name: str) -> Path:
+    return repo_root / "docs" / "proposals" / feature_name
+
+
+def _find_historical_feature_commit(repo_root: Path, feature_name: str) -> str | None:
+    feature_path = f"docs/proposals/{feature_name}"
+    commits = subprocess.run(
+        ["git", "rev-list", "--all", "--", feature_path],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for commit in commits:
+        if all(
+            subprocess.run(
+                [
+                    "git",
+                    "cat-file",
+                    "-e",
+                    f"{commit}:{feature_path}/{document}",
+                ],
+                cwd=repo_root,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            ).returncode
+            == 0
+            for document in _FEATURE_DOCUMENTS
+        ):
+            return commit
+    return None
+
+
+def _seed_feature_from_history(repo_root: Path, feature_name: str) -> bool:
+    destination = _feature_path(repo_root, feature_name)
+    if destination.is_dir() and all(
+        (destination / document).is_file() for document in _FEATURE_DOCUMENTS
+    ):
+        return False
+    commit = _find_historical_feature_commit(repo_root, feature_name)
+    if commit is None:
+        raise SystemExit(
+            f"Cannot seed {feature_name!r}: no complete historical feature "
+            "specification was found. Pass --no-seed-feature to test missing "
+            "context handling explicitly."
+        )
+    destination.mkdir(parents=True, exist_ok=True)
+    for document in _FEATURE_DOCUMENTS:
+        content = subprocess.run(
+            [
+                "git",
+                "show",
+                f"{commit}:docs/proposals/{feature_name}/{document}",
+            ],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+        ).stdout
+        (destination / document).write_bytes(content)
+    print(
+        f"Seeded {destination} from historical commit {commit[:12]} for harness run.",
+        file=sys.stderr,
+    )
+    return True
+
+
+def _mirror_local_code_changes(source_root: Path, destination_root: Path) -> None:
+    """Copy the caller's tracked code/skill edits into an isolated run tree."""
+    changed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            "HEAD",
+            "--",
+            "skill-definitions",
+            "src",
+            "scripts",
+        ],
+        cwd=source_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for relative_name in changed:
+        source = source_root / relative_name
+        destination = destination_root / relative_name
+        if source.is_file():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        elif destination.exists():
+            destination.unlink()
+
+
+def _create_isolated_run_worktree(repo_root: Path) -> Path:
+    run_root = Path(
+        tempfile.mkdtemp(
+            prefix=f"{repo_root.name}-start-feature-run-", dir=repo_root.parent
+        )
+    )
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(run_root), "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _mirror_local_code_changes(repo_root, run_root)
+    return run_root
+
+
+def _remove_isolated_run_worktree(repo_root: Path, run_root: Path) -> None:
+    subprocess.run(
+        ["git", "worktree", "remove", "--force", str(run_root)],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if run_root.exists():
+        shutil.rmtree(run_root, ignore_errors=True)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -122,6 +282,7 @@ def _run_iteration(
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        start_new_session=True,
     )
     timed_out = False
     interrupted = False
@@ -132,12 +293,21 @@ def _run_iteration(
         )
     except subprocess.TimeoutExpired as exc:
         timed_out = True
-        process.kill()
+        # workflow-chat may have a provider/helper descendant holding the
+        # transcript pipe open. Kill the whole session so communicate() cannot
+        # wait indefinitely after the configured timeout.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         output, _ = process.communicate()
-        output = (exc.output or "") + (output or "")
+        output = _text_output(exc.output) + _text_output(output)
     except KeyboardInterrupt:
         interrupted = True
-        process.kill()
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
         output, _ = process.communicate()
     transcript.write_text(output or "", encoding="utf-8")
     new_errors = _read_jsonl(error_log)[previous_errors:]
@@ -194,63 +364,80 @@ def main() -> int:
     if args.iterations < 1:
         raise SystemExit("--iterations must be positive")
     repo_root = args.repo_root.resolve()
-    log_root = _log_root(repo_root)
-    error_log = _resolve_path(args.error_log, repo_root=repo_root, log_root=log_root)
-    transcript_dir = _resolve_path(
-        args.transcript_dir, repo_root=repo_root, log_root=log_root
-    )
-    report_path = _resolve_path(args.report, repo_root=repo_root, log_root=log_root)
-    transcript_dir.mkdir(parents=True, exist_ok=True)
-    reports: list[dict[str, Any]] = []
-    for iteration in range(1, args.iterations + 1):
-        transcript = transcript_dir / f"iteration-{iteration:02d}.log"
-        result = _run_iteration(
-            args=args,
-            repo_root=repo_root,
-            error_log=error_log,
-            transcript=transcript,
-            iteration=iteration,
+    run_root = repo_root
+    isolated = not args.no_isolate_run_worktree
+    if isolated:
+        run_root = _create_isolated_run_worktree(repo_root)
+    try:
+        if not args.no_seed_feature:
+            _seed_feature_from_history(run_root, args.feature_name)
+        log_root = _log_root(run_root)
+        error_log = _resolve_path(
+            args.error_log, repo_root=repo_root, log_root=log_root
         )
-        reports.append(result)
-        print(
-            f"Iteration {iteration}: {result['status']} "
-            f"(errors={result['error_count']}, "
-            f"corrections={len(result['corrections'])})",
-            file=sys.stderr,
+        transcript_dir = _resolve_path(
+            args.transcript_dir, repo_root=repo_root, log_root=log_root
         )
-        if result["status"] == "clean":
-            report_path.write_text(
-                json.dumps(reports, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
+        report_path = _resolve_path(args.report, repo_root=repo_root, log_root=log_root)
+        transcript_dir.mkdir(parents=True, exist_ok=True)
+        reports: list[dict[str, Any]] = []
+        for iteration in range(1, args.iterations + 1):
+            transcript = transcript_dir / f"iteration-{iteration:02d}.log"
+            result = _run_iteration(
+                args=args,
+                repo_root=run_root,
+                error_log=error_log,
+                transcript=transcript,
+                iteration=iteration,
             )
-            print(f"Harness completed cleanly after {iteration} iteration(s).")
-            return 0
-        if result["status"] in {"timeout", "interrupted"}:
-            break
-        if not args.repair_command:
+            reports.append(result)
             print(
-                "Iteration failed; provide --repair-command to apply a fix and "
-                "continue. Inspect the iteration transcript and structured errors.",
+                f"Iteration {iteration}: {result['status']} "
+                f"(errors={result['error_count']}, "
+                f"corrections={len(result['corrections'])})",
                 file=sys.stderr,
             )
-            break
-        if (
-            _run_repair_command(
-                args.repair_command,
-                repo_root=repo_root,
-                error_log=error_log,
-                iteration=iteration,
-                result=result,
-            )
-            != 0
-        ):
-            print("Repair command failed; stopping harness.", file=sys.stderr)
-            break
-    report_path.write_text(
-        json.dumps(reports, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
-    print(f"Harness did not complete cleanly; report: {report_path}", file=sys.stderr)
-    return 1
+            if result["status"] == "clean":
+                report_path.write_text(
+                    json.dumps(reports, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                print(f"Harness completed cleanly after {iteration} iteration(s).")
+                return 0
+            if result["status"] in {"timeout", "interrupted"}:
+                break
+            if not args.repair_command:
+                print(
+                    "Iteration failed; provide --repair-command to apply a fix and "
+                    "continue. Inspect the iteration transcript and structured errors.",
+                    file=sys.stderr,
+                )
+                break
+            if (
+                _run_repair_command(
+                    args.repair_command,
+                    repo_root=run_root,
+                    error_log=error_log,
+                    iteration=iteration,
+                    result=result,
+                )
+                != 0
+            ):
+                print("Repair command failed; stopping harness.", file=sys.stderr)
+                break
+            if isolated:
+                _mirror_local_code_changes(run_root, repo_root)
+        report_path.write_text(
+            json.dumps(reports, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        print(
+            f"Harness did not complete cleanly; report: {report_path}",
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        if isolated:
+            _remove_isolated_run_worktree(repo_root, run_root)
 
 
 if __name__ == "__main__":

@@ -53,6 +53,7 @@ from powdrr_lift.core.workflow_task_specification import (
     save_workflow_task,
     select_ready_workflow_tasks,
 )
+from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.workflow_chat_agent import (
     ALL_PROVIDERS,
@@ -88,6 +89,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_shell_tool,
     _execution_events_for_prompt,
     _handle_workflow_action_edit,
+    _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
     _latest_deterministic_pre_step,
     _latest_execution_event_for_prompt,
@@ -1470,6 +1472,20 @@ def test_textual_response_grows_beyond_previous_thirty_row_cap() -> None:
     assert scroll_y == 0
 
 
+def test_textual_status_textarea_does_not_reserve_hidden_label_row() -> None:
+    async def exercise() -> tuple[int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            status_container = app.query_one("#status-container", ScrollableContainer)
+            status = app.query_one("#status-text", TextArea)
+            return status.region.y, status_container.region.y
+
+    status_y, container_y = asyncio.run(exercise())
+    assert status_y == container_y + 1
+
+
 def test_textual_startup_shows_initial_question(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1976,7 +1992,7 @@ def test_textual_status_keeps_all_questions_visible() -> None:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         async with app.run_test() as pilot:
-            status = app.query_one("#status", Static)
+            status = app.query_one("#status-text", TextArea)
             for question in (
                 "1. What should be logged?",
                 "2. Which file format should be used?",
@@ -1986,7 +2002,7 @@ def test_textual_status_keeps_all_questions_visible() -> None:
             ):
                 app._set_message(question)
             await pilot.pause()
-            return str(status.render()), status.region.height
+            return status.text, status.region.height
 
     rendered, height = asyncio.run(exercise())
     assert all(f"{number}." in rendered for number in range(1, 6))
@@ -2279,6 +2295,25 @@ def test_textual_response_supports_copy() -> None:
     assert asyncio.run(exercise()) == (False, "copy this output")
 
 
+def test_textual_copy_uses_native_macos_clipboard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+    monkeypatch.setattr(sys, "platform", "darwin")
+    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
+        app.copy_to_clipboard("copy this output")
+
+    assert app.clipboard == "copy this output"
+    run.assert_called_once_with(
+        ["pbcopy"],
+        input="copy this output",
+        text=True,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def test_textual_response_supports_cut_through_app_action() -> None:
     async def exercise() -> tuple[str, str]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
@@ -2394,6 +2429,25 @@ def test_textual_read_only_panels_support_copy_and_cut() -> None:
         "Powdrr Agent v0.0.1\n\nrunning\n\ngreen output",
         "1. Capture the feature goal.\n2. Summarize the result.",
     )
+
+
+def test_textual_status_textarea_supports_range_copy_and_cut() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            status = app.query_one("#status-text", TextArea)
+            status.text = "copy only this range"
+            status.select_all()
+            status.focus()
+            await pilot.press("super+c")
+            await pilot.pause()
+            copied = app.clipboard
+            await pilot.press("super+x")
+            await pilot.pause()
+            return status.text, copied
+
+    assert asyncio.run(exercise()) == ("copy only this range", "copy only this range")
 
 
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
@@ -3939,6 +3993,72 @@ def test_read_document_action_clamps_range_past_end_of_short_document(
     assert context["start_line"] == 1
     assert context["end_line"] == 3
     assert [line["text"] for line in context["lines"]] == ["one", "two", "three"]
+
+
+def test_file_management_action_renames_and_records_result(tmp_path: Path) -> None:
+    source = tmp_path / "old.txt"
+    source.write_text("content", encoding="utf-8")
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "action": "file_management",
+            "operation": "rename",
+            "file_path": "old.txt",
+            "destination_path": "new.txt",
+        }
+    )
+
+    assert (
+        _handle_workflow_action_file_management(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    assert not source.exists()
+    assert (tmp_path / "new.txt").read_text(encoding="utf-8") == "content"
+    assert state.execution_events[-1]["result"]["destination_path"] == "new.txt"
+
+
+@pytest.mark.parametrize("path", ["../outside.txt", "nested/../../outside.txt"])
+def test_file_management_rejects_parent_traversal(tmp_path: Path, path: str) -> None:
+    source = tmp_path / "source.txt"
+    source.write_text("content", encoding="utf-8")
+
+    with pytest.raises(FileManagementError, match="must not contain '..'"):
+        manage_worktree_file(
+            tmp_path,
+            operation="delete",
+            file_path=path,
+        )
+    assert source.exists()
+
+
+def test_file_management_rejects_symlinked_directory(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret", encoding="utf-8")
+    link = tmp_path / "linked"
+    link.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(FileManagementError, match="symlink"):
+        manage_worktree_file(
+            tmp_path,
+            operation="delete",
+            file_path="linked/secret.txt",
+        )
+    assert (outside / "secret.txt").exists()
 
 
 def test_run_workflow_chat_gathers_context_into_follow_up_step(

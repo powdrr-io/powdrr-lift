@@ -188,6 +188,14 @@ class WorkflowChatApp(App[None]):
     }
     #status {
         width: 100%;
+        visibility: hidden;
+    }
+    #status-text {
+        width: 100%;
+        height: 1fr;
+        min-height: 1;
+        border: none;
+        padding: 0;
     }
     #response {
         width: 100%;
@@ -226,6 +234,12 @@ class WorkflowChatApp(App[None]):
     def compose(self) -> ComposeResult:
         yield ScrollableContainer(
             Label(self._status_text(_POWDRR_AGENT_BANNER), markup=False, id="status"),
+            TextArea(
+                _POWDRR_AGENT_BANNER,
+                read_only=True,
+                show_line_numbers=False,
+                id="status-text",
+            ),
             id="status-container",
         )
         yield ListView(id="steps")
@@ -620,8 +634,10 @@ class WorkflowChatApp(App[None]):
     def _render_status(self) -> None:
         status_container = self.query_one("#status-container", ScrollableContainer)
         status_widget = self.query_one("#status", Label)
+        status_text = self.query_one("#status-text", TextArea)
         content = self._status_content()
         status_widget.update(self._status_text(content))
+        status_text.text = content
         status_container.scroll_end(animate=False)
         status_container.call_after_refresh(status_container.scroll_end, animate=False)
         status_widget.refresh(repaint=True)

@@ -944,6 +944,17 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
             state=state,
         )
 
+    _validate_dynamic_validation_gate_action(
+        _parse_action_response(
+            {
+                "kind": "gather_context",
+                "types": ["requirements"],
+            }
+        ),
+        state,
+        step,
+    )
+
     state.validation_gates["checks"].correction_required = False
     obligation = state.validation_gates["checks"].obligations["pytest"]
     obligation.status = "passed"
@@ -4460,7 +4471,9 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
             {"kind": "yaml_edit", "file_path": "docs/specification.yaml"}
         )
 
-    with pytest.raises(RuntimeError, match="upsert_item, remove_item, or set_value"):
+    with pytest.raises(
+        RuntimeError, match="upsert_item, remove_item, remove_key, or set_value"
+    ):
         _parse_action_response(
             {
                 "kind": "yaml_edit",
@@ -4496,7 +4509,7 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
     )
     assert "upsert_item" in feedback
     assert "multiple independent operations" in feedback
-    assert "Do not use line numbers" in feedback
+    assert "exact line ranges" in feedback
 
 
 def test_yaml_edit_set_value_supports_validator_list_indices() -> None:
@@ -4545,6 +4558,24 @@ def test_yaml_edit_remove_item_supports_validator_list_indices() -> None:
     )
 
     assert yaml.safe_load(updated) == {"requirements": [{"id": "req-1"}]}
+
+
+def test_yaml_edit_remove_key_deletes_top_level_key() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "yaml_edit",
+            "file_path": "docs/system-specification.yaml",
+            "operations": [{"op": "remove_key", "path": ["0"]}],
+        }
+    )
+
+    updated = _apply_yaml_operations(
+        Path("docs/system-specification.yaml"),
+        "schema: v1\n'0': null\nrequirements: []\n",
+        action.yaml_operations,
+    )
+
+    assert yaml.safe_load(updated) == {"schema": "v1", "requirements": []}
 
 
 def test_yaml_edit_index_errors_include_repair_guidance() -> None:
@@ -4660,46 +4691,46 @@ def test_edit_action_can_update_multiple_files_in_one_response(
     assert len(state.execution_events[0]["result"]) == 2
 
 
-def test_edit_action_rejects_invalid_yaml_before_writing(tmp_path: Path) -> None:
+def test_edit_action_accepts_yaml_fallback_shape(tmp_path: Path) -> None:
     yaml_path = tmp_path / "project-structure.yaml"
     yaml_path.write_text("name: original\n", encoding="utf-8")
-    with pytest.raises(RuntimeError, match="Use yaml_edit"):
-        _parse_action_response(
-            {
-                "kind": "edit",
-                "file_path": yaml_path.name,
-                "edits": [
-                    {
-                        "kind": "replace",
-                        "start_line": 1,
-                        "text": "name: [",
-                    }
-                ],
-            }
-        )
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_path": yaml_path.name,
+            "edits": [
+                {
+                    "kind": "replace",
+                    "start_line": 1,
+                    "text": "name: [",
+                }
+            ],
+        }
+    )
 
-    assert yaml_path.read_text(encoding="utf-8") == "name: original\n"
+    assert action.kind == "edit"
 
 
-def test_edit_action_rejects_yaml_file_edits_with_yaml_edit_guidance() -> None:
-    with pytest.raises(RuntimeError, match="Use yaml_edit"):
-        _parse_action_response(
-            {
-                "kind": "edit",
-                "file_edits": [
-                    {
-                        "file_path": "docs/structure.yml",
-                        "edits": [
-                            {
-                                "kind": "replace",
-                                "start_line": 1,
-                                "text": "name: changed",
-                            }
-                        ],
-                    }
-                ],
-            }
-        )
+def test_edit_action_accepts_yaml_file_edits_fallback_shape() -> None:
+    action = _parse_action_response(
+        {
+            "kind": "edit",
+            "file_edits": [
+                {
+                    "file_path": "docs/structure.yml",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "text": "name: changed",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert action.kind == "edit"
 
 
 def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:

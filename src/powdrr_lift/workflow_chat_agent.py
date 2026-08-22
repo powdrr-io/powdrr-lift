@@ -4103,8 +4103,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; do not use edit for .yaml or .yml files; use yaml_edit "
-        "instead. invoke_tool requires a tool listed in the current step's "
+        "line numbers; prefer yaml_edit for .yaml or .yml files, but use edit as "
+        "a fallback when a structural operation cannot express the repair. "
+        "invoke_tool requires a tool listed in the current step's "
         "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
@@ -4181,11 +4182,15 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "Use edit when you know the current file should be changed and you "
         "have enough context to describe line-based removals, additions, or "
         "replacements.\n"
-        "Use yaml_edit for YAML specification files. It preserves section keys "
+        "Prefer yaml_edit for YAML specification files. It preserves section keys "
         "and edits list items structurally: upsert_item uses section, id, and a "
         "complete value mapping; remove_item uses section and id, or section and "
         "index for a validator-reported boilerplate list entry; set_value uses "
-        "a mapping-key path and value. Try to combine multiple independent edits "
+        "a mapping-key path and value; remove_key deletes an exact mapping-key "
+        "path. Never use set_value to delete a key or represent deletion with null. "
+        "Use edit as a fallback when direct textual "
+        "repair is necessary, and validate the resulting YAML afterward. Try to "
+        "combine multiple independent edits "
         "to the same YAML file into one yaml_edit operations array. If yaml_edit "
         "reports a usage error, "
         "follow its corrective instructions and retry with the corrected shape.\n"
@@ -4279,7 +4284,8 @@ def _modular_action_system_prompt(
         "action that makes progress without asking for information already present.\n"
         "Available actions (choose exactly one): gather_context discovers checked-in "
         "specifications; prompt_user asks one necessary human question; edit applies "
-        "line-based edits to non-YAML files; yaml_edit applies structural YAML "
+        "line-based edits to files, including YAML as a fallback; yaml_edit applies "
+        "structural YAML "
         "operations; invoke_skill runs a listed nested skill; invoke_tool runs one "
         "declared command; read_document reads a bounded file range; goto_step "
         "repeats a declared step; next_step advances after completion; complete ends "
@@ -4371,6 +4377,10 @@ def _modular_action_system_prompt(
             "goto_step, or complete until every obligation passes in the current "
             "epoch. If any obligation fails, apply its corrective action; the runtime "
             "will reset the epoch and require every obligation to run again.\n"
+            "gather_context remains allowed while repairing a failed obligation. "
+            "Use it when the latest validator result reports a missing or unknown id; "
+            "use the validator's suggested context types and keywords, then apply "
+            "the correction.\n"
             "Validation repair protocol: a failed result is a diagnosis, not "
             "permission to repeat the same edit. First inspect the exact current "
             "file and full validator result, map each issue to its reported path, "
@@ -4391,8 +4401,9 @@ def _modular_action_system_prompt(
             "for at most 2000 lines, with line 0 meaning the beginning and an "
             "end_line past "
             "EOF clamped.\n"
-            "edit requires valid line edits and must not target YAML; use yaml_edit "
-            "for YAML. A yaml_edit set_value path is a JSON array of mapping keys, "
+            "edit requires valid line edits; prefer yaml_edit for YAML, but edit is "
+            "allowed as a fallback when structural operations cannot express the "
+            "repair. A yaml_edit set_value path is a JSON array of mapping keys, "
             'such as ["title"] or ["metadata","owner"], never a JSON '
             "pointer such as /title. For list sections, use one upsert_item per "
             "item with section, id, and a complete value mapping; do not replace "
@@ -4428,7 +4439,8 @@ def _modular_action_system_prompt(
         "of mapping keys and non-negative list indexes; use upsert_item with the "
         "section, existing-or-new item id, and complete mapping when replacing a "
         "whole list item. The only supported operation names are "
-        "set_value, upsert_item, and remove_item; never use remove or replace. "
+        "set_value, upsert_item, remove_item, and remove_key; never use remove "
+        "or replace. Never use set_value with null to delete a key. "
         "Use remove_item with an existing item id from the current document, or "
         "use the exact validator-reported list index when removing boilerplate. "
         "Template comments and boilerplate disappear when a valid yaml_edit "
@@ -4666,7 +4678,6 @@ def _handle_workflow_action_edit(
     pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
     for file_edit in file_edits:
-        _reject_line_edit_for_yaml(file_edit.file_path)
         target_path = _resolve_worktree_file_path(
             file_edit.file_path,
             state.worktree_root,
@@ -5473,7 +5484,7 @@ def _validate_dynamic_validation_gate_action(
         )
     if state.step_index != gate_state.step_index:
         return
-    if gate_state.correction_required:
+    if gate_state.correction_required and action.kind != "gather_context":
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="validation_correction_required",
@@ -5489,8 +5500,12 @@ def _validate_dynamic_validation_gate_action(
         "tool": action.tool,
         "parameters": dict(action.parameters),
     }
+    if action.kind == "gather_context":
+        return
     config = _validation_gate_config(step) or {}
-    correction_actions = config.get("correction_actions", ["edit", "yaml_edit"])
+    correction_actions = config.get(
+        "correction_actions", ["edit", "yaml_edit", "gather_context"]
+    )
     if isinstance(correction_actions, Sequence) and action.kind in correction_actions:
         return
     if action.kind in {"next_step", "goto_step", "complete"}:
@@ -6241,7 +6256,6 @@ def _parse_workflow_action_edit(
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
         raise RuntimeError("Workflow edit action must include file_path.")
-    _reject_line_edit_for_yaml(file_path)
     edits = _required_edit_operations(payload.get("edits"))
     return SkillChatAction(
         kind="edit",
@@ -6250,15 +6264,6 @@ def _parse_workflow_action_edit(
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
-
-
-def _reject_line_edit_for_yaml(file_path: str) -> None:
-    if file_path.strip().lower().endswith((".yaml", ".yml")):
-        raise RuntimeError(
-            f"Workflow edit action cannot target YAML file {file_path.strip()!r}. "
-            "Use yaml_edit with structural operations: upsert_item, "
-            "remove_item, or set_value."
-        )
 
 
 def _parse_workflow_action_yaml_edit(
@@ -6281,14 +6286,16 @@ def _parse_workflow_action_yaml_edit(
     ):
         raise RuntimeError(
             "yaml_edit requires a non-empty operations array. Supported "
-            "operations are upsert_item, remove_item, and set_value. Include "
+            "operations are upsert_item, remove_item, remove_key, and set_value. "
+            "Include "
             "all independent edits for this YAML file in one operations array."
         )
     operations = tuple(_parse_yaml_operation(item) for item in raw_operations)
     if not operations:
         raise RuntimeError(
             "yaml_edit operations must not be empty. Use upsert_item, "
-            "remove_item, or set_value. Try to include multiple independent "
+            "remove_item, remove_key, or set_value. Try to include multiple "
+            "independent "
             "edits in this one operations array when possible."
         )
     return SkillChatAction(
@@ -6308,12 +6315,12 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
             '"feature-id", "value": {...}}.'
         )
     operation = value.get("op")
-    if operation not in {"upsert_item", "remove_item", "set_value"}:
+    if operation not in {"upsert_item", "remove_item", "remove_key", "set_value"}:
         raise RuntimeError(
-            f"yaml_edit operation op must be upsert_item, remove_item, or "
+            f"yaml_edit operation op must be upsert_item, remove_item, remove_key, or "
             f"set_value; received {operation!r}."
         )
-    if operation == "set_value":
+    if operation in {"set_value", "remove_key"}:
         raw_path = value.get("path")
         if (
             not isinstance(raw_path, Sequence)
@@ -6331,6 +6338,11 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
             raise RuntimeError(
                 "yaml_edit set_value requires a non-empty path array of mapping "
                 'keys or non-negative list indexes, for example ["title"].'
+            )
+        if operation == "remove_key":
+            return SkillChatYamlOperation(
+                operation=operation,
+                path=tuple(str(item).strip() for item in raw_path),
             )
         if "value" not in value:
             raise RuntimeError("yaml_edit set_value requires value.")
@@ -6992,7 +7004,6 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
             raise RuntimeError(
                 "Workflow edit action file_edits entries must include file_path."
             )
-        _reject_line_edit_for_yaml(file_path)
         file_edits.append(
             SkillChatFileEdits(
                 file_path=file_path.strip(),
@@ -7987,6 +7998,40 @@ def _apply_yaml_operations(
                 )
             continue
 
+        if operation.operation == "remove_key":
+            if not operation.path:
+                raise _WorkflowYamlEditError(
+                    "remove_key requires a non-empty mapping-key path."
+                )
+            remove_target: Any = updated
+            for key in operation.path[:-1]:
+                if isinstance(remove_target, dict) and key in remove_target:
+                    remove_target = remove_target[key]
+                    continue
+                if isinstance(remove_target, list) and key.isdigit():
+                    index = int(key)
+                    if 0 <= index < len(remove_target):
+                        remove_target = remove_target[index]
+                        continue
+                raise _WorkflowYamlEditError(
+                    f"remove_key path {list(operation.path)!r} cannot find "
+                    f"mapping key {key!r}. Re-read the YAML and use the exact "
+                    "path from the current document."
+                )
+            final_key = operation.path[-1]
+            if not isinstance(remove_target, dict):
+                raise _WorkflowYamlEditError(
+                    f"remove_key path {list(operation.path)!r} does not resolve "
+                    "to a YAML mapping."
+                )
+            if final_key not in remove_target:
+                raise _WorkflowYamlEditError(
+                    f"No mapping key {final_key!r} exists at path "
+                    f"{list(operation.path)!r}. Re-read the YAML before retrying."
+                )
+            del remove_target[final_key]
+            continue
+
         if operation.section is None or (
             operation.item_id is None and operation.item_index is None
         ):
@@ -8059,7 +8104,7 @@ def _apply_yaml_operations(
 
         raise _WorkflowYamlEditError(
             f"Unsupported yaml_edit operation {operation.operation!r}. Use "
-            "upsert_item, remove_item, or set_value."
+            "upsert_item, remove_item, remove_key, or set_value."
         )
 
     return yaml.safe_dump(
@@ -8098,13 +8143,16 @@ def _workflow_edit_failure_feedback(
         )
     elif isinstance(error, _WorkflowYamlEditError):
         feedback += (
-            " Use yaml_edit only for .yaml or .yml files. Its operations are "
+            " Prefer yaml_edit for .yaml or .yml files. Its operations are "
             "structural: upsert_item replaces or appends a list item by section "
             "and id, remove_item deletes one by section and id (or by an exact "
             "validator-reported list index for boilerplate), and set_value "
-            "updates a mapping value by path. Include multiple independent "
+            "updates a mapping value by path; remove_key deletes an exact mapping "
+            "key path. Include multiple independent "
             "operations in one yaml_edit action when correcting the same file. "
-            "Do not use line numbers or replace section headers."
+            "If the structural operations cannot express the repair, use a normal "
+            "edit with exact line ranges, preserve YAML indentation and section "
+            "headers, and rerun the validator."
         )
     return feedback
 
@@ -8544,8 +8592,10 @@ def _action_repair_prompt(
             "\nThe previous edit action failed and was not applied. don't do this "
             "again; do not repeat it "
             "unchanged; reread the current file and return a corrected action. "
-            "For YAML, use yaml_edit with upsert_item, remove_item, or set_value "
-            "instead of line numbers. The "
+            "For YAML, prefer yaml_edit with upsert_item, remove_item, "
+            "remove_key, or set_value; use a normal edit with exact line "
+            "ranges when those "
+            "operations cannot express the repair. The "
             "rejected edit was:\n"
             f"{_workflow_action_signature(failed_action)}"
         )

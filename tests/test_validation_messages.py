@@ -31,3 +31,56 @@ def test_boilerplate_issue_includes_indexed_yaml_removal() -> None:
     assert data["yaml_edit"]["operations"] == [
         {"op": "remove_item", "section": "requirements", "index": 0}
     ]
+
+
+def test_unknown_id_correction_includes_gather_context_action() -> None:
+    error = ValidationError(
+        "unknown_supercedes_id",
+        "The referenced requirement id is not available.",
+        "requirements[0].supercedes[0]",
+    )
+
+    data = validation_error_to_data(error, file_path="system-specification.yaml")
+
+    assert '"action":"gather_context"' in data["corrective_action"]
+    assert '"types":["requirements"]' in data["corrective_action"]
+    assert "exact returned id" in data["corrective_action"]
+
+
+def test_missing_id_correction_includes_gather_context_action() -> None:
+    error = ValidationError(
+        "section_item_id_missing",
+        "A section item must include an id.",
+        "requirements[0].id",
+    )
+
+    data = validation_error_to_data(error, file_path="system-specification.yaml")
+
+    assert '"action":"gather_context"' in data["corrective_action"]
+    assert '"types":["requirements"]' in data["corrective_action"]
+
+
+def test_unknown_top_level_id_uses_field_name_without_wrong_default() -> None:
+    error = ValidationError(
+        "architecture_id_missing",
+        "The architecture id is missing.",
+        "id",
+    )
+
+    data = validation_error_to_data(error, file_path="architecture-specification.yaml")
+
+    assert '"keywords":["id"]' in data["corrective_action"]
+    assert '"types":["requirements","approach","entities"' in data["corrective_action"]
+
+
+def test_unknown_field_includes_remove_key_yaml_edit() -> None:
+    error = ValidationError(
+        "unknown_field",
+        "Unknown field '0'.",
+        "0",
+    )
+
+    data = validation_error_to_data(error, file_path="system-specification.yaml")
+
+    assert data["yaml_edit"]["operations"] == [{"op": "remove_key", "path": ["0"]}]
+    assert "set_value with null" in data["corrective_action"]

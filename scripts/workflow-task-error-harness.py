@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import selectors
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +73,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--provider", default="auto")
     parser.add_argument("--max-roundtrips", type=int)
     parser.add_argument("--timeout", type=float, default=1800.0)
+    parser.add_argument(
+        "--progress-interval",
+        type=float,
+        default=15.0,
+        help="Seconds between heartbeat messages when the task emits no output.",
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
         "--no-isolate-run-worktree",
@@ -285,11 +293,11 @@ def _run_iteration(
     repo_root: Path,
     workflow_dir: Path,
     task: WorkflowTask,
-    error_log: Path,
+    error_logs: tuple[Path, ...],
     transcript: Path,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
-    previous_errors = len(_read_jsonl(error_log))
+    previous_error_counts = {path: len(_read_jsonl(path)) for path in error_logs}
     command = [
         sys.executable,
         "-m",
@@ -311,7 +319,7 @@ def _run_iteration(
     process = subprocess.Popen(
         command,
         cwd=repo_root,
-        text=True,
+        text=False,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -319,25 +327,79 @@ def _run_iteration(
     )
     timed_out = False
     interrupted = False
-    try:
-        output, _ = process.communicate(timeout=args.timeout)
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        output, _ = process.communicate()
-        output = _text_output(exc.output) + _text_output(output)
-    except KeyboardInterrupt:
-        interrupted = True
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        output, _ = process.communicate()
-    transcript.write_text(output or "", encoding="utf-8")
-    new_errors = _read_jsonl(error_log)[previous_errors:]
+    output_parts: list[str] = []
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    last_heartbeat = started
+    captured_bytes = 0
+    selector = selectors.DefaultSelector()
+    assert process.stdout is not None
+    selector.register(process.stdout, selectors.EVENT_READ)
+    with transcript.open("w", encoding="utf-8") as transcript_file:
+        while process.poll() is None:
+            now = time.monotonic()
+            if now - started >= args.timeout:
+                timed_out = True
+                print(
+                    f"Harness timeout after {now - started:.0f}s; terminating "
+                    f"process group (captured={captured_bytes} bytes).",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                break
+            try:
+                ready = selector.select(timeout=1.0)
+            except KeyboardInterrupt:
+                interrupted = True
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                break
+            if ready:
+                chunk = process.stdout.read1(65536)
+                if not chunk:
+                    selector.unregister(process.stdout)
+                    break
+                output = _text_output(chunk)
+                output_parts.append(output)
+                captured_bytes += len(chunk)
+                transcript_file.write(output)
+                transcript_file.flush()
+                sys.stdout.write(output)
+                sys.stdout.flush()
+                last_heartbeat = time.monotonic()
+            elif time.monotonic() - last_heartbeat >= args.progress_interval:
+                elapsed = time.monotonic() - started
+                print(
+                    f"Harness progress: task {task.task_id} still running after "
+                    f"{elapsed:.0f}s; captured={captured_bytes} bytes.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                last_heartbeat = time.monotonic()
+        if process.poll() is None:
+            process.wait()
+        while process.stdout is not None:
+            chunk = process.stdout.read1(65536)
+            if not chunk:
+                break
+            output = _text_output(chunk)
+            output_parts.append(output)
+            captured_bytes += len(chunk)
+            transcript_file.write(output)
+            transcript_file.flush()
+            sys.stdout.write(output)
+            sys.stdout.flush()
+    selector.close()
+    output = "".join(output_parts)
+    new_errors: list[dict[str, Any]] = []
+    for path in error_logs:
+        new_errors.extend(_read_jsonl(path)[previous_error_counts[path] :])
     lowered = (output or "").lower()
     corrections = [marker for marker in _FAILURE_MARKERS if marker in lowered]
     status = "clean"
@@ -380,6 +442,9 @@ def _run_repair_command(
         "HARNESS_TEMPLATE_PATH": str(template_path),
         "HARNESS_TRANSCRIPT": result["transcript"],
         "HARNESS_ERROR_LOG": str(error_log),
+        "HARNESS_ERROR_LOGS": os.pathsep.join(
+            str(path) for path in result.get("error_logs", [])
+        ),
         "HARNESS_RESULT_JSON": json.dumps(result, ensure_ascii=False),
     }
     print(
@@ -431,6 +496,13 @@ def main() -> int:
 
         log_root = _log_root(run_root)
         error_log = _resolve_path(args.error_log, log_root=log_root)
+        runner_error_logs = (
+            log_root / DEFAULT_ERROR_LOG,
+            run_root / DEFAULT_ERROR_LOG,
+            run_root.parent / DEFAULT_ERROR_LOG,
+            run_root.parent.parent / DEFAULT_ERROR_LOG,
+        )
+        error_logs = tuple(dict.fromkeys((error_log, *runner_error_logs)))
         transcript_dir = _resolve_path(args.transcript_dir, log_root=log_root)
         report_path = _resolve_path(args.report, log_root=log_root)
         transcript_dir.mkdir(parents=True, exist_ok=True)
@@ -447,12 +519,13 @@ def main() -> int:
                 repo_root=run_root,
                 workflow_dir=workflow_dir,
                 task=task,
-                error_log=error_log,
+                error_logs=error_logs,
                 transcript=transcript_dir / f"iteration-{iteration:02d}.log",
                 args=args,
             )
             result["iteration"] = iteration
             result["template_path"] = str(template_path)
+            result["error_logs"] = [str(path) for path in error_logs]
             reports.append(result)
             if isolated:
                 _mirror_repair_changes(
@@ -487,7 +560,7 @@ def main() -> int:
                 workflow_dir=workflow_dir,
                 task=task,
                 template_path=template_path,
-                error_log=error_log,
+                error_log=runner_error_logs[-1],
                 result=result,
                 iteration=iteration,
             )

@@ -6354,10 +6354,18 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
         and not isinstance(item_index, bool)
     ):
         if item_index < 0:
-            raise RuntimeError("yaml_edit remove_item index must be non-negative.")
+            raise RuntimeError(
+                "yaml_edit remove_item index must be non-negative. Corrective "
+                "action: use the zero-based list index reported by the validator, "
+                'for example {"op":"remove_item","section":"requirements",'
+                '"index":0}; do not use a negative index.'
+            )
         if item_id is not None:
             raise RuntimeError(
-                "yaml_edit remove_item must use either id or index, not both."
+                "yaml_edit remove_item must use exactly one of id or index. "
+                "Corrective action: remove id when using the validator-reported "
+                'index, for example {"op":"remove_item",'
+                '"section":"requirements","index":0}; do not include both.'
             )
         return SkillChatYamlOperation(
             operation=operation,

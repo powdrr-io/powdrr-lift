@@ -4547,6 +4547,39 @@ def test_yaml_edit_remove_item_supports_validator_list_indices() -> None:
     assert yaml.safe_load(updated) == {"requirements": [{"id": "req-1"}]}
 
 
+def test_yaml_edit_index_errors_include_repair_guidance() -> None:
+    with pytest.raises(RuntimeError, match="Corrective action"):
+        _parse_action_response(
+            {
+                "kind": "yaml_edit",
+                "file_path": "docs/system-specification.yaml",
+                "operations": [
+                    {
+                        "op": "remove_item",
+                        "section": "requirements",
+                        "index": -1,
+                    }
+                ],
+            }
+        )
+
+    with pytest.raises(RuntimeError, match="exactly one of id or index"):
+        _parse_action_response(
+            {
+                "kind": "yaml_edit",
+                "file_path": "docs/system-specification.yaml",
+                "operations": [
+                    {
+                        "op": "remove_item",
+                        "section": "requirements",
+                        "id": "req-1",
+                        "index": 0,
+                    }
+                ],
+            }
+        )
+
+
 @pytest.mark.parametrize("tool", ["internal", "shell"])
 @pytest.mark.parametrize(
     ("command", "expected_action"),

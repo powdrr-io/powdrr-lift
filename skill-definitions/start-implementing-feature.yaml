@@ -12,7 +12,11 @@ steps:
   description: Discover proposed feature specification candidates.
   step_type: freeform
   llm_type: standard_reasoning
-  details: Invoke the declared fuzzy-match command once for docs/proposals using the feature name from the user's request. Treat a missing root or empty result as no matches; do not select the feature yet.
+  details: >-
+    Invoke only the declared fuzzy-match command once for docs/proposals using
+    the feature name from the user's request. Do not invoke internal, shell, or
+    any other tool in this step. Treat a missing root or empty result as no
+    matches; do not select the feature yet.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -29,7 +33,11 @@ steps:
   description: Discover current feature specification candidates.
   step_type: freeform
   llm_type: standard_reasoning
-  details: Invoke the declared fuzzy-match command once for docs/current using the feature name from the user's request. Treat a missing root or empty result as no matches; do not select the feature yet.
+  details: >-
+    Invoke only the declared fuzzy-match command once for docs/current using
+    the feature name from the user's request. Do not invoke internal, shell, or
+    any other tool in this step. Treat a missing root or empty result as no
+    matches; do not select the feature yet.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -46,7 +54,11 @@ steps:
   description: Discover execution workflow candidates.
   step_type: freeform
   llm_type: standard_reasoning
-  details: Invoke the declared fuzzy-match command once for docs/workflows using the feature name from the user's request. Treat a missing root or empty result as no matches; do not select the workflow yet.
+  details: >-
+    Invoke only the declared fuzzy-match command once for docs/workflows using
+    the feature name from the user's request. Do not invoke internal, shell, or
+    any other tool in this step. Treat a missing root or empty result as no
+    matches; do not select the workflow yet.
   tool_invocations:
   - tool: fuzzy-match
     command:
@@ -67,12 +79,19 @@ steps:
     Review all three deterministic search results. Filter them to the best
     matching feature directory and workflow directories. If exactly one
     feature specification and workflow set are the best matches, select them
-    without asking. If a match is uncertain, ask one specific question that
-    identifies the correct feature or workflow, for example:
+    without asking. If no candidates are found, do not claim that a canonical
+    feature was selected and do not use next_step or complete: ask one specific
+    question identifying the missing feature or workflow path. If the user
+    supplies an identifier or path, use goto_step to rerun the relevant
+    deterministic discovery step(s), then select from those results. If a
+    match is uncertain, ask one specific question that identifies the correct
+    feature or workflow, for example:
     {"action":"prompt_user","text":"Which feature or workflow should I use from these candidates: <candidate-names>?"}
-    Do not ask whether documents exist before searching. Pass the selected
-    specification documents, workflow documents, canonical feature name, and
-    missing-document findings to the next step.
+    Do not ask whether documents exist before searching. The feature_name
+    output is required for this step; emit it only when this step has actually
+    selected a canonical feature. Pass the selected specification documents,
+    workflow documents, canonical feature name, and missing-document findings
+    to the next step.
   outputs:
   - name: feature_name
     type: string
@@ -119,7 +138,9 @@ steps:
     acceptance criteria, validation commands, dependencies, and risks. Use the
     read_document action to inspect templates/execute-proposed-pr.yaml; do not
     use shell commands to read the template. Do not generate or edit
-    implementation-specification files in this step.
+    implementation-specification files in this step. Before next_step, return
+    exactly one output named proposed_pr_names containing every stable proposed
+    PR name. Do not rely on decisions_and_context for this handoff.
   outputs:
   - name: proposed_pr_names
     type: any
@@ -134,7 +155,11 @@ steps:
     invoke the declared implementation-specification command exactly once with
     its stable proposed-PR name and output path. Reuse existing files. Generate
     only the templates; do not fill, validate, instantiate, stage, or commit
-    them. Pass every generated path and proposed-PR relationship onward.
+    them. Pass every generated path and proposed-PR relationship onward. Before
+    next_step, return exactly one output named
+    implementation_specification_paths containing every generated or reused
+    path; do not repeat proposed_pr_names from the previous step and do not
+    include any other output name.
   inputs:
   - name: proposed_pr_names
     type: any

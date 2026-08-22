@@ -1976,7 +1976,7 @@ def test_textual_status_keeps_all_questions_visible() -> None:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         async with app.run_test() as pilot:
-            status = app.query_one("#status", Static)
+            status = app.query_one("#status-text", TextArea)
             for question in (
                 "1. What should be logged?",
                 "2. Which file format should be used?",
@@ -1986,7 +1986,7 @@ def test_textual_status_keeps_all_questions_visible() -> None:
             ):
                 app._set_message(question)
             await pilot.pause()
-            return str(status.render()), status.region.height
+            return status.text, status.region.height
 
     rendered, height = asyncio.run(exercise())
     assert all(f"{number}." in rendered for number in range(1, 6))
@@ -2394,6 +2394,25 @@ def test_textual_read_only_panels_support_copy_and_cut() -> None:
         "Powdrr Agent v0.0.1\n\nrunning\n\ngreen output",
         "1. Capture the feature goal.\n2. Summarize the result.",
     )
+
+
+def test_textual_status_textarea_supports_range_copy_and_cut() -> None:
+    async def exercise() -> tuple[str, str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            status = app.query_one("#status-text", TextArea)
+            status.text = "copy only this range"
+            status.select_all()
+            status.focus()
+            await pilot.press("super+c")
+            await pilot.pause()
+            copied = app.clipboard
+            await pilot.press("super+x")
+            await pilot.pause()
+            return status.text, copied
+
+    assert asyncio.run(exercise()) == ("copy only this range", "copy only this range")
 
 
 def test_workflow_progress_lists_steps_and_updates_status() -> None:

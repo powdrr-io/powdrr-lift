@@ -137,7 +137,10 @@ steps:
     stable names. For each proposed PR, record its goal, scope, files, tests,
     acceptance criteria, validation commands, dependencies, and risks. Use the
     read_document action to inspect templates/execute-proposed-pr.yaml; do not
-    use shell commands to read the template. Do not generate or edit
+    use shell commands to read the template. The dependency relationships are
+    authoritative: a later proposed PR must not be runnable until the final
+    task of every earlier proposed PR it depends on is completed. Do not
+    generate or edit
     implementation-specification files in this step. Before next_step, return
     exactly one output named proposed_pr_names containing every stable proposed
     PR name. Do not rely on decisions_and_context for this handoff.
@@ -252,9 +255,12 @@ steps:
     every task input_state placeholder from the matching validated
     implementation specification, and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
-    instance names, proposed-PR order, and dependency relationships. Never ask
-    the user for a template path, leave a required placeholder empty, or
-    overwrite an existing workflow without approval. Pass an invocation plan
+    instance names, proposed-PR order, and dependency relationships. For every
+    proposed PR with a predecessor, the first task in its instantiated workflow
+    must list the predecessor workflow's final task in upstream_task_ids; do not
+    leave that first task ready merely because its local upstream list is empty.
+    Never ask the user for a template path, leave a required placeholder empty,
+    or overwrite an existing workflow without approval. Pass an invocation plan
     containing every created or reused workflow and its proposed-PR relationship
     onward.
 - id: instantiate-execution-workflows
@@ -267,9 +273,13 @@ steps:
     template-specific value with repeated --template-value NAME=VALUE options,
     and use the canonical feature name as the shared work-item name. The
     command must create the powdrr/<proposed-pr-id> integration branch while
-    writing workflow files into this active worktree. Stop if a returned
-    workflow directory is outside the active worktree. Pass every created or
-    reused workflow path onward.
+    writing workflow files into this active worktree. After instantiating a
+    dependent proposed PR, update its first task with yaml_edit so its
+    upstream_task_ids includes the final task id of each predecessor workflow.
+    Verify that selecting ready tasks cannot return that dependent workflow
+    before those predecessor tasks are complete. Stop if a returned workflow
+    directory is outside the active worktree. Pass every created or reused
+    workflow path onward.
   tool_invocations:
   - tool: internal
     command:

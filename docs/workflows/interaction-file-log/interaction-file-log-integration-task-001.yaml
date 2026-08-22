@@ -1,7 +1,9 @@
 task_id: interaction-file-log-integration-task-001
 status: open
-upstream_task_ids: []
+upstream_task_ids:
+- interaction-file-log-core-task-012
 dependent_state:
+- core-pull-request-created
 - proposed-pr-context-gathered
 complexity: high
 input_state:

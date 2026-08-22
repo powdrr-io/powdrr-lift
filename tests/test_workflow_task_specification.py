@@ -520,6 +520,24 @@ def test_select_ready_workflow_tasks_excludes_missing_upstreams() -> None:
     assert select_ready_workflow_tasks((task,)) == ()
 
 
+def test_interaction_file_log_integration_waits_for_core_pr() -> None:
+    workflow_directory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "workflows"
+        / "interaction-file-log"
+    )
+    tasks = load_workflow_tasks(workflow_directory)
+    tasks_by_id = {task.task_id: task for task in tasks}
+
+    assert tasks_by_id[
+        "interaction-file-log-integration-task-001"
+    ].upstream_task_ids == ("interaction-file-log-core-task-012",)
+    assert tasks_by_id["interaction-file-log-integration-task-001"] not in (
+        select_ready_workflow_tasks(tasks)
+    )
+
+
 def test_select_ready_workflow_tasks_filters_by_assignee_type_and_role() -> None:
     agent_task = WorkflowTask(
         task_id="agent-task",

@@ -1,0 +1,52 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Core Implementation
+architecture_id: '2026-08-22'
+entities:
+- id: interaction-log
+  action: added
+  rationale: Central log file storing all interaction entries.
+- id: interaction-entry
+  action: added
+  rationale: A single recorded interaction with input and output.
+- id: log-writer
+  action: added
+  rationale: Writes interaction entries to the log file.
+- id: interaction-source
+  action: added
+  rationale: Origin of an interaction, human or LLM.
+modules:
+- id: mod-log-writer
+  action: added
+  relative_location: src/log_writer/
+  purpose: Writes interaction entries to the JSON log file in the hidden .powdrr directory.
+tools:
+- id: tool-log-writer
+  action: added
+  when_to_use: Whenever an interaction with a human or LLM occurs and needs to be
+    logged.
+  template: interaction-log-writer
+  how_to_use: Invoke the log writer to append the interaction input and output to
+    the log file.
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  rationale: The log writer appends entries to the log.
+- id: rel-log-contains
+  action: added
+  rationale: The log contains interaction entries.
+- id: rel-source-feeds
+  action: added
+  rationale: Interaction sources feed entries to the writer.
+features:
+- id: feat-core-log-writer
+  action: added
+  description: Core log writer that appends interaction entries as JSON to the log
+    file.
+  functional_requirements:
+  - Append interaction input and output as a JSON entry.
+  - Store the log in the hidden .powdrr directory.
+  - Support human and LLM interaction sources.
+decisions:
+- id: dec-json-format
+  action: added
+  description: Use JSON Lines format for the interaction log.

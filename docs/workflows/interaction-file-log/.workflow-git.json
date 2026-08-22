@@ -1,0 +1,6 @@
+{
+  "proposed_pr_id": "interaction-file-log-integration",
+  "base_branch": "main",
+  "integration_branch": "powdrr/interaction-file-log-integration",
+  "workflow_relative_directory": "docs/workflows/interaction-file-log"
+}

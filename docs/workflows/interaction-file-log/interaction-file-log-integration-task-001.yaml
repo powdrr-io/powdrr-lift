@@ -1,0 +1,44 @@
+task_id: interaction-file-log-integration-task-001
+status: open
+upstream_task_ids: []
+dependent_state:
+- proposed-pr-context-gathered
+complexity: high
+input_state:
+  proposed_pr: interaction-file-log-integration
+  feature_id: interaction-file-log
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+description: Gather context about the proposed PR
+step_type: invoke_tool
+details: 'Use the deterministic gathered context as the input for this step. Treat
+  input_state.feature_id as the proposal directory scope and input_state.proposed_pr
+  as the candidate to filter against the returned proposed_prs matches and identify
+  the canonical proposed PR. Then summarize its goals, scope, acceptance criteria,
+  tests, dependencies, risks, and related requirements into the declared task output.
+  If the candidate is a workflow label, resolve it to the canonical proposed PR id
+  from the gathered matches. Preserve the exact specification path and record only
+  the relevant implementation context in output_state. Use read_document only when
+  a specific section of a known document is needed. If the result is ambiguous or
+  has no matching proposed PR, choose prompt_user with one precise question instead
+  of guessing. Do not invoke gather_context again or guess a path.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-integration''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: long_context
+pre_step:
+  action: gather_context
+  template:
+    feature_id: <feature_id>
+    types:
+    - proposed_prs
+    - requirements
+    - features
+    - acceptance_criteria
+    - expected_tests
+    - intent
+    - risks
+    - decisions

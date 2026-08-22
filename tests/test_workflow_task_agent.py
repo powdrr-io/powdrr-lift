@@ -19,7 +19,11 @@ from powdrr_lift.core import (
     WorkflowTask,
     save_skill,
 )
-from powdrr_lift.workflow_chat_agent import LLMModelLimits, _action_system_prompt
+from powdrr_lift.workflow_chat_agent import (
+    LLMModelLimits,
+    _action_system_prompt,
+    _parse_action_response,
+)
 from powdrr_lift.workflow_llm import WorkflowLLMHTTPError
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
@@ -88,7 +92,8 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert completed.status is TaskStatus.COMPLETED
     assert completed.output_state == {"version": "v2"}
     prompt = client.messages[0][1]["content"]
-    assert client.messages[0][0]["content"] == _action_system_prompt()
+    assert client.messages[0][0]["content"].startswith(_action_system_prompt())
+    assert "`next_step` is invalid here" in client.messages[0][0]["content"]
     assert '"execution_mode":"process_workflow_task"' in prompt
     assert json.loads(prompt)["workflow_dir"] == "workflow"
     assert str(tmp_path) not in prompt
@@ -171,6 +176,7 @@ def test_workflow_task_prompt_includes_task_interaction_style(
         "Separate observations, inferences, risks, and recommendations."
         in (messages[0]["content"])
     )
+    assert "`next_step` is invalid here" in messages[0]["content"]
     assert json.loads(messages[1]["content"])["task"]["interaction_style"] == (
         "observational_review"
     )
@@ -526,6 +532,15 @@ def test_process_workflow_task_repairs_invalid_json_response(
     )
 
 
+def test_workflow_task_accepts_workflow_chat_action_field() -> None:
+    action = _parse_action_response(
+        {"action": "complete", "output_state": {"result": "shared contract"}}
+    )
+
+    assert action.kind == "complete"
+    assert action.output_state == {"result": "shared contract"}
+
+
 def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -602,8 +617,10 @@ def test_process_workflow_task_compacts_at_proactive_threshold(
     def _estimate(messages: list[dict[str, str]]) -> int:
         if "compacting context" in messages[0]["content"]:
             return 10
+        if len(messages) == 1:
+            return 10
         payload = json.loads(messages[1]["content"])
-        return 10 if "compacted_context" in payload else 3_000
+        return 10 if "compacted_context" in payload else 4_000
 
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._estimate_message_tokens", _estimate
@@ -749,8 +766,8 @@ def test_process_workflow_task_prints_invalid_response_before_repair(
         ),
         client=_FakeClient(
             [
-                {"kind": None, "diagnostic": "inspect me"},
-                {"kind": "complete", "output_state": {"version": "v2"}},
+                {"action": None, "diagnostic": "inspect me"},
+                {"action": "complete", "output_state": {"version": "v2"}},
             ]
         ),
         stdout=io.StringIO(),
@@ -760,7 +777,7 @@ def test_process_workflow_task_prints_invalid_response_before_repair(
     assert exit_code == 0
     output = stderr.getvalue()
     assert "Workflow task LLM response requiring repair:" in output
-    assert '"kind": null' in output
+    assert '"action": null' in output
     assert '"diagnostic": "inspect me"' in output
 
 
@@ -770,7 +787,7 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
     client = _FakeClient(
         [
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "fuzzy-match",
                 "parameters": {
                     "command": [
@@ -812,7 +829,7 @@ def test_process_workflow_task_repairs_fuzzy_match_tool_error(
     client = _FakeClient(
         [
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "fuzzy-match",
                 "parameters": {"command": ["fuzzy-match", "."]},
             },
@@ -963,12 +980,13 @@ def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     client = _FakeClient(
         [
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
+                "tool": "shell",
                 "parameters": {
                     "command": f"cat {guessed_path}",
                 },
             },
-            {"kind": "complete", "output_state": {"version": "v2"}},
+            {"action": "complete", "output_state": {"version": "v2"}},
         ]
     )
     stdout = io.StringIO()

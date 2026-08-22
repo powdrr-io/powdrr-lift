@@ -6273,6 +6273,7 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
 def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
     return {
         "complete": _parse_workflow_action_complete,
+        "get-human-input": _parse_workflow_action_human_input,
         "edit": _parse_workflow_action_edit,
         "yaml_edit": _parse_workflow_action_yaml_edit,
         "file_management": _parse_workflow_action_file_management,
@@ -6349,6 +6350,58 @@ def _parse_workflow_action_complete(
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
+
+
+def _parse_workflow_action_human_input(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    value = payload.get("human_input")
+    if not isinstance(value, Mapping):
+        raise RuntimeError("get-human-input must include human_input.")
+    human_task = _parse_human_input_task(value.get("human_task"), "human_task")
+    instructions = value.get("incorporation_instructions")
+    if not isinstance(instructions, str) or not instructions.strip():
+        raise RuntimeError("get-human-input must include incorporation_instructions.")
+    follow_up_value = value.get("follow_up_task")
+    follow_up = (
+        _parse_human_input_task(follow_up_value, "follow_up_task")
+        if follow_up_value is not None
+        else None
+    )
+    return SkillChatAction(
+        kind="get-human-input",
+        human_input={
+            "human_task": human_task,
+            "incorporation_instructions": instructions.strip(),
+            "follow_up_task": follow_up,
+        },
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
+def _parse_human_input_task(value: object, field_name: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise RuntimeError(f"{field_name} must be an object.")
+    description = value.get("description")
+    role = value.get("role")
+    output_state_type = value.get("output_state_type")
+    if not isinstance(description, str) or not description.strip():
+        raise RuntimeError(f"{field_name}.description must be non-empty.")
+    if not isinstance(role, str) or not role.strip():
+        raise RuntimeError(f"{field_name}.role must be provided.")
+    if not isinstance(output_state_type, str) or not output_state_type.strip():
+        raise RuntimeError(f"{field_name}.output_state_type must be non-empty.")
+    if "input_state" not in value:
+        raise RuntimeError(f"{field_name}.input_state must be provided.")
+    return {
+        "description": description.strip(),
+        "role": role.strip(),
+        "input_state": value["input_state"],
+        "output_state_type": output_state_type.strip(),
+    }
 
 
 def _parse_workflow_action_edit(
@@ -6554,7 +6607,7 @@ def _parse_workflow_action_invoke_tool(
     decisions_and_context: str | None,
     llm_type: str | None,
 ) -> SkillChatAction:
-    tool = payload.get("tool")
+    tool = payload.get("tool", "shell")
     if not isinstance(tool, str) or not tool.strip():
         raise RuntimeError("Workflow invoke_tool action must include tool.")
     parameters = payload.get("parameters")

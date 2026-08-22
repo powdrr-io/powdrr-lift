@@ -34,12 +34,12 @@ tools:
   - id: ruff-format
     action: added
     when_to_use: Format Python source files with ruff.
-    template: uv run ruff format .
+    template: uv run --extra dev ruff format .
     validation_action:
       kind: invoke_tool
       tool: shell
       parameters:
-        command: uv run ruff format .
+        command: uv run --extra dev ruff format .
     how_to_use: Run from repository root.
     labels:
       - format
@@ -47,12 +47,12 @@ tools:
   - id: ruff-format-check
     action: added
     when_to_use: Check Python source formatting without modifying files.
-    template: uv run ruff format --check .
+    template: uv run --extra dev ruff format --check .
     validation_action:
       kind: invoke_tool
       tool: shell
       parameters:
-        command: uv run ruff format --check .
+        command: uv run --extra dev ruff format --check .
     how_to_use: Run from repository root.
     labels:
       - format
@@ -60,12 +60,12 @@ tools:
   - id: ruff-lint
     action: added
     when_to_use: Lint Python source files with ruff.
-    template: uv run ruff check .
+    template: uv run --extra dev ruff check .
     validation_action:
       kind: invoke_tool
       tool: shell
       parameters:
-        command: uv run ruff check .
+        command: uv run --extra dev ruff check .
     how_to_use: Run from repository root.
     labels:
       - lint
@@ -73,12 +73,12 @@ tools:
   - id: pytest
     action: added
     when_to_use: Run the test suite.
-    template: uv run pytest
+    template: uv run --extra dev pytest
     validation_action:
       kind: invoke_tool
       tool: shell
       parameters:
-        command: uv run pytest
+        command: uv run --extra dev pytest
     how_to_use: Run from repository root.
     labels:
       - test
@@ -86,12 +86,12 @@ tools:
   - id: mypy
     action: added
     when_to_use: Type-check Python source and test files.
-    template: uv run mypy src tests
+    template: uv run --extra dev mypy src tests
     validation_action:
       kind: invoke_tool
       tool: shell
       parameters:
-        command: uv run mypy src tests
+        command: uv run --extra dev mypy src tests
     how_to_use: Run from repository root.
     labels:
       - type-check

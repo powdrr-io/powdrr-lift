@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import powdrr_lift.workflow_git as workflow_git
 from powdrr_lift.workflow_git import (
     WorkflowGitState,
     claim_workflow_task,
@@ -17,6 +18,7 @@ from powdrr_lift.workflow_git import (
     resolve_git_repository_root,
     save_workflow_git_state,
     task_branch_name,
+    workflow_dependencies_completion,
 )
 
 
@@ -49,6 +51,75 @@ def test_workflow_git_state_round_trips_and_names_branches(tmp_path: Path) -> No
     assert task_branch_name("Feature Request 17", "task-001") == (
         "powdrr/feature-request-17-task/task-001"
     )
+
+
+def test_workflow_git_state_loads_by_workflow_id_when_directory_is_shared(
+    tmp_path: Path,
+) -> None:
+    workflow_dir = tmp_path / "docs" / "workflows" / "feature"
+    workflow_dir.mkdir(parents=True)
+    core_state = WorkflowGitState(
+        proposed_pr_id="feature-core",
+        base_branch="main",
+        integration_branch="powdrr/feature-core",
+        workflow_relative_directory="docs/workflows/feature",
+    )
+    integration_state = WorkflowGitState(
+        proposed_pr_id="feature-integration",
+        base_branch="main",
+        integration_branch="powdrr/feature-integration",
+        workflow_relative_directory="docs/workflows/feature",
+    )
+
+    core_path = save_workflow_git_state(workflow_dir, core_state)
+    integration_path = save_workflow_git_state(workflow_dir, integration_state)
+
+    assert core_path.name == "feature-core-workflow.yaml"
+    assert integration_path.name == "feature-integration-workflow.yaml"
+    assert load_workflow_git_state(workflow_dir, "feature-core") == core_state
+    assert (
+        load_workflow_git_state(workflow_dir, "feature-integration")
+        == integration_state
+    )
+    assert load_workflow_git_state(workflow_dir) is None
+
+
+def test_workflow_git_state_round_trips_workflow_dependencies() -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+    )
+
+    assert WorkflowGitState.from_data(state.to_data()) == state
+
+
+def test_workflow_dependency_requires_merged_integration_pull_request(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+    )
+    responses = [[{"state": "OPEN"}], [{"state": "MERGED"}]]
+
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_pull_requests",
+        lambda _repo_root, _branches: (responses.pop(0), None),
+    )
+
+    assert workflow_dependencies_completion(tmp_path, state) == (
+        False,
+        ("core: integration PR for powdrr/core is not merged",),
+    )
+    assert workflow_dependencies_completion(tmp_path, state) == (True, ())
 
 
 def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> None:
@@ -203,7 +274,7 @@ def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
     assert report["integration_worktree_exists"] is False
     assert report["workflow_git_state"] == state.to_data()
     assert report["workflow_git_state_source"] == (
-        "docs/workflows/feature-17/.workflow-git.json"
+        "docs/workflows/feature-17/feature-17-workflow.yaml"
     )
     assert report["task_branches"] == [{"branch": task_branch, "integrated": True}]
     assert report["tasks"] == [

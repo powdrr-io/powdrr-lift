@@ -292,7 +292,7 @@ workflow:
     step_type: freeform
     id: verify-workflow-artifacts
     details: Confirm from the repository-state result that every generated workflow
-      JSON file and .workflow-git.json is under docs/workflows/ in this active worktree,
+      YAML metadata file and workflow task files are under docs/workflows/ in this active worktree,
       that each integration branch is powdrr/<proposed-pr-id>, and that no required
       artifact exists only below .worktrees/. If any file is missing or outside the
       active worktree, stop and report the inconsistency; do not stage or create a

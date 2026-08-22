@@ -6991,7 +6991,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     instantiate_output = json.loads(cast(str, instantiate_result["stdout"]))
     integration_worktree = Path(instantiate_output["integration_worktree"])
     workflow_directory = Path(instantiate_output["workflow_directory"])
-    assert (workflow_directory / ".workflow-git.json").exists()
+    workflow_state_files = sorted(workflow_directory.glob("*-workflow.yaml"))
+    assert len(workflow_state_files) == 1
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
         f"display-related-photos-pr-001-task-{index:03d}" for index in range(1, 13)

@@ -137,7 +137,11 @@ steps:
     stable names. For each proposed PR, record its goal, scope, files, tests,
     acceptance criteria, validation commands, dependencies, and risks. Use the
     read_document action to inspect templates/execute-proposed-pr.yaml; do not
-    use shell commands to read the template. Do not generate or edit
+    use shell commands to read the template. A proposed PR dependency means
+    the predecessor workflow is complete only after its integration pull
+    request is merged; completion of the predecessor's final task or creation
+    of its pull request is not sufficient. Preserve these workflow-level
+    dependencies in the instantiation plan. Do not generate or edit
     implementation-specification files in this step. Before next_step, return
     exactly one output named proposed_pr_names containing every stable proposed
     PR name. Do not rely on decisions_and_context for this handoff.
@@ -252,7 +256,11 @@ steps:
     every task input_state placeholder from the matching validated
     implementation specification, and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
-    instance names, proposed-PR order, and dependency relationships. Never ask
+    instance names, proposed-PR order, and dependency relationships. For every
+    dependent workflow, pass each predecessor workflow id with
+    --depends-on-workflow. This records a workflow-level prerequisite whose
+    integration PR must be MERGED before any task in the dependent workflow is
+    selected. Do not model this only as an upstream task dependency. Never ask
     the user for a template path, leave a required placeholder empty, or
     overwrite an existing workflow without approval. Pass an invocation plan
     containing every created or reused workflow and its proposed-PR relationship
@@ -300,8 +308,8 @@ steps:
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Confirm from the repository-state result that every generated workflow JSON
-    file and .workflow-git.json is under docs/workflows/ in this active
+    Confirm from the repository-state result that every generated workflow task
+    file and <workflow-id>-workflow.yaml is under docs/workflows/ in this active
     worktree, that each integration branch is powdrr/<proposed-pr-id>, and that
     no required artifact exists only below .worktrees/. If any file is missing
     or outside the active worktree, stop and report the inconsistency; do not

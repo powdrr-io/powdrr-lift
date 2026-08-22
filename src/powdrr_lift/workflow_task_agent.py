@@ -81,6 +81,8 @@ from powdrr_lift.workflow_git import (
     load_workflow_git_state,
     task_branch_name,
     validate_workflow_git_state,
+    workflow_dependencies_completion,
+    workflow_id_from_task_id,
 )
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
@@ -610,6 +612,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             _publish_workflow_progress(
                 self.repo_root,
                 self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
                 reason=f"complete {completed.task_id}",
                 stdout=self.stdout,
                 events=self.events,
@@ -636,6 +639,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _publish_workflow_progress(
             self.repo_root,
             self.workflow,
+            workflow_id=workflow_id_from_task_id(self.task.task_id),
             reason=f"{reason_prefix} {self.task.task_id}",
             stdout=self.stdout,
             events=self.events,
@@ -707,6 +711,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _record_task_pull_request(
             action,
             self.workflow,
+            self.task.task_id,
             self.repo_root,
             self.events,
             result,
@@ -770,6 +775,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _publish_workflow_progress(
             self.repo_root,
             self.workflow,
+            workflow_id=workflow_id_from_task_id(self.task.task_id),
             reason=f"roundtrip limit for {self.task.task_id}",
             stdout=self.stdout,
             events=self.events,
@@ -780,6 +786,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 def _record_task_pull_request(
     action: WorkflowAction,
     workflow: WorkflowInstance,
+    task_id: str,
     repo_root: Path,
     events: Sequence[Mapping[str, Any]],
     result: object,
@@ -801,7 +808,10 @@ def _record_task_pull_request(
             "could not be named under docs/prs/<pr-number>.yaml."
         )
     branch = _git_output(repo_root, ["branch", "--show-current"])
-    state = load_workflow_git_state(workflow.directory)
+    state = load_workflow_git_state(
+        workflow.directory,
+        workflow_id=workflow_id_from_task_id(task_id),
+    )
     record_pull_request_workflow(
         repo_root,
         number,
@@ -839,7 +849,28 @@ def run_workflow_task(
     try:
         configured_workflow = WorkflowInstance.from_directory(configured_workflow_dir)
         configured_task = _select_task(configured_workflow, config.task_id)
-        configured_git_state = load_workflow_git_state(configured_workflow_dir)
+        configured_workflow_id = workflow_id_from_task_id(
+            configured_task.task_id if configured_task is not None else ""
+        )
+        configured_git_state = load_workflow_git_state(
+            configured_workflow_dir,
+            workflow_id=configured_workflow_id,
+        )
+        if configured_git_state is not None:
+            dependencies_complete, incomplete_dependencies = (
+                workflow_dependencies_completion(
+                    configured_repo_root,
+                    configured_git_state,
+                )
+            )
+            if not dependencies_complete:
+                print(
+                    "Workflow dependencies are not complete; no task work was started.",
+                    file=stderr,
+                )
+                for dependency in incomplete_dependencies:
+                    print(f"  - {dependency}", file=stderr)
+                return 1
         if configured_git_state is not None and configured_task is not None:
             project_root = _resolve_project_root(
                 configured_repo_root,
@@ -876,7 +907,10 @@ def run_workflow_task(
     workflow = WorkflowInstance.from_directory(workflow_dir)
     task = _select_task(workflow, config.task_id)
     if task is None:
-        workflow_git_state = load_workflow_git_state(workflow_dir)
+        workflow_git_state = load_workflow_git_state(
+            workflow_dir,
+            workflow_id=workflow_id_from_task_id(config.task_id or ""),
+        )
         if workflow_git_state is not None and workflow.tasks:
             if all(item.status is TaskStatus.COMPLETED for item in workflow.tasks):
                 _open_final_workflow_pull_request(
@@ -894,6 +928,7 @@ def run_workflow_task(
     _publish_workflow_progress(
         repo_root,
         workflow,
+        workflow_id=workflow_id_from_task_id(task.task_id),
         reason=f"claim {task.task_id}",
         stdout=stdout,
         open_pull_request=False,
@@ -995,7 +1030,10 @@ def _resolve_workflow_task_context(
 ) -> tuple[Path, Path]:
     """Use the same dedicated worktree isolation as workflow chat."""
     configured_workflow_dir = config.workflow_dir.resolve()
-    workflow_git_state = load_workflow_git_state(configured_workflow_dir)
+    workflow_git_state = load_workflow_git_state(
+        configured_workflow_dir,
+        workflow_id=workflow_id_from_task_id(task_id or ""),
+    )
     if workflow_git_state is not None and task_id is not None:
         current_branch = _git_output(
             configured_repo_root,
@@ -1066,6 +1104,7 @@ def _publish_workflow_progress(
     repo_root: Path,
     workflow: WorkflowInstance,
     *,
+    workflow_id: str | None = None,
     reason: str,
     stdout: TextIO,
     open_pull_request: bool = True,
@@ -1105,7 +1144,10 @@ def _publish_workflow_progress(
         print(f"Published workflow task branch: {branch}", file=stdout)
         return
 
-    workflow_git_state = load_workflow_git_state(workflow.directory)
+    workflow_git_state = load_workflow_git_state(
+        workflow.directory,
+        workflow_id=workflow_id,
+    )
     default_branch = (
         workflow_git_state.integration_branch
         if workflow_git_state is not None
@@ -1745,7 +1787,7 @@ def _workflow_file_names(workflow_dir: Path) -> list[str]:
         path.name
         for pattern in ("*.yaml", "*.yml", "*.json")
         for path in workflow_dir.glob(pattern)
-        if path.is_file() and path.name != ".workflow-git.json"
+        if path.is_file() and not path.name.endswith("-workflow.yaml")
     )
 
 

@@ -53,6 +53,7 @@ from powdrr_lift.core.workflow_task_specification import (
     save_workflow_task,
     select_ready_workflow_tasks,
 )
+from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.workflow_chat_agent import (
     ALL_PROVIDERS,
@@ -88,6 +89,7 @@ from powdrr_lift.workflow_chat_agent import (
     _execute_shell_tool,
     _execution_events_for_prompt,
     _handle_workflow_action_edit,
+    _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
     _latest_deterministic_pre_step,
     _latest_execution_event_for_prompt,
@@ -3958,6 +3960,72 @@ def test_read_document_action_clamps_range_past_end_of_short_document(
     assert context["start_line"] == 1
     assert context["end_line"] == 3
     assert [line["text"] for line in context["lines"]] == ["one", "two", "three"]
+
+
+def test_file_management_action_renames_and_records_result(tmp_path: Path) -> None:
+    source = tmp_path / "old.txt"
+    source.write_text("content", encoding="utf-8")
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "action": "file_management",
+            "operation": "rename",
+            "file_path": "old.txt",
+            "destination_path": "new.txt",
+        }
+    )
+
+    assert (
+        _handle_workflow_action_file_management(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    assert not source.exists()
+    assert (tmp_path / "new.txt").read_text(encoding="utf-8") == "content"
+    assert state.execution_events[-1]["result"]["destination_path"] == "new.txt"
+
+
+@pytest.mark.parametrize("path", ["../outside.txt", "nested/../../outside.txt"])
+def test_file_management_rejects_parent_traversal(tmp_path: Path, path: str) -> None:
+    source = tmp_path / "source.txt"
+    source.write_text("content", encoding="utf-8")
+
+    with pytest.raises(FileManagementError, match="must not contain '..'"):
+        manage_worktree_file(
+            tmp_path,
+            operation="delete",
+            file_path=path,
+        )
+    assert source.exists()
+
+
+def test_file_management_rejects_symlinked_directory(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret", encoding="utf-8")
+    link = tmp_path / "linked"
+    link.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(FileManagementError, match="symlink"):
+        manage_worktree_file(
+            tmp_path,
+            operation="delete",
+            file_path="linked/secret.txt",
+        )
+    assert (outside / "secret.txt").exists()
 
 
 def test_run_workflow_chat_gathers_context_into_follow_up_step(

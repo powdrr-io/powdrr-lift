@@ -29,6 +29,7 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
+from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
@@ -548,6 +549,27 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         for operation in action.yaml_operations
                     ],
                     "result": {"line_count": len(updated.splitlines())},
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "file_management":
+            if action.file_operation is None or action.file_path is None:
+                raise RuntimeError(
+                    "file_management action requires operation and file_path."
+                )
+            result = manage_worktree_file(
+                self.repo_root,
+                operation=action.file_operation,
+                file_path=action.file_path,
+                destination_path=action.destination_path,
+            )
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "operation": action.file_operation,
+                    "file_path": action.file_path,
+                    "destination_path": action.destination_path,
+                    "result": result,
                 }
             )
             return WorkflowActionOutcome()
@@ -1657,13 +1679,20 @@ def _task_action_material_state(
     action.  Edits are the only action whose target is known in advance; tool
     output and event logging are context, not material progress.
     """
-    if action.kind != "edit":
+    if action.kind not in {"edit", "file_management"}:
         return None
-    file_paths = (
-        tuple(group.file_path for group in action.file_edits)
-        if action.file_edits
-        else ((action.file_path,) if action.file_path is not None else ())
-    )
+    if action.kind == "file_management":
+        file_paths = tuple(
+            path
+            for path in (action.file_path, action.destination_path)
+            if path is not None
+        )
+    else:
+        file_paths = (
+            tuple(group.file_path for group in action.file_edits)
+            if action.file_edits
+            else ((action.file_path,) if action.file_path is not None else ())
+        )
     if not file_paths:
         return None
     material_state: list[tuple[str, str | None]] = []

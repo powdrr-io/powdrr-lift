@@ -109,9 +109,10 @@ steps:
   details: >-
     Use yaml_edit to capture the entity model before review; do not invoke tools
     or rewrite the YAML as prose, then choose next_step. Keep the model small:
-    for example, define `related-photo` and `gallery-photo` entities plus one
-    `groups_with` relationship, and add invariants or guidance only when they
-    constrain those entities or that relationship.
+    derive entities, modules, tools, relationships, invariants, and guidance
+    only from the current feature requirements and approach. Do not copy example
+    domain entities, relationships, or ids from another feature. Every entity
+    and relationship must explain which current requirement or approach it serves.
 - id: review-architecture-context
   description: Review architecture before implementation.
   step_type: freeform

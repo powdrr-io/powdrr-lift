@@ -107,3 +107,60 @@ def test_pull_request_command_and_url_parsing() -> None:
     assert not is_pull_request_create_command(["gh", "pr", "edit", "42"])
     assert pull_request_number("https://github.com/example/repo/pull/42\n") == 42
     assert pull_request_number("no pull request") is None
+
+
+def test_pull_request_record_preserves_root_workflow_and_nested_skill_events(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    remote = tmp_path / "remote.git"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True)
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("test\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-m", "initial")
+    _git(repo, "branch", "-M", "main")
+    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "push", "-u", "origin", "main")
+    _git(repo, "switch", "-c", "feature/root-workflow")
+
+    record_pull_request_workflow(
+        repo,
+        43,
+        branch="feature/root-workflow",
+        base_branch="main",
+        title="Example PR",
+        workflow_name="specify-a-feature",
+        workflow_path="skill-definitions/specify-a-feature.yaml",
+        steps=[{"id": "capture-goal", "description": "Capture the goal"}],
+        events=[
+            {"kind": "invoke_skill", "skill": "review-system"},
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["git", "add", "docs"]},
+                "result": {"returncode": 0},
+            },
+        ],
+        explanation="The record makes the automated PR auditable.",
+    )
+
+    document = yaml.safe_load(
+        (repo / "docs" / "prs" / "43.yaml").read_text(encoding="utf-8")
+    )
+    assert document["workflow"]["name"] == "specify-a-feature"
+    assert document["workflow"]["steps"] == [
+        {"id": "capture-goal", "description": "Capture the goal"}
+    ]
+    assert document["workflow"]["skills"] == [
+        "specify-a-feature",
+        "review-system",
+    ]
+    assert document["tool_calls"][0]["parameters"]["command"] == [
+        "git",
+        "add",
+        "docs",
+    ]

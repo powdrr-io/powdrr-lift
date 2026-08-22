@@ -314,7 +314,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 return WorkflowActionRequest(
                     client=self.client,
                     messages=messages,
-                    parser=_parse_task_action,
+                    parser=_parse_action_response,
                     model=self.model,
                     stderr=self.stderr,
                     max_timeout_retries=self.config.max_timeout_retries,
@@ -496,13 +496,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
-            self.events.append(
-                {
-                    "kind": action.kind,
-                    "decisions_and_context": action.decisions_and_context,
-                }
+            raise RuntimeError(
+                "next_step is invalid for a durable workflow task. The task "
+                "runner advances automatically; return complete with output_state "
+                "when the task is finished."
             )
-            return WorkflowActionOutcome()
         if action.kind == "read_document":
             self.events.append(
                 {
@@ -1615,6 +1613,7 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "was not valid json",
             "must be a json object",
             "workflow task action must include",
+            "workflow action response must include action",
             "unknown workflow task action",
             "must include parameters.command",
             "must include output_state",
@@ -1700,7 +1699,16 @@ def _task_action_failure_reached(
 
 
 def _task_system_prompt(*, interaction_style: str | None = None) -> str:
-    return _action_system_prompt() + _interaction_style_prompt(interaction_style)
+    return (
+        _action_system_prompt()
+        + "\nDurable workflow-task contract: this is one task, not a skill-step "
+        "state machine. The runner automatically requests the next action after "
+        "each successful action, so `next_step` is invalid here. After the task "
+        "requirements are satisfied, return `complete` with the declared "
+        "output_state. Use `invoke_tool`, `invoke_skill`, `edit`, or another "
+        "action only when it advances this task toward that completion.\n"
+        + _interaction_style_prompt(interaction_style)
+    )
 
 
 def _workflow_file_names(workflow_dir: Path) -> list[str]:
@@ -1889,24 +1897,6 @@ def _repair_workflow_file_command(
     repaired_parameters = dict(parameters)
     repaired_parameters["command"] = repaired_command
     return repaired_parameters
-
-
-def _parse_task_action(payload: dict[str, Any]) -> WorkflowAction:
-    kind = payload.get("kind")
-    if not isinstance(kind, str) or not kind.strip():
-        raise RuntimeError("Workflow task action must include kind.")
-    normalized_kind = kind.strip()
-    if normalized_kind == "complete" and "output_state" not in payload:
-        raise RuntimeError("Complete action must include output_state.")
-    if normalized_kind == "get-human-input":
-        return WorkflowAction(
-            kind=normalized_kind,
-            human_input=_parse_human_input(payload.get("human_input")),
-        )
-    normalized_payload = dict(payload)
-    if normalized_kind == "invoke_tool" and "tool" not in normalized_payload:
-        normalized_payload["tool"] = "shell"
-    return _parse_action_response(normalized_payload)
 
 
 def _run_skill_for_agent(
@@ -2370,55 +2360,6 @@ def _prompt_user_handoff(
             "input_state": task.input_state,
             "output_state_type": task.output_state_type,
         },
-    }
-
-
-def _parse_human_input(value: object) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise RuntimeError("get-human-input must include human_input.")
-    human_task = _parse_handoff_task(value.get("human_task"), HumanRole, "human_task")
-    instructions = value.get("incorporation_instructions")
-    if not isinstance(instructions, str) or not instructions.strip():
-        raise RuntimeError("get-human-input must include incorporation_instructions.")
-    follow_up = value.get("follow_up_task")
-    return {
-        "human_task": human_task,
-        "incorporation_instructions": instructions.strip(),
-        "follow_up_task": (
-            _parse_handoff_task(follow_up, AgentRole, "follow_up_task")
-            if follow_up is not None
-            else None
-        ),
-    }
-
-
-def _parse_handoff_task(
-    value: object,
-    role_type: type[HumanRole] | type[AgentRole],
-    field_name: str,
-) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise RuntimeError(f"{field_name} must be an object.")
-    description = value.get("description")
-    role = value.get("role")
-    output_state_type = value.get("output_state_type")
-    if not isinstance(description, str) or not description.strip():
-        raise RuntimeError(f"{field_name}.description must be non-empty.")
-    if not isinstance(role, str):
-        raise RuntimeError(f"{field_name}.role must be provided.")
-    try:
-        normalized_role = role_type(role).value
-    except ValueError as exc:
-        raise RuntimeError(f"Invalid {field_name}.role: {role}") from exc
-    if not isinstance(output_state_type, str) or not output_state_type.strip():
-        raise RuntimeError(f"{field_name}.output_state_type must be non-empty.")
-    if "input_state" not in value:
-        raise RuntimeError(f"{field_name}.input_state must be provided.")
-    return {
-        "description": description.strip(),
-        "role": normalized_role,
-        "input_state": value["input_state"],
-        "output_state_type": output_state_type.strip(),
     }
 
 

@@ -315,11 +315,12 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[0].step_type == "invoke_tool"
     assert template.task_templates[0].pre_step is not None
     assert template.task_templates[0].pre_step.action == "gather_context"
-    assert "deterministic gathered context" in (
-        template.task_templates[0].details or ""
+    assert (
+        template.task_templates[0].details
+        == "Assign the deterministic gather_context result directly to the "
+        "proposed-pr-context-state output. Do not search for or rediscover the "
+        "proposed PR."
     )
-    assert "input_state.feature_id" in (template.task_templates[0].details or "")
-    assert "input_state.proposed_pr" in (template.task_templates[0].details or "")
     assert "<work-item-name>" not in (template.task_templates[0].details or "")
     assert "<proposed-pr-id>" not in (template.task_templates[0].details or "")
     report = build_workflow_template_validation_report(template.to_json())

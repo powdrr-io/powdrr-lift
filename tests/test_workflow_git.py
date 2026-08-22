@@ -165,6 +165,79 @@ def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) 
     )
 
 
+def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+    integration_worktree, integration_branch = create_workflow_worktree(
+        tmp_path, "feature-17"
+    )
+    workflow_dir = integration_worktree / "docs" / "workflows" / "feature-17"
+    workflow_dir.mkdir(parents=True)
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch=integration_branch,
+        workflow_relative_directory="docs/workflows/feature-17",
+    )
+    save_workflow_git_state(workflow_dir, state)
+    (workflow_dir / "task-001.json").write_text(
+        '{"task_id": "task-001", "status": "open"}\n',
+        encoding="utf-8",
+    )
+    _git(integration_worktree, "add", "docs/workflows/feature-17")
+    _git(integration_worktree, "commit", "-m", "initialize workflow")
+    task_worktree, task_branch = create_task_worktree(tmp_path, state, "task-001")
+    claim_workflow_task(tmp_path, state, "task-001")
+    _git(tmp_path, "worktree", "remove", "--force", str(task_worktree))
+    _git(tmp_path, "worktree", "remove", "--force", str(integration_worktree))
+
+    report = inspect_workflow_run(tmp_path, "feature-17")
+
+    assert report["integration_branch_exists"] is True
+    assert report["integration_worktree_exists"] is False
+    assert report["workflow_git_state"] == state.to_data()
+    assert report["workflow_git_state_source"] == (
+        "docs/workflows/feature-17/.workflow-git.json"
+    )
+    assert report["task_branches"] == [{"branch": task_branch, "integrated": True}]
+    assert report["tasks"] == [
+        {
+            "path": f"{integration_branch}:docs/workflows/feature-17/task-001.json",
+            "task_id": "task-001",
+            "status": "open",
+        }
+    ]
+
+    cleaned = cleanup_workflow_run(tmp_path, "feature-17", report=report)
+
+    assert cleaned["integration_checkpoint_preserved"] is True
+    assert cleaned["integration_worktree_exists"] is False
+    assert (
+        not subprocess.run(
+            ["git", "show-ref", "--verify", f"refs/heads/{task_branch}"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
+    assert (
+        not subprocess.run(
+            ["git", "show-ref", "--verify", "refs/agents/claims/feature-17/task-001"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
+
+
 def test_inspection_follows_registered_nested_integration_worktree(
     tmp_path: Path,
 ) -> None:

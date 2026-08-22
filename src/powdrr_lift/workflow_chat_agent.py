@@ -4297,6 +4297,9 @@ def _modular_action_system_prompt(
         "output. For example, a step requiring work_item_name must return: "
         '{"action":"next_step","outputs":{"work_item_name":"interaction-file-log"},'
         '"decisions_and_context":"Captured the feature name."}.\n'
+        "The outputs object is scoped to the current step only: never copy an "
+        "output name produced by a previous step, and never include a name that "
+        "is absent from the current-step contract.\n"
         "Return exactly one JSON object with a top-level action field. The action "
         "field is the discriminator: never use kind or action_input. Include "
         "decisions_and_context when a later step needs it, and include outputs "
@@ -6874,7 +6877,7 @@ def _required_shell_command_item(value: object) -> str:
 
 def _wrap_shell_command(command: str) -> str:
     """Run a shell tool command through rtk without wrapping it twice."""
-    if _shell_command_starts_with_rtk(command):
+    if _shell_command_starts_with_rtk(command) or _shell_command_is_unwrapped(command):
         return command
     return f"rtk {command}"
 
@@ -6884,7 +6887,7 @@ def _rtk_command_display(command: str) -> str:
 
 
 def _wrap_argument_command(command: list[str]) -> list[str]:
-    if command and command[0] == "rtk":
+    if command and (command[0] == "rtk" or command[0] in _RTK_BYPASS_COMMANDS):
         return command
     return ["rtk", *command]
 
@@ -6895,6 +6898,20 @@ def _shell_command_starts_with_rtk(command: str) -> bool:
     except ValueError:
         return False
     return bool(command_items) and command_items[0] == "rtk"
+
+
+# `test` is used by deterministic file-existence gates, but is not an rtk
+# subcommand. Wrapping `test -f ...` as `rtk test -f ...` invokes bash help and
+# makes an existence gate fail even when the file is present.
+_RTK_BYPASS_COMMANDS = frozenset({"test"})
+
+
+def _shell_command_is_unwrapped(command: str) -> bool:
+    try:
+        command_items = shlex.split(command)
+    except ValueError:
+        return False
+    return bool(command_items) and command_items[0] in _RTK_BYPASS_COMMANDS
 
 
 def _required_action_string_item(value: object, *, field_name: str) -> str:
@@ -8523,6 +8540,9 @@ def _action_repair_prompt(
             "\nThe current step is the only authority for what may be done. "
             f"Step description: {current_step.description}. "
             f"Step details: {current_step.details}. "
+            "The outputs object is also scoped to this step: include only the "
+            "exact names listed in current_step_contract.outputs; previous-step "
+            "outputs must not be repeated. "
         )
         if _validation_gate_enabled(current_step):
             prompt += (

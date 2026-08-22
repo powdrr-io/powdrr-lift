@@ -65,6 +65,7 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
+from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
@@ -4082,6 +4083,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
         "next action is a line-based file change.\n"
+        "- file_management: choose this to delete, move, or rename one existing "
+        "regular file. Paths must be relative to the current worktree, must not "
+        "contain '..', and move/rename requires destination_path.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
         "workflow before continuing. It inherits the current context and LLM "
         "provider role by default, including the current skill's adversarial "
@@ -4125,6 +4129,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "file_edits array, with each edit using add, remove, or replace and valid "
         "line numbers; prefer yaml_edit for .yaml or .yml files, but use edit as "
         "a fallback when a structural operation cannot express the repair. "
+        "file_management requires operation (delete, move, or rename) and "
+        "file_path; move and rename also require destination_path.\n"
         "invoke_tool requires a tool listed in the current step's "
         "tool_invocations and "
         "parameters.command as a non-empty string or string array, except that "
@@ -4148,6 +4154,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         '"edits":[{"kind":"replace","start_line":1,"end_line":2,'
         '"text":"..."}],"decisions_and_context":"...",'
         '"llm_type":"standard_reasoning"}\n'
+        '{"action":"file_management","operation":"rename",'
+        '"file_path":"src/old_name.py","destination_path":"src/new_name.py",'
+        '"decisions_and_context":"Renamed the file."}\n'
         "For edits across multiple files, use one edit action with "
         '"file_edits":[{"file_path":"...","edits":[...]}].\n'
         '{"action":"yaml_edit","file_path":"docs/proposals/example/implementation-specification.yaml",'
@@ -4306,7 +4315,8 @@ def _modular_action_system_prompt(
         "specifications; prompt_user asks one necessary human question; edit applies "
         "line-based edits to files, including YAML as a fallback; yaml_edit applies "
         "structural YAML "
-        "operations; invoke_skill runs a listed nested skill; invoke_tool runs one "
+        "operations; file_management moves, renames, or deletes one relative file; "
+        "invoke_skill runs a listed nested skill; invoke_tool runs one "
         "declared command; read_document reads a bounded file range; goto_step "
         "repeats a declared step; next_step advances after completion; complete ends "
         "the skill. "
@@ -4331,6 +4341,9 @@ def _modular_action_system_prompt(
         " A completed step is represented as: "
         '{"action":"next_step","decisions_and_context":"The current step "'
         '"is complete."}.\n'
+        "file_management uses operation delete, move, or rename plus a relative "
+        "file_path; move and rename also require destination_path. Never use '..' "
+        "or absolute paths.\n"
         "prompt_user is always allowed when a specific human decision or fact is "
         "needed. It requires the question in the text field; never use prompt, "
         "question, or action_input. For example: "
@@ -4529,6 +4542,7 @@ def _workflow_action_handlers() -> dict[
         "complete": _handle_workflow_action_complete,
         "edit": _handle_workflow_action_edit,
         "yaml_edit": _handle_workflow_action_yaml_edit,
+        "file_management": _handle_workflow_action_file_management,
         "read_document": _handle_workflow_action_read_document,
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
@@ -4601,6 +4615,8 @@ def _workflow_action_material_state(
             )
             for file_path in file_paths
         )
+    if action.kind == "file_management":
+        return (action.file_operation, action.file_path, action.destination_path)
     if action.kind == "prompt_user":
         return _last_user_message(state)
     if action.kind == "goto_step":
@@ -4627,6 +4643,8 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
 def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
     if action.kind in {"edit", "yaml_edit"}:
         return "Edited file"
+    if action.kind == "file_management":
+        return f"Managing file: {action.file_operation} {action.file_path}"
     if action.kind == "read_document":
         return "Reading file"
     if action.kind == "gather_context":
@@ -4838,6 +4856,69 @@ def _handle_workflow_action_yaml_edit(
     )
     print(f"Edited YAML file: {target_path}", file=stdout)
     _verbose_print(stderr, config.verbose, f"Applied YAML edit to {target_path}")
+    return True
+
+
+def _handle_workflow_action_file_management(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    if action.file_operation is None or action.file_path is None:
+        raise RuntimeError("file_management action requires operation and file_path.")
+    result = manage_worktree_file(
+        state.worktree_root,
+        operation=action.file_operation,
+        file_path=action.file_path,
+        destination_path=action.destination_path,
+    )
+    if action.decisions_and_context:
+        _record_durable_fact(
+            state,
+            action.decisions_and_context,
+            kind="decision",
+            source=action.kind,
+        )
+    action_data = {
+        "kind": action.kind,
+        "operation": action.file_operation,
+        "file_path": action.file_path,
+        "destination_path": action.destination_path,
+    }
+    state.transcript.extend(
+        [
+            {"role": "assistant", "content": json.dumps(action_data)},
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {"file_management_result": result}, ensure_ascii=False
+                ),
+            },
+        ]
+    )
+    state.execution_events.append(
+        {
+            **action_data,
+            "result": result,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    state.fuzzy_match_cache.clear()
+    print(
+        f"File {action.file_operation}: {result['file_path']}"
+        + (
+            f" -> {result['destination_path']}"
+            if result["destination_path"] is not None
+            else ""
+        ),
+        file=stdout,
+    )
+    _verbose_print(stderr, config.verbose, f"File management result: {result}")
     return True
 
 
@@ -5247,6 +5328,9 @@ def _workflow_action_data(action: SkillChatAction) -> dict[str, Any]:
     return {
         "kind": action.kind,
         "tool": action.tool,
+        "file_operation": action.file_operation,
+        "file_path": action.file_path,
+        "destination_path": action.destination_path,
         "parameters": dict(action.parameters),
         "types": list(action.types),
         "keywords": list(action.keywords),
@@ -5530,7 +5614,8 @@ def _validate_dynamic_validation_gate_action(
         return
     config = _validation_gate_config(step) or {}
     correction_actions = config.get(
-        "correction_actions", ["edit", "yaml_edit", "gather_context"]
+        "correction_actions",
+        ["edit", "yaml_edit", "file_management", "gather_context"],
     )
     if isinstance(correction_actions, Sequence) and action.kind in correction_actions:
         return
@@ -6190,6 +6275,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "complete": _parse_workflow_action_complete,
         "edit": _parse_workflow_action_edit,
         "yaml_edit": _parse_workflow_action_yaml_edit,
+        "file_management": _parse_workflow_action_file_management,
         "gather_context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
@@ -6559,6 +6645,10 @@ def _first_class_action_example(action_name: str) -> str:
         "yaml_edit": (
             '{"action":"yaml_edit","file_path":"docs/example.yaml","operations":[...]}'
         ),
+        "file_management": (
+            '{"action":"file_management","operation":"rename",'
+            '"file_path":"old.txt","destination_path":"new.txt"}'
+        ),
         "invoke_skill": '{"action":"invoke_skill","skill":"skill-name"}',
         "goto_step": '{"action":"goto_step","step_id":"step-id"}',
         "read_document": (
@@ -6569,6 +6659,36 @@ def _first_class_action_example(action_name: str) -> str:
         "complete": '{"action":"complete"}',
     }
     return examples[action_name]
+
+
+def _parse_workflow_action_file_management(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    operation = payload.get("operation")
+    if operation not in {"delete", "move", "rename"}:
+        raise RuntimeError("file_management operation must be delete, move, or rename.")
+    file_path = payload.get("file_path")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise RuntimeError("file_management action requires file_path.")
+    destination_path = payload.get("destination_path")
+    if operation in {"move", "rename"} and (
+        not isinstance(destination_path, str) or not destination_path.strip()
+    ):
+        raise RuntimeError(f"file_management {operation} requires destination_path.")
+    if destination_path is not None and not isinstance(destination_path, str):
+        raise RuntimeError("file_management destination_path must be a string.")
+    return SkillChatAction(
+        kind="file_management",
+        file_operation=operation,
+        file_path=file_path.strip(),
+        destination_path=(
+            destination_path.strip() if isinstance(destination_path, str) else None
+        ),
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
 
 
 def _parse_workflow_action_read_document(
@@ -8478,6 +8598,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     allowed_actions = [
         "edit",
         "yaml_edit",
+        "file_management",
         "read_document",
         "prompt_user",
         "next_step",
@@ -8491,6 +8612,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
             "invoke_tool",
             "edit",
             "yaml_edit",
+            "file_management",
             "prompt_user",
             "next_step",
         ]
@@ -8525,6 +8647,7 @@ def _action_repair_prompt(
         "context. The available actions are: gather_context to discover "
         "repository specifications before deciding; prompt_user to ask one "
         "necessary human question; edit to make a known line-based file change; "
+        "file_management to safely delete, move, or rename one relative file; "
         "invoke_skill to run a listed nested skill; yaml_edit to make a "
         "structural YAML change; invoke_tool to run a shell, "
         "fuzzy-match, or basedpyright query; read_document to "
@@ -8536,7 +8659,8 @@ def _action_repair_prompt(
         "as next_step.\n"
         'Return exactly one JSON object with a top-level "action" field and the '
         "fields required by that action. Never use kind or action_input. Use "
-        "file_path and edits or file_edits for edit, file_path "
+        "file_path and edits or file_edits for edit, operation and file_path "
+        "for file_management (plus destination_path for move or rename), file_path "
         "and operations for yaml_edit, tool and "
         "parameters.command for invoke_tool, skill for invoke_skill, file_path "
         "with positive start_line "

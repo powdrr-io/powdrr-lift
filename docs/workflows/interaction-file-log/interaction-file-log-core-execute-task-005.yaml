@@ -1,0 +1,40 @@
+task_id: interaction-file-log-core-execute-task-005
+status: open
+upstream_task_ids:
+- interaction-file-log-core-execute-task-001
+- interaction-file-log-core-execute-task-002
+- interaction-file-log-core-execute-task-003
+- interaction-file-log-core-execute-task-004
+dependent_state:
+- product-code-generated
+complexity: high
+input_state:
+  proposed_pr_context: interaction-file-log-core-execute-task-001.proposed-pr-context-state
+  execution_plan: interaction-file-log-core-execute-task-002.detailed-execution-plan-state
+  generated_test_diffs: interaction-file-log-core-execute-task-003.generated-test-diffs-state
+  tests_proven_failing: interaction-file-log-core-execute-task-004.tests-proven-failing-state
+  implementation_diffs: {}
+assignee_type: agent
+assignee_role: coder
+output_state_type: generated-product-code-state
+description: Generate product code changes
+step_type: freeform
+details: 'Implement the smallest safe product-code change that satisfies the proposed
+  PR specification and the failing tests. Follow the execution plan and existing architecture.
+  Do not weaken, delete, or bypass tests. Inspect the complete diff after editing,
+  keep scope limited to the approved files, and record the implementation files, key
+  design decisions, and resulting diff in output_state. Use shell for all repository
+  inspection and edits.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-core-execute''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: standard_reasoning
+tool_invocations:
+- tool: shell
+  command:
+  - git
+  - diff
+  - --
+  - tests

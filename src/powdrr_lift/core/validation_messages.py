@@ -207,6 +207,23 @@ def validation_error_to_data(
                     }
                 ],
             }
+        boilerplate_match = (
+            re.fullmatch(r"([A-Za-z_][A-Za-z0-9_-]*)\[(\d+)\]", error.path or "")
+            if error.code.casefold() == "boilerplate_not_removed"
+            else None
+        )
+        if boilerplate_match is not None:
+            data["yaml_edit"] = {
+                "kind": "yaml_edit",
+                "file_path": file_path,
+                "operations": [
+                    {
+                        "op": "remove_item",
+                        "section": boilerplate_match.group(1),
+                        "index": int(boilerplate_match.group(2)),
+                    }
+                ],
+            }
     if error.path is not None:
         data["path"] = error.path
     return data

@@ -4183,7 +4183,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "replacements.\n"
         "Use yaml_edit for YAML specification files. It preserves section keys "
         "and edits list items structurally: upsert_item uses section, id, and a "
-        "complete value mapping; remove_item uses section and id; set_value uses "
+        "complete value mapping; remove_item uses section and id, or section and "
+        "index for a validator-reported boilerplate list entry; set_value uses "
         "a mapping-key path and value. Try to combine multiple independent edits "
         "to the same YAML file into one yaml_edit operations array. If yaml_edit "
         "reports a usage error, "
@@ -4428,7 +4429,8 @@ def _modular_action_system_prompt(
         "section, existing-or-new item id, and complete mapping when replacing a "
         "whole list item. The only supported operation names are "
         "set_value, upsert_item, and remove_item; never use remove or replace. "
-        "Use remove_item only for an existing item id from the current document. "
+        "Use remove_item with an existing item id from the current document, or "
+        "use the exact validator-reported list index when removing boilerplate. "
         "Template comments and boilerplate disappear when a valid yaml_edit "
         "rewrites the file; do not model comments as list items.\n"
         "When a validation result contains corrective_action, apply it before "
@@ -6340,10 +6342,27 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
 
     section = value.get("section")
     item_id = value.get("id")
+    item_index = value.get("index")
     if not isinstance(section, str) or not section.strip():
         raise RuntimeError(
             f"yaml_edit {operation} requires a non-empty section, such as "
             "features or decisions."
+        )
+    if (
+        operation == "remove_item"
+        and isinstance(item_index, int)
+        and not isinstance(item_index, bool)
+    ):
+        if item_index < 0:
+            raise RuntimeError("yaml_edit remove_item index must be non-negative.")
+        if item_id is not None:
+            raise RuntimeError(
+                "yaml_edit remove_item must use either id or index, not both."
+            )
+        return SkillChatYamlOperation(
+            operation=operation,
+            section=section.strip(),
+            item_index=item_index,
         )
     if not isinstance(item_id, str) or not item_id.strip():
         raise RuntimeError(
@@ -7783,6 +7802,8 @@ def _yaml_operation_to_data(operation: SkillChatYamlOperation) -> dict[str, Any]
         data["section"] = operation.section
     if operation.item_id is not None:
         data["id"] = operation.item_id
+    if operation.item_index is not None:
+        data["index"] = operation.item_index
     if operation.path:
         data["path"] = list(operation.path)
     if operation.value is not None:
@@ -7958,11 +7979,15 @@ def _apply_yaml_operations(
                 )
             continue
 
-        if operation.section is None or operation.item_id is None:
+        if operation.section is None or (
+            operation.item_id is None and operation.item_index is None
+        ):
             raise _WorkflowYamlEditError(
-                f"{operation.operation} requires section and id. Use an operation "
+                f"{operation.operation} requires section plus id or index. "
+                "Use an operation "
                 'such as {"op": "upsert_item", "section": "features", '
-                '"id": "feature-id", "value": {...}}.'
+                '"id": "feature-id", "value": {...}} or {"op": '
+                '"remove_item", "section": "requirements", "index": 0}.'
             )
         raw_items = updated.get(operation.section)
         if raw_items is None and operation.operation == "upsert_item":
@@ -7980,6 +8005,14 @@ def _apply_yaml_operations(
             for index, item in enumerate(raw_items)
             if isinstance(item, Mapping) and item.get("id") == operation.item_id
         ]
+        if operation.operation == "remove_item" and operation.item_index is not None:
+            if not 0 <= operation.item_index < len(raw_items):
+                raise _WorkflowYamlEditError(
+                    f"No item at index {operation.item_index} exists in section "
+                    f"{operation.section!r}. Re-read the YAML before retrying."
+                )
+            del raw_items[operation.item_index]
+            continue
         if len(matching_indexes) > 1:
             raise _WorkflowYamlEditError(
                 f"YAML section {operation.section!r} contains duplicate id "
@@ -8059,7 +8092,8 @@ def _workflow_edit_failure_feedback(
         feedback += (
             " Use yaml_edit only for .yaml or .yml files. Its operations are "
             "structural: upsert_item replaces or appends a list item by section "
-            "and id, remove_item deletes one by section and id, and set_value "
+            "and id, remove_item deletes one by section and id (or by an exact "
+            "validator-reported list index for boilerplate), and set_value "
             "updates a mapping value by path. Include multiple independent "
             "operations in one yaml_edit action when correcting the same file. "
             "Do not use line numbers or replace section headers."

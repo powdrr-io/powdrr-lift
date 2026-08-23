@@ -1,4 +1,0 @@
-proposed_pr_id: harness-run-20260823
-base_branch: main
-integration_branch: powdrr/harness-run-20260823
-workflow_relative_directory: docs/workflows/interaction-file-log

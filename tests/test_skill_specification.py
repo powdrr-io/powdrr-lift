@@ -982,6 +982,11 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert step("select-feature-context").step_type == "freeform"
     assert step("select-feature-context").outputs[0].name == "feature_name"
     assert step("select-feature-context").outputs[0].required_for_next_step
+    select_details = step("select-feature-context").details
+    assert select_details is not None
+    assert "directory's basename as the canonical feature_name" in select_details
+    assert "docs/workflows/<canonical-feature-name>" in select_details
+    assert "do not ask the user which workflow path to use" in select_details
     assert step("bootstrap-project-structure").uses_skills == (
         "bootstrap-code-structure",
     )

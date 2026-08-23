@@ -1,5 +1,5 @@
 task_id: harness-391-task-001
-status: locked
+status: completed
 upstream_task_ids: []
 dependent_state:
 - proposed-pr-context-gathered
@@ -11,6 +11,8 @@ assignee_type: agent
 assignee_role: architect
 output_state_type: proposed-pr-context-state
 description: Gather context about the proposed PR
+output_state:
+  proposed-pr-context-state: proposed-pr-context-gathered
 step_type: invoke_tool
 details: 'The deterministic pre-step already gathered the context. Assign that exact
   result to proposed-pr-context-state. Do not search for, rediscover, or reinterpret

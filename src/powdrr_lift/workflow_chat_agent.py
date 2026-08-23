@@ -117,7 +117,7 @@ _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 _DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
-_OPENROUTER_MODEL = "openrouter/ox-alpha"
+_OPENROUTER_MODEL = "stealth/ox-alpha"
 ALL_LLM_TYPES = (
     "high_reasoning",
     "standard_reasoning",

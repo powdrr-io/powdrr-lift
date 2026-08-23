@@ -1,0 +1,29 @@
+task_id: interaction-file-log-validation-task-002
+status: open
+upstream_task_ids:
+- interaction-file-log-validation-task-001
+dependent_state:
+- execution-plan-created
+complexity: high
+input_state:
+  proposed_pr_context: interaction-file-log-validation-task-001.proposed-pr-context-state
+  execution_plan: []
+assignee_type: agent
+assignee_role: architect
+output_state_type: detailed-execution-plan-state
+description: Create the execution plan
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Perform exactly one action: create the ordered execution plan. Read the
+  supplied proposed PR context, map every acceptance criterion to tests and implementation
+  work, and record exact paths and validation commands in the plan. Do not edit files,
+  run commands, or repair anything in this step. If a required decision is missing,
+  use one prompt_user action instead of inventing it. When the plan is complete, return
+  exactly this shape with the plan replacing the example value: {"action":"complete","output_state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created
+  the ordered plan and mapped each acceptance criterion to validation."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-validation''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: high_reasoning

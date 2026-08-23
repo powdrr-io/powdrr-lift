@@ -154,6 +154,7 @@ from powdrr_lift.workflow_chat_agent import (
 from powdrr_lift.workflow_chat_tui import (
     WorkflowChatApp,
     _TextualStdoutOutput,
+    _visible_step_indices,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 
@@ -1698,6 +1699,49 @@ def test_textual_panels_place_green_output_above_orange_steps() -> None:
     assert status_y < steps_y
     assert empty_height == 0
     assert populated_height > 0
+
+
+def test_visible_step_window_is_limited_to_ten_steps() -> None:
+    assert _visible_step_indices(10, 5) == tuple(range(10))
+    assert _visible_step_indices(20, 5) == (4, 5, 6, 7, 8, 9, 10, 11, 12, 19)
+    assert _visible_step_indices(20, 0) == (0, 1, 2, 3, 4, 5, 6, 7, 19)
+    assert _visible_step_indices(20, 19) == (18, 19)
+
+
+def test_textual_long_step_list_shows_requested_window() -> None:
+    async def exercise() -> list[str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        skill = SkillCatalogEntry(
+            Path("long-skill.yaml"),
+            Skill(
+                name="long-skill",
+                when_to_use=(),
+                steps=tuple(
+                    SkillStep(description=f"Step {index}") for index in range(1, 21)
+                ),
+            ),
+        )
+        async with app.run_test() as pilot:
+            app._apply_progress(skill, current_step_index=5, status="running")
+            await pilot.pause()
+            return [
+                str(label.render())
+                for label in app.query_one("#steps", ListView).query(Label)
+            ]
+
+    assert asyncio.run(exercise()) == [
+        "5. Step 5",
+        "6. Step 6",
+        "7. Step 7",
+        "8. Step 8",
+        "9. Step 9",
+        "10. Step 10",
+        "11. Step 11",
+        "12. Step 12",
+        "13. Step 13",
+        "20. Step 20",
+    ]
 
 
 def test_textual_completed_skill_removes_orange_step_list() -> None:
@@ -3248,6 +3292,7 @@ def test_auto_provider_prefers_deepinfra_cheap_when_credentials_are_available(
         "CLAUDE_API_KEY",
         "ZAI_API_KEY",
         "ZAI_BASE_URL",
+        "OPENROUTER_API_KEY",
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
@@ -3268,6 +3313,7 @@ def test_auto_provider_roles_use_the_top_two_configured_providers(
         "DEEPINFRA_API_TOKEN",
         "DEEPINFRA_API_KEY",
         "DEEPINFRA_BASE_URL",
+        "OPENROUTER_API_KEY",
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
@@ -3284,7 +3330,12 @@ def test_auto_provider_roles_return_no_adversarial_provider_when_only_one_is_con
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    for env_name in ("OPENAI_API_KEY", "CODEX_API_KEY", "ZAI_API_KEY"):
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ZAI_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")

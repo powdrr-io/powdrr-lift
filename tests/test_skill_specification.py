@@ -663,7 +663,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         for invocation in step("stage-specification-artifacts").tool_invocations
     ] == [
         ("powdrr-lift", "repository-state"),
-        ("git", "add", "docs/proposals/<work-item-name>"),
+        ("add", "docs/proposals/<work-item-name>"),
     ]
     assert step("prepare-pull-request").uses_skills == ("finish-pr-prep",)
     assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
@@ -741,7 +741,6 @@ def test_review_skill_workflow_ends_with_pull_request_creation() -> None:
     )
     assert "choose `complete`" in (skill.steps[-4].details or "")
     assert skill.steps[-3].tool_invocations[0].command == (
-        "git",
         "add",
         "<target-definition-path>",
     )
@@ -799,7 +798,6 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     assert "files_to_publish" in (skill.steps[2].details or "")
     assert "git diff --cached --name-only" in (skill.steps[2].details or "")
     assert skill.steps[2].tool_invocations[0].command == (
-        "git",
         "add",
         "<files-to-publish>",
     )
@@ -817,12 +815,11 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "HEAD",
     )
     assert skill.steps[5].tool_invocations[0].command[:3] == (
-        "gh",
         "pr",
         "create",
+        "--draft",
     )
-    assert skill.steps[6].tool_invocations[0].command[:3] == (
-        "gh",
+    assert skill.steps[6].tool_invocations[0].command[:2] == (
         "pr",
         "edit",
     )
@@ -918,10 +915,8 @@ def test_checked_in_finish_pr_prep_skill_definition_matches_flow() -> None:
     ]
     assert skill.steps[0].pre_step is not None
     assert skill.steps[0].pre_step.template["command"] == [
-        "git",
-        "diff",
-        "--cached",
-        "--name-only",
+        "status",
+        "--short",
     ]
     assert skill.steps[1].tool_invocations[0].tool == "shell"
     assert skill.steps[1].tool_invocations[0].command == (
@@ -1064,7 +1059,6 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "repository-state",
     )
     assert step("stage-validated-artifacts").tool_invocations[0].command == (
-        "git",
         "add",
         "docs/proposals/<feature-name>",
         "docs/workflows",

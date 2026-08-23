@@ -23,17 +23,15 @@ steps:
     when one is known. Treat structured repository specifications as
     authoritative and record missing security context as a review gap.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - view
     - <pr-reference>
     - --json
     - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - diff
     - <pr-reference>

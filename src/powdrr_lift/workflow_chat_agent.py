@@ -67,6 +67,12 @@ from powdrr_lift.core.validation_messages import (
 )
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.intrinsic_git_gh import (
+    GH_TOOL,
+    GIT_TOOL,
+    execute_intrinsic_git_gh_tool,
+    intrinsic_command,
+)
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
@@ -3763,6 +3769,8 @@ def _run_deterministic_pre_step(
             raise RuntimeError("Invoke tool pre-step template requires a tool.")
         parameters = dict(template)
         parameters.pop("tool", None)
+        if tool in {GIT_TOOL, GH_TOOL}:
+            parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
         if tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
                 parameters,
@@ -3778,6 +3786,12 @@ def _run_deterministic_pre_step(
                 stderr=stderr,
                 verbose=verbose,
                 announce=False,
+            )
+        elif tool in {GIT_TOOL, GH_TOOL}:
+            result = execute_intrinsic_git_gh_tool(
+                tool,
+                parameters,
+                worktree_root=worktree_root,
             )
         elif is_basedpyright_tool(tool):
             result = execute_basedpyright_tool(
@@ -3957,7 +3971,7 @@ def _build_step_execution_messages(
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
         }
-        | {_INTERNAL_TOOL}
+        | {_INTERNAL_TOOL, GIT_TOOL, GH_TOOL}
     )
     tool_descriptions = {
         "shell": (
@@ -3968,6 +3982,16 @@ def _build_step_execution_messages(
             "Execute a powdrr-lift CLI command. This tool is always available, "
             "but its command must invoke only the powdrr-lift binary and runs "
             "with the current worktree as cwd."
+        ),
+        GIT_TOOL: (
+            "Intrinsic Git tool; supports status, add, and move only. Example: "
+            '{"action":"invoke_tool","tool":"git","parameters":'
+            '{"operation":"status"}}.'
+        ),
+        GH_TOOL: (
+            "Intrinsic GitHub tool for pull-request creation and inspection. "
+            'Example: {"action":"invoke_tool","tool":"gh",'
+            '"parameters":{"operation":"pr_view","pr_reference":"394"}}.'
         ),
         "fuzzy-match": (
             "Search worktree paths with find-like filters and fuzzy name matching."
@@ -4159,8 +4183,11 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "file_management requires operation (delete, move, or rename) and "
         "file_path; move and rename also require destination_path.\n"
         "invoke_tool requires a tool listed in the current step's "
-        "tool_invocations and "
-        "parameters.command as a non-empty string or string array, except that "
+        "tool_invocations. Shell and internal require parameters.command as a "
+        "non-empty string or string array. The intrinsic git and gh tools use "
+        "parameters.operation and never accept a shell command array. "
+        "a shell command. For git use operation status, add, or move; for gh "
+        "use pr_view, pr_diff, pr_checks, pr_create, pr_edit, or pr_comments. "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
@@ -4272,6 +4299,12 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "range before editing.\n"
         "Use invoke_skill for a listed nested skill; it runs in the same worktree "
         "and returns here when complete. Use invoke_tool for shell commands, "
+        "or use the always-available intrinsic git and gh tools for repository "
+        "state/staging/moves and pull-request creation/inspection. Examples: "
+        '{"action":"invoke_tool","tool":"git","parameters":{"operation":"status"}} '
+        "and "
+        '{"action":"invoke_tool","tool":"gh","parameters":'
+        '{"operation":"pr_view","pr_reference":"394"}}. '
         "fuzzy-match searches, or basedpyright "
         "symbol and structure queries.\n"
         "Use goto_step only with an id declared on a step in the current skill. "
@@ -5164,6 +5197,16 @@ def _handle_workflow_action_invoke_tool(
                 and command_items[1:2] == ["pull-request-description"]
             ),
         )
+    elif action.tool in {GIT_TOOL, GH_TOOL}:
+        tool_result = execute_intrinsic_git_gh_tool(
+            action.tool,
+            action.parameters,
+            worktree_root=state.worktree_root,
+        )
+        if tool_result.get("stdout"):
+            print(str(tool_result["stdout"]), end="", file=stdout)
+        if tool_result.get("stderr"):
+            print(str(tool_result["stderr"]), end="", file=stderr)
     elif is_basedpyright_tool(action.tool or ""):
         assert action.tool is not None
         tool_result = execute_basedpyright_tool(
@@ -5174,9 +5217,10 @@ def _handle_workflow_action_invoke_tool(
     else:
         raise RuntimeError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
-            "internal, fuzzy-match, basedpyright-symbol, and basedpyright-structure."
+            "internal, git, gh, fuzzy-match, basedpyright-symbol, and "
+            "basedpyright-structure."
         )
-    if action.tool == "shell":
+    if action.tool in {"shell", GH_TOOL}:
         _record_chat_pull_request(action, state, tool_result)
     inferred_path = _resolve_generated_file_path_from_command(
         action.parameters.get("command"),
@@ -5252,7 +5296,8 @@ def _record_skill_pull_request(
     root_skill: SkillCatalogEntry | None = None,
     step_index: int | None = None,
 ) -> None:
-    command = _command_items_for_validation(action.parameters.get("command"))
+    command_value = action.parameters.get("command", tool_result.get("command"))
+    command = _command_items_for_validation(command_value)
     if not is_pull_request_create_command(command):
         return
     if tool_result.get("returncode") != 0:
@@ -6108,6 +6153,13 @@ def _validate_workflow_action_for_step_unwrapped(
         for invocation in supported_invocations
         if invocation.tool == action.tool
     )
+    if action.tool in {GIT_TOOL, GH_TOOL}:
+        intrinsic_items = intrinsic_command(action.parameters, tool=action.tool)
+        if not matching_invocations or any(
+            _intrinsic_command_matches(intrinsic_items, invocation.command)
+            for invocation in matching_invocations
+        ):
+            return
     if not matching_invocations:
         supported_tools = sorted(
             {invocation.tool for invocation in supported_invocations}
@@ -6117,7 +6169,11 @@ def _validate_workflow_action_for_step_unwrapped(
             f"Tool {action.tool!r} is not supported by the current workflow step. "
             f"The step explicitly supports: {supported_tools_text}."
         )
-    command = action.parameters.get("command")
+    command = (
+        intrinsic_command(action.parameters, tool=action.tool)
+        if action.tool in {GIT_TOOL, GH_TOOL}
+        else action.parameters.get("command")
+    )
     command_items = _command_items_for_validation(command)
     if any(
         _command_matches_invocation(command_items, invocation.command)
@@ -6173,6 +6229,18 @@ def _command_matches_invocation(
             return False
         actual_index += 1
     return actual_index == len(command)
+
+
+def _intrinsic_command_matches(
+    command: Sequence[str], expected_command: Sequence[str]
+) -> bool:
+    """Allow structured intrinsic operations to omit optional CLI flags."""
+    if len(command) > len(expected_command):
+        return False
+    return all(
+        _command_token_matches(actual, expected)
+        for actual, expected in zip(command, expected_command, strict=True)
+    )
 
 
 def _command_token_matches(actual: str, expected: str) -> bool:
@@ -6651,6 +6719,15 @@ def _parse_workflow_action_invoke_tool(
     if not isinstance(parameters, dict):
         raise RuntimeError("Workflow invoke_tool action must include parameters.")
     normalized_tool = tool.strip()
+    if normalized_tool in {GIT_TOOL, GH_TOOL}:
+        intrinsic_command(parameters, tool=normalized_tool)
+        return SkillChatAction(
+            kind="invoke_tool",
+            tool=normalized_tool,
+            parameters=dict(parameters),
+            decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
+        )
     if is_basedpyright_tool(normalized_tool):
         return SkillChatAction(
             kind="invoke_tool",
@@ -6997,6 +7074,10 @@ def _execute_shell_tool(
                 stderr=process.stderr,
             ):
                 break
+    original_returncode = process.returncode
+    process = _normalize_noop_git_commit_result(
+        process, validation_command, resolved_cwd
+    )
     if process.stdout:
         if print_stdout:
             print(process.stdout, end="", file=stdout)
@@ -7016,10 +7097,76 @@ def _execute_shell_tool(
         "returncode": process.returncode,
         "stdout": process.stdout,
         "stderr": process.stderr,
+        "no_op": original_returncode != 0 and process.returncode == 0,
     }
     if len(attempted_commands) > 1:
         result["attempted_commands"] = attempted_commands
     return result
+
+
+def _structured_intrinsic_pre_step_parameters(
+    tool: str, parameters: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Translate legacy declarative pre-step commands to structured actions."""
+    command = parameters.get("command")
+    if tool == GIT_TOOL and command == ["status", "--short"]:
+        return {"operation": "status"}
+    raise RuntimeError(
+        f"Intrinsic {tool} pre-steps must declare a supported structured operation."
+    )
+
+
+def _normalize_noop_git_commit_result(
+    process: subprocess.CompletedProcess[str],
+    command: str | Sequence[str],
+    worktree_root: Path,
+) -> subprocess.CompletedProcess[str]:
+    """Treat a clean-worktree empty commit as a successful no-op."""
+    command_items = shlex.split(command) if isinstance(command, str) else list(command)
+    if command_items[:2] != ["git", "commit"] or process.returncode == 0:
+        return process
+    combined_output = f"{process.stdout}\n{process.stderr}".lower()
+    if not any(
+        marker in combined_output
+        for marker in (
+            "nothing to commit",
+            "nothing added to commit",
+            "no changes added to commit",
+        )
+    ):
+        return process
+    status = subprocess.run(
+        ["git", "status", "--short"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.returncode != 0 or status.stdout.strip():
+        paths = [line[3:] for line in status.stdout.splitlines() if len(line) >= 4]
+        path_hint = ", ".join(paths) if paths else "the reported files"
+        guidance = (
+            "Commit was skipped because Git found no staged changes, but the "
+            f"worktree is not clean ({path_hint}). For each intended path, use "
+            "the intrinsic git add action, for example "
+            '{"action":"invoke_tool","tool":"git","parameters":'
+            '{"operation":"add","paths":["path/to/file"]}}. '
+            "For an unintended untracked file, delete it with the file-management "
+            "action or remove it explicitly, then rerun git status before retrying "
+            "the commit."
+        )
+        return subprocess.CompletedProcess(
+            process.args,
+            process.returncode,
+            stdout=process.stdout,
+            stderr=f"{process.stderr.rstrip()}\n{guidance}\n",
+        )
+    return subprocess.CompletedProcess(
+        process.args,
+        0,
+        stdout=f"{process.stdout}No changes to commit; existing HEAD retained.\n",
+        stderr=process.stderr,
+    )
 
 
 def _empty_pull_request_error(

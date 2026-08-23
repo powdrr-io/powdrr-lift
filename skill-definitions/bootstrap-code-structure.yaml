@@ -164,9 +164,8 @@ steps:
     command:
     - powdrr-lift
     - repository-state
-  - tool: shell
+  - tool: git
     command:
-    - git
     - add
     - docs/project_structure/project-structure.yaml
 - description: Run finish-pr-prep on the validated project-structure artifact.

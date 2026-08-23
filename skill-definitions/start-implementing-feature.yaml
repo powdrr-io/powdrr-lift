@@ -370,11 +370,14 @@ steps:
   description: Stage the validated implementation and workflow artifacts.
   step_type: freeform
   llm_type: simple_task
-  details: Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the shell tool, review the staged paths, and do not commit or create a pull request yet.
+  details: >-
+    Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the
+    intrinsic git add action, review the staged paths, and do not commit or
+    create a pull request yet. Use
+    {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["docs/proposals/<feature-name>","docs/workflows"]}}.
   tool_invocations:
-  - tool: shell
+  - tool: git
     command:
-    - git
     - add
     - docs/proposals/<feature-name>
     - docs/workflows

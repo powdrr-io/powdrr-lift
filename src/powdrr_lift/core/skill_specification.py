@@ -15,7 +15,8 @@ from powdrr_lift.core.validation_messages import (
 )
 
 SUPPORTED_SKILL_TOOL_TYPES = (
-    frozenset({"shell", "internal", "fuzzy-match", "ref"}) | BASEDPYRIGHT_TOOLS
+    frozenset({"shell", "internal", "git", "gh", "fuzzy-match", "ref"})
+    | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
 SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate"})

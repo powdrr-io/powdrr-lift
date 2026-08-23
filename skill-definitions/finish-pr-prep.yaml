@@ -10,19 +10,17 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    The deterministic pre-step records the staged file names for the next step.
-    An empty result is valid: `git diff --cached --name-only` returns success
+    The deterministic pre-step records repository status for the next step.
+    An empty result is valid: `git status --short` returns success
     even when no files are staged. Do not invoke the command again; use the
     deterministic_context result and choose `next_step`.
   pre_step:
     action: invoke_tool
     template:
-      tool: shell
+      tool: git
       command:
-      - git
-      - diff
-      - --cached
-      - --name-only
+      - status
+      - --short
 - description: Confirm the staged pull request scope.
   step_type: freeform
   llm_type: simple_task

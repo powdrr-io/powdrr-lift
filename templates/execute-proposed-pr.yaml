@@ -463,7 +463,6 @@ task_templates:
     template:
       tool: shell
       command:
-      - git
       - mv
       - docs/proposals/<work-item-name>
       - docs/current/<work-item-name>
@@ -488,9 +487,8 @@ task_templates:
   pre_step:
     action: invoke_tool
     template:
-      tool: shell
+      tool: git
       command:
-      - git
       - status
       - --short
   details: >-

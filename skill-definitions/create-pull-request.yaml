@@ -41,14 +41,16 @@ steps:
   details: >-
     Read the `files_to_publish` list from workflow context. It is authoritative
     for this pull request. Verify every listed path exists or is an intended
-    new file, then invoke `git add` with exactly those paths. Do not use `git
-    add .`, `git add --all`, or stage logs, caches, or unrelated files. Verify
-    the staged names with `git diff --cached --name-only`; do not advance until
-    every intended path is staged and no unintended path is staged.
+    new file, then invoke the intrinsic git tool with exactly those paths. The
+    exact action shape is
+    {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["path/to/file"]}}.
+    Do not use `git add .`, `git add --all`, or stage logs, caches, or unrelated
+    files. Verify the staged names with `git diff --cached --name-only`; do not
+    advance until every intended path is staged and no unintended path is
+    staged.
   tool_invocations:
-  - tool: shell
+  - tool: git
     command:
-    - git
     - add
     - <files-to-publish>
 - description: Commit the validated changes.
@@ -56,11 +58,17 @@ steps:
   llm_type: simple_task
   details: >-
     Confirm with `git diff --cached --name-only` that the exact
-    `files_to_publish` list is staged and that the staged diff is non-empty.
-    If any intended file is missing or any unrelated file is staged, correct
-    the staging before continuing. Commit with `<commit-message>`, then verify
-    that `HEAD` advanced. Never create an empty commit. Do not push or invoke
-    any GitHub command in this step.
+    `files_to_publish` list is staged. If any intended file is missing or any
+    unrelated file is staged, correct the staging before continuing. Commit
+    with `<commit-message>`, then verify the result. If the commit reports
+    "nothing to commit" and `git status --short` is empty, treat that as a
+    successful no-change outcome: an earlier action already committed the
+    exact state, so continue without creating an empty commit. If status shows
+    unstaged or untracked paths, stop and correct each one: stage an intended
+    path with the intrinsic git add action, or delete an unintended path with
+    the file-management action. Rerun status, then retry the commit only after
+    the worktree is clean or the intended changes are staged. Do not push or
+    invoke any GitHub command in this step.
   tool_invocations:
   - tool: internal
     command:
@@ -106,9 +114,8 @@ steps:
     Do not report completion until the command succeeds and its output includes
     the pull request URL. Never merge the PR or push directly to main.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - create
     - --draft
@@ -127,9 +134,8 @@ steps:
     tool. Do not report completion until the command succeeds and its output
     identifies the pull request. Never merge the PR or push directly to main.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - edit
     - <pr-reference>

@@ -161,9 +161,8 @@ steps:
     logs, caches, or unrelated files. Do not create or update a pull request in
     this step.
   tool_invocations:
-  - tool: shell
+  - tool: git
     command:
-    - git
     - add
     - <target-definition-path>
 

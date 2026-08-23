@@ -96,3 +96,16 @@ tools:
     labels:
       - type-check
       - pr-prep
+  - id: validate-pr-files
+    action: added
+    when_to_use: Validate every recognized repository-format file changed by a pull request.
+    template: uv run powdrr-lift validate-pr-files --pr-number <pr-number> --repo-root .
+    validation_action:
+      kind: invoke_tool
+      tool: shell
+      parameters:
+        command: uv run powdrr-lift validate-pr-files --pr-number <pr-number> --repo-root .
+    how_to_use: Run from the checked-out pull-request worktree; it validates changed skill, workflow, project-structure, workflow-template, and specification-v1 files and returns non-zero when any validator fails.
+    labels:
+      - validation
+      - pr-prep

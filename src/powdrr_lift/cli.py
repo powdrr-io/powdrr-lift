@@ -9,6 +9,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -58,7 +60,10 @@ from powdrr_lift.core import (
     validate_change_log_yaml,
     validate_implementation_specification_yaml,
     validate_pr_specification_yaml,
+    validate_skill_directory,
     validate_system_specification_yaml,
+    validate_workflow_task_directory,
+    validate_workflow_template_json,
 )
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.project_structure import (
@@ -257,6 +262,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the default branch name.",
     )
     evaluate_parser.set_defaults(func=_run_evaluate)
+
+    validate_pr_files_parser = subparsers.add_parser(
+        "validate-pr-files",
+        aliases=["validate_pr_files"],
+        help="Run repository format validators for every recognized file in a PR.",
+    )
+    validate_pr_files_parser.add_argument(
+        "--pr-number",
+        type=int,
+        required=True,
+        help="GitHub pull request number whose changed files should be validated.",
+    )
+    validate_pr_files_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root and checked-out PR worktree to validate.",
+    )
+    validate_pr_files_parser.set_defaults(func=_run_validate_pr_files)
 
     edit_context_parser = subparsers.add_parser(
         "edit-context",
@@ -1459,6 +1482,217 @@ def _run_evaluate(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
     return 0 if report.validation_successful else 1
+
+
+def _run_validate_pr_files(args: argparse.Namespace) -> int:
+    """Validate recognized repository-format files changed by a pull request."""
+    repo_root = resolve_repo_root(args.repo_root)
+    changed = subprocess.run(
+        ["gh", "pr", "diff", str(args.pr_number), "--name-only"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if changed.returncode != 0:
+        print(
+            changed.stderr.strip()
+            or f"Could not read files changed by PR #{args.pr_number}.",
+            file=sys.stderr,
+        )
+        return 1
+
+    changed_paths = [
+        repo_root / relative_path
+        for relative_path in changed.stdout.splitlines()
+        if relative_path.strip()
+    ]
+    results: list[dict[str, Any]] = []
+    overall_success = True
+    validated_groups: set[Path] = set()
+
+    def add_result(
+        *,
+        validator: str,
+        paths: list[Path],
+        report_text: str,
+    ) -> None:
+        nonlocal overall_success
+        try:
+            parsed_report = json.loads(report_text)
+        except json.JSONDecodeError:
+            try:
+                parsed_report = yaml.safe_load(report_text)
+            except yaml.YAMLError:
+                parsed_report = {"raw_report": report_text}
+        successful = (
+            isinstance(parsed_report, dict)
+            and parsed_report.get("validation_successful", False) is True
+        )
+        results.append(
+            {
+                "validator": validator,
+                "files": [str(path.relative_to(repo_root)) for path in paths],
+                "validation_successful": successful,
+                "report": parsed_report,
+            }
+        )
+        overall_success = overall_success and successful
+
+    for path in changed_paths:
+        relative_path = path.relative_to(repo_root)
+        if not path.exists():
+            results.append(
+                {
+                    "files": [str(relative_path)],
+                    "validation_successful": False,
+                    "error": (
+                        "Changed file is not present in the checked-out PR worktree."
+                    ),
+                }
+            )
+            overall_success = False
+            continue
+
+        if relative_path.parts[:1] == ("skill-definitions",) and path.suffix in {
+            ".yaml",
+            ".yml",
+            ".json",
+        }:
+            skill_directory = repo_root / "skill-definitions"
+            if skill_directory not in validated_groups:
+                add_result(
+                    validator="validate_skill_directory",
+                    paths=[skill_directory],
+                    report_text=validate_skill_directory(skill_directory),
+                )
+                validated_groups.add(skill_directory)
+            continue
+
+        if (
+            relative_path.parts[:2] == ("docs", "workflows")
+            and path.name.endswith((".yaml", ".yml", ".json"))
+            and "-task-" in path.name
+        ):
+            workflow_directory = path.parent
+            if workflow_directory not in validated_groups:
+                add_result(
+                    validator="validate_workflow_task_directory",
+                    paths=[workflow_directory],
+                    report_text=validate_workflow_task_directory(workflow_directory),
+                )
+                validated_groups.add(workflow_directory)
+            continue
+
+        if relative_path == Path("docs/project_structure/project-structure.yaml"):
+            project_structure_report = validate_project_structure_yaml(path)
+            add_result(
+                validator="validate_project_structure_yaml",
+                paths=[path],
+                report_text=json.dumps(
+                    {
+                        "validation_successful": (
+                            project_structure_report.validation_successful
+                        ),
+                        "issues": [
+                            {
+                                "code": issue.code,
+                                "message": issue.instructional_message(),
+                                **(
+                                    {"path": issue.path}
+                                    if issue.path is not None
+                                    else {}
+                                ),
+                            }
+                            for issue in project_structure_report.issues
+                        ],
+                    }
+                ),
+            )
+            continue
+
+        if relative_path.parts[:1] == ("templates",) and path.name.endswith(
+            "execute-proposed-pr.yaml"
+        ):
+            add_result(
+                validator="validate_workflow_template_json",
+                paths=[path],
+                report_text=validate_workflow_template_json(
+                    path.read_text(encoding="utf-8")
+                ),
+            )
+            continue
+
+        kind = _specification_kind_for_filename(path.name)
+        if kind is not None:
+            try:
+                report_text = _validate_pr_file_specification(path, kind, repo_root)
+            except (OSError, ValueError) as exc:
+                results.append(
+                    {
+                        "validator": f"validate_{kind}_specification_yaml",
+                        "files": [str(relative_path)],
+                        "validation_successful": False,
+                        "error": str(exc),
+                    }
+                )
+                overall_success = False
+            else:
+                add_result(
+                    validator=f"validate_{kind}_specification_yaml",
+                    paths=[path],
+                    report_text=report_text,
+                )
+
+    final_report = {
+        "pr_number": args.pr_number,
+        "changed_file_count": len(changed_paths),
+        "validation_successful": overall_success,
+        "results": results,
+    }
+    print(json.dumps(final_report, indent=2, ensure_ascii=False))
+    return 0 if overall_success else 1
+
+
+def _validate_pr_file_specification(
+    path: Path,
+    kind: str,
+    repo_root: Path,
+) -> str:
+    normalize_specification_v1_file(path)
+    proposed_yaml = _read_input(path)
+    work_item_name = path.parent.name
+    if kind == "system":
+        return validate_system_specification_yaml(
+            proposed_yaml,
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+            file_path=path,
+        )
+    if kind == "architecture":
+        entity_types = tuple(load_entity_taxonomy(repo_root).entity_types)
+        return validate_architecture_specification_yaml(
+            proposed_yaml,
+            entity_types=entity_types,
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+            file_path=path,
+        )
+    if kind == "implementation":
+        return validate_implementation_specification_yaml(
+            proposed_yaml,
+            architecture_specification_path=path.parent
+            / "architecture-specification.yaml",
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+            file_path=path,
+        )
+    return validate_pr_specification_yaml(
+        proposed_yaml,
+        work_item_name=work_item_name,
+        repo_root=repo_root,
+        file_path=path,
+    )
 
 
 def _run_edit_context(args: argparse.Namespace) -> int:

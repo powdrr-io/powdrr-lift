@@ -405,11 +405,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         }
 
     def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:
-        print(
-            f"Workflow task LLM action:\n{workflow_action_signature(action)}",
-            file=self.stdout,
-            flush=True,
-        )
+        if self.config.verbose:
+            print(
+                f"Workflow task LLM action:\n{workflow_action_signature(action)}",
+                file=self.stdout,
+                flush=True,
+            )
         print(
             f"Workflow task roundtrip {roundtrip}: {workflow_action_summary(action)}",
             file=self.stdout,

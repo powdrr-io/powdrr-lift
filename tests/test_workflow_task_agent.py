@@ -110,6 +110,7 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert ("Workflow task LLM output:" in displayed) is verbose
     assert ('"kind": "complete"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
+    assert ("Workflow task LLM action:" in stdout.getvalue()) is verbose
     assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
 
 

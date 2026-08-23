@@ -7436,6 +7436,7 @@ def test_run_workflow_chat_verbose_prints_progress(
     assert '"selected_skill_path":' in stderr_value
     assert "[verbose] workflow execution for step 1/2 LLM input" in stderr_value
     assert '"kind": "complete"' in stderr_value
+    assert "Workflow chat LLM action:" in stderr_value
     assert "test-key" not in stderr_value
     assert "[verbose] Prepared execution summary for specify-a-feature" in stderr_value
     assert (worktree_root / output_dir / "skill-execution.json").exists()

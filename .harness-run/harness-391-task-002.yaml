@@ -7,19 +7,36 @@ dependent_state:
 complexity: high
 input_state:
   proposed_pr_context:
-    proposed-pr-context-state: proposed-pr-context-gathered
+    proposal_directory: docs/proposals/interaction-file-log
+    proposal_files:
+    - proposed-pr-specification.yaml
+    - implementation-specification.yaml
+    - architecture-specification.yaml
+    - system-specification.yaml
+    acceptance_criteria:
+    - JSON interaction log
+    - hidden .powdrr directory
+    - fixed interaction-log.json filename
+    - human and LLM inputs and outputs captured
+    expected_tests:
+    - valid JSON
+    - hidden directory
+    - fixed filename
+    - append-only entries
   execution_plan: []
 assignee_type: agent
 assignee_role: architect
 output_state_type: detailed-execution-plan-state
 description: Create the execution plan
 step_type: freeform
-details: 'Perform exactly one action: create the ordered execution plan. Read the
-  supplied proposed PR context, map every acceptance criterion to tests and implementation
-  work, and record exact paths and validation commands in the plan. Do not edit files,
-  run commands, or repair anything in this step. If a required decision is missing,
-  use one prompt_user action instead of inventing it. When the plan is complete, return
-  exactly this shape with the plan replacing the example value: {"action":"complete","output_state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created
+details: 'Perform exactly one action: create the ordered execution plan. The proposed
+  PR context is fully supplied in input_state; do not use gather_context, shell, find,
+  or read_document to rediscover it. Read the supplied proposed PR context, map every
+  acceptance criterion to tests and implementation work, and record exact paths and
+  validation commands in the plan. Do not edit files, run commands, or repair anything
+  in this step. If a required decision is missing, use one prompt_user action instead
+  of inventing it. When the plan is complete, return exactly this shape with the plan
+  replacing the example value: {"action":"complete","output_state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created
   the ordered plan and mapped each acceptance criterion to validation."}
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -171,6 +172,39 @@ def test_validate_pr_files_fails_for_invalid_changed_file(
     monkeypatch.setattr("powdrr_lift.cli.subprocess.run", fake_run)
 
     assert main(["validate-pr-files", "--pr-number", "123"]) == 1
+
+
+def test_validate_pr_files_defaults_to_checked_out_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output_path = tmp_path / "docs" / "project_structure" / "project-structure.yaml"
+    output_path.parent.mkdir(parents=True)
+    output_path.write_text(
+        "schema: https://powdrr.io/schemas/specification-v1\nid: project-structure\n",
+        encoding="utf-8",
+    )
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        if command == ["git", "diff", "--name-only", "main...HEAD"]:
+            stdout = "docs/project_structure/project-structure.yaml\n"
+        else:
+            assert tuple(command) in {
+                ("git", "diff", "--name-only", "HEAD"),
+                ("git", "diff", "--cached", "--name-only"),
+            }
+            stdout = ""
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr("powdrr_lift.cli.resolve_repo_root", lambda _: tmp_path)
+    monkeypatch.setattr("powdrr_lift.cli.subprocess.run", fake_run)
+
+    assert main(["validate-pr-files", "--repo-root", str(tmp_path)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["scope"] == "checked_out_branch"
+    assert report["base_branch"] == "main"
+    assert report["changed_file_count"] == 1
 
 
 def test_project_structure_validator_normalizes_explicit_empty_values(

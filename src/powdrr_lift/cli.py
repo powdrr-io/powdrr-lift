@@ -266,13 +266,23 @@ def build_parser() -> argparse.ArgumentParser:
     validate_pr_files_parser = subparsers.add_parser(
         "validate-pr-files",
         aliases=["validate_pr_files"],
-        help="Run repository format validators for every recognized file in a PR.",
+        help=(
+            "Run repository format validators for every recognized changed file "
+            "in a PR or the checked-out branch."
+        ),
     )
     validate_pr_files_parser.add_argument(
         "--pr-number",
         type=int,
-        required=True,
-        help="GitHub pull request number whose changed files should be validated.",
+        help=(
+            "GitHub pull request number whose changed files should be validated. "
+            "If omitted, validate files changed on the checked-out branch."
+        ),
+    )
+    validate_pr_files_parser.add_argument(
+        "--base-branch",
+        default="main",
+        help=("Branch to compare with when --pr-number is omitted (default: main)."),
     )
     validate_pr_files_parser.add_argument(
         "--repo-root",
@@ -1488,28 +1498,63 @@ def _run_evaluate(args: argparse.Namespace) -> int:
 
 
 def _run_validate_pr_files(args: argparse.Namespace) -> int:
-    """Validate recognized repository-format files changed by a pull request."""
+    """Validate recognized repository-format files in the current scope."""
     repo_root = resolve_repo_root(args.repo_root)
-    changed = subprocess.run(
-        ["gh", "pr", "diff", str(args.pr_number), "--name-only"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if changed.returncode != 0:
-        print(
-            changed.stderr.strip()
-            or f"Could not read files changed by PR #{args.pr_number}.",
-            file=sys.stderr,
+    changed_file_names: list[str] = []
+    if args.pr_number is not None:
+        changed = subprocess.run(
+            ["gh", "pr", "diff", str(args.pr_number), "--name-only"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
         )
-        return 1
+        if changed.returncode != 0:
+            print(
+                changed.stderr.strip()
+                or f"Could not read files changed by PR #{args.pr_number}.",
+                file=sys.stderr,
+            )
+            return 1
+        changed_file_names.extend(changed.stdout.splitlines())
+        scope = "pull_request"
+    else:
+        scope = "checked_out_branch"
+        branch_commands = (
+            ["git", "diff", "--name-only", f"{args.base_branch}...HEAD"],
+            ["git", "diff", "--name-only", "HEAD"],
+            ["git", "diff", "--cached", "--name-only"],
+        )
+        for command in branch_commands:
+            changed = subprocess.run(
+                command,
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if changed.returncode != 0:
+                print(
+                    changed.stderr.strip()
+                    or (
+                        "Could not determine files changed on the checked-out "
+                        f"branch relative to {args.base_branch}."
+                    ),
+                    file=sys.stderr,
+                )
+                return 1
+            changed_file_names.extend(changed.stdout.splitlines())
 
-    changed_paths = [
-        repo_root / relative_path
-        for relative_path in changed.stdout.splitlines()
-        if relative_path.strip()
-    ]
+    # A file can occur in both the committed and working-tree diffs. Preserve
+    # the first occurrence so each validator runs once per file/group.
+    changed_file_names = list(
+        dict.fromkeys(
+            relative_path.strip()
+            for relative_path in changed_file_names
+            if relative_path.strip()
+        )
+    )
+    changed_paths = [repo_root / relative_path for relative_path in changed_file_names]
     results: list[dict[str, Any]] = []
     overall_success = True
     validated_groups: set[Path] = set()
@@ -1648,7 +1693,9 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
                 )
 
     final_report = {
+        "scope": scope,
         "pr_number": args.pr_number,
+        "base_branch": None if args.pr_number is not None else args.base_branch,
         "changed_file_count": len(changed_paths),
         "validation_successful": overall_success,
         "results": results,

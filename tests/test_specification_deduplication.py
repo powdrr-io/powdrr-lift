@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import yaml
 
+from powdrr_lift.cli import _add_llm_guidance_to_report, _automatic_repair_guidance
 from powdrr_lift.core.specification_deduplication import (
     deduplicate_specification_ids,
 )
@@ -64,3 +65,17 @@ def test_deduplication_does_not_rewrite_valid_file(tmp_path):
     assert path.read_text(encoding="utf-8") == (
         "id: system-one\nrequirements:\n- id: req-one\n"
     )
+
+
+def test_repair_guidance_requires_rereading_the_rewritten_file(tmp_path):
+    path = tmp_path / "implementation-specification.yaml"
+    guidance = _automatic_repair_guidance(
+        path, ("features[1].id=feature-one -> feature-one-2 (renamed)",)
+    )
+
+    assert guidance is not None
+    assert "Re-read the rewritten file" in guidance
+    report = yaml.safe_load(
+        _add_llm_guidance_to_report("validation_successful: true\n", guidance)
+    )
+    assert report["llm_guidance"] == guidance

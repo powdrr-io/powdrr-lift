@@ -1592,6 +1592,7 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
         validator: str,
         paths: list[Path],
         report_text: str,
+        guidance: str | None = None,
     ) -> None:
         nonlocal overall_success
         try:
@@ -1601,6 +1602,8 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
                 parsed_report = yaml.safe_load(report_text)
             except yaml.YAMLError:
                 parsed_report = {"raw_report": report_text}
+        if guidance is not None and isinstance(parsed_report, dict):
+            parsed_report["llm_guidance"] = guidance
         successful = (
             isinstance(parsed_report, dict)
             and parsed_report.get("validation_successful", False) is True
@@ -1702,7 +1705,9 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
         kind = _specification_kind_for_filename(path.name)
         if kind is not None:
             try:
-                report_text = _validate_pr_file_specification(path, kind, repo_root)
+                report_text, automatic_repairs = _validate_pr_file_specification(
+                    path, kind, repo_root
+                )
             except (OSError, ValueError) as exc:
                 results.append(
                     {
@@ -1718,6 +1723,7 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
                     validator=f"validate_{kind}_specification_yaml",
                     paths=[path],
                     report_text=report_text,
+                    guidance=_automatic_repair_guidance(path, automatic_repairs),
                 )
 
     final_report = {
@@ -1926,29 +1932,29 @@ def _validate_pr_file_specification(
     path: Path,
     kind: str,
     repo_root: Path,
-) -> str:
+) -> tuple[str, tuple[str, ...]]:
     normalize_specification_v1_file(path)
-    deduplicate_specification_ids(path)
+    automatic_repairs = deduplicate_specification_ids(path)
     proposed_yaml = _read_input(path)
     work_item_name = path.parent.name
     if kind == "system":
-        return validate_system_specification_yaml(
+        report = validate_system_specification_yaml(
             proposed_yaml,
             work_item_name=work_item_name,
             repo_root=repo_root,
             file_path=path,
         )
-    if kind == "architecture":
+    elif kind == "architecture":
         entity_types = tuple(load_entity_taxonomy(repo_root).entity_types)
-        return validate_architecture_specification_yaml(
+        report = validate_architecture_specification_yaml(
             proposed_yaml,
             entity_types=entity_types,
             work_item_name=work_item_name,
             repo_root=repo_root,
             file_path=path,
         )
-    if kind == "implementation":
-        return validate_implementation_specification_yaml(
+    elif kind == "implementation":
+        report = validate_implementation_specification_yaml(
             proposed_yaml,
             architecture_specification_path=path.parent
             / "architecture-specification.yaml",
@@ -1956,12 +1962,46 @@ def _validate_pr_file_specification(
             repo_root=repo_root,
             file_path=path,
         )
-    return validate_pr_specification_yaml(
-        proposed_yaml,
-        work_item_name=work_item_name,
-        repo_root=repo_root,
-        file_path=path,
+    else:
+        report = validate_pr_specification_yaml(
+            proposed_yaml,
+            work_item_name=work_item_name,
+            repo_root=repo_root,
+            file_path=path,
+        )
+    return report, automatic_repairs
+
+
+def _automatic_repair_guidance(path: Path, repairs: tuple[str, ...]) -> str | None:
+    if not repairs:
+        return None
+    changes = "; ".join(repairs)
+    return (
+        f"The evaluator automatically repaired {path.name}: {changes}. "
+        "Re-read the rewritten file before taking another action and use its "
+        "current IDs and formatting; do not continue from the previous file "
+        "contents."
     )
+
+
+def _add_llm_guidance_to_report(report_text: str, guidance: str | None) -> str:
+    if guidance is None:
+        return report_text
+    try:
+        report = json.loads(report_text)
+        format_as_json = True
+    except json.JSONDecodeError:
+        try:
+            report = yaml.safe_load(report_text)
+        except yaml.YAMLError:
+            return f"llm_guidance: {guidance}\n{report_text}"
+        format_as_json = False
+    if not isinstance(report, dict):
+        return f"llm_guidance: {guidance}\n{report_text}"
+    report["llm_guidance"] = guidance
+    if format_as_json:
+        return json.dumps(report, indent=2, ensure_ascii=False)
+    return yaml.safe_dump(report, sort_keys=False)
 
 
 def _run_edit_context(args: argparse.Namespace) -> int:
@@ -2356,7 +2396,9 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
         work_item_name = args.work_item_name or specification_path.parent.name
         try:
             normalize_specification_v1_file(specification_path)
-            deduplicate_specification_ids(specification_path, reformat=False)
+            automatic_repairs = deduplicate_specification_ids(
+                specification_path, reformat=False
+            )
             proposed_yaml = _read_input(specification_path)
             if kind == "system":
                 validation_successful = build_system_specification_validation_report(
@@ -2424,6 +2466,10 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
             continue
 
         reformat_specification_file(specification_path)
+        report_yaml = _add_llm_guidance_to_report(
+            report_yaml,
+            _automatic_repair_guidance(specification_path, automatic_repairs),
+        )
         print(f"File: {specification_path}")
         sys.stdout.write(report_yaml)
         if not report_yaml.endswith("\n"):

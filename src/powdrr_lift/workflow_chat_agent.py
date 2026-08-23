@@ -1206,11 +1206,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
 
     def report_roundtrip(self, roundtrip: int, action: SkillChatAction) -> None:
-        print(
-            f"Workflow chat LLM action:\n{_workflow_action_signature(action)}",
-            file=self.stderr,
-            flush=True,
-        )
+        if self.config.verbose:
+            print(
+                f"Workflow chat LLM action:\n{_workflow_action_signature(action)}",
+                file=self.stderr,
+                flush=True,
+            )
         parent_skill, parent_step_index = self._parent_progress()
         self.progress.update(
             self.selected_skill,

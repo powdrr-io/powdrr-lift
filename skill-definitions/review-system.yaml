@@ -24,7 +24,11 @@ steps:
   description: Deterministically generate the system specification template.
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the declared generator exactly once; do not edit the generated file.
+  details: >-
+    Invoke the declared generator exactly once; do not edit the generated file.
+    The generator overwrites an unreadable/invalid existing file and merges
+    readable values into the fresh template while restoring instructions and
+    missing default fields.
   pre_step:
     action: invoke_tool
     template:
@@ -67,7 +71,9 @@ steps:
     document. Template comments and boilerplate are removed as a side effect of
     any valid yaml_edit rewrite; do not treat comments as list items. Do not use
     invoke_tool in this freeform repair step; the next deterministic step reruns
-    the evaluator.
+    the evaluator. If evaluation reports invalid YAML/structure or you are
+    stuck, restart generation with {"action":"goto_step","step_id":"generate-system"}
+    instead of repeating the same repair.
 - id: gate-system
   description: Confirm that system evaluation reports zero issues.
   step_type: gate

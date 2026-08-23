@@ -18,9 +18,11 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    Invoke the declared implementation-specification tool exactly once. Pass its
-    generated file to the next step for completion; do not edit the file in this
-    step.
+    Invoke the declared implementation-specification tool exactly once. The
+    generator is restart-safe: it overwrites an unreadable/invalid existing
+    file and merges readable existing values into the fresh template while
+    restoring all instructions and missing default fields. Pass its generated
+    file to the next step for completion; do not edit the file in this step.
   pre_step:
     action: invoke_tool
     template:
@@ -62,7 +64,7 @@ steps:
     with yaml_edit actions. Each action must include the YAML file_path and a
     non-empty operations array. Use set_value with a JSON path array for scalar
     changes; use upsert_item with section, id, and a complete value mapping for
-    entities, relationships, modules, tools, features, or decisions. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"architecture-id"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file.
+    entities, relationships, modules, tools, features, or decisions. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"architecture-id"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-implementation"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
 - id: gate-implementation
   description: Confirm that implementation evaluation reports zero issues.
   step_type: gate

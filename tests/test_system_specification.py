@@ -91,6 +91,56 @@ approach: []
     ]
 
 
+def test_create_system_specification_template_recovers_invalid_yaml_and_defaults(
+    tmp_path: Path,
+) -> None:
+    output_path = system_specification_default_output_path("powdrr-lift", tmp_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        "schema: [broken\n",
+        encoding="utf-8",
+    )
+
+    create_system_specification_template(
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    recovered = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+    assert recovered["schema"] == "https://powdrr.io/schemas/specification-v1"
+    assert recovered["requirements"][0]["state"] is None
+    assert "# System specification template." in output_path.read_text(encoding="utf-8")
+
+
+def test_create_system_specification_template_merges_defaults_into_existing_entries(
+    tmp_path: Path,
+) -> None:
+    output_path = system_specification_default_output_path("powdrr-lift", tmp_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        """schema: https://powdrr.io/schemas/specification-v1
+id: existing-system
+requirements:
+  - id: existing-requirement
+    description: Keep this requirement.
+custom_metadata: keep-this-too
+""",
+        encoding="utf-8",
+    )
+
+    create_system_specification_template(
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    recovered = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+    assert recovered["id"] == "existing-system"
+    assert recovered["requirements"][0]["description"] == "Keep this requirement."
+    assert recovered["requirements"][0]["state"] is None
+    assert recovered["custom_metadata"] == "keep-this-too"
+    assert recovered["approach"][0]["description"] is None
+
+
 def test_validate_system_specification_reports_errors() -> None:
     proposed_spec = """
     version: 1

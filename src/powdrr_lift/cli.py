@@ -1257,6 +1257,36 @@ def main(argv: list[str] | None = None) -> int:
     return args.func(args)
 
 
+def _stage_generated_file(repo_root: Path, output_path: Path) -> None:
+    """Stage a generated file when the endpoint runs inside a Git checkout."""
+    try:
+        relative_path = output_path.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return
+
+    repository_check = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if repository_check.returncode != 0:
+        return
+
+    staged = subprocess.run(
+        ["git", "add", "--", str(relative_path)],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if staged.returncode != 0:
+        raise RuntimeError(
+            f"Could not stage generated file {relative_path}: {staged.stderr.strip()}"
+        )
+
+
 def _run_repository_state(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     sys.stdout.write(render_repository_state(repo_root))
@@ -1283,6 +1313,7 @@ def _run_init(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         default_branch=args.default_branch,
     )
+    _stage_generated_file(repo_root, output_path)
     print(output_path)
     if args.pr_number is not None:
         print("Next: fill out the template according to the instructions in the file.")
@@ -1481,6 +1512,7 @@ def _run_init_from_plan_diff(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         default_branch=args.default_branch,
     )
+    _stage_generated_file(repo_root, output_path)
     print(output_path)
     if args.pr_number is not None:
         print("Next: fill out the template according to the instructions in the file.")
@@ -2077,6 +2109,7 @@ def _run_codebase_state(args: argparse.Namespace) -> int:
         parent_branch=args.parent_branch,
         repo_root=repo_root,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = codebase_state_default_output_path(repo_root)
         print(f"Wrote codebase state to {default_output}")
@@ -2094,6 +2127,7 @@ def _run_current_state(args: argparse.Namespace) -> int:
         parent_branch=args.parent_branch,
         repo_root=repo_root,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = current_state_specification_default_output_path(repo_root)
         print(f"Wrote current state report to {default_output}")
@@ -2125,6 +2159,7 @@ def _run_architecture_specification(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         title=args.title,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = architecture_specification_default_output_path(
             args.work_item_name,
@@ -2146,6 +2181,7 @@ def _run_implementation_specification(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         title=args.title,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = implementation_specification_default_output_path(
             args.work_item_name,
@@ -2166,6 +2202,7 @@ def _run_system_specification(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         title=args.title,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = system_specification_default_output_path(
             args.work_item_name,
@@ -2188,6 +2225,7 @@ def _run_project_structure(args: argparse.Namespace) -> int:
         ),
         repo_root=repo_root,
     )
+    _stage_generated_file(repo_root, output_path)
     print(f"Wrote project structure template to {output_path}")
     return 0
 
@@ -2218,6 +2256,7 @@ def _run_system_map_specification(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         title=args.title,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = system_map_specification_default_output_path(
             args.work_item_name,
@@ -2238,6 +2277,7 @@ def _run_feature_pr_specification(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         title=args.title,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = feature_pr_specification_default_output_path(
             args.work_item_name,
@@ -2270,6 +2310,7 @@ def _run_plan_diff_specification(args: argparse.Namespace) -> int:
         output_path=args.output,
         repo_root=repo_root,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = plan_diff_specification_default_output_path(
             args.feature_plan_specification,
@@ -2289,6 +2330,7 @@ def _run_pr_specification(args: argparse.Namespace) -> int:
         output_path=args.output,
         repo_root=repo_root,
     )
+    _stage_generated_file(repo_root, output_path)
     if args.output is None:
         default_output = pr_specification_default_output_path(
             args.work_item_name,

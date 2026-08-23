@@ -4,12 +4,19 @@ when_to_use:
 - When implementation must be validated against the proposed PR specification
   before creating the PR.
 how_to_fill_this_out:
-- Keep the tasks in this order. Each task must complete before the next task
-  starts.
-- Use the listed tool invocations as the preferred commands. Use invoke_tool
-  with tool=shell for repository commands and tool=fuzzy-match for fuzzy path
-  discovery. A task may invoke another safe command when the listed command
-  needs a concrete path discovered from its context.
+- Keep the tasks in this order. Each task has one responsibility and must
+  complete before the next task starts.
+- A freeform task performs one LLM-directed action. Do not combine discovery,
+  editing, validation, review, and repair in one task.
+- An invoke_tool task performs the one declared command. The command result is
+  authoritative; do not replace it with a prose claim.
+- Use the exact top-level JSON field `action`. Never use `kind`, `action_input`,
+  or markdown. After an edit or review is complete, use `next_step` and put
+  required handoff values in `outputs`.
+- For an edit, return one `edit` or `yaml_edit` action. For a file move, return
+  one `file_management` action. For a review, return one `next_step` action with
+  the review in its declared output. Examples below are complete JSON shapes,
+  not pseudocode.
 - Do not modify product code before the test-generation and test-failure
   validation tasks complete. Do not create a pull request before all validation
   and review tasks complete.
@@ -40,13 +47,15 @@ task_templates:
       - risks
       - decisions
   details: >-
-    Assign the deterministic gather_context result directly to the
-    proposed-pr-context-state output. Do not search for or rediscover the
-    proposed PR.
+    The deterministic pre-step already gathered the context. Assign that exact
+    result to proposed-pr-context-state. Do not search for, rediscover, or
+    reinterpret the proposed PR. Complete this step with a next_step action,
+    for example:
+    {"action":"next_step","outputs":{"proposed-pr-context-state":"the exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed PR context for planning."}
   output_state_type: proposed-pr-context-state
   dependent_state:
   - proposed-pr-context-gathered
-- description: Create a detailed execution plan
+- description: Create the execution plan
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -56,25 +65,18 @@ task_templates:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: []
   details: >-
-    Read the gathered proposed PR specification and all referenced documents.
-    Create a detailed, ordered execution plan before changing files. Map every
-    acceptance criterion to one or more tests, identify the exact test files
-    and product files to change, describe the expected initially failing test
-    command, define the implementation sequence, and define the final
-    validation commands. Detect missing requirements, conflicts, excessive
-    scope, or unsafe assumptions. If the plan is not implementable, use
-    get-human-input for a specific decision. Otherwise record the complete plan
-    in output_state and pass it to the next task.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - diff
-    - --stat
+    Perform exactly one action: create the ordered execution plan. Read the
+    supplied proposed PR context, map every acceptance criterion to tests and
+    implementation work, and record exact paths and validation commands in the
+    plan. Do not edit files, run commands, or repair anything in this step. If
+    a required decision is missing, use one prompt_user action instead of
+    inventing it. When the plan is complete, return exactly this shape with the
+    plan replacing the example value:
+    {"action":"next_step","outputs":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
   output_state_type: detailed-execution-plan-state
   dependent_state:
   - execution-plan-created
-- description: Generate tests that will validate the new functionality
+- description: Generate the planned tests
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -85,48 +87,46 @@ task_templates:
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
     test_plan: []
   details: >-
-    Implement only the tests described by the execution plan. Add focused tests
-    for the required behavior, edge cases, and acceptance criteria. Keep the
-    tests deterministic and consistent with existing repository conventions.
-    Do not implement product behavior yet. Inspect the changed test files and
-    record the test paths, test names, and expected failure reasons in
-    output_state. Use the shell tool for repository inspection and edits.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - status
-    - --short
+    Perform exactly one action: edit only the test files named by the execution
+    plan. Add focused tests for the acceptance criteria and required edge cases;
+    do not edit product code, run tests, or review unrelated files. Use one
+    edit action, with file_edits when more than one test file is required. A
+    valid response after the edit looks like:
+    {"action":"edit","file_edits":[{"file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":0,"text":"new test code"}]}],"decisions_and_context":"Added the planned failing tests without changing product code."}
+    After the edit result is returned, use next_step with the test paths,
+    test names, and expected failure reasons in generated-test-diffs-state.
   output_state_type: generated-test-diffs-state
   dependent_state:
   - tests-generated
-- description: Validate the tests do not pass
-  step_type: freeform
+- description: Run the generated tests before implementation
+  step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
   input_state:
-    test_plan: <upstream-task-2>.generated-test-diffs-state
     generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
-    expected_failure_reasons: <upstream-task-2>.generated-test-diffs-state
+    test_results: []
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - pytest
+      - -q
   details: >-
-    Run the targeted tests generated by the previous task before writing any
-    product code. Use the pytest command below, or the narrower command from
-    the test plan when one is specified. Confirm that the tests fail because
-    the requested behavior is not implemented, not because of a syntax error,
-    broken fixture, malformed test, or unrelated environment failure. If the
-    tests pass, revise the tests to ensure they actually validate the new
-    functionality. Record the exact command and result in output_state.
-  tool_invocations:
-  - tool: shell
-    command:
-    - pytest
-    - -q
+    The deterministic pytest command already ran. Perform exactly one action:
+    classify its result. Confirm that failures are caused by missing requested
+    behavior, not malformed tests, syntax errors, broken fixtures, or unrelated
+    environment errors. If the tests pass, use one edit action to strengthen
+    them before continuing. If they fail for the expected reason, return:
+    {"action":"next_step","outputs":{"tests-proven-failing-state":{"command":"pytest -q","expected_failure":true,"failures":[]}},"decisions_and_context":"The generated tests fail for the expected unimplemented behavior."}
+    Replace the example failure list with the actual result. Do not implement
+    product code in this step.
   output_state_type: tests-proven-failing-state
   dependent_state:
   - tests-proven-failing
-- description: Generate product code changes
+- description: Implement the planned product code
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -139,46 +139,153 @@ task_templates:
     tests_proven_failing: <upstream-task-3>.tests-proven-failing-state
     implementation_diffs: {}
   details: >-
-    Implement the smallest safe product-code change that satisfies the
-    proposed PR specification and the failing tests. Follow the execution plan
-    and existing architecture. Do not weaken, delete, or bypass tests. Inspect
-    the complete diff after editing, keep scope limited to the approved files,
-    and record the implementation files, key design decisions, and resulting
-    diff in output_state. Use shell for all repository inspection and edits.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - diff
-    - "--"
-    - tests
+    Perform exactly one action: edit the approved product files to implement the
+    proposed behavior and satisfy the failing tests. Make the smallest safe
+    change; do not weaken or delete tests, run validation, or clean unrelated
+    files. Use one edit action, with file_edits for multiple files. A valid
+    response looks like:
+    {"action":"edit","file_edits":[{"file_path":"src/feature.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"implementation code"}]}],"decisions_and_context":"Implemented the planned behavior in the approved product file."}
+    After the edit succeeds, use next_step and record implementation files and
+    the resulting diff in generated-product-code-state.
   output_state_type: generated-product-code-state
   dependent_state:
   - product-code-generated
-- description: Validate all tests pass
-  step_type: freeform
-  complexity: high
+- description: Run the implementation test suite
+  step_type: invoke_tool
+  complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
   input_state:
     implementation_diffs: <upstream-task-4>.generated-product-code-state
-    test_results: []
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - pytest
+      - -q
   details: >-
-    Run the targeted tests first and then the full repository test suite. Use
-    pytest through the shell tool. Diagnose and fix failures caused by the
-    implementation or tests, rerunning the relevant tests after each fix.
-    Do not declare success from a partial run. Record every command, result,
-    failure diagnosis, and final passing result in output_state.
-  tool_invocations:
-  - tool: shell
-    command:
-    - pytest
-    - -q
-  output_state_type: all-tests-passing-state
+    The deterministic implementation test command already ran. Assign its complete
+    result to implementation-test-results-state; do not fix failures or claim success
+    from memory. Complete with a next_step action such as:
+    {"action":"next_step","outputs":{"implementation-test-results-state":{"command":"pytest -q","returncode":0,"summary":"All implementation tests passed."}},"decisions_and_context":"Recorded the deterministic implementation test result."}
+  output_state_type: implementation-test-results-state
   dependent_state:
-  - all-tests-passing
-- description: Confirm functional completeness against the specification
+  - implementation-tests-run
+- description: Repair implementation test failures
+  step_type: freeform
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    implementation_diffs: <upstream-task-4>.generated-product-code-state
+    implementation_test_results: <upstream-task-5>.implementation-test-results-state
+    repair_result: {}
+  details: >-
+    Perform exactly one action only when the implementation tests failed: edit the
+    approved implementation or test files to fix the reported failure. Do not
+    run tests in this step; the next deterministic task reruns them. If the
+    tests already passed, make no edit and pass the result onward. For a repair,
+    return one edit action like:
+    {"action":"edit","file_path":"src/feature.py","edits":[{"kind":"replace","start_line":20,"end_line":21,"text":"corrected code"}],"decisions_and_context":"Corrected the failure reported by the implementation test result."}
+    Then use next_step with the repair summary. Never repeat an unchanged failed
+    command or claim that a repair passed without the rerun.
+  output_state_type: implementation-test-repair-state
+  dependent_state:
+  - implementation-test-repair-complete
+- description: Rerun the implementation test suite after repair
+  step_type: invoke_tool
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  input_state:
+    implementation_test_repair: <upstream-task-6>.implementation-test-repair-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - pytest
+      - -q
+  details: >-
+    The deterministic implementation test command already reran after the
+    repair task. Assign the complete result to final-implementation-test-results-state.
+    Do not diagnose or repair in this step. Use one next_step action with the
+    exact command, return code, and summary:
+    {"action":"next_step","outputs":{"final-implementation-test-results-state":{"command":"pytest -q","returncode":0,"summary":"All implementation tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic implementation-test rerun."}
+  output_state_type: final-implementation-test-results-state
+  dependent_state:
+  - final-implementation-tests-run
+- description: Run the full test suite
+  step_type: invoke_tool
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  input_state:
+    final_implementation_test_results: <upstream-task-7>.final-implementation-test-results-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - pytest
+      - -q
+  details: >-
+    The deterministic full test command already ran. Assign the complete result
+    to all-tests-results-state. Do not diagnose or repair in this step. Use a
+    next_step action with the exact command, return code, and summary:
+    {"action":"next_step","outputs":{"all-tests-results-state":{"command":"pytest -q","returncode":0,"summary":"All tests passed."}},"decisions_and_context":"Recorded the deterministic full-suite result."}
+  output_state_type: all-tests-results-state
+  dependent_state:
+  - full-tests-run
+- description: Repair full test failures
+  step_type: freeform
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    all_tests_results: <upstream-task-8>.all-tests-results-state
+    repair_result: {}
+  details: >-
+    Perform exactly one action only when the full suite failed: edit the
+    approved files to address the reported failures. Do not run tests in this
+    step; the workflow reruns the deterministic full-suite task afterward. If
+    the suite passed, make no edit and record that no repair was needed. A repair
+    response is exactly one edit action, for example:
+    {"action":"edit","file_path":"src/feature.py","edits":[{"kind":"replace","start_line":30,"end_line":31,"text":"corrected code"}],"decisions_and_context":"Addressed the reported full-suite failure; rerun the suite next."}
+  output_state_type: full-test-repair-state
+  dependent_state:
+  - full-test-repair-complete
+- description: Rerun the full test suite after repair
+  step_type: invoke_tool
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  input_state:
+    full_test_repair: <upstream-task-9>.full-test-repair-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - pytest
+      - -q
+  details: >-
+    The deterministic full test command already reran after the repair task.
+    Assign the complete result to final-all-tests-results-state. Do not diagnose
+    or repair in this step. Use one next_step action with the exact command,
+    return code, and summary:
+    {"action":"next_step","outputs":{"final-all-tests-results-state":{"command":"pytest -q","returncode":0,"summary":"All tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic full-suite rerun."}
+  output_state_type: final-all-tests-results-state
+  dependent_state:
+  - final-full-tests-run
+- description: Review specification completeness
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -188,119 +295,202 @@ task_templates:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
     implementation_diffs: <upstream-task-4>.generated-product-code-state
-    test_results: <upstream-task-5>.all-tests-passing-state
-    acceptance_criteria: <upstream-task-0>.proposed-pr-context-state
+    all_tests_results: <upstream-task-10>.final-all-tests-results-state
+    completeness_review: {}
   details: >-
-    Re-read the proposed PR specification and compare it line by line with the
-    implementation diff and passing test results. Confirm that every goal,
-    acceptance criterion, required file change, error case, and validation
-    requirement is covered. Identify accidental scope, missing behavior,
-    untested behavior, and contradictions. If anything is incomplete, make the
-    required scoped correction and send it back through validation. Otherwise
-    record an explicit criterion-by-criterion completeness result in
-    output_state.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - diff
-    - "--check"
+    Perform exactly one action: compare the implementation and test evidence to
+    every proposed PR requirement and acceptance criterion. Do not edit files or
+    run commands. Return a criterion-by-criterion review in one next_step
+    action, using this shape:
+    {"action":"next_step","outputs":{"specification-completeness-state":{"complete":true,"criteria":[]}},"decisions_and_context":"Compared every criterion with implementation and test evidence."}
+    Set complete false and list exact missing behavior or paths when anything is
+    incomplete. Do not claim completeness because tests pass alone.
   output_state_type: specification-completeness-state
   dependent_state:
   - specification-complete
-- description: Run lint, type checks, and cleanup
+- description: Repair specification completeness gaps
+  step_type: freeform
+  complexity: high
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    completeness_review: <upstream-task-11>.specification-completeness-state
+    repair_result: {}
+  details: >-
+    Perform exactly one action only when the completeness review identifies a
+    gap: edit the approved files to close the listed gap. Do not run tests or
+    broaden scope here; later deterministic checks provide evidence. If the
+    review is complete, make no edit. A repair uses one edit action, for example:
+    {"action":"edit","file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":0,"text":"missing acceptance test"}],"decisions_and_context":"Added the missing coverage identified by completeness review."}
+  output_state_type: completeness-repair-state
+  dependent_state:
+  - completeness-repair-complete
+- description: Run formatting checks
+  step_type: invoke_tool
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: simple_task
+  input_state:
+    completeness_repair: <upstream-task-12>.completeness-repair-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - ruff
+      - format
+      - --check
+      - .
+  details: >-
+    Assign the deterministic formatter result to formatting-check-state. Do not
+    fix files in this step. Use exactly one next_step action with the command,
+    return code, and result.
+  output_state_type: formatting-check-state
+  dependent_state:
+  - formatting-checked
+- description: Run lint checks
+  step_type: invoke_tool
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: simple_task
+  input_state:
+    formatting_check: <upstream-task-13>.formatting-check-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - ruff
+      - check
+      - .
+  details: >-
+    Assign the deterministic lint result to lint-check-state. Do not fix files in
+    this step. Use exactly one next_step action with the command, return code,
+    and result.
+  output_state_type: lint-check-state
+  dependent_state:
+  - lint-checked
+- description: Run type checks
+  step_type: invoke_tool
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: simple_task
+  input_state:
+    lint_check: <upstream-task-14>.lint-check-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - mypy
+      - src
+  details: >-
+    Assign the deterministic type-check result to type-check-state. Do not fix
+    files in this step. Use exactly one next_step action with the command, return
+    code, and result.
+  output_state_type: type-check-state
+  dependent_state:
+  - type-checked
+- description: Review the final diff for scope
   step_type: freeform
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
-  llm_type: fast_iteration
+  llm_type: high_reasoning
   input_state:
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    test_results: <upstream-task-5>.all-tests-passing-state
-    completeness_review: <upstream-task-6>.specification-completeness-state
-    lint_results: []
+    formatting_check: <upstream-task-13>.formatting-check-state
+    lint_check: <upstream-task-14>.lint-check-state
+    type_check: <upstream-task-15>.type-check-state
+    scope_review: {}
   details: >-
-    Run repository formatting checks, lint checks, and type checks using the
-    shell tool. Review the complete diff for debug code, generated artifacts,
-    unrelated edits, formatting issues, and accidental secrets. Fix only
-    issues within the approved scope, rerun all affected checks, and record
-    the final commands and results in output_state.
-  tool_invocations:
-  - tool: shell
-    command:
-    - ruff
-    - format
-    - "--check"
-    - .
-  - tool: shell
-    command:
-    - ruff
-    - check
-    - .
-  - tool: shell
-    command:
-    - mypy
-    - src
-  output_state_type: linted-and-cleaned-state
+    Perform exactly one action: inspect the complete diff and identify debug
+    code, generated artifacts, secrets, unrelated edits, or missing intended
+    files. Do not edit or stage files. Return one next_step action with an
+    explicit clean boolean and every finding, for example:
+    {"action":"next_step","outputs":{"final-scope-review-state":{"clean":true,"findings":[]}},"decisions_and_context":"Reviewed the complete diff and found no out-of-scope changes."}
+    A clean review requires an empty findings list, not merely passing checks.
+  output_state_type: final-scope-review-state
   dependent_state:
-  - lint-and-cleanup-complete
-- description: Promote the implemented feature documents to current state
+  - final-scope-reviewed
+- description: Repair final diff scope issues
   step_type: freeform
+  complexity: medium
+  assignee_type: agent
+  assignee_role: coder
+  llm_type: standard_reasoning
+  input_state:
+    scope_review: <upstream-task-16>.final-scope-review-state
+    scope_repair: {}
+  details: >-
+    Perform exactly one action only when the scope review identifies a finding:
+    edit or remove only the reported out-of-scope content. Do not run checks or
+    stage files here. If the review is clean, make no edit. For a file removal,
+    use one file_management action such as:
+    {"action":"file_management","operation":"delete","file_path":"tmp/debug.log","decisions_and_context":"Removed the reported generated artifact."}
+    For a code correction, use one edit action. Record the repair in the
+    output_state and let the final checks rerun after this task.
+  output_state_type: final-scope-repair-state
+  dependent_state:
+  - final-scope-repair-complete
+- description: Promote the feature documents
+  step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    completeness_review: <upstream-task-6>.specification-completeness-state
+    completeness_review: <upstream-task-11>.specification-completeness-state
+    scope_repair: <upstream-task-17>.final-scope-repair-state
     feature_id: <work-item-name>
-    promoted_documents: {}
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - git
+      - mv
+      - docs/proposals/<work-item-name>
+      - docs/current/<work-item-name>
   details: >-
-    After implementation and validation are complete, move the feature's
-    specification directory from docs/proposals/<feature_id>/ to
-    docs/current/<feature_id>/. Use git mv so the committed implementation
-    records the transition and preserves history. Move only the documents for
-    the completed feature; leave unrelated proposals in place. If the proposal
-    directory does not exist or the current directory already exists, inspect
-    the exact contents and resolve the situation before continuing. Record the
-    moved paths in output_state.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - mv
-    - docs/proposals/<work-item-name>
-    - docs/current/<work-item-name>
+    The deterministic git mv already ran. Assign its complete result and moved
+    paths to promoted-current-state-documents. Do not edit, stage, or resolve a
+    different feature in this step. If the command reports an inconsistent
+    proposal/current directory, stop and report that exact inconsistency.
   output_state_type: promoted-current-state-documents
   dependent_state:
   - current-state-documents-promoted
-- description: Stage the pull request changes
-  step_type: freeform
+- description: Verify the pull request file set
+  step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
     implementation_diffs: <upstream-task-4>.generated-product-code-state
-    test_results: <upstream-task-5>.all-tests-passing-state
-    completeness_review: <upstream-task-6>.specification-completeness-state
-    lint_results: <upstream-task-7>.linted-and-cleaned-state
-    promoted_documents: <upstream-task-8>.promoted-current-state-documents
-    staged_changes: {}
+    promoted_documents: <upstream-task-18>.promoted-current-state-documents
+    type_check: <upstream-task-15>.type-check-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - git
+      - status
+      - --short
   details: >-
-    Inspect the final diff and stage only the intended pull-request files.
-    Ensure the staged set matches the approved scope and record the staged paths
-    in output_state before final pull-request preparation.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - status
-    - --short
+    Assign the deterministic repository status to staged-pull-request-state.
+    Verify that every changed path is within the approved implementation,
+    test, and promoted-document scope. Do not stage or commit in this step. Use
+    one next_step action with the exact path list; report an inconsistency rather
+    than silently accepting an unexpected file.
   output_state_type: staged-pull-request-state
   dependent_state:
-  - staged-for-pull-request
+  - pull-request-files-verified
 - description: Finish pull request preparation
   step_type: freeform
   complexity: medium
@@ -312,22 +502,20 @@ task_templates:
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     implementation_diffs: <upstream-task-4>.generated-product-code-state
-    test_results: <upstream-task-5>.all-tests-passing-state
-    completeness_review: <upstream-task-6>.specification-completeness-state
-    lint_results: <upstream-task-7>.linted-and-cleaned-state
-    promoted_documents: <upstream-task-8>.promoted-current-state-documents
-    staged_changes: <upstream-task-9>.staged-pull-request-state
+    all_tests_results: <upstream-task-10>.final-all-tests-results-state
+    completeness_review: <upstream-task-11>.specification-completeness-state
+    formatting_check: <upstream-task-13>.formatting-check-state
+    lint_check: <upstream-task-14>.lint-check-state
+    type_check: <upstream-task-15>.type-check-state
+    promoted_documents: <upstream-task-18>.promoted-current-state-documents
+    staged_changes: <upstream-task-19>.staged-pull-request-state
   details: >-
-    Run finish-pr-prep after the intended pull-request files are staged. If the
-    prep step changes files, restage only the approved files and rerun any
-    affected checks before continuing. Record the final validation evidence in
-    output_state for the pull-request handoff.
-  tool_invocations:
-  - tool: shell
-    command:
-    - git
-    - status
-    - --short
+    Perform exactly one action: invoke the listed finish-pr-prep skill. Do not
+    independently edit, stage, commit, push, or create a pull request here; the
+    nested skill owns those operations. After it returns, pass its complete
+    evidence to the next workflow boundary with one next_step action, for
+    example:
+    {"action":"next_step","outputs":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep completed with the recorded validation evidence."}
   output_state_type: pull-request-prep-state
   dependent_state:
   - pull-request-prep-complete

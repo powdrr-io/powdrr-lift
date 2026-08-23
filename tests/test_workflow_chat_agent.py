@@ -7215,10 +7215,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ("task-012",),
         ("task-013",),
         ("task-014",),
+        ("task-015",),
         ("task-014", "task-015", "task-016"),
         ("task-017",),
         ("task-001", "task-012", "task-018"),
-        ("task-005", "task-016", "task-019"),
+        ("task-005", "task-019", "task-016"),
         (
             "task-001",
             "task-005",

@@ -109,3 +109,4 @@ tools:
     labels:
       - validation
       - pr-prep
+      - yaml

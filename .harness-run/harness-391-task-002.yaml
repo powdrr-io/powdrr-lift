@@ -1,5 +1,5 @@
 task_id: harness-391-task-002
-status: locked
+status: completed
 upstream_task_ids:
 - harness-391-task-001
 dependent_state:
@@ -28,6 +28,40 @@ assignee_type: agent
 assignee_role: architect
 output_state_type: detailed-execution-plan-state
 description: Create the execution plan
+output_state:
+  execution_plan:
+    criteria_to_tests:
+    - criterion: JSON interaction log
+      test: Validate that the log file parses as valid JSON
+      implementation: Implement JSON serialization for interaction entries
+    - criterion: hidden .powdrr directory
+      test: Verify the log is stored under a hidden .powdrr directory
+      implementation: Create and use the .powdrr directory for log storage
+    - criterion: fixed interaction-log.json filename
+      test: Verify the log file is named interaction-log.json
+      implementation: Use the fixed filename interaction-log.json
+    - criterion: human and LLM inputs and outputs captured
+      test: Verify both human and LLM inputs and outputs are recorded
+      implementation: Capture and log both human and LLM inputs and outputs
+    - criterion: append-only entries
+      test: Verify entries are appended without overwriting existing data
+      implementation: Append new entries to the log file without truncation
+    implementation_files:
+    - docs/proposals/interaction-file-log/implementation-specification.yaml
+    - docs/proposals/interaction-file-log/architecture-specification.yaml
+    - docs/proposals/interaction-file-log/system-specification.yaml
+    - docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+    test_commands:
+    - python -m pytest tests/test_interaction_log.py
+    validation_commands:
+    - python -m pytest tests/test_interaction_log.py
+    - python -m json.tool .powdrr/interaction-log.json
+    risks:
+    - Hidden directory may not be created on all platforms
+    - Append-only behavior may conflict with concurrent writes
+    - JSON serialization may fail for non-serializable objects
+  decisions_and_context: Created the ordered plan and mapped each acceptance criterion
+    to validation.
 step_type: freeform
 details: 'Perform exactly one action: create the ordered execution plan. The proposed
   PR context is fully supplied in input_state; do not use gather_context, shell, find,

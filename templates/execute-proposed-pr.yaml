@@ -11,12 +11,14 @@ how_to_fill_this_out:
 - An invoke_tool task performs the one declared command. The command result is
   authoritative; do not replace it with a prose claim.
 - Use the exact top-level JSON field `action`. Never use `kind`, `action_input`,
-  or markdown. After an edit or review is complete, use `next_step` and put
-  required handoff values in `outputs`.
-- For an edit, return one `edit` or `yaml_edit` action. For a file move, return
-  one `file_management` action. For a review, return one `next_step` action with
-  the review in its declared output. Examples below are complete JSON shapes,
-  not pseudocode.
+  or markdown. Every task must finish with `complete` and put its declared
+  handoff values in `output_state`; `next_step` does not persist a durable task
+  result.
+- For an edit, return one `edit` or `yaml_edit` action, then finish with
+  `complete` after the edit result is returned. For a file move, return one
+  `file_management` action, then finish with `complete`. For a review, return
+  one `complete` action with the review in its declared output. Examples below
+  are complete JSON shapes, not pseudocode.
 - Do not modify product code before the test-generation and test-failure
   validation tasks complete. Do not create a pull request before all validation
   and review tasks complete.
@@ -49,9 +51,9 @@ task_templates:
   details: >-
     The deterministic pre-step already gathered the context. Assign that exact
     result to proposed-pr-context-state. Do not search for, rediscover, or
-    reinterpret the proposed PR. Complete this step with a next_step action,
+    reinterpret the proposed PR. Complete this task with a complete action,
     for example:
-    {"action":"next_step","outputs":{"proposed-pr-context-state":"the exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed PR context for planning."}
+    {"action":"complete","output_state":{"proposed-pr-context-state":"the exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed PR context for planning."}
   output_state_type: proposed-pr-context-state
   dependent_state:
   - proposed-pr-context-gathered
@@ -72,7 +74,7 @@ task_templates:
     a required decision is missing, use one prompt_user action instead of
     inventing it. When the plan is complete, return exactly this shape with the
     plan replacing the example value:
-    {"action":"next_step","outputs":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
+    {"action":"complete","output_state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
   output_state_type: detailed-execution-plan-state
   dependent_state:
   - execution-plan-created
@@ -92,9 +94,10 @@ task_templates:
     do not edit product code, run tests, or review unrelated files. Use one
     edit action, with file_edits when more than one test file is required. A
     valid response after the edit looks like:
-    {"action":"edit","file_edits":[{"file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":0,"text":"new test code"}]}],"decisions_and_context":"Added the planned failing tests without changing product code."}
-    After the edit result is returned, use next_step with the test paths,
-    test names, and expected failure reasons in generated-test-diffs-state.
+    {"action":"edit","file_edits":[{"file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":1,"text":"new test code"}]}],"decisions_and_context":"Added the planned failing tests without changing product code."}
+    After the edit result is returned, complete the task with
+    output_state.generated-test-diffs-state containing the test paths, test
+    names, and expected failure reasons. Do not use next_step.
   output_state_type: generated-test-diffs-state
   dependent_state:
   - tests-generated
@@ -322,7 +325,7 @@ task_templates:
     gap: edit the approved files to close the listed gap. Do not run tests or
     broaden scope here; later deterministic checks provide evidence. If the
     review is complete, make no edit. A repair uses one edit action, for example:
-    {"action":"edit","file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":0,"text":"missing acceptance test"}],"decisions_and_context":"Added the missing coverage identified by completeness review."}
+    {"action":"edit","file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":1,"text":"missing acceptance test"}],"decisions_and_context":"Added the missing coverage identified by completeness review."}
   output_state_type: completeness-repair-state
   dependent_state:
   - completeness-repair-complete

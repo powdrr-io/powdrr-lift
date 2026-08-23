@@ -3254,6 +3254,26 @@ def test_auto_provider_selects_openrouter_when_configured(
     assert _resolve_provider("auto", "glm-5.2") == "openrouter"
 
 
+def test_auto_provider_prefers_deepinfra_cheap_over_openrouter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_API_KEY",
+        "ZAI_API_KEY",
+        "ZAI_BASE_URL",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_BASE_URL",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+
+    assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
+
+
 def test_available_workflow_providers_requires_api_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

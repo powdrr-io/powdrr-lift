@@ -181,3 +181,60 @@ def test_evaluate_rejects_changed_task_without_template_identity(
         _evaluate_workflow_changed_files(repo_root=tmp_path, base_branch="main")
         is False
     )
+
+
+def test_evaluate_rejects_workflow_dependency_drift(
+    tmp_path: Path,
+) -> None:
+    _setup_repo(tmp_path)
+    proposal_path = (
+        tmp_path / "docs" / "proposals" / "demo" / "proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True)
+    proposal_path.write_text(
+        "id: workflow-pr\ndependent_prs: [base-pr]\n",
+        encoding="utf-8",
+    )
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "invariants": [],
+                "task_templates": [
+                    {
+                        "description": "Do work",
+                        "complexity": "low",
+                        "input_state": {"proposed_pr": "workflow-pr"},
+                        "assignee_type": "agent",
+                        "assignee_role": "coder",
+                        "output_state_type": "state",
+                        "dependent_state": [],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    workflow = tmp_path / "generated" / "task.yaml"
+    workflow.parent.mkdir()
+    workflow.write_text(
+        "task_id: example-task-001\nworkflow_template: workflow\n"
+        "input_state:\n  proposed_pr: workflow-pr\n",
+        encoding="utf-8",
+    )
+    state = tmp_path / "generated" / "workflow-pr-workflow.yaml"
+    state.write_text(
+        "proposed_pr_id: workflow-pr\n"
+        "depends_on_workflows: []\n"
+        "invariants: []\nrelationships: []\n",
+        encoding="utf-8",
+    )
+    _git(tmp_path, "add", "templates", "generated", "docs")
+    _git(tmp_path, "commit", "-m", "workflow")
+
+    assert (
+        _evaluate_workflow_changed_files(repo_root=tmp_path, base_branch="main")
+        is False
+    )

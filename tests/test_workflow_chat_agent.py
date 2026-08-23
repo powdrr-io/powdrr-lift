@@ -3182,7 +3182,7 @@ def test_openrouter_credentials_and_default_base_url_are_supported(
 def test_openrouter_maps_every_llm_type_to_ox_alpha() -> None:
     for llm_type in ALL_LLM_TYPES:
         mapping = OPENROUTER_LLM_MAPPINGS[llm_type]
-        assert mapping.model == "openrouter/ox-alpha"
+        assert mapping.model == "stealth/ox-alpha"
         assert mapping.provider == "openrouter"
 
 
@@ -3208,9 +3208,7 @@ def test_auto_provider_selects_openrouter_when_configured(
 
 
 def test_initial_model_uses_openrouter_mapping_for_default_model() -> None:
-    assert _initial_model_for_provider("openrouter", "glm-5.2") == (
-        "openrouter/ox-alpha"
-    )
+    assert _initial_model_for_provider("openrouter", "glm-5.2") == ("stealth/ox-alpha")
     assert _initial_model_for_provider("openai", "glm-5.2") == "glm-5.2"
     assert _initial_model_for_provider("openrouter", "custom-model") == ("custom-model")
 

@@ -214,7 +214,7 @@ continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
 - Use `--provider openrouter` with `OPENROUTER_API_KEY` to use
-  `openrouter/ox-alpha` for every workflow capability. OpenRouter uses
+  `stealth/ox-alpha` for every workflow capability. OpenRouter uses
   `https://openrouter.ai/api/v1` by default; override it with
   `OPENROUTER_BASE_URL` when needed. In `auto` mode, OpenRouter is preferred
   whenever `OPENROUTER_API_KEY` is available.

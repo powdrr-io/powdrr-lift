@@ -323,6 +323,24 @@ steps:
     no required artifact exists only below .worktrees/. If any file is missing
     or outside the active worktree, stop and report the inconsistency; do not
     stage or create a pull request.
+- id: review-workflow-proposed-pr-links
+  description: Review the bidirectional workflow and proposed-PR mapping.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Build an exact mapping table from every validated proposed-PR specification
+    in docs/proposals/<feature-name>/ to its execution workflow in
+    docs/workflows/<feature-name>/. Confirm that every proposed PR has exactly
+    one matching workflow and that every workflow has exactly one matching
+    proposed PR. Match only stable proposed-PR ids and the workflow's
+    proposed-pr-id metadata; do not infer matches from ordering, directory
+    names, branch names, or fuzzy similarity. Check both directions explicitly:
+    proposed PR -> workflow and workflow -> proposed PR. If any proposed PR is
+    missing a workflow, or any workflow is missing its proposed PR, do not stage
+    artifacts or continue to pull-request preparation; return to the relevant
+    planning or instantiation step with the mismatch and exact paths. Continue
+    only after the mapping is complete, unique, and recorded in workflow
+    context.
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
   step_type: freeform

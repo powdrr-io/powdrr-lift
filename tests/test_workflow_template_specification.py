@@ -422,6 +422,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
+    assert all(task.workflow_template == template_path.stem for task in tasks)
 
 
 def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(

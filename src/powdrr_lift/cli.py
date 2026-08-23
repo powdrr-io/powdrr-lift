@@ -71,9 +71,16 @@ from powdrr_lift.core.project_structure import (
     validate_project_structure_yaml,
 )
 from powdrr_lift.core.specification_v1 import normalize_specification_v1_file
+from powdrr_lift.core.workflow_relationships import (
+    WorkflowRelationshipValidationIssue,
+    WorkflowRelationshipValidationReport,
+    validate_workflow_relationships,
+)
 from powdrr_lift.core.workflow_task_specification import HumanRole
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
+    instantiated_workflow_relationships,
+    load_workflow_template,
 )
 from powdrr_lift.openai_proxy import (
     OpenAIProxyConfig,
@@ -835,7 +842,11 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_specification_parser.add_argument(
         "path",
         type=Path,
-        help="Specification-v1 YAML file or directory to validate.",
+        nargs="?",
+        help=(
+            "Optional specification-v1 YAML file or directory. When omitted, "
+            "evaluate inspects workflow documents changed on the current branch."
+        ),
     )
     evaluate_specification_parser.add_argument(
         "--work-item-name",
@@ -856,6 +867,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root",
         type=Path,
         help="Repository root to use when running validation.",
+    )
+    evaluate_specification_parser.add_argument(
+        "--base-branch",
+        default="main",
+        help="Base branch used to discover changed workflow documents (default: main).",
     )
     evaluate_specification_parser.set_defaults(func=_run_evaluate_specification)
 
@@ -1312,6 +1328,12 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             workflow_instance_name=args.workflow_instance_name,
             template_values=template_values,
         )
+        invariants, relationships = instantiated_workflow_relationships(
+            template_path,
+            work_item_name=args.work_item_name,
+            workflow_instance_name=args.workflow_instance_name,
+            template_values=template_values,
+        )
         relative_workflow = output_directory.relative_to(repo_root)
         state = WorkflowGitState(
             proposed_pr_id=template_values.get("proposed-pr-id", args.work_item_name),
@@ -1319,6 +1341,8 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             integration_branch=integration_branch,
             workflow_relative_directory=str(relative_workflow),
             depends_on_workflows=tuple(args.depends_on_workflow),
+            invariants=invariants,
+            relationships=relationships,
         )
         save_workflow_git_state(output_directory, state)
         commit_and_push_workflow_initialization(
@@ -1702,6 +1726,196 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
     }
     print(json.dumps(final_report, indent=2, ensure_ascii=False))
     return 0 if overall_success else 1
+
+
+def _changed_branch_paths(repo_root: Path, base_branch: str) -> list[Path]:
+    names: list[str] = []
+    for command in (
+        ["git", "diff", "--name-only", f"{base_branch}...HEAD"],
+        ["git", "diff", "--name-only", "HEAD"],
+        ["git", "diff", "--cached", "--name-only"],
+    ):
+        result = subprocess.run(
+            command, cwd=repo_root, capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                result.stderr.strip()
+                or f"Could not determine changed files relative to {base_branch}."
+            )
+        names.extend(line.strip() for line in result.stdout.splitlines())
+    return [
+        repo_root / name
+        for name in dict.fromkeys(name for name in names if name)
+        if (repo_root / name).is_file()
+    ]
+
+
+def _repository_yaml_documents(repo_root: Path) -> list[tuple[Path, dict[str, Any]]]:
+    documents: list[tuple[Path, dict[str, Any]]] = []
+    ignored = {".git", ".venv", ".worktrees", "node_modules", "__pycache__"}
+    for path in repo_root.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in {".yaml", ".yml"}:
+            continue
+        if ignored.intersection(path.relative_to(repo_root).parts):
+            continue
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        if isinstance(data, dict):
+            documents.append((path, data))
+    return documents
+
+
+def _evaluate_workflow_changed_files(*, repo_root: Path, base_branch: str) -> bool:
+    try:
+        changed_paths = _changed_branch_paths(repo_root, base_branch)
+    except RuntimeError as exc:
+        print(json.dumps({"validation_successful": False, "issues": [str(exc)]}))
+        return False
+
+    task_paths: list[Path] = []
+    state_paths_by_workflow: dict[str, list[Path]] = {}
+    task_requirements: dict[str, set[str]] = {}
+    issues: list[dict[str, str]] = []
+    for path in changed_paths:
+        if path.suffix.lower() not in {".yaml", ".yml"}:
+            continue
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as exc:
+            issues.append({"path": str(path), "message": str(exc)})
+            continue
+        if not isinstance(data, dict):
+            continue
+        if "task_id" in data:
+            task_paths.append(path)
+            template_id = data.get("workflow_template")
+            if not isinstance(template_id, str) or not template_id.strip():
+                issues.append(
+                    {
+                        "path": str(path),
+                        "message": (
+                            "Every workflow task must declare a non-empty "
+                            "workflow_template identity."
+                        ),
+                    }
+                )
+            else:
+                input_state = data.get("input_state")
+                workflow_id = (
+                    input_state.get("proposed_pr")
+                    if isinstance(input_state, dict)
+                    else None
+                )
+                workflow_key = (
+                    workflow_id.strip()
+                    if isinstance(workflow_id, str) and workflow_id.strip()
+                    else "__unscoped__"
+                )
+                task_requirements.setdefault(workflow_key, set()).add(
+                    template_id.strip()
+                )
+            continue
+        if "relationships" in data and "invariants" in data:
+            workflow_id = data.get("proposed_pr_id")
+            workflow_key = (
+                workflow_id.strip()
+                if isinstance(workflow_id, str) and workflow_id.strip()
+                else "__unscoped__"
+            )
+            state_paths_by_workflow.setdefault(workflow_key, []).append(path)
+
+    if not task_paths:
+        print(
+            json.dumps(
+                {
+                    "scope": "changed_branch_files",
+                    "task_count": 0,
+                    "validation_successful": True,
+                    "message": "No changed workflow task documents were found.",
+                },
+                indent=2,
+            )
+        )
+        return True
+
+    template_paths: dict[str, Path] = {}
+    for template_path, data in _repository_yaml_documents(repo_root):
+        if "task_templates" not in data:
+            continue
+        template_id = data.get("id") or template_path.stem
+        if isinstance(template_id, str):
+            template_paths.setdefault(template_id, template_path)
+    relationship_issues: list[WorkflowRelationshipValidationIssue] = []
+    relationships_checked = 0
+    for workflow_key, template_ids in sorted(task_requirements.items()):
+        required_invariants: list[dict[str, Any]] = []
+        for template_id in sorted(template_ids):
+            template_candidate = template_paths.get(template_id)
+            if template_candidate is None:
+                issues.append(
+                    {
+                        "path": "workflow_template",
+                        "message": (
+                            "Workflow template identity does not resolve: "
+                            f"{template_id}"
+                        ),
+                    }
+                )
+                continue
+            try:
+                template = load_workflow_template(template_candidate)
+            except (OSError, ValueError) as exc:
+                issues.append({"path": str(template_candidate), "message": str(exc)})
+                continue
+            required_invariants.extend(template.invariants)
+        scoped_states = state_paths_by_workflow.get(workflow_key, [])
+        if not scoped_states and workflow_key == "__unscoped__":
+            scoped_states = [
+                path for paths in state_paths_by_workflow.values() for path in paths
+            ]
+        report = validate_workflow_relationships(
+            scoped_states,
+            required_invariant_ids=[
+                invariant["id"]
+                for invariant in required_invariants
+                if isinstance(invariant.get("id"), str)
+            ],
+            required_invariants=required_invariants,
+        )
+        relationships_checked += report.relationships_checked
+        relationship_issues.extend(report.issues)
+    relationship_report = WorkflowRelationshipValidationReport(
+        validation_successful=not relationship_issues,
+        relationships_checked=relationships_checked,
+        issues=relationship_issues,
+    )
+    print(
+        json.dumps(
+            {
+                "scope": "changed_branch_files",
+                "changed_file_count": len(changed_paths),
+                "task_count": len(task_paths),
+                "template_count": len(
+                    {
+                        template_id
+                        for ids in task_requirements.values()
+                        for template_id in ids
+                    }
+                ),
+                "task_template_references_valid": not issues,
+                "relationship_validation": relationship_report.to_data(),
+                "issues": issues,
+                "validation_successful": not issues
+                and relationship_report.validation_successful,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    return not issues and relationship_report.validation_successful
 
 
 def _validate_pr_file_specification(
@@ -2094,21 +2308,22 @@ def _specification_kind_for_filename(filename: str) -> str | None:
 
 def _run_evaluate_specification(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    input_path = args.path if args.path.is_absolute() else repo_root / args.path
-    if not input_path.exists():
-        print(f"Specification path does not exist: {input_path}", file=sys.stderr)
-        return 1
-
-    specification_paths = (
-        [input_path]
-        if input_path.is_file()
-        else sorted(
-            path
-            for path in input_path.rglob("*")
-            if path.is_file() and _specification_kind_for_filename(path.name)
+    specification_paths: list[Path] = []
+    if args.path is not None:
+        input_path = args.path if args.path.is_absolute() else repo_root / args.path
+        if not input_path.exists():
+            print(f"Specification path does not exist: {input_path}", file=sys.stderr)
+            return 1
+        specification_paths = (
+            [input_path]
+            if input_path.is_file()
+            else sorted(
+                path
+                for path in input_path.rglob("*")
+                if path.is_file() and _specification_kind_for_filename(path.name)
+            )
         )
-    )
-    if not specification_paths:
+    if args.path is not None and not specification_paths:
         print(
             f"No recognized specification-v1 YAML files found under {input_path}.",
             file=sys.stderr,
@@ -2207,6 +2422,12 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
         if not report_yaml.endswith("\n"):
             sys.stdout.write("\n")
         overall_success = overall_success and validation_successful
+
+    workflow_success = _evaluate_workflow_changed_files(
+        repo_root=repo_root,
+        base_branch=args.base_branch,
+    )
+    overall_success = overall_success and workflow_success
 
     return 0 if overall_success else 1
 

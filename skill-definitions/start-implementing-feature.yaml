@@ -286,7 +286,8 @@ steps:
     command must create the powdrr/<proposed-pr-id> integration branch while
     writing workflow files into this active worktree. Stop if a returned
     workflow directory is outside the active worktree. Pass every created or
-    reused workflow path onward.
+    reused workflow identity onward. Relationships use semantic identifiers;
+    never add file or directory pointers.
   tool_invocations:
   - tool: internal
     command:
@@ -346,6 +347,25 @@ steps:
     when a workflow has no proposed PR. After the mapping is complete, unique,
     and recorded in workflow context, return
     `{"action":"next_step","decisions_and_context":"Every proposed PR maps to exactly one workflow, and every workflow maps to exactly one proposed PR."}`.
+- id: evaluate-workflow-artifacts
+  description: Evaluate workflow tasks and relationship invariants deterministically.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Run the generic evaluator against files changed on the current branch. The
+    evaluator is authoritative: it
+    requires every task to name an existing workflow template and checks every
+    relationship invariant declared by those templates. Do not replace a
+    failure with a prose claim; repair the reported task, template, relationship,
+    or target artifact and rerun the evaluator.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<feature-name>
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
   step_type: freeform

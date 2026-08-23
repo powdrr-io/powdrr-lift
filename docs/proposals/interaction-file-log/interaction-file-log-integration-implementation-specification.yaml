@@ -3,51 +3,57 @@ title: Interaction File Log Integration Implementation
 architecture_id: '2026-08-22'
 entities:
 - id: interaction-log
-  action: added
-  rationale: Central log file storing all interaction entries.
+  action: changed
+  rationale: Central log file storing all interaction entries, now integrated into
+    the workflow.
 - id: interaction-entry
-  action: added
-  rationale: A single recorded interaction with input and output.
+  action: changed
+  rationale: A single recorded interaction with input and output, now written by the
+    integrated log writer.
 - id: log-writer
-  action: added
-  rationale: Writes interaction entries to the log file.
+  action: changed
+  rationale: Writes interaction entries to the log file, now invoked from the workflow.
 - id: interaction-source
-  action: added
-  rationale: Origin of an interaction, human or LLM.
+  action: changed
+  rationale: Origin of an interaction, human or LLM, now captured by the integrated
+    log writer.
 modules:
 - id: mod-log-writer
   action: changed
   relative_location: src/log_writer/
-  purpose: Writes interaction entries to the JSON log file in the hidden .powdrr directory.
+  purpose: Writes interaction entries to the JSON log file in the hidden .powdrr directory,
+    integrated into the workflow.
 tools:
 - id: tool-log-writer
   action: changed
   when_to_use: Whenever an interaction with a human or LLM occurs and needs to be
-    logged.
+    logged, now invoked automatically by the workflow.
   template: interaction-log-writer
   how_to_use: Invoke the log writer to append the interaction input and output to
-    the log file.
+    the log file, now called from the workflow.
 entity_relationships:
 - id: rel-writer-appends
-  action: added
-  rationale: The log writer appends entries to the log.
+  action: changed
+  rationale: The log writer appends entries to the log, now integrated into the workflow.
 - id: rel-log-contains
-  action: added
-  rationale: The log contains interaction entries.
+  action: changed
+  rationale: The log contains interaction entries, now populated by the integrated
+    log writer.
 - id: rel-source-feeds
-  action: added
-  rationale: Interaction sources feed entries to the writer.
+  action: changed
+  rationale: Interaction sources feed entries to the writer, now captured by the integrated
+    log writer.
 features:
-- id: feat-integration-wiring
-  action: added
-  description: Wire the log writer into human and LLM interaction flows.
+- id: feat-integrated-log-writer
+  action: changed
+  description: Integrated log writer that appends interaction entries as JSON to the
+    log file from the workflow.
   functional_requirements:
-  - Invoke the log writer after each human interaction completes.
-  - Invoke the log writer after each LLM interaction completes.
-  - Ensure the log file is created and appended without disrupting the interaction
-    flow.
+  - Append interaction input and output as a JSON entry from the workflow.
+  - Store the log in the hidden .powdrr directory.
+  - Support human and LLM interaction sources from the workflow.
 decisions:
-- id: dec-integration-points
-  action: added
-  description: Integrate the log writer at the existing interaction completion points
-    for both human and LLM sources.
+- id: dec-json-format
+  action: changed
+  description: Use JSON Lines format for the interaction log, now integrated into
+    the workflow.

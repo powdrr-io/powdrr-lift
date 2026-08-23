@@ -282,7 +282,12 @@ steps:
     Invoke instantiate-workflow once for each missing workflow using the
     invocation plan. Use templates/execute-proposed-pr.yaml, pass every
     template-specific value with repeated --template-value NAME=VALUE options,
-    and use the canonical feature name as the shared work-item name. The
+    and for every predecessor listed for the workflow, repeat
+    --depends-on-workflow <predecessor-workflow-id>. Omit that option for a
+    workflow with no predecessors. The dependency arguments are mandatory
+    command arguments, not planning notes; do not claim they were applied
+    unless they are present in the invocation and persisted in workflow state.
+    Use the canonical feature name as the shared work-item name. The
     command must create the powdrr/<proposed-pr-id> integration branch while
     writing workflow files into this active worktree. Stop if a returned
     workflow directory is outside the active worktree. Pass every created or
@@ -299,8 +304,27 @@ steps:
     - <proposed-pr-name>
     - --template-value
     - proposed-pr-id=<proposed-pr-name>
+    - --depends-on-workflow
+    - <predecessor-workflow-id>
     - --template
     - templates/execute-proposed-pr.yaml
+- id: verify-workflow-dependencies
+  description: Verify workflow-level dependency metadata.
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Compare the dependency relationships in the instantiation plan with every
+    generated or reused <workflow-id>-workflow.yaml in
+    docs/workflows/<feature-name>/. Read each workflow state document and build
+    an exact table of workflow id to depends_on_workflows. Confirm that every
+    planned predecessor appears in the matching workflow's
+    depends_on_workflows list, that workflows with no planned predecessors have
+    no dependency entries, and that no undeclared dependency was added. Do not
+    infer dependencies from ordering, filenames, task upstream_task_ids, or
+    prose. If any mismatch exists, do not stage or create a pull request; use
+    goto_step with step_id `plan-workflow-instantiation` and include the exact
+    workflow id, expected dependency list, actual dependency list, and file
+    path. Continue only after the persisted metadata exactly matches the plan.
 - id: inspect-workflow-repository-state
   description: Inspect generated workflow repository state.
   step_type: invoke_tool

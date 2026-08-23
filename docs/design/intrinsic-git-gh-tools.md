@@ -6,7 +6,7 @@ stdout, and stderr data.
 
 ## Supported operations
 
-Use structured parameters whenever possible:
+Only structured parameters are accepted for intrinsic actions:
 
 ```json
 {"action":"invoke_tool","tool":"git","parameters":{"operation":"status"}}

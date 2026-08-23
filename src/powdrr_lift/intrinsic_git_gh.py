@@ -48,24 +48,20 @@ def intrinsic_command(parameters: Mapping[str, Any], *, tool: str) -> list[str]:
 
 
 def _git_command(parameters: Mapping[str, Any]) -> list[str]:
-    command = _parameter_command(parameters)
-    if not command:
-        operation = parameters.get("operation")
-        if operation == "status":
-            command = ["status", "--short"]
-        elif operation == "add":
-            paths = _relative_paths(parameters.get("paths"), field="paths")
-            command = ["add", *paths]
-        elif operation in {"move", "rename"}:
-            source = _relative_path(parameters.get("source"), field="source")
-            destination = _relative_path(
-                parameters.get("destination"), field="destination"
-            )
-            command = ["mv", source, destination]
-        else:
-            raise RuntimeError(
-                "git intrinsic tool requires operation status, add, or move."
-            )
+    operation = parameters.get("operation")
+    if operation == "status":
+        command = ["status", "--short"]
+    elif operation == "add":
+        paths = _relative_paths(parameters.get("paths"), field="paths")
+        command = ["add", *paths]
+    elif operation in {"move", "rename"}:
+        source = _relative_path(parameters.get("source"), field="source")
+        destination = _relative_path(parameters.get("destination"), field="destination")
+        command = ["mv", source, destination]
+    else:
+        raise RuntimeError(
+            "git intrinsic tool requires structured operation status, add, or move."
+        )
     if command[0] not in {"status", "add", "mv"}:
         raise RuntimeError("git intrinsic tool only supports status, add, and move.")
     if command[0] in {"add", "mv"}:
@@ -75,46 +71,44 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
 
 
 def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
-    command = _parameter_command(parameters)
-    if not command:
-        operation = parameters.get("operation")
-        reference = parameters.get("pr_reference", parameters.get("number"))
-        if operation in {"pr_view", "pr_diff", "pr_checks"}:
-            reference = _required_text(reference, "pr_reference")
-            command = ["pr", operation.removeprefix("pr_").replace("_", "-"), reference]
-        elif operation == "pr_create":
-            command = [
-                "pr",
-                "create",
-                "--title",
-                _required_text(parameters.get("title"), "title"),
-                "--body",
-                _required_text(parameters.get("body"), "body"),
-            ]
-            if parameters.get("draft", False):
-                command.insert(2, "--draft")
-        elif operation == "pr_edit":
-            command = [
-                "pr",
-                "edit",
-                _required_text(reference, "pr_reference"),
-                "--title",
-                _required_text(parameters.get("title"), "title"),
-                "--body",
-                _required_text(parameters.get("body"), "body"),
-            ]
-        elif operation == "pr_comments":
-            command = [
-                "pr",
-                "view",
-                _required_text(reference, "pr_reference"),
-                "--comments",
-            ]
-        else:
-            raise RuntimeError(
-                "gh intrinsic tool requires pr_view, pr_diff, pr_checks, "
-                "pr_create, pr_edit, or pr_comments."
-            )
+    operation = parameters.get("operation")
+    reference = parameters.get("pr_reference", parameters.get("number"))
+    if operation in {"pr_view", "pr_diff", "pr_checks"}:
+        reference = _required_text(reference, "pr_reference")
+        command = ["pr", operation.removeprefix("pr_").replace("_", "-"), reference]
+    elif operation == "pr_create":
+        command = [
+            "pr",
+            "create",
+            "--title",
+            _required_text(parameters.get("title"), "title"),
+            "--body",
+            _required_text(parameters.get("body"), "body"),
+        ]
+        if parameters.get("draft", False):
+            command.insert(2, "--draft")
+    elif operation == "pr_edit":
+        command = [
+            "pr",
+            "edit",
+            _required_text(reference, "pr_reference"),
+            "--title",
+            _required_text(parameters.get("title"), "title"),
+            "--body",
+            _required_text(parameters.get("body"), "body"),
+        ]
+    elif operation == "pr_comments":
+        command = [
+            "pr",
+            "view",
+            _required_text(reference, "pr_reference"),
+            "--comments",
+        ]
+    else:
+        raise RuntimeError(
+            "gh intrinsic tool requires structured operation pr_view, pr_diff, "
+            "pr_checks, pr_create, pr_edit, or pr_comments."
+        )
     if (
         len(command) < 2
         or command[0] != "pr"
@@ -131,18 +125,6 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             "gh intrinsic tool only supports GitHub pull-request create and "
             "inspect operations."
         )
-    return command
-
-
-def _parameter_command(parameters: Mapping[str, Any]) -> list[str]:
-    raw = parameters.get("command")
-    if raw is None:
-        return []
-    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)):
-        raise RuntimeError("Intrinsic repository tool command must be an array.")
-    command = [item for item in raw if isinstance(item, str) and item]
-    if len(command) != len(raw):
-        raise RuntimeError("Intrinsic repository tool command items must be strings.")
     return command
 
 

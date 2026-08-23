@@ -3769,6 +3769,8 @@ def _run_deterministic_pre_step(
             raise RuntimeError("Invoke tool pre-step template requires a tool.")
         parameters = dict(template)
         parameters.pop("tool", None)
+        if tool in {GIT_TOOL, GH_TOOL}:
+            parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
         if tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
                 parameters,
@@ -4183,7 +4185,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "invoke_tool requires a tool listed in the current step's "
         "tool_invocations. Shell and internal require parameters.command as a "
         "non-empty string or string array. The intrinsic git and gh tools use "
-        "parameters.operation (or a declared command array) and never require "
+        "parameters.operation and never accept a shell command array. "
         "a shell command. For git use operation status, add, or move; for gh "
         "use pr_view, pr_diff, pr_checks, pr_create, pr_edit, or pr_comments. "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
@@ -7100,6 +7102,18 @@ def _execute_shell_tool(
     if len(attempted_commands) > 1:
         result["attempted_commands"] = attempted_commands
     return result
+
+
+def _structured_intrinsic_pre_step_parameters(
+    tool: str, parameters: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Translate legacy declarative pre-step commands to structured actions."""
+    command = parameters.get("command")
+    if tool == GIT_TOOL and command == ["status", "--short"]:
+        return {"operation": "status"}
+    raise RuntimeError(
+        f"Intrinsic {tool} pre-steps must declare a supported structured operation."
+    )
 
 
 def _normalize_noop_git_commit_result(

@@ -34,6 +34,13 @@ def test_git_intrinsic_rejects_worktree_escape() -> None:
         )
 
 
+def test_intrinsics_require_structured_operations() -> None:
+    with pytest.raises(RuntimeError, match="structured operation"):
+        intrinsic_command({"command": ["status", "--short"]}, tool="git")
+    with pytest.raises(RuntimeError, match="structured operation"):
+        intrinsic_command({"command": ["pr", "view", "394"]}, tool="gh")
+
+
 def test_gh_intrinsic_operations_have_expected_commands() -> None:
     assert intrinsic_command(
         {"operation": "pr_view", "pr_reference": "394"}, tool="gh"

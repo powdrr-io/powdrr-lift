@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.core.spec_context import proposed_pr_id_exists
+
 
 @dataclass(frozen=True, slots=True)
 class WorkflowRelationshipValidationIssue:
@@ -292,24 +294,7 @@ def _validate_repository_target(
 
 
 def _proposed_pr_id_exists(repository_root: Path, target_id: str) -> bool:
-    for root in (
-        repository_root / "docs" / "proposals",
-        repository_root / "docs" / "specs",
-    ):
-        if not root.is_dir():
-            continue
-        for path in root.rglob("*.yaml"):
-            if path.name != "proposed-pr-specification.yaml" and not path.name.endswith(
-                "-proposed-pr-specification.yaml"
-            ):
-                continue
-            try:
-                data = yaml.safe_load(path.read_text(encoding="utf-8"))
-            except (OSError, yaml.YAMLError):
-                continue
-            if isinstance(data, Mapping) and data.get("id") == target_id:
-                return True
-    return False
+    return proposed_pr_id_exists(repository_root, target_id)
 
 
 def _required_string(

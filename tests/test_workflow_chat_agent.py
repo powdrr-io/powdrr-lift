@@ -3201,6 +3201,7 @@ def test_auto_provider_selects_openrouter_when_configured(
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
 
     assert _resolve_provider("auto", "glm-5.2") == "openrouter"
 

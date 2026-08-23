@@ -338,7 +338,7 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         api_key_env_names=("OPENROUTER_API_KEY",),
         base_url_env_names=("OPENROUTER_BASE_URL",),
         default_base_url="https://openrouter.ai/api/v1",
-        auto_priority=35,
+        auto_priority=0,
     ),
     "deepinfra": LLMProviderDefinition(
         name="deepinfra",

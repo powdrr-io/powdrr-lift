@@ -216,7 +216,8 @@ continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
 - Use `--provider openrouter` with `OPENROUTER_API_KEY` to use
   `openrouter/ox-alpha` for every workflow capability. OpenRouter uses
   `https://openrouter.ai/api/v1` by default; override it with
-  `OPENROUTER_BASE_URL` when needed.
+  `OPENROUTER_BASE_URL` when needed. In `auto` mode, OpenRouter is preferred
+  whenever `OPENROUTER_API_KEY` is available.
 - Use `--provider deepinfra-cheap` with `DEEPINFRA_API_TOKEN` to use
   `deepseek-ai/DeepSeek-V4-Flash` for every workflow capability. In `auto`
   mode, this provider is selected for non-Claude models whenever DeepInfra

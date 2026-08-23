@@ -1,0 +1,45 @@
+task_id: execute-proposed-pr-interaction-file-log-formatting-task-021
+status: open
+upstream_task_ids:
+- execute-proposed-pr-interaction-file-log-formatting-task-001
+- execute-proposed-pr-interaction-file-log-formatting-task-005
+- execute-proposed-pr-interaction-file-log-formatting-task-011
+- execute-proposed-pr-interaction-file-log-formatting-task-012
+- execute-proposed-pr-interaction-file-log-formatting-task-014
+- execute-proposed-pr-interaction-file-log-formatting-task-015
+- execute-proposed-pr-interaction-file-log-formatting-task-016
+- execute-proposed-pr-interaction-file-log-formatting-task-019
+- execute-proposed-pr-interaction-file-log-formatting-task-020
+dependent_state:
+- pull-request-prep-complete
+complexity: medium
+input_state:
+  proposed_pr_context: execute-proposed-pr-interaction-file-log-formatting-task-001.proposed-pr-context-state
+  implementation_diffs: execute-proposed-pr-interaction-file-log-formatting-task-005.generated-product-code-state
+  all_tests_results: execute-proposed-pr-interaction-file-log-formatting-task-011.final-all-tests-results-state
+  completeness_review: execute-proposed-pr-interaction-file-log-formatting-task-012.specification-completeness-state
+  formatting_check: execute-proposed-pr-interaction-file-log-formatting-task-014.formatting-check-state
+  lint_check: execute-proposed-pr-interaction-file-log-formatting-task-015.lint-check-state
+  type_check: execute-proposed-pr-interaction-file-log-formatting-task-016.type-check-state
+  promoted_documents: execute-proposed-pr-interaction-file-log-formatting-task-019.promoted-current-state-documents
+  staged_changes: execute-proposed-pr-interaction-file-log-formatting-task-020.staged-pull-request-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: pull-request-prep-state
+description: Finish pull request preparation
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Perform exactly one action: invoke the listed finish-pr-prep skill. Do not
+  independently edit, stage, commit, push, or create a pull request here; the nested
+  skill owns those operations. After it returns, pass its complete evidence to the
+  next workflow boundary with one next_step action, for example: {"action":"next_step","outputs":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep
+  completed with the recorded validation evidence."}
+
+
+  Instantiation context: work item name is ''interaction-file-logging''; workflow
+  instance name is ''execute-proposed-pr-interaction-file-log-formatting''. Use these
+  values as search context and verify repository documents before deciding what they
+  identify.'
+llm_type: fast_iteration
+uses_skills:
+- finish-pr-prep

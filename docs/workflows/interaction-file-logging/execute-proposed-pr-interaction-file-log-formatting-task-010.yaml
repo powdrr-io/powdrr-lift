@@ -1,0 +1,30 @@
+task_id: execute-proposed-pr-interaction-file-log-formatting-task-010
+status: open
+upstream_task_ids:
+- execute-proposed-pr-interaction-file-log-formatting-task-009
+dependent_state:
+- full-test-repair-complete
+complexity: high
+input_state:
+  all_tests_results: execute-proposed-pr-interaction-file-log-formatting-task-009.all-tests-results-state
+  repair_result: {}
+assignee_type: agent
+assignee_role: coder
+output_state_type: full-test-repair-state
+description: Repair full test failures
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Perform exactly one action only when the full suite failed: edit the approved
+  files to address the reported failures. Do not run tests in this step; the workflow
+  reruns the deterministic full-suite task afterward. If the suite passed, make no
+  edit and record that no repair was needed. A repair response is exactly one edit
+  action, for example: {"action":"edit","file_path":"src/feature.py","edits":[{"kind":"replace","start_line":30,"end_line":31,"text":"corrected
+  code"}],"decisions_and_context":"Addressed the reported full-suite failure; rerun
+  the suite next."}
+
+
+  Instantiation context: work item name is ''interaction-file-logging''; workflow
+  instance name is ''execute-proposed-pr-interaction-file-log-formatting''. Use these
+  values as search context and verify repository documents before deciding what they
+  identify.'
+llm_type: standard_reasoning

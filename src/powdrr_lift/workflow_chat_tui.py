@@ -29,6 +29,25 @@ _POWDRR_AGENT_BANNER = "Powdrr Agent v0.0.1"
 _MAX_STATUS_HISTORY_ENTRIES = 80
 _MAX_STATUS_HISTORY_CHARS = 24_000
 _MAX_STATUS_MESSAGE_CHARS = 8_000
+_MAX_VISIBLE_WORKFLOW_STEPS = 10
+
+
+def _visible_step_indices(total_steps: int, current_step_index: int) -> tuple[int, ...]:
+    """Return the workflow steps that fit in the orange progress panel."""
+    if total_steps <= _MAX_VISIBLE_WORKFLOW_STEPS:
+        return tuple(range(total_steps))
+
+    candidates = (
+        current_step_index - 1,
+        current_step_index,
+        *range(current_step_index + 1, current_step_index + 8),
+        total_steps - 1,
+    )
+    visible_indices: list[int] = []
+    for index in candidates:
+        if 0 <= index < total_steps and index not in visible_indices:
+            visible_indices.append(index)
+    return tuple(visible_indices)
 
 
 class _TextualOutput:
@@ -516,34 +535,29 @@ class WorkflowChatApp(App[None]):
         )
         skill_path = self._resolve_skill_path(skill, parent_skill)
         steps.border_title = " > ".join(skill_path)
-        expected_item_count = len(skill.skill.steps) + (2 if nested else 0)
-        items = list(steps.query(ListItem))
-        rebuilt = len(steps.children) != expected_item_count
-        if rebuilt:
-            steps.clear()
-            if nested:
-                assert nested_parent_skill is not None
-                assert nested_parent_step_index is not None
-                parent_step = nested_parent_skill.skill.steps[nested_parent_step_index]
-                steps.mount(
-                    ListItem(
-                        Label(
-                            f"{nested_parent_step_index + 1}. {parent_step.description}"
-                        )
-                    ),
-                    ListItem(Label("-------")),
-                )
-            items = [
-                ListItem(Label(f"{step_index + 1}. {step.description}"))
-                for step_index, step in enumerate(skill.skill.steps)
-            ]
-            steps.mount(*items)
-        else:
-            items = list(steps.query(ListItem))
-        if nested and not rebuilt:
-            items = items[2:]
+        visible_indices = _visible_step_indices(
+            len(skill.skill.steps), current_step_index
+        )
+        steps.clear()
+        if nested:
+            assert nested_parent_skill is not None
+            assert nested_parent_step_index is not None
+            parent_step = nested_parent_skill.skill.steps[nested_parent_step_index]
+            steps.mount(
+                ListItem(
+                    Label(f"{nested_parent_step_index + 1}. {parent_step.description}")
+                ),
+                ListItem(Label("-------")),
+            )
+        items = [
+            ListItem(
+                Label(f"{step_index + 1}. {skill.skill.steps[step_index].description}")
+            )
+            for step_index in visible_indices
+        ]
+        steps.mount(*items)
         steps.set_class(bool(items), "has-content")
-        for step_index, item in enumerate(items):
+        for step_index, item in zip(visible_indices, items, strict=True):
             item.remove_class("completed", "current")
             if step_index < current_step_index:
                 item.add_class("completed")

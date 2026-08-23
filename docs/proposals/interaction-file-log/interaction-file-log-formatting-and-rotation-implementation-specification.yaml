@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Formatting and Rotation for Interaction File Log
+architecture_id: '2026-08-22'
+entities:
+- id: interaction-log
+  action: added
+  rationale: The interaction log entity is the central artifact that stores interaction
+    entries, and this PR adds formatting and rotation capabilities to manage log file
+    size and readability.
+- id: interaction-entry
+  action: added
+  rationale: The interaction entry entity represents a single logged interaction,
+    and this PR defines its formatted output structure for consistent log entries.
+- id: log-writer
+  action: added
+  rationale: The log writer is the tool that writes interaction entries to the log,
+    and this PR extends it with formatting and rotation behavior.
+- id: interaction-source
+  action: added
+  rationale: The interaction source entity represents the origin of interaction data,
+    and this PR ensures sources provide data that is formatted consistently in the
+    log.
+modules:
+- id: mod-log-writer
+  action: changed
+  relative_location: src/interaction_file_log/log_writer.py
+  purpose: Extend the log writer module with formatting and rotation capabilities
+    to produce readable log entries and manage log file size.
+tools:
+- id: tool-log-writer
+  action: changed
+  when_to_use: Use this tool when writing interaction entries to the log file with
+    formatted output and when log rotation is needed to prevent unbounded file growth.
+  template: templates/log-writer.yaml
+  how_to_use: Invoke the log writer tool with the interaction entry data to append
+    a formatted entry to the log file, and configure rotation settings to automatically
+    rotate the log when it reaches a size threshold.
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  rationale: The log writer appends formatted interaction entries to the interaction
+    log, and this PR enhances this relationship with formatting and rotation.
+- id: rel-log-contains
+  action: added
+  rationale: The interaction log contains formatted interaction entries, and this
+    PR defines the formatted structure of this containment.
+- id: rel-source-feeds
+  action: added
+  rationale: Interaction sources feed entries into the log, and this PR ensures the
+    data is formatted consistently before being written.
+features:
+- id: formatting-and-rotation
+  action: added
+  description: Add formatting and rotation capabilities to the interaction file log
+    to produce readable log entries and manage log file size.
+  functional_requirements:
+  - The log writer must format each interaction entry with a timestamp, source, and
+    message in a consistent, human-readable format.
+  - The log writer must support configurable rotation based on log file size, rotating
+    the log when the size threshold is exceeded.
+  - The log writer must preserve the most recent log entries across rotations by archiving
+    or renaming the rotated log file.
+  - The log writer must support configurable formatting options, such as timestamp
+    format and field ordering.
+decisions:
+- id: formatting-rotation-approach
+  action: added
+  description: Implement formatting and rotation by extending the log writer module
+    with configurable formatting and size-based rotation.

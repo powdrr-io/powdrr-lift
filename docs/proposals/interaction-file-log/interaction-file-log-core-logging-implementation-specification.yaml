@@ -1,0 +1,64 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Core Logging for Interaction File Log
+architecture_id: '2026-08-22'
+entities:
+- id: interaction-log
+  action: added
+  rationale: The interaction log entity is the central artifact that stores interaction
+    entries, and this PR establishes its core structure and file-based persistence.
+- id: interaction-entry
+  action: added
+  rationale: The interaction entry entity represents a single logged interaction,
+    and this PR defines its core structure and how it is appended to the log.
+- id: log-writer
+  action: added
+  rationale: The log writer is the tool that writes interaction entries to the log,
+    and this PR implements its core file creation and append behavior.
+- id: interaction-source
+  action: added
+  rationale: The interaction source entity represents the origin of interaction data,
+    and this PR establishes how sources feed entries into the log.
+modules:
+- id: mod-log-writer
+  action: added
+  relative_location: src/interaction_file_log/log_writer.py
+  purpose: Implement the core log writer module that creates the log file and appends
+    interaction entries to it.
+tools:
+- id: tool-log-writer
+  action: added
+  when_to_use: Use this tool when writing interaction entries to the log file, such
+    as when an interaction occurs and needs to be recorded.
+  template: templates/log-writer.yaml
+  how_to_use: Invoke the log writer tool with the interaction entry data to append
+    it to the configured log file, creating the file if it does not exist.
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  rationale: The log writer appends interaction entries to the interaction log, and
+    this PR implements this core relationship.
+- id: rel-log-contains
+  action: added
+  rationale: The interaction log contains interaction entries, and this PR establishes
+    the core containment relationship.
+- id: rel-source-feeds
+  action: added
+  rationale: Interaction sources feed entries into the log, and this PR establishes
+    how sources provide data to the log writer.
+features:
+- id: core-logging
+  action: added
+  description: Implement the core logging functionality for the interaction file log,
+    including file creation and appending interaction entries.
+  functional_requirements:
+  - The log writer must create the log file if it does not exist when the first entry
+    is written.
+  - The log writer must append each interaction entry to the end of the log file.
+  - The log writer must accept interaction entries from interaction sources and write
+    them to the log.
+  - The log file must be created in the configured location with the configured filename.
+decisions:
+- id: core-logging-approach
+  action: added
+  description: Implement core logging by creating a dedicated log writer module that
+    handles file creation and appending entries.

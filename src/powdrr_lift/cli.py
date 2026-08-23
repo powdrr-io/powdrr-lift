@@ -70,6 +70,10 @@ from powdrr_lift.core.project_structure import (
     create_project_structure_template,
     validate_project_structure_yaml,
 )
+from powdrr_lift.core.specification_deduplication import (
+    deduplicate_specification_ids,
+    reformat_specification_file,
+)
 from powdrr_lift.core.specification_v1 import normalize_specification_v1_file
 from powdrr_lift.core.workflow_relationships import (
     WorkflowRelationshipValidationIssue,
@@ -1924,6 +1928,7 @@ def _validate_pr_file_specification(
     repo_root: Path,
 ) -> str:
     normalize_specification_v1_file(path)
+    deduplicate_specification_ids(path)
     proposed_yaml = _read_input(path)
     work_item_name = path.parent.name
     if kind == "system":
@@ -2351,6 +2356,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
         work_item_name = args.work_item_name or specification_path.parent.name
         try:
             normalize_specification_v1_file(specification_path)
+            deduplicate_specification_ids(specification_path, reformat=False)
             proposed_yaml = _read_input(specification_path)
             if kind == "system":
                 validation_successful = build_system_specification_validation_report(
@@ -2417,6 +2423,7 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
             overall_success = False
             continue
 
+        reformat_specification_file(specification_path)
         print(f"File: {specification_path}")
         sys.stdout.write(report_yaml)
         if not report_yaml.endswith("\n"):

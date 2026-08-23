@@ -25,6 +25,12 @@ from powdrr_lift.core import (
     load_workflow_template,
 )
 from powdrr_lift.core.workflow_task_specification import save_workflow_task
+from powdrr_lift.workflow_git import (
+    load_workflow_git_state,
+    resolve_git_repository_root,
+    slugify_workflow_id,
+    workflow_worktree_path,
+)
 
 DEFAULT_ERROR_LOG = Path("workflow-llm-errors.jsonl")
 DEFAULT_TRANSCRIPT_DIR = Path("workflow-task-harness")
@@ -173,6 +179,23 @@ def _select_task(workflow_dir: Path, task_id: str | None) -> WorkflowTask | None
     return ready[0] if ready else None
 
 
+def _active_workflow_dir(repo_root: Path, workflow_dir: Path) -> Path:
+    """Resolve the durable graph where process-workflow-task actually writes."""
+    state = load_workflow_git_state(workflow_dir)
+    if state is None:
+        return workflow_dir
+    try:
+        project_root = resolve_git_repository_root(repo_root)
+        integration_dir = workflow_worktree_path(
+            project_root,
+            state.proposed_pr_id,
+        )
+    except (OSError, RuntimeError, ValueError):
+        return workflow_dir
+    active_dir = integration_dir / state.workflow_relative_directory
+    return active_dir if active_dir.is_dir() else workflow_dir
+
+
 def _workflow_state(workflow_dir: Path) -> dict[str, Any]:
     """Return a stable, JSON-serializable snapshot of the durable workflow."""
     workflow = WorkflowInstance.from_directory(workflow_dir)
@@ -214,15 +237,32 @@ def _workflow_state(workflow_dir: Path) -> dict[str, Any]:
     }
 
 
-def _reopen_locked_tasks(workflow_dir: Path, task_ids: list[str]) -> None:
+def _reopen_locked_tasks(
+    repo_root: Path,
+    workflow_dir: Path,
+    task_ids: list[str],
+) -> None:
     """Make failed agent tasks retryable without touching human handoffs."""
     workflow = WorkflowInstance.from_directory(workflow_dir)
+    state = load_workflow_git_state(workflow_dir)
     for task_id in task_ids:
         task = next((item for item in workflow.tasks if item.task_id == task_id), None)
         if task is None or task.assignee_type is not AssigneeType.AGENT:
             continue
         if task.status is TaskStatus.LOCKED:
             _reopen_task(workflow_dir, task_id)
+        if state is not None:
+            claim_ref = (
+                f"refs/agents/claims/{slugify_workflow_id(state.proposed_pr_id)}/"
+                f"{slugify_workflow_id(task_id)}"
+            )
+            subprocess.run(
+                ["git", "update-ref", "-d", claim_ref],
+                cwd=repo_root,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
 
 def _state_fingerprint(state: dict[str, Any]) -> str:
@@ -403,6 +443,7 @@ def _run_iteration(
     error_logs: tuple[Path, ...],
     transcript: Path,
     args: argparse.Namespace,
+    state_workflow_dir: Path | None = None,
 ) -> dict[str, Any]:
     previous_error_counts = {path: len(_read_jsonl(path)) for path in error_logs}
     command = _build_task_command(
@@ -498,7 +539,7 @@ def _run_iteration(
         new_errors.extend(_read_jsonl(path)[previous_error_counts[path] :])
     lowered = (output or "").lower()
     corrections = [marker for marker in _FAILURE_MARKERS if marker in lowered]
-    workflow_state = _workflow_state(workflow_dir)
+    workflow_state = _workflow_state(state_workflow_dir or workflow_dir)
     status = "clean"
     if timed_out:
         status = "timeout"
@@ -517,7 +558,9 @@ def _run_iteration(
         "returncode": process.returncode,
         "task_id": task.task_id if task is not None else None,
         "task_path": (
-            str(_task_path(workflow_dir, task)) if task is not None else None
+            str(_task_path(state_workflow_dir or workflow_dir, task))
+            if task is not None
+            else None
         ),
         "workflow_dir": str(workflow_dir),
         "transcript": str(transcript),
@@ -540,13 +583,14 @@ def _run_repair_command(
     iteration: int,
     timeout: float,
 ) -> int:
+    task_root = _active_workflow_dir(repo_root, workflow_dir)
     environment = {
         "HARNESS_ITERATION": str(iteration),
         "HARNESS_REPO_ROOT": str(repo_root),
         "HARNESS_WORKFLOW_DIR": str(workflow_dir),
         "HARNESS_TASK_ID": task.task_id if task is not None else "",
         "HARNESS_TASK_PATH": (
-            str(_task_path(workflow_dir, task)) if task is not None else ""
+            str(_task_path(task_root, task)) if task is not None else ""
         ),
         "HARNESS_TEMPLATE_PATH": str(template_path),
         "HARNESS_TRANSCRIPT": result["transcript"],
@@ -566,7 +610,7 @@ def _run_repair_command(
                 "template": str(template_path),
                 "workflow": str(workflow_dir),
                 "task": (
-                    str(_task_path(workflow_dir, task)) if task is not None else None
+                    str(_task_path(task_root, task)) if task is not None else None
                 ),
             },
             ensure_ascii=False,
@@ -663,7 +707,8 @@ def main() -> int:
         previous_fingerprint: str | None = None
         repeated_state_count = 0
         for iteration in range(1, args.iterations + 1):
-            before = _workflow_state(workflow_dir)
+            observed_workflow_dir = _active_workflow_dir(run_root, workflow_dir)
+            before = _workflow_state(observed_workflow_dir)
             if before["outcome"] in {"completed", "human_handoff"}:
                 reports.append(
                     {
@@ -690,7 +735,7 @@ def main() -> int:
                     }
                 )
                 break
-            selected_task = _select_task(workflow_dir, args.task_id)
+            selected_task = _select_task(observed_workflow_dir, args.task_id)
             # A full run is the default. The explicit task option remains useful
             # for isolating one failing task while debugging a template.
             task_for_run = selected_task if args.task_id is not None else None
@@ -701,12 +746,13 @@ def main() -> int:
                 error_logs=error_logs,
                 transcript=transcript_dir / f"iteration-{iteration:02d}.log",
                 args=args,
+                state_workflow_dir=observed_workflow_dir,
             )
             result["iteration"] = iteration
             result["template_path"] = str(template_path)
             result["error_logs"] = [str(path) for path in error_logs]
             result["workflow_state_before"] = before
-            result["workflow_state_after"] = _workflow_state(workflow_dir)
+            result["workflow_state_after"] = _workflow_state(observed_workflow_dir)
             result["workflow_fingerprint"] = _state_fingerprint(
                 result["workflow_state_after"]
             )
@@ -750,23 +796,24 @@ def main() -> int:
                 return 0
             if result["status"] in {"timeout", "interrupted"}:
                 break
+            _reopen_locked_tasks(
+                run_root,
+                observed_workflow_dir,
+                list(after.get("locked_task_ids", [])),
+            )
             if not args.repair_command:
                 print(
                     "Iteration failed; inspect the transcript and structured errors.",
                     file=sys.stderr,
                 )
                 break
-            _reopen_locked_tasks(
-                workflow_dir,
-                list(after.get("locked_task_ids", [])),
-            )
             repair_task = selected_task
             if repair_task is None:
-                repair_task = _select_task(workflow_dir, args.task_id)
+                repair_task = _select_task(observed_workflow_dir, args.task_id)
             repair_returncode = _run_repair_command(
                 args.repair_command,
                 repo_root=run_root,
-                workflow_dir=workflow_dir,
+                workflow_dir=observed_workflow_dir,
                 task=repair_task,
                 template_path=template_path,
                 error_log=runner_error_logs[-1],

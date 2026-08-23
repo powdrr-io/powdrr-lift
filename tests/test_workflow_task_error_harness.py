@@ -124,7 +124,11 @@ def test_workflow_state_and_fingerprint_detect_locked_agent_without_hanging(
         first_fingerprint
     )
 
-    module._reopen_locked_tasks(workflow.directory, state["locked_task_ids"])
+    module._reopen_locked_tasks(
+        tmp_path,
+        workflow.directory,
+        state["locked_task_ids"],
+    )
     reopened = module._workflow_state(workflow.directory)
     assert reopened["outcome"] == "agent_work_remaining"
     assert module._state_fingerprint(reopened) != first_fingerprint

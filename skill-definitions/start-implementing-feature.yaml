@@ -339,10 +339,13 @@ steps:
     missing a workflow, or any workflow is missing its proposed PR, do not stage
     artifacts or continue to pull-request preparation; return to the relevant
     planning or instantiation step with the mismatch and exact paths. For
-    example, use `goto_step: plan-workflow-instantiation` when a proposed PR
-    has no workflow, or `goto_step: plan-proposed-prs` when a workflow has no
-    proposed PR. Continue only after the mapping is complete, unique, and
-    recorded in workflow context.
+    example, return
+    `{"action":"goto_step","step_id":"plan-workflow-instantiation","decisions_and_context":"Proposed PR <id> has no matching workflow at <path>."}`
+    when a proposed PR has no workflow, or
+    `{"action":"goto_step","step_id":"plan-proposed-prs","decisions_and_context":"Workflow <path> has no matching proposed PR."}`
+    when a workflow has no proposed PR. After the mapping is complete, unique,
+    and recorded in workflow context, return
+    `{"action":"next_step","decisions_and_context":"Every proposed PR maps to exactly one workflow, and every workflow maps to exactly one proposed PR."}`.
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
   step_type: freeform

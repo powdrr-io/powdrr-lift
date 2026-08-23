@@ -2340,9 +2340,8 @@ def run_workflow_chat(
 
     provider_roles = _resolve_provider_roles(config)
     provider_role: LLMProviderRole = "normal"
-    current_model = config.model
     provider = provider_roles.provider_for(provider_role)
-    current_model = _provider_definition(provider).forced_model or current_model
+    current_model = _initial_model_for_provider(provider, config.model)
     credentials = _resolve_credentials(provider, config.api_key, config.base_url)
     clients: dict[tuple[str, str], WorkflowLLMClient] = {}
 
@@ -2391,7 +2390,7 @@ def run_workflow_chat(
         f"Loaded {len(catalog)} skill(s) from {skills_dir}",
     )
     _verbose_print(stderr, config.verbose, f"Selected provider: {provider}")
-    _verbose_print(stderr, config.verbose, f"Selected model: {config.model}")
+    _verbose_print(stderr, config.verbose, f"Selected model: {current_model}")
 
     user_request = _prompt_user(
         "What do you want to do? ",
@@ -3284,6 +3283,17 @@ def _active_llm_mappings(
     if role == "normal":
         mappings += config.llm_mappings
     return mappings
+
+
+def _initial_model_for_provider(provider: str, configured_model: str) -> str:
+    """Resolve the first request model using the selected provider's mapping."""
+    definition = _provider_definition(provider)
+    if definition.forced_model is not None:
+        return definition.forced_model
+    if configured_model != _DEFAULT_MODEL:
+        return configured_model
+    mapping = definition.llm_mappings.get(_DEFAULT_LLM_TYPE)
+    return mapping.model if mapping is not None else configured_model
 
 
 def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:

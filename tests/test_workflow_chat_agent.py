@@ -93,6 +93,7 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_edit,
     _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
+    _initial_model_for_provider,
     _latest_deterministic_pre_step,
     _latest_execution_event_for_prompt,
     _LLMExchangeRecordingClient,
@@ -3204,6 +3205,14 @@ def test_auto_provider_selects_openrouter_when_configured(
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
 
     assert _resolve_provider("auto", "glm-5.2") == "openrouter"
+
+
+def test_initial_model_uses_openrouter_mapping_for_default_model() -> None:
+    assert _initial_model_for_provider("openrouter", "glm-5.2") == (
+        "openrouter/ox-alpha"
+    )
+    assert _initial_model_for_provider("openai", "glm-5.2") == "glm-5.2"
+    assert _initial_model_for_provider("openrouter", "custom-model") == ("custom-model")
 
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:

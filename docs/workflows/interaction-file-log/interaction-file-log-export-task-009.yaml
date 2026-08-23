@@ -1,0 +1,40 @@
+task_id: interaction-file-log-export-task-009
+status: open
+upstream_task_ids:
+- interaction-file-log-export-task-001
+- interaction-file-log-export-task-005
+- interaction-file-log-export-task-007
+dependent_state:
+- current-state-documents-promoted
+complexity: medium
+input_state:
+  proposed_pr_context: interaction-file-log-export-task-001.proposed-pr-context-state
+  implementation_diffs: interaction-file-log-export-task-005.generated-product-code-state
+  completeness_review: interaction-file-log-export-task-007.specification-completeness-state
+  feature_id: interaction-file-log
+  promoted_documents: {}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: promoted-current-state-documents
+description: Promote the implemented feature documents to current state
+step_type: freeform
+details: 'After implementation and validation are complete, move the feature''s specification
+  directory from docs/proposals/<feature_id>/ to docs/current/<feature_id>/. Use git
+  mv so the committed implementation records the transition and preserves history.
+  Move only the documents for the completed feature; leave unrelated proposals in
+  place. If the proposal directory does not exist or the current directory already
+  exists, inspect the exact contents and resolve the situation before continuing.
+  Record the moved paths in output_state.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-export''. Use these values as search context and
+  verify repository documents before deciding what they identify.'
+llm_type: simple_task
+tool_invocations:
+- tool: shell
+  command:
+  - git
+  - mv
+  - docs/proposals/<work-item-name>
+  - docs/current/<work-item-name>

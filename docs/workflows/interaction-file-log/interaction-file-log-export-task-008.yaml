@@ -1,0 +1,45 @@
+task_id: interaction-file-log-export-task-008
+status: open
+upstream_task_ids:
+- interaction-file-log-export-task-005
+- interaction-file-log-export-task-006
+- interaction-file-log-export-task-007
+dependent_state:
+- lint-and-cleanup-complete
+complexity: medium
+input_state:
+  implementation_diffs: interaction-file-log-export-task-005.generated-product-code-state
+  test_results: interaction-file-log-export-task-006.all-tests-passing-state
+  completeness_review: interaction-file-log-export-task-007.specification-completeness-state
+  lint_results: []
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: linted-and-cleaned-state
+description: Run lint, type checks, and cleanup
+step_type: freeform
+details: 'Run repository formatting checks, lint checks, and type checks using the
+  shell tool. Review the complete diff for debug code, generated artifacts, unrelated
+  edits, formatting issues, and accidental secrets. Fix only issues within the approved
+  scope, rerun all affected checks, and record the final commands and results in output_state.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-export''. Use these values as search context and
+  verify repository documents before deciding what they identify.'
+llm_type: fast_iteration
+tool_invocations:
+- tool: shell
+  command:
+  - ruff
+  - format
+  - --check
+  - .
+- tool: shell
+  command:
+  - ruff
+  - check
+  - .
+- tool: shell
+  command:
+  - mypy
+  - src

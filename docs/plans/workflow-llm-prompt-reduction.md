@@ -268,7 +268,7 @@ send only the fields relevant to the current step:
 - proposed PR ID;
 - workflow directory;
 - active task ID;
-- integration and task branch names;
+- integration branch name;
 - relevant PR URLs and statuses;
 - the current consistency/recovery state when applicable.
 

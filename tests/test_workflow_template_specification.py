@@ -305,7 +305,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "Promote the implemented feature documents to current state",
         "Stage the pull request changes",
         "Finish pull request preparation",
-        "Create the pull request",
     ]
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
@@ -341,10 +340,9 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         ("agent", "reviewer"),
         ("agent", "reviewer"),
         ("agent", "reviewer"),
-        ("human", "reviewer"),
     ]
     assert template.task_templates[0].tool_invocations == ()
-    assert all(task.tool_invocations for task in template.task_templates[1:-1])
+    assert all(task.tool_invocations for task in template.task_templates[1:])
     for task in template.task_templates[1:]:
         assert "upstream_task_outputs" not in (task.details or "")
         assert "runtime task ID" not in (task.details or "")
@@ -367,9 +365,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[10].input_state["staged_changes"] == (
         "<upstream-task-9>.staged-pull-request-state"
     )
-    assert template.task_templates[11].input_state["lint_results"] == (
-        "<upstream-task-10>.pull-request-prep-state"
-    )
     assert template.task_templates[3].tool_invocations[0].command == (
         "pytest",
         "-q",
@@ -391,7 +386,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
-    assert len(tasks) == 12
+    assert len(tasks) == 11
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)

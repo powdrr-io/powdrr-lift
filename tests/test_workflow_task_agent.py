@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ import pytest
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
+    HumanRole,
     Skill,
     SkillStep,
     TaskComplexity,
@@ -24,12 +26,17 @@ from powdrr_lift.workflow_chat_agent import (
     _action_system_prompt,
     _parse_action_response,
 )
+from powdrr_lift.workflow_git import (
+    WorkflowGitState,
+    save_workflow_git_state,
+)
 from powdrr_lift.workflow_llm import WorkflowLLMHTTPError
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,
     _build_workflow_client,
     _handle_exhausted_timeout,
+    _publish_workflow_progress,
     _task_events_for_prompt,
     _workflow_file_command_error,
     run_workflow_task,
@@ -358,17 +365,53 @@ def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
     assert nested_prompt["transcript"] == []
 
 
-def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
+def test_process_workflow_task_uses_workflow_integration_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     primary_root = tmp_path / "repo"
-    worktree_root = primary_root / ".worktrees" / "workflow-task"
-    workflow = WorkflowInstance.create(
-        worktree_root / "docs" / "workflows" / "feature",
+    primary_root.mkdir()
+    for command in (
+        ("git", "init", "-b", "main"),
+        ("git", "config", "user.email", "test@example.com"),
+        ("git", "config", "user.name", "Test User"),
+    ):
+        subprocess.run(
+            list(command),
+            cwd=primary_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    (primary_root / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "README.md"],
+        cwd=primary_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "initial"],
+        cwd=primary_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    source_root = primary_root / ".worktrees" / "source"
+    subprocess.run(
+        ["git", "worktree", "add", "-b", "source", str(source_root), "main"],
+        cwd=primary_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    workflow_dir = source_root / "docs" / "workflows" / "feature"
+    WorkflowInstance.create(
+        workflow_dir,
         (
             WorkflowTask(
-                task_id="agent-task",
+                task_id="feature-17-task-001",
                 status=TaskStatus.OPEN,
                 upstream_task_ids=(),
                 dependent_state=(),
@@ -381,15 +424,48 @@ def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
             ),
         ),
     )
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="docs/workflows/feature",
+    )
+    save_workflow_git_state(workflow_dir, state)
+    subprocess.run(
+        ["git", "add", "docs/workflows/feature"],
+        cwd=source_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "initialize workflow"],
+        cwd=source_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    integration_root = primary_root / ".worktrees" / "powdrr" / "feature-17"
+    subprocess.run(
+        [
+            "git",
+            "worktree",
+            "add",
+            "-b",
+            "powdrr/feature-17",
+            str(integration_root),
+            "source",
+        ],
+        cwd=primary_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     published_roots: list[Path] = []
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._is_git_worktree",
-        lambda _: True,
-    )
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._resolve_worktree_context",
-        lambda *_args, **_kwargs: worktree_root,
+        "powdrr_lift.workflow_task_agent._open_final_workflow_pull_request",
+        lambda *_args, **_kwargs: None,
     )
 
     def _record_publish(
@@ -404,7 +480,9 @@ def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
     ) -> None:
         del workflow_id, reason, stdout, open_pull_request, events
         published_roots.append(repo_root)
-        assert published_workflow.directory == workflow.directory
+        assert published_workflow.directory == (
+            integration_root / "docs" / "workflows" / "feature"
+        )
 
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._publish_workflow_progress",
@@ -413,7 +491,7 @@ def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
-            workflow_dir=primary_root / "docs" / "workflows" / "feature",
+            workflow_dir=workflow_dir,
             repo_root=primary_root,
         ),
         client=_FakeClient([{"kind": "complete", "output_state": {"ok": True}}]),
@@ -422,10 +500,71 @@ def test_process_workflow_task_relocates_execution_into_dedicated_worktree(
     )
 
     assert exit_code == 0
-    assert published_roots == [worktree_root, worktree_root]
-    assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
-        TaskStatus.COMPLETED
+    assert published_roots == [integration_root, integration_root]
+    assert WorkflowInstance.from_directory(
+        integration_root / "docs" / "workflows" / "feature"
+    ).tasks[0].status is (TaskStatus.COMPLETED)
+    assert (
+        subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=integration_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == "powdrr/feature-17"
     )
+    assert not (integration_root / "tasks").exists()
+
+
+def test_publish_workflow_progress_pushes_clean_worktree_commits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = WorkflowInstance.create(tmp_path / "workflow")
+    save_workflow_git_state(
+        workflow.directory,
+        WorkflowGitState(
+            proposed_pr_id="feature-17",
+            base_branch="main",
+            integration_branch="powdrr/feature-17",
+            workflow_relative_directory="workflow",
+        ),
+    )
+    git_calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._is_git_worktree",
+        lambda _repo_root: True,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._git_output",
+        lambda _repo_root, _arguments: "powdrr/feature-17",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._git_result",
+        lambda _repo_root, _arguments: subprocess.CompletedProcess(
+            [], 0, stdout="", stderr=""
+        ),
+    )
+
+    def _record_git_call(_repo_root: Path, arguments: list[str]) -> str:
+        git_calls.append(arguments)
+        return ""
+
+    monkeypatch.setattr("powdrr_lift.workflow_task_agent._run_git", _record_git_call)
+
+    _publish_workflow_progress(
+        tmp_path,
+        workflow,
+        workflow_id="feature-17",
+        reason="complete feature-17-task-001",
+        stdout=io.StringIO(),
+        open_pull_request=False,
+    )
+
+    assert ["add", "--all"] in git_calls
+    assert ["push", "--set-upstream", "origin", "powdrr/feature-17"] in git_calls
 
 
 def test_process_workflow_task_persists_output_for_downstream_claim(
@@ -465,7 +604,12 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         "powdrr_lift.workflow_task_agent._publish_workflow_progress",
         _record_publish,
     )
-    client = _FakeClient([{"kind": "complete", "output_state": {"plan": ["step"]}}])
+    client = _FakeClient(
+        [
+            {"kind": "complete", "output_state": {"plan": ["step"]}},
+            {"kind": "complete", "output_state": {"result": "done"}},
+        ]
+    )
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -484,11 +628,51 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
     next_task = next(task for task in persisted.tasks if task.task_id == "next-task")
     assert exit_code == 0
     assert completed_task.output_state == {"plan": ["step"]}
-    assert next_task.input_state == {"plan": "agent-task.state"}
+    assert next_task.input_state == {"plan": {"plan": ["step"]}}
+    assert next_task.status is TaskStatus.COMPLETED
+    assert next_task.output_state == {"result": "done"}
+    assert published_reasons == [
+        "claim agent-task",
+        "complete agent-task",
+        "claim next-task",
+        "complete next-task",
+    ]
 
-    claimed_next_task = persisted.claim_task("next-task")
-    assert claimed_next_task.input_state == {"plan": {"plan": ["step"]}}
-    assert published_reasons == ["claim agent-task", "complete agent-task"]
+
+def test_process_workflow_task_stops_when_human_task_becomes_ready(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.add_task(
+        WorkflowTask(
+            task_id="human-task",
+            status=TaskStatus.OPEN,
+            upstream_task_ids=("agent-task",),
+            dependent_state=(),
+            complexity=TaskComplexity.LOW,
+            input_state={"decision": "required"},
+            description="Make the final decision.",
+            assignee_type=AssigneeType.HUMAN,
+            assignee_role=HumanRole.REVIEWER,
+        )
+    )
+    stdout = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=_FakeClient([{"kind": "complete", "output_state": {"result": "ready"}}]),
+        stdout=stdout,
+        stderr=io.StringIO(),
+    )
+
+    persisted = WorkflowInstance.from_directory(workflow.directory)
+    assert exit_code == 0
+    assert persisted.tasks[0].status is TaskStatus.COMPLETED
+    assert persisted.tasks[1].status is TaskStatus.OPEN
+    assert "Workflow waiting on human task: human-task" in stdout.getvalue()
 
 
 def test_process_workflow_task_repairs_invalid_json_response(
@@ -732,7 +916,7 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
     assert stderr.getvalue().count("provider is overloaded") == 2
 
 
-def test_exhausted_timeout_deletes_only_dedicated_worktree(
+def test_exhausted_timeout_keeps_workflow_worktree_for_resume(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -753,7 +937,7 @@ def test_exhausted_timeout_deletes_only_dedicated_worktree(
     )
 
     assert result == 2
-    assert deleted == [dedicated_worktree]
+    assert deleted == []
 
 
 def test_process_workflow_task_prints_invalid_response_before_repair(

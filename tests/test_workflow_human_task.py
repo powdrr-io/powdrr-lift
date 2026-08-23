@@ -152,6 +152,10 @@ def test_run_human_task_claims_git_task_and_publishes_completion(
         "powdrr_lift.workflow_human_task.publish_workflow_progress",
         _fake_publish,
     )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_human_task._open_final_workflow_pull_request",
+        lambda *_args, **_kwargs: None,
+    )
     stdout = io.StringIO()
     stderr = io.StringIO()
     assert (
@@ -170,9 +174,9 @@ def test_run_human_task_claims_git_task_and_publishes_completion(
     assert "complete human task human-review" == published["reason"]
     published_root = published["repo_root"]
     assert isinstance(published_root, Path)
-    assert published_root.name == "human-review"
-    task_branch_workflow = published_root / "docs" / "workflows" / "feature-17"
-    completed = WorkflowInstance.from_directory(task_branch_workflow).tasks[0]
+    assert published_root == integration_worktree
+    integration_workflow = published_root / "docs" / "workflows" / "feature-17"
+    completed = WorkflowInstance.from_directory(integration_workflow).tasks[0]
     assert completed.status is TaskStatus.COMPLETED
     assert completed.output_state == {"answer": "Approved."}
     claim = subprocess.run(

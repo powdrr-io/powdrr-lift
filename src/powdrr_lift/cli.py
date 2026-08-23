@@ -2423,11 +2423,12 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
             sys.stdout.write("\n")
         overall_success = overall_success and validation_successful
 
-    workflow_success = _evaluate_workflow_changed_files(
-        repo_root=repo_root,
-        base_branch=args.base_branch,
-    )
-    overall_success = overall_success and workflow_success
+    if args.path is None:
+        workflow_success = _evaluate_workflow_changed_files(
+            repo_root=repo_root,
+            base_branch=args.base_branch,
+        )
+        overall_success = overall_success and workflow_success
 
     return 0 if overall_success else 1
 

@@ -90,6 +90,7 @@ _TOOL_FIELDS = {
     "when_to_use",
     "template",
     "how_to_use",
+    "validation_action",
     "evidence",
 }
 _REQUIRED_TOOL_FIELDS = {"id", "action", "when_to_use", "template", "how_to_use"}

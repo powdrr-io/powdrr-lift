@@ -98,14 +98,14 @@ tools:
       - pr-prep
   - id: validate-pr-files
     action: added
-    when_to_use: Validate every recognized repository-format file changed by a pull request.
-    template: uv run powdrr-lift validate-pr-files --pr-number <pr-number> --repo-root .
+    when_to_use: Validate every recognized repository-format file changed on the checked-out branch or in a pull request.
+    template: uv run powdrr-lift validate-pr-files --repo-root .
     validation_action:
       kind: invoke_tool
       tool: shell
       parameters:
-        command: uv run powdrr-lift validate-pr-files --pr-number <pr-number> --repo-root .
-    how_to_use: Run from the checked-out pull-request worktree; it validates changed skill, workflow, project-structure, workflow-template, and specification-v1 files and returns non-zero when any validator fails.
+        command: uv run powdrr-lift validate-pr-files --repo-root .
+    how_to_use: Run from the checked-out worktree; by default it validates files changed by the current branch relative to main, including staged and unstaged changes. Use --pr-number only when a GitHub pull request number is available. It validates changed skill, workflow, project-structure, workflow-template, and specification-v1 files and returns non-zero when any validator fails.
     labels:
       - validation
       - pr-prep

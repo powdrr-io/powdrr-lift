@@ -1,6 +1,8 @@
 proposed_pr_id: interaction-file-log-formatting-and-rotation
 base_branch: main
 integration_branch: powdrr/interaction-file-log-formatting-and-rotation
+depends_on_workflows:
+- interaction-file-log-core-logging
 workflow_relative_directory: docs/workflows/interaction-file-log
 invariants:
 - id: workflow-implements-target

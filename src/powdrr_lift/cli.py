@@ -1359,14 +1359,6 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
                 f"No proposed PR specification exists for {proposed_pr_id!r}."
             )
         derived_dependencies = dependency_graph[proposed_pr_id]
-        declared_dependencies = tuple(args.depends_on_workflow)
-        if declared_dependencies and set(declared_dependencies) != set(
-            derived_dependencies
-        ):
-            raise ValueError(
-                "--depends-on-workflow does not match dependent_prs for "
-                f"{proposed_pr_id!r}; expected {list(derived_dependencies)!r}."
-            )
         integration_worktree, integration_branch = create_workflow_worktree(
             project_root,
             proposed_pr_id,

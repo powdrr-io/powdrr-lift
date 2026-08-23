@@ -2,7 +2,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from powdrr_lift.core.spec_context import gather_specification_context
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    proposed_pr_id_exists,
+)
+
+
+def test_proposed_pr_id_exists_uses_gather_context_discovery(
+    tmp_path: Path,
+) -> None:
+    proposal_path = (
+        tmp_path
+        / "docs"
+        / "proposals"
+        / "demo-feature"
+        / "proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True)
+    proposal_path.write_text(
+        "id: demo-pr\nfeature_ids: []\n",
+        encoding="utf-8",
+    )
+
+    assert proposed_pr_id_exists(tmp_path, "demo-pr") is True
+    assert proposed_pr_id_exists(tmp_path, "missing-pr") is False
 
 
 def test_gather_context_filters_tools_by_entity_type_and_labels(

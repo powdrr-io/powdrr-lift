@@ -95,6 +95,80 @@ def test_evaluate_discovers_changed_tasks_without_directory_arguments(
     )
 
 
+def test_evaluate_rejects_relationship_to_missing_proposed_pr(
+    tmp_path: Path,
+) -> None:
+    _setup_repo(tmp_path)
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "invariants": [
+                    {
+                        "id": "implements-target",
+                        "relationship": "implements",
+                        "cardinality": "exactly_one",
+                    }
+                ],
+                "task_templates": [
+                    {
+                        "description": "Do work",
+                        "complexity": "low",
+                        "input_state": {},
+                        "assignee_type": "agent",
+                        "assignee_role": "coder",
+                        "output_state_type": "state",
+                        "dependent_state": [],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    workflow = tmp_path / "generated" / "task.yaml"
+    workflow.parent.mkdir()
+    workflow.write_text(
+        "task_id: example-task-001\nworkflow_template: workflow\n"
+        "input_state:\n  proposed_pr: missing-pr\n",
+        encoding="utf-8",
+    )
+    state = tmp_path / "generated" / "state.yaml"
+    state.write_text(
+        yaml.safe_dump(
+            {
+                "invariants": [
+                    {
+                        "id": "implements-target",
+                        "relationship": "implements",
+                        "cardinality": "exactly_one",
+                    }
+                ],
+                "relationships": [
+                    {
+                        "invariant_id": "implements-target",
+                        "relationship": "implements",
+                        "source_type": "workflow",
+                        "source_id": "example",
+                        "target_type": "proposed_pr",
+                        "target_id": "missing-pr",
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _git(tmp_path, "add", "templates", "generated")
+    _git(tmp_path, "commit", "-m", "workflow")
+
+    assert (
+        _evaluate_workflow_changed_files(repo_root=tmp_path, base_branch="main")
+        is False
+    )
+
+
 def test_evaluate_rejects_changed_task_without_template_identity(
     tmp_path: Path,
 ) -> None:

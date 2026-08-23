@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -153,6 +154,40 @@ def gather_specification_context(
         filters=normalized_filters,
         matches=matches,
     )
+
+
+def proposed_pr_id_exists(repo_root: str | Path, proposed_pr_id: str) -> bool:
+    """Resolve a proposed PR id using the same discovery as gather_context."""
+    repo_root_path = _resolve_repo_root(repo_root)
+    normalized_id = proposed_pr_id.strip().casefold()
+    if not normalized_id:
+        return False
+
+    feature_ids = {
+        path.name
+        for proposals_root in (
+            repo_root_path / "docs" / "proposals",
+            repo_root_path / "docs" / "proposed",
+        )
+        if proposals_root.is_dir()
+        for path in proposals_root.iterdir()
+        if path.is_dir()
+    }
+    feature_ids.add("")
+    for feature_id in sorted(feature_ids):
+        report = gather_specification_context(
+            repo_root_path,
+            types=["proposed_prs"],
+            keywords=[proposed_pr_id],
+            feature_id=feature_id or None,
+        )
+        for match in report.matches:
+            if not isinstance(match.item, Mapping):
+                continue
+            item_id = match.item.get("id")
+            if isinstance(item_id, str) and item_id.strip().casefold() == normalized_id:
+                return True
+    return False
 
 
 def render_gather_context_report(report: GatherContextReport) -> str:

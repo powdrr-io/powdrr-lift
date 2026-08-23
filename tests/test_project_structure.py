@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from powdrr_lift.cli import main
 from powdrr_lift.core.project_structure import (
@@ -107,6 +110,67 @@ id: project-structure
     )
 
     assert main(["validate-project-structure", "--input", str(output_path)]) == 0
+
+
+def test_validate_pr_files_runs_project_structure_validator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output_path = tmp_path / "docs" / "project_structure" / "project-structure.yaml"
+    output_path.parent.mkdir(parents=True)
+    output_path.write_text(
+        "schema: https://powdrr.io/schemas/specification-v1\nid: project-structure\n",
+        encoding="utf-8",
+    )
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        assert command == ["gh", "pr", "diff", "123", "--name-only"]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="docs/project_structure/project-structure.yaml\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.resolve_repo_root", lambda _: tmp_path)
+    monkeypatch.setattr("powdrr_lift.cli.subprocess.run", fake_run)
+
+    assert (
+        main(
+            [
+                "validate-pr-files",
+                "--pr-number",
+                "123",
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    assert '"validator": "validate_project_structure_yaml"' in capsys.readouterr().out
+
+
+def test_validate_pr_files_fails_for_invalid_changed_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path = tmp_path / "docs" / "project_structure" / "project-structure.yaml"
+    output_path.parent.mkdir(parents=True)
+    output_path.write_text("id: invalid\n", encoding="utf-8")
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="docs/project_structure/project-structure.yaml\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.resolve_repo_root", lambda _: tmp_path)
+    monkeypatch.setattr("powdrr_lift.cli.subprocess.run", fake_run)
+
+    assert main(["validate-pr-files", "--pr-number", "123"]) == 1
 
 
 def test_project_structure_validator_normalizes_explicit_empty_values(

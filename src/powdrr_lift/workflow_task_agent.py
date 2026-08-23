@@ -605,9 +605,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.task.task_id,
                 action.output_state,
             )
-            if action.text:
-                print(action.text, file=self.stdout)
-            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
             _publish_workflow_progress(
                 self.repo_root,
                 self.workflow,
@@ -617,6 +614,9 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 open_pull_request=False,
                 events=self.events,
             )
+            if action.text:
+                print(action.text, file=self.stdout)
+            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
             return WorkflowActionOutcome(continue_running=False)
         if action.kind == "get-human-input":
             return self._handoff(action.human_input or {}, "human input required by")
@@ -1215,13 +1215,13 @@ def _publish_workflow_progress(
 
     _run_git(repo_root, ["add", "--all"])
     status = _git_result(repo_root, ["status", "--porcelain"])
-    if not status.stdout.strip():
-        return
-
-    _run_git(
-        repo_root,
-        ["commit", "-m", f"Persist workflow progress: {reason}"],
-    )
+    if status.stdout.strip():
+        _run_git(
+            repo_root,
+            ["commit", "-m", f"Persist workflow progress: {reason}"],
+        )
+    # Always push at a task boundary. A nested operation may have created a
+    # local commit, leaving no working-tree changes for the add/status check.
     _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
     if not open_pull_request:
         print(f"Published workflow progress on branch: {branch}", file=stdout)

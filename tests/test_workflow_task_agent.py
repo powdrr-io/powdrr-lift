@@ -36,6 +36,7 @@ from powdrr_lift.workflow_task_agent import (
     _build_task_messages,
     _build_workflow_client,
     _handle_exhausted_timeout,
+    _publish_workflow_progress,
     _task_events_for_prompt,
     _workflow_file_command_error,
     run_workflow_task,
@@ -514,6 +515,56 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         == "powdrr/feature-17"
     )
     assert not (integration_root / "tasks").exists()
+
+
+def test_publish_workflow_progress_pushes_clean_worktree_commits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = WorkflowInstance.create(tmp_path / "workflow")
+    save_workflow_git_state(
+        workflow.directory,
+        WorkflowGitState(
+            proposed_pr_id="feature-17",
+            base_branch="main",
+            integration_branch="powdrr/feature-17",
+            workflow_relative_directory="workflow",
+        ),
+    )
+    git_calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._is_git_worktree",
+        lambda _repo_root: True,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._git_output",
+        lambda _repo_root, _arguments: "powdrr/feature-17",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent._git_result",
+        lambda _repo_root, _arguments: subprocess.CompletedProcess(
+            [], 0, stdout="", stderr=""
+        ),
+    )
+
+    def _record_git_call(_repo_root: Path, arguments: list[str]) -> str:
+        git_calls.append(arguments)
+        return ""
+
+    monkeypatch.setattr("powdrr_lift.workflow_task_agent._run_git", _record_git_call)
+
+    _publish_workflow_progress(
+        tmp_path,
+        workflow,
+        workflow_id="feature-17",
+        reason="complete feature-17-task-001",
+        stdout=io.StringIO(),
+        open_pull_request=False,
+    )
+
+    assert ["add", "--all"] in git_calls
+    assert ["push", "--set-upstream", "origin", "powdrr/feature-17"] in git_calls
 
 
 def test_process_workflow_task_persists_output_for_downstream_claim(

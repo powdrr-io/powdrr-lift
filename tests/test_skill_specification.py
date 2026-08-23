@@ -185,9 +185,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 18),
                 ("execute-proposed-pr.yaml", 19),
                 ("start-implementing-feature.yaml", 9),
-                ("start-implementing-feature.yaml", 14),
-                ("start-implementing-feature.yaml", 17),
-                ("start-implementing-feature.yaml", 19),
+                ("start-implementing-feature.yaml", 15),
+                ("start-implementing-feature.yaml", 18),
+                ("start-implementing-feature.yaml", 20),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -1040,9 +1040,23 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "<proposed-pr-name>",
         "--template-value",
         "proposed-pr-id=<proposed-pr-name>",
+        "--depends-on-workflow",
+        "<predecessor-workflow-id>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
+    instantiate_details = step("instantiate-execution-workflows").details
+    assert instantiate_details is not None
+    assert "repeat --depends-on-workflow" in instantiate_details
+    assert "Omit that option for a workflow with no predecessors" in instantiate_details
+    assert "mandatory command arguments" in instantiate_details
+    dependency_step = step("verify-workflow-dependencies")
+    assert dependency_step.step_type == "freeform"
+    dependency_details = dependency_step.details
+    assert dependency_details is not None
+    assert "depends_on_workflows" in dependency_details
+    assert "Do not infer dependencies from ordering" in dependency_details
+    assert "step_id `plan-workflow-instantiation`" in dependency_details
     review_details = step("review-workflow-proposed-pr-links").details
     assert review_details is not None
     assert "every proposed PR has exactly one matching workflow" in review_details

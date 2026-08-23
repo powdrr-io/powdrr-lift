@@ -1,0 +1,37 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Export Implementation
+architecture_id: '2026-08-22'
+entities:
+- id: interaction-log
+  action: added
+  rationale: Central log file storing all interaction entries.
+modules:
+- id: mod-log-writer
+  action: added
+  relative_location: src/log_writer/
+  purpose: Writes interaction entries to the JSON log file in the hidden .powdrr directory.
+tools:
+- id: tool-log-writer
+  action: added
+  when_to_use: Whenever an interaction with a human or LLM occurs and needs to be
+    logged.
+  template: interaction-log-writer
+  how_to_use: Invoke the log writer to append the interaction input and output to
+    the log file.
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  rationale: The log writer appends entries to the log.
+features:
+- id: feat-export-capability
+  action: added
+  description: Export interaction log entries to an external format for analysis or
+    sharing.
+  functional_requirements:
+  - Export log entries to CSV format.
+  - Support filtering by interaction source.
+  - Write export output to a user-specified file path.
+decisions:
+- id: dec-export-format
+  action: added
+  description: Export format is CSV for broad compatibility.

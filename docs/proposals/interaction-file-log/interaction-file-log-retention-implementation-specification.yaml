@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Retention Implementation
+architecture_id: '2026-08-22'
+entities:
+- id: interaction-log
+  action: added
+  rationale: Central log file storing all interaction entries.
+modules:
+- id: mod-log-writer
+  action: added
+  relative_location: src/log_writer/
+  purpose: Writes interaction entries to the JSON log file in the hidden .powdrr directory.
+tools:
+- id: tool-log-writer
+  action: added
+  when_to_use: Whenever an interaction with a human or LLM occurs and needs to be
+    logged.
+  template: interaction-log-writer
+  how_to_use: Invoke the log writer to append the interaction input and output to
+    the log file.
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  rationale: The log writer appends entries to the log.
+features:
+- id: feat-retention-policy
+  action: added
+  description: Retention policy that prunes old interaction entries from the log file.
+  functional_requirements:
+  - Prune entries older than the configured retention period.
+  - Support configurable retention duration.
+  - Run retention cleanup on a scheduled basis.
+decisions:
+- id: dec-retention-config
+  action: added
+  description: Retention period is configurable via a settings file.

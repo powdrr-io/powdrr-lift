@@ -56,9 +56,11 @@ from powdrr_lift.core.workflow_task_specification import (
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.workflow_chat_agent import (
+    ALL_LLM_TYPES,
     ALL_PROVIDERS,
     DEEPINFRA_CHEAP_LLM_MAPPINGS,
     DEEPINFRA_LLM_MAPPINGS,
+    OPENROUTER_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
     LLMModelLimits,
@@ -3158,6 +3160,49 @@ def test_deepinfra_credentials_and_base_url_are_supported(
         "https://deepinfra.example/v1/openai",
         "DEEPINFRA_BASE_URL",
     )
+
+
+def test_openrouter_credentials_and_default_base_url_are_supported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
+
+    assert _resolve_api_key("openrouter", None) == (
+        "openrouter-key",
+        "OPENROUTER_API_KEY",
+    )
+    assert _resolve_base_url("openrouter", None) == (
+        "https://openrouter.ai/api/v1",
+        "default",
+    )
+
+
+def test_openrouter_maps_every_llm_type_to_ox_alpha() -> None:
+    for llm_type in ALL_LLM_TYPES:
+        mapping = OPENROUTER_LLM_MAPPINGS[llm_type]
+        assert mapping.model == "openrouter/ox-alpha"
+        assert mapping.provider == "openrouter"
+
+
+def test_auto_provider_selects_openrouter_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_API_KEY",
+        "ZAI_API_KEY",
+        "ZAI_BASE_URL",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_BASE_URL",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+
+    assert _resolve_provider("auto", "glm-5.2") == "openrouter"
 
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:

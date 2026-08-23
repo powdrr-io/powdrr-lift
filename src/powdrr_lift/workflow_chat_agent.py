@@ -117,6 +117,7 @@ _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 _DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
+_OPENROUTER_MODEL = "openrouter/ox-alpha"
 ALL_LLM_TYPES = (
     "high_reasoning",
     "standard_reasoning",
@@ -278,6 +279,11 @@ DEEPINFRA_CHEAP_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     for llm_type in ALL_LLM_TYPES
 }
 
+OPENROUTER_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
+    llm_type: LLMModelMapping(_OPENROUTER_MODEL, provider="openrouter")
+    for llm_type in ALL_LLM_TYPES
+}
+
 
 @dataclass(frozen=True, slots=True)
 class LLMProviderDefinition:
@@ -323,6 +329,16 @@ LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
         base_url_env_names=("ZAI_BASE_URL",),
         default_base_url="https://api.z.ai/api/paas/v4/",
         auto_priority=30,
+    ),
+    "openrouter": LLMProviderDefinition(
+        name="openrouter",
+        display_name="OpenRouter",
+        llm_mappings=OPENROUTER_LLM_MAPPINGS,
+        model_limits={},
+        api_key_env_names=("OPENROUTER_API_KEY",),
+        base_url_env_names=("OPENROUTER_BASE_URL",),
+        default_base_url="https://openrouter.ai/api/v1",
+        auto_priority=35,
     ),
     "deepinfra": LLMProviderDefinition(
         name="deepinfra",

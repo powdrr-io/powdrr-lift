@@ -1044,6 +1044,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert "proposed PR -> workflow" in review_details
     assert "workflow -> proposed PR" in review_details
     assert "do not infer matches from ordering" in review_details
+    assert "goto_step: plan-workflow-instantiation" in review_details
+    assert "goto_step: plan-proposed-prs" in review_details
     assert pre_step_command("inspect-workflow-repository-state") == (
         "powdrr-lift",
         "repository-state",

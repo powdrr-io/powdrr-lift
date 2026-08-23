@@ -1,5 +1,5 @@
 task_id: harness-391-task-001
-status: completed
+status: locked
 upstream_task_ids: []
 dependent_state:
 - proposed-pr-context-gathered
@@ -14,7 +14,7 @@ description: Gather context about the proposed PR
 step_type: invoke_tool
 details: 'The deterministic pre-step already gathered the context. Assign that exact
   result to proposed-pr-context-state. Do not search for, rediscover, or reinterpret
-  the proposed PR. Complete this step with a next_step action, for example: {"action":"next_step","outputs":{"proposed-pr-context-state":"the
+  the proposed PR. Complete this task with a complete action, for example: {"action":"complete","output_state":{"proposed-pr-context-state":"the
   exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed
   PR context for planning."}
 

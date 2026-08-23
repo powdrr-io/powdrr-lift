@@ -77,16 +77,25 @@ steps:
   llm_type: standard_reasoning
   details: >-
     Review all three deterministic search results. Filter them to the best
-    matching feature directory and workflow directories. If exactly one
-    feature specification and workflow set are the best matches, select them
-    without asking. If no candidates are found, do not claim that a canonical
-    feature was selected and do not use next_step or complete: ask one specific
-    question identifying the missing feature or workflow path. If the user
-    supplies an identifier or path, use goto_step to rerun the relevant
-    deterministic discovery step(s), then select from those results. If a
-    match is uncertain, ask one specific question that identifies the correct
-    feature or workflow, for example:
+    matching feature directory and workflow directories. Normalize case,
+    spaces, underscores, and hyphens when comparing the user's feature name to
+    candidate directory names. If exactly one proposal or current-feature
+    directory is the best normalized match, select it without asking and use
+    that directory's basename as the canonical feature_name. A workflow
+    directory is never an independent choice: its only valid path is
+    docs/workflows/<canonical-feature-name>. If that directory is absent, record
+    it as missing and let the later instantiation step create it; do not ask
+    the user which workflow path to use. If no proposal or current-feature
+    candidate is found, do not claim that a canonical feature was selected and
+    do not use next_step or complete: ask one specific question identifying the
+    missing feature. If the user supplies an identifier or path, use goto_step
+    to rerun the relevant deterministic discovery step(s), then select from
+    those results. Ask a question only when multiple normalized feature
+    candidates remain tied and cannot be resolved from the user's request or
+    the search results. For example:
     {"action":"prompt_user","text":"Which feature or workflow should I use from these candidates: <candidate-names>?"}
+    Never ask the user to choose between a found proposal and a missing
+    workflow directory.
     Do not ask whether documents exist before searching. The feature_name
     output is required for this step; emit it only when this step has actually
     selected a canonical feature. Pass the selected specification documents,

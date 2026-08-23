@@ -331,27 +331,3 @@ task_templates:
   output_state_type: pull-request-prep-state
   dependent_state:
   - pull-request-prep-complete
-- description: Create the pull request
-  step_type: freeform
-  complexity: high
-  assignee_type: human
-  assignee_role: reviewer
-  llm_type: standard_reasoning
-  input_state:
-    proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    test_results: <upstream-task-5>.all-tests-passing-state
-    completeness_review: <upstream-task-6>.specification-completeness-state
-    lint_results: <upstream-task-10>.pull-request-prep-state
-    pull_request: {}
-  details: >-
-    Present the proposed PR specification, implementation summary, changed
-    files, acceptance-criteria results, test commands and results, lint and
-    type-check results, risks, and remaining caveats. Ask the human reviewer to
-    confirm that the work is ready for a pull request. After approval, create
-    the pull request using the repository's normal Git workflow and record its
-    URL and final status in output_state. Do not create a pull request before
-    the human explicitly approves it.
-  output_state_type: pull-request-created-state
-  dependent_state:
-  - pull-request-created

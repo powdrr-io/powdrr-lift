@@ -7171,7 +7171,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert len(workflow_state_files) == 1
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
-        f"display-related-photos-pr-001-task-{index:03d}" for index in range(1, 13)
+        f"display-related-photos-pr-001-task-{index:03d}" for index in range(1, 12)
     ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
         "Gather context about the proposed PR",
@@ -7185,7 +7185,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Promote the implemented feature documents to current state",
         "Stage the pull request changes",
         "Finish pull request preparation",
-        "Create the pull request",
     ]
     assert [
         tuple(task_id[task_id.rfind("task-") :] for task_id in task.upstream_task_ids)
@@ -7209,13 +7208,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             "task-008",
             "task-009",
             "task-010",
-        ),
-        (
-            "task-001",
-            "task-005",
-            "task-006",
-            "task-007",
-            "task-011",
         ),
     ]
     assert all(task.status.value == "open" for task in tasks)
@@ -7293,12 +7285,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ("agent", "reviewer"),
         ("agent", "reviewer"),
         ("agent", "reviewer"),
-        ("human", "reviewer"),
     ]
     assert load_ready_workflow_tasks(workflow_root) == ()
 
     execute_tasks = load_workflow_tasks(workflow_root / "display-related-photos")
-    assert len(execute_tasks) == 12
+    assert len(execute_tasks) == 11
     assert execute_tasks[0].input_state["proposed_pr"] == (
         "display-related-photos-pr-001"
     )
@@ -7315,7 +7306,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         "Promote the implemented feature documents to current state",
         "Stage the pull request changes",
         "Finish pull request preparation",
-        "Create the pull request",
     ]
     assert all(task.status is TaskStatus.COMPLETED for task in execute_tasks)
 

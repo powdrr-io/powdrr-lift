@@ -92,6 +92,7 @@ class WorkflowTask:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    workflow_template: str | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -132,6 +133,8 @@ class WorkflowTask:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             step_data["gate"] = self.gate.to_data()
+        if self.workflow_template is not None:
+            data["workflow_template"] = self.workflow_template
         data.update({key: value for key, value in step_data.items() if value})
         return data
 
@@ -332,6 +335,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,
+        workflow_template=data.get("workflow_template"),
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
@@ -533,6 +537,7 @@ def build_workflow_task_validation_report(
             "prompt_catalogs",
             "pre_step",
             "gate",
+            "workflow_template",
         },
         issues,
         path=_format_path(source_path) or "",

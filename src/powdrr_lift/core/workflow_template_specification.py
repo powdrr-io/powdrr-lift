@@ -125,15 +125,22 @@ class WorkflowTemplate:
     when_to_use: tuple[str, ...]
     how_to_fill_this_out: tuple[str, ...]
     task_templates: tuple[WorkflowTaskTemplate, ...]
+    invariants: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    id: str | None = None
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "when_to_use": list(self.when_to_use),
             "how_to_fill_this_out": list(self.how_to_fill_this_out),
             "task_templates": [
                 task_template.to_data() for task_template in self.task_templates
             ],
         }
+        if self.id is not None:
+            data["id"] = self.id
+        if self.invariants:
+            data["invariants"] = [dict(item) for item in self.invariants]
+        return data
 
     def to_json(self) -> str:
         return workflow_template_to_json(self)
@@ -183,10 +190,17 @@ def workflow_template_from_data(data: Mapping[str, Any]) -> WorkflowTemplate:
     when_to_use = _required_string_sequence(data, "when_to_use")
     how_to_fill_this_out = _required_string_sequence(data, "how_to_fill_this_out")
     task_templates = _parse_task_templates(data.get("task_templates"))
+    raw_invariants = data.get("invariants", [])
+    if not isinstance(raw_invariants, list) or not all(
+        isinstance(item, Mapping) for item in raw_invariants
+    ):
+        raise ValueError("invariants must be an array of objects.")
     return WorkflowTemplate(
         when_to_use=when_to_use,
         how_to_fill_this_out=how_to_fill_this_out,
         task_templates=task_templates,
+        invariants=tuple(dict(item) for item in raw_invariants),
+        id=data.get("id") if isinstance(data.get("id"), str) else None,
     )
 
 
@@ -198,6 +212,40 @@ def load_workflow_template(path: str | Path) -> WorkflowTemplate:
     return workflow_template_from_json(template_text)
 
 
+def instantiated_workflow_relationships(
+    template_path: str | Path,
+    *,
+    work_item_name: str,
+    workflow_instance_name: str | None,
+    template_values: Mapping[str, str] | None = None,
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+    """Resolve template relationship invariants into durable workflow metadata."""
+    template = load_workflow_template(template_path)
+    substitutions = {
+        "work-item-name": work_item_name,
+        "workflow-instance-name": workflow_instance_name or work_item_name,
+        **dict(template_values or {}),
+    }
+    resolved_invariants: list[dict[str, Any]] = []
+    relationships: list[dict[str, Any]] = []
+    for raw_invariant in template.invariants:
+        invariant = _substitute_workflow_placeholders(raw_invariant, substitutions)
+        if not isinstance(invariant, dict):
+            raise ValueError("Resolved relationship invariant must be an object.")
+        invariant_id = invariant.get("id")
+        if not isinstance(invariant_id, str) or not invariant_id.strip():
+            raise ValueError("Every relationship invariant requires a non-empty id.")
+        resolved_invariants.append(invariant)
+        relation = dict(invariant)
+        relation["invariant_id"] = invariant_id
+        relation["source_id"] = relation.get(
+            "source_id", substitutions["workflow-instance-name"]
+        )
+        relation.pop("id", None)
+        relationships.append(relation)
+    return tuple(resolved_invariants), tuple(relationships)
+
+
 def instantiate_workflow_template(
     template_path: str | Path,
     work_item_name: str,
@@ -207,6 +255,7 @@ def instantiate_workflow_template(
 ) -> tuple[Path, tuple[WorkflowTask, ...]]:
     """Materialize a workflow template as validated durable task documents."""
     template = load_workflow_template(template_path)
+    template_identity = template.id or Path(template_path).stem
     slug = re.sub(r"[^a-z0-9]+", "-", work_item_name.strip().lower()).strip("-")
     if not slug:
         raise ValueError("work-item-name must contain at least one letter or digit")
@@ -286,6 +335,7 @@ def instantiate_workflow_template(
                 task_ids[upstream_index] for upstream_index in upstream_task_indexes
             ),
             dependent_state=task_template.dependent_state,
+            workflow_template=template_identity,
         )
         task_path = output_directory / f"{task.task_id}.yaml"
         if task_path.exists():
@@ -425,9 +475,26 @@ def build_workflow_template_validation_report(
     raw_template = cast("Mapping[str, Any]", loaded_content)
     issues: list[WorkflowTemplateValidationIssue] = []
 
+    if "id" in raw_template and (
+        not isinstance(raw_template["id"], str) or not raw_template["id"].strip()
+    ):
+        issues.append(
+            WorkflowTemplateValidationIssue(
+                code="invalid_id",
+                message="Workflow template id must be a non-empty string.",
+                path=_child_path(source_path, "id"),
+            )
+        )
+
     _validate_unknown_keys(
         raw_template,
-        {"when_to_use", "how_to_fill_this_out", "task_templates"},
+        {
+            "id",
+            "when_to_use",
+            "how_to_fill_this_out",
+            "task_templates",
+            "invariants",
+        },
         issues,
         path=_path_prefix(source_path) or "",
         subject="workflow template",
@@ -457,6 +524,19 @@ def build_workflow_template_validation_report(
                 )
             )
     raw_task_templates = raw_template.get("task_templates")
+    raw_invariants = raw_template.get("invariants", [])
+    if (
+        not isinstance(raw_invariants, Sequence)
+        or isinstance(raw_invariants, (str, bytes, bytearray))
+        or not all(isinstance(item, Mapping) for item in raw_invariants)
+    ):
+        issues.append(
+            WorkflowTemplateValidationIssue(
+                code="invalid_invariants",
+                message="invariants must be an array of objects.",
+                path=_child_path(source_path, "invariants"),
+            )
+        )
     task_template_reports: list[tuple[int, Mapping[str, Any] | None]] = []
 
     if not isinstance(raw_task_templates, Sequence) or isinstance(

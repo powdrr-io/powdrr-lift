@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,8 @@ class WorkflowGitState:
     integration_branch: str
     workflow_relative_directory: str
     depends_on_workflows: tuple[str, ...] = ()
+    invariants: tuple[Mapping[str, Any], ...] = ()
+    relationships: tuple[Mapping[str, Any], ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -37,6 +40,10 @@ class WorkflowGitState:
         }
         if self.depends_on_workflows:
             data["depends_on_workflows"] = list(self.depends_on_workflows)
+        if self.invariants:
+            data["invariants"] = [dict(item) for item in self.invariants]
+        if self.relationships:
+            data["relationships"] = [dict(item) for item in self.relationships]
         return data
 
     @classmethod
@@ -61,10 +68,27 @@ class WorkflowGitState:
             raise ValueError(
                 "Workflow Git state depends_on_workflows must be an array."
             )
+        invariants = _read_relationship_metadata(data.get("invariants"), "invariants")
+        relationships = _read_relationship_metadata(
+            data.get("relationships"), "relationships"
+        )
         return cls(
             **values,
             depends_on_workflows=tuple(item.strip() for item in dependencies),
+            invariants=invariants,
+            relationships=relationships,
         )
+
+
+def _read_relationship_metadata(
+    value: object,
+    field_name: str,
+) -> tuple[Mapping[str, Any], ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError(f"Workflow Git state {field_name} must be a list of mappings.")
+    return tuple(value)
 
 
 def workflow_git_state_filename(workflow_id: str) -> str:

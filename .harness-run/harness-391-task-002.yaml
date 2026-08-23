@@ -1,5 +1,5 @@
 task_id: harness-391-task-002
-status: locked
+status: completed
 upstream_task_ids:
 - harness-391-task-001
 dependent_state:

@@ -1,0 +1,799 @@
+schema: https://powdrr.io/schemas/pr-workflow-record-v1
+pull_request: 385
+title: Agent-created pull request
+branch: workflow-chat-20260823-045153-850263
+base_branch: main
+workflow:
+  name: start-implementing-feature
+  path: /Users/gregory/code/powdrr-lift/skill-definitions/start-implementing-feature.yaml
+  skills:
+  - start-implementing-feature
+  - bootstrap-code-structure
+  - finish-pr-prep
+  - create-pull-request
+  steps:
+  - description: Discover proposed feature specification candidates.
+    step_type: freeform
+    id: discover-proposed-feature
+    details: Invoke only the declared fuzzy-match command once for docs/proposals
+      using the feature name from the user's request. Do not invoke internal, shell,
+      or any other tool in this step. Treat a missing root or empty result as no matches;
+      do not select the feature yet.
+    llm_type: standard_reasoning
+    tool_invocations:
+    - tool: fuzzy-match
+      command:
+      - fuzzy-match
+      - docs/proposals
+      - -name
+      - <feature-name>
+      - -type
+      - d
+      - -maxdepth
+      - '2'
+      - -print
+  - description: Discover current feature specification candidates.
+    step_type: freeform
+    id: discover-current-feature
+    details: Invoke only the declared fuzzy-match command once for docs/current using
+      the feature name from the user's request. Do not invoke internal, shell, or
+      any other tool in this step. Treat a missing root or empty result as no matches;
+      do not select the feature yet.
+    llm_type: standard_reasoning
+    tool_invocations:
+    - tool: fuzzy-match
+      command:
+      - fuzzy-match
+      - docs/current
+      - -name
+      - <feature-name>
+      - -type
+      - d
+      - -maxdepth
+      - '2'
+      - -print
+  - description: Discover execution workflow candidates.
+    step_type: freeform
+    id: discover-feature-workflows
+    details: Invoke only the declared fuzzy-match command once for docs/workflows
+      using the feature name from the user's request. Do not invoke internal, shell,
+      or any other tool in this step. Treat a missing root or empty result as no matches;
+      do not select the workflow yet.
+    llm_type: standard_reasoning
+    tool_invocations:
+    - tool: fuzzy-match
+      command:
+      - fuzzy-match
+      - docs/workflows
+      - -name
+      - <feature-name>
+      - -type
+      - d
+      - -maxdepth
+      - '3'
+      - -print
+  - description: Select the canonical feature and workflow context.
+    step_type: freeform
+    id: select-feature-context
+    details: 'Review all three deterministic search results. Filter them to the best
+      matching feature directory and workflow directories. Normalize case, spaces,
+      underscores, and hyphens when comparing the user''s feature name to candidate
+      directory names. If exactly one proposal or current-feature directory is the
+      best normalized match, select it without asking and use that directory''s basename
+      as the canonical feature_name. A workflow directory is never an independent
+      choice: its only valid path is docs/workflows/<canonical-feature-name>. If that
+      directory is absent, record it as missing and let the later instantiation step
+      create it; do not ask the user which workflow path to use. If no proposal or
+      current-feature candidate is found, do not claim that a canonical feature was
+      selected and do not use next_step or complete: ask one specific question identifying
+      the missing feature. If the user supplies an identifier or path, use goto_step
+      to rerun the relevant deterministic discovery step(s), then select from those
+      results. Ask a question only when multiple normalized feature candidates remain
+      tied and cannot be resolved from the user''s request or the search results.
+      For example: {"action":"prompt_user","text":"Which feature or workflow should
+      I use from these candidates: <candidate-names>?"} Never ask the user to choose
+      between a found proposal and a missing workflow directory. Do not ask whether
+      documents exist before searching. The feature_name output is required for this
+      step; emit it only when this step has actually selected a canonical feature.
+      Pass the selected specification documents, workflow documents, canonical feature
+      name, and missing-document findings to the next step.'
+    llm_type: standard_reasoning
+    outputs:
+    - name: feature_name
+      type: string
+      required_for_next_step: true
+      scope: skill
+  - description: Bootstrap the project-wide module and tool structure.
+    step_type: freeform
+    id: bootstrap-project-structure
+    details: Invoke bootstrap-code-structure with the selected feature context. The
+      nested skill is project-wide and must not ask for a feature or target module.
+    llm_type: standard_reasoning
+    uses_skills:
+    - bootstrap-code-structure
+  - description: Confirm the project-structure artifact is available.
+    step_type: gate
+    id: confirm-project-structure
+    details: The gate passes only when the project-structure artifact exists in the
+      active worktree.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: shell
+        command:
+        - test
+        - -f
+        - docs/project_structure/project-structure.yaml
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: bootstrap-project-structure
+      retry_context: The project-structure artifact is not available in the active
+        worktree. Rerun bootstrap-code-structure, then retry this gate.
+  - description: Plan the proposed PR implementation sequence.
+    step_type: freeform
+    id: plan-proposed-prs
+    details: If proposed PR specifications or implementation specifications already
+      exist in the selected feature context, inspect them, reuse them, and pass their
+      stable names and paths onward. Otherwise analyze the feature specification and
+      the project structure to define ordered proposed PRs with incremental validation,
+      clear boundaries, low risk, dependencies, and stable names. For each proposed
+      PR, record its goal, scope, files, tests, acceptance criteria, validation commands,
+      dependencies, and risks. Use the read_document action to inspect templates/execute-proposed-pr.yaml;
+      do not use shell commands to read the template. A proposed PR dependency means
+      the predecessor workflow is complete only after its integration pull request
+      is merged; completion of the predecessor's final task or creation of its pull
+      request is not sufficient. Preserve these workflow-level dependencies in the
+      instantiation plan. Do not generate or edit implementation-specification files
+      in this step. Before next_step, return exactly one output named proposed_pr_names
+      containing every stable proposed PR name. Do not rely on decisions_and_context
+      for this handoff.
+    llm_type: high_reasoning
+    outputs:
+    - name: proposed_pr_names
+      type: any
+      required_for_next_step: true
+      scope: skill
+  - description: Generate one implementation specification per proposed PR.
+    step_type: freeform
+    id: generate-implementation-specifications
+    details: For each name in proposed_pr_names that lacks an implementation specification,
+      invoke the declared implementation-specification command exactly once with its
+      stable proposed-PR name and output path. Reuse existing files. Generate only
+      the templates; do not fill, validate, instantiate, stage, or commit them. Pass
+      every generated path and proposed-PR relationship onward. Before next_step,
+      return exactly one output named implementation_specification_paths containing
+      every generated or reused path; do not repeat proposed_pr_names from the previous
+      step and do not include any other output name.
+    llm_type: high_reasoning
+    tool_invocations:
+    - tool: internal
+      command:
+      - powdrr-lift
+      - implementation-specification
+      - --work-item-name
+      - <feature-name>
+      - --output
+      - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
+    inputs:
+    - name: proposed_pr_names
+      type: any
+      required: true
+      source: previous_step
+    outputs:
+    - name: implementation_specification_paths
+      type: any
+      required_for_next_step: true
+      scope: skill
+  - description: Fill every implementation specification.
+    step_type: freeform
+    id: fill-implementation-specifications
+    details: For each path in implementation_specification_paths, replace every placeholder
+      and fill every required field using the selected feature, project-structure,
+      and proposed-PR context. Remove generator instructions and instructional comments.
+      Do not leave null, empty, example, or TODO values in required fields. Keep each
+      proposed PR in its own file and preserve its stable proposed-PR id. Use yaml_edit
+      for all YAML changes in this active worktree. Do not validate or instantiate
+      workflows until every file is populated. Pass the exact filled paths and proposed-PR
+      mapping onward.
+    llm_type: high_reasoning
+    inputs:
+    - name: implementation_specification_paths
+      type: any
+      required: true
+      source: previous_step
+  - description: Evaluate all implementation specifications deterministically.
+    step_type: invoke_tool
+    id: evaluate-implementation-specifications
+    details: Invoke the evaluator exactly once for the selected feature directory;
+      do not edit files in this step.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<feature-name>
+  - description: Repair every reported implementation specification issue.
+    step_type: freeform
+    id: repair-implementation-specifications
+    details: Review the deterministic evaluator result and repair every reported issue
+      with yaml_edit. Use the evaluator's corrective guidance and exact file paths.
+      Do not instantiate workflows, stage artifacts, request approval, or create a
+      pull request while any specification is invalid. After changing the affected
+      YAML, choose next_step so the deterministic evaluation step runs again; if no
+      repair is needed, proceed to the validation gate.
+    llm_type: fast_iteration
+  - description: Confirm all implementation specifications are valid.
+    step_type: gate
+    id: gate-implementation-specifications
+    details: The gate passes only when the directory evaluator exits successfully
+      with zero issues.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<feature-name>
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: repair-implementation-specifications
+      retry_context: The implementation-specification gate failed. Inspect the latest
+        evaluator result, repair every affected YAML with yaml_edit, and rerun deterministic
+        evaluation before continuing.
+  - description: Plan execution workflow instantiation.
+    step_type: freeform
+    id: plan-workflow-instantiation
+    details: For each validated proposed PR, inspect whether its matching workflow
+      already exists and reuse it when present. For each missing workflow, inspect
+      templates/execute-proposed-pr.yaml with read_document, resolve every task input_state
+      placeholder from the matching validated implementation specification, and prepare
+      the complete instantiation values. Use the fixed template, canonical feature
+      name, distinct workflow instance names, proposed-PR order, and dependency relationships.
+      For every dependent workflow, pass each predecessor workflow id with --depends-on-workflow.
+      This records a workflow-level prerequisite whose integration PR must be MERGED
+      before any task in the dependent workflow is selected. Do not model this only
+      as an upstream task dependency. Never ask the user for a template path, leave
+      a required placeholder empty, or overwrite an existing workflow without approval.
+      Pass an invocation plan containing every created or reused workflow and its
+      proposed-PR relationship onward.
+    llm_type: simple_task
+  - description: Instantiate each missing execution workflow.
+    step_type: freeform
+    id: instantiate-execution-workflows
+    details: Invoke instantiate-workflow once for each missing workflow using the
+      invocation plan. Use templates/execute-proposed-pr.yaml, pass every template-specific
+      value with repeated --template-value NAME=VALUE options, and use the canonical
+      feature name as the shared work-item name. The command must create the powdrr/<proposed-pr-id>
+      integration branch while writing workflow files into this active worktree. Stop
+      if a returned workflow directory is outside the active worktree. Pass every
+      created or reused workflow path onward.
+    llm_type: simple_task
+    tool_invocations:
+    - tool: internal
+      command:
+      - powdrr-lift
+      - instantiate-workflow
+      - --work-item-name
+      - <feature-name>
+      - --workflow-instance-name
+      - <proposed-pr-name>
+      - --template-value
+      - proposed-pr-id=<proposed-pr-name>
+      - --template
+      - templates/execute-proposed-pr.yaml
+  - description: Inspect generated workflow repository state.
+    step_type: invoke_tool
+    id: inspect-workflow-repository-state
+    details: Inspect the active repository state after workflow instantiation.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - repository-state
+  - description: Verify workflow artifacts are in the active worktree.
+    step_type: freeform
+    id: verify-workflow-artifacts
+    details: Confirm from the repository-state result that every generated workflow
+      task file and <workflow-id>-workflow.yaml is under docs/workflows/ in this active
+      worktree, that each integration branch is powdrr/<proposed-pr-id>, and that
+      no required artifact exists only below .worktrees/. If any file is missing or
+      outside the active worktree, stop and report the inconsistency; do not stage
+      or create a pull request.
+    llm_type: fast_iteration
+  - description: Stage the validated implementation and workflow artifacts.
+    step_type: freeform
+    id: stage-validated-artifacts
+    details: Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the
+      shell tool, review the staged paths, and do not commit or create a pull request
+      yet.
+    llm_type: simple_task
+    tool_invocations:
+    - tool: shell
+      command:
+      - git
+      - add
+      - docs/proposals/<feature-name>
+      - docs/workflows
+  - description: Verify the staged artifact set.
+    step_type: invoke_tool
+    id: verify-staged-artifacts
+    details: Confirm that only the validated planning artifacts are staged before
+      pull request preparation.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - repository-state
+  - description: Run finish-pr-prep on the validated planning artifacts.
+    step_type: freeform
+    id: prepare-feature-pull-request
+    details: Run finish-pr-prep after the validated planning artifacts are staged.
+      If cleanup changes files, restage only those artifacts before continuing. Do
+      not implement any proposed PR in this skill.
+    llm_type: fast_iteration
+    uses_skills:
+    - finish-pr-prep
+  - description: Commit the validated artifacts and open a draft pull request.
+    step_type: freeform
+    id: create-feature-pull-request
+    details: Invoke create-pull-request with pr-kind `feature`, commit message `Add
+      <feature-name> implementation workflow`, and pull-request title `<pull-request-title>`.
+      Pass files_to_publish containing exactly every validated file under docs/proposals/<feature-name>/
+      and docs/workflows/, plus the validated planning artifacts and Feature Plan
+      context. The nested skill must stage exactly that list. Do not advance until
+      it has committed, pushed, and created or updated a pull request successfully.
+      Never claim a PR is ready without a returned PR URL.
+    llm_type: simple_task
+    uses_skills:
+    - create-pull-request
+  - description: Hand the draft pull request to the user for review.
+    step_type: freeform
+    id: handoff-feature-pull-request
+    details: Show the pull request URL. Summarize the selected feature specification,
+      every proposed-PR implementation specification, every execution workflow, and
+      their dependency relationships. State that implementation has not begun and
+      the draft pull request is ready for review.
+    llm_type: standard_reasoning
+tool_calls:
+- tool: fuzzy-match
+  parameters:
+    command:
+    - fuzzy-match
+    - docs/proposals
+    - -name
+    - interaction-file-logging
+    - -type
+    - d
+    - -maxdepth
+    - '2'
+    - -print
+  why: Searching for a proposal directory matching the feature name.
+- tool: fuzzy-match
+  parameters:
+    command:
+    - fuzzy-match
+    - docs/current
+    - -name
+    - interaction-file-logging
+    - -type
+    - d
+    - -maxdepth
+    - '2'
+    - -print
+  why: Invoking the declared fuzzy-match command against docs/current using the feature
+    name interaction-file-logging to discover current feature specification candidates.
+- tool: fuzzy-match
+  parameters:
+    command:
+    - fuzzy-match
+    - docs/workflows
+    - -name
+    - interaction-file-logging
+    - -type
+    - d
+    - -maxdepth
+    - '3'
+    - -print
+  why: Invoking the declared fuzzy-match command against docs/workflows using the
+    feature name interaction-file-logging to discover execution workflow candidates.
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - implementation-specification
+    - --work-item-name
+    - interaction-file-log
+    - --output
+    - docs/proposals/interaction-file-log/interaction-file-log-core-implementation-specification.yaml
+  why: Generating the implementation specification template for the first proposed
+    PR (interaction-file-log-core). The other two proposed PRs (interaction-file-log-export
+    and interaction-file-log-retention) will be generated in subsequent invocations
+    before completing this step.
+  returncode: 0
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - implementation-specification
+    - --work-item-name
+    - interaction-file-log
+    - --output
+    - docs/proposals/interaction-file-log/interaction-file-log-export-implementation-specification.yaml
+  why: Generated the implementation specification template for the first proposed
+    PR (interaction-file-log-core). Now generating the template for the second proposed
+    PR (interaction-file-log-export). The third proposed PR (interaction-file-log-retention)
+    will be generated next before completing this step.
+  returncode: 0
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - implementation-specification
+    - --work-item-name
+    - interaction-file-log
+    - --output
+    - docs/proposals/interaction-file-log/interaction-file-log-retention-implementation-specification.yaml
+  why: Generated the implementation specification template for the second proposed
+    PR (interaction-file-log-export). Now generating the template for the third and
+    final proposed PR (interaction-file-log-retention). After this invocation, all
+    three proposed PRs will have implementation specification templates, and I will
+    complete the step with the implementation_specification_paths output.
+  returncode: 0
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template
+    - templates/execute-proposed-pr.yaml
+  why: Instantiating the first missing execution workflow for the core proposed PR.
+    The template has been inspected and all placeholders are resolved from the validated
+    implementation specifications. The canonical feature name interaction-file-log
+    is used as the shared work-item name. The export and retention workflows will
+    be instantiated in subsequent invocations before completing this step.
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template
+    - templates/execute-proposed-pr.yaml
+  why: 'Retrying the core workflow instantiation with the exact declared command structure.
+    The previous attempt failed because the command included an extra ''rtk'' prefix
+    and the export attempt added an unsupported ''--depends-on-workflow'' flag. This
+    corrected command matches the declared invocation exactly: powdrr-lift instantiate-workflow
+    --work-item-name interaction-file-log --workflow-instance-name interaction-file-log-core
+    --template-value proposed-pr-id=interaction-file-log-core --template templates/execute-proposed-pr.yaml.
+    The export and retention workflows will be instantiated in subsequent invocations
+    after this one succeeds.'
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-export
+    - --template-value
+    - proposed-pr-id=interaction-file-log-export
+    - --template
+    - templates/execute-proposed-pr.yaml
+  why: The core workflow already exists at docs/workflows/interaction-file-log/interaction-file-log-core-task-001.yaml,
+    so it is reused. Instantiating the second missing workflow for the export proposed
+    PR with the exact declared command structure. The retention workflow will be instantiated
+    next before completing this step.
+  returncode: 0
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-retention
+    - --template-value
+    - proposed-pr-id=interaction-file-log-retention
+    - --template
+    - templates/execute-proposed-pr.yaml
+  why: The core and export workflows are now instantiated. The core workflow was reused
+    from docs/workflows/interaction-file-log/interaction-file-log-core-task-001.yaml,
+    and the export workflow was created at docs/workflows/interaction-file-log/interaction-file-log-export-task-001.yaml
+    with integration branch powdrr/interaction-file-log-export. Now instantiating
+    the third and final missing workflow for the retention proposed PR using the exact
+    declared command structure. After this succeeds, all three workflows will be created
+    and I will complete the step with the workflow paths.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - add
+    - docs/proposals/interaction-file-log
+    - docs/workflows
+  why: Staging the validated implementation specification files under docs/proposals/interaction-file-log/
+    and the instantiated workflow files under docs/workflows/ as required by the current
+    step. The repository state shows the export and retention implementation specifications
+    are untracked, and the workflow files exist under docs/workflows/interaction-file-log/.
+    No commit or pull request will be created.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+  why: Invoking the declared git diff --cached --stat command to confirm the staged
+    pull request scope.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format .
+  why: Running the first validation obligation (ruff-format) from the discovered pr-prep
+    tool list. This formats Python source files and may modify files; if it changes
+    files, I will inspect the edits, restage only intended files, and rerun the full
+    obligation list.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format --check .
+  why: The ruff-format obligation passed with 115 files left unchanged. Running the
+    next obligation, ruff-format-check, to verify formatting without modifying files.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff check .
+  why: The ruff-format and ruff-format-check obligations passed. Running the next
+    obligation, ruff-lint, to check Python source files for lint issues.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev pytest
+  why: The ruff-format, ruff-format-check, and ruff-lint obligations all passed in
+    epoch 1. Running the next pending obligation, pytest, to execute the test suite.
+    After this, mypy remains before the gate can advance.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev mypy src tests
+  why: The ruff-format, ruff-format-check, ruff-lint, and pytest obligations all passed
+    in epoch 1. Running the final pending obligation, mypy, to type-check the source
+    and test files. After this passes, the validation gate will be satisfied and the
+    step can advance.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+  why: Invoking the declared git diff --cached --stat command to confirm the staged
+    pull request scope.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - add
+    - docs/proposals/interaction-file-log/interaction-file-log-export-implementation-specification.yaml
+    - docs/proposals/interaction-file-log/interaction-file-log-retention-implementation-specification.yaml
+  why: 'Staging the exact files from the files_to_publish list: the export and retention
+    implementation specifications. The repository state confirms these are the only
+    untracked intended files; agent_error.txt is not a required artifact and must
+    not be staged. The core specification and workflow files are already tracked.'
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - commit
+    - -m
+    - Add interaction file log export and retention implementation specifications
+  why: 'The staged diff contains exactly the two intended files: the export and retention
+    implementation specifications under docs/proposals/interaction-file-log/. The
+    repository state confirms both are staged with no unrelated files staged; agent_error.txt
+    remains untracked and is not part of the commit. The staged diff is non-empty
+    with 73 insertions. Committing with a descriptive message for the validated planning
+    artifacts.'
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
+  why: Pushing the current feature branch workflow-chat-20260823-045153-850263 with
+    its upstream set to origin. The committed HEAD contains the export and retention
+    implementation specifications. No pull request will be created in this step; the
+    completed body remains in workflow context for the next step.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - gh
+    - pr
+    - create
+    - --draft
+    - --title
+    - Add interaction file log export and retention implementation specifications
+    - --body
+    - '# Pull Request Description
+
+
+      ## Summary
+
+
+      Adds validated implementation specifications for the interaction file log export
+      and retention features.
+
+
+      ## Problem
+
+
+      The interaction file log feature requires detailed implementation specifications
+      for export and retention capabilities before implementation can begin.
+
+
+      ## Behavior
+
+
+      ### Before
+
+
+      - No implementation specifications existed for export or retention.
+
+
+      ### After
+
+
+      - Export and retention implementation specifications are defined and validated.
+
+
+      ## Scope
+
+
+      ### Included
+
+
+      - Export implementation specification
+
+      - Retention implementation specification
+
+
+      ### Explicitly not included
+
+
+      - Core implementation specification (already tracked)
+
+      - Workflow files (already tracked)
+
+
+      ## Implementation
+
+
+      - Added YAML specification documents under docs/proposals/interaction-file-log/.
+
+
+      ### Data, API, schema, or workflow changes
+
+
+      - No runtime data, API, or schema changes; specification documents only.
+
+
+      ### Compatibility considerations
+
+
+      - No breaking changes; additive specification documents.
+
+
+      ## Validation
+
+
+      | Check | Command | Result |
+
+      | --- | --- | --- |
+
+      | Focused tests | N/A | Not applicable; no code changes |
+
+      | Full tests | uv run --extra dev pytest | Passed |
+
+      | Formatting | uv run --extra dev ruff format . | Passed (115 files unchanged)
+      |
+
+      | Lint | uv run --extra dev ruff check . | Passed |
+
+      | Type checks | uv run --extra dev mypy src tests | Passed |
+
+
+      ## Risks and Mitigations
+
+
+      | Risk | Impact | Mitigation or evidence |
+
+      | --- | --- | --- |
+
+      | Specification drift | Low | Validated against schema |
+
+
+      ## Reviewer Guide
+
+
+      Please focus on:
+
+
+      - Verify export and retention specifications align with the core specification.
+
+
+      Open questions or decisions needing review:
+
+
+      - None.
+
+
+      ## Dependencies and Follow-up
+
+
+      - Depends on: Core implementation specification
+
+      - Follow-up work: Implement export and retention features
+
+      - Rollback considerations: Revert specification documents
+
+
+      ## References
+
+
+      - Feature/specification: interaction-file-log
+
+      - Related PRs/issues: None
+
+      - Review comments addressed: None
+
+
+      ## Feature Plan
+
+
+      Core, export, and retention implementation specifications with export and retention
+      depending on core.'
+  why: The branch has committed changes (ahead of base) and the pushed HEAD contains
+    both files_to_publish paths. No pull request exists for this branch. Invoking
+    gh pr create with the completed body from the previous steps, using the validated
+    export and retention implementation specifications as the PR scope.
+  returncode: 0
+explanation: This record documents the selected skill steps and the tool calls observed
+  before the agent created the pull request.

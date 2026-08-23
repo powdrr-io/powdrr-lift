@@ -66,6 +66,7 @@ from powdrr_lift.core import (
     validate_workflow_template_json,
 )
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
+from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
     create_project_structure_template,
     validate_project_structure_yaml,
@@ -1352,6 +1353,12 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     try:
         project_root = resolve_git_repository_root(repo_root)
         proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
+        dependency_graph = load_proposed_pr_dependency_graph(repo_root)
+        if proposed_pr_id not in dependency_graph:
+            raise ValueError(
+                f"No proposed PR specification exists for {proposed_pr_id!r}."
+            )
+        derived_dependencies = dependency_graph[proposed_pr_id]
         integration_worktree, integration_branch = create_workflow_worktree(
             project_root,
             proposed_pr_id,
@@ -1375,7 +1382,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             base_branch="main",
             integration_branch=integration_branch,
             workflow_relative_directory=str(relative_workflow),
-            depends_on_workflows=tuple(args.depends_on_workflow),
+            depends_on_workflows=derived_dependencies,
             invariants=invariants,
             relationships=relationships,
         )
@@ -1892,6 +1899,7 @@ def _evaluate_workflow_changed_files(*, repo_root: Path, base_branch: str) -> bo
             template_paths.setdefault(template_id, template_path)
     relationship_issues: list[WorkflowRelationshipValidationIssue] = []
     relationships_checked = 0
+    proposed_pr_dependencies = load_proposed_pr_dependency_graph(repo_root)
     for workflow_key, template_ids in sorted(task_requirements.items()):
         required_invariants: list[dict[str, Any]] = []
         for template_id in sorted(template_ids):
@@ -1918,6 +1926,57 @@ def _evaluate_workflow_changed_files(*, repo_root: Path, base_branch: str) -> bo
             scoped_states = [
                 path for paths in state_paths_by_workflow.values() for path in paths
             ]
+        if workflow_key != "__unscoped__":
+            expected_dependencies = set(proposed_pr_dependencies.get(workflow_key, ()))
+            if workflow_key not in proposed_pr_dependencies:
+                issues.append(
+                    {
+                        "path": workflow_key,
+                        "message": (
+                            "Workflow has no matching proposed PR specification: "
+                            f"{workflow_key}"
+                        ),
+                    }
+                )
+            for state_path in scoped_states:
+                try:
+                    state_data = yaml.safe_load(state_path.read_text(encoding="utf-8"))
+                except (OSError, yaml.YAMLError) as exc:
+                    issues.append({"path": str(state_path), "message": str(exc)})
+                    continue
+                actual_raw = (
+                    state_data.get("depends_on_workflows", [])
+                    if isinstance(state_data, dict)
+                    else []
+                )
+                actual_dependencies = (
+                    set(actual_raw)
+                    if isinstance(actual_raw, list)
+                    and all(isinstance(item, str) for item in actual_raw)
+                    else None
+                )
+                if actual_dependencies is None:
+                    issues.append(
+                        {
+                            "path": str(state_path),
+                            "message": (
+                                "depends_on_workflows must be a list of workflow "
+                                "or proposed PR ids."
+                            ),
+                        }
+                    )
+                elif actual_dependencies != expected_dependencies:
+                    issues.append(
+                        {
+                            "path": str(state_path),
+                            "message": (
+                                "Workflow dependencies do not match proposed PR "
+                                f"dependent_prs for {workflow_key!r}: expected "
+                                f"{sorted(expected_dependencies)!r}, found "
+                                f"{sorted(actual_dependencies)!r}."
+                            ),
+                        }
+                    )
         report = validate_workflow_relationships(
             scoped_states,
             required_invariant_ids=[

@@ -112,6 +112,10 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# Instructions:",
         "# - Create one template per proposed PR.",
         "# - Set `id` to a globally unique proposed PR id.",
+        "# - List prerequisite proposed PR ids under `dependent_prs`; use [] when",
+        "#   this proposed PR has no prerequisites.",
+        "# - Every dependent_prs id must identify an existing proposed PR, and",
+        "#   dependency cycles are not allowed.",
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
         "# - Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`.",
@@ -126,6 +130,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         *feature_lines,
         "schema: https://powdrr.io/schemas/specification-v1",
         "id: null",
+        "dependent_prs: []",
         "feature_ids:",
         "  - null",
         "intent:",
@@ -329,6 +334,21 @@ def build_pr_specification_validation_report(
     if proposed_pr_id is not None:
         seen_detail_ids.add(proposed_pr_id)
 
+    dependent_prs = _collect_dependent_pr_ids(
+        raw_spec.get("dependent_prs", []),
+        proposed_pr_id=proposed_pr_id,
+        known_pr_ids=known_pr_ids,
+        issues=issues,
+    )
+    if proposed_pr_id is not None:
+        _validate_proposed_pr_dependency_cycle(
+            repo_root_path,
+            proposed_pr_id,
+            dependent_prs,
+            excluded_file_path=file_path,
+            issues=issues,
+        )
+
     _collect_feature_ids(
         _coerce_sequence(
             raw_spec.get("feature_ids"),
@@ -405,6 +425,147 @@ def build_pr_specification_validation_report(
         known_pr_ids=known_pr_ids,
         issues=issues,
     )
+
+
+def _collect_dependent_pr_ids(
+    raw_value: object,
+    *,
+    proposed_pr_id: str | None,
+    known_pr_ids: Sequence[str],
+    issues: list[PRSpecificationValidationIssue],
+) -> tuple[str, ...]:
+    if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes)):
+        issues.append(
+            PRSpecificationValidationIssue(
+                code="invalid_dependent_prs_section",
+                message="dependent_prs must be a list of proposed PR ids.",
+                path="dependent_prs",
+            )
+        )
+        return ()
+
+    known_ids = _normalize_identifier_set(known_pr_ids)
+    if proposed_pr_id is not None:
+        known_ids.add(_normalize_identifier(proposed_pr_id))
+    seen_ids: set[str] = set()
+    dependent_prs: list[str] = []
+    for index, raw_id in enumerate(raw_value):
+        dependency_id = _required_string(
+            raw_id,
+            path=f"dependent_prs[{index}]",
+            issues=issues,
+            issue_code="dependent_pr_id_missing",
+            issue_message="Each dependent_prs entry must be a proposed PR id.",
+        )
+        if dependency_id is None:
+            continue
+        normalized_id = _normalize_identifier(dependency_id)
+        if normalized_id in seen_ids:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="duplicate_dependent_pr_id",
+                    message=(
+                        f"Dependent proposed PR id {dependency_id!r} is duplicated."
+                    ),
+                    path=f"dependent_prs[{index}]",
+                )
+            )
+            continue
+        seen_ids.add(normalized_id)
+        dependent_prs.append(dependency_id)
+        if proposed_pr_id is not None and normalized_id == _normalize_identifier(
+            proposed_pr_id
+        ):
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="self_dependent_pr_id",
+                    message="A proposed PR cannot depend on itself.",
+                    path=f"dependent_prs[{index}]",
+                )
+            )
+        elif normalized_id not in known_ids:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="unknown_dependent_pr_id",
+                    message=(
+                        f"Dependent proposed PR id {dependency_id!r} does not "
+                        "identify an existing proposed PR."
+                    ),
+                    path=f"dependent_prs[{index}]",
+                )
+            )
+    return tuple(dependent_prs)
+
+
+def load_proposed_pr_dependency_graph(
+    repo_root: str | Path,
+) -> dict[str, tuple[str, ...]]:
+    """Load the proposed-PR dependency graph from checked-in specifications."""
+    repo_root_path = _resolve_repo_root(repo_root)
+    graph: dict[str, tuple[str, ...]] = {}
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root_path):
+        try:
+            raw_spec = _load_yaml_mapping(
+                specification_path.read_text(encoding="utf-8")
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        proposed_pr_id = _optional_string(raw_spec.get("id"))
+        if proposed_pr_id is None:
+            continue
+        raw_dependencies = raw_spec.get("dependent_prs", [])
+        if not isinstance(raw_dependencies, Sequence) or isinstance(
+            raw_dependencies, (str, bytes)
+        ):
+            continue
+        dependencies = tuple(
+            dependency.strip()
+            for dependency in raw_dependencies
+            if isinstance(dependency, str) and dependency.strip()
+        )
+        graph[proposed_pr_id] = dependencies
+    return graph
+
+
+def _validate_proposed_pr_dependency_cycle(
+    repo_root: Path,
+    proposed_pr_id: str,
+    dependent_prs: Sequence[str],
+    *,
+    excluded_file_path: str | Path | None,
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    graph = load_proposed_pr_dependency_graph(repo_root)
+    if excluded_file_path is not None:
+        for existing_id, _dependencies in list(graph.items()):
+            if existing_id == proposed_pr_id:
+                del graph[existing_id]
+    graph[proposed_pr_id] = tuple(dependent_prs)
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node: str, path: tuple[str, ...]) -> None:
+        normalized_node = _normalize_identifier(node)
+        if normalized_node in visiting:
+            cycle = " -> ".join((*path, node))
+            issues.append(
+                PRSpecificationValidationIssue(
+                    code="proposed_pr_dependency_cycle",
+                    message=f"Proposed PR dependency cycle detected: {cycle}.",
+                    path="dependent_prs",
+                )
+            )
+            return
+        if normalized_node in visited:
+            return
+        visiting.add(normalized_node)
+        for dependency in graph.get(node, ()):
+            visit(dependency, (*path, node))
+        visiting.remove(normalized_node)
+        visited.add(normalized_node)
+
+    visit(proposed_pr_id, ())
 
 
 def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:

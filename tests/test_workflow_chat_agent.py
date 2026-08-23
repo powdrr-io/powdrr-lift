@@ -5790,7 +5790,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     pr_spec_yaml = yaml.safe_dump(
         {
             "schema": "https://powdrr.io/schemas/specification-v1",
-            "id": "display-related-photos",
+            "id": "display-related-photos-pr-001",
             "feature_ids": _repo_feature_ids(repo_root),
             "intent": {
                 "problem": (

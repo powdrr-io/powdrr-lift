@@ -265,15 +265,15 @@ steps:
     every task input_state placeholder from the matching validated
     implementation specification, and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
-    instance names, proposed-PR order, and dependency relationships. For every
-    dependent workflow, pass each predecessor workflow id with
-    --depends-on-workflow. This records a workflow-level prerequisite whose
-    integration PR must be MERGED before any task in the dependent workflow is
-    selected. Do not model this only as an upstream task dependency. Never ask
-    the user for a template path, leave a required placeholder empty, or
-    overwrite an existing workflow without approval. Pass an invocation plan
-    containing every created or reused workflow and its proposed-PR relationship
-    onward.
+    instance names, proposed-PR order, and dependency relationships. Do not
+    pass workflow dependencies manually: instantiate-workflow derives them from
+    dependent_prs in the matching proposed PR specification. The resulting
+    workflow state must preserve those derived dependencies so its integration
+    PR must be MERGED before any task in the dependent workflow is selected.
+    Do not model this only as an upstream task dependency. Never ask the user
+    for a template path, leave a required placeholder empty, or overwrite an
+    existing workflow without approval. Pass an invocation plan containing
+    every created or reused workflow and its proposed-PR relationship onward.
 - id: instantiate-execution-workflows
   description: Instantiate each missing execution workflow.
   step_type: freeform

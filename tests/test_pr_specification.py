@@ -164,6 +164,7 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert [section for section in rendered_template] == [
         "schema",
         "id",
+        "dependent_prs",
         "feature_ids",
         "intent",
         "acceptance_criteria",
@@ -280,6 +281,41 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
     )
 
     assert report.validation_successful is True
+
+
+def test_validate_pr_specification_rejects_unknown_dependent_pr(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: pr-456
+    dependent_prs:
+      - missing-pr
+    feature_ids:
+      - feature-a
+    intent:
+      problem: Add a new capability.
+      goal: Add a new capability.
+      reasoning: Keep the repo aligned.
+    acceptance_criteria: []
+    expected_tests: []
+    required_test_cases: []
+    expected_outcomes: []
+    non_goals: []
+    risks: []
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed_spec,
+        work_item_name="PR-456",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} == {
+        "unknown_dependent_pr_id",
+    }
 
 
 def test_validate_pr_specification_does_not_flag_the_current_file_as_duplicate(

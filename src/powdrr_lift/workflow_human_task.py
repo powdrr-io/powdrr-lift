@@ -21,6 +21,7 @@ from powdrr_lift.workflow_git import (
     load_workflow_git_state,
     resolve_git_repository_root,
     validate_workflow_git_state,
+    workflow_id_from_task_id,
 )
 from powdrr_lift.workflow_task_agent import (
     publish_workflow_progress,
@@ -57,7 +58,10 @@ def run_human_task(
         print("No ready human task found.", file=stderr)
         return 1
 
-    configured_git_state = load_workflow_git_state(configured_workflow_dir)
+    configured_git_state = load_workflow_git_state(
+        configured_workflow_dir,
+        workflow_id=workflow_id_from_task_id(configured_task.task_id),
+    )
     repo_root = configured_repo_root
     workflow_dir = configured_workflow_dir
     if configured_git_state is not None:

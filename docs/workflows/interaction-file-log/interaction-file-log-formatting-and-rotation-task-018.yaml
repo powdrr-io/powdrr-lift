@@ -1,0 +1,28 @@
+task_id: interaction-file-log-formatting-and-rotation-task-018
+status: open
+upstream_task_ids:
+- interaction-file-log-formatting-and-rotation-task-017
+dependent_state:
+- final-scope-repair-complete
+complexity: medium
+input_state:
+  scope_review: interaction-file-log-formatting-and-rotation-task-017.final-scope-review-state
+  scope_repair: {}
+assignee_type: agent
+assignee_role: coder
+output_state_type: final-scope-repair-state
+description: Repair final diff scope issues
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Perform exactly one action only when the scope review identifies a finding:
+  edit or remove only the reported out-of-scope content. Do not run checks or stage
+  files here. If the review is clean, make no edit. For a file removal, use one file_management
+  action such as: {"action":"file_management","operation":"delete","file_path":"tmp/debug.log","decisions_and_context":"Removed
+  the reported generated artifact."} For a code correction, use one edit action. Record
+  the repair in the output_state and let the final checks rerun after this task.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-formatting-and-rotation''. Use these values as search
+  context and verify repository documents before deciding what they identify.'
+llm_type: standard_reasoning

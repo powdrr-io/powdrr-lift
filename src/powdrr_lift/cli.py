@@ -5,6 +5,7 @@ import difflib
 import json
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -84,6 +85,7 @@ from powdrr_lift.repository_state import render_repository_state
 from powdrr_lift.workflow_chat_agent import (
     ALL_PROVIDERS,
     WorkflowChatConfig,
+    choose_workflow_provider,
     download_local_qwen_model,
     run_workflow_chat,
 )
@@ -2004,6 +2006,13 @@ def _run_workflow_chat(args: argparse.Namespace) -> int:
         max_stalled_roundtrips=args.max_stalled_roundtrips,
         verbose=args.verbose,
     )
+    if args.provider == "auto" and sys.stdin.isatty():
+        try:
+            selected_provider = choose_workflow_provider()
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        config = replace(config, normal_provider=selected_provider)
     while True:
         if sys.stdin.isatty() and sys.stdout.isatty():
             exit_code = run_workflow_chat_tui(config)

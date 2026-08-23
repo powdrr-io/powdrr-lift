@@ -146,6 +146,8 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowStructuredDocumentError,
     _WorkflowYamlEditError,
     _worktree_reuse_decision,
+    available_workflow_providers,
+    choose_workflow_provider,
     dependency_backed_command_variants,
     download_local_qwen_model,
     missing_executable_output,
@@ -3206,6 +3208,63 @@ def test_auto_provider_selects_openrouter_when_configured(
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
 
     assert _resolve_provider("auto", "glm-5.2") == "openrouter"
+
+
+def test_available_workflow_providers_requires_api_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_API_KEY",
+        "ZAI_API_KEY",
+        "GLM_API_KEY",
+        "OPENROUTER_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_API_KEY",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_codex_access_token",
+        lambda: None,
+    )
+    monkeypatch.setenv("OPENROUTER_BASE_URL", "https://example.test")
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+
+    assert available_workflow_providers() == ("deepinfra-cheap", "deepinfra")
+
+
+def test_choose_workflow_provider_presents_configured_provider_pick_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_API_KEY",
+        "ZAI_API_KEY",
+        "GLM_API_KEY",
+        "OPENROUTER_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_API_KEY",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._resolve_codex_access_token",
+        lambda: None,
+    )
+    monkeypatch.setenv("ZAI_API_KEY", "zai-token")
+    output = io.StringIO()
+
+    selected = choose_workflow_provider(
+        input_func=lambda: "1",
+        stdout=output,
+    )
+
+    assert selected == "zai"
+    assert "z.ai (zai)" in output.getvalue()
+    assert "OPENAI_API_KEY" not in output.getvalue()
 
 
 def test_initial_model_uses_openrouter_mapping_for_default_model() -> None:

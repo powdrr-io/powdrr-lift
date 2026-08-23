@@ -6614,9 +6614,12 @@ def _parse_workflow_action_gather_context(
         raise RuntimeError(
             "Workflow gather_context action feature_id must be a non-empty string."
         )
-    normalized_types = tuple(
-        normalize_context_type(context_type) for context_type in types
-    )
+    try:
+        normalized_types = tuple(
+            normalize_context_type(context_type) for context_type in types
+        )
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
     return SkillChatAction(
         kind="gather_context",
         types=normalized_types,

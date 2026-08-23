@@ -104,6 +104,7 @@ from powdrr_lift.workflow_chat_agent import (
     _normalize_cache_usage,
     _parse_action_response,
     _parse_json_object,
+    _parse_workflow_action_gather_context,
     _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,
@@ -3211,6 +3212,18 @@ def test_initial_model_uses_openrouter_mapping_for_default_model() -> None:
     assert _initial_model_for_provider("openrouter", "glm-5.2") == ("stealth/ox-alpha")
     assert _initial_model_for_provider("openai", "glm-5.2") == "glm-5.2"
     assert _initial_model_for_provider("openrouter", "custom-model") == ("custom-model")
+
+
+def test_invalid_gather_context_type_is_repairable() -> None:
+    with pytest.raises(
+        RuntimeError,
+        match="Unsupported context type 'implementation-specifications'",
+    ):
+        _parse_workflow_action_gather_context(
+            {"types": ["implementation-specifications"]},
+            None,
+            None,
+        )
 
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:

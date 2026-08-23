@@ -36,6 +36,7 @@ from powdrr_lift.pr_workflow_record import (
     record_pull_request_workflow,
 )
 from powdrr_lift.workflow_chat_agent import (
+    _DEFAULT_LLM_TYPE,
     _DEFAULT_MODEL,
     LLMModelMapping,
     LocalLlamaChatClient,
@@ -62,7 +63,6 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_llm_mapping,
     _resolve_local_model_path,
     _resolve_project_root,
-    _resolve_worktree_context,
     _resolve_worktree_file_path,
     _run_deterministic_pre_step,
     _run_gate,
@@ -77,9 +77,8 @@ from powdrr_lift.workflow_git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
     claim_workflow_task,
-    create_task_worktree,
+    create_workflow_worktree,
     load_workflow_git_state,
-    task_branch_name,
     validate_workflow_git_state,
     workflow_dependencies_completion,
     workflow_id_from_task_id,
@@ -615,6 +614,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 workflow_id=workflow_id_from_task_id(self.task.task_id),
                 reason=f"complete {completed.task_id}",
                 stdout=self.stdout,
+                open_pull_request=False,
                 events=self.events,
             )
             return WorkflowActionOutcome(continue_running=False)
@@ -642,6 +642,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             workflow_id=workflow_id_from_task_id(self.task.task_id),
             reason=f"{reason_prefix} {self.task.task_id}",
             stdout=self.stdout,
+            open_pull_request=False,
             events=self.events,
         )
         return WorkflowActionOutcome(continue_running=False)
@@ -778,6 +779,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             workflow_id=workflow_id_from_task_id(self.task.task_id),
             reason=f"roundtrip limit for {self.task.task_id}",
             stdout=self.stdout,
+            open_pull_request=False,
             events=self.events,
         )
         return 2
@@ -856,10 +858,16 @@ def run_workflow_task(
             configured_workflow_dir,
             workflow_id=configured_workflow_id,
         )
+        if configured_git_state is None and configured_workflow_id is None:
+            configured_git_state = load_workflow_git_state(configured_workflow_dir)
         if configured_git_state is not None:
+            project_root = _resolve_project_root(
+                configured_repo_root,
+                configured_repo_root,
+            )
             dependencies_complete, incomplete_dependencies = (
                 workflow_dependencies_completion(
-                    configured_repo_root,
+                    project_root,
                     configured_git_state,
                 )
             )
@@ -871,25 +879,10 @@ def run_workflow_task(
                 for dependency in incomplete_dependencies:
                     print(f"  - {dependency}", file=stderr)
                 return 1
-        if configured_git_state is not None and configured_task is not None:
-            project_root = _resolve_project_root(
-                configured_repo_root,
-                configured_repo_root,
-            )
-            validate_workflow_git_state(
-                project_root,
-                configured_git_state,
-                configured_task.task_id,
-            )
-            claim_workflow_task(
-                project_root,
-                configured_git_state,
-                configured_task.task_id,
-            )
         repo_root, workflow_dir = _resolve_workflow_task_context(
             config,
             configured_repo_root=configured_repo_root,
-            task_id=configured_task.task_id if configured_task is not None else None,
+            workflow_git_state=configured_git_state,
             stdout=stdout,
             stderr=stderr,
         )
@@ -905,106 +898,186 @@ def run_workflow_task(
         stderr=stderr,
     )
     workflow = WorkflowInstance.from_directory(workflow_dir)
-    task = _select_task(workflow, config.task_id)
-    if task is None:
-        workflow_git_state = load_workflow_git_state(
-            workflow_dir,
-            workflow_id=workflow_id_from_task_id(config.task_id or ""),
-        )
-        if workflow_git_state is not None and workflow.tasks:
-            if all(item.status is TaskStatus.COMPLETED for item in workflow.tasks):
-                _open_final_workflow_pull_request(
-                    repo_root,
-                    workflow,
-                    workflow_git_state,
-                    stdout=stdout,
-                )
-                return 0
-        print("No ready agent task found.", file=stderr)
-        return 1
-    task = workflow.claim_task(task.task_id)
-    print(f"Claimed workflow task: {task.task_id}", file=stdout)
-    print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
-    _publish_workflow_progress(
-        repo_root,
-        workflow,
-        workflow_id=workflow_id_from_task_id(task.task_id),
-        reason=f"claim {task.task_id}",
-        stdout=stdout,
-        open_pull_request=False,
-    )
-    provider = resolve_workflow_provider(config.provider)
-    mappings = tuple(_default_llm_mappings(provider).items())
-    mapping = _resolve_workflow_task_mapping(
-        task.llm_type,
-        mappings=mappings,
-        provider=provider,
-    )
-    if mapping is None:
-        raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
-    model = mapping.model
+    requested_task_id = config.task_id
     client_was_provided = client is not None
-    if client is None:
-        client = _build_workflow_client(config, task)
     dump_root = _resolve_project_root(
         configured_repo_root,
         repo_root,
     )
-    if config.verbose:
-        client = _WorkflowTaskDisplayClient(client, stderr=stderr)
-    client = _maybe_record_llm_exchanges(client, dump_root)
-    compaction_client = client
-    long_context_backup = _long_context_backup_for(
-        model,
-        mappings,
-    )
-    if not client_was_provided and long_context_backup is not None:
-        backup_client = _build_workflow_client_for_mapping(
-            config,
-            task,
-            long_context_backup,
-        )
-        if config.verbose:
-            backup_client = _WorkflowTaskDisplayClient(
-                backup_client,
-                stderr=stderr,
-            )
-        compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
-
-    driver_events: list[dict[str, Any]] = []
-    driver = WorkflowLLMExecutionDriver(
-        max_stalled_roundtrips=config.max_stalled_roundtrips
-    )
-    strategy = _TaskWorkflowExecutionStrategy(
-        config=config,
-        workflow=workflow,
-        task=task,
-        skill_catalog=skill_catalog,
-        repo_root=repo_root,
-        error_log_root=dump_root,
-        client=client,
-        compaction_client=compaction_client,
-        model=model,
-        mapping_provider=mapping.provider,
-        stdout=stdout,
-        stderr=stderr,
-        action_engine=driver.action_engine,
-        events=driver_events,
+    workflow_git_state = load_workflow_git_state(
+        workflow_dir,
+        workflow_id=(
+            configured_git_state.proposed_pr_id
+            if configured_git_state is not None
+            else configured_workflow_id
+        ),
     )
     try:
-        return driver.run(
-            strategy,
-            max_roundtrips=config.max_roundtrips,
-            signature=workflow_action_signature,
+        if configured_git_state is not None and workflow_git_state is None:
+            raise WorkflowGitInconsistency(
+                json.dumps(
+                    {
+                        "proposed_pr_id": configured_git_state.proposed_pr_id,
+                        "inconsistencies": [
+                            "integration worktree does not contain the expected "
+                            "workflow Git metadata"
+                        ],
+                        "recovery_command": (
+                            "powdrr-lift workflow-recovery --proposed-pr-id "
+                            f"{configured_git_state.proposed_pr_id} --cleanup"
+                        ),
+                    },
+                    indent=2,
+                )
+            )
+        if workflow_git_state is not None:
+            project_root = _resolve_project_root(configured_repo_root, repo_root)
+            validate_workflow_git_state(
+                project_root,
+                workflow_git_state,
+                config.task_id or f"{workflow_git_state.proposed_pr_id}-workflow",
+            )
+        else:
+            project_root = configured_repo_root
+    except WorkflowGitInconsistency as exc:
+        print(
+            "Workflow Git state is inconsistent; no task work was started.",
+            file=stderr,
         )
-    except WorkflowLLMTimeoutExhausted as exc:
-        return _handle_exhausted_timeout(
+        print(str(exc), file=stderr)
+        return 2
+
+    while True:
+        task = _select_task(workflow, requested_task_id)
+        requested_task_id = None
+        if task is None:
+            ready_human_tasks = workflow.ready_tasks(assignee_type=AssigneeType.HUMAN)
+            if ready_human_tasks:
+                print(
+                    f"Workflow waiting on human task: {ready_human_tasks[0].task_id}",
+                    file=stdout,
+                )
+                return 0
+            if workflow.tasks and all(
+                item.status is TaskStatus.COMPLETED for item in workflow.tasks
+            ):
+                if workflow_git_state is not None:
+                    _open_final_workflow_pull_request(
+                        repo_root,
+                        workflow,
+                        workflow_git_state,
+                        stdout=stdout,
+                    )
+                    return 0
+                if not _is_git_worktree(repo_root):
+                    return 0
+                print(
+                    "Workflow is complete, but no workflow Git state was found; "
+                    "no final pull request was created.",
+                    file=stderr,
+                )
+                return 1
+            print("No ready agent task found.", file=stderr)
+            return 1
+
+        try:
+            if workflow_git_state is not None:
+                validate_workflow_git_state(
+                    project_root,
+                    workflow_git_state,
+                    task.task_id,
+                )
+                claim_workflow_task(project_root, workflow_git_state, task.task_id)
+            task = workflow.claim_task(task.task_id)
+        except (RuntimeError, ValueError) as exc:
+            print(
+                "Workflow state changed or is inconsistent; no task work was "
+                "started for this task.",
+                file=stderr,
+            )
+            print(str(exc), file=stderr)
+            return 2
+        print(f"Claimed workflow task: {task.task_id}", file=stdout)
+        print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
+        _publish_workflow_progress(
             repo_root,
-            task,
+            workflow,
+            workflow_id=workflow_id_from_task_id(task.task_id),
+            reason=f"claim {task.task_id}",
+            stdout=stdout,
+            open_pull_request=False,
+        )
+
+        provider = resolve_workflow_provider(config.provider)
+        mappings = tuple(_default_llm_mappings(provider).items())
+        mapping = _resolve_workflow_task_mapping(
+            task.llm_type,
+            mappings=mappings,
+            provider=provider,
+        )
+        if mapping is None:
+            raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
+        model = mapping.model
+        if client_was_provided:
+            assert client is not None
+            task_client = client
+        else:
+            task_client = _build_workflow_client(config, task)
+        if config.verbose:
+            task_client = _WorkflowTaskDisplayClient(task_client, stderr=stderr)
+        task_client = _maybe_record_llm_exchanges(task_client, dump_root)
+        compaction_client = task_client
+        long_context_backup = _long_context_backup_for(model, mappings)
+        if not client_was_provided and long_context_backup is not None:
+            backup_client = _build_workflow_client_for_mapping(
+                config,
+                task,
+                long_context_backup,
+            )
+            if config.verbose:
+                backup_client = _WorkflowTaskDisplayClient(
+                    backup_client,
+                    stderr=stderr,
+                )
+            compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
+
+        driver_events: list[dict[str, Any]] = []
+        driver = WorkflowLLMExecutionDriver(
+            max_stalled_roundtrips=config.max_stalled_roundtrips
+        )
+        strategy = _TaskWorkflowExecutionStrategy(
+            config=config,
+            workflow=workflow,
+            task=task,
+            skill_catalog=skill_catalog,
+            repo_root=repo_root,
+            error_log_root=dump_root,
+            client=task_client,
+            compaction_client=compaction_client,
+            model=model,
+            mapping_provider=mapping.provider,
             stdout=stdout,
             stderr=stderr,
-            error=exc,
+            action_engine=driver.action_engine,
+            events=driver_events,
         )
+        try:
+            exit_code = driver.run(
+                strategy,
+                max_roundtrips=config.max_roundtrips,
+                signature=workflow_action_signature,
+            )
+        except WorkflowLLMTimeoutExhausted as exc:
+            return _handle_exhausted_timeout(
+                repo_root,
+                task,
+                stdout=stdout,
+                stderr=stderr,
+                error=exc,
+            )
+        if exit_code != 0:
+            return exit_code
+        workflow = WorkflowInstance.from_directory(workflow_dir)
 
 
 def _select_task(
@@ -1024,80 +1097,65 @@ def _resolve_workflow_task_context(
     config: WorkflowTaskAgentConfig,
     *,
     configured_repo_root: Path,
-    task_id: str | None,
+    workflow_git_state: WorkflowGitState | None,
     stdout: TextIO,
     stderr: TextIO,
 ) -> tuple[Path, Path]:
-    """Use the same dedicated worktree isolation as workflow chat."""
+    """Resolve the single integration worktree used by the workflow run."""
     configured_workflow_dir = config.workflow_dir.resolve()
-    workflow_git_state = load_workflow_git_state(
-        configured_workflow_dir,
-        workflow_id=workflow_id_from_task_id(task_id or ""),
-    )
-    if workflow_git_state is not None and task_id is not None:
-        current_branch = _git_output(
-            configured_repo_root,
-            ["branch", "--show-current"],
-        )
-        expected_task_branch = task_branch_name(
-            workflow_git_state.proposed_pr_id,
-            task_id,
-        )
-        if current_branch != expected_task_branch:
-            project_root = _resolve_project_root(
-                configured_repo_root,
-                configured_repo_root,
-            )
-            try:
-                task_worktree, task_branch = create_task_worktree(
-                    project_root,
-                    workflow_git_state,
-                    task_id,
-                )
-            except RuntimeError as exc:
-                raise WorkflowGitInconsistency(
-                    json.dumps(
-                        {
-                            "proposed_pr_id": workflow_git_state.proposed_pr_id,
-                            "task_id": task_id,
-                            "inconsistencies": [str(exc)],
-                            "recovery_command": (
-                                "powdrr-lift workflow-recovery --proposed-pr-id "
-                                f"{workflow_git_state.proposed_pr_id} --cleanup"
-                            ),
-                        },
-                        indent=2,
-                    )
-                ) from exc
-            print(
-                f"Using workflow task branch {task_branch} in {task_worktree}",
-                file=stdout,
-                flush=True,
-            )
-            return (
-                task_worktree,
-                task_worktree / workflow_git_state.workflow_relative_directory,
-            )
-
     if not _is_git_worktree(configured_repo_root):
         return configured_repo_root, configured_workflow_dir
+    if workflow_git_state is None:
+        raise WorkflowGitInconsistency(
+            json.dumps(
+                {
+                    "inconsistencies": [
+                        "workflow Git metadata is missing or invalid; "
+                        "cannot determine the integration branch"
+                    ],
+                    "recovery_command": (
+                        "powdrr-lift workflow-recovery --proposed-pr-id "
+                        "<proposed-pr-id> --cleanup"
+                    ),
+                },
+                indent=2,
+            )
+        )
 
-    worktree_root = _resolve_worktree_context(
+    project_root = _resolve_project_root(
         configured_repo_root,
-        stderr=stderr,
-        verbose=config.verbose,
+        configured_repo_root,
     )
-    workflow_dir = configured_workflow_dir
     try:
-        workflow_relative_path = workflow_dir.relative_to(configured_repo_root)
-    except ValueError as exc:
-        raise RuntimeError(
-            "Workflow directory must be inside the configured repository root "
-            "when workflow task execution creates a dedicated worktree."
+        integration_worktree, integration_branch = create_workflow_worktree(
+            project_root,
+            workflow_git_state.proposed_pr_id,
+            base_branch=workflow_git_state.base_branch,
+        )
+    except RuntimeError as exc:
+        raise WorkflowGitInconsistency(
+            json.dumps(
+                {
+                    "proposed_pr_id": workflow_git_state.proposed_pr_id,
+                    "inconsistencies": [str(exc)],
+                    "recovery_command": (
+                        "powdrr-lift workflow-recovery --proposed-pr-id "
+                        f"{workflow_git_state.proposed_pr_id} --cleanup"
+                    ),
+                },
+                indent=2,
+            )
         ) from exc
-    relocated_workflow_dir = worktree_root / workflow_relative_path
-    print(f"Using workflow task worktree: {worktree_root}", file=stdout, flush=True)
-    return worktree_root, relocated_workflow_dir
+    print(
+        f"Using workflow integration branch {integration_branch} in "
+        f"{integration_worktree}",
+        file=stdout,
+        flush=True,
+    )
+    return (
+        integration_worktree,
+        integration_worktree / workflow_git_state.workflow_relative_directory,
+    )
 
 
 def _publish_workflow_progress(
@@ -1115,12 +1173,37 @@ def _publish_workflow_progress(
     Unit tests and callers operating outside a git checkout can still use the
     execution loop; in that case task JSON is durable locally and publishing is
     skipped. A real workflow execution always runs from a git worktree and
-    creates or updates one draft PR for the branch.
+    commits to the integration branch; final pull-request creation is handled
+    when the workflow reaches completion.
     """
     if not _is_git_worktree(repo_root):
         return
 
+    workflow_git_state = load_workflow_git_state(
+        workflow.directory,
+        workflow_id=workflow_id,
+    )
     branch = _git_output(repo_root, ["branch", "--show-current"])
+    if (
+        workflow_git_state is not None
+        and branch != workflow_git_state.integration_branch
+    ):
+        raise WorkflowGitInconsistency(
+            json.dumps(
+                {
+                    "proposed_pr_id": workflow_git_state.proposed_pr_id,
+                    "inconsistencies": [
+                        f"workflow execution is on {branch!r}, expected "
+                        f"integration branch {workflow_git_state.integration_branch!r}"
+                    ],
+                    "recovery_command": (
+                        "powdrr-lift workflow-recovery --proposed-pr-id "
+                        f"{workflow_git_state.proposed_pr_id} --cleanup"
+                    ),
+                },
+                indent=2,
+            )
+        )
     if branch in {"", "main", "master"}:
         branch = _workflow_branch_name(workflow)
         if _git_result(
@@ -1141,13 +1224,9 @@ def _publish_workflow_progress(
     )
     _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
     if not open_pull_request:
-        print(f"Published workflow task branch: {branch}", file=stdout)
+        print(f"Published workflow progress on branch: {branch}", file=stdout)
         return
 
-    workflow_git_state = load_workflow_git_state(
-        workflow.directory,
-        workflow_id=workflow_id,
-    )
     default_branch = (
         workflow_git_state.integration_branch
         if workflow_git_state is not None
@@ -1353,7 +1432,8 @@ def _open_final_workflow_pull_request(
             "--body",
             (
                 "Final integration pull request for durable workflow "
-                f"{workflow.directory.name}. All task branches have been merged."
+                f"{workflow.directory.name}. All workflow tasks are complete on "
+                "the integration branch."
             ),
         ],
         cwd=repo_root,
@@ -1452,11 +1532,11 @@ def _handle_exhausted_timeout(
     )
     if ".worktrees" in repo_root.parts:
         print(
-            f"Deleting dedicated workflow worktree after timeout: {repo_root}",
+            "Keeping the workflow integration worktree so the task can be "
+            "resumed after the timeout.",
             file=stderr,
             flush=True,
         )
-        _delete_workflow_task_worktree(repo_root, stderr=stderr)
     else:
         print(
             "Keeping the configured repository because it is not a dedicated worktree.",
@@ -2510,7 +2590,7 @@ def _resolve_workflow_task_mapping(
 ) -> LLMModelMapping | None:
     """Resolve task mappings, using workflow-chat's model for generic providers."""
     if llm_type is None:
-        return None
+        llm_type = _DEFAULT_LLM_TYPE
     if not mappings:
         return LLMModelMapping(_DEFAULT_MODEL, provider=provider)
     return _resolve_llm_mapping(

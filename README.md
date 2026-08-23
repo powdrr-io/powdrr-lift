@@ -168,6 +168,13 @@ highest-priority configured provider, it reads `DEEPINFRA_API_TOKEN` (or
 powdrr-lift process-workflow-task --workflow-dir docs/workflows/implement-a-feature --repo-root .
 ```
 
+The command resolves the workflow's `powdrr/<proposed-pr-id>` integration
+branch, creates or reuses its local integration worktree, and runs ready agent
+tasks there in dependency order. Each task's claim and output is committed and
+pushed to that same branch. Processing stops when a human task is ready; after
+all tasks are complete, the command opens the integration pull request against
+the workflow's base branch.
+
 Human-assigned tasks can be handled through the same durable workflow protocol:
 
 ```bash

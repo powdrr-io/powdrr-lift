@@ -11,19 +11,21 @@ from typing import TextIO
 from powdrr_lift.core.workflow_task_specification import (
     AssigneeType,
     HumanRole,
+    TaskStatus,
     WorkflowInstance,
     WorkflowTask,
 )
 from powdrr_lift.workflow_git import (
     WorkflowGitInconsistency,
     claim_workflow_task,
-    create_task_worktree,
+    create_workflow_worktree,
     load_workflow_git_state,
     resolve_git_repository_root,
     validate_workflow_git_state,
     workflow_id_from_task_id,
 )
 from powdrr_lift.workflow_task_agent import (
+    _open_final_workflow_pull_request,
     publish_workflow_progress,
 )
 
@@ -67,6 +69,11 @@ def run_human_task(
     if configured_git_state is not None:
         project_root = resolve_git_repository_root(configured_repo_root)
         try:
+            integration_worktree, _integration_branch = create_workflow_worktree(
+                project_root,
+                configured_git_state.proposed_pr_id,
+                base_branch=configured_git_state.base_branch,
+            )
             _ = validate_workflow_git_state(
                 project_root,
                 configured_git_state,
@@ -77,12 +84,7 @@ def run_human_task(
                 configured_git_state,
                 configured_task.task_id,
             )
-            task_worktree, _task_branch = create_task_worktree(
-                project_root,
-                configured_git_state,
-                configured_task.task_id,
-            )
-            repo_root = task_worktree
+            repo_root = integration_worktree
             workflow_dir = repo_root / configured_git_state.workflow_relative_directory
         except WorkflowGitInconsistency as exc:
             print(
@@ -91,7 +93,11 @@ def run_human_task(
             )
             print(str(exc), file=stderr)
             return 2
-        print(f"Using human task worktree: {repo_root}", file=stdout, flush=True)
+        print(
+            f"Using workflow integration worktree: {repo_root}",
+            file=stdout,
+            flush=True,
+        )
 
     workflow = WorkflowInstance.from_directory(workflow_dir)
     task = _select_human_task(workflow, configured_task.task_id, None)
@@ -121,7 +127,18 @@ def run_human_task(
             workflow,
             reason=f"complete human task {completed.task_id}",
             stdout=stdout,
+            open_pull_request=False,
         )
+        workflow = WorkflowInstance.from_directory(workflow_dir)
+        if workflow.tasks and all(
+            item.status is TaskStatus.COMPLETED for item in workflow.tasks
+        ):
+            _open_final_workflow_pull_request(
+                repo_root,
+                workflow,
+                configured_git_state,
+                stdout=stdout,
+            )
     return 0
 
 

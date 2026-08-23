@@ -1055,7 +1055,10 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser = subparsers.add_parser(
         "process-workflow-task",
         aliases=["process_workflow_task"],
-        help="Pull and process one ready agent task from a durable workflow.",
+        help=(
+            "Process ready agent tasks from a durable workflow on its integration "
+            "branch until human work or completion."
+        ),
     )
     process_workflow_task_parser.add_argument(
         "--workflow-dir",

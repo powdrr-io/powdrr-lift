@@ -209,6 +209,12 @@ def create_workflow_worktree(
             raise RuntimeError(
                 f"Workflow worktree path is not a Git worktree: {worktree}"
             )
+        existing_branch = _run_git(worktree, ["branch", "--show-current"])
+        if existing_branch != branch:
+            raise RuntimeError(
+                f"Workflow worktree {worktree} is on {existing_branch!r}, "
+                f"expected integration branch {branch!r}."
+            )
         return worktree, branch
     if (
         _git(
@@ -605,24 +611,26 @@ def validate_workflow_git_state(
     state: WorkflowGitState,
     task_id: str,
 ) -> dict[str, Any]:
-    """Return actionable consistency errors before a task mutates Git state."""
+    """Return actionable consistency errors before a task mutates Git state.
+
+    Tasks in the current execution model all run on the workflow integration
+    branch.  The task id remains part of the diagnostic and claim identity,
+    but it must not imply a task branch or task worktree.
+    """
     report = inspect_workflow_run(repo_root, state.proposed_pr_id)
     errors = list(report["inconsistencies"])
-    expected_branch = task_branch_name(state.proposed_pr_id, task_id)
-    task_branches = {item["branch"] for item in report["task_branches"]}
-    if expected_branch in task_branches:
-        matching_worktrees = [
-            item
-            for item in report["worktrees"]
-            if item.get("branch") == expected_branch
-        ]
-        if not matching_worktrees:
-            errors.append(
-                f"task branch {expected_branch!r} exists without its "
-                "registered worktree"
-            )
     if not report["integration_branch_exists"]:
         errors.append(f"integration branch {state.integration_branch!r} does not exist")
+    integration_worktrees = [
+        item
+        for item in report["worktrees"]
+        if item.get("branch") == state.integration_branch
+    ]
+    if report["integration_worktree_exists"] and not integration_worktrees:
+        errors.append(
+            f"integration worktree for {state.integration_branch!r} is not "
+            "registered with Git"
+        )
     if errors:
         raise WorkflowGitInconsistency(
             json.dumps(

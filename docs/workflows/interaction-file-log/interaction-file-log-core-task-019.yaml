@@ -1,0 +1,38 @@
+task_id: interaction-file-log-core-task-019
+status: open
+upstream_task_ids:
+- interaction-file-log-core-task-001
+- interaction-file-log-core-task-012
+- interaction-file-log-core-task-018
+dependent_state:
+- current-state-documents-promoted
+complexity: medium
+input_state:
+  proposed_pr_context: interaction-file-log-core-task-001.proposed-pr-context-state
+  completeness_review: interaction-file-log-core-task-012.specification-completeness-state
+  scope_repair: interaction-file-log-core-task-018.final-scope-repair-state
+  feature_id: interaction-file-log
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: promoted-current-state-documents
+description: Promote the feature documents
+step_type: invoke_tool
+details: 'The deterministic git mv already ran. Assign its complete result and moved
+  paths to promoted-current-state-documents. Do not edit, stage, or resolve a different
+  feature in this step. If the command reports an inconsistent proposal/current directory,
+  stop and report that exact inconsistency.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-core''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: simple_task
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - git
+    - mv
+    - docs/proposals/<work-item-name>
+    - docs/current/<work-item-name>

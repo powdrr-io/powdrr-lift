@@ -1,0 +1,4 @@
+proposed_pr_id: interaction-file-log-core
+base_branch: main
+integration_branch: powdrr/interaction-file-log-core
+workflow_relative_directory: docs/workflows/interaction-file-log

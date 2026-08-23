@@ -176,7 +176,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 0),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 14),
-                ("start-implementing-feature.yaml", 17),
+                ("start-implementing-feature.yaml", 18),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -1037,6 +1037,17 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
+    review_details = step("review-workflow-proposed-pr-links").details
+    assert review_details is not None
+    assert "every proposed PR has exactly one matching workflow" in review_details
+    assert "every workflow has exactly one matching proposed PR" in review_details
+    assert "proposed PR -> workflow" in review_details
+    assert "workflow -> proposed PR" in review_details
+    assert "do not infer matches from ordering" in review_details
+    assert '"action":"goto_step"' in review_details
+    assert '"step_id":"plan-workflow-instantiation"' in review_details
+    assert '"step_id":"plan-proposed-prs"' in review_details
+    assert '"action":"next_step"' in review_details
     assert pre_step_command("inspect-workflow-repository-state") == (
         "powdrr-lift",
         "repository-state",

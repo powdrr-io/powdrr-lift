@@ -1894,6 +1894,7 @@ def _evaluate_workflow_changed_files(*, repo_root: Path, base_branch: str) -> bo
                 if isinstance(invariant.get("id"), str)
             ],
             required_invariants=required_invariants,
+            repository_root=repo_root,
         )
         relationships_checked += report.relationships_checked
         relationship_issues.extend(report.issues)

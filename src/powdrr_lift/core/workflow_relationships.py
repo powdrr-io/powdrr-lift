@@ -44,6 +44,7 @@ def validate_workflow_relationships(
     *,
     required_invariant_ids: Sequence[str] = (),
     required_invariants: Sequence[Mapping[str, Any]] = (),
+    repository_root: str | Path | None = None,
 ) -> WorkflowRelationshipValidationReport:
     """Validate declared workflow relationship invariants deterministically.
 
@@ -164,6 +165,13 @@ def validate_workflow_relationships(
             )
         if relation_id is not None:
             relationships_by_invariant[relation_id].append((path, index, relation))
+        _validate_repository_target(
+            relation,
+            path=path,
+            index=index,
+            repository_root=repository_root,
+            issues=issues,
+        )
 
     seen_invariants: set[str] = set()
     expected_by_id = {
@@ -255,6 +263,53 @@ def validate_workflow_relationships(
 
 def _is_placeholder(value: str) -> bool:
     return value.startswith("<") and value.endswith(">")
+
+
+def _validate_repository_target(
+    relation: Mapping[str, Any],
+    *,
+    path: Path,
+    index: int,
+    repository_root: str | Path | None,
+    issues: list[WorkflowRelationshipValidationIssue],
+) -> None:
+    if repository_root is None:
+        return
+    target_type = relation.get("target_type")
+    target_id = relation.get("target_id")
+    if target_type != "proposed_pr" or not isinstance(target_id, str):
+        return
+    if _proposed_pr_id_exists(Path(repository_root), target_id):
+        return
+    issues.append(
+        WorkflowRelationshipValidationIssue(
+            "missing_workflow_target",
+            f"Workflow relationship target proposed_pr {target_id!r} does not "
+            "resolve to a proposed PR specification in docs/proposals or docs/specs.",
+            f"{path}:relationships[{index}].target_id",
+        )
+    )
+
+
+def _proposed_pr_id_exists(repository_root: Path, target_id: str) -> bool:
+    for root in (
+        repository_root / "docs" / "proposals",
+        repository_root / "docs" / "specs",
+    ):
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*.yaml"):
+            if path.name != "proposed-pr-specification.yaml" and not path.name.endswith(
+                "-proposed-pr-specification.yaml"
+            ):
+                continue
+            try:
+                data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            except (OSError, yaml.YAMLError):
+                continue
+            if isinstance(data, Mapping) and data.get("id") == target_id:
+                return True
+    return False
 
 
 def _required_string(

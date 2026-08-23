@@ -38,7 +38,11 @@ steps:
   description: Generate the system specification template.
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the declared system-specification generator exactly once; do not edit the generated file.
+  details: >-
+    Invoke the declared system-specification generator exactly once; do not edit
+    the generated file. It overwrites unreadable/invalid existing content and
+    merges readable values into the fresh template while restoring instructions
+    and missing default fields.
   pre_step:
     action: invoke_tool
     template:
@@ -91,7 +95,11 @@ steps:
   description: Generate the architecture specification template.
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the declared architecture-specification generator exactly once with all entity types; do not edit the generated file.
+  details: >-
+    Invoke the declared architecture-specification generator exactly once with
+    all entity types; do not edit the generated file. It overwrites
+    unreadable/invalid existing content and merges readable values into the fresh
+    template while restoring instructions and missing default fields.
   pre_step:
     action: invoke_tool
     template:
@@ -147,7 +155,11 @@ steps:
   description: Generate the implementation specification template.
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the declared implementation-specification generator exactly once; do not edit the generated file.
+  details: >-
+    Invoke the declared implementation-specification generator exactly once; do
+    not edit the generated file. It overwrites unreadable/invalid existing
+    content and merges readable values into the fresh template while restoring
+    instructions and missing default fields.
   pre_step:
     action: invoke_tool
     template:
@@ -187,7 +199,11 @@ steps:
   description: Generate the proposed PR specification template.
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the declared pr-specification generator exactly once; do not edit the generated file.
+  details: >-
+    Invoke the declared pr-specification generator exactly once; do not edit the
+    generated file. It overwrites unreadable/invalid existing content and merges
+    readable values into the fresh template while restoring instructions and
+    missing default fields.
   pre_step:
     action: invoke_tool
     template:
@@ -231,6 +247,13 @@ steps:
     has rerun. Each action must include the YAML file_path and a non-empty
     operations array. Use set_value with a JSON path array for scalar changes and
     upsert_item with section, id, and a complete value mapping for list entries.
+    If any evaluator reports invalid YAML/structure or you are stuck, restart
+    the matching generator with a goto_step action. Use
+    {"action":"goto_step","step_id":"generate-system-specification"},
+    {"action":"goto_step","step_id":"generate-architecture-specification"},
+    {"action":"goto_step","step_id":"generate-implementation-specification"},
+    or {"action":"goto_step","step_id":"generate-pr-specification"} for
+    the affected file. Do not repeat the same repair indefinitely.
     For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not invoke tools other than gather_context in this repair step; gather_context is allowed when the latest evaluator result reports a missing or unknown id. Use the evaluator's suggested context types and keywords, then apply the correction without guessing. The evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use gather_context or read_document, then apply yaml_edit without guessing. For entity_type_not_allowed, use the exact allowed_entity_types list from the latest evaluator result and edit only the reported entities[N].type path. Never confuse that field with entity_relationships[*].source or target: those fields contain entity ids and must not be changed to entity type names. Never alternate between File and Source file, change a different entity, or modify a value that already matches the latest allowed list. After the edit, choose next_step so deterministic evaluation can verify the current file; do not claim that your own reasoning proves validation passed.
 - id: gate-feature-specifications
   description: Confirm that every generated specification evaluates cleanly.

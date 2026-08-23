@@ -19,8 +19,11 @@ steps:
   llm_type: simple_task
   details: >-
     Invoke the declared architecture-specification tool exactly once with all
-    entity types. Pass its generated file to the next step; do not edit the file
-    in this step.
+    entity types. The generator is restart-safe: it overwrites an
+    unreadable/invalid existing file and merges readable existing values into
+    the fresh template while restoring all instructions and missing default
+    fields. Pass its generated file to the next step; do not edit the file in
+    this step.
   pre_step:
     action: invoke_tool
     template:
@@ -74,7 +77,7 @@ steps:
     allowed list. Never alternate between two type values, repair a different
     entity, or change a value that already matches the latest allowed list. After
     applying the edit, choose next_step and let deterministic evaluation verify
-    it; do not claim that the edit passed validation yourself. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"architecture-id"},{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"Service","name":"Example","description":"..."}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file.
+    it; do not claim that the edit passed validation yourself. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"architecture-id"},{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"Service","name":"Example","description":"..."}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-architecture"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
 - id: gate-architecture
   description: Confirm that architecture evaluation reports zero issues.
   step_type: gate

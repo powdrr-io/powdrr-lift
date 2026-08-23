@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Iteratively run the next workflow task and expose repair feedback."""
+"""Run a durable workflow to completion or a human handoff with bounded repair."""
 
 from __future__ import annotations
 
@@ -58,21 +58,37 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument(
-        "--iterations", type=int, default=10, help="Maximum repair iterations."
+        "--iterations",
+        type=int,
+        default=10,
+        help="Maximum bounded workflow runs, including repair retries.",
     )
     parser.add_argument(
         "--repair-command",
         help=(
-            "Command run after a failed iteration. It receives HARNESS_* variables, "
-            "including the instantiated task and source template paths."
+            "Command run after a failed or diagnostic iteration. It receives "
+            "HARNESS_* variables, including workflow state, errors, corrections, "
+            "the instantiated workflow, and source template paths."
         ),
     )
     parser.add_argument(
-        "--task-id", help="Always retry this task instead of selecting the next one."
+        "--task-id",
+        help=(
+            "Run only this task; by default the durable runner processes the "
+            "full workflow."
+        ),
     )
     parser.add_argument("--provider", default="auto")
     parser.add_argument("--max-roundtrips", type=int)
-    parser.add_argument("--timeout", type=float, default=1800.0)
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=1800.0,
+        help=(
+            "Hard timeout for each full workflow run; the process group is "
+            "killed on expiry."
+        ),
+    )
     parser.add_argument(
         "--progress-interval",
         type=float,
@@ -155,6 +171,69 @@ def _select_task(workflow_dir: Path, task_id: str | None) -> WorkflowTask | None
             return locked
         raise SystemExit(f"Task is not a ready or locked agent task: {task_id}")
     return ready[0] if ready else None
+
+
+def _workflow_state(workflow_dir: Path) -> dict[str, Any]:
+    """Return a stable, JSON-serializable snapshot of the durable workflow."""
+    workflow = WorkflowInstance.from_directory(workflow_dir)
+    tasks = [
+        {
+            "task_id": task.task_id,
+            "status": task.status.value,
+            "assignee_type": task.assignee_type.value,
+            "upstream_task_ids": list(task.upstream_task_ids),
+        }
+        for task in workflow.tasks
+    ]
+    ready_agent = [
+        task.task_id for task in workflow.ready_tasks(assignee_type=AssigneeType.AGENT)
+    ]
+    ready_human = [
+        task.task_id for task in workflow.ready_tasks(assignee_type=AssigneeType.HUMAN)
+    ]
+    locked = [task["task_id"] for task in tasks if task["status"] == "locked"]
+    all_completed = bool(tasks) and all(
+        task["status"] == TaskStatus.COMPLETED.value for task in tasks
+    )
+    if all_completed:
+        outcome = "completed"
+    elif ready_human:
+        outcome = "human_handoff"
+    elif ready_agent:
+        outcome = "agent_work_remaining"
+    elif locked:
+        outcome = "agent_task_locked"
+    else:
+        outcome = "stalled"
+    return {
+        "outcome": outcome,
+        "tasks": tasks,
+        "ready_agent_task_ids": ready_agent,
+        "ready_human_task_ids": ready_human,
+        "locked_task_ids": locked,
+    }
+
+
+def _reopen_locked_tasks(workflow_dir: Path, task_ids: list[str]) -> None:
+    """Make failed agent tasks retryable without touching human handoffs."""
+    workflow = WorkflowInstance.from_directory(workflow_dir)
+    for task_id in task_ids:
+        task = next((item for item in workflow.tasks if item.task_id == task_id), None)
+        if task is None or task.assignee_type is not AssigneeType.AGENT:
+            continue
+        if task.status is TaskStatus.LOCKED:
+            _reopen_task(workflow_dir, task_id)
+
+
+def _state_fingerprint(state: dict[str, Any]) -> str:
+    return json.dumps(
+        {
+            "outcome": state["outcome"],
+            "tasks": state["tasks"],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def _reopen_task(workflow_dir: Path, task_id: str) -> None:
@@ -288,16 +367,13 @@ def _mirror_repair_changes(
         _copy_path(path, destination_root / relative_path)
 
 
-def _run_iteration(
+def _build_task_command(
     *,
     repo_root: Path,
     workflow_dir: Path,
-    task: WorkflowTask,
-    error_logs: tuple[Path, ...],
-    transcript: Path,
+    task: WorkflowTask | None,
     args: argparse.Namespace,
-) -> dict[str, Any]:
-    previous_error_counts = {path: len(_read_jsonl(path)) for path in error_logs}
+) -> list[str]:
     command = [
         sys.executable,
         "-m",
@@ -307,15 +383,34 @@ def _run_iteration(
         str(repo_root),
         "--workflow-dir",
         str(workflow_dir),
-        "--task-id",
-        task.task_id,
         "--provider",
         args.provider,
     ]
+    if task is not None:
+        command.extend(["--task-id", task.task_id])
     if args.max_roundtrips is not None:
         command.extend(["--max-roundtrips", str(args.max_roundtrips)])
     if args.verbose:
         command.append("--verbose")
+    return command
+
+
+def _run_iteration(
+    *,
+    repo_root: Path,
+    workflow_dir: Path,
+    task: WorkflowTask | None,
+    error_logs: tuple[Path, ...],
+    transcript: Path,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    previous_error_counts = {path: len(_read_jsonl(path)) for path in error_logs}
+    command = _build_task_command(
+        repo_root=repo_root,
+        workflow_dir=workflow_dir,
+        task=task,
+        args=args,
+    )
     process = subprocess.Popen(
         command,
         cwd=repo_root,
@@ -375,8 +470,9 @@ def _run_iteration(
                 last_heartbeat = time.monotonic()
             elif time.monotonic() - last_heartbeat >= args.progress_interval:
                 elapsed = time.monotonic() - started
+                task_label = task.task_id if task is not None else "full workflow"
                 print(
-                    f"Harness progress: task {task.task_id} still running after "
+                    f"Harness progress: {task_label} still running after "
                     f"{elapsed:.0f}s; captured={captured_bytes} bytes.",
                     file=sys.stderr,
                     flush=True,
@@ -402,23 +498,33 @@ def _run_iteration(
         new_errors.extend(_read_jsonl(path)[previous_error_counts[path] :])
     lowered = (output or "").lower()
     corrections = [marker for marker in _FAILURE_MARKERS if marker in lowered]
+    workflow_state = _workflow_state(workflow_dir)
     status = "clean"
     if timed_out:
         status = "timeout"
     elif interrupted:
         status = "interrupted"
-    elif process.returncode != 0 or new_errors or corrections:
+    elif process.returncode != 0 or new_errors:
         status = "failed"
+    elif workflow_state["outcome"] == "stalled":
+        status = "stalled"
+    elif workflow_state["outcome"] == "agent_task_locked":
+        status = "failed"
+    elif workflow_state["outcome"] == "agent_work_remaining":
+        status = "incomplete"
     return {
         "status": status,
         "returncode": process.returncode,
-        "task_id": task.task_id,
-        "task_path": str(_task_path(workflow_dir, task)),
+        "task_id": task.task_id if task is not None else None,
+        "task_path": (
+            str(_task_path(workflow_dir, task)) if task is not None else None
+        ),
         "workflow_dir": str(workflow_dir),
         "transcript": str(transcript),
         "error_count": len(new_errors),
         "errors": new_errors,
         "corrections": corrections,
+        "workflow_state": workflow_state,
     }
 
 
@@ -427,23 +533,43 @@ def _run_repair_command(
     *,
     repo_root: Path,
     workflow_dir: Path,
-    task: WorkflowTask,
+    task: WorkflowTask | None,
     template_path: Path,
     error_log: Path,
     result: dict[str, Any],
     iteration: int,
+    timeout: float,
 ) -> int:
     environment = {
         "HARNESS_ITERATION": str(iteration),
         "HARNESS_REPO_ROOT": str(repo_root),
         "HARNESS_WORKFLOW_DIR": str(workflow_dir),
-        "HARNESS_TASK_ID": task.task_id,
-        "HARNESS_TASK_PATH": str(_task_path(workflow_dir, task)),
+        "HARNESS_TASK_ID": task.task_id if task is not None else "",
+        "HARNESS_TASK_PATH": (
+            str(_task_path(workflow_dir, task)) if task is not None else ""
+        ),
         "HARNESS_TEMPLATE_PATH": str(template_path),
         "HARNESS_TRANSCRIPT": result["transcript"],
         "HARNESS_ERROR_LOG": str(error_log),
         "HARNESS_ERROR_LOGS": os.pathsep.join(
             str(path) for path in result.get("error_logs", [])
+        ),
+        "HARNESS_WORKFLOW_STATE": json.dumps(
+            result.get("workflow_state_after", result.get("workflow_state", {})),
+            ensure_ascii=False,
+        ),
+        "HARNESS_CORRECTIONS": json.dumps(
+            result.get("corrections", []), ensure_ascii=False
+        ),
+        "HARNESS_IMPROVEMENT_TARGETS": json.dumps(
+            {
+                "template": str(template_path),
+                "workflow": str(workflow_dir),
+                "task": (
+                    str(_task_path(workflow_dir, task)) if task is not None else None
+                ),
+            },
+            ensure_ascii=False,
         ),
         "HARNESS_RESULT_JSON": json.dumps(result, ensure_ascii=False),
     }
@@ -451,12 +577,39 @@ def _run_repair_command(
         f"Running repair command after iteration {iteration}: {command_text}",
         file=sys.stderr,
     )
-    return subprocess.run(
+    process = subprocess.Popen(
         shlex.split(command_text),
         cwd=repo_root,
         env={**os.environ, **environment},
-        check=False,
-    ).returncode
+        start_new_session=(os.name != "nt"),
+    )
+    try:
+        process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(
+            f"Repair command timed out after {timeout:g}s; terminating process group.",
+            file=sys.stderr,
+        )
+        if os.name == "nt":
+            process.kill()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        process.wait()
+        return 124
+    except KeyboardInterrupt:
+        if os.name == "nt":
+            process.terminate()
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        process.wait()
+        return 130
+    return process.returncode
 
 
 def main() -> int:
@@ -507,18 +660,44 @@ def main() -> int:
         report_path = _resolve_path(args.report, log_root=log_root)
         transcript_dir.mkdir(parents=True, exist_ok=True)
         reports: list[dict[str, Any]] = []
+        previous_fingerprint: str | None = None
+        repeated_state_count = 0
         for iteration in range(1, args.iterations + 1):
-            task = _select_task(workflow_dir, args.task_id)
-            if task is None:
-                print("No ready agent task found; workflow may be complete.")
+            before = _workflow_state(workflow_dir)
+            if before["outcome"] in {"completed", "human_handoff"}:
+                reports.append(
+                    {
+                        "iteration": iteration,
+                        "status": "clean",
+                        "workflow_state": before,
+                    }
+                )
                 report_path.write_text(
-                    json.dumps(reports, indent=2) + "\n", encoding="utf-8"
+                    json.dumps(reports, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                print(
+                    "Harness stopped at "
+                    f"{before['outcome']} after {iteration - 1} workflow run(s)."
                 )
                 return 0
+            if before["outcome"] == "stalled":
+                reports.append(
+                    {
+                        "iteration": iteration,
+                        "status": "stalled",
+                        "workflow_state": before,
+                    }
+                )
+                break
+            selected_task = _select_task(workflow_dir, args.task_id)
+            # A full run is the default. The explicit task option remains useful
+            # for isolating one failing task while debugging a template.
+            task_for_run = selected_task if args.task_id is not None else None
             result = _run_iteration(
                 repo_root=run_root,
                 workflow_dir=workflow_dir,
-                task=task,
+                task=task_for_run,
                 error_logs=error_logs,
                 transcript=transcript_dir / f"iteration-{iteration:02d}.log",
                 args=args,
@@ -526,6 +705,11 @@ def main() -> int:
             result["iteration"] = iteration
             result["template_path"] = str(template_path)
             result["error_logs"] = [str(path) for path in error_logs]
+            result["workflow_state_before"] = before
+            result["workflow_state_after"] = _workflow_state(workflow_dir)
+            result["workflow_fingerprint"] = _state_fingerprint(
+                result["workflow_state_after"]
+            )
             reports.append(result)
             if isolated:
                 _mirror_repair_changes(
@@ -536,16 +720,34 @@ def main() -> int:
                 )
             print(
                 f"Iteration {iteration}: {result['status']} "
-                f"(task={task.task_id}, errors={result['error_count']})",
+                f"(outcome={result['workflow_state_after']['outcome']}, "
+                f"errors={result['error_count']}, "
+                f"corrections={len(result['corrections'])})",
                 file=sys.stderr,
             )
-            if result["status"] == "clean":
+            after = result["workflow_state_after"]
+            fingerprint = result["workflow_fingerprint"]
+            if fingerprint == previous_fingerprint:
+                repeated_state_count += 1
+            else:
+                repeated_state_count = 0
+            previous_fingerprint = fingerprint
+            if repeated_state_count >= 2:
+                result["status"] = "stalled"
+                print(
+                    "Workflow state repeated without progress three times; stopping.",
+                    file=sys.stderr,
+                )
+            if result["status"] == "clean" and after["outcome"] in {
+                "completed",
+                "human_handoff",
+            }:
                 report_path.write_text(
-                    json.dumps(reports, indent=2) + "\n", encoding="utf-8"
+                    json.dumps(reports, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
                 )
                 print(f"Harness completed cleanly after {iteration} iteration(s).")
                 return 0
-            _reopen_task(workflow_dir, task.task_id)
             if result["status"] in {"timeout", "interrupted"}:
                 break
             if not args.repair_command:
@@ -554,15 +756,23 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 break
+            _reopen_locked_tasks(
+                workflow_dir,
+                list(after.get("locked_task_ids", [])),
+            )
+            repair_task = selected_task
+            if repair_task is None:
+                repair_task = _select_task(workflow_dir, args.task_id)
             repair_returncode = _run_repair_command(
                 args.repair_command,
                 repo_root=run_root,
                 workflow_dir=workflow_dir,
-                task=task,
+                task=repair_task,
                 template_path=template_path,
                 error_log=runner_error_logs[-1],
                 result=result,
                 iteration=iteration,
+                timeout=args.timeout,
             )
             if isolated:
                 _mirror_repair_changes(
@@ -574,7 +784,10 @@ def main() -> int:
             if repair_returncode != 0:
                 print("Repair command failed; stopping harness.", file=sys.stderr)
                 break
-        report_path.write_text(json.dumps(reports, indent=2) + "\n", encoding="utf-8")
+        report_path.write_text(
+            json.dumps(reports, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
         print(
             f"Harness did not complete cleanly; report: {report_path}", file=sys.stderr
         )

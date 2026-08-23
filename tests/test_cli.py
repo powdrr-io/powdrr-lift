@@ -16,7 +16,7 @@ from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig
 
 def test_cli_init_writes_template(tmp_path: Path) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
-    output_path = tmp_path / "change-log.template.yaml"
+    output_path = repo_root / "change-log.template.yaml"
 
     with redirect_stdout(io.StringIO()) as stdout:
         exit_code = main(
@@ -33,6 +33,10 @@ def test_cli_init_writes_template(tmp_path: Path) -> None:
     assert exit_code == 0
     assert output_path.exists()
     assert str(output_path) in stdout.getvalue()
+    assert (
+        _git_output(repo_root, "diff", "--cached", "--name-only")
+        == "change-log.template.yaml"
+    )
     change_log = parse_change_log(output_path.read_text(encoding="utf-8"))
     assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
@@ -316,7 +320,7 @@ def test_cli_init_from_plan_diff_writes_template(tmp_path: Path) -> None:
         """,
         encoding="utf-8",
     )
-    output_path = tmp_path / "change-log.template.yaml"
+    output_path = repo_root / "change-log.template.yaml"
 
     with redirect_stdout(io.StringIO()) as stdout:
         exit_code = main(
@@ -498,3 +502,13 @@ def _git(repo_root: Path, *args: str) -> None:
         capture_output=True,
         text=True,
     )
+
+
+def _git_output(repo_root: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()

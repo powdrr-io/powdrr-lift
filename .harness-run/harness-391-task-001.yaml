@@ -1,5 +1,5 @@
 task_id: harness-391-task-001
-status: locked
+status: completed
 upstream_task_ids: []
 dependent_state:
 - proposed-pr-context-gathered

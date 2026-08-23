@@ -266,9 +266,8 @@ steps:
     command:
     - powdrr-lift
     - repository-state
-  - tool: shell
+  - tool: git
     command:
-    - git
     - add
     - docs/proposals/<work-item-name>
 - id: prepare-pull-request

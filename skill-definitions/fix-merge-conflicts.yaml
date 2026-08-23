@@ -21,17 +21,15 @@ steps:
     - gh
     - auth
     - status
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - view
     - <pr-reference>
     - --json
     - number,url,title,state,baseRefName,headRefName,headRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,files,commits
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - diff
     - <pr-reference>
@@ -135,9 +133,8 @@ steps:
     fill in the commit-level details. Do not rely on line ownership alone to
     infer behavior.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - view
     - <current-pr>
@@ -159,9 +156,8 @@ steps:
     - <owner>/<repo>
     - --json
     - number,title,state,url
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - diff
     - <related-pr-number>

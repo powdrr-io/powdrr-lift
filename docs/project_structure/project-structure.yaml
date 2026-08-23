@@ -96,6 +96,41 @@ tools:
     labels:
       - type-check
       - pr-prep
+  - id: intrinsic-git
+    action: added
+    when_to_use: Read status, stage explicit paths, or move a file within the active worktree.
+    template: '{"action":"invoke_tool","tool":"git","parameters":{"operation":"status"}}'
+    validation_action:
+      kind: invoke_tool
+      tool: git
+      parameters:
+        operation: status
+    how_to_use: >-
+      This intrinsic tool is always available. Use operation status, add, or
+      move. For staging, pass paths as an array; for moving, pass source and
+      destination relative paths. It cannot run arbitrary Git commands.
+    labels:
+      - git
+      - workflow
+      - pr-prep
+  - id: intrinsic-gh
+    action: added
+    when_to_use: Create or inspect a GitHub pull request from the active worktree.
+    template: '{"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_view","pr_reference":"394"}}'
+    validation_action:
+      kind: invoke_tool
+      tool: gh
+      parameters:
+        operation: pr_view
+        pr_reference: '394'
+    how_to_use: >-
+      This intrinsic tool is always available. Use pr_create, pr_view,
+      pr_diff, pr_checks, pr_edit, or pr_comments. It is limited to pull
+      request operations and cannot run arbitrary gh commands.
+    labels:
+      - github
+      - pull-request
+      - workflow
   - id: validate-pr-files
     action: added
     when_to_use: Validate every recognized repository-format file changed on the checked-out branch or in a pull request.

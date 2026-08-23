@@ -21,17 +21,15 @@ steps:
     - gh
     - auth
     - status
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - view
     - <pr-reference>
     - --json
     - number,url,title,headRefName,headRefOid,baseRefName,state,files
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - checks
     - <pr-reference>

@@ -38,6 +38,8 @@ from powdrr_lift.pr_workflow_record import (
 from powdrr_lift.workflow_chat_agent import (
     _DEFAULT_LLM_TYPE,
     _DEFAULT_MODEL,
+    GH_TOOL,
+    GIT_TOOL,
     LLMModelMapping,
     LocalLlamaChatClient,
     SkillCatalogEntry,
@@ -70,6 +72,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_internal_command,
     _validate_workflow_action_outputs,
     _validate_workflow_handoff,
+    execute_intrinsic_git_gh_tool,
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
@@ -687,6 +690,16 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 stderr=self.stderr,
                 verbose=self.config.verbose,
             )
+        elif action.tool in {GIT_TOOL, GH_TOOL}:
+            result = execute_intrinsic_git_gh_tool(
+                action.tool,
+                action.parameters,
+                worktree_root=self.repo_root,
+            )
+            if result.get("stdout"):
+                print(str(result["stdout"]), end="", file=self.stdout)
+            if result.get("stderr"):
+                print(str(result["stderr"]), end="", file=self.stderr)
         elif action.tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
                 action.parameters,
@@ -701,7 +714,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         else:
             raise RuntimeError(
                 f"Unsupported workflow task tool {action.tool!r}; supported tools "
-                "are shell, internal, fuzzy-match, basedpyright-symbol, and "
+                "are shell, internal, git, gh, fuzzy-match, basedpyright-symbol, and "
                 "basedpyright-structure."
             )
         event = {
@@ -795,6 +808,8 @@ def _record_task_pull_request(
     result: object,
 ) -> None:
     command = action.parameters.get("command")
+    if command is None and isinstance(result, Mapping):
+        command = result.get("command")
     if not isinstance(command, Sequence) or isinstance(command, (str, bytes)):
         return
     if not is_pull_request_create_command([str(item) for item in command]):
@@ -1628,6 +1643,20 @@ def _build_task_messages(
                             "description": (
                                 "Execute a powdrr-lift CLI command. This tool is "
                                 "always available, but may invoke only powdrr-lift."
+                            ),
+                        },
+                        {
+                            "name": GIT_TOOL,
+                            "description": (
+                                "Intrinsic Git tool; supports status, add, and move. "
+                                "Use invoke_tool with parameters.operation."
+                            ),
+                        },
+                        {
+                            "name": GH_TOOL,
+                            "description": (
+                                "Intrinsic GitHub tool for pull-request creation and "
+                                "inspection. Use parameters.operation."
                             ),
                         },
                         {

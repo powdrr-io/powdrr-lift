@@ -24,17 +24,15 @@ steps:
     posting findings until the candidate ledger has evidence from both the diff and
     the current repository.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - view
     - <pr-reference>
     - --json
     - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - diff
     - <pr-reference>

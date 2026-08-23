@@ -22,17 +22,15 @@ steps:
     prepare one inline finding on the nearest relevant changed line and do not
     continue with an assumed feature.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - view
     - <pr-reference>
     - --json
     - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: shell
+  - tool: gh
     command:
-    - gh
     - pr
     - diff
     - <pr-reference>

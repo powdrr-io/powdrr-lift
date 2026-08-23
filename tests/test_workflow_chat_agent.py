@@ -6488,15 +6488,22 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             elif self._call_index == 22:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=16,
-                    expected_step_description=step_descriptions[16],
+                    expected_step_index=18,
+                    expected_step_description=(
+                        "Stage the validated specification artifacts for pull request preparation."
+                    ),
                     expected_context_suffix="All specification issues are fixed.",
-                    expected_event_count=29,
-                    expected_last_event_kind="next_step",
+                    expected_event_count=32,
+                    expected_last_event_kind="gate",
                 )
                 response = {
-                    "kind": "next_step",
-                    "decisions_and_context": "Specification repair is complete.",
+                    "kind": "invoke_tool",
+                    "tool": "git",
+                    "parameters": {
+                        "operation": "add",
+                        "paths": ["docs/proposals/display-related-photos"],
+                    },
+                    "decisions_and_context": "Specification artifacts are staged.",
                 }
             elif self._call_index == 23:
                 self._assert_execution_prompt(
@@ -6505,21 +6512,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_step_description=(
                         "Stage the validated specification artifacts for pull request preparation."
                     ),
-                    expected_context_suffix="Specification repair is complete.",
+                    expected_context_suffix="Specification artifacts are staged.",
                     expected_event_count=32,
-                    expected_last_event_kind="gate",
+                    expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "invoke_tool",
-                    "tool": "shell",
-                    "parameters": {
-                        "command": [
-                            "git",
-                            "add",
-                            "docs/proposals/display-related-photos",
-                        ],
-                    },
-                    "decisions_and_context": "Specification artifacts are staged.",
+                    "kind": "complete",
+                    "text": "Feature specification complete.",
+                    "decisions_and_context": "Specification validation is complete.",
                 }
             elif self._call_index == 24:
                 self._assert_execution_prompt(
@@ -6968,18 +6968,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._call_index += 1
                         return {
                             "kind": "invoke_tool",
-                            "tool": "shell",
+                            "tool": "gh",
                             "parameters": {
-                                "command": [
-                                    "gh",
-                                    "pr",
-                                    "create",
-                                    "--draft",
-                                    "--title",
-                                    "test",
-                                    "--body",
-                                    "test",
-                                ]
+                                "operation": "pr_create",
+                                "draft": True,
+                                "title": "test",
+                                "body": "test",
                             },
                         }
                     if (
@@ -6990,18 +6984,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._call_index += 1
                         return {
                             "kind": "invoke_tool",
-                            "tool": "shell",
+                            "tool": "gh",
                             "parameters": {
-                                "command": [
-                                    "gh",
-                                    "pr",
-                                    "edit",
-                                    "123",
-                                    "--title",
-                                    "test",
-                                    "--body",
-                                    "test",
-                                ]
+                                "operation": "pr_edit",
+                                "pr_reference": "123",
+                                "title": "test",
+                                "body": "test",
                             },
                         }
                     self._call_index += 1
@@ -7085,7 +7073,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 stdout="Implementation specifications are valid.\n",
                 stderr="",
             )
-        if isinstance(command, list) and command[:2] == ["rtk", "gh"]:
+        if isinstance(command, list) and (
+            command[:2] == ["rtk", "gh"] or command[:2] == ["gh", "pr"]
+        ):
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -7172,7 +7162,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert start_event_kinds[-1] in {"complete", "next_step"}
     assert any(
         event["kind"] == "invoke_tool"
-        and event.get("parameters", {}).get("command", [])[:3] == ["gh", "pr", "create"]
+        and event.get("tool") == "gh"
+        and event.get("parameters", {}).get("operation") == "pr_create"
         for event in start_summary["execution_events"]
     )
 
@@ -7180,6 +7171,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         event
         for event in start_summary["execution_events"]
         if event["kind"] == "invoke_tool"
+        and event.get("parameters", {}).get("command")
         and event["parameters"]["command"][1] == "instantiate-workflow"
     )
     instantiate_result = cast(dict[str, object], instantiate_event["result"])
@@ -8448,6 +8440,67 @@ dev = ["ruff>=0.8"]
         "--check",
         ".",
     ]
+
+
+def test_execute_shell_tool_accepts_empty_commit_on_clean_worktree(
+    tmp_path: Path,
+) -> None:
+    no_commit = subprocess.CompletedProcess(
+        ["git", "commit", "-m", "message"],
+        1,
+        stdout="",
+        stderr="nothing to commit, working tree clean\n",
+    )
+    clean_status = subprocess.CompletedProcess(
+        ["git", "status", "--short"], 0, stdout="", stderr=""
+    )
+    with patch(
+        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        side_effect=[no_commit, clean_status],
+    ):
+        result = _execute_shell_tool(
+            {"command": ["git", "commit", "-m", "message"]},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+            announce=False,
+        )
+
+    assert result["returncode"] == 0
+    assert result["no_op"] is True
+    assert "existing HEAD retained" in result["stdout"]
+
+
+def test_execute_shell_tool_reports_corrective_action_for_dirty_empty_commit(
+    tmp_path: Path,
+) -> None:
+    no_commit = subprocess.CompletedProcess(
+        ["git", "commit", "-m", "message"],
+        1,
+        stdout="",
+        stderr="nothing to commit\n",
+    )
+    dirty_status = subprocess.CompletedProcess(
+        ["git", "status", "--short"], 0, stdout="?? agent_error.txt\n", stderr=""
+    )
+    with patch(
+        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        side_effect=[no_commit, dirty_status],
+    ):
+        result = _execute_shell_tool(
+            {"command": ["git", "commit", "-m", "message"]},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+            announce=False,
+        )
+
+    assert result["returncode"] == 1
+    assert "agent_error.txt" in result["stderr"]
+    assert '"operation":"add"' in result["stderr"]
+    assert "file-management action" in result["stderr"]
 
 
 def test_command_invocation_accepts_multiple_publish_files() -> None:

@@ -1,5 +1,5 @@
 task_id: harness-391-task-003
-status: open
+status: locked
 upstream_task_ids:
 - harness-391-task-001
 - harness-391-task-002
@@ -7,8 +7,8 @@ dependent_state:
 - tests-generated
 complexity: high
 input_state:
-  proposed_pr_context: harness-391-task-001.proposed-pr-context-state
-  execution_plan: harness-391-task-002.detailed-execution-plan-state
+  proposed_pr_context: null
+  execution_plan: null
   test_plan: []
 assignee_type: agent
 assignee_role: coder

@@ -9085,14 +9085,60 @@ def _auto_provider_candidates() -> tuple[str, ...]:
     return tuple(name for _, name in sorted(candidates))
 
 
+def available_workflow_providers() -> tuple[str, ...]:
+    """Return API-backed providers that have usable credentials configured."""
+    candidates: list[tuple[int, str]] = []
+    for name, definition in LLM_PROVIDERS.items():
+        if not definition.api_key_env_names and name != "openai":
+            continue
+        if not _provider_has_credentials(name):
+            continue
+        priority = definition.auto_priority
+        candidates.append((priority if priority is not None else 100, name))
+    return tuple(name for _, name in sorted(candidates))
+
+
+def choose_workflow_provider(
+    *,
+    input_func: Callable[[], str] = input,
+    stdout: TextIO = sys.stdout,
+) -> str:
+    """Present configured API providers and return the user's selection."""
+    providers = available_workflow_providers()
+    if not providers:
+        raise RuntimeError(
+            "No workflow-chat providers are configured. Set an API key for at "
+            "least one supported provider before starting workflow-chat."
+        )
+    stdout.write("Available workflow-chat providers:\n")
+    for index, provider in enumerate(providers, start=1):
+        definition = _provider_definition(provider)
+        stdout.write(f"  {index}. {definition.display_name} ({provider})\n")
+    stdout.write("Choose a provider by number or name: ")
+    stdout.flush()
+    while True:
+        answer = input_func().strip()
+        if answer.isdigit():
+            index = int(answer) - 1
+            if 0 <= index < len(providers):
+                stdout.write("\n")
+                return providers[index]
+        normalized = answer.casefold()
+        for provider in providers:
+            if normalized == provider.casefold():
+                stdout.write("\n")
+                return provider
+        stdout.write(
+            f"Choose a number from 1 to {len(providers)} or enter a provider name: "
+        )
+        stdout.flush()
+
+
 def _provider_has_credentials(provider: str) -> bool:
     definition = _provider_definition(provider)
     if provider == "openai" and _resolve_codex_access_token() is not None:
         return True
-    return any(
-        os.environ.get(env_name)
-        for env_name in definition.api_key_env_names + definition.base_url_env_names
-    )
+    return any(os.environ.get(env_name) for env_name in definition.api_key_env_names)
 
 
 def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:

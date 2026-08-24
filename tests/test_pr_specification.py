@@ -159,7 +159,10 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         in template_text
     )
     assert "id: null" in template_text
-    assert "Fill in each proposed PR's intent and acceptance details." in template_text
+    assert (
+        "Fill in each proposed PR's intent, justification, and dependencies."
+        in template_text
+    )
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
@@ -167,6 +170,12 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         "id",
         "feature_ids",
         "proposed_prs",
+        "entities",
+        "modules",
+        "tools",
+        "entity_relationships",
+        "features",
+        "decisions",
     ]
 
 
@@ -207,18 +216,21 @@ def test_validate_unified_proposed_pr_effects_match_v1_files(tmp_path: Path) -> 
     feature_ids: [feature-a]
     proposed_prs:
       - id: feature-a-core
+        intent: Need the feature.
+        justification: It is required.
         dependent_prs: []
-        changes:
-          entities:
-            - id: entity-a
-              action: added
-          features:
-            - id: feature-a
-              action: added
-        intent:
-          problem: Need the feature.
-          goal: Add the feature.
-          reasoning: It is required.
+    entities:
+      - id: entity-a
+        action: added
+        proposed_pr_id: feature-a-core
+    features:
+      - id: feature-a
+        action: added
+        proposed_pr_id: feature-a-core
+    modules: []
+    tools: []
+    entity_relationships: []
+    decisions: []
     """
     report = build_pr_specification_validation_report(
         proposed,
@@ -646,6 +658,43 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
     report = yaml.safe_load(stdout.getvalue())
     assert report["validation_successful"] is True
     assert report["proposed_pr_id"] == "pr-456"
+
+
+def test_cli_evaluate_validates_unified_proposed_pr_specification(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    spec_path = (
+        tmp_path / "docs" / "proposals" / "feature-a" / "proposed-pr-specification.yaml"
+    )
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(
+        """
+        schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+        id: feature-a
+        feature_ids: [feature-a]
+        proposed_prs:
+          - id: feature-a-core
+            dependent_prs: []
+            intent: Add the feature.
+            justification: It is required.
+        entities: []
+        modules: []
+        tools: []
+        entity_relationships: []
+        features: []
+        decisions: []
+        """,
+        encoding="utf-8",
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(["evaluate", str(spec_path), "--repo-root", str(tmp_path)])
+
+    assert exit_code == 0
+    report = yaml.safe_load(stdout.getvalue())
+    assert report["validation_successful"] is True
 
 
 def test_search_proposed_pr_specifications_ranks_matching_results(

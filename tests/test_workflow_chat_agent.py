@@ -5787,73 +5787,127 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         },
         sort_keys=False,
     )
+    pr_spec_entry = {
+        "id": "display-related-photos-pr-001",
+        "intent": "Produce the related photos feature.",
+        "justification": "The feature plan requires a durable proposed PR.",
+        "acceptance_criteria": [
+            {
+                "id": "ac-display-related-photos",
+                "description": (
+                    "The proposed PR captures the feature scope and validation trail."
+                ),
+            }
+        ],
+        "expected_tests": [
+            {
+                "id": "test-display-related-photos",
+                "description": (
+                    "The workflow produces a validated set of specification files."
+                ),
+            }
+        ],
+        "required_test_cases": [
+            {
+                "id": "rtc-display-related-photos",
+                "description": (
+                    "Verify the workflow creates and validates the system, "
+                    "architecture, implementation, and PR specs."
+                ),
+            }
+        ],
+        "expected_outcomes": [
+            {
+                "id": "outcome-display-related-photos",
+                "description": (
+                    "The feature plan is ready for asynchronous implementation work."
+                ),
+            }
+        ],
+        "non_goals": [
+            {
+                "id": "ng-display-related-photos",
+                "description": (
+                    "Do not execute the async implementation work in this test."
+                ),
+            }
+        ],
+        "risks": [
+            {
+                "id": "risk-display-related-photos",
+                "description": (
+                    "The current feature catalog may need refreshing if ids change."
+                ),
+            }
+        ],
+    }
     pr_spec_yaml = yaml.safe_dump(
         {
-            "schema": "https://powdrr.io/schemas/specification-v1",
-            "id": "display-related-photos-pr-001",
+            "schema": "https://powdrr.io/schemas/proposed-pr-specification-v1",
+            "id": "display-related-photos",
             "feature_ids": _repo_feature_ids(repo_root),
-            "intent": {
-                "problem": (
-                    "Users need a structured workflow for specifying related photos."
-                ),
-                "goal": (
-                    "Produce validated system, architecture, implementation, and PR "
-                    "specifications."
-                ),
-                "reasoning": (
-                    "The feature-specification flow should leave a durable record "
-                    "for follow-up work."
-                ),
-            },
-            "acceptance_criteria": [
+            "proposed_prs": [
                 {
-                    "id": "ac-display-related-photos",
-                    "description": (
-                        "The proposed PR captures the feature scope and validation "
-                        "trail."
-                    ),
-                }
-            ],
-            "expected_tests": [
-                {
-                    "id": "test-display-related-photos",
-                    "description": (
-                        "The workflow produces a validated set of specification files."
-                    ),
-                }
-            ],
-            "required_test_cases": [
-                {
-                    "id": "rtc-display-related-photos",
-                    "description": (
-                        "Verify the workflow creates and validates the system, "
-                        "architecture, implementation, and PR specs."
-                    ),
-                }
-            ],
-            "expected_outcomes": [
-                {
-                    "id": "outcome-display-related-photos",
-                    "description": (
-                        "The feature plan is ready for asynchronous "
-                        "implementation work."
-                    ),
-                }
-            ],
-            "non_goals": [
-                {
-                    "id": "ng-display-related-photos",
-                    "description": (
-                        "Do not execute the async implementation work in this test."
-                    ),
-                }
-            ],
-            "risks": [
-                {
-                    "id": "risk-display-related-photos",
-                    "description": (
-                        "The current feature catalog may need refreshing if ids change."
-                    ),
+                    **pr_spec_entry,
+                    "id": "display-related-photos-pr-001",
+                    "dependent_prs": [],
+                    "entities": [
+                        {
+                            "id": "related-photo",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        },
+                        {
+                            "id": "gallery-photo",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        },
+                    ],
+                    "modules": [
+                        {
+                            "id": "related-photos-module",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        },
+                        {
+                            "id": "related-photos-module",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        },
+                    ],
+                    "tools": [
+                        {
+                            "id": "related-photos-check",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        },
+                        {
+                            "id": "related-photos-check",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        },
+                    ],
+                    "entity_relationships": [
+                        {
+                            "id": "related-photo-groups-with-gallery-photo",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        }
+                    ],
+                    "features": [
+                        {
+                            "id": "display-related-photos",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        }
+                    ],
+                    "decisions": [
+                        {
+                            "id": "display-related-photos-grid",
+                            "action": "added",
+                            "proposed_pr_id": "display-related-photos-pr-001",
+                        }
+                    ],
                 }
             ],
         },

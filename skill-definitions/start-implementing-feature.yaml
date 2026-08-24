@@ -3,8 +3,8 @@ name: start-implementing-feature
 interaction_style: engineering
 when_to_use:
 - When the user is ready to begin implementing a feature.
-- When the feature needs implementation specifications and durable execution
-  workflows before implementation starts.
+- When the feature needs proposed PR planning and durable execution workflows
+  before implementation starts.
 - When the generated planning artifacts and first task should be placed in a
   pull request for user review.
 steps:
@@ -141,79 +141,71 @@ steps:
     If the unified proposed-PR specification already exists in the selected
     feature context, inspect and reuse its ordered `proposed_prs` entries and
     pass their stable names and paths onward. Otherwise analyze the feature
-    specification and the project structure to define ordered proposed PRs
+    context and the project structure to define ordered proposed PRs
     with incremental validation, clear boundaries, low risk, dependencies, and
     stable names in one proposed-pr-specification.yaml file. For each proposed
     PR, record its goal, scope, files, tests, acceptance criteria, validation
     commands, dependencies, and risks. Record every action-bearing id from the
-    v1 architecture and implementation specifications in each proposed PR's
-    changes sections, preserving order and action. Use the
+    feature-wide specification-v1 sections after the proposed_prs section,
+    preserving source order and action. Label every change item with the
+    proposed_pr_id that will deliver it. Use the
     read_document action to inspect templates/execute-proposed-pr.yaml; do not
     use shell commands to read the template. A proposed PR dependency means
     the predecessor workflow is complete only after its integration pull
     request is merged; completion of the predecessor's final task or creation
     of its pull request is not sufficient. Preserve these workflow-level
     dependencies in the instantiation plan. Do not generate one proposed-PR
-    file per PR. Do not generate or edit
-    implementation-specification files in this step. Before next_step, return
+    file per PR. Before next_step, return
     exactly one output named proposed_pr_names containing every stable proposed
     PR name. Do not rely on decisions_and_context for this handoff.
   outputs:
   - name: proposed_pr_names
     type: any
     required_for_next_step: true
-- id: generate-implementation-specifications
-  description: Generate one implementation specification per proposed PR.
+- id: generate-proposed-pr-specification
+  description: Generate the single proposed PR specification template.
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared proposed-pr-specification command exactly once for the
+    selected feature. It must create or reuse exactly one feature-level file at
+    docs/proposals/<feature-name>/proposed-pr-specification.yaml containing all
+    proposed_prs entries in the planned order. Generate only the template; do
+    not fill, validate, instantiate, stage, or commit it. Do not create one
+    file per proposed PR.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - pr-specification
+      - --work-item-name
+      - <feature-name>
+      - --output
+      - docs/proposals/<feature-name>/proposed-pr-specification.yaml
+- id: fill-proposed-pr-specification
+  description: Fill the complete proposed PR specification.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    For each name in proposed_pr_names that lacks an implementation
-    specification,
-    invoke the declared implementation-specification command exactly once with
-    its stable proposed-PR name and output path. Reuse existing files. Generate
-    only the templates; do not fill, validate, instantiate, stage, or commit
-    them. Pass every generated path and proposed-PR relationship onward. Before
-    next_step, return exactly one output named
-    implementation_specification_paths containing every generated or reused
-    path; do not repeat proposed_pr_names from the previous step and do not
-    include any other output name.
-  inputs:
-  - name: proposed_pr_names
-    type: any
-    source: previous_step
-  outputs:
-  - name: implementation_specification_paths
-    type: any
-    required_for_next_step: true
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - implementation-specification
-    - --work-item-name
-    - <feature-name>
-    - --output
-    - docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml
-- id: fill-implementation-specifications
-  description: Fill every implementation specification.
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    For each path in implementation_specification_paths, replace every
-    placeholder and fill every required field using the selected feature,
-    project-structure, and proposed-PR context. Remove generator instructions
-    and instructional comments. Do not leave null, empty, example, or TODO
-    values in required fields. Keep each proposed PR in its own file and
-    preserve its stable proposed-PR id. Use yaml_edit for all YAML changes in
-    this active worktree. Do not validate or instantiate workflows until every
-    file is populated. Pass the exact filled paths and proposed-PR mapping
-    onward.
-  inputs:
-  - name: implementation_specification_paths
-    type: any
-    source: previous_step
-- id: evaluate-implementation-specifications
-  description: Evaluate all implementation specifications deterministically.
+    In docs/proposals/<feature-name>/proposed-pr-specification.yaml, replace
+    every placeholder and fill every required field using the selected feature,
+    project-structure, and planned
+    proposed-PR context. Fill one ordered proposed_prs entry for every planned
+    proposed PR in the same file. Each entry must contain only its stable id,
+    intent, justification, and dependent_prs. In the feature-wide
+    specification-v1 sections, list every entity/module/tool/relationship/
+    feature/decision change exactly once and label it with a declared
+    proposed_pr_id. Do not put change lists inside individual proposed PR
+    entries.
+    Remove generator
+    instructions and instructional comments. Do not leave null, empty, example,
+    or TODO values in required fields. Use yaml_edit for all YAML changes in
+    this active worktree. Do not validate or instantiate workflows until this
+    single file is fully populated.
+- id: evaluate-proposed-pr-specification
+  description: Evaluate the proposed PR specification deterministically.
   step_type: invoke_tool
   llm_type: simple_task
   details: Invoke the evaluator exactly once for the selected feature directory; do not edit files in this step.
@@ -225,19 +217,20 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<feature-name>
-- id: repair-implementation-specifications
-  description: Repair every reported implementation specification issue.
+- id: repair-proposed-pr-specification
+  description: Repair every reported proposed PR specification issue.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Review the deterministic evaluator result and repair every reported issue
-    with yaml_edit. Use the evaluator's corrective guidance and exact file
-    paths. Do not instantiate workflows, stage artifacts, request approval, or
-    create a pull request while any specification is invalid. After changing
-    the affected YAML, choose next_step so the deterministic evaluation step
-    runs again; if no repair is needed, proceed to the validation gate.
-- id: gate-implementation-specifications
-  description: Confirm all implementation specifications are valid.
+    Review the deterministic evaluator result and repair every reported issue in
+    the single proposed-pr-specification.yaml with yaml_edit. Use the
+    evaluator's corrective guidance and exact paths. Do not instantiate
+    workflows, stage artifacts, request approval, or create a pull request while
+    the proposed PR file is invalid. After changing the YAML, choose next_step
+    so deterministic evaluation runs again; if no repair is needed, proceed to
+    the validation gate.
+- id: gate-proposed-pr-specification
+  description: Confirm the proposed PR specification is valid.
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the directory evaluator exits successfully with zero issues.
@@ -253,11 +246,11 @@ steps:
     outcome:
       path: returncode
       equals: 0
-    goto_step: repair-implementation-specifications
+    goto_step: repair-proposed-pr-specification
     retry_context: >-
-      The implementation-specification gate failed. Inspect the latest
-      evaluator result, repair every affected YAML with yaml_edit, and rerun
-      deterministic evaluation before continuing.
+      The proposed-PR specification gate failed. Inspect the latest evaluator
+      result, repair the single proposed-pr-specification.yaml with yaml_edit, and
+      rerun deterministic evaluation before continuing.
 - id: plan-workflow-instantiation
   description: Plan execution workflow instantiation.
   step_type: freeform
@@ -266,8 +259,8 @@ steps:
     For each validated proposed PR, inspect whether its matching workflow
     already exists and reuse it when present. For each missing workflow,
     inspect templates/execute-proposed-pr.yaml with read_document, resolve
-    every task input_state placeholder from the matching validated
-    implementation specification, and prepare the complete instantiation
+    every task input_state placeholder from the matching validated proposed PR,
+    and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
     instance names, proposed-PR order, and dependency relationships. Do not
     pass workflow dependencies manually: instantiate-workflow derives them from
@@ -444,4 +437,4 @@ steps:
   description: Hand the draft pull request to the user for review.
   step_type: freeform
   llm_type: standard_reasoning
-  details: Show the pull request URL. Summarize the selected feature specification, every proposed-PR implementation specification, every execution workflow, and their dependency relationships. State that implementation has not begun and the draft pull request is ready for review.
+  details: Show the pull request URL. Summarize the selected feature, every proposed PR, every execution workflow, and their dependency relationships. State that implementation has not begun and the draft pull request is ready for review.

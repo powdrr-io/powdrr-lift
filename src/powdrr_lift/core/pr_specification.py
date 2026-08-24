@@ -131,9 +131,11 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "#   are not allowed.",
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
-        "# - Fill in each proposed PR's intent and acceptance details.",
-        "# - In each proposed PR's `changes`, record every action-bearing id from",
-        "#   the v1 architecture and implementation specifications exactly once",
+        "# - Fill in each proposed PR's intent, justification, and dependencies.",
+        "# - In the feature-wide specification-v1 sections below",
+        "#   (`entities`, `modules`, `tools`, `entity_relationships`, `features`,",
+        "#   and `decisions`), record every action-bearing id once and label each",
+        "#   item with the proposed_pr_id that will deliver it.",
         "#   in execution order. The combined ordered effects must match those",
         "#   v1 files exactly; do not omit or invent an id/action pair.",
         "# - Delete these instructions and replace them with this comment at the top:",
@@ -151,19 +153,10 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "  - null",
         "proposed_prs:",
         "  - id: null",
+        "    intent: null",
+        "    justification: null",
         "    dependent_prs: []",
-        "    intent:",
-        "      problem: null",
-        "      goal: null",
-        "      reasoning: null",
-        "    changes:",
-        *[f"      {section}: []" for section in _EFFECT_SECTIONS],
-        "    acceptance_criteria: []",
-        "    expected_tests: []",
-        "    required_test_cases: []",
-        "    expected_outcomes: []",
-        "    non_goals: []",
-        "    risks: []",
+        *[f"{section}: []" for section in _EFFECT_SECTIONS],
         "",
     ]
     return "\n".join(lines)
@@ -489,7 +482,6 @@ def _build_multi_proposed_pr_validation_report(
         issue_code="invalid_proposed_prs_section",
         issue_message="proposed_prs must be a list of proposed PR mappings.",
     )
-    entries: list[Mapping[str, Any]] = []
     ids: dict[str, str] = {}
     for index, raw_pr in enumerate(raw_prs):
         if not isinstance(raw_pr, Mapping):
@@ -519,10 +511,11 @@ def _build_multi_proposed_pr_validation_report(
                     )
                 )
             ids[normalized] = pr_id
-        entries.append(raw_pr)
-
     graph: dict[str, tuple[str, ...]] = {}
-    for index, entry in enumerate(entries):
+    for index, raw_pr in enumerate(raw_prs):
+        if not isinstance(raw_pr, Mapping):
+            continue
+        entry = raw_pr
         pr_id = _optional_string(entry.get("id"))
         if pr_id is None:
             continue
@@ -533,10 +526,22 @@ def _build_multi_proposed_pr_validation_report(
             issues=issues,
         )
         graph[pr_id] = dependencies
-        _validate_multi_pr_details(entry, index=index, issues=issues)
+        for detail_field in ("intent", "justification"):
+            _required_string(
+                entry.get(detail_field),
+                path=f"proposed_prs[{index}].{detail_field}",
+                issues=issues,
+                issue_code=f"proposed_pr_{detail_field}_missing",
+                issue_message=f"Each proposed PR requires {detail_field}.",
+            )
     _validate_dependency_graph(graph, issues=issues)
+    _validate_feature_change_sections(
+        raw_spec,
+        proposed_pr_ids=tuple(ids.values()),
+        issues=issues,
+    )
     _validate_v1_effect_equivalence(
-        entries,
+        raw_spec,
         repo_root=repo_root,
         work_item_name=work_item_name,
         file_path=file_path,
@@ -549,6 +554,71 @@ def _build_multi_proposed_pr_validation_report(
         known_pr_ids=known_pr_ids,
         issues=issues,
     )
+
+
+def _validate_feature_change_sections(
+    raw_spec: Mapping[str, Any],
+    *,
+    proposed_pr_ids: Sequence[str],
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    known_ids = _normalize_identifier_set(proposed_pr_ids)
+    for section in _EFFECT_SECTIONS:
+        raw_items = raw_spec.get(section, [])
+        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "invalid_specification_v1_section",
+                    f"{section} must be a list.",
+                    section,
+                )
+            )
+            continue
+        for item_index, item in enumerate(raw_items):
+            path = f"{section}[{item_index}]"
+            if not isinstance(item, Mapping):
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "invalid_specification_v1_item",
+                        "Each specification-v1 item must be a mapping.",
+                        path,
+                    )
+                )
+                continue
+            _required_string(
+                item.get("id"),
+                path=f"{path}.id",
+                issues=issues,
+                issue_code="specification_v1_id_missing",
+                issue_message="Each specification-v1 item must include an id.",
+            )
+            action = _optional_string(item.get("action"))
+            if action not in {"added", "removed", "changed"}:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "invalid_specification_v1_action",
+                        "Each specification-v1 action must be added, removed, or "
+                        "changed.",
+                        f"{path}.action",
+                    )
+                )
+            proposed_pr_id = _optional_string(item.get("proposed_pr_id"))
+            if proposed_pr_id is None:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "proposed_pr_id_missing",
+                        "Each feature change must identify its proposed PR.",
+                        f"{path}.proposed_pr_id",
+                    )
+                )
+            elif _normalize_identifier(proposed_pr_id) not in known_ids:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "unknown_proposed_pr_id",
+                        f"Proposed PR id {proposed_pr_id!r} is not declared above.",
+                        f"{path}.proposed_pr_id",
+                    )
+                )
 
 
 def _validate_multi_pr_details(
@@ -596,55 +666,45 @@ def _validate_multi_pr_details(
             seen_ids=seen_detail_ids,
             issues=issues,
         )
-    changes = entry.get("changes")
-    if not isinstance(changes, Mapping):
-        issues.append(
-            PRSpecificationValidationIssue(
-                "changes_missing",
-                "Each proposed PR must include a changes mapping.",
-                f"proposed_prs[{index}].changes",
+    for section in _EFFECT_SECTIONS:
+        raw_items = entry.get(section, [])
+        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "invalid_specification_v1_section",
+                    f"{section} must be a list in each proposed PR entry.",
+                    f"proposed_prs[{index}].{section}",
+                )
             )
-        )
-    elif changes is not None:
-        for section in _EFFECT_SECTIONS:
-            raw_items = changes.get(section, [])
-            if not isinstance(raw_items, Sequence) or isinstance(
-                raw_items, (str, bytes)
-            ):
+            continue
+        for item_index, item in enumerate(raw_items):
+            if not isinstance(item, Mapping):
                 issues.append(
                     PRSpecificationValidationIssue(
-                        "invalid_changes_section",
-                        f"changes.{section} must be a list.",
-                        f"proposed_prs[{index}].changes.{section}",
+                        "invalid_specification_v1_item",
+                        "Each specification-v1 item must be a mapping with id "
+                        "and action.",
+                        f"proposed_prs[{index}].{section}[{item_index}]",
                     )
                 )
                 continue
-            for item_index, item in enumerate(raw_items):
-                if not isinstance(item, Mapping):
-                    issues.append(
-                        PRSpecificationValidationIssue(
-                            "invalid_change_item",
-                            "Each change must be a mapping with id and action.",
-                            f"proposed_prs[{index}].changes.{section}[{item_index}]",
-                        )
+            _required_string(
+                item.get("id"),
+                path=f"proposed_prs[{index}].{section}[{item_index}].id",
+                issues=issues,
+                issue_code="specification_v1_id_missing",
+                issue_message="Each specification-v1 item must include an id.",
+            )
+            action = _optional_string(item.get("action"))
+            if action not in {"added", "removed", "changed"}:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "invalid_specification_v1_action",
+                        "Each specification-v1 action must be added, removed, or "
+                        "changed.",
+                        f"proposed_prs[{index}].{section}[{item_index}].action",
                     )
-                    continue
-                _required_string(
-                    item.get("id"),
-                    path=f"proposed_prs[{index}].changes.{section}[{item_index}].id",
-                    issues=issues,
-                    issue_code="change_id_missing",
-                    issue_message="Each change must include an id.",
                 )
-                action = _optional_string(item.get("action"))
-                if action not in {"added", "removed", "changed"}:
-                    issues.append(
-                        PRSpecificationValidationIssue(
-                            "invalid_change_action",
-                            "Each change action must be added, removed, or changed.",
-                            f"proposed_prs[{index}].changes.{section}[{item_index}].action",
-                        )
-                    )
 
 
 def _validate_dependency_graph(
@@ -680,7 +740,7 @@ def _validate_dependency_graph(
 
 
 def _validate_v1_effect_equivalence(
-    entries: Sequence[Mapping[str, Any]],
+    raw_spec: Mapping[str, Any],
     *,
     repo_root: Path,
     work_item_name: str,
@@ -729,30 +789,24 @@ def _validate_v1_effect_equivalence(
     proposed_effects: dict[str, list[tuple[str, str]]] = {
         section: [] for section in _EFFECT_SECTIONS
     }
-    for entry in entries:
-        changes = entry.get("changes")
-        if not isinstance(changes, Mapping):
+    for section in _EFFECT_SECTIONS:
+        raw_items = raw_spec.get(section, [])
+        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
             continue
-        for section in _EFFECT_SECTIONS:
-            raw_items = changes.get(section, [])
-            if not isinstance(raw_items, Sequence) or isinstance(
-                raw_items, (str, bytes)
-            ):
-                continue
-            for item in raw_items:
-                if isinstance(item, Mapping):
-                    item_id = _optional_string(item.get("id"))
-                    action = _optional_string(item.get("action"))
-                    if item_id is not None and action is not None:
-                        proposed_effects[section].append((item_id, action))
+        for item in raw_items:
+            if isinstance(item, Mapping):
+                item_id = _optional_string(item.get("id"))
+                action = _optional_string(item.get("action"))
+                if item_id is not None and action is not None:
+                    proposed_effects[section].append((item_id, action))
     for section in _EFFECT_SECTIONS:
         if proposed_effects[section] != source_effects[section]:
             issues.append(
                 PRSpecificationValidationIssue(
                     "v1_effect_mismatch",
-                    f"Proposed PR changes for {section} do not match the ordered "
+                    f"Proposed PR {section} entries do not match the ordered "
                     "id/action effects in the v1 specification files.",
-                    f"proposed_prs.changes.{section}",
+                    f"proposed_prs.{section}",
                 )
             )
 
@@ -1369,7 +1423,7 @@ def _collect_feature_ids(
                     code="unknown_feature_id",
                     message=(
                         f"Feature id {feature_id!r} is not listed in the current "
-                        "implementation specifications."
+                        "source specifications."
                     ),
                     path=f"feature_ids[{index}]",
                 )

@@ -779,7 +779,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr_specification_parser = subparsers.add_parser(
         "pr-specification",
         aliases=["pr_specification"],
-        help="Generate a proposed PR specification template.",
+        help="Generate a proposed PR specification v1 template.",
     )
     pr_specification_parser.add_argument(
         "--work-item-name",

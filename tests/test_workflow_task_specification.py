@@ -154,11 +154,6 @@ def test_workflow_task_directory_loader_reads_all_json_files(
         "integration_branch: powdrr/feature\n",
         encoding="utf-8",
     )
-    (tmp_path / ".workflow-git.json").write_text(
-        '{"proposed_pr_id":"feature"}\n',
-        encoding="utf-8",
-    )
-
     assert load_workflow_tasks(tmp_path) == (task_a, task_b)
 
 

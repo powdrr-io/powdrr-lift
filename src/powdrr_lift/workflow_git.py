@@ -13,7 +13,6 @@ from typing import Any
 import yaml
 
 WORKFLOW_GIT_STATE_SUFFIX = "-workflow.yaml"
-LEGACY_WORKFLOW_GIT_STATE_FILENAME = ".workflow-git.json"
 
 
 class WorkflowGitInconsistency(RuntimeError):
@@ -113,32 +112,24 @@ def load_workflow_git_state(
     workflow_id: str | None = None,
 ) -> WorkflowGitState | None:
     directory = Path(workflow_directory)
-    if workflow_id is not None:
-        paths = [workflow_git_state_path(directory, workflow_id)]
-        paths.append(directory / LEGACY_WORKFLOW_GIT_STATE_FILENAME)
-    else:
-        paths = sorted(directory.glob(f"*{WORKFLOW_GIT_STATE_SUFFIX}"))
-        paths.extend(
-            path
-            for path in [directory / LEGACY_WORKFLOW_GIT_STATE_FILENAME]
-            if path.is_file()
-        )
-        if len(paths) != 1:
-            return None
-    for path in paths:
-        if not path.is_file():
-            continue
-        try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        except (OSError, yaml.YAMLError):
-            continue
-        try:
-            state = WorkflowGitState.from_data(data)
-        except ValueError:
-            continue
-        if workflow_id is None or state.proposed_pr_id == workflow_id:
-            return state
-    return None
+    paths = (
+        [workflow_git_state_path(directory, workflow_id)]
+        if workflow_id is not None
+        else sorted(directory.glob(f"*{WORKFLOW_GIT_STATE_SUFFIX}"))
+    )
+    if len(paths) != 1:
+        return None
+    try:
+        data = yaml.safe_load(paths[0].read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    try:
+        state = WorkflowGitState.from_data(data)
+    except ValueError:
+        return None
+    if workflow_id is not None and state.proposed_pr_id != workflow_id:
+        return None
+    return state
 
 
 def save_workflow_git_state(
@@ -458,9 +449,6 @@ def inspect_workflow_run(
         state_paths.extend(
             integration_worktree.rglob(workflow_git_state_filename(proposed_pr_id))
         )
-        state_paths.extend(
-            integration_worktree.rglob(LEGACY_WORKFLOW_GIT_STATE_FILENAME)
-        )
         state_paths = sorted(set(state_paths))
     state = (
         load_workflow_git_state(state_paths[0].parent, proposed_pr_id)
@@ -487,7 +475,6 @@ def inspect_workflow_run(
                 (str(task_path), task_path.read_text(encoding="utf-8"))
                 for task_path in task_paths
                 if not task_path.name.endswith(WORKFLOW_GIT_STATE_SUFFIX)
-                and task_path.name != LEGACY_WORKFLOW_GIT_STATE_FILENAME
             ]
         else:
             task_contents = _workflow_task_files_from_branch(

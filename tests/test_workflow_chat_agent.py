@@ -4247,6 +4247,42 @@ def test_read_document_action_clamps_range_past_end_of_short_document(
     assert [line["text"] for line in context["lines"]] == ["one", "two", "three"]
 
 
+def test_read_document_missing_file_lists_directory_files(
+    tmp_path: Path,
+) -> None:
+    workflow_directory = tmp_path / "docs" / "workflows" / "feature"
+    workflow_directory.mkdir(parents=True)
+    (workflow_directory / "feature-core-workflow.yaml").write_text(
+        "id: feature-core\n", encoding="utf-8"
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "kind": "read_document",
+            "file_path": "docs/workflows/feature/wrong-workflow.yaml",
+            "start_line": 1,
+            "end_line": 10,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="feature-core-workflow.yaml"):
+        _handle_workflow_action_read_document(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+
+
 def test_file_management_action_renames_and_records_result(tmp_path: Path) -> None:
     source = tmp_path / "old.txt"
     source.write_text("content", encoding="utf-8")

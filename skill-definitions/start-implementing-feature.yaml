@@ -266,7 +266,14 @@ steps:
     every task input_state placeholder from the matching validated proposed PR,
     and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
-    instance names, proposed-PR order, and dependency relationships. Do not
+    instance names, proposed-PR order, and dependency relationships. A persisted
+    workflow metadata file is named exactly
+    `<proposed_pr_id>-workflow.yaml` inside
+    `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the exact
+    id from `proposed_prs`, such as `interaction-log-core`. Do not prepend the
+    template id (`execute-proposed-pr`), the template filename, or a branch name.
+    Use the exact path returned by instantiation or an exact filename listed by
+    the workflow directory; never compose a filename from memory. Do not
     pass workflow dependencies manually: instantiate-workflow derives them from
     dependent_prs in the matching proposed PR specification. The resulting
     workflow state must preserve those derived dependencies so its integration
@@ -312,8 +319,12 @@ steps:
   llm_type: fast_iteration
   details: >-
     Compare the dependency relationships in the unified proposed-PR file with every
-    generated or reused <workflow-id>-workflow.yaml in
-    docs/workflows/<feature-name>/. Read each workflow state document and build
+    generated or reused `<proposed_pr_id>-workflow.yaml` in
+    docs/workflows/<feature-name>/. The filename is derived only from the exact
+    proposed_pr_id; do not use the template id, template filename, branch name,
+    or a guessed name. If a path is not present in the instantiation result,
+    use the exact filenames returned by read_document's missing-file error
+    before reading it. Read each workflow state document and build
     an exact table of workflow id to depends_on_workflows. Confirm that every
     proposed_pr dependent_prs predecessor appears in the matching workflow's
     depends_on_workflows list, that workflows with no planned predecessors have

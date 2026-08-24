@@ -4161,7 +4161,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "listed tool_invocations support the tool needed for the next action.\n"
         "- read_document: choose this when you know the document path but need "
         "specific lines from that document before deciding the next action. "
-        "Request only the smallest useful contiguous range.\n"
+        "Request only the smallest useful contiguous range. If a missing-file "
+        "error lists files in the directory, retry only with one of those exact "
+        "paths; never synthesize a filename from related names.\n"
         "- next_step: choose this when the current step is complete and the next "
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
@@ -5046,8 +5048,24 @@ def _handle_workflow_action_read_document(
 
     target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
     if not target_path.exists() or not target_path.is_file():
+        directory = target_path.parent
+        if directory.is_dir():
+            directory_files = sorted(
+                path.name for path in directory.iterdir() if path.is_file()
+            )
+            directory_context = (
+                f" Files currently in {directory.relative_to(state.worktree_root)}: "
+                f"{', '.join(directory_files) or '<no files>'}."
+            )
+        else:
+            directory_context = (
+                f" Directory does not exist: "
+                f"{directory.relative_to(state.worktree_root)}."
+            )
         raise RuntimeError(
-            f"Workflow read_document action file does not exist: {action.file_path}"
+            f"Workflow read_document action file does not exist: {action.file_path}."
+            f"{directory_context} Use an exact existing file path; do not infer or "
+            "compose a filename from the template id or workflow description."
         )
     lines = target_path.read_text(encoding="utf-8").splitlines()
     if action.start_line > len(lines) and lines:

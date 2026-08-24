@@ -30,6 +30,7 @@ _MAX_STATUS_HISTORY_ENTRIES = 80
 _MAX_STATUS_HISTORY_CHARS = 24_000
 _MAX_STATUS_MESSAGE_CHARS = 8_000
 _MAX_VISIBLE_WORKFLOW_STEPS = 10
+_MAX_ADDED_FILE_ENTRIES = 80
 
 
 def _visible_step_indices(total_steps: int, current_step_index: int) -> tuple[int, ...]:
@@ -522,7 +523,9 @@ class WorkflowChatApp(App[None]):
         if not new_paths:
             return
         self._added_files.extend(new_paths)
-        files.mount(*(ListItem(Label(path)) for path in new_paths))
+        self._added_files = self._added_files[-_MAX_ADDED_FILE_ENTRIES:]
+        files.clear()
+        files.mount(*(ListItem(Label(path)) for path in self._added_files))
         files.scroll_end(animate=False)
         files.call_after_refresh(files.scroll_end, animate=False)
 

@@ -1,5 +1,5 @@
 task_id: harness-debug3-task-002
-status: locked
+status: completed
 upstream_task_ids:
 - harness-debug3-task-001
 dependent_state:
@@ -14,6 +14,13 @@ assignee_type: agent
 assignee_role: architect
 output_state_type: detailed-execution-plan-state
 description: Create the execution plan
+output_state:
+  execution_plan:
+    criteria_to_tests: []
+    implementation_files: []
+    test_commands: []
+    validation_commands: []
+    risks: []
 workflow_template: execute-proposed-pr
 step_type: freeform
 details: 'Perform exactly one action: create the ordered execution plan. Read the

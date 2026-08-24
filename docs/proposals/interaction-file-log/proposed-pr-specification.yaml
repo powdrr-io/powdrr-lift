@@ -1,0 +1,49 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: interaction-file-log
+feature_ids:
+- feat-interaction-log
+proposed_prs:
+- id: interaction-file-log-core
+  intent: 'Implement the interaction file logging feature: write interaction inputs
+    and outputs to .powdrr/interaction-log.json in JSON format.'
+  justification: This single PR delivers the entire cohesive feature, covering the
+    JSON log writer, the .powdrr directory handling, and the required tests.
+entities:
+- id: interaction-log
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: interaction-entry
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: log-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: interaction-source
+  action: added
+  proposed_pr_id: interaction-file-log-core
+modules:
+- id: mod-log-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+tools:
+- id: tool-log-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+entity_relationships:
+- id: rel-writer-appends
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: rel-log-contains
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: rel-source-feeds
+  action: added
+  proposed_pr_id: interaction-file-log-core
+features:
+- id: feat-interaction-log
+  action: added
+  proposed_pr_id: interaction-file-log-core
+decisions:
+- id: dec-json-format
+  action: added
+  proposed_pr_id: interaction-file-log-core

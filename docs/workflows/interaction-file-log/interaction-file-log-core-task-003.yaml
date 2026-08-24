@@ -1,0 +1,33 @@
+task_id: interaction-file-log-core-task-003
+status: open
+upstream_task_ids:
+- interaction-file-log-core-task-001
+- interaction-file-log-core-task-002
+dependent_state:
+- tests-generated
+complexity: high
+input_state:
+  proposed_pr_context: interaction-file-log-core-task-001.proposed-pr-context-state
+  execution_plan: interaction-file-log-core-task-002.detailed-execution-plan-state
+  test_plan: []
+assignee_type: agent
+assignee_role: coder
+output_state_type: generated-test-diffs-state
+description: Generate the planned tests
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Perform exactly one action: edit only the test files named by the execution
+  plan. Add focused tests for the acceptance criteria and required edge cases; do
+  not edit product code, run tests, or review unrelated files. Use one edit action,
+  with file_edits when more than one test file is required. A valid response after
+  the edit looks like: {"action":"edit","file_edits":[{"file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":1,"text":"new
+  test code"}]}],"decisions_and_context":"Added the planned failing tests without
+  changing product code."} After the edit result is returned, complete the task with
+  output_state.generated-test-diffs-state containing the test paths, test names, and
+  expected failure reasons. Do not use next_step.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-core''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: standard_reasoning

@@ -145,7 +145,7 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "#",
         "# Current feature ids:",
         *feature_lines,
-        "schema: https://powdrr.io/schemas/proposed-pr-specification-v2",
+        "schema: https://powdrr.io/schemas/proposed-pr-specification-v1",
         "id: null",
         "feature_ids:",
         "  - null",

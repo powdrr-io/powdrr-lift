@@ -155,7 +155,7 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         in template_text
     )
     assert (
-        "schema: https://powdrr.io/schemas/proposed-pr-specification-v2"
+        "schema: https://powdrr.io/schemas/proposed-pr-specification-v1"
         in template_text
     )
     assert "id: null" in template_text
@@ -202,7 +202,7 @@ def test_validate_unified_proposed_pr_effects_match_v1_files(tmp_path: Path) -> 
         encoding="utf-8",
     )
     proposed = """
-    schema: https://powdrr.io/schemas/proposed-pr-specification-v2
+    schema: https://powdrr.io/schemas/proposed-pr-specification-v1
     id: feature-a
     feature_ids: [feature-a]
     proposed_prs:

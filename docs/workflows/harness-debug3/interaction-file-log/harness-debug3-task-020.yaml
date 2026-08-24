@@ -1,0 +1,37 @@
+task_id: harness-debug3-task-020
+status: open
+upstream_task_ids:
+- harness-debug3-task-005
+- harness-debug3-task-019
+- harness-debug3-task-016
+dependent_state:
+- pull-request-files-verified
+complexity: medium
+input_state:
+  implementation_diffs: harness-debug3-task-005.generated-product-code-state
+  promoted_documents: harness-debug3-task-019.promoted-current-state-documents
+  type_check: harness-debug3-task-016.type-check-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: staged-pull-request-state
+description: Verify the pull request file set
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+details: 'Assign the deterministic repository status to staged-pull-request-state.
+  Verify that every changed path is within the approved implementation, test, and
+  promoted-document scope. Do not stage or commit in this step. Use one next_step
+  action with the exact path list; report an inconsistency rather than silently accepting
+  an unexpected file.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''harness-debug3''. Use these values as search context and verify repository
+  documents before deciding what they identify.'
+llm_type: simple_task
+pre_step:
+  action: invoke_tool
+  template:
+    tool: git
+    command:
+    - status
+    - --short

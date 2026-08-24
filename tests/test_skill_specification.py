@@ -194,6 +194,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
                 ("specify-a-feature.yaml", 15),
+                ("validate-generated-tests.yaml", 1),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -697,6 +698,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "specify-implementation",
         "specify-system",
         "start-implementing-feature",
+        "validate-generated-tests",
     ]
 
 

@@ -1,0 +1,57 @@
+---
+name: validate-generated-tests
+when_to_use:
+- When generated tests must be classified before product implementation begins.
+- When unexpected test failures require edits followed by deterministic reruns.
+steps:
+- id: classify-generated-tests
+  description: Classify the deterministic generated-test result.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Inspect the latest deterministic test result in the execution events and
+    the generated-test diff's explicit expected-failure ledger. A failure is
+    expected only when the test path and test name match a ledger entry and the
+    observed assertion/error is consistent with that entry's expected failure
+    reason. Treat every unlisted test, missing expected failure, syntax/import
+    error, fixture/setup error, assertion mismatch, or unexpected passing test
+    as unexpected. If every result matches the ledger, return complete with the
+    exact command, return code, expected failure flag, and failure details. If
+    any result is unexpected, edit only the generated test files to correct that
+    cause, then return next_step. The edit target must be an existing generated
+    test path under tests/; do not edit product code, fixtures, configuration,
+    documentation, dependencies, or any other file. Never hide an unexpected
+    failure by weakening or deleting a test.
+- id: rerun-generated-tests
+  description: Rerun generated tests after a repair.
+  step_type: invoke_tool
+  llm_type: fast_iteration
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - uv
+      - run
+      - --extra
+      - dev
+      - pytest
+      - -q
+  details: >-
+    The deterministic test command has rerun after a generated-test repair.
+    Assign its complete result to the latest test result context and return
+    next_step so the classification step can decide whether another bounded
+    repair is needed.
+- id: finish-generated-test-validation
+  description: Finish with an expected failing generated-test result.
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Use the latest deterministic result. If it contains only the expected
+    unimplemented behavior recorded in the generated-test diff's expected-
+    failure ledger, return complete with the exact command, return code,
+    expected failure flag, and failure details. If an unlisted test or a
+    materially different failure remains, make one focused edit to the generated
+    tests under tests/ and return goto_step with step_id rerun-generated-tests.
+    Do not modify product code, fixtures, configuration, documentation,
+    dependencies, or any other file.

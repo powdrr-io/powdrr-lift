@@ -398,6 +398,10 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     )
     assert template.task_templates[3].pre_step is not None
     assert template.task_templates[3].pre_step.template["command"] == [
+        "uv",
+        "run",
+        "--extra",
+        "dev",
         "pytest",
         "-q",
     ]

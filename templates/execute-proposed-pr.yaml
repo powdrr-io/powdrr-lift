@@ -78,11 +78,13 @@ task_templates:
     Perform exactly one action: create the ordered execution plan. Read the
     supplied proposed PR context, map every acceptance criterion to tests and
     implementation work, and record exact paths and validation commands in the
-    plan. Do not edit files, run commands, or repair anything in this step. If
-    a required decision is missing, use one prompt_user action instead of
-    inventing it. When the plan is complete, return exactly this shape with the
-    plan replacing the example value:
-    {"action":"complete","output_state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}},"decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
+    plan. Do not edit files, run commands, or call gather_context in this step.
+    If a required decision is missing, use one prompt_user action instead of
+    inventing it. When the planning sub-step is complete, first return exactly
+    this next_step shape:
+    {"action":"next_step","decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
+    On the following roundtrip, return complete with the plan in
+    output_state.execution_plan, using the declared handoff shape.
   output_state_type: detailed-execution-plan-state
   dependent_state:
   - execution-plan-created
@@ -115,25 +117,33 @@ task_templates:
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
+  uses_skills:
+  - validate-generated-tests
   input_state:
     generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
+    expected_test_failures: <upstream-task-2>.generated-test-diffs-state
     test_results: []
   pre_step:
     action: invoke_tool
     template:
       tool: shell
       command:
+      - uv
+      - run
+      - --extra
+      - dev
       - pytest
       - -q
   details: >-
-    The deterministic pytest command already ran. Perform exactly one action:
-    classify its result. Confirm that failures are caused by missing requested
-    behavior, not malformed tests, syntax errors, broken fixtures, or unrelated
-    environment errors. If the tests pass, use one edit action to strengthen
-    them before continuing. If they fail for the expected reason, return:
-    {"action":"next_step","outputs":{"tests-proven-failing-state":{"command":"pytest -q","expected_failure":true,"failures":[]}},"decisions_and_context":"The generated tests fail for the expected unimplemented behavior."}
-    Replace the example failure list with the actual result. Do not implement
-    product code in this step.
+    Invoke validate-generated-tests with the deterministic test result and the
+    explicit expected-test-failure ledger from generated-test-diffs-state. The
+    ledger must contain each expected test path, test name, and failure reason;
+    an unlisted or materially different failure is unexpected. The nested skill
+    owns classification and the bounded repair/rerun loop for malformed tests,
+    fixture errors, unexpected failures, and setup failures. Do not modify
+    product code in this task. After it reports an expected result, complete
+    this task with output_state.tests-proven-failing-state containing the exact
+    command, return code, expected-failure flag, and failure details.
   output_state_type: tests-proven-failing-state
   dependent_state:
   - tests-proven-failing
@@ -174,13 +184,17 @@ task_templates:
     template:
       tool: shell
       command:
+      - uv
+      - run
+      - --extra
+      - dev
       - pytest
       - -q
   details: >-
     The deterministic implementation test command already ran. Assign its complete
     result to implementation-test-results-state; do not fix failures or claim success
     from memory. Complete with a next_step action such as:
-    {"action":"next_step","outputs":{"implementation-test-results-state":{"command":"pytest -q","returncode":0,"summary":"All implementation tests passed."}},"decisions_and_context":"Recorded the deterministic implementation test result."}
+    {"action":"next_step","outputs":{"implementation-test-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All implementation tests passed."}},"decisions_and_context":"Recorded the deterministic implementation test result."}
   output_state_type: implementation-test-results-state
   dependent_state:
   - implementation-tests-run
@@ -219,6 +233,10 @@ task_templates:
     template:
       tool: shell
       command:
+      - uv
+      - run
+      - --extra
+      - dev
       - pytest
       - -q
   details: >-
@@ -226,7 +244,7 @@ task_templates:
     repair task. Assign the complete result to final-implementation-test-results-state.
     Do not diagnose or repair in this step. Use one next_step action with the
     exact command, return code, and summary:
-    {"action":"next_step","outputs":{"final-implementation-test-results-state":{"command":"pytest -q","returncode":0,"summary":"All implementation tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic implementation-test rerun."}
+    {"action":"next_step","outputs":{"final-implementation-test-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All implementation tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic implementation-test rerun."}
   output_state_type: final-implementation-test-results-state
   dependent_state:
   - final-implementation-tests-run
@@ -243,13 +261,17 @@ task_templates:
     template:
       tool: shell
       command:
+      - uv
+      - run
+      - --extra
+      - dev
       - pytest
       - -q
   details: >-
     The deterministic full test command already ran. Assign the complete result
     to all-tests-results-state. Do not diagnose or repair in this step. Use a
     next_step action with the exact command, return code, and summary:
-    {"action":"next_step","outputs":{"all-tests-results-state":{"command":"pytest -q","returncode":0,"summary":"All tests passed."}},"decisions_and_context":"Recorded the deterministic full-suite result."}
+    {"action":"next_step","outputs":{"all-tests-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All tests passed."}},"decisions_and_context":"Recorded the deterministic full-suite result."}
   output_state_type: all-tests-results-state
   dependent_state:
   - full-tests-run
@@ -285,6 +307,10 @@ task_templates:
     template:
       tool: shell
       command:
+      - uv
+      - run
+      - --extra
+      - dev
       - pytest
       - -q
   details: >-
@@ -292,7 +318,7 @@ task_templates:
     Assign the complete result to final-all-tests-results-state. Do not diagnose
     or repair in this step. Use one next_step action with the exact command,
     return code, and summary:
-    {"action":"next_step","outputs":{"final-all-tests-results-state":{"command":"pytest -q","returncode":0,"summary":"All tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic full-suite rerun."}
+    {"action":"next_step","outputs":{"final-all-tests-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic full-suite rerun."}
   output_state_type: final-all-tests-results-state
   dependent_state:
   - final-full-tests-run

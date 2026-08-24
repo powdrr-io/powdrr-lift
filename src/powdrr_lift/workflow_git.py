@@ -124,9 +124,12 @@ def load_workflow_git_state(
     except (OSError, yaml.YAMLError):
         return None
     try:
-        return WorkflowGitState.from_data(data)
+        state = WorkflowGitState.from_data(data)
     except ValueError:
         return None
+    if workflow_id is not None and state.proposed_pr_id != workflow_id:
+        return None
+    return state
 
 
 def save_workflow_git_state(
@@ -441,11 +444,12 @@ def inspect_workflow_run(
         if registered_integration_worktrees
         else workflow_worktree_path(repo_root_path, proposed_pr_id)
     )
-    state_paths = (
-        sorted(integration_worktree.rglob(f"*{WORKFLOW_GIT_STATE_SUFFIX}"))
-        if integration_worktree.is_dir()
-        else []
-    )
+    state_paths: list[Path] = []
+    if integration_worktree.is_dir():
+        state_paths.extend(
+            integration_worktree.rglob(workflow_git_state_filename(proposed_pr_id))
+        )
+        state_paths = sorted(set(state_paths))
     state = (
         load_workflow_git_state(state_paths[0].parent, proposed_pr_id)
         if state_paths

@@ -113,17 +113,12 @@ class _TextualStdoutOutput(_TextualOutput):
             # like a real empty question.
             if line or self._pending_lines:
                 self._pending_lines.append(line)
-        if self._buffer:
-            prompt = self._buffer
-            if prompt.strip() == ">":
+        if self._buffer and self._buffer.strip() == ">":
+            if self._buffer:
                 self._flush_pending(question=True)
                 # `> ` is only the input delimiter. A question, including an
                 # intentionally empty one, is delivered by _flush_pending.
                 # Do not interpret a bare delimiter as an empty LLM response.
-                self._buffer = ""
-            elif self._initial_prompt_pending:
-                self._initial_prompt_pending = False
-                self._app._output_initial_prompt(prompt)
                 self._buffer = ""
         return len(text)
 
@@ -131,7 +126,11 @@ class _TextualStdoutOutput(_TextualOutput):
         if self._buffer:
             prompt = self._buffer
             self._buffer = ""
-            self._app._output_question(prompt)
+            if self._initial_prompt_pending:
+                self._initial_prompt_pending = False
+                self._app._output_initial_prompt(prompt)
+            else:
+                self._app._output_question(prompt)
         self._flush_pending(question=True)
 
 

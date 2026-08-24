@@ -1,0 +1,37 @@
+task_id: execute-proposed-pr-interaction-log-format-task-004
+status: open
+upstream_task_ids:
+- execute-proposed-pr-interaction-log-format-task-003
+dependent_state:
+- tests-proven-failing
+complexity: medium
+input_state:
+  generated_test_diffs: execute-proposed-pr-interaction-log-format-task-003.generated-test-diffs-state
+  test_results: []
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: tests-proven-failing-state
+description: Run the generated tests before implementation
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+details: 'The deterministic pytest command already ran. Perform exactly one action:
+  classify its result. Confirm that failures are caused by missing requested behavior,
+  not malformed tests, syntax errors, broken fixtures, or unrelated environment errors.
+  If the tests pass, use one edit action to strengthen them before continuing. If
+  they fail for the expected reason, return: {"action":"next_step","outputs":{"tests-proven-failing-state":{"command":"pytest
+  -q","expected_failure":true,"failures":[]}},"decisions_and_context":"The generated
+  tests fail for the expected unimplemented behavior."} Replace the example failure
+  list with the actual result. Do not implement product code in this step.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''execute-proposed-pr-interaction-log-format''. Use these values as search
+  context and verify repository documents before deciding what they identify.'
+llm_type: fast_iteration
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - pytest
+    - -q

@@ -199,6 +199,64 @@ def _active_workflow_dir(repo_root: Path, workflow_dir: Path) -> Path:
     return active_dir if active_dir.is_dir() else workflow_dir
 
 
+def _sync_workflow_branch_from_main(repo_root: Path, workflow_dir: Path) -> Path:
+    """Refresh and push the workflow branch from the local main workflow files."""
+    state = load_workflow_git_state(workflow_dir)
+    if state is None:
+        return workflow_dir
+    active_dir = _active_workflow_dir(repo_root, workflow_dir)
+    if active_dir == workflow_dir or not active_dir.is_dir():
+        raise SystemExit(
+            "Workflow integration worktree is not available for "
+            f"{state.integration_branch!r}."
+        )
+    project_root = resolve_git_repository_root(repo_root)
+    relative_directory = Path(state.workflow_relative_directory)
+    source_directory = project_root / relative_directory
+    if not source_directory.is_dir():
+        raise SystemExit(
+            f"Workflow directory is missing from main: {relative_directory}"
+        )
+    subprocess.run(
+        ["git", "restore", "--source", "main", "--", str(relative_directory)],
+        cwd=active_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    status = subprocess.run(
+        ["git", "status", "--short", "--", str(relative_directory)],
+        cwd=active_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if status:
+        subprocess.run(
+            ["git", "add", str(relative_directory)],
+            cwd=active_dir,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "commit",
+                "-m",
+                "Sync workflow files from main before harness run",
+            ],
+            cwd=active_dir,
+            check=True,
+        )
+    subprocess.run(
+        ["git", "push", "origin", state.integration_branch],
+        cwd=active_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return active_dir
+
+
 def _workflow_state(workflow_dir: Path) -> dict[str, Any]:
     """Return a stable, JSON-serializable snapshot of the durable workflow."""
     workflow = WorkflowInstance.from_directory(workflow_dir)
@@ -732,6 +790,8 @@ def main() -> int:
             template_path = _workflow_document(workflow_dir)
         if not template_path.is_file():
             raise SystemExit(f"Workflow template does not exist: {template_path}")
+
+        _sync_workflow_branch_from_main(run_root, workflow_dir)
 
         log_root = _log_root(run_root)
         error_log = _resolve_path(args.error_log, log_root=log_root)

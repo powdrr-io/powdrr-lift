@@ -325,6 +325,38 @@ def test_unified_proposed_pr_rejects_unlabeled_or_mismatched_effects(
         "unknown_proposed_pr_id",
         "v1_effect_mismatch",
     }
+    serialized = yaml.safe_load(
+        validate_pr_specification_yaml(
+            """
+            schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+            id: feature-a
+            feature_ids: [feature-a]
+            proposed_prs:
+              - id: feature-a-core
+                intent: Add the feature.
+                justification: It is required.
+                dependent_prs: []
+            features:
+              - id: feature-a
+                action: removed
+                proposed_pr_id: missing-pr
+            entities: []
+            modules: []
+            tools: []
+            entity_relationships: []
+            decisions: []
+            """,
+            work_item_name="feature-a",
+            repo_root=tmp_path,
+            file_path=proposal_dir / "proposed-pr-specification.yaml",
+        )
+    )
+    mismatch = next(
+        issue for issue in serialized["issues"] if issue["code"] == "v1_effect_mismatch"
+    )
+    assert "Expected ordered id/action pairs" in mismatch["message"]
+    assert "Actual ordered id/action pairs" in mismatch["message"]
+    assert mismatch["yaml_edit"]["operations"][0]["op"] == "upsert_item"
 
 
 def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:

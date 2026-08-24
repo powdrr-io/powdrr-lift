@@ -888,14 +888,36 @@ def _validate_v1_effect_equivalence(
                         proposed_effects[section].append(effect)
     for section in _EFFECT_SECTIONS:
         if proposed_effects[section] != source_effects[section]:
+            expected = source_effects[section]
+            actual = proposed_effects[section]
+            missing = [effect for effect in expected if effect not in actual]
+            unexpected = [effect for effect in actual if effect not in expected]
+            details = [
+                f"Expected ordered id/action pairs: {_format_effect_pairs(expected)}.",
+                f"Actual ordered id/action pairs: {_format_effect_pairs(actual)}.",
+            ]
+            if missing:
+                details.append(f"Missing: {_format_effect_pairs(missing)}.")
+            if unexpected:
+                details.append(f"Unexpected: {_format_effect_pairs(unexpected)}.")
             issues.append(
                 PRSpecificationValidationIssue(
                     "v1_effect_mismatch",
-                    f"Proposed PR {section} entries do not match the ordered "
-                    "id/action effects in the v1 specification files.",
+                    f"Proposed PR {section} entries do not match the authoritative "
+                    "ordered id/action effects. " + " ".join(details),
                     f"proposed_prs.{section}",
                 )
             )
+
+
+def _format_effect_pairs(effects: Sequence[tuple[str, str]]) -> str:
+    if not effects:
+        return "[]"
+    return (
+        "["
+        + ", ".join(f"({item_id!r}, {action!r})" for item_id, action in effects)
+        + "]"
+    )
 
 
 def _collect_dependent_pr_ids(

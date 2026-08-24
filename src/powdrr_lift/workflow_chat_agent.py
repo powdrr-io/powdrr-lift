@@ -114,6 +114,7 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
 from powdrr_lift.workflow_observer import (
+    ObserverDecision,
     ObserverExecutionContext,
     ShadowWorkflowObserver,
     compact_observer_mapping,
@@ -843,6 +844,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     current_step: Any = None
     current_step_index: int = 0
     inherited_interaction_style: str | None = None
+    observer_intervention: str | None = None
+    observer_rejected_action_signature: str | None = None
+    observer_redirect_step_id: str | None = None
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -928,6 +932,34 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def next_request(self) -> WorkflowActionRequest | None:
         while True:
+            if self.observer_redirect_step_id is not None:
+                target_step_id = self.observer_redirect_step_id
+                self.observer_redirect_step_id = None
+                try:
+                    target_index = _step_index_by_id(
+                        self.selected_skill, target_step_id
+                    )
+                except RuntimeError as error:
+                    self.observer_intervention = (
+                        "The observer proposed an invalid redirect and it was "
+                        f"ignored: {error}"
+                    )
+                else:
+                    _invalidate_deterministic_pre_step(
+                        self.state.execution_events,
+                        skill_name=self.selected_skill.skill.name,
+                        step_index=target_index,
+                    )
+                    self.state.step_index = target_index
+                    self.state.execution_events.append(
+                        {
+                            "kind": "observer_redirect",
+                            "step_id": target_step_id,
+                            "target_step_index": target_index,
+                            "source": "observer",
+                        }
+                    )
+                continue
             if self.state.step_index >= len(self.selected_skill.skill.steps):
                 if not self.skill_stack:
                     return None
@@ -1101,6 +1133,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 validation_gate=_validation_gate_prompt_data(self.state),
                 stalled_step_context=self.state.stalled_step_context,
                 inherited_interaction_style=self.inherited_interaction_style,
+                observer_intervention=self.observer_intervention,
             )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
@@ -1243,6 +1276,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _ChatActionProgressStrategy(self.state).record_no_progress(action, observation)
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
+        action_signature = _workflow_action_signature(action)
+        if action_signature == self.observer_rejected_action_signature:
+            raise RuntimeError(
+                "The observer rejected this exact action after it failed to "
+                "make progress. Choose a materially different action."
+            )
         action_failure_signature = workflow_action_failure_signature(
             action,
             signature=_workflow_action_signature,
@@ -1494,6 +1533,48 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _ = action
         print("Workflow stopped after repeated action failures.", file=self.stderr)
         return 1
+
+    def apply_observer_decision(
+        self,
+        decision: ObserverDecision,
+        action: SkillChatAction,
+        observation: WorkflowActionObservation | None,
+    ) -> bool:
+        """Apply Phase 2 coaching without bypassing deterministic skill rules."""
+        if decision.verdict in {"continue", "request_human"}:
+            return False
+        guidance = [f"Reason: {decision.reason}", *decision.guidance]
+        if decision.expected_progress:
+            guidance.append(f"Evidence expected: {decision.expected_progress}")
+        self.observer_intervention = "Observer intervention\n" + "\n".join(
+            f"- {item}" for item in guidance
+        )
+        self.observer_rejected_action_signature = _workflow_action_signature(action)
+        if decision.verdict == "redirect" and decision.target_step_id:
+            try:
+                _step_index_by_id(self.selected_skill, decision.target_step_id)
+            except RuntimeError as error:
+                self.observer_intervention += f"\n- Redirect ignored: {error}"
+            else:
+                self.observer_rejected_action_signature = None
+                self.observer_redirect_step_id = decision.target_step_id
+        self.state.execution_events.append(
+            {
+                "kind": "observer_intervention",
+                "verdict": decision.verdict,
+                "reason": decision.reason,
+                "target_step_id": decision.target_step_id,
+                "action": json.loads(_workflow_action_signature(action)),
+                "material_progress": (
+                    observation.made_progress if observation is not None else None
+                ),
+            }
+        )
+        return observation is None
+
+    def clear_observer_intervention(self) -> None:
+        self.observer_intervention = None
+        self.observer_rejected_action_signature = None
 
     def _retry_stalled_step(
         self,
@@ -2637,11 +2718,22 @@ def run_workflow_chat(
                 handoff_state=compact_observer_mapping(execution_state.handoff_records),
             )
 
-        driver.observer = ShadowWorkflowObserver(
-            client=client_for_model(
-                observer_mapping.model,
-                observer_mapping.provider,
+        observer_credentials = _resolve_credentials(
+            observer_mapping.provider,
+            config.api_key,
+            config.base_url,
+        )
+        observer_client = _maybe_record_llm_exchanges(
+            _build_chat_client(
+                observer_credentials,
+                model=observer_mapping.model,
+                model_cache_dir=project_root / ".powdrr" / "models",
+                progress_stream=stderr,
             ),
+            project_root,
+        )
+        driver.observer = ShadowWorkflowObserver(
+            client=observer_client,
             model=observer_mapping.model,
             provider=observer_mapping.provider,
             worktree_root=worktree_root,
@@ -4026,6 +4118,7 @@ def _build_step_execution_messages(
     validation_gate: Mapping[str, Any] | None = None,
     stalled_step_context: Sequence[Mapping[str, Any]] = (),
     inherited_interaction_style: str | None = None,
+    observer_intervention: str | None = None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(
         worktree_root,
@@ -4116,6 +4209,8 @@ def _build_step_execution_messages(
         "stalled_step_context": [dict(item) for item in stalled_step_context],
         "current_file": current_file_context,
     }
+    if observer_intervention is not None:
+        prompt_data["observer_intervention"] = observer_intervention
     if _step_needs_prompt_catalog(current_step, "context_types"):
         prompt_data["available_context_types"] = [
             {

@@ -314,15 +314,17 @@ class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
 class WorkflowExecutionObserver(Protocol):
     """Optional, failure-isolated observer of shared execution boundaries."""
 
-    def response_failed(self, error: Exception) -> None: ...
+    def response_failed(self, error: Exception) -> Any: ...
 
-    def action_failed(self, action: Any, error: Exception) -> None: ...
+    def action_failed(self, action: Any, error: Exception) -> Any: ...
+
+    def action_proposed(self, action: Any) -> Any: ...
 
     def action_completed(
         self,
         action: Any,
         observation: WorkflowActionObservation,
-    ) -> None: ...
+    ) -> Any: ...
 
 
 class WorkflowLLMExecutionDriver:
@@ -385,16 +387,35 @@ class WorkflowLLMExecutionDriver:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            proposal_decision = None
+            if self.observer is not None:
+                propose = getattr(self.observer, "action_proposed", None)
+                if callable(propose):
+                    try:
+                        proposal_decision = propose(action)
+                    except Exception:
+                        proposal_decision = None
+            if proposal_decision is not None:
+                apply_decision = getattr(strategy, "apply_observer_decision", None)
+                if callable(apply_decision) and apply_decision(
+                    proposal_decision, action, None
+                ):
+                    continue
             before_state = strategy.material_state(action)
             try:
                 outcome = strategy.execute_action(action)
             except (RuntimeError, ValueError) as exc:
+                strategy.record_action_error(action, exc)
+                failure_decision = None
                 if self.observer is not None:
                     try:
-                        self.observer.action_failed(action, exc)
+                        failure_decision = self.observer.action_failed(action, exc)
                     except Exception:
-                        pass
-                strategy.record_action_error(action, exc)
+                        failure_decision = None
+                if failure_decision is not None:
+                    apply_decision = getattr(strategy, "apply_observer_decision", None)
+                    if callable(apply_decision):
+                        apply_decision(failure_decision, action, None)
                 if (
                     self.action_engine.record_action_failure(
                         action,
@@ -414,11 +435,24 @@ class WorkflowLLMExecutionDriver:
             if not observation.made_progress:
                 strategy.record_no_progress(action, observation)
             outcome = strategy.observe_outcome(action, observation, outcome)
+            observer_decision = None
             if self.observer is not None:
                 try:
-                    self.observer.action_completed(action, observation)
+                    observer_decision = self.observer.action_completed(
+                        action, observation
+                    )
                 except Exception:
-                    pass
+                    observer_decision = None
+            if observer_decision is not None:
+                apply_decision = getattr(strategy, "apply_observer_decision", None)
+                if callable(apply_decision):
+                    apply_decision(observer_decision, action, observation)
+            if observation.made_progress and observer_decision is None:
+                clear_intervention = getattr(
+                    strategy, "clear_observer_intervention", None
+                )
+                if callable(clear_intervention):
+                    clear_intervention()
             if outcome.exit_code is not None:
                 return outcome.exit_code
             if not outcome.continue_running:

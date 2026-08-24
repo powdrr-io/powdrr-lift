@@ -41,8 +41,15 @@ ObserverVerdict = Literal[
 ]
 
 _SHADOW_LLM_TRIGGERS: frozenset[ObserverTriggerKind] = frozenset(
-    {"repeated_action", "repeated_failure", "semantic_stall", "repair_regression"}
+    {
+        "repeated_action",
+        "repeated_failure",
+        "semantic_stall",
+        "repair_regression",
+        "human_prompt",
+    }
 )
+_OBSERVER_COOLDOWN_ACTIONS = 4
 _ALLOWED_VERDICTS: frozenset[str] = frozenset(
     {"continue", "coach", "redirect", "block_transition", "request_human"}
 )
@@ -125,6 +132,7 @@ class ObserverPacket:
     validation_state: Mapping[str, object]
     handoff_state: Mapping[str, object]
     progress_state: ObserverProgressState
+    prior_decision: ObserverDecision | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,35 +310,82 @@ class ShadowWorkflowObserver:
         self._last_material_progress_action: int | None = None
         self._action_index = 0
         self._last_validation_issue_count: int | None = None
+        self._last_observed_failure_signature: str | None = None
+        self._pending_action: ObserverActionSummary | None = None
 
-    def response_failed(self, error: Exception) -> None:
+    def response_failed(self, error: Exception) -> ObserverDecision | None:
         count = self._record_failure(None, error)
         if count >= 2:
-            self._trigger(
+            return self._trigger(
                 ObserverTrigger(
                     kind="repeated_failure",
                     reason="The same LLM response failure occurred at least twice.",
                     priority="high",
                 )
             )
+        return None
 
-    def action_failed(self, action: Any, error: Exception) -> None:
+    def action_failed(self, action: Any, error: Exception) -> ObserverDecision | None:
         signature = _action_signature(action)
         count = self._record_failure(signature, error)
+        if _action_kind(action) in {"prompt_user", "get-human-input"}:
+            return None
+        if any(
+            marker in str(error).casefold()
+            for marker in ("prompt_user", "human_input", "question")
+        ):
+            return None
         if count >= 2:
-            self._trigger(
+            return self._trigger(
                 ObserverTrigger(
                     kind="repeated_failure",
                     reason="The same action failure occurred at least twice.",
                     priority="high",
                 )
             )
+        return None
+
+    def action_proposed(self, action: Any) -> ObserverDecision | None:
+        """Review a human request before it can pause a struggling workflow."""
+        if _action_kind(action) not in {"prompt_user", "get-human-input"}:
+            return None
+        if self.state.last_decision is None:
+            # Human interaction is normal in a healthy chat. Phase 2 only
+            # intercepts it after the observer has diagnosed a stuck execution.
+            return None
+        if self._failures and any(
+            marker in self._failures[-1].error.casefold()
+            for marker in ("prompt_user", "human_input", "question")
+        ):
+            # The ordinary action-repair loop owns malformed question shapes;
+            # observer review is for a human request made because discovery
+            # appears blocked, not for correcting its JSON contract.
+            return None
+        context = self._safe_context()
+        if context is None:
+            return None
+        self._pending_action = ObserverActionSummary(
+            index=self._action_index + 1,
+            action=_compact_text(_action_signature(action)),
+            made_progress=None,
+            outcome="proposed",
+        )
+        try:
+            return self._trigger(
+                ObserverTrigger(
+                    kind="human_prompt",
+                    reason="The working agent requested human input.",
+                ),
+                context=context,
+            )
+        finally:
+            self._pending_action = None
 
     def action_completed(
         self,
         action: Any,
         observation: WorkflowActionObservation,
-    ) -> None:
+    ) -> ObserverDecision | None:
         self._action_index += 1
         signature = observation.signature or _action_signature(action)
         if signature == self._last_action_signature:
@@ -341,6 +396,7 @@ class ShadowWorkflowObserver:
         self._last_action_signature = signature
         if observation.made_progress:
             self._last_material_progress_action = self._action_index
+            self.state.intervention_pending = False
         self._actions.append(
             ObserverActionSummary(
                 index=self._action_index,
@@ -352,7 +408,7 @@ class ShadowWorkflowObserver:
 
         context = self._safe_context()
         if context is None:
-            return
+            return None
         if (
             self._last_step_id is not None
             and context.current_step_id != self._last_step_id
@@ -399,18 +455,11 @@ class ShadowWorkflowObserver:
                     priority="high",
                 )
 
+        decision: ObserverDecision | None = None
         if diagnostic_trigger is not None:
-            self._trigger(diagnostic_trigger, context=context)
+            decision = self._trigger(diagnostic_trigger, context=context)
 
         action_kind = _action_kind(action)
-        if action_kind in {"prompt_user", "get-human-input"}:
-            self._trigger(
-                ObserverTrigger(
-                    kind="human_prompt",
-                    reason="The working agent requested human input.",
-                ),
-                context=context,
-            )
         if _is_pull_request_creation(action):
             self._trigger(
                 ObserverTrigger(
@@ -427,6 +476,7 @@ class ShadowWorkflowObserver:
                 ),
                 context=context,
             )
+        return decision
 
     def _record_failure(self, action_signature: str | None, error: Exception) -> int:
         self._action_index += 1
@@ -505,7 +555,11 @@ class ShadowWorkflowObserver:
             skill_or_workflow=context.skill_or_workflow,
             current_step_id=context.current_step_id,
             current_step_intent=_compact_text(context.current_step_intent),
-            recent_actions=tuple(self._actions),
+            recent_actions=tuple(
+                (*self._actions, self._pending_action)
+                if self._pending_action is not None
+                else self._actions
+            ),
             recent_failures=tuple(self._failures),
             changed_files=(
                 self._changed_files() if trigger.kind in _SHADOW_LLM_TRIGGERS else ()
@@ -518,6 +572,7 @@ class ShadowWorkflowObserver:
                 repeated_action_count=action_count,
                 repeated_failure_count=failure_count,
             ),
+            prior_decision=self.state.last_decision,
         )
 
     def _trigger(
@@ -525,15 +580,42 @@ class ShadowWorkflowObserver:
         trigger: ObserverTrigger,
         *,
         context: ObserverExecutionContext | None = None,
-    ) -> None:
+    ) -> ObserverDecision | None:
         context = context or self._safe_context()
         if context is None:
-            return
+            return None
         packet = self._packet(trigger, context)
         fingerprint = observer_packet_fingerprint(packet, self.worktree_root)
         if fingerprint == self.state.last_fingerprint:
-            return
+            return None
         should_call = trigger.kind in _SHADOW_LLM_TRIGGERS
+        new_failure_class = (
+            trigger.kind == "repeated_failure"
+            and self._last_failure_signature != self._last_observed_failure_signature
+        )
+        within_cooldown = (
+            self.state.last_observed_action_index is not None
+            and self._action_index - self.state.last_observed_action_index
+            < _OBSERVER_COOLDOWN_ACTIONS
+        )
+        human_review_ready = (
+            trigger.kind == "human_prompt" and self.state.last_decision is not None
+        )
+        if (
+            should_call
+            and within_cooldown
+            and not new_failure_class
+            and not human_review_ready
+        ):
+            return self._record_trigger(
+                context,
+                trigger,
+                fingerprint,
+                packet,
+                decision=None,
+                error=None,
+                llm_invoked=False,
+            )
         decision: ObserverDecision | None = None
         error: Exception | None = None
         if should_call:
@@ -542,11 +624,37 @@ class ShadowWorkflowObserver:
                     self.client.complete_json(build_observer_messages(packet))
                 )
                 self.state.last_decision = decision
+                self.state.intervention_pending = decision.verdict not in {
+                    "continue",
+                    "request_human",
+                }
                 self.state.last_observed_action_index = self._action_index
                 self.state.observation_epoch += 1
+                self._last_observed_failure_signature = self._last_failure_signature
             except Exception as observer_error:  # shadow failures are non-fatal
                 error = observer_error
         self.state.last_fingerprint = fingerprint
+        return self._record_trigger(
+            context,
+            trigger,
+            fingerprint,
+            packet,
+            decision=decision,
+            error=error,
+            llm_invoked=should_call,
+        )
+
+    def _record_trigger(
+        self,
+        context: ObserverExecutionContext,
+        trigger: ObserverTrigger,
+        fingerprint: str,
+        packet: ObserverPacket,
+        *,
+        decision: ObserverDecision | None,
+        error: Exception | None,
+        llm_invoked: bool,
+    ) -> ObserverDecision | None:
         record_workflow_observer_event(
             self.log_root,
             execution_mode=context.execution_mode,
@@ -558,12 +666,13 @@ class ShadowWorkflowObserver:
                 "model": self.model,
                 "provider": self.provider,
                 "shadow_mode": True,
-                "llm_invoked": should_call,
+                "llm_invoked": llm_invoked,
             },
             packet=asdict(packet),
             decision=asdict(decision) if decision is not None else None,
             error=error,
         )
+        return decision
 
     def _log_internal_failure(self, phase: str, error: Exception) -> None:
         record_workflow_observer_event(

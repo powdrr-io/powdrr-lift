@@ -200,3 +200,28 @@ def test_completion_trigger_is_logged_without_calling_observer(tmp_path: Path) -
     )
     assert record["trigger"] == "completion"
     assert record["context"]["llm_invoked"] is False
+
+
+def test_human_prompt_review_can_bypass_cooldown_after_stall_diagnosis(
+    tmp_path: Path,
+) -> None:
+    _git_init(tmp_path)
+    client = _Client(_decision_payload())
+    observer = ShadowWorkflowObserver(
+        client=client,
+        model="high-model",
+        provider="configured-provider",
+        worktree_root=tmp_path,
+        log_root=tmp_path,
+        context_provider=_context,
+    )
+
+    observer.action_failed({"kind": "edit"}, ValueError("invalid edit"))
+    observer.action_failed({"kind": "edit"}, ValueError("invalid edit"))
+    decision = observer.action_proposed(
+        {"kind": "prompt_user", "text": "Which choice should I make?"}
+    )
+
+    assert decision is not None
+    assert decision.verdict == "coach"
+    assert len(client.messages) == 2

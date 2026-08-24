@@ -43,7 +43,6 @@ from powdrr_lift.core.implementation_specification import (
 )
 from powdrr_lift.core.pr_specification import (
     _load_feature_catalog,
-    validate_pr_specification_yaml,
 )
 from powdrr_lift.core.system_specification import validate_system_specification_yaml
 from powdrr_lift.core.workflow_task_specification import (
@@ -5691,7 +5690,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     system_spec_filename = "system-specification.yaml"
     architecture_spec_filename = "architecture-specification.yaml"
     implementation_spec_filename = "implementation-specification.yaml"
-    pr_spec_filename = "proposed-pr-specification.yaml"
     system_goal_description = "Show related photos in the feature view."
     system_grid_description = "Reuse the existing grid layout for related photos."
     system_grid_approach_description = "Render related photos in the existing grid."
@@ -5904,7 +5902,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "id": "rtc-display-related-photos",
                 "description": (
                     "Verify the workflow creates and validates the system, "
-                    "architecture, implementation, and PR specs."
+                    "architecture, and implementation specs."
                 ),
             }
         ],
@@ -6119,7 +6117,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "kind": "complete",
                     "text": "The existing specification already satisfies this review.",
                 }
-            elif 3 <= self._call_index <= 21:
+            elif 3 <= self._call_index <= 17:
                 current_step = cast(dict[str, object], prompt["current_step"])
                 assert prompt["selected_skill"]["name"] == "specify-a-feature"
                 step_id = current_step.get("id")
@@ -6128,7 +6126,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "fill-system-specification",
                     "fill-architecture-specification",
                     "fill-implementation-specification",
-                    "fill-pr-specification",
                 } and not (
                     isinstance(latest_action, dict)
                     and latest_action.get("kind") == "yaml_edit"
@@ -6139,7 +6136,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         system_spec_filename: system_spec_yaml,
                         architecture_spec_filename: architecture_spec_yaml,
                         implementation_spec_filename: implementation_spec_yaml,
-                        pr_spec_filename: pr_spec_yaml,
                     }[Path(file_path).name]
                     generic_response = _full_replace_edit(prompt, yaml_text=yaml_text)
                 elif step_id == "stage-specification-artifacts" and not (
@@ -6148,13 +6144,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ):
                     generic_response = {
                         "kind": "invoke_tool",
-                        "tool": "shell",
+                        "tool": "git",
                         "parameters": {
-                            "command": [
-                                "git",
-                                "add",
-                                "docs/proposals/display-related-photos",
-                            ]
+                            "operation": "add",
+                            "paths": ["docs/proposals/display-related-photos"],
                         },
                     }
                 elif step_id == "stage-specification-artifacts":
@@ -6571,65 +6564,36 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     ),
                 }
             elif self._call_index == 18:
-                prompt = self._assert_execution_prompt(
+                self._assert_execution_prompt(
                     messages,
-                    expected_step_index=13,
-                    expected_step_description=step_descriptions[13],
-                    expected_context_suffix=(
-                        "Implementation step complete; use this spec for PR scope."
-                    ),
+                    expected_step_index=16,
+                    expected_step_description=step_descriptions[16],
+                    expected_context_suffix="Implementation step complete; use this spec for PR scope.",
                     expected_event_count=20,
-                    expected_last_event_kind="deterministic_pre_step",
+                    expected_last_event_kind="gate",
                 )
                 response = {
-                    "kind": "next_step",
-                    "decisions_and_context": "PR template generated; fill it next.",
+                    "kind": "invoke_tool",
+                    "tool": "git",
+                    "parameters": {
+                        "operation": "add",
+                        "paths": ["docs/proposals/display-related-photos"],
+                    },
+                    "decisions_and_context": "Specification artifacts are staged.",
                 }
             elif self._call_index == 19:
-                prompt = self._assert_execution_prompt(
-                    messages,
-                    expected_step_index=14,
-                    expected_step_description=step_descriptions[14],
-                    expected_context_suffix=("PR template generated; fill it next."),
-                    expected_event_count=26,
-                    expected_last_event_kind="next_step",
-                )
-                current_file = cast(dict[str, object], prompt["current_file"])
-                assert current_file["path"] == (f"{system_spec_dir}/{pr_spec_filename}")
-                response = _full_replace_edit(
-                    prompt,
-                    yaml_text=pr_spec_yaml,
-                )
-                response["decisions_and_context"] = (
-                    "PR template filled with acceptance criteria and risks."
-                )
-            elif self._call_index == 20:
                 self._assert_execution_prompt(
                     messages,
-                    expected_step_index=14,
-                    expected_step_description=step_descriptions[14],
-                    expected_context_suffix=(
-                        "PR template filled with acceptance criteria and risks."
-                    ),
-                    expected_event_count=27,
-                    expected_last_event_kind="yaml_edit",
+                    expected_step_index=16,
+                    expected_step_description=step_descriptions[16],
+                    expected_context_suffix="Specification artifacts are staged.",
+                    expected_event_count=21,
+                    expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "next_step",
-                    "decisions_and_context": "PR step complete; handoff is ready.",
-                }
-            elif self._call_index == 21:
-                self._assert_execution_prompt(
-                    messages,
-                    expected_step_index=15,
-                    expected_step_description=step_descriptions[15],
-                    expected_context_suffix="PR step complete; handoff is ready.",
-                    expected_event_count=28,
-                    expected_last_event_kind="deterministic_pre_step",
-                )
-                response = {
-                    "kind": "next_step",
-                    "decisions_and_context": "All specification issues are fixed.",
+                    "kind": "complete",
+                    "text": "Feature specification complete.",
+                    "decisions_and_context": "Specification validation is complete.",
                 }
             elif self._call_index == 22:
                 self._assert_execution_prompt(
@@ -6709,7 +6673,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "system-specification": system_spec_filename,
                 "architecture-specification": architecture_spec_filename,
                 "implementation-specification": implementation_spec_filename,
-                "pr-specification": pr_spec_filename,
             }.get(str(command[1]))
             if generated_name is not None:
                 generated_path = worktree_root / system_spec_dir / generated_name
@@ -6756,21 +6719,19 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     system_path = worktree_root / system_spec_dir / system_spec_filename
     architecture_path = worktree_root / system_spec_dir / architecture_spec_filename
     implementation_path = worktree_root / system_spec_dir / implementation_spec_filename
-    pr_path = worktree_root / system_spec_dir / pr_spec_filename
 
     assert summary_path.exists()
     assert system_path.exists()
     assert architecture_path.exists()
     assert implementation_path.exists()
-    assert pr_path.exists()
 
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["selected_skill_name"] == "specify-a-feature"
     event_kinds = [event["kind"] for event in summary["execution_events"]]
     assert event_kinds[0:2] == ["prompt_user", "next_step"]
     assert event_kinds[-1] == "complete"
-    assert event_kinds.count("yaml_edit") == 4
-    assert event_kinds.count("deterministic_pre_step") >= 9
+    assert event_kinds.count("yaml_edit") == 3
+    assert event_kinds.count("deterministic_pre_step") >= 7
 
     system_report = yaml.safe_load(
         validate_system_specification_yaml(
@@ -6795,18 +6756,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             repo_root=worktree_root,
         )
     )
-    pr_report = yaml.safe_load(
-        validate_pr_specification_yaml(
-            pr_path.read_text(encoding="utf-8"),
-            work_item_name="display-related-photos",
-            repo_root=repo_root,
-        )
-    )
 
     _assert_validation_success(system_report, label="system")
     _assert_validation_success(architecture_report, label="architecture")
     _assert_validation_success(implementation_report, label="implementation")
-    _assert_validation_success(pr_report, label="proposed PR")
     assert "Wrote skill execution summary to" in stdout.getvalue()
     assert "Would you please review the draft result?" not in stdout.getvalue()
 
@@ -7207,6 +7160,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     def _fake_start_subprocess_run(*args: Any, **kwargs: Any) -> Any:
         command = args[0] if args else kwargs.get("args")
+        if isinstance(command, list) and "pr-specification" in command:
+            generated_pr_path = (
+                worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+            )
+            generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+            generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
         if command == [
             "rtk",
             "powdrr-lift",

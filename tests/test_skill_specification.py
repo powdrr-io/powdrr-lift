@@ -193,7 +193,6 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
-                ("specify-a-feature.yaml", 15),
                 ("validate-generated-tests.yaml", 1),
             }
             expected_gate_steps = {
@@ -205,7 +204,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 5),
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
-                ("specify-a-feature.yaml", 17),
+                ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
             }
@@ -647,14 +646,10 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "evaluate",
         "docs/proposals/<work-item-name>/implementation-specification.yaml",
     ]
-    assert step("generate-pr-specification").step_type == "invoke_tool"
-    assert command("generate-pr-specification") == [
-        "powdrr-lift",
-        "pr-specification",
-        "--work-item-name",
-        "<work-item-name>",
-    ]
-    assert step("fill-pr-specification").tool_invocations == ()
+    assert all(
+        candidate not in {item.id for item in skill.steps}
+        for candidate in ("generate-pr-specification", "fill-pr-specification")
+    )
     assert command("evaluate-feature-specifications") == [
         "powdrr-lift",
         "evaluate",

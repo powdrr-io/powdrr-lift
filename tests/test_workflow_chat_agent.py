@@ -1457,6 +1457,7 @@ def test_textual_response_grows_and_submits_on_return(
 
     def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
         kwargs["stdout"].write("What do you want to do? ")
+        kwargs["stdout"].flush()
         received.append(kwargs["input_func"]())
         if len(received) == 1:
             skill_path = Path("skill-definitions/bootstrap-code-structure.yaml")
@@ -1576,6 +1577,7 @@ def test_textual_startup_shows_initial_question(
 ) -> None:
     def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
         kwargs["stdout"].write("What do you want to do? ")
+        kwargs["stdout"].flush()
         kwargs["input_func"]()
         return 1
 

@@ -5702,6 +5702,8 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
     assert any(
         record["phase"] == "action_validation_or_execution"
         and record["attempted_action"]["kind"] == "invoke_tool"
+        and record["context"]["replay_state"]["transcript"]
+        and record["context"]["prompt_builder_version"] == 1
         for record in error_records
     )
 

@@ -148,22 +148,18 @@ def test_full_workflow_run_does_not_select_a_single_task() -> None:
     assert "--task-id" not in command
 
 
-def test_harness_defaults_to_the_checked_in_workflow_without_instantiation() -> None:
+def test_discover_workflow_dir_finds_the_only_runnable_workflow(
+    tmp_path: Path,
+) -> None:
     module = _harness_module()
+    workflow_dir = tmp_path / "docs" / "workflows" / "available"
+    workflow_dir.mkdir(parents=True)
+    workflow = WorkflowInstance.create(workflow_dir, (_task(),))
+    workflow_document = workflow_dir / "available-workflow.yaml"
+    workflow_document.write_text("workflow: available\n", encoding="utf-8")
 
-    assert module.DEFAULT_WORKFLOW_DIR == Path("docs/workflows/interaction-file-log")
-    args = SimpleNamespace(provider="auto", max_roundtrips=None, verbose=False)
-    command = module._build_task_command(
-        repo_root=Path("."),
-        workflow_dir=module.DEFAULT_WORKFLOW_DIR,
-        task=None,
-        args=args,
-    )
-
-    assert command[command.index("--workflow-dir") + 1] == str(
-        module.DEFAULT_WORKFLOW_DIR
-    )
-    assert "instantiate-workflow" not in command
+    assert module._discover_workflow_dir(tmp_path) == workflow.directory
+    assert module._workflow_document(workflow.directory) == workflow_document
 
 
 def test_repair_command_timeout_kills_the_process_group(tmp_path: Path) -> None:

@@ -4,28 +4,10 @@ when_to_use:
 - When generated tests must be classified before product implementation begins.
 - When unexpected test failures require edits followed by deterministic reruns.
 steps:
-- id: classify-generated-tests
-  description: Classify the deterministic generated-test result.
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    Inspect the latest deterministic test result in the execution events and
-    the generated-test diff's explicit expected-failure ledger. A failure is
-    expected only when the test path and test name match a ledger entry and the
-    observed assertion/error is consistent with that entry's expected failure
-    reason. Treat every unlisted test, missing expected failure, syntax/import
-    error, fixture/setup error, assertion mismatch, or unexpected passing test
-    as unexpected. If every result matches the ledger, return complete with the
-    exact command, return code, expected failure flag, and failure details. If
-    any result is unexpected, edit only the generated test files to correct that
-    cause, then return next_step. The edit target must be an existing generated
-    test path under tests/; do not edit product code, fixtures, configuration,
-    documentation, dependencies, or any other file. Never hide an unexpected
-    failure by weakening or deleting a test.
-- id: rerun-generated-tests
-  description: Rerun generated tests after a repair.
+- id: run-generated-tests
+  description: Run the generated tests before classification.
   step_type: invoke_tool
-  llm_type: fast_iteration
+  llm_type: simple_task
   pre_step:
     action: invoke_tool
     template:
@@ -37,11 +19,49 @@ steps:
       - dev
       - pytest
       - -q
+- id: classify-generated-tests
+  description: Classify the deterministic generated-test result.
+  step_type: freeform
+  llm_type: high_reasoning
   details: >-
-    The deterministic test command has rerun after a generated-test repair.
-    Assign its complete result to the latest test result context and return
-    next_step so the classification step can decide whether another bounded
-    repair is needed.
+    Inspect the latest deterministic test result and the generated-test diff's
+    explicit expected-failure ledger. A failure is expected only when the test
+    path and test name match a ledger entry and the observed assertion/error is
+    consistent with that entry's expected failure reason. Treat every unlisted
+    test, missing expected failure, syntax/import error, fixture/setup error,
+    assertion mismatch, or unexpected passing test as unexpected. If every
+    result matches the ledger, complete this skill with the exact command,
+    return code, expected failure flag, and failure details. If any result is
+    unexpected, edit only the generated test files to correct that cause and
+    return goto_step to rerun-generated-tests. The edit target must be an
+    existing generated test path under tests/; do not edit product code,
+    fixtures, configuration, documentation, dependencies, or any other file.
+    Never hide an unexpected failure by weakening or deleting a test.
+- id: rerun-generated-tests
+  description: Rerun generated tests after a repair and route back to classification.
+  step_type: gate
+  llm_type: simple_task
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - uv
+      - run
+      - --extra
+      - dev
+      - pytest
+      - -q
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: classify-generated-tests
+    retry_context: >-
+      The generated tests were rerun. A nonzero return code may represent the
+      explicitly expected unimplemented behavior; classify the complete result
+      against the ledger. Repair only an unexpected result in the generated test
+      files, then return to this rerun gate.
 - id: finish-generated-test-validation
   description: Finish with an expected failing generated-test result.
   step_type: freeform

@@ -174,7 +174,6 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
-                ("execute-proposed-pr.yaml", 3),
                 ("execute-proposed-pr.yaml", 5),
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 8),
@@ -193,7 +192,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
-                ("validate-generated-tests.yaml", 1),
+                ("validate-generated-tests.yaml", 0),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -205,6 +204,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
                 ("specify-a-feature.yaml", 15),
+                ("validate-generated-tests.yaml", 2),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
             }

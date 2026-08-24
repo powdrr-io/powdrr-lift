@@ -80,11 +80,9 @@ task_templates:
     implementation work, and record exact paths and validation commands in the
     plan. Do not edit files, run commands, or call gather_context in this step.
     If a required decision is missing, use one prompt_user action instead of
-    inventing it. When the planning sub-step is complete, first return exactly
-    this next_step shape:
-    {"action":"next_step","decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
-    On the following roundtrip, return complete with the plan in
-    output_state.execution_plan, using the declared handoff shape.
+    inventing it. When the plan is complete, return exactly this complete shape,
+    replacing the example execution_plan with the ordered plan:
+    {"action":"complete","output_state":{"detailed-execution-plan-state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}}},"decisions_and_context":"Created the ordered plan and mapped each acceptance criterion to validation."}
   output_state_type: detailed-execution-plan-state
   dependent_state:
   - execution-plan-created
@@ -112,7 +110,7 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Run the generated tests before implementation
-  step_type: invoke_tool
+  step_type: freeform
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -123,24 +121,11 @@ task_templates:
     generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
     expected_test_failures: <upstream-task-2>.generated-test-diffs-state
     test_results: []
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
   details: >-
-    Invoke validate-generated-tests with the deterministic test result and the
-    explicit expected-test-failure ledger from generated-test-diffs-state. The
-    ledger must contain each expected test path, test name, and failure reason;
-    an unlisted or materially different failure is unexpected. The nested skill
-    owns classification and the bounded repair/rerun loop for malformed tests,
-    fixture errors, unexpected failures, and setup failures. Do not modify
+    Invoke validate-generated-tests with the explicit expected-test-failure
+    ledger from generated-test-diffs-state. The nested skill runs the initial
+    test command, classifies the result, edits only generated test files when
+    needed, and uses its rerun gate until the result is valid. Do not modify
     product code in this task. After it reports an expected result, complete
     this task with output_state.tests-proven-failing-state containing the exact
     command, return code, expected-failure flag, and failure details.

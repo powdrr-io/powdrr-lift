@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from powdrr_lift.core import (
     AssigneeType,
@@ -35,7 +35,6 @@ from powdrr_lift.workflow_git import (
 DEFAULT_ERROR_LOG = Path("workflow-llm-errors.jsonl")
 DEFAULT_TRANSCRIPT_DIR = Path("workflow-task-harness")
 DEFAULT_REPORT = Path("workflow-task-harness-report.json")
-DEFAULT_WORKFLOW_DIR = Path("docs/workflows/interaction-file-log")
 _FAILURE_MARKERS = (
     "action failed",
     "validation_error",
@@ -52,10 +51,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workflow-dir",
         type=Path,
-        default=DEFAULT_WORKFLOW_DIR,
+        default=None,
         help=(
-            "Directory containing the existing workflow task documents "
-            f"(default: {DEFAULT_WORKFLOW_DIR})."
+            "Directory containing an existing workflow task document set. If "
+            "omitted, discover the available workflow under docs/workflows."
         ),
     )
     parser.add_argument(
@@ -339,6 +338,40 @@ def _infer_template(repo_root: Path, workflow_dir: Path) -> Path:
     )
 
 
+def _workflow_document(workflow_dir: Path) -> Path:
+    documents = sorted(workflow_dir.glob("*-workflow.yaml"))
+    if len(documents) != 1:
+        raise SystemExit(
+            f"Expected exactly one workflow document in {workflow_dir}; found: "
+            + (", ".join(str(path.name) for path in documents) or "none")
+        )
+    return documents[0]
+
+
+def _discover_workflow_dir(repo_root: Path) -> Path:
+    workflow_root = repo_root / "docs" / "workflows"
+    candidates: list[Path] = []
+    for workflow_document in sorted(workflow_root.rglob("*-workflow.yaml")):
+        workflow_dir = workflow_document.parent
+        try:
+            workflow = WorkflowInstance.from_directory(workflow_dir)
+        except (OSError, ValueError, TypeError):
+            continue
+        if workflow.tasks:
+            candidates.append(workflow_dir)
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise SystemExit(
+            f"No runnable workflow found under {workflow_root}. "
+            "Pass --workflow-dir explicitly."
+        )
+    raise SystemExit(
+        "Multiple runnable workflows found; pass --workflow-dir explicitly: "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
 def _create_run_worktree(repo_root: Path) -> Path:
     run_root = Path(
         tempfile.mkdtemp(
@@ -501,7 +534,7 @@ def _run_iteration(
                     pass
                 break
             if ready:
-                chunk = process.stdout.read1(65536)
+                chunk = cast(Any, process.stdout).read1(65536)
                 if not chunk:
                     selector.unregister(process.stdout)
                     break
@@ -526,7 +559,7 @@ def _run_iteration(
         if process.poll() is None:
             process.wait()
         while process.stdout is not None:
-            chunk = process.stdout.read1(65536)
+            chunk = cast(Any, process.stdout).read1(65536)
             if not chunk:
                 break
             output = _text_output(chunk)
@@ -666,7 +699,9 @@ def main() -> int:
         raise SystemExit("--iterations must be positive")
     repo_root = args.repo_root.resolve()
     source_workflow_dir = args.workflow_dir
-    if not source_workflow_dir.is_absolute():
+    if source_workflow_dir is None:
+        source_workflow_dir = _discover_workflow_dir(repo_root)
+    elif not source_workflow_dir.is_absolute():
         source_workflow_dir = repo_root / source_workflow_dir
     source_template_path = args.template_path
     if source_template_path is not None and not source_template_path.is_absolute():
@@ -676,9 +711,9 @@ def main() -> int:
     if isolated:
         run_root = _create_run_worktree(repo_root)
     try:
-        workflow_dir = args.workflow_dir
-        if not workflow_dir.is_absolute():
-            workflow_dir = run_root / workflow_dir
+        workflow_dir = source_workflow_dir
+        if isolated:
+            workflow_dir = run_root / source_workflow_dir.relative_to(repo_root)
         if isolated:
             _mirror_repair_changes(
                 repo_root,
@@ -694,7 +729,7 @@ def main() -> int:
             # This harness executes an existing durable workflow. It must not
             # infer or instantiate a template as part of the run. Keep the
             # workflow document available as context for optional repair hooks.
-            template_path = workflow_dir / "interaction-file-log-core-workflow.yaml"
+            template_path = _workflow_document(workflow_dir)
         if not template_path.is_file():
             raise SystemExit(f"Workflow template does not exist: {template_path}")
 

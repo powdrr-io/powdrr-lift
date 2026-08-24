@@ -137,6 +137,33 @@ def test_workflow_template_validation_accepts_generation_and_dependencies() -> N
     }
 
 
+def test_workflow_template_validation_rejects_skill_and_pre_step_together() -> None:
+    report = build_workflow_template_validation_report(
+        json.dumps(
+            {
+                "when_to_use": ["When a workflow invokes a nested skill."],
+                "how_to_fill_this_out": ["Declare the nested skill."],
+                "task_templates": [
+                    {
+                        "description": "Run the nested validation skill.",
+                        "step_type": "freeform",
+                        "uses_skills": ["validate-generated-tests"],
+                        "pre_step": {
+                            "action": "invoke_tool",
+                            "template": {"tool": "shell", "command": ["true"]},
+                        },
+                    }
+                ],
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    issue_codes = [issue.code for issue in report.issues]
+    assert "uses_skills_with_pre_step" in issue_codes
+    assert "unexpected_pre_step" in issue_codes
+
+
 def test_workflow_template_validation_rejects_unknown_generation_target() -> None:
     json_text = json.dumps(
         {
@@ -359,7 +386,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         ("agent", "reviewer"),
     ]
     assert template.task_templates[0].tool_invocations == ()
-    invoke_tool_indexes = (0, 3, 5, 7, 8, 10, 13, 14, 15, 18, 19)
+    invoke_tool_indexes = (0, 5, 7, 8, 10, 13, 14, 15, 18, 19)
     assert [
         index
         for index, task in enumerate(template.task_templates)
@@ -396,15 +423,12 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[20].input_state["staged_changes"] == (
         "<upstream-task-19>.staged-pull-request-state"
     )
-    assert template.task_templates[3].pre_step is not None
-    assert template.task_templates[3].pre_step.template["command"] == [
-        "uv",
-        "run",
-        "--extra",
-        "dev",
-        "pytest",
-        "-q",
-    ]
+    assert template.task_templates[3].uses_skills == ("validate-generated-tests",)
+    assert template.task_templates[3].pre_step is None
+    plan_details = template.task_templates[1].details or ""
+    assert '"action":"complete"' in plan_details
+    assert '"action":"next_step"' not in plan_details
+    assert '"detailed-execution-plan-state"' in plan_details
     assert build_workflow_template_validation_report(
         template.to_json()
     ).validation_successful

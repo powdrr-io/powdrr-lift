@@ -196,15 +196,16 @@ class WorkflowChatApp(App[None]):
         display: none;
         border: round $warning;
         padding: 0 1;
+        overflow-y: hidden;
     }
     #steps.has-content {
         display: block;
     }
     #workflow-panels {
         width: 100%;
-        height: 10;
-        max-height: 10;
-        min-height: 5;
+        height: 12;
+        max-height: 12;
+        min-height: 12;
     }
     #files {
         width: 1fr;

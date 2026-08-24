@@ -105,6 +105,7 @@ from powdrr_lift.workflow_llm import (
     workflow_action_summary,
 )
 from powdrr_lift.workflow_observer import (
+    ObserverDecision,
     ObserverExecutionContext,
     ShadowWorkflowObserver,
     compact_observer_mapping,
@@ -283,6 +284,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     events: list[dict[str, Any]]
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
+    observer_intervention: str | None = None
+    observer_rejected_action_signature: str | None = None
 
     def next_request(self) -> WorkflowActionRequest:
         while True:
@@ -294,6 +297,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 skill_catalog=self.skill_catalog,
                 response_correction=self.response_correction,
                 compacted_context=self.compacted_context,
+                observer_intervention=self.observer_intervention,
             )
             limits = _model_limits_for(self.mapping_provider, self.model)
             estimated_input_tokens = _estimate_message_tokens(messages)
@@ -487,6 +491,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None
+        if workflow_action_signature(action) == self.observer_rejected_action_signature:
+            raise RuntimeError(
+                "The observer rejected this exact action after it failed to "
+                "make progress. Choose a materially different action."
+            )
         if action.kind == "gather_context":
             report = gather_specification_context(
                 self.repo_root,
@@ -630,6 +639,45 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         if action.kind == "get-human-input":
             return self._handoff(action.human_input or {}, "human input required by")
         raise RuntimeError(f"Unsupported workflow task action: {action.kind}")
+
+    def apply_observer_decision(
+        self,
+        decision: ObserverDecision,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation | None,
+    ) -> bool:
+        """Apply advisory coaching to the next durable-task request."""
+        if decision.verdict in {"continue", "request_human"}:
+            return False
+        guidance = [f"Reason: {decision.reason}", *decision.guidance]
+        if decision.expected_progress:
+            guidance.append(f"Evidence expected: {decision.expected_progress}")
+        self.observer_intervention = "Observer intervention\n" + "\n".join(
+            f"- {item}" for item in guidance
+        )
+        if decision.verdict == "redirect" and decision.target_step_id:
+            self.observer_intervention += (
+                "\n- Redirect ignored: durable workflow tasks do not expose "
+                "skill step ids."
+            )
+        self.observer_rejected_action_signature = workflow_action_signature(action)
+        self.events.append(
+            {
+                "kind": "observer_intervention",
+                "verdict": decision.verdict,
+                "reason": decision.reason,
+                "target_step_id": decision.target_step_id,
+                "action": json.loads(workflow_action_signature(action)),
+                "material_progress": (
+                    observation.made_progress if observation is not None else None
+                ),
+            }
+        )
+        return observation is None
+
+    def clear_observer_intervention(self) -> None:
+        self.observer_intervention = None
+        self.observer_rejected_action_signature = None
 
     def _handoff(
         self, human_input: dict[str, Any], reason_prefix: str
@@ -1659,6 +1707,7 @@ def _build_task_messages(
     response_correction: str | None = None,
     compacted_context: dict[str, Any] | None = None,
     skill_catalog: tuple[SkillCatalogEntry, ...] = (),
+    observer_intervention: str | None = None,
 ) -> list[dict[str, str]]:
     resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
     context_data: dict[str, Any]
@@ -1697,6 +1746,11 @@ def _build_task_messages(
                     **context_data,
                     "step_context": (
                         [response_correction] if response_correction is not None else []
+                    ),
+                    **(
+                        {"observer_intervention": observer_intervention}
+                        if observer_intervention is not None
+                        else {}
                     ),
                     "workflow_dir": workflow_dir,
                     "workflow_files": _workflow_file_names(workflow.directory),

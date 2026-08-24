@@ -281,6 +281,10 @@ def test_execution_driver_never_crashes_when_observer_fails() -> None:
         def action_failed(self, action: Any, error: Exception) -> None:
             raise RuntimeError("observer failed") from error
 
+        def action_proposed(self, action: Any) -> None:
+            _ = action
+            raise RuntimeError("observer failed")
+
         def action_completed(
             self,
             action: Any,

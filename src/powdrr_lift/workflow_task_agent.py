@@ -83,6 +83,7 @@ from powdrr_lift.workflow_git import (
     claim_workflow_task,
     create_workflow_worktree,
     load_workflow_git_state,
+    slugify_workflow_id,
     validate_workflow_git_state,
     workflow_dependencies_completion,
     workflow_id_from_task_id,
@@ -183,6 +184,7 @@ class WorkflowTaskAgentConfig:
     workflow_dir: Path
     repo_root: Path = Path(".")
     provider: str = "auto"
+    workflow_id: str | None = None
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
@@ -200,6 +202,23 @@ def _context_compaction_threshold(context_window: int, fraction: float) -> int:
             "context_compaction_threshold must be greater than 0 and at most 1."
         )
     return max(1, int(context_window * fraction))
+
+
+def _select_workflow_instance(
+    workflow: WorkflowInstance,
+    workflow_id: str | None,
+) -> WorkflowInstance:
+    if workflow_id is None:
+        return workflow
+    prefix = f"{slugify_workflow_id(workflow_id)}-task-"
+    return WorkflowInstance(
+        workflow.directory,
+        {
+            task.task_id: task
+            for task in workflow.tasks
+            if task.task_id.startswith(prefix)
+        },
+    )
 
 
 @dataclass(slots=True)
@@ -925,11 +944,15 @@ def run_workflow_task(
     configured_repo_root = resolve_repo_root(config.repo_root)
     configured_workflow_dir = config.workflow_dir.resolve()
     try:
-        configured_workflow = WorkflowInstance.from_directory(configured_workflow_dir)
+        configured_workflow = _select_workflow_instance(
+            WorkflowInstance.from_directory(configured_workflow_dir),
+            config.workflow_id,
+        )
         configured_task = _select_task(configured_workflow, config.task_id)
         configured_workflow_id = workflow_id_from_task_id(
             configured_task.task_id if configured_task is not None else ""
         )
+        configured_workflow_id = config.workflow_id or configured_workflow_id
         configured_git_state = load_workflow_git_state(
             configured_workflow_dir,
             workflow_id=configured_workflow_id,
@@ -973,7 +996,10 @@ def run_workflow_task(
         repo_root / "skill-definitions",
         stderr=stderr,
     )
-    workflow = WorkflowInstance.from_directory(workflow_dir)
+    workflow = _select_workflow_instance(
+        WorkflowInstance.from_directory(workflow_dir),
+        configured_workflow_id,
+    )
     requested_task_id = config.task_id
     client_was_provided = client is not None
     dump_root = _resolve_project_root(
@@ -1226,7 +1252,10 @@ def run_workflow_task(
             )
         if exit_code != 0:
             return exit_code
-        workflow = WorkflowInstance.from_directory(workflow_dir)
+        workflow = _select_workflow_instance(
+            WorkflowInstance.from_directory(workflow_dir),
+            configured_workflow_id,
+        )
 
 
 def _select_task(

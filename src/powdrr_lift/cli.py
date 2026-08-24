@@ -1106,6 +1106,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root used as the working directory for task tools.",
     )
     process_workflow_task_parser.add_argument(
+        "--workflow-id",
+        help=(
+            "Workflow/proposed-PR id to select when the directory contains "
+            "multiple workflows."
+        ),
+    )
+    process_workflow_task_parser.add_argument(
         "--provider",
         choices=["auto", *ALL_PROVIDERS],
         default="auto",
@@ -1443,6 +1450,7 @@ def _run_process_workflow_task(args: argparse.Namespace) -> int:
             workflow_dir=workflow_dir,
             repo_root=repo_root,
             provider=args.provider,
+            workflow_id=args.workflow_id,
             task_id=args.task_id,
             api_key=args.api_key,
             base_url=args.base_url,

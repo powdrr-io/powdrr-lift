@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -160,6 +161,37 @@ def test_discover_workflow_dir_finds_the_only_runnable_workflow(
 
     assert module._discover_workflow_dir(tmp_path) == workflow.directory
     assert module._workflow_document(workflow.directory) == workflow_document
+
+
+def test_workflow_id_selects_one_workflow_from_a_shared_directory(
+    tmp_path: Path,
+) -> None:
+    module = _harness_module()
+    workflow_dir = tmp_path / "docs" / "workflows" / "interaction-file-log"
+    writer_task = _task()
+    writer_task = replace(
+        writer_task,
+        task_id="interaction-file-log-writer-task-001",
+    )
+    tool_task = replace(
+        writer_task,
+        task_id="interaction-file-log-tool-task-001",
+    )
+    workflow = WorkflowInstance.create(workflow_dir, (writer_task, tool_task))
+    (workflow_dir / "interaction-file-log-writer-workflow.yaml").write_text(
+        "workflow: writer\n", encoding="utf-8"
+    )
+    (workflow_dir / "interaction-file-log-tool-workflow.yaml").write_text(
+        "workflow: tool\n", encoding="utf-8"
+    )
+
+    assert module._workflow_document(
+        workflow_dir, "interaction-file-log-writer"
+    ).name == ("interaction-file-log-writer-workflow.yaml")
+    assert (
+        module._discover_workflow_dir(tmp_path, "interaction-file-log-tool")
+        == workflow.directory
+    )
 
 
 def test_repair_command_timeout_kills_the_process_group(tmp_path: Path) -> None:

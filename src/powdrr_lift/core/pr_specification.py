@@ -23,6 +23,18 @@ _IMPLEMENTATION_SPECIFICATION_DIRS = (
     PROPOSALS_ROOT,
     Path("docs") / "specs",
 )
+_EFFECT_SECTIONS = (
+    "entities",
+    "modules",
+    "tools",
+    "entity_relationships",
+    "features",
+    "decisions",
+)
+_EFFECT_SOURCE_FILES = (
+    "architecture-specification.yaml",
+    "implementation-specification.yaml",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +60,7 @@ class _FeatureCatalogEntry:
 
 @dataclass(frozen=True, slots=True)
 class ProposedPRSearchResult:
-    pr_number: int
+    pr_number: int | None
     proposed_pr_id: str | None
     path: Path
     score: float
@@ -66,7 +78,7 @@ class ProposedPRSearchReport:
 
 @dataclass(frozen=True, slots=True)
 class _ProposedPRDocument:
-    pr_number: int
+    pr_number: int | None
     path: Path
     data: Mapping[str, Any]
     proposed_pr_id: str | None
@@ -110,15 +122,20 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "# PR specification template.",
         "#",
         "# Instructions:",
-        "# - Create one template per proposed PR.",
-        "# - Set `id` to a globally unique proposed PR id.",
-        "# - List prerequisite proposed PR ids under `dependent_prs`; use [] when",
-        "#   this proposed PR has no prerequisites.",
-        "# - Every dependent_prs id must identify an existing proposed PR, and",
-        "#   dependency cycles are not allowed.",
+        "# - Keep every proposed PR for this feature in this one file.",
+        "# - Set the top-level `id` to the feature/work-item id.",
+        "# - Add one ordered entry under `proposed_prs` for each proposed PR.",
+        "# - Set each proposed PR `id` to a globally unique proposed PR id.",
+        "# - List prerequisite proposed PR ids under each entry's `dependent_prs`.",
+        "# - Dependency ids must identify another entry in this same file; cycles",
+        "#   are not allowed.",
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
-        "# - Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`.",
+        "# - Fill in each proposed PR's intent and acceptance details.",
+        "# - In each proposed PR's `changes`, record every action-bearing id from",
+        "#   the v1 architecture and implementation specifications exactly once",
+        "#   in execution order. The combined ordered effects must match those",
+        "#   v1 files exactly; do not omit or invent an id/action pair.",
         "# - Delete these instructions and replace them with this comment at the top:",
         '#   "# This file is read-only and should never be edited by a tool or agent."',
         "# - Add acceptance criteria, expected tests, expected outcomes,",
@@ -128,32 +145,25 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "#",
         "# Current feature ids:",
         *feature_lines,
-        "schema: https://powdrr.io/schemas/specification-v1",
+        "schema: https://powdrr.io/schemas/proposed-pr-specification-v2",
         "id: null",
-        "dependent_prs: []",
         "feature_ids:",
         "  - null",
-        "intent:",
-        "  goal: null",
-        "  reasoning: null",
-        "acceptance_criteria:",
+        "proposed_prs:",
         "  - id: null",
-        "    description: null",
-        "expected_tests:",
-        "  - id: null",
-        "    description: null",
-        "required_test_cases:",
-        "  - id: null",
-        "    description: null",
-        "expected_outcomes:",
-        "  - id: null",
-        "    description: null",
-        "non_goals:",
-        "  - id: null",
-        "    description: null",
-        "risks:",
-        "  - id: null",
-        "    description: null",
+        "    dependent_prs: []",
+        "    intent:",
+        "      problem: null",
+        "      goal: null",
+        "      reasoning: null",
+        "    changes:",
+        *[f"      {section}: []" for section in _EFFECT_SECTIONS],
+        "    acceptance_criteria: []",
+        "    expected_tests: []",
+        "    required_test_cases: []",
+        "    expected_outcomes: []",
+        "    non_goals: []",
+        "    risks: []",
         "",
     ]
     return "\n".join(lines)
@@ -244,7 +254,11 @@ def search_proposed_pr_specifications(
             _score_proposed_pr_document(normalized_query, document)
             for document in documents
         ),
-        key=lambda result: (-result.score, result.pr_number, result.path.name),
+        key=lambda result: (
+            -result.score,
+            result.pr_number if result.pr_number is not None else float("inf"),
+            result.path.name,
+        ),
     )
     filtered_results = [result for result in results if result.score > 0.0][:limit]
     return ProposedPRSearchReport(query=normalized_query, results=filtered_results)
@@ -311,6 +325,18 @@ def build_pr_specification_validation_report(
         proposed_pr_specification_yaml,
         issues=issues,
     )
+
+    if "proposed_prs" in raw_spec:
+        return _build_multi_proposed_pr_validation_report(
+            raw_spec,
+            proposed_pr_specification_yaml=proposed_pr_specification_yaml,
+            work_item_name=work_item_name,
+            repo_root=repo_root_path,
+            file_path=file_path,
+            available_feature_ids=available_feature_ids,
+            known_pr_ids=known_pr_ids,
+            issues=issues,
+        )
 
     seen_detail_ids: set[str] = set()
 
@@ -427,6 +453,310 @@ def build_pr_specification_validation_report(
     )
 
 
+def _build_multi_proposed_pr_validation_report(
+    raw_spec: Mapping[str, Any],
+    *,
+    proposed_pr_specification_yaml: str,
+    work_item_name: str,
+    repo_root: Path,
+    file_path: str | Path | None,
+    available_feature_ids: list[str],
+    known_pr_ids: list[str],
+    issues: list[PRSpecificationValidationIssue],
+) -> PRSpecificationValidationReport:
+    _required_string(
+        raw_spec.get("id"),
+        path="id",
+        issues=issues,
+        issue_code="feature_id_missing",
+        issue_message="The unified proposed PR file requires a top-level id.",
+    )
+    _collect_feature_ids(
+        _coerce_sequence(
+            raw_spec.get("feature_ids"),
+            path="feature_ids",
+            issues=issues,
+            issue_code="invalid_feature_ids_section",
+            issue_message="feature_ids must be a list of feature id strings.",
+        ),
+        available_feature_ids=set(available_feature_ids),
+        issues=issues,
+    )
+    raw_prs = _coerce_sequence(
+        raw_spec.get("proposed_prs"),
+        path="proposed_prs",
+        issues=issues,
+        issue_code="invalid_proposed_prs_section",
+        issue_message="proposed_prs must be a list of proposed PR mappings.",
+    )
+    entries: list[Mapping[str, Any]] = []
+    ids: dict[str, str] = {}
+    for index, raw_pr in enumerate(raw_prs):
+        if not isinstance(raw_pr, Mapping):
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "invalid_proposed_pr_entry",
+                    "Each proposed_prs entry must be a mapping.",
+                    f"proposed_prs[{index}]",
+                )
+            )
+            continue
+        pr_id = _required_string(
+            raw_pr.get("id"),
+            path=f"proposed_prs[{index}].id",
+            issues=issues,
+            issue_code="proposed_pr_id_missing",
+            issue_message="Each proposed PR requires an id.",
+        )
+        if pr_id is not None:
+            normalized = _normalize_identifier(pr_id)
+            if normalized in ids:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "duplicate_proposed_pr_id",
+                        f"Proposed PR id {pr_id!r} is duplicated.",
+                        f"proposed_prs[{index}].id",
+                    )
+                )
+            ids[normalized] = pr_id
+        entries.append(raw_pr)
+
+    graph: dict[str, tuple[str, ...]] = {}
+    for index, entry in enumerate(entries):
+        pr_id = _optional_string(entry.get("id"))
+        if pr_id is None:
+            continue
+        dependencies = _collect_dependent_pr_ids(
+            entry.get("dependent_prs", []),
+            proposed_pr_id=pr_id,
+            known_pr_ids=tuple(ids.values()),
+            issues=issues,
+        )
+        graph[pr_id] = dependencies
+        _validate_multi_pr_details(entry, index=index, issues=issues)
+    _validate_dependency_graph(graph, issues=issues)
+    _validate_v1_effect_equivalence(
+        entries,
+        repo_root=repo_root,
+        work_item_name=work_item_name,
+        file_path=file_path,
+        issues=issues,
+    )
+    return PRSpecificationValidationReport(
+        validation_successful=not issues,
+        proposed_pr_id=None,
+        available_feature_ids=available_feature_ids,
+        known_pr_ids=known_pr_ids,
+        issues=issues,
+    )
+
+
+def _validate_multi_pr_details(
+    entry: Mapping[str, Any],
+    *,
+    index: int,
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    intent = entry.get("intent")
+    if not isinstance(intent, Mapping):
+        issues.append(
+            PRSpecificationValidationIssue(
+                "intent_missing",
+                "Each proposed PR must include an intent mapping.",
+                f"proposed_prs[{index}].intent",
+            )
+        )
+    else:
+        for field in ("problem", "goal", "reasoning"):
+            _required_string(
+                intent.get(field),
+                path=f"proposed_prs[{index}].intent.{field}",
+                issues=issues,
+                issue_code=f"intent_{field}_missing",
+                issue_message=f"The intent.{field} field is required.",
+            )
+    seen_detail_ids: set[str] = set()
+    for section in (
+        "acceptance_criteria",
+        "expected_tests",
+        "required_test_cases",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+    ):
+        _collect_detail_items(
+            _coerce_sequence(
+                entry.get(section, []),
+                path=f"proposed_prs[{index}].{section}",
+                issues=issues,
+                issue_code=f"invalid_{section}_section",
+                issue_message=f"{section} must be a list of detail items.",
+            ),
+            section_name=f"proposed_prs[{index}].{section}",
+            seen_ids=seen_detail_ids,
+            issues=issues,
+        )
+    changes = entry.get("changes")
+    if not isinstance(changes, Mapping):
+        issues.append(
+            PRSpecificationValidationIssue(
+                "changes_missing",
+                "Each proposed PR must include a changes mapping.",
+                f"proposed_prs[{index}].changes",
+            )
+        )
+    elif changes is not None:
+        for section in _EFFECT_SECTIONS:
+            raw_items = changes.get(section, [])
+            if not isinstance(raw_items, Sequence) or isinstance(
+                raw_items, (str, bytes)
+            ):
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "invalid_changes_section",
+                        f"changes.{section} must be a list.",
+                        f"proposed_prs[{index}].changes.{section}",
+                    )
+                )
+                continue
+            for item_index, item in enumerate(raw_items):
+                if not isinstance(item, Mapping):
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "invalid_change_item",
+                            "Each change must be a mapping with id and action.",
+                            f"proposed_prs[{index}].changes.{section}[{item_index}]",
+                        )
+                    )
+                    continue
+                _required_string(
+                    item.get("id"),
+                    path=f"proposed_prs[{index}].changes.{section}[{item_index}].id",
+                    issues=issues,
+                    issue_code="change_id_missing",
+                    issue_message="Each change must include an id.",
+                )
+                action = _optional_string(item.get("action"))
+                if action not in {"added", "removed", "changed"}:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "invalid_change_action",
+                            "Each change action must be added, removed, or changed.",
+                            f"proposed_prs[{index}].changes.{section}[{item_index}].action",
+                        )
+                    )
+
+
+def _validate_dependency_graph(
+    graph: Mapping[str, Sequence[str]],
+    *,
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node: str, path: tuple[str, ...]) -> None:
+        normalized = _normalize_identifier(node)
+        if normalized in visiting:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "proposed_pr_dependency_cycle",
+                    "Proposed PR dependency cycle detected: "
+                    f"{' -> '.join((*path, node))}.",
+                    "proposed_prs",
+                )
+            )
+            return
+        if normalized in visited:
+            return
+        visiting.add(normalized)
+        for dependency in graph.get(node, ()):
+            visit(dependency, (*path, node))
+        visiting.remove(normalized)
+        visited.add(normalized)
+
+    for node in graph:
+        visit(node, ())
+
+
+def _validate_v1_effect_equivalence(
+    entries: Sequence[Mapping[str, Any]],
+    *,
+    repo_root: Path,
+    work_item_name: str,
+    file_path: str | Path | None,
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    proposal_dir = (
+        Path(file_path).resolve().parent
+        if file_path is not None
+        else repo_root / PROPOSALS_ROOT / work_item_name
+    )
+    source_effects: dict[str, list[tuple[str, str]]] = {
+        section: [] for section in _EFFECT_SECTIONS
+    }
+    found_source = False
+    for filename in _EFFECT_SOURCE_FILES:
+        path = proposal_dir / filename
+        if not path.is_file():
+            continue
+        found_source = True
+        try:
+            data = _load_yaml_mapping(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "invalid_effect_source",
+                    f"Could not read v1 effect source: {exc}",
+                    str(path),
+                )
+            )
+            continue
+        for section in _EFFECT_SECTIONS:
+            raw_items = data.get(section, [])
+            if not isinstance(raw_items, Sequence) or isinstance(
+                raw_items, (str, bytes)
+            ):
+                continue
+            for item in raw_items:
+                if isinstance(item, Mapping):
+                    item_id = _optional_string(item.get("id"))
+                    action = _optional_string(item.get("action"))
+                    if item_id is not None and action is not None:
+                        source_effects[section].append((item_id, action))
+    if not found_source:
+        return
+    proposed_effects: dict[str, list[tuple[str, str]]] = {
+        section: [] for section in _EFFECT_SECTIONS
+    }
+    for entry in entries:
+        changes = entry.get("changes")
+        if not isinstance(changes, Mapping):
+            continue
+        for section in _EFFECT_SECTIONS:
+            raw_items = changes.get(section, [])
+            if not isinstance(raw_items, Sequence) or isinstance(
+                raw_items, (str, bytes)
+            ):
+                continue
+            for item in raw_items:
+                if isinstance(item, Mapping):
+                    item_id = _optional_string(item.get("id"))
+                    action = _optional_string(item.get("action"))
+                    if item_id is not None and action is not None:
+                        proposed_effects[section].append((item_id, action))
+    for section in _EFFECT_SECTIONS:
+        if proposed_effects[section] != source_effects[section]:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "v1_effect_mismatch",
+                    f"Proposed PR changes for {section} do not match the ordered "
+                    "id/action effects in the v1 specification files.",
+                    f"proposed_prs.changes.{section}",
+                )
+            )
+
+
 def _collect_dependent_pr_ids(
     raw_value: object,
     *,
@@ -510,20 +840,28 @@ def load_proposed_pr_dependency_graph(
             )
         except Exception:  # noqa: BLE001
             continue
-        proposed_pr_id = _optional_string(raw_spec.get("id"))
-        if proposed_pr_id is None:
-            continue
-        raw_dependencies = raw_spec.get("dependent_prs", [])
-        if not isinstance(raw_dependencies, Sequence) or isinstance(
-            raw_dependencies, (str, bytes)
-        ):
-            continue
-        dependencies = tuple(
-            dependency.strip()
-            for dependency in raw_dependencies
-            if isinstance(dependency, str) and dependency.strip()
+        nested_prs = raw_spec.get("proposed_prs")
+        records = (
+            [item for item in nested_prs if isinstance(item, Mapping)]
+            if isinstance(nested_prs, Sequence)
+            and not isinstance(nested_prs, (str, bytes))
+            else [raw_spec]
         )
-        graph[proposed_pr_id] = dependencies
+        for record in records:
+            proposed_pr_id = _optional_string(record.get("id"))
+            if proposed_pr_id is None:
+                continue
+            raw_dependencies = record.get("dependent_prs", [])
+            if not isinstance(raw_dependencies, Sequence) or isinstance(
+                raw_dependencies, (str, bytes)
+            ):
+                continue
+            dependencies = tuple(
+                dependency.strip()
+                for dependency in raw_dependencies
+                if isinstance(dependency, str) and dependency.strip()
+            )
+            graph[proposed_pr_id] = dependencies
     return graph
 
 
@@ -663,16 +1001,25 @@ def _load_existing_pr_ids(
             continue
 
         proposed_pr_id = _optional_string(raw_spec.get("id"))
-        if proposed_pr_id is None:
-            continue
-
-        normalized_proposed_pr_id = _normalize_identifier(proposed_pr_id)
-
-        if normalized_proposed_pr_id in seen_ids:
-            continue
-
-        seen_ids.add(normalized_proposed_pr_id)
-        pr_ids.append(proposed_pr_id)
+        nested_prs = raw_spec.get("proposed_prs")
+        candidate_ids = (
+            [
+                _optional_string(item.get("id"))
+                for item in nested_prs
+                if isinstance(item, Mapping)
+            ]
+            if isinstance(nested_prs, Sequence)
+            and not isinstance(nested_prs, (str, bytes))
+            else [proposed_pr_id]
+        )
+        for candidate_id in candidate_ids:
+            if candidate_id is None:
+                continue
+            normalized_proposed_pr_id = _normalize_identifier(candidate_id)
+            if normalized_proposed_pr_id in seen_ids:
+                continue
+            seen_ids.add(normalized_proposed_pr_id)
+            pr_ids.append(candidate_id)
 
     return pr_ids
 
@@ -681,8 +1028,6 @@ def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
     documents: list[_ProposedPRDocument] = []
     for specification_path in _iter_proposed_pr_specification_paths(repo_root):
         pr_number = _parse_proposed_pr_number(specification_path)
-        if pr_number is None:
-            continue
 
         try:
             raw_spec = _load_yaml_mapping(
@@ -691,41 +1036,53 @@ def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
         except Exception:  # noqa: BLE001
             continue
 
-        proposed_pr_id = _optional_string(raw_spec.get("id"))
-        feature_ids = tuple(
-            feature_id
-            for feature_id in (
-                _optional_string(raw_feature_id)
-                for raw_feature_id in _coerce_sequence(
-                    raw_spec.get("feature_ids"),
-                    path=f"{specification_path}#feature_ids",
-                    issues=[],
-                    issue_code="invalid_feature_ids_section",
-                    issue_message="",
+        nested_prs = raw_spec.get("proposed_prs")
+        records = (
+            [item for item in nested_prs if isinstance(item, Mapping)]
+            if isinstance(nested_prs, Sequence)
+            and not isinstance(nested_prs, (str, bytes))
+            else [raw_spec]
+        )
+        top_level_feature_ids = raw_spec.get("feature_ids")
+        for record in records:
+            proposed_pr_id = _optional_string(record.get("id"))
+            feature_values = record.get("feature_ids", top_level_feature_ids)
+            feature_ids = tuple(
+                feature_id
+                for feature_id in (
+                    _optional_string(raw_feature_id)
+                    for raw_feature_id in _coerce_sequence(
+                        feature_values,
+                        path=f"{specification_path}#feature_ids",
+                        issues=[],
+                        issue_code="invalid_feature_ids_section",
+                        issue_message="",
+                    )
+                )
+                if feature_id is not None
+            )
+            intent = _coerce_mapping(
+                record.get("intent"),
+                path=f"{specification_path}#intent",
+                issues=[],
+                issue_code="invalid_intent_section",
+                issue_message="",
+            )
+            documents.append(
+                _ProposedPRDocument(
+                    pr_number=pr_number,
+                    path=specification_path,
+                    data=record,
+                    proposed_pr_id=proposed_pr_id,
+                    feature_ids=feature_ids,
+                    intent_goal=_optional_string(intent.get("goal"))
+                    if intent
+                    else None,
+                    intent_reasoning=(
+                        _optional_string(intent.get("reasoning")) if intent else None
+                    ),
                 )
             )
-            if feature_id is not None
-        )
-        intent = _coerce_mapping(
-            raw_spec.get("intent"),
-            path=f"{specification_path}#intent",
-            issues=[],
-            issue_code="invalid_intent_section",
-            issue_message="",
-        )
-        intent_goal = _optional_string(intent.get("goal")) if intent else None
-        intent_reasoning = _optional_string(intent.get("reasoning")) if intent else None
-        documents.append(
-            _ProposedPRDocument(
-                pr_number=pr_number,
-                path=specification_path,
-                data=raw_spec,
-                proposed_pr_id=proposed_pr_id,
-                feature_ids=feature_ids,
-                intent_goal=intent_goal,
-                intent_reasoning=intent_reasoning,
-            )
-        )
 
     return documents
 

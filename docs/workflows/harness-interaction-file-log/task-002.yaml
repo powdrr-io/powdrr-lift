@@ -1,12 +1,14 @@
 task_id: task-002
-status: open
+status: locked
 upstream_task_ids:
 - task-001
 dependent_state:
 - execution-plan-created
 complexity: high
 input_state:
-  proposed_pr_context: task-001.proposed-pr-context-state
+  proposed_pr_context:
+    proposed-pr-context-state: Proposed PR 'harness-debug' for feature 'harness-interaction-file-log'
+      context gathered via deterministic pre-step.
   execution_plan: []
 assignee_type: agent
 assignee_role: architect

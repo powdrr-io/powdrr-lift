@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -111,6 +112,13 @@ from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     render_skill_prompt_snapshots,
+)
+from powdrr_lift.workflow_error_analysis import (
+    WorkflowErrorAnalysisError,
+    cluster_workflow_errors,
+    load_workflow_error_records,
+    promote_replay_candidates,
+    workflow_error_analysis_data,
 )
 from powdrr_lift.workflow_git import (
     WorkflowGitState,
@@ -1057,6 +1065,30 @@ def build_parser() -> argparse.ArgumentParser:
     prompt_snapshot_parser.add_argument("--output-dir", required=True, type=Path)
     prompt_snapshot_parser.add_argument("--repo-root", type=Path)
     prompt_snapshot_parser.set_defaults(func=_run_render_workflow_prompts)
+
+    error_analysis_parser = subparsers.add_parser(
+        "analyze-workflow-errors",
+        aliases=["analyze_workflow_errors"],
+        help="Cluster workflow LLM errors and optionally promote replay candidates.",
+    )
+    error_analysis_parser.add_argument(
+        "--error-log",
+        type=Path,
+        action="append",
+        required=True,
+        help="Workflow LLM error JSONL file; repeat to analyze multiple logs.",
+    )
+    error_analysis_parser.add_argument("--repo-root", type=Path)
+    error_analysis_parser.add_argument(
+        "--replay-output-dir",
+        type=Path,
+        help="Optional destination for representative draft replay bundles.",
+    )
+    error_analysis_parser.add_argument(
+        "--limit", type=int, help="Maximum ranked clusters to promote."
+    )
+    error_analysis_parser.add_argument("--json", action="store_true")
+    error_analysis_parser.set_defaults(func=_run_analyze_workflow_errors)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -2884,6 +2916,50 @@ def _run_render_workflow_prompts(args: argparse.Namespace) -> int:
     )
     for path in paths:
         print(path)
+    return 0
+
+
+def _run_analyze_workflow_errors(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    error_paths = tuple(
+        path if path.is_absolute() else repo_root / path for path in args.error_log
+    )
+    try:
+        records = load_workflow_error_records(error_paths)
+        clusters = cluster_workflow_errors(records)
+        candidates: Sequence[Mapping[str, Any]] = ()
+        if args.replay_output_dir is not None:
+            output_dir = (
+                args.replay_output_dir
+                if args.replay_output_dir.is_absolute()
+                else repo_root / args.replay_output_dir
+            )
+            candidates = promote_replay_candidates(
+                clusters,
+                repo_root=repo_root,
+                output_dir=output_dir,
+                limit=args.limit,
+            )
+    except WorkflowErrorAnalysisError as exc:
+        print(f"Workflow error analysis failed: {exc}", file=sys.stderr)
+        return 1
+    data = workflow_error_analysis_data(
+        clusters, record_count=len(records), candidates=candidates
+    )
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(f"Workflow errors: {len(records)} records in {len(clusters)} clusters")
+        for cluster in clusters:
+            location = " / ".join(
+                value
+                for value in (cluster.skill_or_task, cluster.step, cluster.action)
+                if value
+            )
+            print(
+                f"{cluster.count}x (rank {cluster.rank}) {location or '<unknown>'}: "
+                f"{cluster.error_summary or cluster.error_type or 'unknown error'}"
+            )
     return 0
 
 

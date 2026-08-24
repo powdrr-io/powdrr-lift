@@ -13,7 +13,7 @@ from typing import Any, TextIO, cast
 from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import ScrollableContainer
+from textual.containers import Horizontal, ScrollableContainer
 from textual.events import Key, Resize
 from textual.widgets import Label, ListItem, ListView, TextArea
 
@@ -187,9 +187,9 @@ class WorkflowChatApp(App[None]):
         layout: vertical;
     }
     #steps {
-        width: 100%;
-        height: auto;
-        min-height: 0;
+        width: 1fr;
+        height: 100%;
+        min-height: 5;
         display: none;
         border: round $warning;
         padding: 0 1;
@@ -197,11 +197,22 @@ class WorkflowChatApp(App[None]):
     #steps.has-content {
         display: block;
     }
-    #status-container {
+    #workflow-panels {
         width: 100%;
         height: 1fr;
-        max-height: 1fr;
-        min-height: 0;
+        min-height: 5;
+    }
+    #files {
+        width: 1fr;
+        height: 100%;
+        min-height: 5;
+        border: round $warning;
+        padding: 0 1;
+    }
+    #status-container {
+        width: 100%;
+        height: 2fr;
+        min-height: 6;
         border: round $success;
         padding: 0 1;
         overflow-y: scroll;
@@ -250,6 +261,7 @@ class WorkflowChatApp(App[None]):
         self._current_status = _POWDRR_AGENT_BANNER
         self._initial_prompt_visible = False
         self._active_skill_path: tuple[str, ...] = ()
+        self._added_files: list[str] = []
 
     def compose(self) -> ComposeResult:
         yield ScrollableContainer(
@@ -262,7 +274,11 @@ class WorkflowChatApp(App[None]):
             ),
             id="status-container",
         )
-        yield ListView(id="steps")
+        yield Horizontal(
+            ListView(id="steps"),
+            ListView(id="files"),
+            id="workflow-panels",
+        )
         yield _WorkflowResponseTextArea(
             placeholder="Press Return to submit; multiline text is supported",
             id="response",
@@ -271,6 +287,7 @@ class WorkflowChatApp(App[None]):
 
     def on_mount(self) -> None:
         self._response = self.query_one("#response", TextArea)
+        self.query_one("#files", ListView).border_title = "Files added to git"
         self.query_one("#status-container", ScrollableContainer).can_focus = True
         self.query_one("#steps", ListView).can_focus = True
         # Paint the initial state before starting any repository or LLM work.
@@ -356,6 +373,10 @@ class WorkflowChatApp(App[None]):
         steps = self.query_one("#steps", ListView)
         if steps.has_focus_within:
             labels = [item.query_one(Label) for item in steps.query(ListItem)]
+            return "\n".join(str(label.render()) for label in labels)
+        files = self.query_one("#files", ListView)
+        if files.has_focus_within:
+            labels = [item.query_one(Label) for item in files.query(ListItem)]
             return "\n".join(str(label.render()) for label in labels)
         return None
 
@@ -468,6 +489,7 @@ class WorkflowChatApp(App[None]):
                     stdout=cast(TextIO, stdout),
                     stderr=cast(TextIO, stderr),
                     progress_callback=self._progress_update,
+                    file_added_callback=self._files_added,
                 )
             except Exception as exc:  # pragma: no cover - defensive UI boundary
                 message = str(exc).strip() or "<exception had no message>"
@@ -490,6 +512,19 @@ class WorkflowChatApp(App[None]):
         answer = self._answers.get()
         self._request_submitted.clear()
         return answer
+
+    def _files_added(self, paths: tuple[str, ...]) -> None:
+        self.call_from_thread(self._record_added_files, paths)
+
+    def _record_added_files(self, paths: tuple[str, ...]) -> None:
+        files = self.query_one("#files", ListView)
+        new_paths = [path for path in paths if path not in self._added_files]
+        if not new_paths:
+            return
+        self._added_files.extend(new_paths)
+        files.mount(*(ListItem(Label(path)) for path in new_paths))
+        files.scroll_end(animate=False)
+        files.call_after_refresh(files.scroll_end, animate=False)
 
     def _progress_update(
         self,

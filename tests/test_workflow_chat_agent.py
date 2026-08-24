@@ -1685,6 +1685,7 @@ def test_textual_files_panel_preserves_add_order_without_duplicates() -> None:
         async with app.run_test() as pilot:
             app._record_added_files(("docs/first.yaml", "src/first.py"))
             app._record_added_files(("docs/first.yaml", "tests/first.py"))
+            app._record_added_files(("./docs/first.yaml",))
             await pilot.pause()
             return [
                 str(label.render())
@@ -1717,7 +1718,7 @@ def test_textual_files_panel_limits_retained_history() -> None:
 
 
 def test_textual_orange_panels_share_the_width() -> None:
-    async def exercise() -> tuple[int, int]:
+    async def exercise() -> tuple[int, int, int]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
@@ -1727,9 +1728,10 @@ def test_textual_orange_panels_share_the_width() -> None:
             return (
                 app.query_one("#steps", ListView).region.width,
                 app.query_one("#files", ListView).region.width,
+                app.query_one("#workflow-panels").region.height,
             )
 
-    assert asyncio.run(exercise()) == (40, 40)
+    assert asyncio.run(exercise()) == (40, 40, 10)
 
 
 def test_textual_panels_place_green_output_above_orange_steps() -> None:

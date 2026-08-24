@@ -4735,6 +4735,13 @@ def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
     return None
 
 
+def _worktree_relative_path(path: Path, worktree_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(worktree_root.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def _workflow_step_requires_pull_request(step: Any) -> bool:
     return any(
         tuple(invocation.command[:3]) == ("gh", "pr", "create")
@@ -4813,6 +4820,13 @@ def _handle_workflow_action_edit(
     for target_path, updated_text in pending_writes:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         target_path.write_text(updated_text, encoding="utf-8")
+    if state.file_added_callback is not None:
+        state.file_added_callback(
+            tuple(
+                _worktree_relative_path(target_path, state.worktree_root)
+                for target_path, _updated_text in pending_writes
+            )
+        )
     state.fuzzy_match_cache.clear()
 
     if action.decisions_and_context:
@@ -4886,6 +4900,10 @@ def _handle_workflow_action_yaml_edit(
     )
     _validate_structured_document_text(target_path, updated_text)
     target_path.write_text(updated_text, encoding="utf-8")
+    if state.file_added_callback is not None:
+        state.file_added_callback(
+            (_worktree_relative_path(target_path, state.worktree_root),)
+        )
     state.fuzzy_match_cache.clear()
 
     if action.decisions_and_context:
@@ -4948,6 +4966,11 @@ def _handle_workflow_action_file_management(
         file_path=action.file_path,
         destination_path=action.destination_path,
     )
+    if state.file_added_callback is not None:
+        changed_paths = [action.file_path]
+        if action.destination_path is not None:
+            changed_paths.append(action.destination_path)
+        state.file_added_callback(tuple(changed_paths))
     if action.decisions_and_context:
         _record_durable_fact(
             state,

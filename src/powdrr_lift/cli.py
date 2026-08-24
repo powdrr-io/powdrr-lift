@@ -121,6 +121,10 @@ from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     render_skill_prompt_snapshots,
 )
+from powdrr_lift.workflow_definition_comparison import (
+    WorkflowComparisonError,
+    compare_workflow_definitions,
+)
 from powdrr_lift.workflow_error_analysis import (
     WorkflowErrorAnalysisError,
     cluster_workflow_errors,
@@ -1119,6 +1123,38 @@ def build_parser() -> argparse.ArgumentParser:
     ambiguity_review_parser.add_argument("--base-url")
     ambiguity_review_parser.add_argument("--json", action="store_true")
     ambiguity_review_parser.set_defaults(func=_run_review_workflow_ambiguity)
+
+    comparison_parser = subparsers.add_parser(
+        "compare-workflow-definitions",
+        aliases=["compare_workflow_definitions"],
+        help=(
+            "Compare explicit deterministic replay and scenario cases against a "
+            "baseline Git ref."
+        ),
+    )
+    comparison_parser.add_argument(
+        "--baseline-ref", required=True, help="Git ref containing the baseline."
+    )
+    comparison_parser.add_argument(
+        "--replay",
+        type=Path,
+        action="append",
+        help="Replay bundle to run on both baseline and candidate; repeatable.",
+    )
+    comparison_parser.add_argument(
+        "--scenario",
+        type=Path,
+        action="append",
+        help="Scripted scenario to run on both baseline and candidate; repeatable.",
+    )
+    comparison_parser.add_argument("--repo-root", type=Path)
+    comparison_parser.add_argument("--max-roundtrip-increase", type=int, default=0)
+    comparison_parser.add_argument("--max-prompt-user-increase", type=int, default=0)
+    comparison_parser.add_argument(
+        "--max-repeated-action-increase", type=int, default=0
+    )
+    comparison_parser.add_argument("--json", action="store_true")
+    comparison_parser.set_defaults(func=_run_compare_workflow_definitions)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -3035,6 +3071,39 @@ def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
             if values:
                 print(f"{field}: {', '.join(values)}")
     return 0
+
+
+def _run_compare_workflow_definitions(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    thresholds = {
+        "roundtrips": args.max_roundtrip_increase,
+        "prompt_user_actions": args.max_prompt_user_increase,
+        "repeated_actions": args.max_repeated_action_increase,
+    }
+    try:
+        report = compare_workflow_definitions(
+            repo_root=repo_root,
+            baseline_ref=args.baseline_ref,
+            replay_paths=args.replay or (),
+            scenario_paths=args.scenario or (),
+            thresholds=thresholds,
+        )
+    except WorkflowComparisonError as exc:
+        print(f"Workflow comparison failed: {exc}", file=sys.stderr)
+        return 1
+    data = report.to_data()
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(
+            f"Workflow comparison against {report.baseline_ref}: "
+            f"{'passed' if report.passed else 'regressed'}"
+        )
+        for item in report.regressions:
+            print(f"Regression: {item}", file=sys.stderr)
+        for item in report.improvements:
+            print(f"Improvement: {item}")
+    return 0 if report.passed else 1
 
 
 def _read_llm_exchange(path: Path) -> object:

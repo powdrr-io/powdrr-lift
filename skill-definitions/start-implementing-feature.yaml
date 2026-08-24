@@ -197,8 +197,9 @@ steps:
     intent, justification, and dependent_prs. In the feature-wide
     specification-v1 sections, list every entity/module/tool/relationship/
     feature/decision change exactly once and label it with a declared
-    proposed_pr_id. Do not put change lists inside individual proposed PR
-    entries.
+    proposed_pr_id. Keep the generated id/action pairs exactly as provided by
+    the authoritative proposal specs; only fill proposed_pr_id. Do not put
+    change lists inside individual proposed PR entries.
     Remove generator
     instructions and instructional comments. Do not leave null, empty, example,
     or TODO values in required fields. Use yaml_edit for all YAML changes in

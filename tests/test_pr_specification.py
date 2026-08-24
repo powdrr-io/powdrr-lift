@@ -126,6 +126,18 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
     assert output_path == (
         tmp_path / "docs" / "proposals" / "PR-456" / "proposed-pr-specification.yaml"
     )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    (output_path.parent / "implementation-specification.yaml").write_text(
+        """
+        entities:
+          - id: generated-entity
+            action: added
+        modules:
+          - id: removed-module
+            action: removed
+        """,
+        encoding="utf-8",
+    )
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
@@ -163,6 +175,11 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         "Fill in each proposed PR's intent, justification, and dependencies."
         in template_text
     )
+    assert "id: generated-entity" in template_text
+    assert "action: added" in template_text
+    assert "id: removed-module" in template_text
+    assert "action: removed" in template_text
+    assert "proposed_pr_id: null" in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
@@ -262,6 +279,51 @@ def test_unified_proposed_pr_dependency_graph_is_loaded_from_one_file(
     assert pr_specification_module.load_proposed_pr_dependency_graph(tmp_path) == {
         "feature-a-core": (),
         "feature-a-docs": ("feature-a-core",),
+    }
+
+
+def test_unified_proposed_pr_rejects_unlabeled_or_mismatched_effects(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposal_dir = tmp_path / "docs" / "proposals" / "feature-a"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "implementation-specification.yaml").write_text(
+        """
+        features:
+          - id: feature-a
+            action: added
+        """,
+        encoding="utf-8",
+    )
+    report = build_pr_specification_validation_report(
+        """
+        schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+        id: feature-a
+        feature_ids: [feature-a]
+        proposed_prs:
+          - id: feature-a-core
+            intent: Add the feature.
+            justification: It is required.
+            dependent_prs: []
+        features:
+          - id: feature-a
+            action: removed
+            proposed_pr_id: missing-pr
+        entities: []
+        modules: []
+        tools: []
+        entity_relationships: []
+        decisions: []
+        """,
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=proposal_dir / "proposed-pr-specification.yaml",
+    )
+    assert report.validation_successful is False
+    assert {issue.code for issue in report.issues} >= {
+        "unknown_proposed_pr_id",
+        "v1_effect_mismatch",
     }
 
 

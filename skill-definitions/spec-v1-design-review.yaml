@@ -1,0 +1,262 @@
+---
+name: spec-v1-design-review
+interaction_style: observational_review
+when_to_use:
+- When the user asks for a design review of a pull request containing spec v1
+  feature or proposed-PR documents.
+- When the review must compare the proposed design with the user's intent before
+  implementation begins.
+- When actionable design findings must be reported directly on GitHub as inline
+  pull-request comments.
+steps:
+- id: discover-design-scope
+  description: Discover the pull request and establish the authoritative design scope.
+  step_type: freeform
+  llm_type: long_context
+  details: >-
+    Inspect the referenced pull request's title, body, linked issues, labels,
+    commits, complete diff, changed files, base and head revisions, review
+    history, and current state. Read every changed design document and identify
+    the feature id, spec v1 document, proposed PR ids, dependencies, entity
+    changes, requirements, decisions, risks, and acceptance criteria. Resolve
+    the user's intent from explicit user or issue text first, then the feature
+    definition and related authoritative documents. Treat the spec v1 document
+    as the proposed design being reviewed, not as proof that the intent is
+    correct. If intent, feature linkage, or the target spec cannot be resolved,
+    record one clarification finding and do not invent missing scope.
+  prompt_catalogs: [context_types]
+  tool_invocations:
+  - tool: gh
+    command:
+    - pr
+    - view
+    - <pr-reference>
+    - --json
+    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
+  - tool: gh
+    command:
+    - pr
+    - diff
+    - <pr-reference>
+    - --patch
+- id: gather-design-context
+  description: Gather the repository context needed to review the proposed design.
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    After identifying the feature id, invoke gather_context with exactly the
+    relevant spec v1 context types: features, requirements, entities,
+    entity-relationships, invariants, decisions, risks, guidance, and
+    proposed_prs, filtered by the feature id. Use the returned records to
+    establish the current entity model, existing constraints, proposed-PR
+    ordering, and documented intent. Keep the returned context and the source
+    paths in the review ledger. Do not treat absent context as permission to
+    assume behavior; record it as an uncertainty for the clarification review.
+- id: review-user-intent
+  description: Ask whether the design properly captures the user's intent.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Compare every stated user goal, constraint, non-goal, and acceptance
+    criterion with the proposed feature and proposed PR changes. Trace each
+    intent item to the exact design section, entity change, relationship,
+    dependency, or proposed PR that addresses it. Identify omissions,
+    contradictions, accidental reinterpretations, and scope that solves a
+    different problem. Record one finding per root cause with the source,
+    changed-file anchor, user impact, confidence, and a concise correction.
+    Do not report a preference when the design satisfies the stated intent.
+- id: review-assumptions
+  description: Ask whether the design contains assumptions requiring clarification.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Inspect the design for unstated assumptions about actors, inputs, entity
+    identity, lifecycle, ownership, ordering, defaults, failure behavior,
+    permissions, consistency, external systems, deployment, and backward
+    compatibility. Report an assumption only when different reasonable answers
+    would change the design, implementation, acceptance criteria, or risk. Ask
+    a precise clarification question and explain which design decision is
+    blocked. Do not turn ordinary implementation choices into questions.
+- id: review-traceability-and-completeness
+  description: Ask whether the spec v1 design is complete and internally traceable.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Build a matrix for every requirement, entity id, entity relationship,
+    invariant, proposed PR, dependency, and acceptance criterion. Confirm that
+    each is declared once where authoritative, assigned to a valid proposed PR,
+    represented consistently across sections, and covered by an observable
+    outcome. Check that every entity change is explicitly added or removed as
+    required by spec v1, every proposed PR id is defined before it is referenced,
+    dependencies are acyclic and ordered, and no change is orphaned. Report
+    missing, duplicated, contradictory, cyclic, or unassigned entries with
+    exact paths and a focused fix direction.
+- id: review-existing-mechanisms
+  description: Ask whether existing repository mechanisms can implement the design.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Search the codebase, architecture documents, dependencies, and established
+    patterns for existing APIs, entities, stores, workflows, validation,
+    authorization, events, serializers, configuration, error handling, and
+    observability that satisfy part of the design. Compare each proposed new
+    mechanism with concrete existing evidence. Report a finding when the design
+    duplicates or bypasses an existing mechanism without a documented capability
+    gap, including the reuse or integration direction. Keep a new mechanism
+    when the design demonstrates a real gap or a necessary boundary.
+- id: review-refactoring-opportunities
+  description: Ask whether an existing area should be refactored first.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Identify existing seams where a small, well-scoped refactor would make the
+    feature simpler, safer, or more testable: duplicated logic, an unsuitable
+    ownership boundary, a missing extension point, tangled dependencies, or an
+    API that forces special cases. Recommend refactoring only when the current
+    design would create duplication, violate an invariant, or make correctness
+    materially harder to achieve. Separate a prerequisite refactor from an
+    optional cleanup and do not expand the feature for stylistic reasons.
+- id: review-unnecessary-scope
+  description: Ask whether the design includes unnecessary changes.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Map every proposed entity, relationship, requirement, proposed PR, migration,
+    and documentation change to an explicit user goal, constraint, dependency,
+    safety requirement, or necessary implementation consequence. Identify changes
+    that do not contribute to the feature, duplicate another change, speculate
+    about future needs, or belong in a separate feature. Explain the cost or risk
+    and propose the smallest removal that preserves the intent.
+- id: review-security
+  description: Ask whether security concerns are addressed by the design.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Threat-model new trust boundaries, actors, inputs, outputs, data stores,
+    external integrations, and privileged operations. Check authentication,
+    authorization and ownership, tenant isolation, injection and parser safety,
+    secrets, privacy, data exposure, replay, abuse limits, auditability, secure
+    defaults, and failure behavior. Require a design-level mitigation or an
+    explicit out-of-scope decision for a plausible security risk. Report only
+    evidence-backed risks with an attack path, impact, and concrete design or
+    validation change.
+- id: review-performance
+  description: Ask whether performance and scale concerns are addressed.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Evaluate expected data size, request rate, fan-out, latency, memory, I/O,
+    concurrency, retries, queueing, indexing, pagination, caching, and external
+    service limits. Look for unbounded work, N+1 access, hot locks, duplicate
+    computation, synchronous calls on critical paths, and retry storms. Require
+    a bound, measurement, capacity assumption, or deliberate tradeoff when the
+    risk is material. Do not report performance concerns without a plausible
+    workload or a concrete design consequence.
+- id: review-entity-lifecycle
+  description: Ask whether entity lifecycle and removals are correct.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    For every existing entity touched by the feature, determine whether it is
+    still needed, whether an existing entity should be removed or retired, and
+    whether relationships, references, persistence, migrations, fixtures,
+    permissions, and documentation are updated consistently. Check creation,
+    update, deletion, archival, replacement, ownership transfer, and recovery
+    semantics. Report stale entities, missing removals, orphaned relationships,
+    or incompatible lifecycle transitions with exact spec v1 paths.
+- id: review-dependencies-and-delivery
+  description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Validate that each proposed PR has a distinct intent and justification,
+    depends only on needed earlier work, and can be implemented and reviewed in
+    the declared order. Reject self-dependencies, cycles, hidden dependencies,
+    overly broad PRs, and plans that require a later PR to make an earlier PR
+    valid. Check that each proposed PR has a demonstrable completion boundary,
+    compatible intermediate state, and appropriate validation. Report the
+    smallest split, reorder, or dependency clarification that fixes the plan.
+- id: review-compatibility-and-failure-modes
+  description: Ask whether compatibility, migration, and failure behavior are designed.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Review rollout, migration, versioning, backward and forward compatibility,
+    partial deployment, retries, idempotency, cancellation, timeouts, rollback,
+    partial failure, invalid data, and recovery. Check whether intermediate
+    proposed PRs leave the system valid and whether the design states what users
+    observe when dependencies are unavailable. Report missing behavior only when
+    it can cause data loss, outages, inconsistent state, or an unclear release
+    path.
+- id: review-testability-and-operability
+  description: Ask whether the design can be validated and operated safely.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Determine whether requirements have observable acceptance tests and whether
+    the design identifies unit, integration, migration, negative, boundary, and
+    regression coverage where appropriate. Check observability, metrics, logs,
+    traces, alerts, dashboards, runbooks, feature flags, and operational ownership
+    for new failure modes. Report missing evidence or operational controls when
+    they are necessary to distinguish success from silent corruption or outage.
+- id: prepare-and-post-findings
+  description: Post every actionable design finding as an inline PR comment.
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    Consolidate findings from every question by root cause and discard
+    duplicates, subjective preferences, pre-existing issues, and unsupported
+    speculation. Check existing unresolved and resolved review threads before
+    posting. Post each retained finding directly to the referenced PR as an
+    inline comment anchored to the smallest relevant changed line in the spec v1
+    document or related changed file on the RIGHT side of the current head SHA.
+    Each comment must identify the review question, cite the exact design path
+    or evidence, explain the user or implementation risk, and give a focused
+    correction or clarification question. If the issue has no exact line, anchor
+    it to the nearest relevant changed line and state the actual path in the
+    body. Do not post a general summary instead of inline findings. Do not
+    approve, merge, close, label, or modify the pull request.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --paginate
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --method
+    - POST
+    - -f
+    - body=<finding>
+    - -f
+    - commit_id=<current-head-sha>
+    - -f
+    - path=<changed-file>
+    - -F
+    - line=<changed-line>
+    - -f
+    - side=RIGHT
+- id: verify-review
+  description: Verify the review comments and report the design audit.
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: >-
+    Re-read the target PR's inline comments and verify every intended finding is
+    attached to the current head SHA, a changed file, and the intended line.
+    Report the PR, authoritative intent sources, spec v1 documents examined,
+    proposed-PR and entity matrix counts, questions reviewed, findings rejected
+    as speculative or duplicate, and comments posted. If no actionable findings
+    remain, report zero findings and the evidence checked. If GitHub write access
+    or inline anchoring fails, report the exact prepared finding and posting
+    failure; never claim it was posted. Never merge the PR or resolve threads.
+  tool_invocations:
+  - tool: shell
+    command:
+    - gh
+    - api
+    - repos/<owner>/<repo>/pulls/<number>/comments
+    - --paginate

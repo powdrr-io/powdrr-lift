@@ -177,6 +177,47 @@ def test_claim_workflow_task_is_an_atomic_git_ref(tmp_path: Path) -> None:
         claim_workflow_task(tmp_path, state, "task-001")
 
 
+def test_claim_workflow_task_reports_ref_creation_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+    _, integration_branch = create_workflow_worktree(tmp_path, "feature-18")
+    state = WorkflowGitState(
+        proposed_pr_id="feature-18",
+        base_branch="main",
+        integration_branch=integration_branch,
+        workflow_relative_directory="docs/workflows/feature-18",
+    )
+    original_git = workflow_git._git
+
+    def failing_claim_git(
+        repo_root: Path, arguments: list[str]
+    ) -> subprocess.CompletedProcess[str]:
+        if arguments[:2] == ["update-ref", "refs/agents/claims/feature-18/task-001"]:
+            return subprocess.CompletedProcess(
+                arguments,
+                1,
+                stdout="",
+                stderr="permission denied",
+            )
+        if arguments[:3] == ["show-ref", "--verify", "--quiet"]:
+            return subprocess.CompletedProcess(arguments, 1, stdout="", stderr="")
+        return original_git(repo_root, arguments)
+
+    monkeypatch.setattr(workflow_git, "_git", failing_claim_git)
+
+    with pytest.raises(
+        RuntimeError, match="could not create task claim.*permission denied"
+    ):
+        claim_workflow_task(tmp_path, state, "task-001")
+
+
 def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) -> None:
     _git(tmp_path, "init", "-b", "main")
     _git(tmp_path, "config", "user.email", "test@example.com")

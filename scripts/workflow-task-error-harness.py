@@ -29,6 +29,7 @@ from powdrr_lift.workflow_git import (
     load_workflow_git_state,
     resolve_git_repository_root,
     slugify_workflow_id,
+    workflow_dependencies_completion,
     workflow_worktree_path,
 )
 
@@ -55,6 +56,13 @@ def _parse_args() -> argparse.Namespace:
         help=(
             "Directory containing an existing workflow task document set. If "
             "omitted, discover the available workflow under docs/workflows."
+        ),
+    )
+    parser.add_argument(
+        "--workflow-id",
+        help=(
+            "Proposed PR/workflow id to select when a directory contains more "
+            "than one workflow document."
         ),
     )
     parser.add_argument(
@@ -166,8 +174,31 @@ def _task_path(workflow_dir: Path, task: WorkflowTask) -> Path:
     raise SystemExit(f"Could not locate durable document for task {task.task_id!r}.")
 
 
-def _select_task(workflow_dir: Path, task_id: str | None) -> WorkflowTask | None:
+def _workflow_instance(
+    workflow_dir: Path,
+    workflow_id: str | None = None,
+) -> WorkflowInstance:
     workflow = WorkflowInstance.from_directory(workflow_dir)
+    if workflow_id is None:
+        return workflow
+    prefix = f"{slugify_workflow_id(workflow_id)}-task-"
+    return WorkflowInstance(
+        workflow.directory,
+        {
+            task.task_id: task
+            for task in workflow.tasks
+            if task.task_id.startswith(prefix)
+        },
+    )
+
+
+def _select_task(
+    workflow_dir: Path,
+    task_id: str | None,
+    *,
+    workflow_id: str | None = None,
+) -> WorkflowTask | None:
+    workflow = _workflow_instance(workflow_dir, workflow_id=workflow_id)
     ready = workflow.ready_tasks(assignee_type=AssigneeType.AGENT)
     if task_id is not None:
         selected = next((task for task in ready if task.task_id == task_id), None)
@@ -182,9 +213,13 @@ def _select_task(workflow_dir: Path, task_id: str | None) -> WorkflowTask | None
     return ready[0] if ready else None
 
 
-def _active_workflow_dir(repo_root: Path, workflow_dir: Path) -> Path:
+def _active_workflow_dir(
+    repo_root: Path,
+    workflow_dir: Path,
+    workflow_id: str | None = None,
+) -> Path:
     """Resolve the durable graph where process-workflow-task actually writes."""
-    state = load_workflow_git_state(workflow_dir)
+    state = load_workflow_git_state(workflow_dir, workflow_id=workflow_id)
     if state is None:
         return workflow_dir
     try:
@@ -199,13 +234,22 @@ def _active_workflow_dir(repo_root: Path, workflow_dir: Path) -> Path:
     return active_dir if active_dir.is_dir() else workflow_dir
 
 
-def _sync_workflow_branch_from_main(repo_root: Path, workflow_dir: Path) -> Path:
+def _sync_workflow_branch_from_main(
+    repo_root: Path,
+    workflow_dir: Path,
+    workflow_id: str | None = None,
+) -> Path:
     """Refresh and push the workflow branch from the local main workflow files."""
-    state = load_workflow_git_state(workflow_dir)
+    state = load_workflow_git_state(workflow_dir, workflow_id=workflow_id)
     if state is None:
         return workflow_dir
-    active_dir = _active_workflow_dir(repo_root, workflow_dir)
-    if active_dir == workflow_dir or not active_dir.is_dir():
+    selected_workflow_id = workflow_id or state.proposed_pr_id
+    active_dir = _active_workflow_dir(
+        repo_root,
+        workflow_dir,
+        workflow_id=selected_workflow_id,
+    )
+    if not active_dir.is_dir():
         raise SystemExit(
             "Workflow integration worktree is not available for "
             f"{state.integration_branch!r}."
@@ -217,26 +261,50 @@ def _sync_workflow_branch_from_main(repo_root: Path, workflow_dir: Path) -> Path
         raise SystemExit(
             f"Workflow directory is missing from main: {relative_directory}"
         )
+    main_paths_result = subprocess.run(
+        [
+            "git",
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "main",
+            "--",
+            str(relative_directory),
+        ],
+        cwd=active_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    workflow_prefix = f"{slugify_workflow_id(selected_workflow_id)}-"
+    relative_paths = [
+        Path(path)
+        for path in main_paths_result.stdout.splitlines()
+        if Path(path).parent == relative_directory
+        and Path(path).name.startswith(workflow_prefix)
+    ]
+    if not relative_paths:
+        raise SystemExit(
+            f"Workflow {selected_workflow_id!r} has no files in main under "
+            f"{relative_directory}."
+        )
+    restore_paths = [str(path) for path in relative_paths]
     subprocess.run(
-        ["git", "restore", "--source", "main", "--", str(relative_directory)],
+        ["git", "restore", "--source", "main", "--", *restore_paths],
         cwd=active_dir,
         check=True,
         capture_output=True,
         text=True,
     )
     status = subprocess.run(
-        ["git", "status", "--short", "--", str(relative_directory)],
+        ["git", "status", "--short", "--", *restore_paths],
         cwd=active_dir,
         check=True,
         capture_output=True,
         text=True,
     ).stdout.strip()
     if status:
-        subprocess.run(
-            ["git", "add", str(relative_directory)],
-            cwd=active_dir,
-            check=True,
-        )
+        subprocess.run(["git", "add", "--", *restore_paths], cwd=active_dir, check=True)
         subprocess.run(
             [
                 "git",
@@ -257,9 +325,13 @@ def _sync_workflow_branch_from_main(repo_root: Path, workflow_dir: Path) -> Path
     return active_dir
 
 
-def _workflow_state(workflow_dir: Path) -> dict[str, Any]:
+def _workflow_state(
+    workflow_dir: Path,
+    *,
+    workflow_id: str | None = None,
+) -> dict[str, Any]:
     """Return a stable, JSON-serializable snapshot of the durable workflow."""
-    workflow = WorkflowInstance.from_directory(workflow_dir)
+    workflow = _workflow_instance(workflow_dir, workflow_id=workflow_id)
     tasks = [
         {
             "task_id": task.task_id,
@@ -302,10 +374,12 @@ def _reopen_locked_tasks(
     repo_root: Path,
     workflow_dir: Path,
     task_ids: list[str],
+    *,
+    workflow_id: str | None = None,
 ) -> None:
     """Make failed agent tasks retryable without touching human handoffs."""
-    workflow = WorkflowInstance.from_directory(workflow_dir)
-    state = load_workflow_git_state(workflow_dir)
+    workflow = _workflow_instance(workflow_dir, workflow_id=workflow_id)
+    state = load_workflow_git_state(workflow_dir, workflow_id=workflow_id)
     for task_id in task_ids:
         task = next((item for item in workflow.tasks if item.task_id == task_id), None)
         if task is None or task.assignee_type is not AssigneeType.AGENT:
@@ -396,8 +470,14 @@ def _infer_template(repo_root: Path, workflow_dir: Path) -> Path:
     )
 
 
-def _workflow_document(workflow_dir: Path) -> Path:
-    documents = sorted(workflow_dir.glob("*-workflow.yaml"))
+def _workflow_document(workflow_dir: Path, workflow_id: str | None = None) -> Path:
+    documents = sorted(
+        workflow_dir.glob(
+            f"{slugify_workflow_id(workflow_id)}-workflow.yaml"
+            if workflow_id
+            else "*-workflow.yaml"
+        )
+    )
     if len(documents) != 1:
         raise SystemExit(
             f"Expected exactly one workflow document in {workflow_dir}; found: "
@@ -406,10 +486,15 @@ def _workflow_document(workflow_dir: Path) -> Path:
     return documents[0]
 
 
-def _discover_workflow_dir(repo_root: Path) -> Path:
+def _discover_workflow_dir(repo_root: Path, workflow_id: str | None = None) -> Path:
     workflow_root = repo_root / "docs" / "workflows"
     candidates: list[Path] = []
-    for workflow_document in sorted(workflow_root.rglob("*-workflow.yaml")):
+    document_pattern = (
+        f"{slugify_workflow_id(workflow_id)}-workflow.yaml"
+        if workflow_id
+        else "*-workflow.yaml"
+    )
+    for workflow_document in sorted(workflow_root.rglob(document_pattern)):
         workflow_dir = workflow_document.parent
         try:
             workflow = WorkflowInstance.from_directory(workflow_dir)
@@ -425,8 +510,8 @@ def _discover_workflow_dir(repo_root: Path) -> Path:
             "Pass --workflow-dir explicitly."
         )
     raise SystemExit(
-        "Multiple runnable workflows found; pass --workflow-dir explicitly: "
-        + ", ".join(str(path) for path in candidates)
+        "Multiple runnable workflows found; pass --workflow-id or "
+        "--workflow-dir explicitly: " + ", ".join(str(path) for path in candidates)
     )
 
 
@@ -523,6 +608,9 @@ def _build_task_command(
     ]
     if task is not None:
         command.extend(["--task-id", task.task_id])
+    workflow_id = getattr(args, "workflow_id", None)
+    if workflow_id is not None:
+        command.extend(["--workflow-id", workflow_id])
     if args.max_roundtrips is not None:
         command.extend(["--max-roundtrips", str(args.max_roundtrips)])
     if args.verbose:
@@ -539,6 +627,7 @@ def _run_iteration(
     transcript: Path,
     args: argparse.Namespace,
     state_workflow_dir: Path | None = None,
+    workflow_id: str | None = None,
 ) -> dict[str, Any]:
     previous_error_counts = {path: len(_read_jsonl(path)) for path in error_logs}
     command = _build_task_command(
@@ -634,7 +723,10 @@ def _run_iteration(
         new_errors.extend(_read_jsonl(path)[previous_error_counts[path] :])
     lowered = (output or "").lower()
     corrections = [marker for marker in _FAILURE_MARKERS if marker in lowered]
-    workflow_state = _workflow_state(state_workflow_dir or workflow_dir)
+    workflow_state = _workflow_state(
+        state_workflow_dir or workflow_dir,
+        workflow_id=workflow_id,
+    )
     status = "clean"
     if timed_out:
         status = "timeout"
@@ -677,8 +769,13 @@ def _run_repair_command(
     result: dict[str, Any],
     iteration: int,
     timeout: float,
+    workflow_id: str | None = None,
 ) -> int:
-    task_root = _active_workflow_dir(repo_root, workflow_dir)
+    task_root = _active_workflow_dir(
+        repo_root,
+        workflow_dir,
+        workflow_id=workflow_id,
+    )
     environment = {
         "HARNESS_ITERATION": str(iteration),
         "HARNESS_REPO_ROOT": str(repo_root),
@@ -758,7 +855,10 @@ def main() -> int:
     repo_root = args.repo_root.resolve()
     source_workflow_dir = args.workflow_dir
     if source_workflow_dir is None:
-        source_workflow_dir = _discover_workflow_dir(repo_root)
+        source_workflow_dir = _discover_workflow_dir(
+            repo_root,
+            workflow_id=args.workflow_id,
+        )
     elif not source_workflow_dir.is_absolute():
         source_workflow_dir = repo_root / source_workflow_dir
     source_template_path = args.template_path
@@ -787,11 +887,18 @@ def main() -> int:
             # This harness executes an existing durable workflow. It must not
             # infer or instantiate a template as part of the run. Keep the
             # workflow document available as context for optional repair hooks.
-            template_path = _workflow_document(workflow_dir)
+            template_path = _workflow_document(
+                workflow_dir,
+                workflow_id=args.workflow_id,
+            )
         if not template_path.is_file():
             raise SystemExit(f"Workflow template does not exist: {template_path}")
 
-        _sync_workflow_branch_from_main(run_root, workflow_dir)
+        _sync_workflow_branch_from_main(
+            run_root,
+            workflow_dir,
+            workflow_id=args.workflow_id,
+        )
 
         log_root = _log_root(run_root)
         error_log = _resolve_path(args.error_log, log_root=log_root)
@@ -809,8 +916,15 @@ def main() -> int:
         previous_fingerprint: str | None = None
         repeated_state_count = 0
         for iteration in range(1, args.iterations + 1):
-            observed_workflow_dir = _active_workflow_dir(run_root, workflow_dir)
-            before = _workflow_state(observed_workflow_dir)
+            observed_workflow_dir = _active_workflow_dir(
+                run_root,
+                workflow_dir,
+                workflow_id=args.workflow_id,
+            )
+            before = _workflow_state(
+                observed_workflow_dir,
+                workflow_id=args.workflow_id,
+            )
             if before["outcome"] in {"completed", "human_handoff"}:
                 reports.append(
                     {
@@ -837,7 +951,37 @@ def main() -> int:
                     }
                 )
                 break
-            selected_task = _select_task(observed_workflow_dir, args.task_id)
+            workflow_state = load_workflow_git_state(
+                observed_workflow_dir,
+                workflow_id=args.workflow_id,
+            )
+            if workflow_state is not None:
+                dependencies_complete, incomplete_dependencies = (
+                    workflow_dependencies_completion(
+                        resolve_git_repository_root(run_root),
+                        workflow_state,
+                    )
+                )
+                if not dependencies_complete:
+                    reports.append(
+                        {
+                            "iteration": iteration,
+                            "status": "blocked",
+                            "workflow_state": before,
+                            "incomplete_dependencies": list(incomplete_dependencies),
+                        }
+                    )
+                    for dependency in incomplete_dependencies:
+                        print(
+                            f"Workflow dependency incomplete: {dependency}",
+                            file=sys.stderr,
+                        )
+                    break
+            selected_task = _select_task(
+                observed_workflow_dir,
+                args.task_id,
+                workflow_id=args.workflow_id,
+            )
             # A full run is the default. The explicit task option remains useful
             # for isolating one failing task while debugging a template.
             task_for_run = selected_task if args.task_id is not None else None
@@ -849,12 +993,16 @@ def main() -> int:
                 transcript=transcript_dir / f"iteration-{iteration:02d}.log",
                 args=args,
                 state_workflow_dir=observed_workflow_dir,
+                workflow_id=args.workflow_id,
             )
             result["iteration"] = iteration
             result["template_path"] = str(template_path)
             result["error_logs"] = [str(path) for path in error_logs]
             result["workflow_state_before"] = before
-            result["workflow_state_after"] = _workflow_state(observed_workflow_dir)
+            result["workflow_state_after"] = _workflow_state(
+                observed_workflow_dir,
+                workflow_id=args.workflow_id,
+            )
             result["workflow_fingerprint"] = _state_fingerprint(
                 result["workflow_state_after"]
             )
@@ -902,6 +1050,7 @@ def main() -> int:
                 run_root,
                 observed_workflow_dir,
                 list(after.get("locked_task_ids", [])),
+                workflow_id=args.workflow_id,
             )
             if not args.repair_command:
                 print(
@@ -911,7 +1060,11 @@ def main() -> int:
                 break
             repair_task = selected_task
             if repair_task is None:
-                repair_task = _select_task(observed_workflow_dir, args.task_id)
+                repair_task = _select_task(
+                    observed_workflow_dir,
+                    args.task_id,
+                    workflow_id=args.workflow_id,
+                )
             repair_returncode = _run_repair_command(
                 args.repair_command,
                 repo_root=run_root,
@@ -922,6 +1075,7 @@ def main() -> int:
                 result=result,
                 iteration=iteration,
                 timeout=args.timeout,
+                workflow_id=args.workflow_id,
             )
             if isolated:
                 _mirror_repair_changes(

@@ -311,14 +311,27 @@ def claim_workflow_task(
         ],
     )
     if result.returncode != 0:
+        claim_exists = (
+            _git(
+                repo_root_path,
+                ["show-ref", "--verify", "--quiet", claim_ref],
+            ).returncode
+            == 0
+        )
+        error_detail = (
+            result.stderr.strip() or result.stdout.strip() or "unknown git error"
+        )
+        inconsistency = (
+            f"task claim already exists: {claim_ref}"
+            if claim_exists
+            else f"could not create task claim {claim_ref}: {error_detail}"
+        )
         raise WorkflowGitInconsistency(
             json.dumps(
                 {
                     "proposed_pr_id": state.proposed_pr_id,
                     "task_id": task_id,
-                    "inconsistencies": [
-                        f"task claim already exists: {claim_ref}",
-                    ],
+                    "inconsistencies": [inconsistency],
                     "recovery_command": (
                         "powdrr-lift workflow-recovery --proposed-pr-id "
                         f"{state.proposed_pr_id} --cleanup"

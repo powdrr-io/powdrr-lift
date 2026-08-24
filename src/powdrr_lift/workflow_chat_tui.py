@@ -191,7 +191,8 @@ class WorkflowChatApp(App[None]):
     #steps {
         width: 1fr;
         height: 100%;
-        min-height: 5;
+        min-height: 0;
+        max-height: 100%;
         display: none;
         border: round $warning;
         padding: 0 1;
@@ -201,13 +202,15 @@ class WorkflowChatApp(App[None]):
     }
     #workflow-panels {
         width: 100%;
-        height: 1fr;
+        height: 10;
+        max-height: 10;
         min-height: 5;
     }
     #files {
         width: 1fr;
         height: 100%;
-        min-height: 5;
+        min-height: 0;
+        max-height: 100%;
         border: round $warning;
         padding: 0 1;
     }
@@ -289,7 +292,7 @@ class WorkflowChatApp(App[None]):
 
     def on_mount(self) -> None:
         self._response = self.query_one("#response", TextArea)
-        self.query_one("#files", ListView).border_title = "Files added to git"
+        self.query_one("#files", ListView).border_title = "Changed Files"
         self.query_one("#status-container", ScrollableContainer).can_focus = True
         self.query_one("#steps", ListView).can_focus = True
         # Paint the initial state before starting any repository or LLM work.
@@ -520,7 +523,12 @@ class WorkflowChatApp(App[None]):
 
     def _record_added_files(self, paths: tuple[str, ...]) -> None:
         files = self.query_one("#files", ListView)
-        new_paths = [path for path in paths if path not in self._added_files]
+        normalized_paths = [
+            Path(path).as_posix().removeprefix("./").strip()
+            for path in paths
+            if path.strip()
+        ]
+        new_paths = [path for path in normalized_paths if path not in self._added_files]
         if not new_paths:
             return
         self._added_files.extend(new_paths)

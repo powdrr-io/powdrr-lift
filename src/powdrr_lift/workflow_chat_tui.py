@@ -31,6 +31,7 @@ _MAX_STATUS_HISTORY_CHARS = 24_000
 _MAX_STATUS_MESSAGE_CHARS = 8_000
 _MAX_VISIBLE_WORKFLOW_STEPS = 10
 _MAX_ADDED_FILE_ENTRIES = 80
+_WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
 
 def _visible_step_indices(total_steps: int, current_step_index: int) -> tuple[int, ...]:
@@ -663,6 +664,11 @@ class WorkflowChatApp(App[None]):
 
     def _output_line(self, channel: str, line: str) -> None:
         self._record_output(channel, line)
+        if line.startswith(_WORKFLOW_FILE_ADDED_EVENT_PREFIX):
+            path = line.removeprefix(_WORKFLOW_FILE_ADDED_EVENT_PREFIX).strip()
+            if path:
+                self.call_from_thread(self._record_added_files, (path,))
+            return
         if channel == "stderr":
             if line.startswith("[workflow] "):
                 self.call_from_thread(

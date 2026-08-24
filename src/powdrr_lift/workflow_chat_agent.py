@@ -114,6 +114,8 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
 
+_WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
+
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
@@ -7015,6 +7017,7 @@ def _execute_shell_tool(
 
     env_value = parameters.get("env")
     env = os.environ.copy()
+    env["POWDRR_FILE_ADDED_EVENTS"] = "1"
     if env_value is not None:
         if not isinstance(env_value, dict):
             raise RuntimeError("Workflow invoke_tool action env must be an object.")

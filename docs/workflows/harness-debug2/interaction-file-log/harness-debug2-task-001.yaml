@@ -1,5 +1,5 @@
 task_id: harness-debug2-task-001
-status: locked
+status: completed
 upstream_task_ids: []
 dependent_state:
 - proposed-pr-context-gathered
@@ -11,6 +11,11 @@ assignee_type: agent
 assignee_role: architect
 output_state_type: proposed-pr-context-state
 description: Gather context about the proposed PR
+output_state:
+  proposed-pr-context-state: "Proposed PR 'harness-debug2' for feature 'interaction-file-log'\
+    \ \u2014 context gathered via deterministic pre-step. The work item is 'interaction-file-log'\
+    \ and the workflow instance is 'harness-debug2'. The proposed PR context has been\
+    \ assigned exactly as gathered; no further search or reinterpretation is required."
 workflow_template: execute-proposed-pr
 step_type: invoke_tool
 details: 'The deterministic pre-step already gathered the context. Assign that exact

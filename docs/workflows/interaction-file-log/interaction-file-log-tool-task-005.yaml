@@ -1,0 +1,31 @@
+task_id: interaction-file-log-tool-task-005
+status: open
+upstream_task_ids:
+- interaction-file-log-tool-task-004
+- interaction-file-log-tool-task-003
+dependent_state:
+- all-tests-passed
+complexity: high
+input_state:
+  implementation_diffs: interaction-file-log-tool-task-004.generated-product-code-state
+  generated_test_diffs: interaction-file-log-tool-task-003.generated-test-diffs-state
+  test_results: {}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: all-tests-results-state
+description: Run all tests and fix failures
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Invoke run-tests-and-fix. It runs the complete test suite, permits edits
+  to approved product and test files to address failures, and repeats the deterministic
+  run/fix gate until every test passes. Do not independently run tests or edit files
+  in this task. Complete with all-tests-results-state containing the exact final command,
+  return code, and test summary.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-tool''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: fast_iteration
+uses_skills:
+- run-tests-and-fix

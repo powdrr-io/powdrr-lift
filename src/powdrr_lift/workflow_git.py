@@ -453,7 +453,7 @@ def inspect_workflow_run(
         if registered_integration_worktrees
         else workflow_worktree_path(repo_root_path, proposed_pr_id)
     )
-    state_paths = []
+    state_paths: list[Path] = []
     if integration_worktree.is_dir():
         state_paths.extend(
             integration_worktree.rglob(workflow_git_state_filename(proposed_pr_id))

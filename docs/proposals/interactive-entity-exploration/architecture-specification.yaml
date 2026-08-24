@@ -1,0 +1,145 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: '2026-08-24'
+title: Interactive Entity Exploration
+entities:
+- id: entity-exploration-session
+  type: Feature
+  action: added
+  rationale: Supports "req-1" by providing the interactive session for exploring existing
+    entities.
+  name: Entity Exploration Session
+  description: An interactive back-and-forth session where the user browses existing
+    entities with filtering, sorting, pagination, and detail selection.
+- id: entity-list-view
+  type: Component
+  action: added
+  rationale: Supports "req-1" by presenting the entity list with filtering, sorting,
+    and pagination.
+  name: Entity List View
+  description: Presents the list of existing entities with filtering, sorting, and
+    pagination controls.
+- id: entity-detail-view
+  type: Component
+  action: added
+  rationale: Supports "req-1" by allowing the user to select an entity and view its
+    details.
+  name: Entity Detail View
+  description: Displays the details of a selected entity during the exploration session.
+- id: default-prompt
+  type: Component
+  action: added
+  rationale: Supports "req-2" and "req-3" by returning to the default prompt on session
+    end or failure.
+  name: Default Prompt
+  description: The default prompt that asks what the user wants to do, returned to
+    when the exploration session ends or fails.
+- id: exploration-loop
+  type: Module
+  action: added
+  rationale: Supports "appr-1" by implementing the interactive exploration loop.
+  name: Exploration Loop
+  description: The interactive loop that drives the exploration session, handling
+    user inputs for filtering, sorting, pagination, and selection.
+- id: end-session-detector
+  type: Module
+  action: added
+  rationale: Supports "appr-2" by detecting the end-session request.
+  name: End Session Detector
+  description: Detects when the user requests to end the exploration session.
+- id: error-handler
+  type: Module
+  action: added
+  rationale: Supports "appr-3" by wrapping the exploration loop in error handling.
+  name: Error Handler
+  description: Handles failures during the exploration session gracefully and returns
+    to the default prompt.
+modules:
+- id: mod-exploration-loop
+  action: added
+- id: mod-end-session-detector
+  action: added
+- id: mod-error-handler
+  action: added
+tools:
+- id: tool-entity-listing
+  action: added
+- id: tool-entity-detail
+  action: added
+entity_relationships:
+- id: rel-exploration-loop-entity-list
+  description: The exploration loop uses the entity list view to present entities
+    with filtering, sorting, and pagination.
+  rationale: Supports "appr-1" by driving the entity list presentation.
+  from: exploration-loop
+  to: entity-list-view
+  type: uses
+  action: added
+  source: exploration-loop
+  target: entity-list-view
+- id: rel-exploration-loop-entity-detail
+  description: The exploration loop uses the entity detail view when the user selects
+    an entity.
+  rationale: Supports "req-1" by showing details for a selected entity.
+  from: exploration-loop
+  to: entity-detail-view
+  type: uses
+  action: added
+  source: exploration-loop
+  target: entity-detail-view
+- id: rel-end-session-default-prompt
+  description: The end session detector triggers a return to the default prompt when
+    the user ends the session.
+  rationale: Supports "req-2" by returning to the default prompt on session end.
+  from: end-session-detector
+  to: default-prompt
+  type: triggers
+  action: added
+  source: end-session-detector
+  target: default-prompt
+- id: rel-error-handler-default-prompt
+  description: The error handler triggers a return to the default prompt on failure.
+  rationale: Supports "req-3" by returning to the default prompt on failure.
+  from: error-handler
+  to: default-prompt
+  type: triggers
+  action: added
+  source: error-handler
+  target: default-prompt
+invariants:
+- id: inv-session-end-returns-default
+  description: When the user requests to end the exploration session, the session
+    must terminate and return to the default prompt.
+  rationale: Supports req-2 by ensuring the session ends and returns to the default
+    prompt.
+  related:
+    entities:
+    - entity-exploration-session
+    - default-prompt
+    entity_relationships:
+    - rel-end-session-default-prompt
+  action: added
+- id: inv-failure-returns-default
+  description: On any failure during the exploration session, the agent must handle
+    the error gracefully and return to the default prompt.
+  rationale: Supports req-3 by ensuring graceful error handling returns to the default
+    prompt.
+  related:
+    entities:
+    - entity-exploration-session
+    - default-prompt
+    entity_relationships:
+    - rel-error-handler-default-prompt
+  action: added
+guidance:
+- id: guid-exploration-controls
+  description: The exploration session must present filtering, sorting, and pagination
+    controls for the entity list, and support selecting an entity to view details.
+  rationale: Supports req-1 by guiding the interactive exploration capabilities.
+  related:
+    entities:
+    - entity-list-view
+    - entity-detail-view
+    entity_relationships:
+    - rel-exploration-loop-entity-list
+    - rel-exploration-loop-entity-detail
+  action: added

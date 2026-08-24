@@ -1,0 +1,459 @@
+schema: https://powdrr.io/schemas/pr-workflow-record-v1
+pull_request: 418
+title: Agent-created pull request
+branch: workflow-chat-20260824-064121-308124
+base_branch: main
+workflow:
+  name: specify-a-feature
+  path: /Users/gregory/code/powdrr-lift/skill-definitions/specify-a-feature.yaml
+  skills:
+  - specify-a-feature
+  - review-system
+  - review-architecture
+  - finish-pr-prep
+  - create-pull-request
+  steps:
+  - description: Capture the feature name.
+    step_type: freeform
+    id: capture-feature-name
+    details: 'Choose a stable kebab-case feature name and reuse this exact name as
+      the work-item name for every generated document. If the name is clear from the
+      request, choose it directly. Otherwise ask the user with a prompt_user action,
+      for example: {"action":"prompt_user","text":"What short kebab-case name should
+      identify this feature in its specification files?"} This step declares the required
+      output work_item_name. When the name is clear, advance only with an outputs
+      object containing that exact field, for example: {"action":"next_step","outputs":{"work_item_name":"interaction-file-log"},"decisions_and_context":"Captured
+      the feature name."}'
+    llm_type: high_reasoning
+    outputs:
+    - name: work_item_name
+      type: string
+      required_for_next_step: true
+      scope: skill
+  - description: Capture the feature goal and success criteria.
+    step_type: freeform
+    id: capture-feature-context
+    details: 'Parse the request and conversation for the named feature''s outcomes,
+      edge cases, tests, constraints, and any other details needed for a properly
+      detailed plan. Use your best judgment to identify what is still missing. If
+      the request already provides a detail, retain it without asking again. Otherwise
+      ask one focused question with a prompt_user action; repeat this step after each
+      answer until the plan has enough context. For example: {"action":"prompt_user","text":"What
+      should this feature record, what should happen when it fails, and how will we
+      test it?"}'
+    llm_type: high_reasoning
+  - description: Generate the system specification template.
+    step_type: invoke_tool
+    id: generate-system-specification
+    details: Invoke the declared system-specification generator exactly once; do not
+      edit the generated file. It overwrites unreadable/invalid existing content and
+      merges readable values into the fresh template while restoring instructions
+      and missing default fields.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - system-specification
+        - --work-item-name
+        - <work-item-name>
+  - description: Fill the system requirements and approach.
+    step_type: freeform
+    id: fill-system-specification
+    details: Use yaml_edit to fill the generated YAML with the feature's requirements
+      and approach; do not invoke tools or rewrite the YAML as prose, then choose
+      next_step. For example, add a requirement describing durable interaction records
+      and an approach describing the log writer.
+    llm_type: standard_reasoning
+  - description: Review the system context before deciding the feature shape.
+    step_type: freeform
+    id: review-system-context
+    details: Run the nested system review skill and use its result to decide whether
+      the current system context remains appropriate.
+    llm_type: simple_task
+    uses_skills:
+    - review-system
+  - description: Gate the filled system specification.
+    step_type: gate
+    id: evaluate-system-specification
+    details: The gate passes only when the system evaluator reports zero issues.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<work-item-name>/system-specification.yaml
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: repair-feature-specifications
+      retry_context: System evaluation reported issues. Repair the affected YAML with
+        yaml_edit, then rerun the complete specification evaluation gate.
+  - description: Generate the architecture specification template.
+    step_type: invoke_tool
+    id: generate-architecture-specification
+    details: Invoke the declared architecture-specification generator exactly once
+      with all entity types; do not edit the generated file. It overwrites unreadable/invalid
+      existing content and merges readable values into the fresh template while restoring
+      instructions and missing default fields.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - architecture-specification
+        - --work-item-name
+        - <work-item-name>
+        - --all-entity-types
+  - description: Fill the architecture entities and relationships.
+    step_type: freeform
+    id: fill-architecture-specification
+    details: 'Use yaml_edit to capture the entity model before review; do not invoke
+      tools or rewrite the YAML as prose, then choose next_step. Keep the model small:
+      derive entities, modules, tools, relationships, invariants, and guidance only
+      from the current feature requirements and approach. Do not copy example domain
+      entities, relationships, or ids from another feature. Every entity and relationship
+      must explain which current requirement or approach it serves.'
+    llm_type: high_reasoning
+  - description: Review architecture before implementation.
+    step_type: freeform
+    id: review-architecture-context
+    details: Run the nested architecture review skill and use its result to decide
+      whether the current architecture remains appropriate.
+    llm_type: high_reasoning
+    uses_skills:
+    - review-architecture
+  - description: Gate the filled architecture specification.
+    step_type: gate
+    id: evaluate-architecture-specification
+    details: The gate passes only when the architecture evaluator reports zero issues.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<work-item-name>/architecture-specification.yaml
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: repair-feature-specifications
+      retry_context: Architecture evaluation reported issues. Repair the affected
+        YAML with yaml_edit, then rerun the complete specification evaluation gate.
+  - description: Generate the implementation specification template.
+    step_type: invoke_tool
+    id: generate-implementation-specification
+    details: Invoke the declared implementation-specification generator exactly once;
+      do not edit the generated file. It overwrites unreadable/invalid existing content
+      and merges readable values into the fresh template while restoring instructions
+      and missing default fields.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - implementation-specification
+        - --work-item-name
+        - <work-item-name>
+  - description: Fill the implementation features and decisions.
+    step_type: freeform
+    id: fill-implementation-specification
+    details: Use yaml_edit to complete the generated implementation template; do not
+      invoke tools or rewrite the YAML as prose, then choose next_step.
+    llm_type: standard_reasoning
+  - description: Gate the filled implementation specification.
+    step_type: gate
+    id: evaluate-implementation-specification
+    details: The gate passes only when the implementation evaluator reports zero issues.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<work-item-name>/implementation-specification.yaml
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: repair-feature-specifications
+      retry_context: Implementation evaluation reported issues. Repair the affected
+        YAML with yaml_edit, then rerun the complete specification evaluation gate.
+  - description: Generate the proposed PR specification template.
+    step_type: invoke_tool
+    id: generate-pr-specification
+    details: Invoke the declared pr-specification generator exactly once; it creates
+      one feature-level proposed-pr-specification.yaml containing every proposed PR.
+      Do not create one proposed-PR file per PR and do not edit the generated file
+      in this step. It overwrites unreadable/invalid existing content and merges readable
+      values into the fresh template while restoring instructions and missing default
+      fields.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - pr-specification
+        - --work-item-name
+        - <work-item-name>
+  - description: Fill the proposed PR specification template.
+    step_type: freeform
+    id: fill-pr-specification
+    details: Fill the single generated proposed-pr-specification.yaml with an ordered
+      proposed_prs entry for every proposed PR. For each entry, record dependent_prs,
+      intent, acceptance details, and changes. The changes sections must contain the
+      exact ordered id/action effects from the v1 architecture and implementation
+      specification files for the feature. Do not invoke tools in this step; after
+      the YAML edit choose next_step and let the later deterministic evaluation step
+      validate both structure and effect equivalence.
+    llm_type: high_reasoning
+  - description: Deterministically evaluate every generated specification before implementation.
+    step_type: invoke_tool
+    id: evaluate-feature-specifications
+    details: Invoke the declared evaluator exactly once for the specification directory.
+      It discovers every recognized spec-v1 YAML file. Pass the complete result to
+      the repair step; do not edit files here.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<work-item-name>
+  - description: Fix every reported specification issue with yaml_edit.
+    step_type: freeform
+    id: repair-feature-specifications
+    details: 'Review only the latest deterministic evaluator result and fix every
+      reported issue with yaml_edit; do not reuse an older LLM explanation after the
+      gate has rerun. Each action must include the YAML file_path and a non-empty
+      operations array. Use set_value with a JSON path array for scalar changes and
+      upsert_item with section, id, and a complete value mapping for list entries.
+      If any evaluator reports invalid YAML/structure or you are stuck, restart the
+      matching generator with a goto_step action. Use {"action":"goto_step","step_id":"generate-system-specification"},
+      {"action":"goto_step","step_id":"generate-architecture-specification"}, {"action":"goto_step","step_id":"generate-implementation-specification"},
+      or {"action":"goto_step","step_id":"generate-pr-specification"} for the affected
+      file. Do not repeat the same repair indefinitely. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}.
+      Repeat the repair/evaluation loop until every required spec-v1 document evaluates
+      cleanly. Do not begin implementation or create a pull request while any required
+      specification remains invalid. Do not invoke tools other than gather_context
+      in this repair step; gather_context is allowed when the latest evaluator result
+      reports a missing or unknown id. Use the evaluator''s suggested context types
+      and keywords, then apply the correction without guessing. The evaluator result
+      is the authoritative issue context and the next gate reruns the deterministic
+      evaluator. If an exact existing id is needed, use gather_context or read_document,
+      then apply yaml_edit without guessing. For entity_type_not_allowed, use the
+      exact allowed_entity_types list from the latest evaluator result and edit only
+      the reported entities[N].type path. Never confuse that field with entity_relationships[*].source
+      or target: those fields contain entity ids and must not be changed to entity
+      type names. Never alternate between File and Source file, change a different
+      entity, or modify a value that already matches the latest allowed list. After
+      the edit, choose next_step so deterministic evaluation can verify the current
+      file; do not claim that your own reasoning proves validation passed.'
+    llm_type: fast_iteration
+  - description: Confirm that every generated specification evaluates cleanly.
+    step_type: gate
+    id: gate-feature-specifications
+    details: The gate passes only when the directory evaluator exits successfully
+      with zero issues.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<work-item-name>
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: evaluate-feature-specifications
+      retry_context: The specification gate failed because one or more spec-v1 files
+        still have validation issues. Inspect the latest evaluator result, repair
+        the affected YAML with yaml_edit, and rerun deterministic evaluation before
+        continuing.
+  - description: Stage the validated specification artifacts for pull request preparation.
+    step_type: freeform
+    id: stage-specification-artifacts
+    details: Inspect the worktree and stage only the validated specification artifacts
+      under docs/proposals/<work-item-name>/. Do not commit or create the pull request
+      yet.
+    llm_type: simple_task
+    tool_invocations:
+    - tool: internal
+      command:
+      - powdrr-lift
+      - repository-state
+    - tool: git
+      command:
+      - add
+      - docs/proposals/<work-item-name>
+  - description: Run finish-pr-prep before creating the pull request.
+    step_type: freeform
+    id: prepare-pull-request
+    details: Run finish-pr-prep after the intended specification artifacts are staged
+      by returning an invoke_skill action for the listed finish-pr-prep skill. Do
+      not invoke it through the internal CLI tool. If cleanup changes files, restage
+      only the validated specification artifacts before continuing. Do not begin implementation
+      in this skill.
+    llm_type: fast_iteration
+    uses_skills:
+    - finish-pr-prep
+  - description: Create or update the pull request for the validated feature.
+    step_type: freeform
+    id: create-feature-pull-request
+    details: Invoke create-pull-request with pr-kind `feature`, commit message `Add
+      <work-item-name> feature specification`, and pull-request title `<pull-request-title>`.
+      Pass a `files_to_publish` context list containing every validated specification
+      document, along with the validated specification documents and feature intent.
+      The nested skill must stage exactly that list. Do not begin implementation in
+      this skill.
+    llm_type: simple_task
+    uses_skills:
+    - create-pull-request
+tool_calls:
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - repository-state
+  why: Inspecting the worktree state to confirm the validated specification artifacts
+    under docs/proposals/interactive-entity-exploration/ before staging them for pull
+    request preparation.
+  returncode: 0
+- tool: git
+  parameters: {}
+  why: The repository-state inspection confirmed all four validated specification
+    artifacts exist under docs/proposals/interactive-entity-exploration/ (architecture,
+    implementation, proposed PR, and system specifications). Each file is currently
+    staged (index_status A) but has unstaged modifications (worktree_status M) from
+    the validation and repair steps. Staging the directory now captures the latest
+    validated content for pull request preparation without committing or creating
+    the PR.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+  why: Invoking the declared git diff --cached --stat command to confirm the staged
+    pull request scope.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format .
+  why: Starting the validation gate for PR preparation. Running the first obligation,
+    ruff-format, to format Python source files before checking, linting, testing,
+    and validating the staged specification files.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format --check .
+  why: The ruff-format obligation passed (126 files left unchanged). Running the next
+    obligation, ruff-format-check, to verify formatting without modifying files.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff check .
+  why: The ruff-format and ruff-format-check obligations passed. Running the next
+    obligation, ruff-lint, to lint the Python source files.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev pytest
+  why: The ruff-format, ruff-format-check, and ruff-lint obligations passed. Running
+    the next obligation, pytest, to execute the test suite.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev mypy src tests
+  why: The ruff-format, ruff-format-check, ruff-lint, and pytest obligations all passed.
+    Running the next obligation, mypy, to type-check the Python source and test files.
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run powdrr-lift validate-pr-files --repo-root .
+  why: The ruff-format, ruff-format-check, ruff-lint, pytest, and mypy obligations
+    all passed. Running the final obligation, validate-pr-files, to validate the staged
+    specification files changed on the branch.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+  why: Invoking the declared git diff --cached --stat command to confirm the staged
+    pull request scope.
+  returncode: 0
+- tool: git
+  parameters: {}
+  why: Staging the four validated specification files that belong in the pull request.
+    The repository-state inspection confirmed these are the intended files, and agent_error.txt
+    is an untracked leftover that must not be staged.
+  returncode: 0
+- tool: git
+  parameters: {}
+  why: The previous git add action succeeded in staging the four intended specification
+    files, but the subsequent verification attempt using git status was rejected because
+    the current step only supports the add operation. Re-running the exact declared
+    add command with the four intended paths ensures the files are staged per the
+    step contract. The untracked agent_error.txt file is intentionally excluded from
+    the staging set.
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - commit
+    - -m
+    - Add interactive entity exploration specifications
+  why: 'The staged set matches the intended pull-request scope exactly: all four specification
+    files under docs/proposals/interactive-entity-exploration/ are staged with no
+    unstaged modifications, and the untracked agent_error.txt is intentionally excluded.
+    Proceeding to commit the validated changes with the commit message.'
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
+  why: Pushing the current feature branch with its upstream set to origin. The committed
+    HEAD contains the four validated specification files for the interactive entity
+    exploration feature. This step does not create or update a pull request; the completed
+    PR body remains in workflow context for the next step.
+  returncode: 0
+- tool: gh
+  parameters: {}
+  why: The branch has committed changes (four specification files) and has been pushed
+    with upstream set. No existing PR is known for this branch. Creating a draft PR
+    with the completed body from the previous steps.
+  returncode: 0
+explanation: This record documents the selected skill steps and the tool calls observed
+  before the agent created the pull request.

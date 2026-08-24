@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Core Implementation
+architecture_id: '2026-08-22'
+entities:
+- action: added
+  id: interaction-log
+  rationale: Core entity representing the interaction log file.
+- action: added
+  id: interaction-entry
+  rationale: Represents a single logged interaction.
+- action: added
+  id: log-writer
+  rationale: Writes interaction entries to the log.
+- action: added
+  id: interaction-source
+  rationale: Source of interactions to be logged.
+modules:
+- action: added
+  id: mod-log-writer
+  purpose: Core log writing logic for interaction entries.
+  relative_location: src/powdrr_lift/core/log_writer.py
+tools:
+- action: added
+  how_to_use: Run from repository root with an interaction entry.
+  id: tool-log-writer
+  template: uv run powdrr-lift log-writer --entry <entry>
+  when_to_use: Write interaction entries to the log file.
+entity_relationships:
+- action: added
+  id: rel-writer-appends
+  rationale: Log writer appends entries to the log.
+- action: added
+  id: rel-log-contains
+  rationale: Log contains interaction entries.
+- action: added
+  id: rel-source-feeds
+  rationale: Interaction source feeds entries to the writer.
+features:
+- action: added
+  description: Core log writer that appends interaction entries to a file.
+  functional_requirements:
+  - Append interaction entries to the log file.
+  - Support structured entry format.
+  id: feat-core-log-writer
+decisions:
+- action: added
+  description: Core PR focuses only on the log writer module and tool.
+  id: dec-core-scope

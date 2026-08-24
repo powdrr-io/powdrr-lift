@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Workflow Implementation
+architecture_id: '2026-08-22'
+entities:
+- action: added
+  id: interaction-log
+  rationale: Core entity representing the interaction log file.
+- action: added
+  id: interaction-entry
+  rationale: Represents a single logged interaction.
+- action: added
+  id: log-writer
+  rationale: Writes interaction entries to the log.
+- action: added
+  id: interaction-source
+  rationale: Source of interactions to be logged.
+modules:
+- action: added
+  id: mod-log-writer
+  purpose: Workflow orchestration for the log writer module.
+  relative_location: src/powdrr_lift/workflows/log_writer_workflow.py
+tools:
+- action: added
+  how_to_use: Run from repository root with an interaction entry.
+  id: tool-log-writer
+  template: uv run powdrr-lift log-writer --entry <entry>
+  when_to_use: Write interaction entries to the log file via the workflow.
+entity_relationships:
+- action: added
+  id: rel-writer-appends
+  rationale: Log writer appends entries to the log.
+- action: added
+  id: rel-log-contains
+  rationale: Log contains interaction entries.
+- action: added
+  id: rel-source-feeds
+  rationale: Interaction source feeds entries to the writer.
+features:
+- action: added
+  description: Workflow that orchestrates the log writer with the CLI and core modules.
+  functional_requirements:
+  - Coordinate the CLI and core log writer modules.
+  - Ensure interaction entries are written in sequence.
+  id: feat-workflow-log-writer
+decisions:
+- action: added
+  description: Workflow PR adds orchestration on top of the CLI and core modules.
+  id: dec-workflow-scope

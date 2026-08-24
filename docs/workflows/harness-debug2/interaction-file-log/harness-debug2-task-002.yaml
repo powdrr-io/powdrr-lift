@@ -1,12 +1,17 @@
 task_id: harness-debug2-task-002
-status: open
+status: locked
 upstream_task_ids:
 - harness-debug2-task-001
 dependent_state:
 - execution-plan-created
 complexity: high
 input_state:
-  proposed_pr_context: harness-debug2-task-001.proposed-pr-context-state
+  proposed_pr_context:
+    proposed-pr-context-state: "Proposed PR 'harness-debug2' for feature 'interaction-file-log'\
+      \ \u2014 context gathered via deterministic pre-step. The work item is 'interaction-file-log'\
+      \ and the workflow instance is 'harness-debug2'. The proposed PR context has\
+      \ been assigned exactly as gathered; no further search or reinterpretation is\
+      \ required."
   execution_plan: []
 assignee_type: agent
 assignee_role: architect

@@ -148,6 +148,20 @@ def test_full_workflow_run_does_not_select_a_single_task() -> None:
     assert "--task-id" not in command
 
 
+def test_discover_workflow_dir_finds_the_only_runnable_workflow(
+    tmp_path: Path,
+) -> None:
+    module = _harness_module()
+    workflow_dir = tmp_path / "docs" / "workflows" / "available"
+    workflow_dir.mkdir(parents=True)
+    workflow = WorkflowInstance.create(workflow_dir, (_task(),))
+    workflow_document = workflow_dir / "available-workflow.yaml"
+    workflow_document.write_text("workflow: available\n", encoding="utf-8")
+
+    assert module._discover_workflow_dir(tmp_path) == workflow.directory
+    assert module._workflow_document(workflow.directory) == workflow_document
+
+
 def test_repair_command_timeout_kills_the_process_group(tmp_path: Path) -> None:
     module = _harness_module()
 

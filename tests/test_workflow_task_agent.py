@@ -15,11 +15,16 @@ from powdrr_lift.core import (
     HumanRole,
     Skill,
     SkillStep,
+    SkillStepPreStep,
     TaskComplexity,
     TaskStatus,
     WorkflowInstance,
     WorkflowTask,
     save_skill,
+)
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    render_gather_context_report,
 )
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
@@ -100,7 +105,10 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert completed.output_state == {"version": "v2"}
     prompt = client.messages[0][1]["content"]
     assert client.messages[0][0]["content"].startswith(_action_system_prompt())
-    assert "`next_step` is invalid here" in client.messages[0][0]["content"]
+    assert (
+        "Use `next_step` to acknowledge an intermediate action"
+        in client.messages[0][0]["content"]
+    )
     assert '"execution_mode":"process_workflow_task"' in prompt
     assert json.loads(prompt)["workflow_dir"] == "workflow"
     assert str(tmp_path) not in prompt
@@ -112,6 +120,77 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert "received streamed LLM data" not in displayed
     assert ("Workflow task LLM action:" in stdout.getvalue()) is verbose
     assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
+
+
+def test_deterministic_gather_context_must_be_persisted_exactly(
+    tmp_path: Path,
+) -> None:
+    specs = tmp_path / "docs" / "proposals" / "feature"
+    specs.mkdir(parents=True)
+    (specs / "proposed-pr-specification.yaml").write_text(
+        "schema: https://powdrr.io/schemas/proposed-pr-specification-v1\n"
+        "id: feature\n"
+        "feature_ids: [feature-id]\n"
+        "proposed_prs:\n"
+        "- id: feature-pr\n"
+        "  intent: Capture the feature context.\n"
+        "  justification: Required for the workflow.\n",
+        encoding="utf-8",
+    )
+    workflow = WorkflowInstance.create(
+        tmp_path / "workflow",
+        (
+            WorkflowTask(
+                task_id="feature-task",
+                status=TaskStatus.OPEN,
+                upstream_task_ids=(),
+                dependent_state=(),
+                complexity=TaskComplexity.MEDIUM,
+                input_state={"feature_id": "feature"},
+                description="Gather feature context.",
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                output_state_type="context-state",
+                step_type="invoke_tool",
+                pre_step=SkillStepPreStep(
+                    action="gather_context",
+                    template={
+                        "feature_id": "<feature_id>",
+                        "types": ["proposed_prs"],
+                    },
+                ),
+            ),
+        ),
+    )
+    expected_context = json.loads(
+        render_gather_context_report(
+            gather_specification_context(
+                tmp_path,
+                types=["proposed_prs"],
+                feature_id="feature",
+            )
+        )
+    )
+    client = _FakeClient(
+        [
+            {"kind": "complete", "output_state": {"context-state": "summary"}},
+            {
+                "kind": "complete",
+                "output_state": {"context-state": expected_context},
+            },
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(workflow_dir=workflow.directory, repo_root=tmp_path),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 2
+    assert "exact deterministic pre-step result" in client.messages[1][1]["content"]
 
 
 def test_process_workflow_task_resolves_input_placeholders_before_llm(
@@ -184,7 +263,10 @@ def test_workflow_task_prompt_includes_task_interaction_style(
         "Separate observations, inferences, risks, and recommendations."
         in (messages[0]["content"])
     )
-    assert "`next_step` is invalid here" in messages[0]["content"]
+    assert (
+        "Use `next_step` to acknowledge an intermediate action"
+        in messages[0]["content"]
+    )
     assert json.loads(messages[1]["content"])["task"]["interaction_style"] == (
         "observational_review"
     )

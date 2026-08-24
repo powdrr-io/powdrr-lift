@@ -630,6 +630,23 @@ def build_workflow_template_validation_report(
                 )
             )
         pre_step = raw_task_template_mapping.get("pre_step")
+        uses_skills = raw_task_template_mapping.get("uses_skills")
+        if (
+            pre_step is not None
+            and isinstance(uses_skills, Sequence)
+            and not isinstance(uses_skills, (str, bytes, bytearray))
+            and uses_skills
+        ):
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="uses_skills_with_pre_step",
+                    message=(
+                        "Workflow task templates must use either uses_skills or "
+                        "pre_step, not both."
+                    ),
+                    path=_child_path(task_template_path, "pre_step"),
+                )
+            )
         if step_type in {"invoke_tool", "gate"} and not isinstance(pre_step, Mapping):
             issues.append(
                 WorkflowTemplateValidationIssue(

@@ -1,0 +1,59 @@
+---
+name: run-tests-and-fix
+when_to_use:
+- When implementation and generated tests are present and the complete test suite must pass.
+- When test failures require bounded edits followed by deterministic reruns.
+steps:
+- id: run-all-tests
+  description: Run the complete test suite before diagnosing failures.
+  step_type: invoke_tool
+  llm_type: simple_task
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - uv
+      - run
+      - --extra
+      - dev
+      - pytest
+      - -q
+- id: diagnose-test-results
+  description: Diagnose the latest complete test result and repair failures.
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Inspect the latest deterministic full-suite result and the supplied
+    implementation and generated-test context. If returncode is zero, make no
+    edits and return next_step so the rerun gate confirms the passing result. If
+    any test fails, identify the reported causes and make all necessary focused
+    edits to approved product or test files, then return next_step so the rerun
+    gate executes. Do not edit
+    documentation, workflow files, configuration, dependencies, or unrelated
+    files. Do not weaken or delete tests to hide a failure. Do not run tests in
+    this step; the deterministic rerun gate is authoritative.
+- id: rerun-all-tests
+  description: Rerun the complete test suite after a repair.
+  step_type: gate
+  llm_type: simple_task
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - uv
+      - run
+      - --extra
+      - dev
+      - pytest
+      - -q
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: diagnose-test-results
+    retry_context: >-
+      The complete test suite still failed. Inspect the latest result, make all
+      necessary focused repairs to approved product or test files, and return
+      next_step so the gate reruns. All tests must pass before completion.

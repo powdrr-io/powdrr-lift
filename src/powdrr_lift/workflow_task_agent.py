@@ -64,6 +64,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
+    _resolve_pre_step_template,
     _resolve_project_root,
     _resolve_worktree_file_path,
     _run_deterministic_pre_step,
@@ -282,6 +283,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     stderr: TextIO
     action_engine: WorkflowLLMActionEngine
     events: list[dict[str, Any]]
+    deterministic_output_state: Any = None
+    requires_deterministic_output_state: bool = False
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
     observer_intervention: str | None = None
@@ -516,11 +519,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
-            raise RuntimeError(
-                "next_step is invalid for a durable workflow task. The task "
-                "runner advances automatically; return complete with output_state "
-                "when the task is finished."
-            )
+            self.events.append({"kind": action.kind})
+            return WorkflowActionOutcome()
         if action.kind == "read_document":
             self.events.append(
                 {
@@ -619,6 +619,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self._execute_tool(action)
             return WorkflowActionOutcome()
         if action.kind == "complete":
+            if self.requires_deterministic_output_state and action.output_state != (
+                self.deterministic_output_state
+            ):
+                raise ValueError(
+                    "This task must persist the exact deterministic pre-step result "
+                    "in output_state; do not replace it with a summary."
+                )
             completed = self.workflow.complete_task(
                 self.task.task_id,
                 action.output_state,
@@ -1111,6 +1118,13 @@ def run_workflow_task(
             compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
 
         driver_events: list[dict[str, Any]] = []
+        deterministic_output_state, requires_deterministic_output_state = (
+            _run_task_deterministic_pre_step(
+                task,
+                repo_root=repo_root,
+                events=driver_events,
+            )
+        )
         driver = WorkflowLLMExecutionDriver(
             max_stalled_roundtrips=config.max_stalled_roundtrips
         )
@@ -1129,6 +1143,8 @@ def run_workflow_task(
             stderr=stderr,
             action_engine=driver.action_engine,
             events=driver_events,
+            deterministic_output_state=deterministic_output_state,
+            requires_deterministic_output_state=requires_deterministic_output_state,
         )
         observer_mapping = _resolve_workflow_task_mapping(
             "high_reasoning",
@@ -2005,13 +2021,12 @@ def _task_action_failure_reached(
 def _task_system_prompt(*, interaction_style: str | None = None) -> str:
     return (
         _action_system_prompt()
-        + "\nDurable workflow-task contract: this is one task, not a skill-step "
-        "state machine. The runner automatically requests the next action after "
-        "each successful action, so `next_step` is invalid here. After the task "
-        "requirements are satisfied, return `complete` with the declared "
-        "output_state. Use `invoke_tool`, `invoke_skill`, `edit`, or another "
-        "action only when it advances this task toward that completion.\n"
-        + _interaction_style_prompt(interaction_style)
+        + "\nDurable workflow-task contract: this is one task that may contain "
+        "multiple actions. Use `next_step` to acknowledge an intermediate action "
+        "or a completed sub-step and continue the task; use `complete` only when "
+        "the task requirements are satisfied, with the declared `output_state`. "
+        "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
+        "it advances this task.\n" + _interaction_style_prompt(interaction_style)
     )
 
 
@@ -2060,6 +2075,67 @@ def _task_context_prompt_data(
         },
         task.input_state,
     )
+
+
+def _run_task_deterministic_pre_step(
+    task: WorkflowTask,
+    *,
+    repo_root: Path,
+    events: list[dict[str, Any]],
+) -> tuple[Any, bool]:
+    """Run a task's deterministic context pre-step before asking the LLM.
+
+    Gathered context is a durable handoff, not merely prompt-time context. The
+    first workflow task must persist the exact report so downstream tasks do
+    not rediscover it or replace it with a lossy summary.
+    """
+    pre_step = task.pre_step
+    if pre_step is None or pre_step.action != "gather_context":
+        return None, False
+    template = _resolve_pre_step_template(
+        pre_step.template,
+        _task_prompt_input_values(task.input_state),
+    )
+    if not isinstance(template, Mapping):
+        raise RuntimeError(
+            "Deterministic gather_context template must resolve to an object."
+        )
+    raw_types = template.get("types")
+    feature_id = template.get("feature_id")
+    if (
+        not isinstance(raw_types, Sequence)
+        or isinstance(raw_types, (str, bytes, bytearray))
+        or not raw_types
+        or not isinstance(feature_id, str)
+        or not feature_id.strip()
+    ):
+        raise RuntimeError(
+            "Deterministic gather_context pre-step requires types and feature_id."
+        )
+    keywords = template.get("keywords")
+    filters = template.get("filters")
+    report = gather_specification_context(
+        repo_root,
+        types=[str(value) for value in raw_types],
+        keywords=(
+            [str(value) for value in keywords]
+            if isinstance(keywords, Sequence)
+            and not isinstance(keywords, (str, bytes, bytearray))
+            else None
+        ),
+        filters=dict(filters) if isinstance(filters, Mapping) else None,
+        feature_id=feature_id,
+    )
+    result = json.loads(render_gather_context_report(report))
+    events.append(
+        {
+            "kind": "deterministic_pre_step",
+            "action": pre_step.action,
+            "template": template,
+            "result": result,
+        }
+    )
+    return {task.output_state_type: result}, True
 
 
 def _task_event_metadata(event: Mapping[str, Any]) -> dict[str, Any]:

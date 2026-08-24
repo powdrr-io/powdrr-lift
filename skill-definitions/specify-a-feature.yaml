@@ -195,39 +195,6 @@ steps:
     retry_context: >-
       Implementation evaluation reported issues. Repair the affected YAML with
       yaml_edit, then rerun the complete specification evaluation gate.
-- id: generate-pr-specification
-  description: Generate the proposed PR specification template.
-  step_type: invoke_tool
-  llm_type: simple_task
-  details: >-
-    Invoke the declared pr-specification generator exactly once; it creates one
-    feature-level proposed-pr-specification.yaml containing every proposed PR.
-    Do not create one proposed-PR file per PR and do not edit the generated file
-    in this step. It overwrites unreadable/invalid existing content and merges
-    readable values into the fresh template while restoring instructions and
-    missing default fields.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - pr-specification
-      - "--work-item-name"
-      - "<work-item-name>"
-- id: fill-pr-specification
-  description: Fill the proposed PR specification template.
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    Fill the single generated proposed-pr-specification.yaml with an ordered
-    proposed_prs entry for every proposed PR. For each entry, record
-    dependent_prs, intent, acceptance details, and changes. The changes sections
-    must contain the exact ordered id/action effects from the v1 architecture
-    and implementation specification files for the feature. Do not invoke tools
-    in this step; after the YAML edit choose next_step and let the later
-    deterministic evaluation step validate both structure and effect
-    equivalence.
 - id: evaluate-feature-specifications
   description: Deterministically evaluate every generated specification before implementation.
   step_type: invoke_tool
@@ -259,8 +226,7 @@ steps:
     {"action":"goto_step","step_id":"generate-system-specification"},
     {"action":"goto_step","step_id":"generate-architecture-specification"},
     {"action":"goto_step","step_id":"generate-implementation-specification"},
-    or {"action":"goto_step","step_id":"generate-pr-specification"} for
-    the affected file. Do not repeat the same repair indefinitely.
+    for the affected file. Do not repeat the same repair indefinitely.
     For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not invoke tools other than gather_context in this repair step; gather_context is allowed when the latest evaluator result reports a missing or unknown id. Use the evaluator's suggested context types and keywords, then apply the correction without guessing. The evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use gather_context or read_document, then apply yaml_edit without guessing. For entity_type_not_allowed, use the exact allowed_entity_types list from the latest evaluator result and edit only the reported entities[N].type path. Never confuse that field with entity_relationships[*].source or target: those fields contain entity ids and must not be changed to entity type names. Never alternate between File and Source file, change a different entity, or modify a value that already matches the latest allowed list. After the edit, choose next_step so deterministic evaluation can verify the current file; do not claim that your own reasoning proves validation passed.
 - id: gate-feature-specifications
   description: Confirm that every generated specification evaluates cleanly.

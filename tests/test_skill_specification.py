@@ -174,16 +174,12 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
-                ("execute-proposed-pr.yaml", 3),
-                ("execute-proposed-pr.yaml", 5),
+                ("run-tests-and-fix.yaml", 0),
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 8),
-                ("execute-proposed-pr.yaml", 10),
+                ("execute-proposed-pr.yaml", 9),
+                ("execute-proposed-pr.yaml", 12),
                 ("execute-proposed-pr.yaml", 13),
-                ("execute-proposed-pr.yaml", 14),
-                ("execute-proposed-pr.yaml", 15),
-                ("execute-proposed-pr.yaml", 18),
-                ("execute-proposed-pr.yaml", 19),
                 ("start-implementing-feature.yaml", 7),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
@@ -193,7 +189,6 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
-                ("specify-a-feature.yaml", 15),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -204,9 +199,10 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 5),
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
-                ("specify-a-feature.yaml", 17),
+                ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
+                ("run-tests-and-fix.yaml", 2),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -646,14 +642,10 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "evaluate",
         "docs/proposals/<work-item-name>/implementation-specification.yaml",
     ]
-    assert step("generate-pr-specification").step_type == "invoke_tool"
-    assert command("generate-pr-specification") == [
-        "powdrr-lift",
-        "pr-specification",
-        "--work-item-name",
-        "<work-item-name>",
-    ]
-    assert step("fill-pr-specification").tool_invocations == ()
+    assert all(
+        candidate not in {item.id for item in skill.steps}
+        for candidate in ("generate-pr-specification", "fill-pr-specification")
+    )
     assert command("evaluate-feature-specifications") == [
         "powdrr-lift",
         "evaluate",
@@ -691,6 +683,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "review-architecture",
         "review-skill-workflow",
         "review-system",
+        "run-tests-and-fix",
         "security-review",
         "specify-a-feature",
         "specify-architecture",

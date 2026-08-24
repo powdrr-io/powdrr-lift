@@ -53,6 +53,27 @@ def test_workflow_git_state_round_trips_and_names_branches(tmp_path: Path) -> No
     )
 
 
+def test_workflow_git_state_loads_legacy_json_metadata(tmp_path: Path) -> None:
+    workflow_dir = tmp_path / "docs" / "workflows" / "feature"
+    workflow_dir.mkdir(parents=True)
+    (workflow_dir / ".workflow-git.json").write_text(
+        """
+        proposed_pr_id: feature-core
+        base_branch: main
+        integration_branch: powdrr/feature-core
+        workflow_relative_directory: docs/workflows/feature
+        """,
+        encoding="utf-8",
+    )
+
+    assert load_workflow_git_state(workflow_dir, "feature-core") == WorkflowGitState(
+        proposed_pr_id="feature-core",
+        base_branch="main",
+        integration_branch="powdrr/feature-core",
+        workflow_relative_directory="docs/workflows/feature",
+    )
+
+
 def test_workflow_git_state_loads_by_workflow_id_when_directory_is_shared(
     tmp_path: Path,
 ) -> None:

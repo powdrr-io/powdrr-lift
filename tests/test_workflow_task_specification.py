@@ -154,6 +154,10 @@ def test_workflow_task_directory_loader_reads_all_json_files(
         "integration_branch: powdrr/feature\n",
         encoding="utf-8",
     )
+    (tmp_path / ".workflow-git.json").write_text(
+        '{"proposed_pr_id":"feature"}\n',
+        encoding="utf-8",
+    )
 
     assert load_workflow_tasks(tmp_path) == (task_a, task_b)
 
@@ -270,6 +274,27 @@ def test_workflow_materializes_upstream_output_contract_when_task_is_claimed(
         task for task in persisted if task.task_id == "implement"
     )
     assert persisted_downstream.input_state == claimed_task.input_state
+
+
+def test_workflow_cannot_complete_without_declared_output_state(tmp_path: Path) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "workflow",
+        (
+            WorkflowTask(
+                task_id="plan",
+                status=TaskStatus.OPEN,
+                upstream_task_ids=(),
+                dependent_state=("plan-created",),
+                complexity=TaskComplexity.HIGH,
+                input_state={"request": "Plan the change."},
+                description="Create a plan.",
+                output_state_type="execution-plan-state",
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="must provide a non-null output_state"):
+        workflow.complete_task("plan")
 
 
 def test_workflow_task_directory_validation_accepts_known_dependencies(

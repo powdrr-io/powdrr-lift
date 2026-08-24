@@ -228,6 +228,11 @@ class WorkflowInstance:
             raise KeyError(f"Unknown workflow task: {task_id}")
         if task.status not in {TaskStatus.OPEN, TaskStatus.LOCKED}:
             raise ValueError(f"Workflow task is not available to complete: {task_id}")
+        if output_state is None:
+            raise ValueError(
+                f"Workflow task {task_id} must provide a non-null output_state "
+                f"for declared output_state_type {task.output_state_type!r}."
+            )
         completed_task = replace(
             task,
             status=TaskStatus.COMPLETED,
@@ -402,6 +407,7 @@ def _is_workflow_task_path(path: Path) -> bool:
         path.is_file()
         and path.suffix.lower() in {".json", ".yaml", ".yml"}
         and not path.name.endswith("-workflow.yaml")
+        and path.name != ".workflow-git.json"
     )
 
 

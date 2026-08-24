@@ -154,26 +154,103 @@ def test_create_pr_specification_template_writes_default_file(tmp_path: Path) ->
         '#   "# This file is read-only and should never be edited by a tool or agent."'
         in template_text
     )
-    assert "schema: https://powdrr.io/schemas/specification-v1" in template_text
-    assert "id: null" in template_text
-    assert "Fill in `intent.problem`, `intent.goal`, and `intent.reasoning`." in (
-        template_text
+    assert (
+        "schema: https://powdrr.io/schemas/proposed-pr-specification-v1"
+        in template_text
     )
+    assert "id: null" in template_text
+    assert "Fill in each proposed PR's intent and acceptance details." in template_text
 
     rendered_template = yaml.safe_load(template_text)
     assert [section for section in rendered_template] == [
         "schema",
         "id",
-        "dependent_prs",
         "feature_ids",
-        "intent",
-        "acceptance_criteria",
-        "expected_tests",
-        "required_test_cases",
-        "expected_outcomes",
-        "non_goals",
-        "risks",
+        "proposed_prs",
     ]
+
+
+def test_validate_unified_proposed_pr_effects_match_v1_files(tmp_path: Path) -> None:
+    _write_implementation_specification(tmp_path)
+    proposal_dir = tmp_path / "docs" / "proposals" / "feature-a"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "architecture-specification.yaml").write_text(
+        """
+        id: architecture-1
+        entities:
+          - id: entity-a
+            action: added
+        modules: []
+        tools: []
+        entity_relationships: []
+        """,
+        encoding="utf-8",
+    )
+    (proposal_dir / "implementation-specification.yaml").write_text(
+        """
+        features:
+          - id: feature-a
+            action: added
+            description: Add feature.
+            functional_requirements: [Do it.]
+        decisions: []
+        entities: []
+        modules: []
+        tools: []
+        entity_relationships: []
+        """,
+        encoding="utf-8",
+    )
+    proposed = """
+    schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+    id: feature-a
+    feature_ids: [feature-a]
+    proposed_prs:
+      - id: feature-a-core
+        dependent_prs: []
+        changes:
+          entities:
+            - id: entity-a
+              action: added
+          features:
+            - id: feature-a
+              action: added
+        intent:
+          problem: Need the feature.
+          goal: Add the feature.
+          reasoning: It is required.
+    """
+    report = build_pr_specification_validation_report(
+        proposed,
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=proposal_dir / "proposed-pr-specification.yaml",
+    )
+    assert report.validation_successful is True
+
+
+def test_unified_proposed_pr_dependency_graph_is_loaded_from_one_file(
+    tmp_path: Path,
+) -> None:
+    proposal_path = (
+        tmp_path / "docs" / "proposals" / "feature-a" / "proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True)
+    proposal_path.write_text(
+        """
+        id: feature-a
+        proposed_prs:
+          - id: feature-a-core
+            dependent_prs: []
+          - id: feature-a-docs
+            dependent_prs: [feature-a-core]
+        """,
+        encoding="utf-8",
+    )
+    assert pr_specification_module.load_proposed_pr_dependency_graph(tmp_path) == {
+        "feature-a-core": (),
+        "feature-a-docs": ("feature-a-core",),
+    }
 
 
 def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:

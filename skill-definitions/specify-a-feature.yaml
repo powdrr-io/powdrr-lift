@@ -200,8 +200,10 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    Invoke the declared pr-specification generator exactly once; do not edit the
-    generated file. It overwrites unreadable/invalid existing content and merges
+    Invoke the declared pr-specification generator exactly once; it creates one
+    feature-level proposed-pr-specification.yaml containing every proposed PR.
+    Do not create one proposed-PR file per PR and do not edit the generated file
+    in this step. It overwrites unreadable/invalid existing content and merges
     readable values into the fresh template while restoring instructions and
     missing default fields.
   pre_step:
@@ -218,9 +220,14 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Fill the generated PR template with intent, criteria, tests, and risks using
-    yaml_edit. Do not invoke tools in this step; after the YAML edit choose
-    next_step and let the later deterministic evaluation step validate the file.
+    Fill the single generated proposed-pr-specification.yaml with an ordered
+    proposed_prs entry for every proposed PR. For each entry, record
+    dependent_prs, intent, acceptance details, and changes. The changes sections
+    must contain the exact ordered id/action effects from the v1 architecture
+    and implementation specification files for the feature. Do not invoke tools
+    in this step; after the YAML edit choose next_step and let the later
+    deterministic evaluation step validate both structure and effect
+    equivalence.
 - id: evaluate-feature-specifications
   description: Deterministically evaluate every generated specification before implementation.
   step_type: invoke_tool

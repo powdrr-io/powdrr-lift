@@ -1040,16 +1040,13 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "<proposed-pr-name>",
         "--template-value",
         "proposed-pr-id=<proposed-pr-name>",
-        "--depends-on-workflow",
-        "<predecessor-workflow-id>",
         "--template",
         "templates/execute-proposed-pr.yaml",
     )
     instantiate_details = step("instantiate-execution-workflows").details
     assert instantiate_details is not None
-    assert "repeat --depends-on-workflow" in instantiate_details
-    assert "Omit that option for a workflow with no predecessors" in instantiate_details
-    assert "mandatory command arguments" in instantiate_details
+    assert "Do not pass workflow dependencies manually" in instantiate_details
+    assert "unified proposed-PR specification" in instantiate_details
     dependency_step = step("verify-workflow-dependencies")
     assert dependency_step.step_type == "freeform"
     dependency_details = dependency_step.details

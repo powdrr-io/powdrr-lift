@@ -108,6 +108,10 @@ from powdrr_lift.workflow_chat_agent import (
     run_workflow_chat,
 )
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
+from powdrr_lift.workflow_definition_analysis import (
+    analyze_workflow_definition,
+    render_skill_prompt_snapshots,
+)
 from powdrr_lift.workflow_git import (
     WorkflowGitState,
     cleanup_workflow_run,
@@ -1031,6 +1035,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the complete scenario result as JSON.",
     )
     workflow_scenario_parser.set_defaults(func=_run_workflow_scenario)
+
+    definition_validation_parser = subparsers.add_parser(
+        "validate-workflow-definition",
+        aliases=["validate_workflow_definition"],
+        help=(
+            "Run schema and deterministic confusion checks for a skill or "
+            "workflow template."
+        ),
+    )
+    definition_validation_parser.add_argument("definition", type=Path)
+    definition_validation_parser.add_argument("--json", action="store_true")
+    definition_validation_parser.set_defaults(func=_run_validate_workflow_definition)
+
+    prompt_snapshot_parser = subparsers.add_parser(
+        "render-workflow-prompts",
+        aliases=["render_workflow_prompts"],
+        help="Render normalized production prompt snapshots for every skill step.",
+    )
+    prompt_snapshot_parser.add_argument("--definition", required=True, type=Path)
+    prompt_snapshot_parser.add_argument("--output-dir", required=True, type=Path)
+    prompt_snapshot_parser.add_argument("--repo-root", type=Path)
+    prompt_snapshot_parser.set_defaults(func=_run_render_workflow_prompts)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -2834,6 +2860,31 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
         if result.worktree_root is not None:
             print(f"Retained failed scenario repository: {result.worktree_root}")
     return 0 if result.status == "passed" else 1
+
+
+def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
+    report = analyze_workflow_definition(args.definition)
+    data = report.to_data()
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    elif report.validation_successful:
+        print(f"Workflow definition valid: {report.definition}")
+    else:
+        print(f"Workflow definition invalid: {report.definition}", file=sys.stderr)
+        for issue in report.issues:
+            print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
+    return 0 if report.validation_successful else 1
+
+
+def _run_render_workflow_prompts(args: argparse.Namespace) -> int:
+    paths = render_skill_prompt_snapshots(
+        args.definition,
+        output_dir=args.output_dir,
+        repo_root=args.repo_root,
+    )
+    for path in paths:
+        print(path)
+    return 0
 
 
 def _read_llm_exchange(path: Path) -> object:

@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 WORKFLOW_LLM_ERROR_LOG = "workflow-llm-errors.jsonl"
+WORKFLOW_OBSERVER_LOG = "workflow-observer-events.jsonl"
 
 
 def record_workflow_llm_error(
@@ -48,6 +49,44 @@ def record_workflow_llm_error(
         record["guidance"] = guidance
 
     path = repo_root / WORKFLOW_LLM_ERROR_LOG
+    try:
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+    except OSError:
+        return None
+    return path
+
+
+def record_workflow_observer_event(
+    repo_root: Path,
+    *,
+    execution_mode: str,
+    trigger: str,
+    fingerprint: str,
+    context: Mapping[str, Any],
+    packet: Mapping[str, Any] | None = None,
+    decision: Mapping[str, Any] | None = None,
+    error: BaseException | None = None,
+) -> Path | None:
+    """Append one repository-root shadow-observer event."""
+    record: dict[str, Any] = {
+        "schema_version": 1,
+        "record_id": str(uuid4()),
+        "recorded_at": datetime.now(UTC).isoformat(),
+        "execution_mode": execution_mode,
+        "phase": "observer_shadow",
+        "trigger": trigger,
+        "fingerprint": fingerprint,
+        "context": dict(context),
+    }
+    if packet is not None:
+        record["observer_packet"] = dict(packet)
+    if decision is not None:
+        record["observer_decision"] = dict(decision)
+    if error is not None:
+        record["error_type"] = type(error).__name__
+        record["error"] = str(error)
+    path = repo_root / WORKFLOW_OBSERVER_LOG
     try:
         with path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")

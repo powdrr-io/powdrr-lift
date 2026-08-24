@@ -113,6 +113,11 @@ from powdrr_lift.workflow_llm import (
 from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
+from powdrr_lift.workflow_observer import (
+    ObserverExecutionContext,
+    ShadowWorkflowObserver,
+    compact_observer_mapping,
+)
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
@@ -2580,6 +2585,69 @@ def run_workflow_chat(
         provider=provider,
         driver=driver,
     )
+    observer_provider = provider_roles.provider_for(provider_role)
+    observer_mapping = (
+        _resolve_llm_mapping(
+            "high_reasoning",
+            mappings=_active_llm_mappings(config, provider_roles, provider_role),
+            provider=observer_provider,
+        )
+        if _provider_supports_llm_mappings(observer_provider)
+        else None
+    )
+    if observer_mapping is not None:
+
+        def observer_context() -> ObserverExecutionContext:
+            step = execution_strategy.current_step
+            validation_state = _validation_gate_prompt_data(execution_state) or {}
+            current_step_events = [
+                event
+                for event in execution_state.execution_events
+                if event.get("step_index") == execution_strategy.current_step_index
+            ]
+            validation_state = {
+                "gate": validation_state,
+                "issue_count": sum(
+                    event.get("kind") in {"validation_error", "action_error"}
+                    for event in current_step_events
+                ),
+            }
+            root_request = next(
+                (
+                    item["content"]
+                    for item in execution_state.transcript
+                    if item.get("role") == "user"
+                ),
+                user_request,
+            )
+            return ObserverExecutionContext(
+                execution_mode="execute_selected_skill",
+                root_intent=root_request,
+                skill_or_workflow=execution_strategy.selected_skill.skill.name,
+                current_step_id=str(
+                    getattr(step, "id", None)
+                    or f"step-{execution_strategy.current_step_index + 1}"
+                ),
+                current_step_intent=str(
+                    getattr(step, "description", None)
+                    or getattr(step, "details", None)
+                    or "Execute the current skill step."
+                ),
+                validation_state=validation_state,
+                handoff_state=compact_observer_mapping(execution_state.handoff_records),
+            )
+
+        driver.observer = ShadowWorkflowObserver(
+            client=client_for_model(
+                observer_mapping.model,
+                observer_mapping.provider,
+            ),
+            model=observer_mapping.model,
+            provider=observer_mapping.provider,
+            worktree_root=worktree_root,
+            log_root=project_root,
+            context_provider=observer_context,
+        )
     exit_code = driver.run(
         execution_strategy,
         max_roundtrips=None,

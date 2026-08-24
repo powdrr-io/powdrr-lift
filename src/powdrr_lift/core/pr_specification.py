@@ -100,7 +100,11 @@ def pr_specification_default_output_path(
     )
 
 
-def render_pr_specification_template(*, repo_root: str | Path | None = None) -> str:
+def render_pr_specification_template(
+    *,
+    repo_root: str | Path | None = None,
+    work_item_name: str | None = None,
+) -> str:
     repo_root_path = _resolve_repo_root(repo_root)
     feature_catalog = _load_feature_catalog(repo_root_path)
     if not feature_catalog:
@@ -118,6 +122,10 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         for entry in feature_catalog
     ]
 
+    authoritative_effects = _load_authoritative_effects(
+        repo_root_path,
+        work_item_name=work_item_name,
+    )
     lines = [
         "# PR specification template.",
         "#",
@@ -136,14 +144,10 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "#   (`entities`, `modules`, `tools`, `entity_relationships`, `features`,",
         "#   and `decisions`), record every action-bearing id once and label each",
         "#   item with the proposed_pr_id that will deliver it.",
-        "#   in execution order. The combined ordered effects must match those",
-        "#   v1 files exactly; do not omit or invent an id/action pair.",
+        "#   These IDs and actions are copied from the authoritative v1 proposal",
+        "#   specs and must not be changed, omitted, or duplicated.",
         "# - Delete these instructions and replace them with this comment at the top:",
         '#   "# This file is read-only and should never be edited by a tool or agent."',
-        "# - Add acceptance criteria, expected tests, expected outcomes,",
-        "#   required test cases, non-goals, and risks as concrete lists with `id` and",
-        "#   `description`.",
-        "# - Keep every detail id globally unique across those six sections.",
         "#",
         "# Current feature ids:",
         *feature_lines,
@@ -156,10 +160,78 @@ def render_pr_specification_template(*, repo_root: str | Path | None = None) -> 
         "    intent: null",
         "    justification: null",
         "    dependent_prs: []",
-        *[f"{section}: []" for section in _EFFECT_SECTIONS],
+        *[
+            line
+            for section in _EFFECT_SECTIONS
+            for line in _render_authoritative_effect_section(
+                section,
+                authoritative_effects.get(section, ()),
+            )
+        ],
         "",
     ]
     return "\n".join(lines)
+
+
+def _load_authoritative_effects(
+    repo_root: Path,
+    *,
+    work_item_name: str | None,
+) -> dict[str, tuple[tuple[str, str], ...]]:
+    effects: dict[str, list[tuple[str, str]]] = {
+        section: [] for section in _EFFECT_SECTIONS
+    }
+    if work_item_name is None:
+        return {section: tuple(items) for section, items in effects.items()}
+    proposal_dir = repo_root / PROPOSALS_ROOT / work_item_name
+    seen: dict[str, set[tuple[str, str]]] = {
+        section: set() for section in _EFFECT_SECTIONS
+    }
+    for filename in _EFFECT_SOURCE_FILES:
+        path = proposal_dir / filename
+        if not path.is_file():
+            continue
+        try:
+            data = _load_yaml_mapping(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        for section in _EFFECT_SECTIONS:
+            raw_items = data.get(section, [])
+            if not isinstance(raw_items, Sequence) or isinstance(
+                raw_items, (str, bytes)
+            ):
+                continue
+            for item in raw_items:
+                if not isinstance(item, Mapping):
+                    continue
+                item_id = _optional_string(item.get("id"))
+                action = _optional_string(item.get("action"))
+                if item_id is None or action is None:
+                    continue
+                effect = (item_id, action)
+                if effect not in seen[section]:
+                    seen[section].add(effect)
+                    effects[section].append(effect)
+    return {section: tuple(items) for section, items in effects.items()}
+
+
+def _render_authoritative_effect_section(
+    section: str,
+    effects: Sequence[tuple[str, str]],
+) -> list[str]:
+    lines = [f"{section}:"]
+    if not effects:
+        lines[-1] = f"{section}: []"
+        return lines
+    for item_id, action in effects:
+        lines.extend(
+            [
+                f"  - id: {item_id}",
+                f"    action: {action}",
+                "    proposed_pr_id: null",
+            ]
+        )
+    return lines
 
 
 def create_pr_specification_template(
@@ -182,7 +254,10 @@ def create_pr_specification_template(
     )
     resolved_output_path.write_text(
         merge_existing_template_content(
-            render_pr_specification_template(repo_root=repo_root_path),
+            render_pr_specification_template(
+                repo_root=repo_root_path,
+                work_item_name=work_item_name,
+            ),
             existing_content,
         ),
         encoding="utf-8",
@@ -755,6 +830,9 @@ def _validate_v1_effect_equivalence(
     source_effects: dict[str, list[tuple[str, str]]] = {
         section: [] for section in _EFFECT_SECTIONS
     }
+    seen_source_effects: dict[str, set[tuple[str, str]]] = {
+        section: set() for section in _EFFECT_SECTIONS
+    }
     found_source = False
     for filename in _EFFECT_SOURCE_FILES:
         path = proposal_dir / filename
@@ -783,11 +861,17 @@ def _validate_v1_effect_equivalence(
                     item_id = _optional_string(item.get("id"))
                     action = _optional_string(item.get("action"))
                     if item_id is not None and action is not None:
-                        source_effects[section].append((item_id, action))
+                        effect = (item_id, action)
+                        if effect not in seen_source_effects[section]:
+                            seen_source_effects[section].add(effect)
+                            source_effects[section].append(effect)
     if not found_source:
         return
     proposed_effects: dict[str, list[tuple[str, str]]] = {
         section: [] for section in _EFFECT_SECTIONS
+    }
+    seen_proposed_effects: dict[str, set[tuple[str, str]]] = {
+        section: set() for section in _EFFECT_SECTIONS
     }
     for section in _EFFECT_SECTIONS:
         raw_items = raw_spec.get(section, [])
@@ -798,17 +882,42 @@ def _validate_v1_effect_equivalence(
                 item_id = _optional_string(item.get("id"))
                 action = _optional_string(item.get("action"))
                 if item_id is not None and action is not None:
-                    proposed_effects[section].append((item_id, action))
+                    effect = (item_id, action)
+                    if effect not in seen_proposed_effects[section]:
+                        seen_proposed_effects[section].add(effect)
+                        proposed_effects[section].append(effect)
     for section in _EFFECT_SECTIONS:
         if proposed_effects[section] != source_effects[section]:
+            expected = source_effects[section]
+            actual = proposed_effects[section]
+            missing = [effect for effect in expected if effect not in actual]
+            unexpected = [effect for effect in actual if effect not in expected]
+            details = [
+                f"Expected ordered id/action pairs: {_format_effect_pairs(expected)}.",
+                f"Actual ordered id/action pairs: {_format_effect_pairs(actual)}.",
+            ]
+            if missing:
+                details.append(f"Missing: {_format_effect_pairs(missing)}.")
+            if unexpected:
+                details.append(f"Unexpected: {_format_effect_pairs(unexpected)}.")
             issues.append(
                 PRSpecificationValidationIssue(
                     "v1_effect_mismatch",
-                    f"Proposed PR {section} entries do not match the ordered "
-                    "id/action effects in the v1 specification files.",
+                    f"Proposed PR {section} entries do not match the authoritative "
+                    "ordered id/action effects. " + " ".join(details),
                     f"proposed_prs.{section}",
                 )
             )
+
+
+def _format_effect_pairs(effects: Sequence[tuple[str, str]]) -> str:
+    if not effects:
+        return "[]"
+    return (
+        "["
+        + ", ".join(f"({item_id!r}, {action!r})" for item_id, action in effects)
+        + "]"
+    )
 
 
 def _collect_dependent_pr_ids(

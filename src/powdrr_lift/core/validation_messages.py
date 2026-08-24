@@ -138,6 +138,24 @@ class WorkflowToolAction(CorrectiveAction):
         )
 
 
+class EffectMismatchAction(CorrectiveAction):
+    def applies_to(self, code: str) -> bool:
+        return code.casefold() == "v1_effect_mismatch"
+
+    def instructions(self, error: ValidationError) -> str:
+        return (
+            f"{error.message} Use the exact expected id/action pairs from the "
+            "message. For each missing pair, use yaml_edit upsert_item keyed by "
+            "the authoritative id, for example: "
+            '{"action":"yaml_edit","file_path":"docs/proposals/<feature-name>/proposed-pr-specification.yaml",'
+            '"operations":[{"op":"upsert_item","section":"<section>",'
+            '"id":"<authoritative-id>","value":{"id":"<authoritative-id>",'
+            '"action":"added|removed","proposed_pr_id":"<declared-pr-id>"}}]}. '
+            "Do not use positional set_value to append an item, change the "
+            "authoritative id/action, or add an effect absent from the source."
+        )
+
+
 class GenericValidationAction(CorrectiveAction):
     def applies_to(self, code: str) -> bool:
         return True
@@ -158,6 +176,7 @@ _ACTIONS: tuple[CorrectiveAction, ...] = (
     MissingValueAction(),
     ParseAction(),
     WorkflowToolAction(),
+    EffectMismatchAction(),
     GenericValidationAction(),
 )
 
@@ -259,6 +278,36 @@ def validation_error_to_data(
             '"path":["title"],"value":"System"}]}'
         )
         yaml_path = _yaml_path_from_error(error.path)
+        if "yaml_edit" not in data:
+            data["yaml_edit"] = {
+                "kind": "yaml_edit",
+                "file_path": file_path,
+                "operations": [
+                    {
+                        "op": "set_value",
+                        "path": yaml_path or ["<field>"],
+                        "value": "<correct-value>",
+                    }
+                ],
+            }
+        if error.code.casefold() == "v1_effect_mismatch":
+            section = (error.path or "").rsplit(".", maxsplit=1)[-1]
+            data["yaml_edit"] = {
+                "kind": "yaml_edit",
+                "file_path": file_path,
+                "operations": [
+                    {
+                        "op": "upsert_item",
+                        "section": section,
+                        "id": "<authoritative-id>",
+                        "value": {
+                            "id": "<authoritative-id>",
+                            "action": "added|removed",
+                            "proposed_pr_id": "<declared-pr-id>",
+                        },
+                    }
+                ],
+            }
         if error.code.casefold() == "unknown_field" and yaml_path is not None:
             data["yaml_edit"] = {
                 "kind": "yaml_edit",

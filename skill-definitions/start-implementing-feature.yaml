@@ -197,8 +197,9 @@ steps:
     intent, justification, and dependent_prs. In the feature-wide
     specification-v1 sections, list every entity/module/tool/relationship/
     feature/decision change exactly once and label it with a declared
-    proposed_pr_id. Do not put change lists inside individual proposed PR
-    entries.
+    proposed_pr_id. Keep the generated id/action pairs exactly as provided by
+    the authoritative proposal specs; only fill proposed_pr_id. Do not put
+    change lists inside individual proposed PR entries.
     Remove generator
     instructions and instructional comments. Do not leave null, empty, example,
     or TODO values in required fields. Use yaml_edit for all YAML changes in
@@ -224,7 +225,10 @@ steps:
   details: >-
     Review the deterministic evaluator result and repair every reported issue in
     the single proposed-pr-specification.yaml with yaml_edit. Use the
-    evaluator's corrective guidance and exact paths. Do not instantiate
+    evaluator's specific error details, expected/actual id-action pairs, exact
+    paths, and yaml_edit example. For v1 effect mismatches, use upsert_item with
+    the authoritative id and action shown by the evaluator; never use positional
+    set_value to append list entries or change an authoritative id/action. Do not instantiate
     workflows, stage artifacts, request approval, or create a pull request while
     the proposed PR file is invalid. After changing the YAML, choose next_step
     so deterministic evaluation runs again; if no repair is needed, proceed to

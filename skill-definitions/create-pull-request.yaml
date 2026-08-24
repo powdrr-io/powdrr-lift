@@ -45,9 +45,14 @@ steps:
     exact action shape is
     {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["path/to/file"]}}.
     Do not use `git add .`, `git add --all`, or stage logs, caches, or unrelated
-    files. Verify the staged names with `git diff --cached --name-only`; do not
-    advance until every intended path is staged and no unintended path is
-    staged.
+    files. If `git status --short` shows an untracked or modified path that is
+    not in `files_to_publish`, delete it before staging. This includes the
+    agent-generated `agent_error.txt`; delete it with the intrinsic
+    file-management action exactly as
+    {"action":"file_management","operation":"delete","file_path":"agent_error.txt"}.
+    Do not stage or preserve that file in the pull request. Verify the staged
+    names with `git diff --cached --name-only`; do not advance until every
+    intended path is staged and no unintended path is staged.
   tool_invocations:
   - tool: git
     command:
@@ -65,8 +70,12 @@ steps:
     successful no-change outcome: an earlier action already committed the
     exact state, so continue without creating an empty commit. If status shows
     unstaged or untracked paths, stop and correct each one: stage an intended
-    path with the intrinsic git add action, or delete an unintended path with
-    the file-management action. Rerun status, then retry the commit only after
+    path with the intrinsic git add action. For every unstaged or untracked path
+    that is not in `files_to_publish`, delete it with the intrinsic
+    file-management action before retrying. In particular, delete the
+    agent-generated `agent_error.txt` with exactly
+    {"action":"file_management","operation":"delete","file_path":"agent_error.txt"};
+    never add it to the commit. Rerun status, then retry the commit only after
     the worktree is clean or the intended changes are staged. Do not push or
     invoke any GitHub command in this step.
   tool_invocations:

@@ -148,6 +148,24 @@ def test_full_workflow_run_does_not_select_a_single_task() -> None:
     assert "--task-id" not in command
 
 
+def test_harness_defaults_to_the_checked_in_workflow_without_instantiation() -> None:
+    module = _harness_module()
+
+    assert module.DEFAULT_WORKFLOW_DIR == Path("docs/workflows/interaction-file-log")
+    args = SimpleNamespace(provider="auto", max_roundtrips=None, verbose=False)
+    command = module._build_task_command(
+        repo_root=Path("."),
+        workflow_dir=module.DEFAULT_WORKFLOW_DIR,
+        task=None,
+        args=args,
+    )
+
+    assert command[command.index("--workflow-dir") + 1] == str(
+        module.DEFAULT_WORKFLOW_DIR
+    )
+    assert "instantiate-workflow" not in command
+
+
 def test_repair_command_timeout_kills_the_process_group(tmp_path: Path) -> None:
     module = _harness_module()
 

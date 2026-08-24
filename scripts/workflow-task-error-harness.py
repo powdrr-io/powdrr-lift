@@ -35,6 +35,7 @@ from powdrr_lift.workflow_git import (
 DEFAULT_ERROR_LOG = Path("workflow-llm-errors.jsonl")
 DEFAULT_TRANSCRIPT_DIR = Path("workflow-task-harness")
 DEFAULT_REPORT = Path("workflow-task-harness-report.json")
+DEFAULT_WORKFLOW_DIR = Path("docs/workflows/interaction-file-log")
 _FAILURE_MARKERS = (
     "action failed",
     "validation_error",
@@ -51,15 +52,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workflow-dir",
         type=Path,
-        required=True,
-        help="Directory containing the instantiated workflow task documents.",
+        default=DEFAULT_WORKFLOW_DIR,
+        help=(
+            "Directory containing the existing workflow task documents "
+            f"(default: {DEFAULT_WORKFLOW_DIR})."
+        ),
     )
     parser.add_argument(
         "--template-path",
         type=Path,
         help=(
-            "Workflow template used to create the instance. If omitted, the harness "
-            "infers a unique template by matching task descriptions."
+            "Optional workflow document supplied to repair hooks. The harness "
+            "does not create or instantiate workflows."
         ),
     )
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
@@ -687,7 +691,10 @@ def main() -> int:
         if template_path is not None and not template_path.is_absolute():
             template_path = run_root / template_path
         if template_path is None:
-            template_path = _infer_template(run_root, workflow_dir)
+            # This harness executes an existing durable workflow. It must not
+            # infer or instantiate a template as part of the run. Keep the
+            # workflow document available as context for optional repair hooks.
+            template_path = workflow_dir / "interaction-file-log-core-workflow.yaml"
         if not template_path.is_file():
             raise SystemExit(f"Workflow template does not exist: {template_path}")
 

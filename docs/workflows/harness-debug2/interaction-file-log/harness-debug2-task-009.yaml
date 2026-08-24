@@ -1,0 +1,33 @@
+task_id: harness-debug2-task-009
+status: open
+upstream_task_ids:
+- harness-debug2-task-008
+dependent_state:
+- full-tests-run
+complexity: high
+input_state:
+  final_implementation_test_results: harness-debug2-task-008.final-implementation-test-results-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: all-tests-results-state
+description: Run the full test suite
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+details: 'The deterministic full test command already ran. Assign the complete result
+  to all-tests-results-state. Do not diagnose or repair in this step. Use a next_step
+  action with the exact command, return code, and summary: {"action":"next_step","outputs":{"all-tests-results-state":{"command":"pytest
+  -q","returncode":0,"summary":"All tests passed."}},"decisions_and_context":"Recorded
+  the deterministic full-suite result."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''harness-debug2''. Use these values as search context and verify repository
+  documents before deciding what they identify.'
+llm_type: fast_iteration
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - pytest
+    - -q

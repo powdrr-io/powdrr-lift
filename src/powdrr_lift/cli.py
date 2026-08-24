@@ -1290,10 +1290,20 @@ def _stage_generated_file(repo_root: Path, output_path: Path) -> None:
             f"Could not stage generated file {relative_path}: {staged.stderr.strip()}"
         )
     if os.environ.get("POWDRR_FILE_ADDED_EVENTS") == "1":
-        print(
-            f"{_WORKFLOW_FILE_ADDED_EVENT_PREFIX}{relative_path}",
-            file=sys.stderr,
-        )
+        resolved_output_path = output_path.resolve()
+        if resolved_output_path.is_dir():
+            added_paths = sorted(
+                path.relative_to(repo_root.resolve())
+                for path in resolved_output_path.rglob("*")
+                if path.is_file()
+            )
+        else:
+            added_paths = [relative_path]
+        for added_path in added_paths:
+            print(
+                f"{_WORKFLOW_FILE_ADDED_EVENT_PREFIX}{added_path}",
+                file=sys.stderr,
+            )
 
 
 def _run_repository_state(args: argparse.Namespace) -> int:

@@ -1731,7 +1731,7 @@ def test_textual_orange_panels_share_the_width() -> None:
                 app.query_one("#workflow-panels").region.height,
             )
 
-    assert asyncio.run(exercise()) == (40, 40, 10)
+    assert asyncio.run(exercise()) == (40, 40, 12)
 
 
 def test_textual_panels_place_green_output_above_orange_steps() -> None:
@@ -1767,7 +1767,7 @@ def test_visible_step_window_is_limited_to_ten_steps() -> None:
 
 
 def test_textual_long_step_list_shows_requested_window() -> None:
-    async def exercise() -> list[str]:
+    async def exercise() -> tuple[list[str], float]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
         app._stop_requested.set()
         skill = SkillCatalogEntry(
@@ -1783,12 +1783,14 @@ def test_textual_long_step_list_shows_requested_window() -> None:
         async with app.run_test() as pilot:
             app._apply_progress(skill, current_step_index=5, status="running")
             await pilot.pause()
-            return [
-                str(label.render())
-                for label in app.query_one("#steps", ListView).query(Label)
-            ]
+            steps = app.query_one("#steps", ListView)
+            return (
+                [str(label.render()) for label in steps.query(Label)],
+                steps.scroll_y,
+            )
 
-    assert asyncio.run(exercise()) == [
+    labels, scroll_y = asyncio.run(exercise())
+    assert labels == [
         "5. Step 5",
         "6. Step 6",
         "7. Step 7",
@@ -1800,6 +1802,30 @@ def test_textual_long_step_list_shows_requested_window() -> None:
         "13. Step 13",
         "20. Step 20",
     ]
+    assert scroll_y == 0
+
+
+def test_textual_nested_steps_fit_without_scrolling() -> None:
+    async def exercise() -> tuple[int, float]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        parent = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
+        nested = SkillCatalogEntry(Path("nested.yaml"), _build_skill())
+        async with app.run_test() as pilot:
+            app._apply_progress(
+                nested,
+                current_step_index=0,
+                status="running",
+                parent_skill=parent,
+                parent_step_index=0,
+            )
+            await pilot.pause()
+            steps = app.query_one("#steps", ListView)
+            return steps.region.height, steps.scroll_y
+
+    height, scroll_y = asyncio.run(exercise())
+    assert height == 12
+    assert scroll_y == 0
 
 
 def test_textual_completed_skill_removes_orange_step_list() -> None:

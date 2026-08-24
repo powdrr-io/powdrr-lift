@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift import parse_change_log, parse_validation_report
-from powdrr_lift.cli import main
+from powdrr_lift.cli import _stage_generated_file, main
 from powdrr_lift.workflow_human_task import HumanTaskRunnerConfig
 from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig
 
@@ -46,6 +46,30 @@ def test_cli_init_writes_template(
     assert [change.path for change in change_log.file_changes] == [
         "src/app.py",
         "tests/test_app.py",
+    ]
+
+
+def test_staging_generated_directory_emits_each_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    generated = repo_root / "generated"
+    (generated / "nested").mkdir(parents=True)
+    (generated / "second.yaml").write_text("second\n", encoding="utf-8")
+    (generated / "nested" / "first.yaml").write_text("first\n", encoding="utf-8")
+    monkeypatch.setenv("POWDRR_FILE_ADDED_EVENTS", "1")
+    stderr = io.StringIO()
+
+    with redirect_stderr(stderr):
+        _stage_generated_file(repo_root, generated)
+
+    assert stderr.getvalue().splitlines() == [
+        "[powdrr-file-added] generated/nested/first.yaml",
+        "[powdrr-file-added] generated/second.yaml",
+    ]
+    assert _git_output(repo_root, "diff", "--cached", "--name-only").splitlines() == [
+        "generated/nested/first.yaml",
+        "generated/second.yaml",
     ]
 
 

@@ -26,9 +26,10 @@ steps:
   details: >-
     Inspect the latest deterministic full-suite result and the supplied
     implementation and generated-test context. If returncode is zero, make no
-    edits and return goto_step to finish-test-validation. If any test fails,
-    identify the reported cause and make one focused edit to an approved product
-    or test file, then return next_step so the rerun gate executes. Do not edit
+    edits and return next_step so the rerun gate confirms the passing result. If
+    any test fails, identify the reported causes and make all necessary focused
+    edits to approved product or test files, then return next_step so the rerun
+    gate executes. Do not edit
     documentation, workflow files, configuration, dependencies, or unrelated
     files. Do not weaken or delete tests to hide a failure. Do not run tests in
     this step; the deterministic rerun gate is authoritative.
@@ -53,17 +54,6 @@ steps:
       equals: 0
     goto_step: diagnose-test-results
     retry_context: >-
-      The complete test suite still failed. Inspect the latest result, make one
-      focused repair to an approved product or test file, and return next_step
-      so the gate reruns. All tests must pass before completion.
-- id: finish-test-validation
-  description: Record the passing complete test result.
-  step_type: freeform
-  llm_type: fast_iteration
-  details: >-
-    Confirm that the latest deterministic complete test result has returncode
-    zero. If it does, return complete with the exact command, return code, and
-    summary in all-tests-results-state. If it does not, make no claim of
-    success; return goto_step to rerun-all-tests after any permitted focused
-    repair. Use this shape:
-    {"action":"complete","output_state":{"all-tests-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All tests passed."}},"decisions_and_context":"Verified that the complete test suite passes after implementation fixes."}
+      The complete test suite still failed. Inspect the latest result, make all
+      necessary focused repairs to approved product or test files, and return
+      next_step so the gate reruns. All tests must pass before completion.

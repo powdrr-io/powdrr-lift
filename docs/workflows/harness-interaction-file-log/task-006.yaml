@@ -1,0 +1,33 @@
+task_id: task-006
+status: open
+upstream_task_ids:
+- task-005
+dependent_state:
+- implementation-tests-run
+complexity: medium
+input_state:
+  implementation_diffs: task-005.generated-product-code-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: implementation-test-results-state
+description: Run the implementation test suite
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+details: 'The deterministic implementation test command already ran. Assign its complete
+  result to implementation-test-results-state; do not fix failures or claim success
+  from memory. Complete with a next_step action such as: {"action":"next_step","outputs":{"implementation-test-results-state":{"command":"pytest
+  -q","returncode":0,"summary":"All implementation tests passed."}},"decisions_and_context":"Recorded
+  the deterministic implementation test result."}
+
+
+  Instantiation context: work item name is ''harness-interaction-file-log''; workflow
+  instance name is ''harness-interaction-file-log''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: fast_iteration
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - pytest
+    - -q

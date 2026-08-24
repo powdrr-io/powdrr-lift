@@ -1,0 +1,34 @@
+task_id: task-008
+status: open
+upstream_task_ids:
+- task-007
+dependent_state:
+- final-implementation-tests-run
+complexity: high
+input_state:
+  implementation_test_repair: task-007.implementation-test-repair-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: final-implementation-test-results-state
+description: Rerun the implementation test suite after repair
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+details: 'The deterministic implementation test command already reran after the repair
+  task. Assign the complete result to final-implementation-test-results-state. Do
+  not diagnose or repair in this step. Use one next_step action with the exact command,
+  return code, and summary: {"action":"next_step","outputs":{"final-implementation-test-results-state":{"command":"pytest
+  -q","returncode":0,"summary":"All implementation tests passed after repair."}},"decisions_and_context":"Verified
+  the repair with a deterministic implementation-test rerun."}
+
+
+  Instantiation context: work item name is ''harness-interaction-file-log''; workflow
+  instance name is ''harness-interaction-file-log''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: fast_iteration
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - pytest
+    - -q

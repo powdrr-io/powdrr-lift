@@ -4317,9 +4317,10 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "its gathered context to the caller.\n"
         "- goto_step: choose this when the current step explicitly says to repeat "
         "work. Set step_id to the labeled target step and include the progress "
-        "that proves why another iteration is needed. Use it until the current "
-        "step's stated completion condition is satisfied. Never use an unknown "
-        "step_id or jump without making progress.\n"
+        "that proves why another iteration is needed. The target must be a prior "
+        "step in this skill; never jump to the current or a later step. Use it "
+        "until the current step's stated completion condition is satisfied. Never "
+        "use an unknown step_id or jump without making progress.\n"
         "- invoke_tool: choose this only when the current step's explicitly "
         "listed tool_invocations support the tool needed for the next action.\n"
         "- read_document: choose this when you know the document path but need "
@@ -4330,7 +4331,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "- next_step: choose this when the current step is complete and the next "
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
-        "is required.\n"
+        "is required. Every later gate in this skill must already have passed; "
+        "you cannot complete while a gate remains further ahead.\n"
         "These next_step and complete rules apply to every step, including steps "
         "whose optional prompt catalogs are omitted.\n"
         "When the current step declares outputs, provide the completed values "
@@ -4665,6 +4667,11 @@ def _modular_action_system_prompt(
             "is unchanged or worse, change the target or repair strategy; do not keep "
             "retrying the same action.\n"
         )
+    prompt += (
+        "Transition rules are enforced by the runtime: goto_step may target only a "
+        "prior step in this skill, never the current or a later step, and complete "
+        "is invalid while any gate remains later in this skill.\n"
+    )
     if getattr(current_step, "prompt_catalogs", None) is None or include_context:
         prompt += (
             "Structured-file guidance: use yaml_edit for YAML specifications, combine "
@@ -6238,6 +6245,33 @@ def _validate_workflow_step_transition(
     """Prevent the LLM from skipping a step's required tool invocation."""
     if action.kind not in {"next_step", "goto_step", "complete"}:
         return
+    if action.kind == "goto_step":
+        if state is None:
+            raise RuntimeError(
+                "Workflow goto_step validation requires the current skill state."
+            )
+        target_index = _step_index_by_id(state.selected_skill, action.step_id)
+        if target_index >= current_step_index:
+            raise RuntimeError(
+                "Workflow goto_step may target only a prior step in the current "
+                f"skill; {action.step_id!r} is not before step "
+                f"{current_step_index}."
+            )
+    if action.kind == "complete":
+        if state is None:
+            raise RuntimeError(
+                "Workflow complete validation requires the current skill state."
+            )
+        later_gates = tuple(
+            step.id or f"index {index}"
+            for index, step in enumerate(state.selected_skill.skill.steps)
+            if index > current_step_index and step.step_type == "gate"
+        )
+        if later_gates:
+            raise RuntimeError(
+                "Cannot complete the skill while later gate steps remain: "
+                + ", ".join(later_gates)
+            )
     if _validation_gate_enabled(step):
         gate_state = _validation_gate_state(state, step) if state is not None else None
         if gate_state is None or not gate_state.discovered:

@@ -881,6 +881,85 @@ def test_workflow_can_advance_after_empty_gather_context_result() -> None:
     )
 
 
+def test_goto_step_can_only_target_a_prior_step() -> None:
+    prior = SkillStep(id="prior", description="Repeat this step.")
+    current = SkillStep(id="current", description="Current step.")
+    later = SkillStep(id="later", description="Later step.")
+    selected_skill = SkillCatalogEntry(
+        Path("skill.yaml"),
+        Skill(name="transitions", when_to_use=(), steps=(prior, current, later)),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=1,
+        worktree_root=Path("."),
+    )
+
+    _validate_workflow_step_transition(
+        _parse_action_response({"kind": "goto_step", "step_id": "prior"}),
+        current,
+        [],
+        1,
+        state=state,
+    )
+    for target in ("current", "later"):
+        with pytest.raises(RuntimeError, match="only a prior step"):
+            _validate_workflow_step_transition(
+                _parse_action_response({"kind": "goto_step", "step_id": target}),
+                current,
+                [],
+                1,
+                state=state,
+            )
+
+
+def test_complete_cannot_bypass_a_later_gate() -> None:
+    current = SkillStep(id="current", description="Current step.")
+    later_gate = SkillStep(
+        id="validate",
+        description="Validate the result.",
+        step_type="gate",
+        gate=SkillStepGate(
+            outcome={"path": "returncode", "equals": 0},
+            goto_step="current",
+            retry_context="Repair the result.",
+        ),
+    )
+    selected_skill = SkillCatalogEntry(
+        Path("skill.yaml"),
+        Skill(name="gated", when_to_use=(), steps=(current, later_gate)),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+
+    with pytest.raises(RuntimeError, match="later gate steps remain"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"kind": "complete"}),
+            current,
+            [],
+            0,
+            state=state,
+        )
+
+    state.step_index = 1
+    _validate_workflow_step_transition(
+        _parse_action_response({"kind": "complete"}),
+        later_gate,
+        [],
+        1,
+        state=state,
+    )
+
+
 def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
     step = SkillStep(
         description="Run discovered checks.",

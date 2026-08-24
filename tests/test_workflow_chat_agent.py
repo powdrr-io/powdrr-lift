@@ -1457,6 +1457,7 @@ def test_textual_response_grows_and_submits_on_return(
 
     def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
         kwargs["stdout"].write("What do you want to do? ")
+        kwargs["stdout"].flush()
         received.append(kwargs["input_func"]())
         if len(received) == 1:
             skill_path = Path("skill-definitions/bootstrap-code-structure.yaml")
@@ -1576,6 +1577,7 @@ def test_textual_startup_shows_initial_question(
 ) -> None:
     def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
         kwargs["stdout"].write("What do you want to do? ")
+        kwargs["stdout"].flush()
         kwargs["input_func"]()
         return 1
 
@@ -2257,6 +2259,7 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
 
             def write_output() -> None:
                 output.write("What do you want to do? ")
+                output.flush()
                 output.write("Matched skill: specify-a-feature\n")
                 output.write(
                     "1. What is the feature goal?\n"
@@ -2284,6 +2287,28 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
         "Matched skill: next-skill\n\n"
         "Next question?"
     )
+
+
+def test_textual_output_buffers_partial_writes_until_the_line_is_complete() -> None:
+    async def exercise() -> str:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        app._workflow_active = True
+        async with app.run_test() as pilot:
+            output = _TextualStdoutOutput(app)
+
+            def write_output() -> None:
+                output.write("ok workf")
+                output.write("low chat\n")
+                output.flush()
+
+            writer = Thread(target=write_output)
+            writer.start()
+            await pilot.pause()
+            writer.join()
+            return str(app.query_one("#status", Static).render())
+
+    assert asyncio.run(exercise()) == ("Powdrr Agent v0.0.1\n\nok workflow chat")
 
 
 def test_textual_execution_transition_retains_output_history() -> None:
@@ -2455,6 +2480,7 @@ def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> No
 
             def write_initial_prompt() -> None:
                 output.write("What do you want to do? ")
+                output.flush()
 
             writer = Thread(target=write_initial_prompt)
             writer.start()

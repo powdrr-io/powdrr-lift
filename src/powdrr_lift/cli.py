@@ -130,6 +130,11 @@ from powdrr_lift.workflow_replay import (
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
 )
+from powdrr_lift.workflow_scenario import (
+    WorkflowScenarioError,
+    load_workflow_scenario,
+    run_workflow_scenario,
+)
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
@@ -995,6 +1000,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the complete replay result as JSON.",
     )
     workflow_replay_parser.set_defaults(func=_run_workflow_replay)
+
+    workflow_scenario_parser = subparsers.add_parser(
+        "workflow-scenario",
+        aliases=["workflow_scenario"],
+        help=(
+            "Run a scripted workflow skill scenario in an isolated temporary "
+            "Git repository."
+        ),
+    )
+    workflow_scenario_parser.add_argument(
+        "--scenario",
+        required=True,
+        type=Path,
+        help="Versioned scenario YAML or JSON file.",
+    )
+    workflow_scenario_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root containing the candidate definition.",
+    )
+    workflow_scenario_parser.add_argument(
+        "--keep-failed",
+        action="store_true",
+        help="Retain the isolated repository for a failed scenario and print its path.",
+    )
+    workflow_scenario_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the complete scenario result as JSON.",
+    )
+    workflow_scenario_parser.set_defaults(func=_run_workflow_scenario)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -2765,6 +2801,39 @@ def _run_workflow_replay(args: argparse.Namespace) -> int:
         else:
             print(f"Recorded response is invalid: {validation['error']}")
     return 0
+
+
+def _run_workflow_scenario(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    scenario_path = (
+        args.scenario if args.scenario.is_absolute() else repo_root / args.scenario
+    )
+    try:
+        scenario = load_workflow_scenario(scenario_path)
+        result = run_workflow_scenario(
+            scenario,
+            scenario_path=scenario_path,
+            repo_root=repo_root,
+            keep_failed=args.keep_failed,
+        )
+    except WorkflowScenarioError as exc:
+        print(f"Workflow scenario failed: {exc}", file=sys.stderr)
+        return 1
+    data = result.to_data()
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(f"Workflow scenario {result.scenario_id}: {result.status}")
+        for assertion in result.assertions:
+            if not assertion["passed"]:
+                print(
+                    f"Failed {assertion['name']}: expected {assertion['expected']!r}, "
+                    f"got {assertion['actual']!r}",
+                    file=sys.stderr,
+                )
+        if result.worktree_root is not None:
+            print(f"Retained failed scenario repository: {result.worktree_root}")
+    return 0 if result.status == "passed" else 1
 
 
 def _read_llm_exchange(path: Path) -> object:

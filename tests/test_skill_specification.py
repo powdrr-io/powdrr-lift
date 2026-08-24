@@ -184,6 +184,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 15),
                 ("execute-proposed-pr.yaml", 18),
                 ("execute-proposed-pr.yaml", 19),
+                ("start-implementing-feature.yaml", 7),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
                 ("start-implementing-feature.yaml", 18),
@@ -996,41 +997,28 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert step("bootstrap-project-structure").uses_skills == (
         "bootstrap-code-structure",
     )
-    assert step("generate-implementation-specifications").step_type == "freeform"
+    assert step("generate-proposed-pr-specification").step_type == "invoke_tool"
     assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
     assert step("plan-proposed-prs").outputs[0].required_for_next_step
-    assert step("generate-implementation-specifications").inputs[0].name == (
-        "proposed_pr_names"
-    )
-    assert step("generate-implementation-specifications").outputs[0].name == (
-        "implementation_specification_paths"
-    )
-    assert (
-        step("generate-implementation-specifications").outputs[0].required_for_next_step
-    )
-    assert step("fill-implementation-specifications").inputs[0].name == (
-        "implementation_specification_paths"
-    )
-    assert step("generate-implementation-specifications").tool_invocations[
-        0
-    ].command == (
+    assert step("generate-proposed-pr-specification").pre_step is not None
+    assert pre_step_command("generate-proposed-pr-specification") == (
         "powdrr-lift",
-        "implementation-specification",
+        "pr-specification",
         "--work-item-name",
         "<feature-name>",
         "--output",
-        "docs/proposals/<feature-name>/<proposed-pr-name>-implementation-specification.yaml",
+        "docs/proposals/<feature-name>/proposed-pr-specification.yaml",
     )
-    assert step("evaluate-implementation-specifications").step_type == "invoke_tool"
-    assert pre_step_command("evaluate-implementation-specifications") == (
+    assert step("evaluate-proposed-pr-specification").step_type == "invoke_tool"
+    assert pre_step_command("evaluate-proposed-pr-specification") == (
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<feature-name>",
     )
-    assert step("gate-implementation-specifications").step_type == "gate"
-    gate = step("gate-implementation-specifications").gate
+    assert step("gate-proposed-pr-specification").step_type == "gate"
+    gate = step("gate-proposed-pr-specification").gate
     assert gate is not None
-    assert gate.goto_step == "repair-implementation-specifications"
+    assert gate.goto_step == "repair-proposed-pr-specification"
     assert step("instantiate-execution-workflows").tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",

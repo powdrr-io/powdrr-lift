@@ -20,9 +20,10 @@ how_to_fill_this_out:
   `file_management` action, then finish with `complete`. For a review, return
   one `complete` action with the review in its declared output. Examples below
   are complete JSON shapes, not pseudocode.
-- Do not modify product code before the test-generation and test-failure
-  validation tasks complete. Do not create a pull request before all validation
-  and review tasks complete.
+- Do not modify product code before the test-generation task completes. After
+  product code is emitted, the test-run/fix skill must report a passing full
+  suite before the remaining validation and review tasks begin. Do not create
+  a pull request before all validation and review tasks complete.
 invariants:
 - id: workflow-implements-target
   relationship: implements
@@ -109,29 +110,6 @@ task_templates:
   output_state_type: generated-test-diffs-state
   dependent_state:
   - tests-generated
-- description: Run the generated tests before implementation
-  step_type: freeform
-  complexity: medium
-  assignee_type: agent
-  assignee_role: reviewer
-  llm_type: fast_iteration
-  uses_skills:
-  - validate-generated-tests
-  input_state:
-    generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
-    expected_test_failures: <upstream-task-2>.generated-test-diffs-state
-    test_results: []
-  details: >-
-    Invoke validate-generated-tests with the explicit expected-test-failure
-    ledger from generated-test-diffs-state. The nested skill runs the initial
-    test command, classifies the result, edits only generated test files when
-    needed, and uses its rerun gate until the result is valid. Do not modify
-    product code in this task. After it reports an expected result, complete
-    this task with output_state.tests-proven-failing-state containing the exact
-    command, return code, expected-failure flag, and failure details.
-  output_state_type: tests-proven-failing-state
-  dependent_state:
-  - tests-proven-failing
 - description: Implement the planned product code
   step_type: freeform
   complexity: high
@@ -142,7 +120,6 @@ task_templates:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
     generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
-    tests_proven_failing: <upstream-task-3>.tests-proven-failing-state
     implementation_diffs: {}
   details: >-
     Perform exactly one action: edit the approved product files to implement the
@@ -151,162 +128,33 @@ task_templates:
     files. Use one edit action, with file_edits for multiple files. A valid
     response looks like:
     {"action":"edit","file_edits":[{"file_path":"src/feature.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"implementation code"}]}],"decisions_and_context":"Implemented the planned behavior in the approved product file."}
-    After the edit succeeds, use next_step and record implementation files and
-    the resulting diff in generated-product-code-state.
+    After the edit succeeds, complete the task and record implementation files
+    and the resulting diff in generated-product-code-state.
   output_state_type: generated-product-code-state
   dependent_state:
   - product-code-generated
-- description: Run the implementation test suite
-  step_type: invoke_tool
-  complexity: medium
-  assignee_type: agent
-  assignee_role: reviewer
-  llm_type: fast_iteration
-  input_state:
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
-  details: >-
-    The deterministic implementation test command already ran. Assign its complete
-    result to implementation-test-results-state; do not fix failures or claim success
-    from memory. Complete with a next_step action such as:
-    {"action":"next_step","outputs":{"implementation-test-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All implementation tests passed."}},"decisions_and_context":"Recorded the deterministic implementation test result."}
-  output_state_type: implementation-test-results-state
-  dependent_state:
-  - implementation-tests-run
-- description: Repair implementation test failures
+- description: Run all tests and fix failures
   step_type: freeform
   complexity: high
   assignee_type: agent
-  assignee_role: coder
-  llm_type: standard_reasoning
-  input_state:
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    implementation_test_results: <upstream-task-5>.implementation-test-results-state
-    repair_result: {}
-  details: >-
-    Perform exactly one action only when the implementation tests failed: edit the
-    approved implementation or test files to fix the reported failure. Do not
-    run tests in this step; the next deterministic task reruns them. If the
-    tests already passed, make no edit and pass the result onward. For a repair,
-    return one edit action like:
-    {"action":"edit","file_path":"src/feature.py","edits":[{"kind":"replace","start_line":20,"end_line":21,"text":"corrected code"}],"decisions_and_context":"Corrected the failure reported by the implementation test result."}
-    Then use next_step with the repair summary. Never repeat an unchanged failed
-    command or claim that a repair passed without the rerun.
-  output_state_type: implementation-test-repair-state
-  dependent_state:
-  - implementation-test-repair-complete
-- description: Rerun the implementation test suite after repair
-  step_type: invoke_tool
-  complexity: high
-  assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
+  uses_skills:
+  - run-tests-and-fix
   input_state:
-    implementation_test_repair: <upstream-task-6>.implementation-test-repair-state
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
+    implementation_diffs: <upstream-task-3>.generated-product-code-state
+    generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
+    test_results: {}
   details: >-
-    The deterministic implementation test command already reran after the
-    repair task. Assign the complete result to final-implementation-test-results-state.
-    Do not diagnose or repair in this step. Use one next_step action with the
-    exact command, return code, and summary:
-    {"action":"next_step","outputs":{"final-implementation-test-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All implementation tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic implementation-test rerun."}
-  output_state_type: final-implementation-test-results-state
-  dependent_state:
-  - final-implementation-tests-run
-- description: Run the full test suite
-  step_type: invoke_tool
-  complexity: high
-  assignee_type: agent
-  assignee_role: reviewer
-  llm_type: fast_iteration
-  input_state:
-    final_implementation_test_results: <upstream-task-7>.final-implementation-test-results-state
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
-  details: >-
-    The deterministic full test command already ran. Assign the complete result
-    to all-tests-results-state. Do not diagnose or repair in this step. Use a
-    next_step action with the exact command, return code, and summary:
-    {"action":"next_step","outputs":{"all-tests-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All tests passed."}},"decisions_and_context":"Recorded the deterministic full-suite result."}
+    Invoke run-tests-and-fix. It runs the complete test suite, permits edits to
+    approved product and test files to address failures, and repeats the
+    deterministic run/fix gate until every test passes. Do not independently
+    run tests or edit files in this task. Complete with
+    all-tests-results-state containing the exact final command, return code,
+    and test summary.
   output_state_type: all-tests-results-state
   dependent_state:
-  - full-tests-run
-- description: Repair full test failures
-  step_type: freeform
-  complexity: high
-  assignee_type: agent
-  assignee_role: coder
-  llm_type: standard_reasoning
-  input_state:
-    all_tests_results: <upstream-task-8>.all-tests-results-state
-    repair_result: {}
-  details: >-
-    Perform exactly one action only when the full suite failed: edit the
-    approved files to address the reported failures. Do not run tests in this
-    step; the workflow reruns the deterministic full-suite task afterward. If
-    the suite passed, make no edit and record that no repair was needed. A repair
-    response is exactly one edit action, for example:
-    {"action":"edit","file_path":"src/feature.py","edits":[{"kind":"replace","start_line":30,"end_line":31,"text":"corrected code"}],"decisions_and_context":"Addressed the reported full-suite failure; rerun the suite next."}
-  output_state_type: full-test-repair-state
-  dependent_state:
-  - full-test-repair-complete
-- description: Rerun the full test suite after repair
-  step_type: invoke_tool
-  complexity: high
-  assignee_type: agent
-  assignee_role: reviewer
-  llm_type: fast_iteration
-  input_state:
-    full_test_repair: <upstream-task-9>.full-test-repair-state
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
-  details: >-
-    The deterministic full test command already reran after the repair task.
-    Assign the complete result to final-all-tests-results-state. Do not diagnose
-    or repair in this step. Use one next_step action with the exact command,
-    return code, and summary:
-    {"action":"next_step","outputs":{"final-all-tests-results-state":{"command":"uv run --extra dev pytest -q","returncode":0,"summary":"All tests passed after repair."}},"decisions_and_context":"Verified the repair with a deterministic full-suite rerun."}
-  output_state_type: final-all-tests-results-state
-  dependent_state:
-  - final-full-tests-run
+  - all-tests-passed
 - description: Review specification completeness
   step_type: freeform
   complexity: high
@@ -316,8 +164,8 @@ task_templates:
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    all_tests_results: <upstream-task-10>.final-all-tests-results-state
+    implementation_diffs: <upstream-task-3>.generated-product-code-state
+    all_tests_results: <upstream-task-4>.all-tests-results-state
     completeness_review: {}
   details: >-
     Perform exactly one action: compare the implementation and test evidence to
@@ -337,7 +185,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    completeness_review: <upstream-task-11>.specification-completeness-state
+    completeness_review: <upstream-task-5>.specification-completeness-state
     repair_result: {}
   details: >-
     Perform exactly one action only when the completeness review identifies a
@@ -355,7 +203,7 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    completeness_repair: <upstream-task-12>.completeness-repair-state
+    completeness_repair: <upstream-task-6>.completeness-repair-state
   pre_step:
     action: invoke_tool
     template:
@@ -379,7 +227,7 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    formatting_check: <upstream-task-13>.formatting-check-state
+    formatting_check: <upstream-task-7>.formatting-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -402,7 +250,7 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    lint_check: <upstream-task-14>.lint-check-state
+    lint_check: <upstream-task-8>.lint-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -424,9 +272,9 @@ task_templates:
   assignee_role: reviewer
   llm_type: high_reasoning
   input_state:
-    formatting_check: <upstream-task-13>.formatting-check-state
-    lint_check: <upstream-task-14>.lint-check-state
-    type_check: <upstream-task-15>.type-check-state
+    formatting_check: <upstream-task-7>.formatting-check-state
+    lint_check: <upstream-task-8>.lint-check-state
+    type_check: <upstream-task-9>.type-check-state
     scope_review: {}
   details: >-
     Perform exactly one action: inspect the complete diff and identify debug
@@ -445,7 +293,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    scope_review: <upstream-task-16>.final-scope-review-state
+    scope_review: <upstream-task-10>.final-scope-review-state
     scope_repair: {}
   details: >-
     Perform exactly one action only when the scope review identifies a finding:
@@ -466,8 +314,8 @@ task_templates:
   llm_type: simple_task
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    completeness_review: <upstream-task-11>.specification-completeness-state
-    scope_repair: <upstream-task-17>.final-scope-repair-state
+    completeness_review: <upstream-task-5>.specification-completeness-state
+    scope_repair: <upstream-task-11>.final-scope-repair-state
     feature_id: <work-item-name>
   pre_step:
     action: invoke_tool
@@ -492,9 +340,9 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    promoted_documents: <upstream-task-18>.promoted-current-state-documents
-    type_check: <upstream-task-15>.type-check-state
+    implementation_diffs: <upstream-task-3>.generated-product-code-state
+    promoted_documents: <upstream-task-12>.promoted-current-state-documents
+    type_check: <upstream-task-9>.type-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -521,14 +369,14 @@ task_templates:
   - finish-pr-prep
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    implementation_diffs: <upstream-task-4>.generated-product-code-state
-    all_tests_results: <upstream-task-10>.final-all-tests-results-state
-    completeness_review: <upstream-task-11>.specification-completeness-state
-    formatting_check: <upstream-task-13>.formatting-check-state
-    lint_check: <upstream-task-14>.lint-check-state
-    type_check: <upstream-task-15>.type-check-state
-    promoted_documents: <upstream-task-18>.promoted-current-state-documents
-    staged_changes: <upstream-task-19>.staged-pull-request-state
+    implementation_diffs: <upstream-task-3>.generated-product-code-state
+    all_tests_results: <upstream-task-4>.all-tests-results-state
+    completeness_review: <upstream-task-5>.specification-completeness-state
+    formatting_check: <upstream-task-7>.formatting-check-state
+    lint_check: <upstream-task-8>.lint-check-state
+    type_check: <upstream-task-9>.type-check-state
+    promoted_documents: <upstream-task-12>.promoted-current-state-documents
+    staged_changes: <upstream-task-13>.staged-pull-request-state
   details: >-
     Perform exactly one action: invoke the listed finish-pr-prep skill. Do not
     independently edit, stage, commit, push, or create a pull request here; the

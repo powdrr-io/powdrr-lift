@@ -174,15 +174,12 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
-                ("execute-proposed-pr.yaml", 5),
+                ("run-tests-and-fix.yaml", 0),
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 8),
-                ("execute-proposed-pr.yaml", 10),
+                ("execute-proposed-pr.yaml", 9),
+                ("execute-proposed-pr.yaml", 12),
                 ("execute-proposed-pr.yaml", 13),
-                ("execute-proposed-pr.yaml", 14),
-                ("execute-proposed-pr.yaml", 15),
-                ("execute-proposed-pr.yaml", 18),
-                ("execute-proposed-pr.yaml", 19),
                 ("start-implementing-feature.yaml", 7),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
@@ -192,7 +189,6 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
-                ("validate-generated-tests.yaml", 0),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -204,9 +200,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
                 ("specify-a-feature.yaml", 15),
-                ("validate-generated-tests.yaml", 2),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
+                ("run-tests-and-fix.yaml", 2),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -687,13 +683,13 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "review-architecture",
         "review-skill-workflow",
         "review-system",
+        "run-tests-and-fix",
         "security-review",
         "specify-a-feature",
         "specify-architecture",
         "specify-implementation",
         "specify-system",
         "start-implementing-feature",
-        "validate-generated-tests",
     ]
 
 

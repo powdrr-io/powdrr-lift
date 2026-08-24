@@ -122,6 +122,14 @@ from powdrr_lift.workflow_human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
+from powdrr_lift.workflow_replay import (
+    WorkflowReplayError,
+    load_error_record,
+    load_workflow_replay_bundle,
+    render_skill_replay,
+    replay_bundle_from_error_record,
+    save_workflow_replay_bundle,
+)
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
@@ -942,6 +950,51 @@ def build_parser() -> argparse.ArgumentParser:
         help="Later or changed llm-*.json exchange file.",
     )
     llm_diff_parser.set_defaults(func=_run_llm_diff)
+
+    workflow_replay_parser = subparsers.add_parser(
+        "workflow-replay",
+        aliases=["workflow_replay"],
+        help=(
+            "Export one workflow LLM error as a replay bundle or render and "
+            "validate a bundle without invoking tools or an LLM."
+        ),
+    )
+    replay_source = workflow_replay_parser.add_mutually_exclusive_group(required=True)
+    replay_source.add_argument(
+        "--bundle",
+        type=Path,
+        help="Existing YAML or JSON replay bundle to render and validate.",
+    )
+    replay_source.add_argument(
+        "--error-log",
+        type=Path,
+        help="Workflow LLM JSONL error log containing the record to export.",
+    )
+    workflow_replay_parser.add_argument(
+        "--record-id",
+        help="Stable error record id to export; required with --error-log.",
+    )
+    workflow_replay_parser.add_argument(
+        "--output",
+        type=Path,
+        help="Replay bundle output path; required with --error-log.",
+    )
+    workflow_replay_parser.add_argument(
+        "--definition",
+        type=Path,
+        help="Optional candidate skill definition used when rendering a bundle.",
+    )
+    workflow_replay_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used to resolve bundle and definition paths.",
+    )
+    workflow_replay_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the complete replay result as JSON.",
+    )
+    workflow_replay_parser.set_defaults(func=_run_workflow_replay)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -2656,6 +2709,61 @@ def _run_llm_diff(args: argparse.Namespace) -> int:
         sys.stdout.write(output + "\n")
     else:
         print("No differences.")
+    return 0
+
+
+def _run_workflow_replay(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        if args.error_log is not None:
+            if not args.record_id:
+                raise WorkflowReplayError("--record-id is required with --error-log.")
+            if args.output is None:
+                raise WorkflowReplayError("--output is required with --error-log.")
+            error_log_path = (
+                args.error_log
+                if args.error_log.is_absolute()
+                else repo_root / args.error_log
+            )
+            record = load_error_record(error_log_path, args.record_id)
+            bundle = replay_bundle_from_error_record(record, repo_root=repo_root)
+            output_path = (
+                args.output if args.output.is_absolute() else repo_root / args.output
+            )
+            saved_path = save_workflow_replay_bundle(output_path, bundle)
+            result: dict[str, Any] = {
+                "status": "exported",
+                "bundle": str(saved_path),
+                "bundle_id": bundle["id"],
+            }
+        else:
+            assert args.bundle is not None
+            bundle_path = (
+                args.bundle if args.bundle.is_absolute() else repo_root / args.bundle
+            )
+            bundle = load_workflow_replay_bundle(bundle_path)
+            result = render_skill_replay(
+                bundle,
+                repo_root=repo_root,
+                definition_path=args.definition,
+            )
+            result["status"] = "rendered"
+    except WorkflowReplayError as exc:
+        print(f"Workflow replay failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif result["status"] == "exported":
+        print(f"Exported workflow replay bundle: {result['bundle']}")
+    else:
+        validation = result["response_validation"]
+        step_label = result["step"]["id"] or result["step"]["index"]
+        print(f"Rendered workflow replay {result['bundle_id']} for step {step_label}.")
+        if validation["valid"]:
+            print(f"Recorded response is valid: {validation['action']}")
+        else:
+            print(f"Recorded response is invalid: {validation['error']}")
     return 0
 
 

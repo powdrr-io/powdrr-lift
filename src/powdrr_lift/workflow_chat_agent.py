@@ -119,6 +119,11 @@ from powdrr_lift.workflow_observer import (
     ShadowWorkflowObserver,
     compact_observer_mapping,
 )
+from powdrr_lift.workflow_replay import (
+    WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
+    build_workflow_replay_state,
+    definition_content_sha256,
+)
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
@@ -1207,6 +1212,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "skill": {
                 "name": self.selected_skill.skill.name,
                 "path": str(self.selected_skill.path),
+                "content_sha256": definition_content_sha256(self.selected_skill.path),
                 "step_index": self.current_step_index,
                 "step_id": getattr(step, "id", None),
                 "description": getattr(step, "description", None),
@@ -1222,6 +1228,18 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "current_step_error_count": sum(
                 event.get("kind") in {"validation_error", "action_error"}
                 for event in current_step_events
+            ),
+            "prompt_builder_version": WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
+            "replay_state": build_workflow_replay_state(
+                transcript=self.state.transcript,
+                execution_events=self.state.execution_events,
+                execution_context=self.state.execution_context,
+                handoff_records=self.state.handoff_records,
+                durable_facts=self.state.durable_facts,
+                current_file_path=self.state.current_file_path,
+                worktree_root=self.state.worktree_root,
+                validation_gate=_validation_gate_prompt_data(self.state),
+                stalled_step_context=self.state.stalled_step_context,
             ),
         }
         if self.workflow_context is not None:

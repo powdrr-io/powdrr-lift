@@ -1,0 +1,72 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: interactive-entity-exploration
+feature_ids:
+- feat-interactive-exploration
+proposed_prs:
+- id: pr-interactive-exploration
+  intent: Implement the interactive entity exploration feature, allowing users to
+    browse and explore entities through an interactive session with filtering, sorting,
+    pagination, and detail views.
+  justification: This PR delivers the complete interactive entity exploration feature
+    as specified in the architecture and implementation specifications, covering all
+    requirements (req-1, req-2, req-3) and approach items (appr-1, appr-2, appr-3).
+entities:
+- id: entity-exploration-session
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: entity-list-view
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: entity-detail-view
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: default-prompt
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: exploration-loop
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: end-session-detector
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: error-handler
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+modules:
+- id: mod-exploration-loop
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: mod-end-session-detector
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: mod-error-handler
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+tools:
+- id: tool-entity-listing
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: tool-entity-detail
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+entity_relationships:
+- id: rel-exploration-loop-entity-list
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: rel-exploration-loop-entity-detail
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: rel-end-session-default-prompt
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+- id: rel-error-handler-default-prompt
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+features:
+- id: feat-interactive-exploration
+  action: added
+  proposed_pr_id: pr-interactive-exploration
+decisions:
+- id: dec-interactive-loop
+  action: added
+  proposed_pr_id: pr-interactive-exploration

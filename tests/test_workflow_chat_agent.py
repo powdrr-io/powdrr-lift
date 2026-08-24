@@ -1678,6 +1678,60 @@ def test_textual_panels_have_the_same_width() -> None:
     assert asyncio.run(exercise()) == (0, 80, 80)
 
 
+def test_textual_files_panel_preserves_add_order_without_duplicates() -> None:
+    async def exercise() -> list[str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            app._record_added_files(("docs/first.yaml", "src/first.py"))
+            app._record_added_files(("docs/first.yaml", "tests/first.py"))
+            await pilot.pause()
+            return [
+                str(label.render())
+                for label in app.query_one("#files", ListView).query(Label)
+            ]
+
+    assert asyncio.run(exercise()) == [
+        "docs/first.yaml",
+        "src/first.py",
+        "tests/first.py",
+    ]
+
+
+def test_textual_files_panel_limits_retained_history() -> None:
+    async def exercise() -> list[str]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        async with app.run_test() as pilot:
+            app._record_added_files(tuple(f"file-{index}.py" for index in range(81)))
+            await pilot.pause()
+            return [
+                str(label.render())
+                for label in app.query_one("#files", ListView).query(Label)
+            ]
+
+    files = asyncio.run(exercise())
+    assert len(files) == 80
+    assert files[0] == "file-1.py"
+    assert files[-1] == "file-80.py"
+
+
+def test_textual_orange_panels_share_the_width() -> None:
+    async def exercise() -> tuple[int, int]:
+        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app._stop_requested.set()
+        skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
+        async with app.run_test() as pilot:
+            app._apply_progress(skill, current_step_index=0, status="running")
+            await pilot.pause()
+            return (
+                app.query_one("#steps", ListView).region.width,
+                app.query_one("#files", ListView).region.width,
+            )
+
+    assert asyncio.run(exercise()) == (40, 40)
+
+
 def test_textual_panels_place_green_output_above_orange_steps() -> None:
     async def exercise() -> tuple[int, int, int, int]:
         app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))

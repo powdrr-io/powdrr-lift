@@ -114,6 +114,8 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
 
+_WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
+
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_COMPLETION_TOKENS = 32768
@@ -561,6 +563,7 @@ class _WorkflowExecutionState:
     validation_gates: dict[str, _ValidationGateState] = field(default_factory=dict)
     step_checkpoint: _WorkflowStepCheckpoint | None = None
     stalled_step_context: list[dict[str, Any]] = field(default_factory=list)
+    file_added_callback: Callable[[tuple[str, ...]], None] | None = None
 
 
 @dataclass(slots=True)
@@ -2331,6 +2334,7 @@ def run_workflow_chat(
         [SkillCatalogEntry, int, str, SkillCatalogEntry | None, int | None], None
     ]
     | None = None,
+    file_added_callback: Callable[[tuple[str, ...]], None] | None = None,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
     error_log_root = _resolve_project_root(configured_repo_root, configured_repo_root)
@@ -2554,6 +2558,7 @@ def run_workflow_chat(
         worktree_root=worktree_root,
         error_log_root=project_root,
         handoff_records=_workflow_context_handoff_records(workflow_context),
+        file_added_callback=file_added_callback,
     )
     driver = WorkflowLLMExecutionDriver(
         max_stalled_roundtrips=config.max_stalled_roundtrips
@@ -5220,6 +5225,19 @@ def _handle_workflow_action_invoke_tool(
             "internal, git, gh, fuzzy-match, basedpyright-symbol, and "
             "basedpyright-structure."
         )
+    if (
+        action.tool == GIT_TOOL
+        and action.parameters.get("operation") == "add"
+        and tool_result.get("returncode") == 0
+        and state.file_added_callback is not None
+    ):
+        paths = action.parameters.get("paths")
+        if isinstance(paths, Sequence) and not isinstance(paths, (str, bytes)):
+            added_paths = tuple(
+                path.strip() for path in paths if isinstance(path, str) and path.strip()
+            )
+            if added_paths:
+                state.file_added_callback(added_paths)
     if action.tool in {"shell", GH_TOOL}:
         _record_chat_pull_request(action, state, tool_result)
     inferred_path = _resolve_generated_file_path_from_command(
@@ -6999,6 +7017,7 @@ def _execute_shell_tool(
 
     env_value = parameters.get("env")
     env = os.environ.copy()
+    env["POWDRR_FILE_ADDED_EVENTS"] = "1"
     if env_value is not None:
         if not isinstance(env_value, dict):
             raise RuntimeError("Workflow invoke_tool action env must be an object.")

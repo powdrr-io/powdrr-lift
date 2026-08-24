@@ -14,11 +14,15 @@ from powdrr_lift.workflow_human_task import HumanTaskRunnerConfig
 from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig
 
 
-def test_cli_init_writes_template(tmp_path: Path) -> None:
+def test_cli_init_writes_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
     output_path = repo_root / "change-log.template.yaml"
+    monkeypatch.setenv("POWDRR_FILE_ADDED_EVENTS", "1")
+    stderr = io.StringIO()
 
-    with redirect_stdout(io.StringIO()) as stdout:
+    with redirect_stdout(io.StringIO()) as stdout, redirect_stderr(stderr):
         exit_code = main(
             [
                 "init",
@@ -33,6 +37,7 @@ def test_cli_init_writes_template(tmp_path: Path) -> None:
     assert exit_code == 0
     assert output_path.exists()
     assert str(output_path) in stdout.getvalue()
+    assert "[powdrr-file-added] change-log.template.yaml" in stderr.getvalue()
     assert (
         _git_output(repo_root, "diff", "--cached", "--name-only")
         == "change-log.template.yaml"

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 import subprocess
 import sys
 from dataclasses import replace
@@ -125,6 +126,8 @@ from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
 )
+
+_WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1285,6 +1288,11 @@ def _stage_generated_file(repo_root: Path, output_path: Path) -> None:
     if staged.returncode != 0:
         raise RuntimeError(
             f"Could not stage generated file {relative_path}: {staged.stderr.strip()}"
+        )
+    if os.environ.get("POWDRR_FILE_ADDED_EVENTS") == "1":
+        print(
+            f"{_WORKFLOW_FILE_ADDED_EVENT_PREFIX}{relative_path}",
+            file=sys.stderr,
         )
 
 

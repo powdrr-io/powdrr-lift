@@ -101,11 +101,19 @@ from powdrr_lift.pull_request_description import (
     render_pull_request_description_template,
 )
 from powdrr_lift.repository_state import render_repository_state
+from powdrr_lift.workflow_ambiguity_review import (
+    WorkflowAmbiguityReviewError,
+    review_workflow_definition_step,
+)
 from powdrr_lift.workflow_chat_agent import (
     ALL_PROVIDERS,
     WorkflowChatConfig,
+    _build_chat_client,
+    _default_llm_mappings,
+    _resolve_credentials,
     choose_workflow_provider,
     download_local_qwen_model,
+    resolve_workflow_provider,
     run_workflow_chat,
 )
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
@@ -1089,6 +1097,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     error_analysis_parser.add_argument("--json", action="store_true")
     error_analysis_parser.set_defaults(func=_run_analyze_workflow_errors)
+
+    ambiguity_review_parser = subparsers.add_parser(
+        "review-workflow-ambiguity",
+        aliases=["review_workflow_ambiguity"],
+        help=(
+            "Request an advisory high-reasoning ambiguity review of one "
+            "definition step."
+        ),
+    )
+    ambiguity_review_parser.add_argument("--definition", required=True, type=Path)
+    step_selector = ambiguity_review_parser.add_mutually_exclusive_group(required=True)
+    step_selector.add_argument("--step-id")
+    step_selector.add_argument("--step-index", type=int)
+    ambiguity_review_parser.add_argument("--repo-root", type=Path)
+    ambiguity_review_parser.add_argument(
+        "--provider", default="auto", choices=ALL_PROVIDERS + ("auto",)
+    )
+    ambiguity_review_parser.add_argument("--model")
+    ambiguity_review_parser.add_argument("--api-key")
+    ambiguity_review_parser.add_argument("--base-url")
+    ambiguity_review_parser.add_argument("--json", action="store_true")
+    ambiguity_review_parser.set_defaults(func=_run_review_workflow_ambiguity)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -2960,6 +2990,50 @@ def _run_analyze_workflow_errors(args: argparse.Namespace) -> int:
                 f"{cluster.count}x (rank {cluster.rank}) {location or '<unknown>'}: "
                 f"{cluster.error_summary or cluster.error_type or 'unknown error'}"
             )
+    return 0
+
+
+def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    definition_path = (
+        args.definition
+        if args.definition.is_absolute()
+        else repo_root / args.definition
+    )
+    try:
+        requested_provider = resolve_workflow_provider(args.provider)
+        mapping = _default_llm_mappings(requested_provider)["high_reasoning"]
+        provider = mapping.provider
+        model = args.model or mapping.model
+        credentials = _resolve_credentials(provider, args.api_key, args.base_url)
+        client = _build_chat_client(
+            credentials,
+            model=model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
+        review = review_workflow_definition_step(
+            client,
+            definition_path,
+            step_id=args.step_id,
+            step_index=args.step_index,
+        )
+    except (KeyError, RuntimeError, WorkflowAmbiguityReviewError) as exc:
+        print(f"Workflow ambiguity review failed: {exc}", file=sys.stderr)
+        return 1
+    data = review.to_data()
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(
+            f"Ambiguity review: {review.definition} step "
+            f"{review.step_id or review.step_index} "
+            f"(confidence {review.confidence:.2f})"
+        )
+        for field in ("missing_information", "conflicts", "ambiguous_phrases"):
+            values = data[field]
+            if values:
+                print(f"{field}: {', '.join(values)}")
     return 0
 
 

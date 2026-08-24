@@ -798,9 +798,11 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     assert "do not print" in (skill.steps[1].details or "").lower()
     assert "files_to_publish" in (skill.steps[2].details or "")
     assert "git diff --cached --name-only" in (skill.steps[2].details or "")
-    assert '"file_path":"agent_error.txt"' in (skill.steps[2].details or "")
+    assert '"file_path":"path/to/unintended-file"' in (skill.steps[2].details or "")
     assert '"operation":"delete"' in (skill.steps[2].details or "")
-    assert '"file_path":"agent_error.txt"' in (skill.steps[3].details or "")
+    assert '"file_path":"path/to/unintended-file"' in (skill.steps[3].details or "")
+    assert "agent_error.txt" not in (skill.steps[2].details or "")
+    assert "agent_error.txt" not in (skill.steps[3].details or "")
     assert skill.steps[2].tool_invocations[0].command == (
         "add",
         "<files-to-publish>",

@@ -46,13 +46,13 @@ steps:
     {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["path/to/file"]}}.
     Do not use `git add .`, `git add --all`, or stage logs, caches, or unrelated
     files. If `git status --short` shows an untracked or modified path that is
-    not in `files_to_publish`, delete it before staging. This includes the
-    agent-generated `agent_error.txt`; delete it with the intrinsic
-    file-management action exactly as
-    {"action":"file_management","operation":"delete","file_path":"agent_error.txt"}.
-    Do not stage or preserve that file in the pull request. Verify the staged
-    names with `git diff --cached --name-only`; do not advance until every
-    intended path is staged and no unintended path is staged.
+    not in `files_to_publish`, delete that path before staging. Delete it with
+    the intrinsic file-management action exactly as
+    {"action":"file_management","operation":"delete","file_path":"path/to/unintended-file"}.
+    Do not stage or preserve unintended diagnostic logs, generated artifacts,
+    or other files in the pull request. Verify the staged names with `git
+    diff --cached --name-only`; do not advance until every intended path is
+    staged and no unintended path is staged.
   tool_invocations:
   - tool: git
     command:
@@ -72,12 +72,12 @@ steps:
     unstaged or untracked paths, stop and correct each one: stage an intended
     path with the intrinsic git add action. For every unstaged or untracked path
     that is not in `files_to_publish`, delete it with the intrinsic
-    file-management action before retrying. In particular, delete the
-    agent-generated `agent_error.txt` with exactly
-    {"action":"file_management","operation":"delete","file_path":"agent_error.txt"};
-    never add it to the commit. Rerun status, then retry the commit only after
-    the worktree is clean or the intended changes are staged. Do not push or
-    invoke any GitHub command in this step.
+    file-management action before retrying. Use exactly
+    {"action":"file_management","operation":"delete","file_path":"path/to/unintended-file"}
+    for each unintended path; never add an unintended file to the commit.
+    Rerun status, then retry the commit only after the worktree is clean or
+    the intended changes are staged. Do not push or invoke any GitHub command
+    in this step.
   tool_invocations:
   - tool: internal
     command:

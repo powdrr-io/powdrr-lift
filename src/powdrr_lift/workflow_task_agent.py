@@ -104,6 +104,11 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature,
     workflow_action_summary,
 )
+from powdrr_lift.workflow_observer import (
+    ObserverExecutionContext,
+    ShadowWorkflowObserver,
+    compact_observer_mapping,
+)
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
 _TASK_PROMPT_INPUT_REFERENCE_RE = re.compile(r"\binput_state\.([A-Za-z0-9_-]+)\b")
@@ -1077,6 +1082,70 @@ def run_workflow_task(
             action_engine=driver.action_engine,
             events=driver_events,
         )
+        observer_mapping = _resolve_workflow_task_mapping(
+            "high_reasoning",
+            mappings=mappings,
+            provider=provider,
+        )
+        if observer_mapping is not None:
+            observer_client = (
+                task_client
+                if client_was_provided
+                else _maybe_record_llm_exchanges(
+                    _build_workflow_client_for_mapping(
+                        config,
+                        task,
+                        observer_mapping,
+                    ),
+                    dump_root,
+                )
+            )
+
+            def observer_context(
+                _workflow: WorkflowInstance = workflow,
+                _task: WorkflowTask = task,
+                _events: list[dict[str, Any]] = driver_events,
+            ) -> ObserverExecutionContext:
+                return ObserverExecutionContext(
+                    execution_mode="process_workflow_task",
+                    root_intent=(
+                        f"Complete workflow {_workflow.directory.name}: "
+                        f"{_task.description}"
+                    ),
+                    skill_or_workflow=_workflow.directory.name,
+                    current_step_id=_task.task_id,
+                    current_step_intent=_task.details or _task.description,
+                    validation_state={
+                        "status": _task.status.value,
+                        "output_state_type": _task.output_state_type,
+                        "issue_count": sum(
+                            event.get("kind")
+                            in {
+                                "validation_error",
+                                "action_error",
+                                "tool_error",
+                                "no_progress",
+                            }
+                            for event in _events
+                        ),
+                    },
+                    handoff_state=compact_observer_mapping(
+                        {
+                            "input_state": _task.input_state,
+                            "output_state": _task.output_state,
+                            "upstream_task_ids": list(_task.upstream_task_ids),
+                        }
+                    ),
+                )
+
+            driver.observer = ShadowWorkflowObserver(
+                client=observer_client,
+                model=observer_mapping.model,
+                provider=observer_mapping.provider,
+                worktree_root=repo_root,
+                log_root=dump_root,
+                context_provider=observer_context,
+            )
         try:
             exit_code = driver.run(
                 strategy,

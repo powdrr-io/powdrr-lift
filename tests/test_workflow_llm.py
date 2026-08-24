@@ -273,6 +273,38 @@ def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None
     ]
 
 
+def test_execution_driver_never_crashes_when_observer_fails() -> None:
+    class _FailingObserver:
+        def response_failed(self, error: Exception) -> None:
+            raise RuntimeError("observer failed") from error
+
+        def action_failed(self, action: Any, error: Exception) -> None:
+            raise RuntimeError("observer failed") from error
+
+        def action_completed(
+            self,
+            action: Any,
+            observation: WorkflowActionObservation,
+        ) -> None:
+            _ = action, observation
+            raise RuntimeError("observer failed")
+
+    strategy = _ExecutionStrategy()
+    driver = WorkflowLLMExecutionDriver(
+        max_stalled_roundtrips=1,
+        observer=_FailingObserver(),
+    )
+
+    assert (
+        driver.run(
+            strategy,
+            max_roundtrips=3,
+            signature=workflow_action_signature,
+        )
+        == 0
+    )
+
+
 def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
     strategy = _ExecutionStrategy()
     action = _Action(kind="complete")

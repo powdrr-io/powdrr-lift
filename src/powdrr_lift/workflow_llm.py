@@ -311,6 +311,20 @@ class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
     def exhausted_roundtrips_exit_code(self) -> int: ...
 
 
+class WorkflowExecutionObserver(Protocol):
+    """Optional, failure-isolated observer of shared execution boundaries."""
+
+    def response_failed(self, error: Exception) -> None: ...
+
+    def action_failed(self, action: Any, error: Exception) -> None: ...
+
+    def action_completed(
+        self,
+        action: Any,
+        observation: WorkflowActionObservation,
+    ) -> None: ...
+
+
 class WorkflowLLMExecutionDriver:
     """Run workflow action roundtrips through one shared control loop.
 
@@ -319,10 +333,16 @@ class WorkflowLLMExecutionDriver:
     drift in parsing, corrective-action thresholds, or no-progress behavior.
     """
 
-    def __init__(self, *, max_stalled_roundtrips: int) -> None:
+    def __init__(
+        self,
+        *,
+        max_stalled_roundtrips: int,
+        observer: WorkflowExecutionObserver | None = None,
+    ) -> None:
         self.action_engine = WorkflowLLMActionEngine(
             max_stalled_roundtrips=max_stalled_roundtrips
         )
+        self.observer = observer
 
     def run(
         self,
@@ -356,6 +376,11 @@ class WorkflowLLMExecutionDriver:
             except WorkflowLLMExecutionAborted as exc:
                 return exc.exit_code
             except RuntimeError as exc:
+                if self.observer is not None:
+                    try:
+                        self.observer.response_failed(exc)
+                    except Exception:
+                        pass
                 strategy.record_response_error(exc, self.action_engine.last_payload)
                 continue
 
@@ -364,6 +389,11 @@ class WorkflowLLMExecutionDriver:
             try:
                 outcome = strategy.execute_action(action)
             except (RuntimeError, ValueError) as exc:
+                if self.observer is not None:
+                    try:
+                        self.observer.action_failed(action, exc)
+                    except Exception:
+                        pass
                 strategy.record_action_error(action, exc)
                 if (
                     self.action_engine.record_action_failure(
@@ -384,6 +414,11 @@ class WorkflowLLMExecutionDriver:
             if not observation.made_progress:
                 strategy.record_no_progress(action, observation)
             outcome = strategy.observe_outcome(action, observation, outcome)
+            if self.observer is not None:
+                try:
+                    self.observer.action_completed(action, observation)
+                except Exception:
+                    pass
             if outcome.exit_code is not None:
                 return outcome.exit_code
             if not outcome.continue_running:

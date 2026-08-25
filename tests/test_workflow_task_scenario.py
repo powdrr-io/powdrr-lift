@@ -141,3 +141,27 @@ def test_execute_proposed_pr_full_fixture_runs_every_task() -> None:
 
     assert result.status == "passed"
     assert result.roundtrips == 15
+
+
+def test_execute_proposed_pr_failure_fixtures_recover_or_handoff() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    scenario_root = repo_root / "workflow-evals" / "scenarios" / "execute-proposed-pr"
+    scenario_names = (
+        "task-001-malformed-action.yaml",
+        "task-001-invalid-output.yaml",
+        "no-change-recovery.yaml",
+        "scope-repair.yaml",
+        "human-handoff.yaml",
+    )
+
+    results = [
+        run_workflow_scenario(
+            load_workflow_scenario(scenario_root / name),
+            scenario_path=scenario_root / name,
+            repo_root=repo_root,
+        )
+        for name in scenario_names
+    ]
+
+    assert all(result.status == "passed" for result in results)
+    assert [result.roundtrips for result in results] == [2, 2, 2, 2, 1]

@@ -108,7 +108,7 @@ def run_workflow_task_scenario(
                 stderr=stderr,
             )
         except WorkflowTaskScenarioError as error:
-            task_path = workflow_dir / f"{task_id}.yaml"
+            task_path = workflow_dir / f"{target_task_id}.yaml"
             raise WorkflowTaskScenarioError(
                 f"{error}\nTask stdout:\n{stdout.getvalue()}\n"
                 f"Task stderr:\n{stderr.getvalue()}\n"

@@ -1,0 +1,19 @@
+schema_version: 1
+id: execute-proposed-pr-human-handoff
+execution_mode: workflow_task
+workflow_dir: workflow-evals/workflow-tasks/execute-proposed-pr/failure
+task_id: execute-proposed-pr-human-task-001
+provider:
+  mode: scripted
+  responses:
+  - action: get-human-input
+    human_input:
+      human_task:
+        description: Choose the implementation variant.
+        role: decider
+        input_state: {options: [v1, v2]}
+        output_state_type: human-decision-state
+      incorporation_instructions: Use the human decision in the next implementation task.
+expect:
+  task_status: locked
+  output_state: null

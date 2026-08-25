@@ -217,6 +217,7 @@ def _select_workflow_instance(
             task.task_id: task
             for task in workflow.tasks
             if task.task_id.startswith(prefix)
+            or task.task_id.startswith("human-input-")
         },
     )
 
@@ -1959,6 +1960,7 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "workflow task action must include",
             "workflow action response must include action",
             "unknown workflow task action",
+            "unknown workflow action",
             "must include parameters.command",
             "must include output_state",
         )

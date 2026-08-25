@@ -1,0 +1,17 @@
+schema_version: 1
+id: execute-proposed-pr-task-001-invalid-output
+execution_mode: workflow_task
+workflow_dir: workflow-evals/workflow-tasks/execute-proposed-pr
+task_id: execute-proposed-pr-task-001
+fixture: fixtures/task-001
+provider:
+  mode: scripted
+  responses:
+  - action: complete
+    output_state: {wrong-state: {ok: true}}
+  - action: complete
+    output_state: $deterministic_pre_step
+expect:
+  output_state: $deterministic_pre_step
+  max_roundtrips: 2
+

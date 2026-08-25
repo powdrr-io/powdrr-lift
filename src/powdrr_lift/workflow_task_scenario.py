@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -125,6 +126,8 @@ def run_workflow_task_scenario(
         )
     temporary = Path(tempfile.mkdtemp(prefix="powdrr-lift-task-scenario-"))
     repo_root = temporary / "repository"
+    previous_uv_cache_dir = os.environ.get("UV_CACHE_DIR")
+    os.environ.setdefault("UV_CACHE_DIR", str(temporary / "uv-cache"))
     workflow_dir = repo_root / "workflow"
     try:
         if fixture_root is not None:
@@ -257,6 +260,10 @@ def run_workflow_task_scenario(
             ),
         }
     finally:
+        if previous_uv_cache_dir is None:
+            os.environ.pop("UV_CACHE_DIR", None)
+        else:
+            os.environ["UV_CACHE_DIR"] = previous_uv_cache_dir
         shutil.rmtree(temporary, ignore_errors=True)
 
 

@@ -5,7 +5,7 @@ import os
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -554,6 +554,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return WorkflowActionOutcome()
         if action.kind == "next_step":
             output_state = _durable_task_action_output_state(action)
+            if self.task.output_state_type == "staged-pull-request-state":
+                _require_staged_pull_request_files(self.repo_root)
             if self.requires_deterministic_output_state and output_state != (
                 self.deterministic_output_state
             ):
@@ -879,8 +881,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             }
         )
         print(
-            "Workflow task action needs correction; requesting a corrected action "
-            "from the LLM.",
+            "Workflow task action failed: "
+            f"{error}\nRequesting a corrected action from the LLM.",
             file=self.stderr,
         )
 
@@ -2116,6 +2118,47 @@ def _durable_task_action_output_state(action: WorkflowAction) -> Any:
     return output_state
 
 
+def _require_staged_pull_request_files(repo_root: Path) -> None:
+    """Require the PR file-set handoff to contain an actual staged diff."""
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError(
+            "Cannot verify staged pull-request files: "
+            f"git diff --cached failed: {result.stderr.strip()}"
+        )
+    if result.stdout.strip():
+        return
+
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.returncode != 0:
+        raise ValueError(
+            "Cannot verify pull-request worktree state: "
+            f"git status failed: {status.stderr.strip()}"
+        )
+    if not status.stdout.strip():
+        return
+
+    raise ValueError(
+        "The staged pull-request file set is empty. Use the intrinsic Git add "
+        '{"operation":"add","paths":[...]} for every approved '
+        "implementation, test, and promoted-document path, then re-read "
+        "Git status before returning next_step. Unstaged or untracked files "
+        "must be added or explicitly deleted before advancing."
+    )
+
+
 def _task_action_failure_reached(
     action_engine: WorkflowLLMActionEngine,
     action: WorkflowAction,
@@ -2223,7 +2266,7 @@ def _deterministic_pre_step_prompt_data(
         "instructions": (
             "This deterministic pre-step already ran. Its result is authoritative. "
             "Do not search for, rediscover, reinterpret, or invoke it again. "
-            "The next action must be complete with output_state exactly equal to "
+            "The next action must be next_step with output_state exactly equal to "
             "the required_output_state object shown here, including its typed "
             "top-level key. Do not put the raw result directly in output_state."
         ),
@@ -2612,6 +2655,16 @@ def _run_skill_for_agent(
             max_timeout_retries=max_timeout_retries,
             timeout_backoff_seconds=timeout_backoff_seconds,
         )
+        if (
+            action.kind == "next_step"
+            and not action.outputs
+            and isinstance(action.output_state, Mapping)
+            and step.outputs
+        ):
+            # Nested skills use the same action schema as durable tasks. Accept
+            # the canonical output_state spelling when it carries the current
+            # skill step's declared handoff outputs.
+            action = replace(action, outputs=dict(action.output_state))
         _validate_workflow_action_outputs(action, step)
         observation = action_engine.observe_action(
             action,
@@ -2648,6 +2701,7 @@ def _run_skill_for_agent(
             continue
         if action.kind == "next_step":
             _validate_workflow_action_outputs(action, step)
+            _record_task_action_outputs(action, handoff_records, step, step_index)
             next_step = (
                 current_skill.skill.steps[step_index + 1]
                 if step_index + 1 < len(current_skill.skill.steps)

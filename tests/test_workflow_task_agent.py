@@ -1276,7 +1276,7 @@ def test_process_workflow_task_repairs_read_document_range_error(
     assert "Request a range from 1 through 2" in correction
     assert "corrected JSON action" in correction
     assert "action_error" in correction
-    assert "needs correction" in stderr.getvalue()
+    assert "action failed" in stderr.getvalue()
 
 
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(

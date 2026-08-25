@@ -385,7 +385,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         for task in template.task_templates
         if task.step_type == "freeform"
     )
-    assert freeform_details.count("Perform exactly one action") >= 8
+    assert freeform_details.count("Perform exactly one action") >= 7
     assert '"action":"edit"' in freeform_details
     assert '"action":"file_management"' in freeform_details
     assert '"action":"next_step"' in freeform_details

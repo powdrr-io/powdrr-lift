@@ -25,9 +25,13 @@ steps:
   step_type: freeform
   llm_type: simple_task
   details: >-
-    Invoke the declared `git diff --cached --stat` command once. Confirm from
-    its result that the staged set is the intended pull-request scope, then
-    choose next_step. Do not invoke another Git command in this step.
+    Invoke the declared shell command exactly once. The action must use the
+    shell tool, not the structured Git intrinsic, because the intrinsic does
+    not support diff. Use this exact shape:
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["git","diff","--cached","--stat"]},"decisions_and_context":"Inspected the staged pull-request diff."}
+    Confirm from its result that the staged set is the intended pull-request
+    scope, then choose next_step. Do not invoke another Git command in this
+    step.
   tool_invocations:
   - tool: shell
     command:
@@ -46,9 +50,13 @@ steps:
     language labels. If no language labels are present, use only pr-prep. Do
     not hard-code a language, tool, or command. For example, the action shape
     is {"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep","<language-label>"]}}.
-    Choose next_step after the gather_context result is returned; that result
-    seeds both the validation tools shown to the next step and its runtime
-    obligations.
+    After the gather_context result is returned, choose next_step and copy the
+    matching tool records into the required output. The next_step must include
+    an outputs object with the exact declared key, for example:
+    {"action":"next_step","outputs":{"validation_tool_obligations":[{"id":"ruff-check","validation_action":["ruff","check","."]}]},"decisions_and_context":"Recorded every discovered validation tool for the mandatory validation gate."}
+    If gather_context returns no matching tools, use an empty list:
+    {"action":"next_step","outputs":{"validation_tool_obligations":[]},"decisions_and_context":"No applicable validation tools were discovered; the empty obligation list is valid."}
+    Do not return next_step without outputs.validation_tool_obligations.
   outputs:
   - name: validation_tool_obligations
     type: any

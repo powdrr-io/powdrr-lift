@@ -200,7 +200,7 @@ def test_execute_proposed_pr_full_fixture_runs_every_task() -> None:
     )
 
     assert result.status == "passed"
-    assert result.roundtrips == 15
+    assert result.roundtrips == 16
 
 
 def test_execute_proposed_pr_failure_fixtures_recover_or_handoff() -> None:

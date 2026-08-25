@@ -272,6 +272,46 @@ def test_workflow_task_prompt_includes_task_interaction_style(
     )
 
 
+def test_task_prompt_marks_deterministic_pre_step_as_authoritative(
+    tmp_path: Path,
+) -> None:
+    task = WorkflowTask(
+        task_id="context-task",
+        status=TaskStatus.OPEN,
+        complexity=TaskComplexity.HIGH,
+        input_state={"feature_id": "fixture-feature"},
+        description="Gather context about the proposed PR.",
+        output_state_type="proposed-pr-context-state",
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.ARCHITECT,
+    )
+    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
+
+    messages = _build_task_messages(
+        workflow,
+        task,
+        [
+            {
+                "kind": "deterministic_pre_step",
+                "action": "gather_context",
+                "result": {"matches": []},
+            }
+        ],
+        repo_root=tmp_path,
+    )
+
+    prompt = json.loads(messages[1]["content"])
+    assert prompt["deterministic_pre_step"]["status"] == "already_completed"
+    assert prompt["deterministic_pre_step"]["result"] == {"matches": []}
+    assert prompt["deterministic_pre_step"]["required_output_state"] == {
+        "proposed-pr-context-state": {"matches": []}
+    }
+    assert (
+        "Do not search for, rediscover, reinterpret"
+        in prompt["deterministic_pre_step"]["instructions"]
+    )
+
+
 def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None:
     events: list[dict[str, Any]] = [
         {

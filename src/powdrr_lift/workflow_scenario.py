@@ -116,6 +116,8 @@ def run_workflow_scenario(
     scenario_path: Path,
     repo_root: Path | None = None,
     keep_failed: bool = False,
+    max_roundtrips_override: int | None = None,
+    max_stalled_roundtrips_override: int | None = None,
 ) -> WorkflowScenarioResult:
     """Run one scripted skill scenario in a fresh temporary Git repository."""
     _validate_scenario(scenario)
@@ -161,12 +163,20 @@ def run_workflow_scenario(
             api_key=_optional_text(provider.get("api_key")),
             base_url=_optional_text(provider.get("base_url")),
             max_roundtrips=(
-                _optional_positive_int(provider.get("max_roundtrips"), default=100)
-                if provider_mode == "scripted"
-                else _optional_positive_int_or_none(provider.get("max_roundtrips"))
+                max_roundtrips_override
+                if max_roundtrips_override is not None
+                else (
+                    _optional_positive_int(provider.get("max_roundtrips"), default=100)
+                    if provider_mode == "scripted"
+                    else _optional_positive_int_or_none(provider.get("max_roundtrips"))
+                )
             ),
-            max_stalled_roundtrips=_optional_non_negative_int(
-                provider.get("max_stalled_roundtrips"), default=3
+            max_stalled_roundtrips=(
+                max_stalled_roundtrips_override
+                if max_stalled_roundtrips_override is not None
+                else _optional_non_negative_int(
+                    provider.get("max_stalled_roundtrips"), default=3
+                )
             ),
             verbose=bool(provider.get("verbose", False)),
         )

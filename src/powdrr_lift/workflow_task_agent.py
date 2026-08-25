@@ -644,7 +644,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             ):
                 raise ValueError(
                     "This task must persist the exact deterministic pre-step result "
-                    "in output_state; do not replace it with a summary."
+                    "in the top-level output_state field; do not use outputs, "
+                    "text, or a summary instead."
                 )
             completed = self.workflow.complete_task(
                 self.task.task_id,
@@ -1763,6 +1764,9 @@ def _build_task_messages(
             "task_context": _task_context_prompt_data(workflow, task),
             "events": _task_events_for_prompt(events),
         }
+        deterministic_pre_step = _deterministic_pre_step_prompt_data(events, task)
+        if deterministic_pre_step is not None:
+            context_data["deterministic_pre_step"] = deterministic_pre_step
     else:
         context_data = {"compacted_context": compacted_context}
     workflow_dir = str(workflow.directory)
@@ -2058,6 +2062,8 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
         "multiple actions. Use `next_step` to acknowledge an intermediate action "
         "or a completed sub-step and continue the task; use `complete` only when "
         "the task requirements are satisfied, with the declared `output_state`. "
+        "For durable task completion, the result MUST be under the top-level "
+        "`output_state` field; never put it under `outputs`. "
         "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
         "it advances this task.\n" + _interaction_style_prompt(interaction_style)
     )
@@ -2108,6 +2114,36 @@ def _task_context_prompt_data(
         },
         task.input_state,
     )
+
+
+def _deterministic_pre_step_prompt_data(
+    events: Sequence[Mapping[str, Any]], task: WorkflowTask
+) -> dict[str, Any] | None:
+    """Make a deterministic pre-step authoritative even for sparse task files."""
+    event = next(
+        (
+            item
+            for item in reversed(events)
+            if item.get("kind") == "deterministic_pre_step"
+        ),
+        None,
+    )
+    if event is None:
+        return None
+    return {
+        "status": "already_completed",
+        "action": event.get("action"),
+        "output_state_type": task.output_state_type,
+        "result": event.get("result"),
+        "required_output_state": {task.output_state_type: event.get("result")},
+        "instructions": (
+            "This deterministic pre-step already ran. Its result is authoritative. "
+            "Do not search for, rediscover, reinterpret, or invoke it again. "
+            "The next action must be complete with output_state exactly equal to "
+            "the required_output_state object shown here, including its typed "
+            "top-level key. Do not put the raw result directly in output_state."
+        ),
+    }
 
 
 def _run_task_deterministic_pre_step(

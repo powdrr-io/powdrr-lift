@@ -1063,6 +1063,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     workflow_scenario_parser.add_argument(
+        "--max-roundtrips",
+        type=int,
+        help="Override the scenario roundtrip limit for an investigative run.",
+    )
+    workflow_scenario_parser.add_argument(
+        "--max-stalled-roundtrips",
+        type=int,
+        help="Override the scenario stalled-action threshold for an investigative run.",
+    )
+    workflow_scenario_parser.add_argument(
         "--json",
         action="store_true",
         help="Print the complete scenario result as JSON.",
@@ -2972,6 +2982,8 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
             scenario_path=scenario_path,
             repo_root=repo_root,
             keep_failed=args.keep_failed,
+            max_roundtrips_override=args.max_roundtrips,
+            max_stalled_roundtrips_override=args.max_stalled_roundtrips,
         )
     except WorkflowScenarioError as exc:
         print(f"Workflow scenario failed: {exc}", file=sys.stderr)

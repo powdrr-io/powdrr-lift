@@ -10,6 +10,7 @@ from powdrr_lift.core import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.workflow_scenario import run_workflow_scenario
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
 
 
@@ -42,3 +43,41 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["exit_code"] == 0
     assert result["task_status"] == "completed"
     assert result["output_matches"] is True
+
+
+def test_workflow_scenario_dispatches_to_task_adapter(tmp_path: Path) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "source-workflow",
+        (
+            WorkflowTask(
+                task_id="execute-proposed-pr-task-001",
+                status=TaskStatus.OPEN,
+                complexity=TaskComplexity.LOW,
+                input_state={},
+                description="Record plan.",
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                output_state_type="plan-state",
+            ),
+        ),
+    )
+    scenario = {
+        "schema_version": 1,
+        "id": "task",
+        "execution_mode": "workflow_task",
+        "workflow_dir": str(workflow.directory),
+        "task_id": "execute-proposed-pr-task-001",
+        "provider": {
+            "mode": "scripted",
+            "responses": [
+                {"action": "complete", "output_state": {"plan-state": {"ok": True}}}
+            ],
+        },
+        "expect": {"output_state": {"plan-state": {"ok": True}}},
+    }
+
+    result = run_workflow_scenario(
+        scenario, scenario_path=tmp_path / "scenario.yaml", repo_root=tmp_path
+    )
+
+    assert result.status == "passed"

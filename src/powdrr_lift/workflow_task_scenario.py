@@ -10,12 +10,21 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core import WorkflowInstance
-from powdrr_lift.workflow_scenario import _ScriptedWorkflowClient
 from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig, run_workflow_task
 
 
 class WorkflowTaskScenarioError(ValueError):
     """Raised for malformed isolated workflow-task scenario inputs."""
+
+
+class _ScriptedWorkflowTaskClient:
+    def __init__(self, responses: Sequence[Mapping[str, Any]]) -> None:
+        self._responses = iter(dict(response) for response in responses)
+        self.messages: list[list[dict[str, str]]] = []
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        self.messages.append(messages)
+        return next(self._responses)
 
 
 def run_workflow_task_scenario(
@@ -46,7 +55,7 @@ def run_workflow_task_scenario(
         else:
             repo_root.mkdir()
         shutil.copytree(workflow_source, workflow_dir)
-        client = _ScriptedWorkflowClient(responses)
+        client = _ScriptedWorkflowTaskClient(responses)
         exit_code = run_workflow_task(
             WorkflowTaskAgentConfig(
                 workflow_dir=workflow_dir, repo_root=repo_root, task_id=task_id

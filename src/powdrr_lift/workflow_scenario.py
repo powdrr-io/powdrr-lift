@@ -34,6 +34,7 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowProgressDisplay,
 )
 from powdrr_lift.workflow_llm import WorkflowLLMExecutionDriver
+from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
 
 WORKFLOW_SCENARIO_SCHEMA_VERSION = 1
 
@@ -112,6 +113,49 @@ def run_workflow_scenario(
     _validate_scenario(scenario)
     source_root = resolve_repo_root(repo_root)
     scenario_id = _required_text(scenario.get("id"), "scenario id")
+    provider = _mapping(scenario.get("provider"), "scenario provider")
+    responses = _mapping_sequence(
+        provider.get("responses"), "scenario provider.responses"
+    )
+    if scenario["execution_mode"] == "workflow_task":
+        workflow_dir = _resolve_path(
+            _required_text(scenario.get("workflow_dir"), "workflow_dir"), source_root
+        )
+        expected = _mapping(scenario.get("expect"), "scenario expect")
+        result = run_workflow_task_scenario(
+            workflow_source=workflow_dir,
+            task_id=_required_text(scenario.get("task_id"), "task_id"),
+            responses=responses,
+            expected_output_state=_mapping(
+                expected.get("output_state"), "expect.output_state"
+            ),
+        )
+        assertions = [
+            _assert(
+                "outcome", result["exit_code"] == 0, "complete", result["exit_code"]
+            ),
+            _assert(
+                "task_status",
+                result["task_status"] == "completed",
+                "completed",
+                result["task_status"],
+            ),
+            _assert(
+                "output_state",
+                result["output_matches"],
+                expected["output_state"],
+                result["output_state"],
+            ),
+        ]
+        return WorkflowScenarioResult(
+            scenario_id=scenario_id,
+            definition=str(workflow_dir),
+            status="passed" if all(item["passed"] for item in assertions) else "failed",
+            assertions=tuple(assertions),
+            execution_events=(),
+            audit_events=(),
+            roundtrips=int(result["roundtrips"]),
+        )
     definition_path = _resolve_path(
         _required_text(scenario.get("definition"), "scenario definition"),
         source_root,
@@ -120,10 +164,6 @@ def run_workflow_scenario(
         raise WorkflowScenarioError(
             f"Scenario definition does not exist: {definition_path}"
         )
-    provider = _mapping(scenario.get("provider"), "scenario provider")
-    responses = _mapping_sequence(
-        provider.get("responses"), "scenario provider.responses"
-    )
     fixture = scenario.get("fixture")
     fixture_path = (
         _resolve_path(fixture, scenario_path.parent)
@@ -514,12 +554,17 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
     if scenario.get("schema_version") != WORKFLOW_SCENARIO_SCHEMA_VERSION:
         raise WorkflowScenarioError("scenario schema_version must be 1.")
     _required_text(scenario.get("id"), "scenario id")
-    _required_text(scenario.get("definition"), "scenario definition")
-    if scenario.get("execution_mode") != "workflow_chat":
+    mode = scenario.get("execution_mode")
+    if mode == "workflow_chat":
+        _required_text(scenario.get("definition"), "scenario definition")
+        _required_text(scenario.get("request"), "scenario request")
+    elif mode == "workflow_task":
+        _required_text(scenario.get("workflow_dir"), "workflow_dir")
+        _required_text(scenario.get("task_id"), "task_id")
+    else:
         raise WorkflowScenarioError(
-            "only workflow_chat scenarios are supported initially."
+            "execution_mode must be workflow_chat or workflow_task."
         )
-    _required_text(scenario.get("request"), "scenario request")
     provider = _mapping(scenario.get("provider"), "scenario provider")
     if provider.get("mode") != "scripted":
         raise WorkflowScenarioError("scenario provider.mode must be scripted.")

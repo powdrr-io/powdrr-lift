@@ -121,3 +121,23 @@ def test_execute_proposed_pr_task_plan_fixture_resolves_upstream_context() -> No
 
     assert result.status == "passed"
     assert result.roundtrips == 1
+
+
+def test_execute_proposed_pr_full_fixture_runs_every_task() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    scenario_path = (
+        repo_root
+        / "workflow-evals"
+        / "scenarios"
+        / "execute-proposed-pr"
+        / "task-all.yaml"
+    )
+
+    result = run_workflow_scenario(
+        load_workflow_scenario(scenario_path),
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+    )
+
+    assert result.status == "passed"
+    assert result.roundtrips == 15

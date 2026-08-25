@@ -1,0 +1,13 @@
+task_id: execute-proposed-pr-task-003
+status: open
+upstream_task_ids: [execute-proposed-pr-task-001, execute-proposed-pr-task-002]
+dependent_state: [tests-generated]
+complexity: high
+input_state: {proposed_pr_context: execute-proposed-pr-task-001.proposed-pr-context-state, execution_plan: execute-proposed-pr-task-002.detailed-execution-plan-state, test_plan: []}
+assignee_type: agent
+assignee_role: coder
+output_state_type: generated-test-diffs-state
+description: Generate the planned tests
+workflow_template: execute-proposed-pr
+step_type: freeform
+

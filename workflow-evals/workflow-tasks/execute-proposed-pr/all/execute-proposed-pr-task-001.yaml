@@ -1,0 +1,14 @@
+task_id: execute-proposed-pr-task-001
+status: open
+upstream_task_ids: []
+dependent_state: [proposed-pr-context-gathered]
+complexity: high
+input_state: {proposed_pr: fixture-pr, feature_id: fixture-feature}
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+description: Gather context about the proposed PR
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+pre_step: {action: gather_context, template: {feature_id: <feature_id>, types: [proposed_prs]}}
+

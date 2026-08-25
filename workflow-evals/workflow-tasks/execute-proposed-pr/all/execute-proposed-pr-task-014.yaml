@@ -1,0 +1,13 @@
+task_id: execute-proposed-pr-task-014
+status: open
+upstream_task_ids: [execute-proposed-pr-task-004, execute-proposed-pr-task-010, execute-proposed-pr-task-013]
+dependent_state: [pull-request-files-verified]
+complexity: medium
+input_state: {implementation_diffs: execute-proposed-pr-task-004.generated-product-code-state, promoted_documents: execute-proposed-pr-task-013.promoted-current-state-documents, type_check: execute-proposed-pr-task-010.type-check-state}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: staged-pull-request-state
+description: Verify the pull request file set
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+pre_step: {action: invoke_tool, template: {tool: shell, command: ["true"]}}

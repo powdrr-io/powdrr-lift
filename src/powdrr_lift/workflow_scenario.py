@@ -151,8 +151,8 @@ def run_workflow_scenario(
             ),
             _assert(
                 "task_status",
-                result["task_status"] == "completed",
-                "completed",
+                result["task_status"] == expected.get("task_status", "completed"),
+                expected.get("task_status", "completed"),
                 result["task_status"],
             ),
             _assert(

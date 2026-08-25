@@ -685,6 +685,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "review-system",
         "run-tests-and-fix",
         "security-review",
+        "spec-v1-design-review",
         "specify-a-feature",
         "specify-architecture",
         "specify-implementation",

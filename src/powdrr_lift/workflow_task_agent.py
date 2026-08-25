@@ -1823,8 +1823,9 @@ def _build_task_messages(
                         {
                             "name": GH_TOOL,
                             "description": (
-                                "Intrinsic GitHub tool for pull-request creation and "
-                                "inspection. Use parameters.operation."
+                                "Intrinsic GitHub tool for pull-request creation, "
+                                "inspection, and inline review comments. Use "
+                                "parameters.operation."
                             ),
                         },
                         {

@@ -47,6 +47,14 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
     ) == ["pr", "view", "394"]
     assert intrinsic_command(
         {
+            "operation": "pr_view",
+            "pr_reference": "394",
+            "json_fields": ["number", "url", "headRefOid"],
+        },
+        tool="gh",
+    ) == ["pr", "view", "394", "--json", "number,url,headRefOid"]
+    assert intrinsic_command(
+        {
             "operation": "pr_create",
             "title": "Add feature",
             "body": "Summary",
@@ -54,6 +62,34 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         },
         tool="gh",
     ) == ["pr", "create", "--draft", "--title", "Add feature", "--body", "Summary"]
+    assert intrinsic_command(
+        {
+            "operation": "pr_review_comment",
+            "repository": "powdrr-io/powdrr-lift",
+            "pr_reference": "432",
+            "body": "Fix the design scope.",
+            "commit_id": "abc123",
+            "path": "docs/proposal.yaml",
+            "line": 12,
+            "side": "RIGHT",
+        },
+        tool="gh",
+    ) == [
+        "api",
+        "repos/powdrr-io/powdrr-lift/pulls/432/comments",
+        "--method",
+        "POST",
+        "-f",
+        "body=Fix the design scope.",
+        "-f",
+        "commit_id=abc123",
+        "-f",
+        "path=docs/proposal.yaml",
+        "-F",
+        "line=12",
+        "-f",
+        "side=RIGHT",
+    ]
 
 
 def test_git_intrinsic_executes_only_inside_the_worktree(tmp_path: Path) -> None:

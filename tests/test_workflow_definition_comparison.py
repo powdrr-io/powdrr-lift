@@ -107,6 +107,31 @@ def test_comparison_rejects_unknown_metric_threshold(tmp_path: Path) -> None:
         raise AssertionError("Expected an invalid threshold to be rejected.")
 
 
+def test_comparison_accepts_a_new_passing_case(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repository"
+    repo_root.mkdir()
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test")
+    _git(repo_root, "config", "user.email", "test@example.invalid")
+    (repo_root / "README.md").write_text("baseline\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "baseline")
+
+    replay = _write_skill_and_replay(repo_root, "rg")
+    report = compare_workflow_definitions(
+        repo_root=repo_root,
+        baseline_ref="HEAD",
+        replay_paths=[replay],
+    )
+
+    assert report.passed is True
+    assert report.baseline_metrics.total_cases == 0
+    assert report.candidate_metrics.valid_replays == 1
+    assert report.improvements == (
+        "new replay inspect-replay.yaml passed on candidate",
+    )
+
+
 def test_cli_emits_json_comparison_report(tmp_path: Path) -> None:
     from powdrr_lift.cli import main
 

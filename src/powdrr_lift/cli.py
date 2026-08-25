@@ -1167,7 +1167,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run deterministic workflow validation, comparison, and reporting.",
     )
     tune_parser.add_argument("--definition", required=True, type=Path)
-    tune_parser.add_argument("--baseline-ref", required=True)
+    tune_parser.add_argument(
+        "--baseline-ref", help="Optional baseline Git ref; defaults to merge-base."
+    )
     tune_parser.add_argument("--replay", type=Path, action="append")
     tune_parser.add_argument("--scenario", type=Path, action="append")
     tune_parser.add_argument("--report", required=True, type=Path)

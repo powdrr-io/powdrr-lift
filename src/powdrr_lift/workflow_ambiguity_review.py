@@ -29,6 +29,8 @@ class WorkflowAmbiguityReview:
     missing_information: tuple[str, ...]
     conflicts: tuple[str, ...]
     ambiguous_phrases: tuple[str, ...]
+    source_sentences: tuple[str, ...]
+    suggested_wording: tuple[str, ...]
     confidence: float
 
     def to_data(self) -> dict[str, Any]:
@@ -43,6 +45,8 @@ class WorkflowAmbiguityReview:
             "missing_information": list(self.missing_information),
             "conflicts": list(self.conflicts),
             "ambiguous_phrases": list(self.ambiguous_phrases),
+            "source_sentences": list(self.source_sentences),
+            "suggested_wording": list(self.suggested_wording),
             "confidence": self.confidence,
         }
 
@@ -67,6 +71,8 @@ def build_ambiguity_review_messages(
         "missing_information": [],
         "conflicts": [],
         "ambiguous_phrases": [],
+        "source_sentences": [],
+        "suggested_wording": [],
         "confidence": 0.95,
     }
     messages = [
@@ -77,7 +83,9 @@ def build_ambiguity_review_messages(
                 "Inspect one step and its compact parent contract. Do not propose "
                 "code changes, invoke tools, or claim execution results. Identify "
                 "only ambiguity that could cause an LLM to choose the wrong first "
-                "action, completion condition, parameters, or human handoff. "
+                "action, completion condition, parameters, or human handoff. Every "
+                "finding must quote its exact source sentence in source_sentences and "
+                "offer a concrete replacement in suggested_wording. "
                 "Return exactly one JSON object matching this complete example:\n"
                 + json.dumps(example, ensure_ascii=False)
             ),
@@ -146,6 +154,17 @@ def _parse_review(
     ambiguous_phrases = _string_list(
         payload.get("ambiguous_phrases"), "ambiguous_phrases"
     )
+    source_sentences = _string_list(payload.get("source_sentences"), "source_sentences")
+    suggested_wording = _string_list(
+        payload.get("suggested_wording"), "suggested_wording"
+    )
+    if bool(ambiguous_phrases) != bool(source_sentences) or bool(
+        ambiguous_phrases
+    ) != bool(suggested_wording):
+        raise WorkflowAmbiguityReviewError(
+            "Reviewer ambiguity findings require source_sentences and "
+            "suggested_wording."
+        )
     confidence = payload.get("confidence")
     if (
         not isinstance(confidence, (int, float))
@@ -170,6 +189,8 @@ def _parse_review(
         missing_information=tuple(missing_information),
         conflicts=tuple(conflicts),
         ambiguous_phrases=tuple(ambiguous_phrases),
+        source_sentences=tuple(source_sentences),
+        suggested_wording=tuple(suggested_wording),
         confidence=float(confidence),
     )
 

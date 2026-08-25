@@ -57,3 +57,35 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: Tune changed workflow definitions
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --name-only "$BASE_REF...HEAD" -- skill-definitions templates \
+            | while IFS= read -r definition; do
+                [ -n "$definition" ] || continue
+                slug="$(basename "$definition" .yaml)"
+                set --
+                for replay in "workflow-evals/replays/$slug"/*.yaml; do
+                  [ -f "$replay" ] && set -- "$@" --replay "$replay"
+                done
+                for scenario in "workflow-evals/scenarios/$slug"/*.yaml; do
+                  [ -f "$scenario" ] && set -- "$@" --scenario "$scenario"
+                done
+                [ "$#" -gt 0 ] || continue
+                mkdir -p workflow-tuning-reports
+                uv run powdrr-lift tune-workflow --definition "$definition" \
+                  --baseline-ref "$BASE_REF" \
+                  --report "workflow-tuning-reports/$slug.json" "$@"
+              done
+
+      - name: Upload workflow tuning reports
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-tuning-reports
+          path: workflow-tuning-reports
+          if-no-files-found: ignore

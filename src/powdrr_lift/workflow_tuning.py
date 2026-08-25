@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,7 @@ def tune_workflow(
     *,
     definition: Path,
     repo_root: Path,
-    baseline_ref: str,
+    baseline_ref: str | None = None,
     replay_paths: Sequence[Path] = (),
     scenario_paths: Sequence[Path] = (),
     thresholds: Mapping[str, int] | None = None,
@@ -39,6 +40,12 @@ def tune_workflow(
     definition_path = definition if definition.is_absolute() else root / definition
     if not definition_path.is_file():
         raise WorkflowTuningError(f"Definition does not exist: {definition_path}")
+    baseline = baseline_ref or resolve_tuning_baseline(root)
+    discovered_replays, discovered_scenarios = discover_tuning_cases(
+        definition_path, root
+    )
+    replay_paths = replay_paths or discovered_replays
+    scenario_paths = scenario_paths or discovered_scenarios
     static = analyze_workflow_definition(definition_path)
     snapshots: list[str] = []
     if snapshot_output_dir is not None:
@@ -56,7 +63,7 @@ def tune_workflow(
     try:
         comparison = compare_workflow_definitions(
             repo_root=root,
-            baseline_ref=baseline_ref,
+            baseline_ref=baseline,
             replay_paths=replay_paths,
             scenario_paths=scenario_paths,
             thresholds=thresholds,
@@ -94,6 +101,32 @@ def tune_workflow(
         },
     }
     return report
+
+
+def resolve_tuning_baseline(repo_root: Path) -> str:
+    """Use the merge base with main, falling back to the parent commit."""
+    for command in (
+        ["git", "merge-base", "HEAD", "origin/main"],
+        ["git", "rev-parse", "HEAD^"],
+    ):
+        result = subprocess.run(command, cwd=repo_root, capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    raise WorkflowTuningError("Could not resolve a baseline; pass --baseline-ref.")
+
+
+def discover_tuning_cases(
+    definition: Path, repo_root: Path
+) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    """Discover committed fixtures named for one definition without broad scans."""
+    slug = definition.stem
+    replays = tuple(
+        sorted((repo_root / "workflow-evals" / "replays" / slug).glob("*.yaml"))
+    )
+    scenarios = tuple(
+        sorted((repo_root / "workflow-evals" / "scenarios" / slug).glob("*.yaml"))
+    )
+    return replays, scenarios
 
 
 def save_workflow_tuning_report(path: Path, report: Mapping[str, Any]) -> Path:

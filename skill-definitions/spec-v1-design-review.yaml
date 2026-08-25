@@ -76,8 +76,8 @@ steps:
     different problem. Record one finding per root cause with the source,
     changed-file anchor, user impact, confidence, and a concise correction.
     Do not report a preference when the design satisfies the stated intent. For
-    example, finish this question with
-    {"action":"next_step","decisions_and_context":"Intent coverage is complete; findings: <list or none>.","llm_type":"high_reasoning"}.
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<intent-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the intent finding with its evidence and impact.","llm_type":"simple_task"}.
 - id: review-assumptions
   description: Ask whether the design contains assumptions requiring clarification.
   step_type: freeform
@@ -90,8 +90,8 @@ steps:
     would change the design, implementation, acceptance criteria, or risk. Ask
     a precise clarification question and explain which design decision is
     blocked. Do not turn ordinary implementation choices into questions. For
-    example, finish with
-    {"action":"next_step","decisions_and_context":"Assumptions requiring clarification: <list or none>.","llm_type":"high_reasoning"}.
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<assumption-finding-and-question>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the unresolved assumption and precise clarification question.","llm_type":"simple_task"}.
 - id: review-traceability-and-completeness
   description: Ask whether the spec v1 design is complete and internally traceable.
   step_type: freeform
@@ -105,8 +105,9 @@ steps:
     required by spec v1, every proposed PR id is defined before it is referenced,
     dependencies are acyclic and ordered, and no change is orphaned. Report
     missing, duplicated, contradictory, cyclic, or unassigned entries with
-    exact paths and a focused fix direction. For example, finish with
-    {"action":"next_step","decisions_and_context":"Traceability matrix complete; issues: <list or none>.","llm_type":"high_reasoning"}.
+    exact paths and a focused fix direction. For an issue found here, post an
+    inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<traceability-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the exact missing, duplicated, cyclic, or unassigned path.","llm_type":"simple_task"}.
 - id: review-existing-mechanisms
   description: Ask whether existing repository mechanisms can implement the design.
   step_type: freeform
@@ -123,7 +124,7 @@ steps:
     repository search tool with JSON such as
     {"action":"invoke_tool","tool":"shell","parameters":{"command":["rg","-n","-i","<mechanism-or-symbol>","src","docs","tests"]},"decisions_and_context":"Search for existing mechanisms before deciding whether the design duplicates one.","llm_type":"high_reasoning"}
     and after its result finish with
-    {"action":"next_step","decisions_and_context":"Existing mechanism comparison complete; findings: <list or none>.","llm_type":"high_reasoning"}.
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<existing-mechanism-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the repository evidence for the existing mechanism and reuse direction.","llm_type":"simple_task"}.
   tool_invocations:
   - tool: shell
     command:
@@ -146,8 +147,8 @@ steps:
     design would create duplication, violate an invariant, or make correctness
     materially harder to achieve. Separate a prerequisite refactor from an
     optional cleanup and do not expand the feature for stylistic reasons. For
-    example, finish with
-    {"action":"next_step","decisions_and_context":"Refactoring assessment complete; prerequisite refactors: <list or none>.","llm_type":"high_reasoning"}.
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<refactoring-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the prerequisite refactor and concrete correctness benefit.","llm_type":"simple_task"}.
 - id: review-unnecessary-scope
   description: Ask whether the design includes unnecessary changes.
   step_type: freeform
@@ -158,9 +159,9 @@ steps:
     safety requirement, or necessary implementation consequence. Identify changes
     that do not contribute to the feature, duplicate another change, speculate
     about future needs, or belong in a separate feature. Explain the cost or risk
-    and propose the smallest removal that preserves the intent. For example,
-    finish with
-    {"action":"next_step","decisions_and_context":"Scope mapping complete; unnecessary changes: <list or none>.","llm_type":"high_reasoning"}.
+    and propose the smallest removal that preserves the intent. For an issue
+    found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<unnecessary-scope-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the unsupported scope and smallest removal.","llm_type":"simple_task"}.
 - id: review-security
   description: Ask whether security concerns are addressed by the design.
   step_type: freeform
@@ -173,8 +174,8 @@ steps:
     defaults, and failure behavior. Require a design-level mitigation or an
     explicit out-of-scope decision for a plausible security risk. Report only
     evidence-backed risks with an attack path, impact, and concrete design or
-    validation change. For example, finish with
-    {"action":"next_step","decisions_and_context":"Threat model complete; security findings: <list or none>.","llm_type":"high_reasoning"}.
+    validation change. For an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<security-finding-with-attack-path>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the evidence-backed security risk and mitigation.","llm_type":"simple_task"}.
 - id: review-performance
   description: Ask whether performance and scale concerns are addressed.
   step_type: freeform
@@ -186,8 +187,9 @@ steps:
     computation, synchronous calls on critical paths, and retry storms. Require
     a bound, measurement, capacity assumption, or deliberate tradeoff when the
     risk is material. Do not report performance concerns without a plausible
-    workload or a concrete design consequence. For example, finish with
-    {"action":"next_step","decisions_and_context":"Performance review complete; material risks: <list or none>.","llm_type":"high_reasoning"}.
+    workload or a concrete design consequence. For an issue found here, post an
+    inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<performance-finding-with-workload>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the plausible workload and performance mitigation.","llm_type":"simple_task"}.
 - id: review-entity-lifecycle
   description: Ask whether entity lifecycle and removals are correct.
   step_type: freeform
@@ -199,9 +201,9 @@ steps:
     permissions, and documentation are updated consistently. Check creation,
     update, deletion, archival, replacement, ownership transfer, and recovery
     semantics. Report stale entities, missing removals, orphaned relationships,
-    or incompatible lifecycle transitions with exact spec v1 paths. For example,
-    finish with
-    {"action":"next_step","decisions_and_context":"Entity lifecycle review complete; removals or lifecycle issues: <list or none>.","llm_type":"high_reasoning"}.
+    or incompatible lifecycle transitions with exact spec v1 paths. For an issue
+    found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<entity-lifecycle-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the stale entity, missing removal, or orphaned relationship.","llm_type":"simple_task"}.
 - id: review-dependencies-and-delivery
   description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
   step_type: freeform
@@ -214,8 +216,8 @@ steps:
     valid. Check that each proposed PR has a demonstrable completion boundary,
     compatible intermediate state, and appropriate validation. Report the
     smallest split, reorder, or dependency clarification that fixes the plan. For
-    example, finish with
-    {"action":"next_step","decisions_and_context":"Proposed-PR dependency graph reviewed; issues: <list or none>.","llm_type":"high_reasoning"}.
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<dependency-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the dependency graph evidence and smallest sequencing fix.","llm_type":"simple_task"}.
 - id: review-compatibility-and-failure-modes
   description: Ask whether compatibility, migration, and failure behavior are designed.
   step_type: freeform
@@ -227,8 +229,8 @@ steps:
     proposed PRs leave the system valid and whether the design states what users
     observe when dependencies are unavailable. Report missing behavior only when
     it can cause data loss, outages, inconsistent state, or an unclear release
-    path. For example, finish with
-    {"action":"next_step","decisions_and_context":"Compatibility and failure-mode review complete; issues: <list or none>.","llm_type":"high_reasoning"}.
+    path. For an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<compatibility-or-failure-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the rollout or failure-mode risk and correction.","llm_type":"simple_task"}.
 - id: review-testability-and-operability
   description: Ask whether the design can be validated and operated safely.
   step_type: freeform
@@ -240,8 +242,8 @@ steps:
     traces, alerts, dashboards, runbooks, feature flags, and operational ownership
     for new failure modes. Report missing evidence or operational controls when
     they are necessary to distinguish success from silent corruption or outage.
-    For example, finish with
-    {"action":"next_step","decisions_and_context":"Testability and operability review complete; gaps: <list or none>.","llm_type":"high_reasoning"}.
+    For an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<testability-or-operability-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the missing validation or operational control.","llm_type":"simple_task"}.
 - id: prepare-and-post-findings
   description: Post every actionable design finding as an inline PR comment.
   step_type: freeform

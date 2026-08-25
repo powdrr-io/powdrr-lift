@@ -23,6 +23,11 @@ makes it possible to inspect the exact response that caused a repair or stall
 and improve the task guidance. Live scenarios do not assert success unless
 `expect` contains explicit expectations.
 
+If `max_roundtrips` is omitted from a live scenario, there is no arbitrary
+roundtrip cap. The existing stalled-action guard remains active, so a run stops
+when it is repeating actions without material progress. Add
+`max_roundtrips: N` when deliberately limiting cost for an experiment.
+
 Runs are isolated in a temporary repository and do not mutate a real worktree.
 Use deterministic scenarios for CI regression coverage after changing
 guidance.

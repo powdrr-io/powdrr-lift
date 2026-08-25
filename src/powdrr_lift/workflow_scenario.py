@@ -160,8 +160,10 @@ def run_workflow_scenario(
             ),
             api_key=_optional_text(provider.get("api_key")),
             base_url=_optional_text(provider.get("base_url")),
-            max_roundtrips=_optional_positive_int(
-                provider.get("max_roundtrips"), default=100
+            max_roundtrips=(
+                _optional_positive_int(provider.get("max_roundtrips"), default=100)
+                if provider_mode == "scripted"
+                else _optional_positive_int_or_none(provider.get("max_roundtrips"))
             ),
             max_stalled_roundtrips=_optional_non_negative_int(
                 provider.get("max_stalled_roundtrips"), default=3
@@ -691,6 +693,12 @@ def _optional_positive_int(value: Any, *, default: int) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise WorkflowScenarioError("max_roundtrips must be a positive integer.")
     return value
+
+
+def _optional_positive_int_or_none(value: Any) -> int | None:
+    if value is None:
+        return None
+    return _optional_positive_int(value, default=1)
 
 
 def _optional_non_negative_int(value: Any, *, default: int) -> int:

@@ -1055,6 +1055,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Retain the isolated repository for a failed scenario and print its path.",
     )
     workflow_scenario_parser.add_argument(
+        "--report",
+        type=Path,
+        help=(
+            "Write the complete result, including live LLM exchanges and repair "
+            "output, to this JSON file."
+        ),
+    )
+    workflow_scenario_parser.add_argument(
         "--json",
         action="store_true",
         help="Print the complete scenario result as JSON.",
@@ -2969,6 +2977,15 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
         print(f"Workflow scenario failed: {exc}", file=sys.stderr)
         return 1
     data = result.to_data()
+    if args.report is not None:
+        report_path = (
+            args.report if args.report.is_absolute() else repo_root / args.report
+        )
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:

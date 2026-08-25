@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -81,6 +83,64 @@ def test_workflow_scenario_dispatches_to_task_adapter(tmp_path: Path) -> None:
     )
 
     assert result.status == "passed"
+
+
+def test_live_workflow_scenario_records_real_client_exchanges(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "source-workflow",
+        (
+            WorkflowTask(
+                task_id="execute-proposed-pr-task-001",
+                status=TaskStatus.OPEN,
+                complexity=TaskComplexity.LOW,
+                input_state={},
+                description="Record plan.",
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                output_state_type="plan-state",
+            ),
+        ),
+    )
+
+    class FakeLiveClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
+            assert messages
+            return {"action": "complete", "output_state": {"plan-state": {"ok": True}}}
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_scenario._build_workflow_client",
+        lambda *_args, **_kwargs: FakeLiveClient(),
+    )
+    scenario = {
+        "schema_version": 1,
+        "id": "live-task",
+        "execution_mode": "workflow_task",
+        "workflow_dir": str(workflow.directory),
+        "task_id": "execute-proposed-pr-task-001",
+        "provider": {"mode": "live", "provider": "openai"},
+        "expect": {"output_state": {"plan-state": {"ok": True}}},
+    }
+
+    result = run_workflow_scenario(
+        scenario, scenario_path=tmp_path / "live.yaml", repo_root=tmp_path
+    )
+
+    assert result.status == "passed"
+    assert len(result.llm_exchanges) == 1
+    assert result.llm_exchanges[0]["output"]["action"] == "complete"
+    assert result.analysis == {
+        "exchange_count": 1,
+        "transport_error_count": 0,
+        "action_correction_count": 0,
+        "no_progress_count": 0,
+        "repeated_action_count": 0,
+        "action_kinds": ["complete"],
+        "roundtrip_limit_reached": False,
+        "human_handoff": False,
+    }
+    assert result.stdout
 
 
 def test_execute_proposed_pr_task_fixture_completes_deterministic_handoff() -> None:

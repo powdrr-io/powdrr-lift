@@ -7,12 +7,14 @@ import json
 import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core import WorkflowInstance
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
+    _build_workflow_client,
     _run_task_deterministic_pre_step,
     run_workflow_task,
 )
@@ -20,6 +22,36 @@ from powdrr_lift.workflow_task_agent import (
 
 class WorkflowTaskScenarioError(ValueError):
     """Raised for malformed isolated workflow-task scenario inputs."""
+
+
+class LiveWorkflowTaskExchangeRecorder:
+    """Capture complete exchanges while delegating to a real LLM client."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+        self.exchanges: list[dict[str, Any]] = []
+
+    @property
+    def messages(self) -> list[list[dict[str, str]]]:
+        return [exchange["input"] for exchange in self.exchanges]
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        record: dict[str, Any] = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "input": [dict(message) for message in messages],
+        }
+        try:
+            response = self._client.complete_json(messages)
+        except Exception as exc:
+            record["error"] = {"type": type(exc).__name__, "message": str(exc)}
+            self.exchanges.append(record)
+            raise
+        record["output"] = response
+        usage = getattr(self._client, "last_usage", None)
+        if isinstance(usage, Mapping):
+            record["usage"] = dict(usage)
+        self.exchanges.append(record)
+        return response
 
 
 class _ScriptedWorkflowTaskClient:
@@ -52,6 +84,12 @@ def run_workflow_task_scenario(
     expected_output_state: Any,
     fixture_root: Path | None = None,
     run_all: bool = False,
+    live_provider: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    max_roundtrips: int | None = None,
+    max_stalled_roundtrips: int = 3,
+    verbose: bool = False,
 ) -> dict[str, Any]:
     """Run one real task, or every ready task, with scripted LLM output.
 
@@ -91,9 +129,35 @@ def run_workflow_task_scenario(
             if source_task is not None
             else (None, False)
         )
-        client = _ScriptedWorkflowTaskClient(
-            [_replace_pre_step_result(item, deterministic_state) for item in responses]
-        )
+        recorder: LiveWorkflowTaskExchangeRecorder | None = None
+        if live_provider is None:
+            client: Any = _ScriptedWorkflowTaskClient(
+                [
+                    _replace_pre_step_result(item, deterministic_state)
+                    for item in responses
+                ]
+            )
+        else:
+            source_task_for_client = next(
+                (item for item in source_tasks if item.task_id == target_task_id),
+                source_tasks[-1],
+            )
+            recorder = LiveWorkflowTaskExchangeRecorder(
+                _build_workflow_client(
+                    WorkflowTaskAgentConfig(
+                        workflow_dir=workflow_dir,
+                        repo_root=repo_root,
+                        provider=live_provider,
+                        api_key=api_key,
+                        base_url=base_url,
+                        max_roundtrips=max_roundtrips,
+                        max_stalled_roundtrips=max_stalled_roundtrips,
+                        verbose=verbose,
+                    ),
+                    source_task_for_client,
+                )
+            )
+            client = recorder
         stdout = io.StringIO()
         stderr = io.StringIO()
         try:
@@ -102,6 +166,12 @@ def run_workflow_task_scenario(
                     workflow_dir=workflow_dir,
                     repo_root=repo_root,
                     task_id=None if run_all else target_task_id,
+                    provider=live_provider or "local",
+                    api_key=api_key,
+                    base_url=base_url,
+                    max_roundtrips=max_roundtrips,
+                    max_stalled_roundtrips=max_stalled_roundtrips,
+                    verbose=verbose,
                 ),
                 client=client,
                 stdout=stdout,
@@ -131,8 +201,16 @@ def run_workflow_task_scenario(
             "output_state": actual,
             "output_matches": actual == expected,
             "roundtrips": len(client.messages),
+            "exchanges": recorder.exchanges if recorder is not None else [],
             "all_tasks_completed": all(
                 item.status.value == "completed" for item in final_tasks
+            ),
+            "stdout": stdout.getvalue(),
+            "stderr": stderr.getvalue(),
+            "analysis": _analyze_live_run(
+                recorder.exchanges if recorder is not None else [],
+                stdout.getvalue(),
+                stderr.getvalue(),
             ),
         }
     finally:
@@ -164,3 +242,30 @@ def _response_correction(messages: Sequence[Mapping[str, str]]) -> str:
         if isinstance(step_context, list) and step_context:
             return str(step_context[-1])
     return "No repair guidance was included in the task-agent request."
+
+
+def _analyze_live_run(
+    exchanges: Sequence[Mapping[str, Any]], stdout: str, stderr: str
+) -> dict[str, Any]:
+    """Summarize actionable failure patterns without replacing raw exchanges."""
+    outputs = [item.get("output") for item in exchanges]
+    action_kinds = [
+        output.get("action")
+        for output in outputs
+        if isinstance(output, Mapping) and isinstance(output.get("action"), str)
+    ]
+    repeated_actions = sum(
+        1
+        for previous, current in zip(action_kinds, action_kinds[1:], strict=False)
+        if previous == current
+    )
+    return {
+        "exchange_count": len(exchanges),
+        "transport_error_count": sum("error" in item for item in exchanges),
+        "action_correction_count": stderr.count("action needs correction"),
+        "no_progress_count": stderr.count("made no progress"),
+        "repeated_action_count": repeated_actions,
+        "action_kinds": action_kinds,
+        "roundtrip_limit_reached": "reached the configured roundtrip limit" in stderr,
+        "human_handoff": "Workflow blocked on human task" in stdout,
+    }

@@ -1,0 +1,12 @@
+schema_version: 1
+id: execute-proposed-pr-live-task-001
+execution_mode: workflow_task
+workflow_dir: workflow-evals/workflow-tasks/execute-proposed-pr
+task_id: execute-proposed-pr-task-001
+provider:
+  mode: live
+  provider: auto
+  # Omit max_roundtrips so progress, rather than an arbitrary cap, determines
+  # how long the live run can continue. The stall guard still stops repetition.
+  max_stalled_roundtrips: 5
+expect: {}

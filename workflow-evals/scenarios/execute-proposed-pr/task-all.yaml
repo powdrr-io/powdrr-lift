@@ -34,9 +34,12 @@ provider:
     output_state: {final-scope-repair-state: {ok: true}}
   - action: next_step
     output_state: {promoted-current-state-documents: {ok: true}}
+  - action: invoke_tool
+    tool: git
+    parameters: {operation: add, paths: [workflow/execute-proposed-pr-task-014.yaml]}
   - action: next_step
     output_state: {staged-pull-request-state: {ok: true}}
-  - action: complete
+  - action: next_step
     output_state: {pull-request-prep-state: {ok: true}}
 expect:
   output_state: {pull-request-prep-state: {ok: true}}

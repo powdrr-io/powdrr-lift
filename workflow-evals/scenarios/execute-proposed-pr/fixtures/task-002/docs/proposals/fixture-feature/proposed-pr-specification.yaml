@@ -1,0 +1,7 @@
+schema_version: 1
+specification_type: proposed
+proposed_prs:
+- id: fixture-pr
+  feature_ids: [fixture-feature]
+  intent: Exercise task-to-task context handoff.
+  justification: Required by the isolated workflow task scenario.

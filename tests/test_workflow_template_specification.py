@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from powdrr_lift.core import WorkflowInstance
 from powdrr_lift.core.skill_specification import SkillToolInvocation
 from powdrr_lift.core.workflow_task_specification import TaskComplexity
 from powdrr_lift.core.workflow_template_specification import (
@@ -435,6 +436,20 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
     assert all(task.workflow_template == template_path.stem for task in tasks)
+
+
+def test_checked_in_execute_workflows_do_not_terminate_on_intermediate_tasks() -> None:
+    workflow_root = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "workflows"
+        / "interaction-file-log"
+    )
+
+    for task in WorkflowInstance.from_directory(workflow_root).tasks:
+        if task.output_state_type == "pull-request-prep-state":
+            continue
+        assert '"action":"complete"' not in (task.details or ""), task.task_id
 
 
 def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(

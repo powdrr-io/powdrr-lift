@@ -48,11 +48,12 @@ def run_workflow_task_scenario(
     *,
     workflow_source: Path,
     responses: Sequence[Mapping[str, Any]],
-    task_id: str,
+    task_id: str | None,
     expected_output_state: Any,
     fixture_root: Path | None = None,
+    run_all: bool = False,
 ) -> dict[str, Any]:
-    """Copy a workflow fixture and run one real task with scripted LLM output.
+    """Run one real task, or every ready task, with scripted LLM output.
 
     The isolated repository deliberately has no .git directory, so the task
     agent persists task state locally and cannot publish or create a PR.
@@ -72,13 +73,23 @@ def run_workflow_task_scenario(
         else:
             repo_root.mkdir()
         shutil.copytree(workflow_source, workflow_dir)
+        source_tasks = WorkflowInstance.from_directory(workflow_dir).tasks
+        target_task_id = task_id or source_tasks[-1].task_id
         source_task = next(
-            item
-            for item in WorkflowInstance.from_directory(workflow_dir).tasks
-            if item.task_id == task_id
+            (
+                item
+                for item in source_tasks
+                if item.pre_step is not None
+                and item.pre_step.action == "gather_context"
+            ),
+            None,
         )
-        deterministic_state, _ = _run_task_deterministic_pre_step(
-            source_task, repo_root=repo_root, events=[]
+        deterministic_state, _ = (
+            _run_task_deterministic_pre_step(
+                source_task, repo_root=repo_root, events=[]
+            )
+            if source_task is not None
+            else (None, False)
         )
         client = _ScriptedWorkflowTaskClient(
             [_replace_pre_step_result(item, deterministic_state) for item in responses]
@@ -88,7 +99,9 @@ def run_workflow_task_scenario(
         try:
             exit_code = run_workflow_task(
                 WorkflowTaskAgentConfig(
-                    workflow_dir=workflow_dir, repo_root=repo_root, task_id=task_id
+                    workflow_dir=workflow_dir,
+                    repo_root=repo_root,
+                    task_id=None if run_all else target_task_id,
                 ),
                 client=client,
                 stdout=stdout,
@@ -105,18 +118,22 @@ def run_workflow_task_scenario(
             (
                 item
                 for item in WorkflowInstance.from_directory(workflow_dir).tasks
-                if item.task_id == task_id
+                if item.task_id == target_task_id
             ),
             None,
         )
         actual = task.output_state if task is not None else None
         expected = _replace_pre_step_result(expected_output_state, deterministic_state)
+        final_tasks = WorkflowInstance.from_directory(workflow_dir).tasks
         return {
             "exit_code": exit_code,
             "task_status": task.status.value if task is not None else None,
             "output_state": actual,
             "output_matches": actual == expected,
             "roundtrips": len(client.messages),
+            "all_tasks_completed": all(
+                item.status.value == "completed" for item in final_tasks
+            ),
         }
     finally:
         shutil.rmtree(temporary, ignore_errors=True)

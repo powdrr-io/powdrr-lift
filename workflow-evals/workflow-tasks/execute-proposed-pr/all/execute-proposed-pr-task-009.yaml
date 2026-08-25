@@ -1,0 +1,13 @@
+task_id: execute-proposed-pr-task-009
+status: open
+upstream_task_ids: [execute-proposed-pr-task-008]
+dependent_state: [lint-checked]
+complexity: medium
+input_state: {formatting_check: execute-proposed-pr-task-008.formatting-check-state}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: lint-check-state
+description: Run lint checks
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+pre_step: {action: invoke_tool, template: {tool: shell, command: ["true"]}}

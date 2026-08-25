@@ -130,12 +130,20 @@ def run_workflow_scenario(
             _required_text(scenario.get("workflow_dir"), "workflow_dir"), source_root
         )
         expected = _mapping(scenario.get("expect"), "scenario expect")
+        run_all = scenario.get("run_all", False)
+        if not isinstance(run_all, bool):
+            raise WorkflowScenarioError("workflow_task run_all must be a boolean.")
         result = run_workflow_task_scenario(
             workflow_source=workflow_dir,
-            task_id=_required_text(scenario.get("task_id"), "task_id"),
+            task_id=(
+                _required_text(scenario.get("task_id"), "task_id")
+                if not run_all
+                else None
+            ),
             responses=responses,
             fixture_root=fixture_path,
             expected_output_state=expected.get("output_state"),
+            run_all=run_all,
         )
         assertions = [
             _assert(
@@ -154,6 +162,15 @@ def run_workflow_scenario(
                 result["output_state"],
             ),
         ]
+        if run_all:
+            assertions.append(
+                _assert(
+                    "all_tasks_completed",
+                    result["all_tasks_completed"],
+                    True,
+                    result["all_tasks_completed"],
+                )
+            )
         return WorkflowScenarioResult(
             scenario_id=scenario_id,
             definition=str(workflow_dir),
@@ -559,7 +576,11 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
         _required_text(scenario.get("request"), "scenario request")
     elif mode == "workflow_task":
         _required_text(scenario.get("workflow_dir"), "workflow_dir")
-        _required_text(scenario.get("task_id"), "task_id")
+        run_all = scenario.get("run_all", False)
+        if not isinstance(run_all, bool):
+            raise WorkflowScenarioError("workflow_task run_all must be a boolean.")
+        if not run_all:
+            _required_text(scenario.get("task_id"), "task_id")
     else:
         raise WorkflowScenarioError(
             "execution_mode must be workflow_chat or workflow_task."

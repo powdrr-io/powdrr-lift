@@ -1,0 +1,42 @@
+schema_version: 1
+id: execute-proposed-pr-task-all
+execution_mode: workflow_task
+workflow_dir: workflow-evals/workflow-tasks/execute-proposed-pr/all
+task_id: execute-proposed-pr-task-015
+run_all: true
+fixture: fixtures/task-002
+provider:
+  mode: scripted
+  responses:
+  - action: complete
+    output_state: $deterministic_pre_step
+  - action: complete
+    output_state: {detailed-execution-plan-state: {ok: true}}
+  - action: complete
+    output_state: {generated-test-diffs-state: {ok: true}}
+  - action: complete
+    output_state: {generated-product-code-state: {ok: true}}
+  - action: complete
+    output_state: {all-tests-results-state: {ok: true}}
+  - action: complete
+    output_state: {specification-completeness-state: {ok: true}}
+  - action: complete
+    output_state: {completeness-repair-state: {ok: true}}
+  - action: complete
+    output_state: {formatting-check-state: {ok: true}}
+  - action: complete
+    output_state: {lint-check-state: {ok: true}}
+  - action: complete
+    output_state: {type-check-state: {ok: true}}
+  - action: complete
+    output_state: {final-scope-review-state: {ok: true}}
+  - action: complete
+    output_state: {final-scope-repair-state: {ok: true}}
+  - action: complete
+    output_state: {promoted-current-state-documents: {ok: true}}
+  - action: complete
+    output_state: {staged-pull-request-state: {ok: true}}
+  - action: complete
+    output_state: {pull-request-prep-state: {ok: true}}
+expect:
+  output_state: {pull-request-prep-state: {ok: true}}

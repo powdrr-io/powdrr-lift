@@ -1,5 +1,5 @@
 task_id: interaction-file-log-writer-task-014
-status: open
+status: closed
 upstream_task_ids:
 - interaction-file-log-writer-task-004
 - interaction-file-log-writer-task-013

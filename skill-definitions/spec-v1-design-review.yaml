@@ -87,6 +87,15 @@ steps:
     Do not report a preference when the design satisfies the stated intent. For
     an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<intent-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the intent finding with its evidence and impact."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-assumptions
   description: Ask whether the design contains assumptions requiring clarification.
   step_type: freeform
@@ -101,6 +110,15 @@ steps:
     blocked. Do not turn ordinary implementation choices into questions. For
     an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<assumption-finding-and-question>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unresolved assumption and precise clarification question."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-traceability-and-completeness
   description: Ask whether the spec v1 design is complete and internally traceable.
   step_type: freeform
@@ -117,6 +135,15 @@ steps:
     exact paths and a focused fix direction. For an issue found here, post an
     inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<traceability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the exact missing, duplicated, cyclic, or unassigned path."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-existing-mechanisms
   description: Ask whether existing repository mechanisms can implement the design.
   step_type: freeform
@@ -136,7 +163,15 @@ steps:
     {"action":"invoke_tool","tool":"shell","parameters":{"command":["rg","-n","-i","<mechanism-or-symbol>","src","docs","tests"]},"decisions_and_context":"Search for existing mechanisms before deciding whether the design duplicates one."}
     and after its result finish with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<existing-mechanism-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the repository evidence for the existing mechanism and reuse direction."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
   tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
   - tool: shell
     command:
     - rg
@@ -160,6 +195,15 @@ steps:
     optional cleanup and do not expand the feature for stylistic reasons. For
     an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<refactoring-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the prerequisite refactor and concrete correctness benefit."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-unnecessary-scope
   description: Ask whether the design includes unnecessary changes.
   step_type: freeform
@@ -173,6 +217,15 @@ steps:
     and propose the smallest removal that preserves the intent. For an issue
     found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<unnecessary-scope-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unsupported scope and smallest removal."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-security
   description: Ask whether security concerns are addressed by the design.
   step_type: freeform
@@ -187,6 +240,15 @@ steps:
     evidence-backed risks with an attack path, impact, and concrete design or
     validation change. For an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<security-finding-with-attack-path>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the evidence-backed security risk and mitigation."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-performance
   description: Ask whether performance and scale concerns are addressed.
   step_type: freeform
@@ -201,6 +263,15 @@ steps:
     workload or a concrete design consequence. For an issue found here, post an
     inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<performance-finding-with-workload>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the plausible workload and performance mitigation."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-entity-lifecycle
   description: Ask whether entity lifecycle and removals are correct.
   step_type: freeform
@@ -215,6 +286,15 @@ steps:
     or incompatible lifecycle transitions with exact spec v1 paths. For an issue
     found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<entity-lifecycle-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the stale entity, missing removal, or orphaned relationship."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-dependencies-and-delivery
   description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
   step_type: freeform
@@ -229,6 +309,15 @@ steps:
     smallest split, reorder, or dependency clarification that fixes the plan. For
     an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<dependency-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the dependency graph evidence and smallest sequencing fix."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-compatibility-and-failure-modes
   description: Ask whether compatibility, migration, and failure behavior are designed.
   step_type: freeform
@@ -242,6 +331,15 @@ steps:
     it can cause data loss, outages, inconsistent state, or an unclear release
     path. For an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<compatibility-or-failure-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the rollout or failure-mode risk and correction."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-testability-and-operability
   description: Ask whether the design can be validated and operated safely.
   step_type: freeform
@@ -255,57 +353,15 @@ steps:
     they are necessary to distinguish success from silent corruption or outage.
     For an issue found here, post an inline comment with
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<testability-or-operability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the missing validation or operational control."}.
-- id: prepare-and-post-findings
-  description: Post every actionable design finding as an inline PR comment.
-  step_type: freeform
-  llm_type: simple_task
-  details: >-
-    Consolidate findings from every question by root cause and discard only
-    duplicates, subjective preferences, pre-existing issues, and unsupported
-    speculation. Every issue finding that survives that evidence check must be
-    posted to the referenced PR; do not leave a finding only in the internal
-    ledger. Check existing unresolved and resolved review threads before
-    posting. Post each retained finding directly to the referenced PR as an
-    inline comment anchored to the smallest relevant changed line in the spec v1
-    document or related changed file on the RIGHT side of the current head SHA.
-    Each comment must identify the review question, cite the exact design path
-    or evidence, explain the user or implementation risk, and give a focused
-    correction or clarification question. If the issue has no exact line, anchor
-    it to the nearest relevant changed line and state the actual path in the
-    body. Do not post a general summary instead of inline findings. Do not
-    approve, merge, close, label, or modify the pull request. Use JSON actions
-    like
-    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_comments","pr_reference":"<number>"},"decisions_and_context":"Read existing review comments before posting findings."}
-    to inspect threads, then for each finding use
-    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post this evidence-backed issue finding inline."}.
-    Here `<finding>` is the complete comment body from one retained issue,
-    `<changed-file>` is its exact diff path, and `123` must be replaced with the
-    positive integer `<changed-line>` recorded for that finding. Use the
-    `<owner>`, `<repo>`, `<number>`, and `<current-head-sha>` captured by
-    discover-design-scope; do not derive them again from prose.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
   tool_invocations:
   - tool: gh
-    command:
-    - pr
-    - view
-    - <number>
-    - --comments
+    command: [pr, view, <number>, --comments]
   - tool: gh
-    command:
-    - api
-    - repos/<owner>/<repo>/pulls/<number>/comments
-    - --method
-    - POST
-    - -f
-    - body=<finding>
-    - -f
-    - commit_id=<current-head-sha>
-    - -f
-    - path=<changed-file>
-    - -F
-    - line=<changed-line>
-    - -f
-    - side=RIGHT
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
 - id: verify-review
   description: Verify the review comments and report the design audit.
   step_type: freeform

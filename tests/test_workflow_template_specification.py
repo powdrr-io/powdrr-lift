@@ -388,7 +388,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert freeform_details.count("Perform exactly one action") >= 8
     assert '"action":"edit"' in freeform_details
     assert '"action":"file_management"' in freeform_details
-    assert '"action":"next_step"' in freeform_details
+    assert '"action":"complete"' in freeform_details
     for task in template.task_templates[1:]:
         assert "upstream_task_outputs" not in (task.details or "")
         assert "runtime task ID" not in (task.details or "")

@@ -7281,6 +7281,13 @@ def _execute_shell_tool(
     env_value = parameters.get("env")
     env = os.environ.copy()
     env["POWDRR_FILE_ADDED_EVENTS"] = "1"
+    worktree_python_path = str(worktree_root.resolve())
+    existing_python_path = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        worktree_python_path
+        if not existing_python_path
+        else worktree_python_path + os.pathsep + existing_python_path
+    )
     if env_value is not None:
         if not isinstance(env_value, dict):
             raise RuntimeError("Workflow invoke_tool action env must be an object.")

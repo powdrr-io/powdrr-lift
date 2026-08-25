@@ -128,8 +128,11 @@ task_templates:
     files. Use one edit action, with file_edits for multiple files. A valid
     response looks like:
     {"action":"edit","file_edits":[{"file_path":"src/feature.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"implementation code"}]}],"decisions_and_context":"Implemented the planned behavior in the approved product file."}
-    After the edit succeeds, return next_step and record implementation files
-    and the resulting diff in generated-product-code-state for the next task.
+    After the edit result is returned, complete this task with the declared
+    output_state. Do not use next_step as the final response: next_step keeps
+    this durable task open. Use this shape, replacing the example values with
+    the actual edit evidence:
+    {"action":"complete","output_state":{"generated-product-code-state":{"implementation_files":["src/feature.py"],"implementation_diffs":{}}},"decisions_and_context":"Implemented the planned behavior in the approved product file."}
   output_state_type: generated-product-code-state
   dependent_state:
   - product-code-generated
@@ -146,10 +149,13 @@ task_templates:
     generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
     test_results: {}
   details: >-
-    Invoke run-tests-and-fix. It runs the complete test suite, permits edits to
-    approved product and test files to address failures, and repeats the
-    deterministic run/fix gate until every test passes. Do not independently
-    run tests or edit files in this task. Complete with
+    Invoke run-tests-and-fix exactly once to run the complete test suite and
+    repair approved product and test files. If it reports a failure without
+    repairing it, do not invoke the skill again unchanged: inspect the reported
+    failure, make one focused edit to the approved product or test file, then
+    invoke run-tests-and-fix again. Repeat only after a new deterministic result
+    and stop once the suite passes. Never invoke this skill from inside itself
+    or run a shell command named run-tests-and-fix. Complete with
     all-tests-results-state containing the exact final command, return code,
     and test summary.
   output_state_type: all-tests-results-state
@@ -170,9 +176,9 @@ task_templates:
   details: >-
     Perform exactly one action: compare the implementation and test evidence to
     every proposed PR requirement and acceptance criterion. Do not edit files or
-    run commands. Return a criterion-by-criterion review in one next_step
-    action, using this shape:
-    {"action":"next_step","outputs":{"specification-completeness-state":{"complete":true,"criteria":[]}},"decisions_and_context":"Compared every criterion with implementation and test evidence."}
+    run commands. Return a criterion-by-criterion review in one complete action,
+    using the declared output_state field and this shape:
+    {"action":"complete","output_state":{"specification-completeness-state":{"complete":true,"criteria":[]}},"decisions_and_context":"Compared every criterion with implementation and test evidence."}
     Set complete false and list exact missing behavior or paths when anything is
     incomplete. Do not claim completeness because tests pass alone.
   output_state_type: specification-completeness-state
@@ -193,6 +199,9 @@ task_templates:
     broaden scope here; later deterministic checks provide evidence. If the
     review is complete, make no edit. A repair uses one edit action, for example:
     {"action":"edit","file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":1,"text":"missing acceptance test"}],"decisions_and_context":"Added the missing coverage identified by completeness review."}
+    After the edit result is returned, or immediately when no repair is needed,
+    complete this task with output_state containing completeness-repair-state.
+    Do not use next_step; it leaves this durable task open.
   output_state_type: completeness-repair-state
   dependent_state:
   - completeness-repair-complete
@@ -215,8 +224,9 @@ task_templates:
       - .
   details: >-
     Assign the deterministic formatter result to formatting-check-state. Do not
-    fix files in this step. Use exactly one next_step action with the command,
-    return code, and result.
+    fix files in this step. Complete with output_state exactly containing that
+    typed state, including the command, return code, and result. Do not use
+    next_step; it would leave this durable task open.
   output_state_type: formatting-check-state
   dependent_state:
   - formatting-checked
@@ -238,8 +248,9 @@ task_templates:
       - .
   details: >-
     Assign the deterministic lint result to lint-check-state. Do not fix files in
-    this step. Use exactly one next_step action with the command, return code,
-    and result.
+    this step. Complete with output_state exactly containing that typed state,
+    including the command, return code, and result. Do not use next_step; it
+    would leave this durable task open.
   output_state_type: lint-check-state
   dependent_state:
   - lint-checked
@@ -260,8 +271,9 @@ task_templates:
       - src
   details: >-
     Assign the deterministic type-check result to type-check-state. Do not fix
-    files in this step. Use exactly one next_step action with the command, return
-    code, and result.
+    files in this step. Complete with output_state exactly containing that typed
+    state, including the command, return code, and result. Do not use next_step;
+    it would leave this durable task open.
   output_state_type: type-check-state
   dependent_state:
   - type-checked
@@ -279,10 +291,17 @@ task_templates:
   details: >-
     Perform exactly one action: inspect the complete diff and identify debug
     code, generated artifacts, secrets, unrelated edits, or missing intended
-    files. Do not edit or stage files. Return one next_step action with an
-    explicit clean boolean and every finding, for example:
-    {"action":"next_step","outputs":{"final-scope-review-state":{"clean":true,"findings":[]}},"decisions_and_context":"Reviewed the complete diff and found no out-of-scope changes."}
+    files. Do not edit or stage files. Use the structured Git intrinsic for
+    status, never a raw git command: 
+    {"action":"invoke_tool","tool":"git","parameters":{"operation":"status"},"decisions_and_context":"Inspected the repository status for the complete scope review."}
+    After the status result, return one complete action with an explicit clean
+    boolean and every finding, for example:
+    {"action":"complete","output_state":{"final-scope-review-state":{"clean":true,"findings":[]}},"decisions_and_context":"Reviewed the complete diff and found no out-of-scope changes."}
     A clean review requires an empty findings list, not merely passing checks.
+    Ignore workflow-llm-errors.jsonl during this review: it is runtime
+    observability state written outside the deliverable and must not be treated
+    as a scope finding or repaired by repeatedly deleting it. Treat other
+    diagnostic artifacts such as agent_error.txt as out of scope when present.
   output_state_type: final-scope-review-state
   dependent_state:
   - final-scope-reviewed
@@ -354,8 +373,9 @@ task_templates:
     Assign the deterministic repository status to staged-pull-request-state.
     Verify that every changed path is within the approved implementation,
     test, and promoted-document scope. Do not stage or commit in this step. Use
-    one next_step action with the exact path list; report an inconsistency rather
-    than silently accepting an unexpected file.
+    complete with the exact path list in the declared output_state; report an
+    inconsistency rather than silently accepting an unexpected file. Do not use
+    next_step because it does not finish the durable task.
   output_state_type: staged-pull-request-state
   dependent_state:
   - pull-request-files-verified
@@ -381,9 +401,9 @@ task_templates:
     Perform exactly one action: invoke the listed finish-pr-prep skill. Do not
     independently edit, stage, commit, push, or create a pull request here; the
     nested skill owns those operations. After it returns, pass its complete
-    evidence to the next workflow boundary with one next_step action, for
+    evidence to the next workflow boundary by completing this task, for
     example:
-    {"action":"next_step","outputs":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep completed with the recorded validation evidence."}
+    {"action":"complete","output_state":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep completed with the recorded validation evidence."}
   output_state_type: pull-request-prep-state
   dependent_state:
   - pull-request-prep-complete

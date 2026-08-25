@@ -22,6 +22,9 @@ from typing import Any
 import yaml
 
 from powdrr_lift.core import load_skill, resolve_repo_root
+from powdrr_lift.core.workflow_template_specification import (
+    instantiate_workflow_template,
+)
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
@@ -118,6 +121,7 @@ def run_workflow_scenario(
     keep_failed: bool = False,
     max_roundtrips_override: int | None = None,
     max_stalled_roundtrips_override: int | None = None,
+    stream_live: bool = False,
 ) -> WorkflowScenarioResult:
     """Run one scripted skill scenario in a fresh temporary Git repository."""
     _validate_scenario(scenario)
@@ -137,49 +141,82 @@ def run_workflow_scenario(
     if fixture_path is not None and not fixture_path.is_dir():
         raise WorkflowScenarioError(f"Scenario fixture does not exist: {fixture_path}")
     if scenario["execution_mode"] == "workflow_task":
-        workflow_dir = _resolve_path(
-            _required_text(scenario.get("workflow_dir"), "workflow_dir"), source_root
-        )
+        generated_workflow_root: Path | None = None
+        if "workflow_template" in scenario:
+            generated_workflow_root = Path(
+                tempfile.mkdtemp(prefix="powdrr-lift-live-workflow-template-")
+            )
+            workflow_dir, _ = instantiate_workflow_template(
+                _resolve_path(
+                    _required_text(
+                        scenario.get("workflow_template"), "workflow_template"
+                    ),
+                    source_root,
+                ),
+                work_item_name=_required_text(
+                    scenario.get("work_item_name"), "work_item_name"
+                ),
+                output_root=generated_workflow_root,
+            )
+        else:
+            workflow_dir = _resolve_path(
+                _required_text(scenario.get("workflow_dir"), "workflow_dir"),
+                source_root,
+            )
         expected = _mapping(scenario.get("expect"), "scenario expect")
         run_all = scenario.get("run_all", False)
         if not isinstance(run_all, bool):
             raise WorkflowScenarioError("workflow_task run_all must be a boolean.")
-        result = run_workflow_task_scenario(
-            workflow_source=workflow_dir,
-            task_id=(
-                _required_text(scenario.get("task_id"), "task_id")
-                if not run_all
-                else None
-            ),
-            responses=responses,
-            fixture_root=fixture_path,
-            expected_output_state=expected.get("output_state"),
-            run_all=run_all,
-            live_provider=(
-                _optional_text(provider.get("provider")) or "auto"
-                if provider_mode == "live"
-                else None
-            ),
-            api_key=_optional_text(provider.get("api_key")),
-            base_url=_optional_text(provider.get("base_url")),
-            max_roundtrips=(
-                max_roundtrips_override
-                if max_roundtrips_override is not None
-                else (
-                    _optional_positive_int(provider.get("max_roundtrips"), default=100)
-                    if provider_mode == "scripted"
-                    else _optional_positive_int_or_none(provider.get("max_roundtrips"))
-                )
-            ),
-            max_stalled_roundtrips=(
-                max_stalled_roundtrips_override
-                if max_stalled_roundtrips_override is not None
-                else _optional_non_negative_int(
-                    provider.get("max_stalled_roundtrips"), default=3
-                )
-            ),
-            verbose=bool(provider.get("verbose", False)),
-        )
+        try:
+            result = run_workflow_task_scenario(
+                workflow_source=workflow_dir,
+                skill_definitions_source=(
+                    source_root / "skill-definitions"
+                    if (source_root / "skill-definitions").is_dir()
+                    else None
+                ),
+                task_id=(
+                    _required_text(scenario.get("task_id"), "task_id")
+                    if not run_all
+                    else None
+                ),
+                responses=responses,
+                fixture_root=fixture_path,
+                expected_output_state=expected.get("output_state"),
+                run_all=run_all,
+                live_provider=(
+                    _optional_text(provider.get("provider")) or "auto"
+                    if provider_mode == "live"
+                    else None
+                ),
+                api_key=_optional_text(provider.get("api_key")),
+                base_url=_optional_text(provider.get("base_url")),
+                max_roundtrips=(
+                    max_roundtrips_override
+                    if max_roundtrips_override is not None
+                    else (
+                        _optional_positive_int(
+                            provider.get("max_roundtrips"), default=100
+                        )
+                        if provider_mode == "scripted"
+                        else _optional_positive_int_or_none(
+                            provider.get("max_roundtrips")
+                        )
+                    )
+                ),
+                max_stalled_roundtrips=(
+                    max_stalled_roundtrips_override
+                    if max_stalled_roundtrips_override is not None
+                    else _optional_non_negative_int(
+                        provider.get("max_stalled_roundtrips"), default=3
+                    )
+                ),
+                verbose=bool(provider.get("verbose", False)),
+                stream_live=stream_live,
+            )
+        finally:
+            if generated_workflow_root is not None:
+                shutil.rmtree(generated_workflow_root, ignore_errors=True)
         assertions: list[dict[str, Any]] = []
         if provider_mode == "scripted" or "outcome" in expected:
             expected_outcome = expected.get("outcome", "complete")
@@ -629,7 +666,13 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
         _required_text(scenario.get("definition"), "scenario definition")
         _required_text(scenario.get("request"), "scenario request")
     elif mode == "workflow_task":
-        _required_text(scenario.get("workflow_dir"), "workflow_dir")
+        if "workflow_dir" not in scenario and "workflow_template" not in scenario:
+            raise WorkflowScenarioError(
+                "workflow_task requires workflow_dir or workflow_template."
+            )
+        if "workflow_template" in scenario:
+            _required_text(scenario.get("workflow_template"), "workflow_template")
+            _required_text(scenario.get("work_item_name"), "work_item_name")
         run_all = scenario.get("run_all", False)
         if not isinstance(run_all, bool):
             raise WorkflowScenarioError("workflow_task run_all must be a boolean.")

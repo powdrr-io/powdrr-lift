@@ -434,6 +434,14 @@ class WorkflowLLMExecutionDriver:
             )
             if not observation.made_progress:
                 strategy.record_no_progress(action, observation)
+                if observation.decision is ProgressDecision.THRESHOLD:
+                    stop_after_stall = getattr(
+                        strategy, "no_progress_threshold_exit_code", None
+                    )
+                    if callable(stop_after_stall):
+                        exit_code = stop_after_stall(action, observation)
+                        if exit_code is not None:
+                            return exit_code
             outcome = strategy.observe_outcome(action, observation, outcome)
             observer_decision = None
             if self.observer is not None:
@@ -505,19 +513,20 @@ class WorkflowLLMActionEngine:
         signature: Callable[[ActionT], str],
         before_state: object,
         after_state: object,
-        terminal_kinds: frozenset[str] = frozenset({"complete", "next_step"}),
     ) -> WorkflowActionObservation:
         """Apply the same material-progress rule to either workflow adapter.
 
-        An action is progress when it transitions a workflow stage, differs from
-        the previous action, is the first action in a sequence, or changes the
-        adapter's material state snapshot.  Status output and human handoff do
-        not influence this decision.
+        An action is progress when it completes the task, differs materially
+        from the previous action, is the first action in a sequence, or changes
+        the adapter's material state snapshot. ``next_step`` alone is not
+        progress because it does not change durable state.
         """
-        action_signature = signature(action)
+        action_signature = workflow_action_failure_signature(
+            action, signature=signature
+        )
         kind = getattr(action, "kind", "")
         made_progress = (
-            kind in terminal_kinds
+            kind == "complete"
             or self._controller.previous_action_signature is None
             or action_signature != self._controller.previous_action_signature
             or before_state != after_state

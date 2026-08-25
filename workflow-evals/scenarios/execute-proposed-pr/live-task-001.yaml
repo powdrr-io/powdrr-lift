@@ -1,0 +1,11 @@
+schema_version: 1
+id: execute-proposed-pr-live-task-001
+execution_mode: workflow_task
+workflow_dir: workflow-evals/workflow-tasks/execute-proposed-pr
+task_id: execute-proposed-pr-task-001
+provider:
+  mode: live
+  provider: auto
+  max_roundtrips: 12
+  max_stalled_roundtrips: 3
+expect: {}

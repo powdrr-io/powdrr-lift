@@ -54,6 +54,10 @@ class WorkflowScenarioResult:
     execution_events: tuple[dict[str, Any], ...]
     audit_events: tuple[dict[str, Any], ...]
     roundtrips: int
+    llm_exchanges: tuple[dict[str, Any], ...] = ()
+    analysis: dict[str, Any] | None = None
+    stdout: str = ""
+    stderr: str = ""
     worktree_root: Path | None = None
 
     def to_data(self) -> dict[str, Any]:
@@ -66,6 +70,10 @@ class WorkflowScenarioResult:
             "execution_events": list(self.execution_events),
             "audit_events": list(self.audit_events),
             "roundtrips": self.roundtrips,
+            "llm_exchanges": list(self.llm_exchanges),
+            "analysis": self.analysis,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
             "worktree_root": str(self.worktree_root) if self.worktree_root else None,
         }
 
@@ -114,6 +122,7 @@ def run_workflow_scenario(
     source_root = resolve_repo_root(repo_root)
     scenario_id = _required_text(scenario.get("id"), "scenario id")
     provider = _mapping(scenario.get("provider"), "scenario provider")
+    provider_mode = _required_text(provider.get("mode"), "scenario provider.mode")
     responses = _mapping_sequence(
         provider.get("responses"), "scenario provider.responses"
     )
@@ -144,24 +153,53 @@ def run_workflow_scenario(
             fixture_root=fixture_path,
             expected_output_state=expected.get("output_state"),
             run_all=run_all,
+            live_provider=(
+                _optional_text(provider.get("provider")) or "auto"
+                if provider_mode == "live"
+                else None
+            ),
+            api_key=_optional_text(provider.get("api_key")),
+            base_url=_optional_text(provider.get("base_url")),
+            max_roundtrips=_optional_positive_int(
+                provider.get("max_roundtrips"), default=100
+            ),
+            max_stalled_roundtrips=_optional_non_negative_int(
+                provider.get("max_stalled_roundtrips"), default=3
+            ),
+            verbose=bool(provider.get("verbose", False)),
         )
-        assertions = [
-            _assert(
-                "outcome", result["exit_code"] == 0, "complete", result["exit_code"]
-            ),
-            _assert(
-                "task_status",
-                result["task_status"] == expected.get("task_status", "completed"),
-                expected.get("task_status", "completed"),
-                result["task_status"],
-            ),
-            _assert(
-                "output_state",
-                result["output_matches"],
-                expected["output_state"],
-                result["output_state"],
-            ),
-        ]
+        assertions: list[dict[str, Any]] = []
+        if provider_mode == "scripted" or "outcome" in expected:
+            expected_outcome = expected.get("outcome", "complete")
+            assertions.append(
+                _assert(
+                    "outcome",
+                    (result["exit_code"] == 0)
+                    if expected_outcome == "complete"
+                    else result["exit_code"] != 0,
+                    expected_outcome,
+                    result["exit_code"],
+                )
+            )
+        if provider_mode == "scripted" or "task_status" in expected:
+            expected_status = expected.get("task_status", "completed")
+            assertions.append(
+                _assert(
+                    "task_status",
+                    result["task_status"] == expected_status,
+                    expected_status,
+                    result["task_status"],
+                )
+            )
+        if "output_state" in expected:
+            assertions.append(
+                _assert(
+                    "output_state",
+                    result["output_matches"],
+                    expected["output_state"],
+                    result["output_state"],
+                )
+            )
         if run_all:
             assertions.append(
                 _assert(
@@ -179,6 +217,10 @@ def run_workflow_scenario(
             execution_events=(),
             audit_events=(),
             roundtrips=int(result["roundtrips"]),
+            llm_exchanges=tuple(result.get("exchanges", ())),
+            analysis=result.get("analysis"),
+            stdout=str(result.get("stdout", "")),
+            stderr=str(result.get("stderr", "")),
         )
     definition_path = _resolve_path(
         _required_text(scenario.get("definition"), "scenario definition"),
@@ -586,9 +628,17 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
             "execution_mode must be workflow_chat or workflow_task."
         )
     provider = _mapping(scenario.get("provider"), "scenario provider")
-    if provider.get("mode") != "scripted":
-        raise WorkflowScenarioError("scenario provider.mode must be scripted.")
-    _mapping_sequence(provider.get("responses"), "scenario provider.responses")
+    provider_mode = _required_text(provider.get("mode"), "scenario provider.mode")
+    if provider_mode not in {"scripted", "live"}:
+        raise WorkflowScenarioError("scenario provider.mode must be scripted or live.")
+    if provider_mode == "scripted":
+        _mapping_sequence(provider.get("responses"), "scenario provider.responses")
+    elif mode != "workflow_task":
+        raise WorkflowScenarioError(
+            "live scenarios currently support execution_mode workflow_task only."
+        )
+    if provider_mode == "live" and provider.get("provider") is not None:
+        _required_text(provider.get("provider"), "scenario provider.provider")
     _mapping(scenario.get("expect"), "scenario expect")
 
 

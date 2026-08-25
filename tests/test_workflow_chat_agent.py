@@ -132,6 +132,7 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_action_for_step,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
+    _validation_actions_match,
     _validation_issue_fingerprint,
     _ValidationGateState,
     _ValidationObligation,
@@ -1065,6 +1066,26 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
             state,
             step,
         )
+
+
+def test_dynamic_validation_gate_matches_shell_command_string_and_argument_list() -> (
+    None
+):
+    expected = {
+        "kind": "invoke_tool",
+        "tool": "shell",
+        "parameters": {"command": "uv run --extra dev ruff format ."},
+    }
+    actual = {
+        "kind": "invoke_tool",
+        "tool": "shell",
+        "parameters": {
+            "command": ["uv", "run", "--extra", "dev", "ruff", "format", "."]
+        },
+    }
+
+    assert _validation_actions_match(expected, actual)
+    assert _validation_actions_match(expected, expected)
 
 
 def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:

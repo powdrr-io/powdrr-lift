@@ -24,8 +24,15 @@ steps:
     as the proposed design being reviewed, not as proof that the intent is
     correct. If intent, feature linkage, or the target spec cannot be resolved,
     record one clarification finding and do not invent missing scope.
+    The input `<pr-reference>` is the pull-request URL or number supplied to this
+    skill. From the `gh pr view` result, store `number` as `<number>`, parse
+    `url` as `<owner>/<repo>` for `<owner>` and `<repo>`, and store `headRefOid`
+    as `<current-head-sha>`. Preserve those values in design_review_ledger and
+    use them in every later GitHub action. A finding's `<changed-file>` must be
+    an exact path from the current PR diff, and `<changed-line>` must be the
+    positive integer line on that changed file used for the RIGHT-side anchor.
     Use the declared GitHub tools with JSON actions such as
-    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_view","pr_reference":"<pr-reference>"},"decisions_and_context":"..."}
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_view","pr_reference":"<pr-reference>","json_fields":["number","title","body","url","baseRefName","headRefName","headRefOid","state","isDraft","labels","files","commits","reviews"]},"decisions_and_context":"Capture the canonical PR number, repository URL, and current head SHA."}
     and
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_diff","pr_reference":"<pr-reference>"},"decisions_and_context":"..."}.
     Preserve the complete returned metadata and diff in design_review_ledger.
@@ -41,7 +48,7 @@ steps:
     - view
     - <pr-reference>
     - --json
-    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
+    - number,title,body,url,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
   - tool: gh
     command:
     - pr
@@ -61,7 +68,9 @@ steps:
     ordering, and documented intent. Keep the returned context and the source
     paths in the review ledger. Do not treat absent context as permission to
     assume behavior; record it as an uncertainty for the clarification review.
-    The action must use JSON in this shape:
+    The `<feature-id>` is the exact feature id identified in
+    design_review_ledger, not a guessed slug. The action must use JSON in this
+    shape:
     {"action":"gather_context","types":["features","requirements","entities","entity-relationships","invariants","decisions","risks","guidance","proposed_prs"],"keywords":["<feature-id>"],"decisions_and_context":"Resolved feature <feature-id> from the PR and authoritative documents."}.
 - id: review-user-intent
   description: Ask whether the design properly captures the user's intent.
@@ -77,7 +86,7 @@ steps:
     changed-file anchor, user impact, confidence, and a concise correction.
     Do not report a preference when the design satisfies the stated intent. For
     an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<intent-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the intent finding with its evidence and impact."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<intent-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the intent finding with its evidence and impact."}.
 - id: review-assumptions
   description: Ask whether the design contains assumptions requiring clarification.
   step_type: freeform
@@ -91,7 +100,7 @@ steps:
     a precise clarification question and explain which design decision is
     blocked. Do not turn ordinary implementation choices into questions. For
     an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<assumption-finding-and-question>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the unresolved assumption and precise clarification question."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<assumption-finding-and-question>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unresolved assumption and precise clarification question."}.
 - id: review-traceability-and-completeness
   description: Ask whether the spec v1 design is complete and internally traceable.
   step_type: freeform
@@ -107,7 +116,7 @@ steps:
     missing, duplicated, contradictory, cyclic, or unassigned entries with
     exact paths and a focused fix direction. For an issue found here, post an
     inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<traceability-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the exact missing, duplicated, cyclic, or unassigned path."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<traceability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the exact missing, duplicated, cyclic, or unassigned path."}.
 - id: review-existing-mechanisms
   description: Ask whether existing repository mechanisms can implement the design.
   step_type: freeform
@@ -121,10 +130,12 @@ steps:
     duplicates or bypasses an existing mechanism without a documented capability
     gap, including the reuse or integration direction. Keep a new mechanism
     when the design demonstrates a real gap or a necessary boundary. Use the
+    exact mechanism or symbol named in the proposed design as
+    `<mechanism-or-symbol>`; do not leave that placeholder literal. Search the
     repository search tool with JSON such as
     {"action":"invoke_tool","tool":"shell","parameters":{"command":["rg","-n","-i","<mechanism-or-symbol>","src","docs","tests"]},"decisions_and_context":"Search for existing mechanisms before deciding whether the design duplicates one."}
     and after its result finish with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<existing-mechanism-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the repository evidence for the existing mechanism and reuse direction."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<existing-mechanism-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the repository evidence for the existing mechanism and reuse direction."}.
   tool_invocations:
   - tool: shell
     command:
@@ -148,7 +159,7 @@ steps:
     materially harder to achieve. Separate a prerequisite refactor from an
     optional cleanup and do not expand the feature for stylistic reasons. For
     an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<refactoring-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the prerequisite refactor and concrete correctness benefit."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<refactoring-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the prerequisite refactor and concrete correctness benefit."}.
 - id: review-unnecessary-scope
   description: Ask whether the design includes unnecessary changes.
   step_type: freeform
@@ -161,7 +172,7 @@ steps:
     about future needs, or belong in a separate feature. Explain the cost or risk
     and propose the smallest removal that preserves the intent. For an issue
     found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<unnecessary-scope-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the unsupported scope and smallest removal."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<unnecessary-scope-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unsupported scope and smallest removal."}.
 - id: review-security
   description: Ask whether security concerns are addressed by the design.
   step_type: freeform
@@ -175,7 +186,7 @@ steps:
     explicit out-of-scope decision for a plausible security risk. Report only
     evidence-backed risks with an attack path, impact, and concrete design or
     validation change. For an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<security-finding-with-attack-path>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the evidence-backed security risk and mitigation."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<security-finding-with-attack-path>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the evidence-backed security risk and mitigation."}.
 - id: review-performance
   description: Ask whether performance and scale concerns are addressed.
   step_type: freeform
@@ -189,7 +200,7 @@ steps:
     risk is material. Do not report performance concerns without a plausible
     workload or a concrete design consequence. For an issue found here, post an
     inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<performance-finding-with-workload>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the plausible workload and performance mitigation."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<performance-finding-with-workload>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the plausible workload and performance mitigation."}.
 - id: review-entity-lifecycle
   description: Ask whether entity lifecycle and removals are correct.
   step_type: freeform
@@ -203,7 +214,7 @@ steps:
     semantics. Report stale entities, missing removals, orphaned relationships,
     or incompatible lifecycle transitions with exact spec v1 paths. For an issue
     found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<entity-lifecycle-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the stale entity, missing removal, or orphaned relationship."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<entity-lifecycle-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the stale entity, missing removal, or orphaned relationship."}.
 - id: review-dependencies-and-delivery
   description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
   step_type: freeform
@@ -217,7 +228,7 @@ steps:
     compatible intermediate state, and appropriate validation. Report the
     smallest split, reorder, or dependency clarification that fixes the plan. For
     an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<dependency-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the dependency graph evidence and smallest sequencing fix."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<dependency-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the dependency graph evidence and smallest sequencing fix."}.
 - id: review-compatibility-and-failure-modes
   description: Ask whether compatibility, migration, and failure behavior are designed.
   step_type: freeform
@@ -230,7 +241,7 @@ steps:
     observe when dependencies are unavailable. Report missing behavior only when
     it can cause data loss, outages, inconsistent state, or an unclear release
     path. For an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<compatibility-or-failure-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the rollout or failure-mode risk and correction."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<compatibility-or-failure-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the rollout or failure-mode risk and correction."}.
 - id: review-testability-and-operability
   description: Ask whether the design can be validated and operated safely.
   step_type: freeform
@@ -243,7 +254,7 @@ steps:
     for new failure modes. Report missing evidence or operational controls when
     they are necessary to distinguish success from silent corruption or outage.
     For an issue found here, post an inline comment with
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<testability-or-operability-finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post the missing validation or operational control."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<testability-or-operability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the missing validation or operational control."}.
 - id: prepare-and-post-findings
   description: Post every actionable design finding as an inline PR comment.
   step_type: freeform
@@ -264,19 +275,23 @@ steps:
     body. Do not post a general summary instead of inline findings. Do not
     approve, merge, close, label, or modify the pull request. Use JSON actions
     like
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--paginate"]},"decisions_and_context":"Read existing review comments before posting findings."}
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_comments","pr_reference":"<number>"},"decisions_and_context":"Read existing review comments before posting findings."}
     to inspect threads, then for each finding use
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post this evidence-backed issue finding inline."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post this evidence-backed issue finding inline."}.
+    Here `<finding>` is the complete comment body from one retained issue,
+    `<changed-file>` is its exact diff path, and `123` must be replaced with the
+    positive integer `<changed-line>` recorded for that finding. Use the
+    `<owner>`, `<repo>`, `<number>`, and `<current-head-sha>` captured by
+    discover-design-scope; do not derive them again from prose.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
-    - api
-    - repos/<owner>/<repo>/pulls/<number>/comments
-    - --paginate
-  - tool: shell
+    - pr
+    - view
+    - <number>
+    - --comments
+  - tool: gh
     command:
-    - gh
     - api
     - repos/<owner>/<repo>/pulls/<number>/comments
     - --method
@@ -305,11 +320,11 @@ steps:
     or inline anchoring fails, report the exact prepared finding and posting
     failure; never claim it was posted. Never merge the PR or resolve threads.
     Verify with this JSON action:
-    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--paginate"]},"decisions_and_context":"Verify every posted issue finding is present on the current head SHA and intended line."}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_comments","pr_reference":"<number>"},"decisions_and_context":"Verify every posted issue finding is present on the current head SHA and intended line."}.
   tool_invocations:
-  - tool: shell
+  - tool: gh
     command:
-    - gh
-    - api
-    - repos/<owner>/<repo>/pulls/<number>/comments
-    - --paginate
+    - pr
+    - view
+    - <number>
+    - --comments

@@ -76,6 +76,20 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
     if operation in {"pr_view", "pr_diff", "pr_checks"}:
         reference = _required_text(reference, "pr_reference")
         command = ["pr", operation.removeprefix("pr_").replace("_", "-"), reference]
+        if operation == "pr_view" and parameters.get("json_fields") is not None:
+            fields = parameters.get("json_fields")
+            if (
+                not isinstance(fields, Sequence)
+                or isinstance(fields, (str, bytes, bytearray))
+                or not fields
+                or any(
+                    not isinstance(field, str) or not field.strip() for field in fields
+                )
+            ):
+                raise RuntimeError(
+                    "gh pr_view json_fields must be a non-empty array of strings."
+                )
+            command.extend(["--json", ",".join(field.strip() for field in fields)])
     elif operation == "pr_create":
         command = [
             "pr",
@@ -104,22 +118,53 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             _required_text(reference, "pr_reference"),
             "--comments",
         ]
+    elif operation == "pr_review_comment":
+        repository = _required_text(parameters.get("repository"), "repository")
+        body = _required_text(parameters.get("body"), "body")
+        commit_id = _required_text(parameters.get("commit_id"), "commit_id")
+        path = _required_text(parameters.get("path"), "path")
+        line = parameters.get("line")
+        if isinstance(line, bool) or not isinstance(line, int) or line < 1:
+            raise RuntimeError("gh pr_review_comment line must be a positive integer.")
+        side = parameters.get("side", "RIGHT")
+        if side not in {"LEFT", "RIGHT"}:
+            raise RuntimeError("gh pr_review_comment side must be LEFT or RIGHT.")
+        command = [
+            "api",
+            "repos/"
+            f"{repository}/pulls/{_required_text(reference, 'pr_reference')}/comments",
+            "--method",
+            "POST",
+            "-f",
+            f"body={body}",
+            "-f",
+            f"commit_id={commit_id}",
+            "-f",
+            f"path={path}",
+            "-F",
+            f"line={line}",
+            "-f",
+            f"side={side}",
+        ]
     else:
         raise RuntimeError(
             "gh intrinsic tool requires structured operation pr_view, pr_diff, "
-            "pr_checks, pr_create, pr_edit, or pr_comments."
+            "pr_checks, pr_create, pr_edit, pr_comments, or pr_review_comment."
         )
     if (
         len(command) < 2
-        or command[0] != "pr"
-        or command[1]
-        not in {
-            "view",
-            "diff",
-            "checks",
-            "create",
-            "edit",
-        }
+        or command[0] not in {"pr", "api"}
+        or (
+            command[0] == "pr"
+            and command[1]
+            not in {
+                "view",
+                "diff",
+                "checks",
+                "create",
+                "edit",
+            }
+        )
     ):
         raise RuntimeError(
             "gh intrinsic tool only supports GitHub pull-request create and "

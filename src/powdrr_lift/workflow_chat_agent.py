@@ -4173,9 +4173,15 @@ def _build_step_execution_messages(
             '{"operation":"status"}}.'
         ),
         GH_TOOL: (
-            "Intrinsic GitHub tool for pull-request creation and inspection. "
+            "Intrinsic GitHub tool for pull-request creation, inspection, and "
+            "inline review comments. "
             'Example: {"action":"invoke_tool","tool":"gh",'
-            '"parameters":{"operation":"pr_view","pr_reference":"394"}}.'
+            '"parameters":{"operation":"pr_view","pr_reference":"394"}}. '
+            'Inline comment example: {"action":"invoke_tool","tool":"gh",'
+            '"parameters":{"operation":"pr_review_comment",'
+            '"repository":"owner/repo","pr_reference":"394",'
+            '"body":"Finding","commit_id":"sha",'
+            '"path":"docs/design.yaml","line":12,"side":"RIGHT"}}.'
         ),
         "fuzzy-match": (
             "Search worktree paths with find-like filters and fuzzy name matching."
@@ -4377,7 +4383,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "non-empty string or string array. The intrinsic git and gh tools use "
         "parameters.operation and never accept a shell command array. "
         "a shell command. For git use operation status, add, or move; for gh "
-        "use pr_view, pr_diff, pr_checks, pr_create, pr_edit, or pr_comments. "
+        "use pr_view, pr_diff, pr_checks, pr_create, pr_edit, pr_comments, or "
+        "pr_review_comment. "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "

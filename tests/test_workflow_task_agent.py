@@ -4,6 +4,7 @@ import io
 import json
 import subprocess
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,7 @@ from powdrr_lift.workflow_task_agent import (
     _build_workflow_client,
     _handle_exhausted_timeout,
     _publish_workflow_progress,
+    _select_ready_workflow_git_state,
     _task_events_for_prompt,
     _workflow_file_command_error,
     run_workflow_task,
@@ -76,6 +78,54 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
             ),
         ),
     )
+
+
+def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow_directory = tmp_path / "workflow"
+    base_task = _workflow(tmp_path).tasks[0]
+    WorkflowInstance.create(
+        workflow_directory,
+        (
+            replace(base_task, task_id="tool-task-001"),
+            replace(base_task, task_id="writer-task-001"),
+        ),
+    )
+    save_workflow_git_state(
+        workflow_directory,
+        WorkflowGitState(
+            proposed_pr_id="tool",
+            base_branch="main",
+            integration_branch="powdrr/tool",
+            workflow_relative_directory="workflow",
+            depends_on_workflows=("writer",),
+        ),
+    )
+    save_workflow_git_state(
+        workflow_directory,
+        WorkflowGitState(
+            proposed_pr_id="writer",
+            base_branch="main",
+            integration_branch="powdrr/writer",
+            workflow_relative_directory="workflow",
+        ),
+    )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent.workflow_dependencies_completion",
+        lambda _repo_root, state: (not state.depends_on_workflows, ()),
+    )
+
+    state, workflow_id = _select_ready_workflow_git_state(
+        workflow_directory,
+        tmp_path,
+    )
+
+    assert state is not None
+    assert state.proposed_pr_id == "writer"
+    assert workflow_id == "writer"
 
 
 @pytest.mark.parametrize("verbose", [False, True])

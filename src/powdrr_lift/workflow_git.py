@@ -132,6 +132,20 @@ def load_workflow_git_state(
     return state
 
 
+def load_workflow_git_states(
+    workflow_directory: str | Path,
+) -> tuple[WorkflowGitState, ...]:
+    """Load every valid workflow Git state in a shared workflow directory."""
+    states: list[WorkflowGitState] = []
+    for path in sorted(Path(workflow_directory).glob(f"*{WORKFLOW_GIT_STATE_SUFFIX}")):
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            states.append(WorkflowGitState.from_data(data))
+        except (OSError, yaml.YAMLError, ValueError):
+            continue
+    return tuple(states)
+
+
 def save_workflow_git_state(
     workflow_directory: str | Path,
     state: WorkflowGitState,

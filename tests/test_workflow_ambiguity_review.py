@@ -48,6 +48,8 @@ def test_ambiguity_review_uses_compact_single_step_prompt(tmp_path: Path) -> Non
             "missing_information": [],
             "conflicts": [],
             "ambiguous_phrases": [],
+            "source_sentences": [],
+            "suggested_wording": [],
             "confidence": 0.9,
         }
     )

@@ -116,3 +116,28 @@ steps:
 
     assert exit_code == 0
     assert json.loads(stdout.getvalue())["validation_successful"] is True
+
+
+def test_prompt_snapshots_support_workflow_templates(tmp_path: Path) -> None:
+    definition = tmp_path / "template.yaml"
+    definition.write_text(
+        """\
+id: execute
+task_templates:
+  - description: Gather context.
+    step_type: invoke_tool
+    input_state: {proposal: <proposal-id>}
+    details: Assign the result.
+    output_state_type: context-state
+""",
+        encoding="utf-8",
+    )
+
+    paths = render_skill_prompt_snapshots(
+        definition, output_dir=tmp_path / "snapshots", repo_root=tmp_path
+    )
+
+    assert [path.name for path in paths] == ["001-gather-context.json"]
+    snapshot = json.loads(paths[0].read_text(encoding="utf-8"))
+    assert snapshot["workflow_template"] == "execute"
+    assert snapshot["step_type"] == "invoke_tool"

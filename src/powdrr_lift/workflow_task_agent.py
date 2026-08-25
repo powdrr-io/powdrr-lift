@@ -1177,18 +1177,19 @@ def run_workflow_task(
             mappings=mappings,
             provider=provider,
         )
-        if observer_mapping is not None:
-            observer_client = (
-                task_client
-                if client_was_provided
-                else _maybe_record_llm_exchanges(
-                    _build_workflow_client_for_mapping(
-                        config,
-                        task,
-                        observer_mapping,
-                    ),
-                    dump_root,
-                )
+        # An injected client is the deterministic task-response seam used by
+        # tests and scenario fixtures.  It supplies task actions only; sharing
+        # it with the observer would consume those scripted actions before the
+        # task agent receives them.  Production runs construct both clients
+        # and continue to enable the observer normally.
+        if observer_mapping is not None and not client_was_provided:
+            observer_client = _maybe_record_llm_exchanges(
+                _build_workflow_client_for_mapping(
+                    config,
+                    task,
+                    observer_mapping,
+                ),
+                dump_root,
             )
 
             def observer_context(

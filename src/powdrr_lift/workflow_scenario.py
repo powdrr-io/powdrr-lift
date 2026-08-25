@@ -117,6 +117,14 @@ def run_workflow_scenario(
     responses = _mapping_sequence(
         provider.get("responses"), "scenario provider.responses"
     )
+    fixture = scenario.get("fixture")
+    fixture_path = (
+        _resolve_path(fixture, scenario_path.parent)
+        if isinstance(fixture, str) and fixture
+        else None
+    )
+    if fixture_path is not None and not fixture_path.is_dir():
+        raise WorkflowScenarioError(f"Scenario fixture does not exist: {fixture_path}")
     if scenario["execution_mode"] == "workflow_task":
         workflow_dir = _resolve_path(
             _required_text(scenario.get("workflow_dir"), "workflow_dir"), source_root
@@ -126,9 +134,8 @@ def run_workflow_scenario(
             workflow_source=workflow_dir,
             task_id=_required_text(scenario.get("task_id"), "task_id"),
             responses=responses,
-            expected_output_state=_mapping(
-                expected.get("output_state"), "expect.output_state"
-            ),
+            fixture_root=fixture_path,
+            expected_output_state=expected.get("output_state"),
         )
         assertions = [
             _assert(
@@ -164,14 +171,6 @@ def run_workflow_scenario(
         raise WorkflowScenarioError(
             f"Scenario definition does not exist: {definition_path}"
         )
-    fixture = scenario.get("fixture")
-    fixture_path = (
-        _resolve_path(fixture, scenario_path.parent)
-        if isinstance(fixture, str) and fixture
-        else None
-    )
-    if fixture_path is not None and not fixture_path.is_dir():
-        raise WorkflowScenarioError(f"Scenario fixture does not exist: {fixture_path}")
 
     temporary_root = Path(tempfile.mkdtemp(prefix="powdrr-lift-scenario-"))
     worktree_root = temporary_root / "repository"

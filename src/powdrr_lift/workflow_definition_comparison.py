@@ -69,12 +69,14 @@ class WorkflowCaseEvaluation:
     kind: str
     passed: bool
     details: Mapping[str, Any]
+    available: bool = True
 
     def to_data(self) -> dict[str, Any]:
         return {
             "case_id": self.case_id,
             "kind": self.kind,
             "passed": self.passed,
+            "available": self.available,
             "details": dict(self.details),
         }
 
@@ -210,6 +212,17 @@ def _evaluate_cases(
     evaluations: list[WorkflowCaseEvaluation] = []
     for relative_path in replay_paths:
         path = repo_root / relative_path
+        if not path.is_file():
+            evaluations.append(
+                WorkflowCaseEvaluation(
+                    case_id=str(relative_path),
+                    kind="replay",
+                    passed=False,
+                    available=False,
+                    details={"unavailable": f"Replay is absent: {relative_path}"},
+                )
+            )
+            continue
         try:
             rendered = render_skill_replay(
                 load_workflow_replay_bundle(path), repo_root=repo_root
@@ -235,6 +248,17 @@ def _evaluate_cases(
             )
     for relative_path in scenario_paths:
         path = repo_root / relative_path
+        if not path.is_file():
+            evaluations.append(
+                WorkflowCaseEvaluation(
+                    case_id=str(relative_path),
+                    kind="scenario",
+                    passed=False,
+                    available=False,
+                    details={"unavailable": f"Scenario is absent: {relative_path}"},
+                )
+            )
+            continue
         try:
             result = run_workflow_scenario(
                 load_workflow_scenario(path), scenario_path=path, repo_root=repo_root
@@ -272,21 +296,30 @@ def _compare_case_evaluations(
         raise WorkflowComparisonError("Baseline and candidate case sets differ.")
     baseline_metrics = _metrics(baseline_cases)
     candidate_metrics = _metrics(candidate_cases)
-    regressions = [
-        f"{before.kind} {before.case_id} passed on baseline but failed on candidate"
+    comparable_pairs = [
+        (before, after)
         for before, after in zip(baseline_cases, candidate_cases, strict=True)
-        if before.passed and not after.passed
+        if before.available and after.available
     ]
-    improvements = [
-        f"{after.kind} {after.case_id} failed on baseline but passed on candidate"
-        for before, after in zip(baseline_cases, candidate_cases, strict=True)
-        if not before.passed and after.passed
-    ]
-    unchanged = [
-        f"{after.kind} {after.case_id}"
-        for before, after in zip(baseline_cases, candidate_cases, strict=True)
-        if before.passed == after.passed
-    ]
+    regressions: list[str] = []
+    improvements: list[str] = []
+    unchanged: list[str] = []
+    for before, after in zip(baseline_cases, candidate_cases, strict=True):
+        label = f"{after.kind} {after.case_id}"
+        if not before.available:
+            if after.available and after.passed:
+                improvements.append(f"new {label} passed on candidate")
+            elif after.available:
+                regressions.append(f"new {label} failed on candidate")
+            continue
+        if not after.available:
+            regressions.append(f"{label} is unavailable on candidate")
+        elif before.passed and not after.passed:
+            regressions.append(f"{label} passed on baseline but failed on candidate")
+        elif not before.passed and after.passed:
+            improvements.append(f"{label} failed on baseline but passed on candidate")
+        else:
+            unchanged.append(label)
     limits = {"roundtrips": 0, "prompt_user_actions": 0, "repeated_actions": 0}
     if thresholds is not None:
         for metric, threshold in thresholds.items():
@@ -296,9 +329,11 @@ def _compare_case_evaluations(
                     "prompt_user_actions, or repeated_actions only."
                 )
             limits[metric] = threshold
+    comparable_baseline_metrics = _metrics([pair[0] for pair in comparable_pairs])
+    comparable_candidate_metrics = _metrics([pair[1] for pair in comparable_pairs])
     for metric, threshold in limits.items():
-        increase = getattr(candidate_metrics, metric) - getattr(
-            baseline_metrics, metric
+        increase = getattr(comparable_candidate_metrics, metric) - getattr(
+            comparable_baseline_metrics, metric
         )
         if increase > threshold:
             regressions.append(
@@ -319,8 +354,9 @@ def _compare_case_evaluations(
 
 
 def _metrics(cases: Sequence[WorkflowCaseEvaluation]) -> WorkflowEvaluationMetrics:
-    values = Counter(total_cases=len(cases))
-    for case in cases:
+    available_cases = [case for case in cases if case.available]
+    values = Counter(total_cases=len(available_cases))
+    for case in available_cases:
         values["passed_cases" if case.passed else "failed_cases"] += 1
         if case.kind == "replay":
             values["valid_replays" if case.passed else "invalid_replays"] += 1

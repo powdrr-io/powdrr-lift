@@ -106,8 +106,7 @@ def test_process_workflow_task_completes_claimed_agent_task(
     prompt = client.messages[0][1]["content"]
     assert client.messages[0][0]["content"].startswith(_action_system_prompt())
     assert (
-        "Use `next_step` to acknowledge an intermediate action"
-        in client.messages[0][0]["content"]
+        "Use `next_step` when this task is finished" in client.messages[0][0]["content"]
     )
     assert '"execution_mode":"process_workflow_task"' in prompt
     assert json.loads(prompt)["workflow_dir"] == "workflow"
@@ -263,10 +262,7 @@ def test_workflow_task_prompt_includes_task_interaction_style(
         "Separate observations, inferences, risks, and recommendations."
         in (messages[0]["content"])
     )
-    assert (
-        "Use `next_step` to acknowledge an intermediate action"
-        in messages[0]["content"]
-    )
+    assert "Use `next_step` when this task is finished" in messages[0]["content"]
     assert json.loads(messages[1]["content"])["task"]["interaction_style"] == (
         "observational_review"
     )
@@ -729,7 +725,7 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
     )
     client = _FakeClient(
         [
-            {"kind": "complete", "output_state": {"plan": ["step"]}},
+            {"kind": "next_step", "output_state": {"plan": ["step"]}},
             {"kind": "complete", "output_state": {"result": "done"}},
         ]
     )
@@ -756,9 +752,9 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
     assert next_task.output_state == {"result": "done"}
     assert published_reasons == [
         "claim agent-task",
-        "complete agent-task",
+        "next_step agent-task",
         "claim next-task",
-        "complete next-task",
+        "terminate next-task",
     ]
 
 
@@ -786,7 +782,9 @@ def test_process_workflow_task_stops_when_human_task_becomes_ready(
             workflow_dir=workflow.directory,
             repo_root=tmp_path,
         ),
-        client=_FakeClient([{"kind": "complete", "output_state": {"result": "ready"}}]),
+        client=_FakeClient(
+            [{"kind": "next_step", "output_state": {"result": "ready"}}]
+        ),
         stdout=stdout,
         stderr=io.StringIO(),
     )

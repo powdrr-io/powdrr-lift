@@ -7182,6 +7182,7 @@ def _parse_workflow_action_next_step(
     _ = payload
     return SkillChatAction(
         kind="next_step",
+        output_state=payload.get("output_state"),
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )

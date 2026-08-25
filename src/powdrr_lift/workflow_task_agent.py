@@ -553,8 +553,36 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
-            self.events.append({"kind": action.kind})
-            return WorkflowActionOutcome()
+            output_state = _durable_task_action_output_state(action)
+            if self.requires_deterministic_output_state and output_state != (
+                self.deterministic_output_state
+            ):
+                raise ValueError(
+                    "This task must persist the exact deterministic pre-step result "
+                    "in the top-level output_state field; do not use outputs, "
+                    "text, or a summary instead."
+                )
+            completed = self.workflow.complete_task(
+                self.task.task_id,
+                output_state,
+            )
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "output_state": output_state,
+                }
+            )
+            _publish_workflow_progress(
+                self.repo_root,
+                self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+                reason=f"next_step {completed.task_id}",
+                stdout=self.stdout,
+                open_pull_request=False,
+                events=self.events,
+            )
+            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
+            return WorkflowActionOutcome(continue_running=False)
         if action.kind == "read_document":
             self.events.append(
                 {
@@ -661,7 +689,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "in the top-level output_state field; do not use outputs, "
                     "text, or a summary instead."
                 )
-            completed = self.workflow.complete_task(
+            completed = self.workflow.terminate_workflow(
                 self.task.task_id,
                 action.output_state,
             )
@@ -669,14 +697,14 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.repo_root,
                 self.workflow,
                 workflow_id=workflow_id_from_task_id(self.task.task_id),
-                reason=f"complete {completed.task_id}",
+                reason=f"terminate {completed.task_id}",
                 stdout=self.stdout,
                 open_pull_request=False,
                 events=self.events,
             )
             if action.text:
                 print(action.text, file=self.stdout)
-            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
+            print(f"Terminated workflow: {completed.task_id}", file=self.stdout)
             return WorkflowActionOutcome(continue_running=False)
         if action.kind == "get-human-input":
             return self._handoff(action.human_input or {}, "human input required by")
@@ -1076,9 +1104,11 @@ def run_workflow_task(
                     file=stdout,
                 )
                 return 0
-            if workflow.tasks and all(
-                item.status is TaskStatus.COMPLETED for item in workflow.tasks
-            ):
+            if workflow.is_finished():
+                if not all(
+                    item.status is TaskStatus.COMPLETED for item in workflow.tasks
+                ):
+                    return 0
                 if workflow_git_state is not None:
                     _open_final_workflow_pull_request(
                         repo_root,
@@ -2069,6 +2099,23 @@ def _task_action_material_state(
     return tuple(material_state)
 
 
+def _durable_task_action_output_state(action: WorkflowAction) -> Any:
+    """Return the typed state that a task-completing action must persist.
+
+    ``output_state`` is the canonical field.  ``outputs`` remains accepted for
+    older workflow documents whose examples used the interactive handoff shape.
+    """
+    output_state = action.output_state
+    if output_state is None and action.outputs:
+        output_state = action.outputs
+    if output_state is None:
+        raise ValueError(
+            "The next_step action must include a non-null top-level "
+            "output_state object."
+        )
+    return output_state
+
+
 def _task_action_failure_reached(
     action_engine: WorkflowLLMActionEngine,
     action: WorkflowAction,
@@ -2094,11 +2141,13 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
     return (
         _action_system_prompt()
         + "\nDurable workflow-task contract: this is one task that may contain "
-        "multiple actions. Use `next_step` to acknowledge an intermediate action "
-        "or a completed sub-step and continue the task; use `complete` only when "
-        "the task requirements are satisfied, with the declared `output_state`. "
-        "For durable task completion, the result MUST be under the top-level "
-        "`output_state` field; never put it under `outputs`. "
+        "multiple actions. Use `next_step` when this task is finished: it persists "
+        "this task's declared output_state and advances the workflow to the next "
+        "task. Use `complete` only for an early workflow termination when no later "
+        "task should run, such as when the proposed PR is superseded. If this is "
+        "the final task, `next_step` completes the workflow after persisting its "
+        "output. For durable task completion, the result MUST be under "
+        "the top-level `output_state` field; never put it under `outputs`. "
         "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
         "it advances this task.\n" + _interaction_style_prompt(interaction_style)
     )

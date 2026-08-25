@@ -242,6 +242,53 @@ class WorkflowInstance:
         self._tasks[task_id] = completed_task
         return completed_task
 
+    def terminate_workflow(
+        self, task_id: str, output_state: Any = None
+    ) -> WorkflowTask:
+        """Terminate the workflow immediately from the current task."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            raise KeyError(f"Unknown workflow task: {task_id}")
+        if task.status not in {TaskStatus.OPEN, TaskStatus.LOCKED}:
+            raise ValueError(f"Workflow task is not available to terminate: {task_id}")
+        if output_state is None:
+            raise ValueError(
+                f"Workflow task {task_id} must provide a non-null output_state "
+                "when terminating the workflow."
+            )
+        terminated_task = replace(
+            task,
+            status=TaskStatus.COMPLETED,
+            output_state=output_state,
+        )
+        save_workflow_task(terminated_task, self.directory / f"{task_id}.yaml")
+        self._tasks[task_id] = terminated_task
+        for candidate in tuple(self._tasks.values()):
+            if candidate.task_id == task_id or candidate.status not in {
+                TaskStatus.OPEN,
+                TaskStatus.LOCKED,
+            }:
+                continue
+            closed_task = replace(candidate, status=TaskStatus.CLOSED)
+            save_workflow_task(
+                closed_task, self.directory / f"{candidate.task_id}.yaml"
+            )
+            self._tasks[candidate.task_id] = closed_task
+        return terminated_task
+
+    def is_finished(self) -> bool:
+        """Return whether no task remains runnable in this workflow."""
+        return bool(self._tasks) and all(
+            task.status
+            in {
+                TaskStatus.COMPLETED,
+                TaskStatus.CLOSED,
+                TaskStatus.SUPERCEDED,
+                TaskStatus.ABANDONED,
+            }
+            for task in self._tasks.values()
+        )
+
     def claim_task(self, task_id: str) -> WorkflowTask:
         """Claim a ready task so another agent cannot pull it concurrently."""
         task = self._tasks.get(task_id)

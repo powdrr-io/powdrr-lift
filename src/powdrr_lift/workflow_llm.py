@@ -516,10 +516,11 @@ class WorkflowLLMActionEngine:
     ) -> WorkflowActionObservation:
         """Apply the same material-progress rule to either workflow adapter.
 
-        An action is progress when it completes the task, differs materially
-        from the previous action, is the first action in a sequence, or changes
-        the adapter's material state snapshot. ``next_step`` alone is not
-        progress because it does not change durable state.
+        An action is progress when it completes the task or workflow, differs
+        materially from the previous action, is the first action in a sequence,
+        or changes the adapter's material state snapshot. The durable-task
+        adapter treats ``next_step`` as a terminal task-completion outcome, so
+        it exits before a repeated-action check can misclassify it.
         """
         action_signature = workflow_action_failure_signature(
             action, signature=signature

@@ -22,7 +22,7 @@ def no_progress_feedback(action_signature: str) -> str:
         "The previous workflow action made no progress because it repeated the "
         "same action without changing the file, staging state, or workflow step. "
         "Do not invoke this action unchanged again. If its result satisfies the "
-        "current step, choose `next_step` immediately; otherwise make a real edit "
+        "current task, choose `next_step` immediately; otherwise make a real edit "
         "or choose a different action. Repeated action: "
         f"{action_signature}"
     )

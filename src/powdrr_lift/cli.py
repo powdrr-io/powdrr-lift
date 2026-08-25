@@ -163,6 +163,11 @@ from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
 )
+from powdrr_lift.workflow_tuning import (
+    WorkflowTuningError,
+    save_workflow_tuning_report,
+    tune_workflow,
+)
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
@@ -1155,6 +1160,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     comparison_parser.add_argument("--json", action="store_true")
     comparison_parser.set_defaults(func=_run_compare_workflow_definitions)
+
+    tune_parser = subparsers.add_parser(
+        "tune-workflow",
+        aliases=["tune_workflow"],
+        help="Run deterministic workflow validation, comparison, and reporting.",
+    )
+    tune_parser.add_argument("--definition", required=True, type=Path)
+    tune_parser.add_argument("--baseline-ref", required=True)
+    tune_parser.add_argument("--replay", type=Path, action="append")
+    tune_parser.add_argument("--scenario", type=Path, action="append")
+    tune_parser.add_argument("--report", required=True, type=Path)
+    tune_parser.add_argument("--snapshot-output-dir", type=Path)
+    tune_parser.add_argument("--repo-root", type=Path)
+    tune_parser.add_argument("--max-roundtrip-increase", type=int, default=0)
+    tune_parser.add_argument("--max-prompt-user-increase", type=int, default=0)
+    tune_parser.add_argument("--max-repeated-action-increase", type=int, default=0)
+    tune_parser.add_argument("--json", action="store_true")
+    tune_parser.set_defaults(func=_run_tune_workflow)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -3104,6 +3127,35 @@ def _run_compare_workflow_definitions(args: argparse.Namespace) -> int:
         for item in report.improvements:
             print(f"Improvement: {item}")
     return 0 if report.passed else 1
+
+
+def _run_tune_workflow(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    report_path = args.report if args.report.is_absolute() else repo_root / args.report
+    try:
+        report = tune_workflow(
+            definition=args.definition,
+            repo_root=repo_root,
+            baseline_ref=args.baseline_ref,
+            replay_paths=args.replay or (),
+            scenario_paths=args.scenario or (),
+            thresholds={
+                "roundtrips": args.max_roundtrip_increase,
+                "prompt_user_actions": args.max_prompt_user_increase,
+                "repeated_actions": args.max_repeated_action_increase,
+            },
+            snapshot_output_dir=args.snapshot_output_dir,
+        )
+        save_workflow_tuning_report(report_path, report)
+    except WorkflowTuningError as exc:
+        print(f"Workflow tuning failed: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(f"Workflow tuning {report['status']}: {report['definition']}")
+        print(f"Report: {report_path}")
+    return 0 if report["status"] == "passed" else 1
 
 
 def _read_llm_exchange(path: Path) -> object:

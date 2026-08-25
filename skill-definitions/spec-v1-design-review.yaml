@@ -24,7 +24,16 @@ steps:
     as the proposed design being reviewed, not as proof that the intent is
     correct. If intent, feature linkage, or the target spec cannot be resolved,
     record one clarification finding and do not invent missing scope.
+    Use the declared GitHub tools with JSON actions such as
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_view","pr_reference":"<pr-reference>"},"decisions_and_context":"...","llm_type":"long_context"}
+    and
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_diff","pr_reference":"<pr-reference>"},"decisions_and_context":"...","llm_type":"long_context"}.
+    Preserve the complete returned metadata and diff in design_review_ledger.
   prompt_catalogs: [context_types]
+  outputs:
+  - name: design_review_ledger
+    type: any
+    required_for_next_step: true
   tool_invocations:
   - tool: gh
     command:
@@ -52,6 +61,8 @@ steps:
     ordering, and documented intent. Keep the returned context and the source
     paths in the review ledger. Do not treat absent context as permission to
     assume behavior; record it as an uncertainty for the clarification review.
+    The action must use JSON in this shape:
+    {"action":"gather_context","types":["features","requirements","entities","entity-relationships","invariants","decisions","risks","guidance","proposed_prs"],"keywords":["<feature-id>"],"decisions_and_context":"Resolved feature <feature-id> from the PR and authoritative documents.","llm_type":"simple_task"}.
 - id: review-user-intent
   description: Ask whether the design properly captures the user's intent.
   step_type: freeform
@@ -204,9 +215,11 @@ steps:
   step_type: freeform
   llm_type: simple_task
   details: >-
-    Consolidate findings from every question by root cause and discard
+    Consolidate findings from every question by root cause and discard only
     duplicates, subjective preferences, pre-existing issues, and unsupported
-    speculation. Check existing unresolved and resolved review threads before
+    speculation. Every issue finding that survives that evidence check must be
+    posted to the referenced PR; do not leave a finding only in the internal
+    ledger. Check existing unresolved and resolved review threads before
     posting. Post each retained finding directly to the referenced PR as an
     inline comment anchored to the smallest relevant changed line in the spec v1
     document or related changed file on the RIGHT side of the current head SHA.
@@ -215,7 +228,11 @@ steps:
     correction or clarification question. If the issue has no exact line, anchor
     it to the nearest relevant changed line and state the actual path in the
     body. Do not post a general summary instead of inline findings. Do not
-    approve, merge, close, label, or modify the pull request.
+    approve, merge, close, label, or modify the pull request. Use JSON actions
+    like
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--paginate"]},"decisions_and_context":"Read existing review comments before posting findings.","llm_type":"simple_task"}
+    to inspect threads, then for each finding use
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--method","POST","-f","body=<finding>","-f","commit_id=<current-head-sha>","-f","path=<changed-file>","-F","line=<changed-line>","-f","side=RIGHT"]},"decisions_and_context":"Post this evidence-backed issue finding inline.","llm_type":"simple_task"}.
   tool_invocations:
   - tool: shell
     command:
@@ -253,6 +270,8 @@ steps:
     remain, report zero findings and the evidence checked. If GitHub write access
     or inline anchoring fails, report the exact prepared finding and posting
     failure; never claim it was posted. Never merge the PR or resolve threads.
+    Verify with this JSON action:
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["gh","api","repos/<owner>/<repo>/pulls/<number>/comments","--paginate"]},"decisions_and_context":"Verify every posted issue finding is present on the current head SHA and intended line.","llm_type":"standard_reasoning"}.
   tool_invocations:
   - tool: shell
     command:

@@ -83,6 +83,7 @@ from powdrr_lift.workflow_git import (
     claim_workflow_task,
     create_workflow_worktree,
     load_workflow_git_state,
+    load_workflow_git_states,
     slugify_workflow_id,
     validate_workflow_git_state,
     workflow_dependencies_completion,
@@ -990,21 +991,26 @@ def run_workflow_task(
     configured_repo_root = resolve_repo_root(config.repo_root)
     configured_workflow_dir = config.workflow_dir.resolve()
     try:
-        configured_workflow = _select_workflow_instance(
-            WorkflowInstance.from_directory(configured_workflow_dir),
-            config.workflow_id,
+        configured_workflow_id = config.workflow_id or workflow_id_from_task_id(
+            config.task_id or ""
         )
-        configured_task = _select_task(configured_workflow, config.task_id)
-        configured_workflow_id = workflow_id_from_task_id(
-            configured_task.task_id if configured_task is not None else ""
-        )
-        configured_workflow_id = config.workflow_id or configured_workflow_id
         configured_git_state = load_workflow_git_state(
             configured_workflow_dir,
             workflow_id=configured_workflow_id,
         )
         if configured_git_state is None and configured_workflow_id is None:
-            configured_git_state = load_workflow_git_state(configured_workflow_dir)
+            configured_git_state, configured_workflow_id = (
+                _select_ready_workflow_git_state(
+                    configured_workflow_dir,
+                    configured_repo_root,
+                )
+            )
+            if configured_git_state is not None:
+                print(
+                    "Automatically selected ready workflow "
+                    f"{configured_git_state.proposed_pr_id}",
+                    file=stdout,
+                )
         if configured_git_state is not None:
             project_root = _resolve_project_root(
                 configured_repo_root,
@@ -1321,6 +1327,22 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _select_ready_workflow_git_state(
+    workflow_dir: Path,
+    repo_root: Path,
+) -> tuple[WorkflowGitState | None, str | None]:
+    """Select a workflow with ready tasks and satisfied Git dependencies."""
+    workflow = WorkflowInstance.from_directory(workflow_dir)
+    for state in load_workflow_git_states(workflow_dir):
+        candidate = _select_workflow_instance(workflow, state.proposed_pr_id)
+        if _select_task(candidate, None) is None:
+            continue
+        dependencies_complete, _ = workflow_dependencies_completion(repo_root, state)
+        if dependencies_complete:
+            return state, state.proposed_pr_id
+    return None, None
 
 
 def _resolve_workflow_task_context(

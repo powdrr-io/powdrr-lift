@@ -229,6 +229,34 @@ def test_workflow_pauses_for_human_input_then_resumes_agent_task(
     )
 
 
+def test_workflow_termination_closes_remaining_tasks(tmp_path: Path) -> None:
+    first = WorkflowTask(
+        task_id="first",
+        status=TaskStatus.OPEN,
+        complexity=TaskComplexity.LOW,
+        input_state={},
+        description="Check whether the proposal is superseded.",
+    )
+    second = WorkflowTask(
+        task_id="second",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=("first",),
+        complexity=TaskComplexity.LOW,
+        input_state={},
+        description="Do the implementation.",
+    )
+    workflow = WorkflowInstance.create(tmp_path / "superseded", (first,))
+    workflow.add_task(second)
+    workflow.claim_task("first")
+
+    terminated = workflow.terminate_workflow("first", {"superseded": True})
+
+    assert terminated.status is TaskStatus.COMPLETED
+    persisted = WorkflowInstance.from_directory(tmp_path / "superseded")
+    assert persisted.tasks[1].status is TaskStatus.CLOSED
+    assert persisted.is_finished()
+
+
 def test_workflow_materializes_upstream_output_contract_when_task_is_claimed(
     tmp_path: Path,
 ) -> None:

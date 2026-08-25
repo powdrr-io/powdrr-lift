@@ -1,0 +1,13 @@
+schema_version: 1
+id: execute-proposed-pr-live-task-all
+execution_mode: workflow_task
+workflow_template: templates/execute-proposed-pr.yaml
+work_item_name: fixture-feature
+run_all: true
+fixture: fixtures/task-002
+provider:
+  mode: live
+  provider: auto
+  # No max_roundtrips: continue while the agent is making progress.
+  max_stalled_roundtrips: 5
+expect: {}

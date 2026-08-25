@@ -194,6 +194,8 @@ class WorkflowTaskAgentConfig:
     timeout_backoff_seconds: float = 10.0
     context_compaction_threshold: float = 0.75
     verbose: bool = False
+    allow_unmanaged_git: bool = False
+    run_deterministic_invoke_tool_pre_steps: bool = False
 
 
 def _context_compaction_threshold(context_window: int, fraction: float) -> int:
@@ -465,6 +467,18 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         ).record_no_progress(action, observation)
         self.response_correction = observation.correction
 
+    def no_progress_threshold_exit_code(
+        self,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation,
+    ) -> int | None:
+        _ = action, observation
+        print(
+            "Workflow task stopped after repeated actions made no material progress.",
+            file=self.stderr,
+        )
+        return 1
+
     def record_response_error(
         self,
         error: RuntimeError,
@@ -539,8 +553,36 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
-            self.events.append({"kind": action.kind})
-            return WorkflowActionOutcome()
+            output_state = _durable_task_action_output_state(action)
+            if self.requires_deterministic_output_state and output_state != (
+                self.deterministic_output_state
+            ):
+                raise ValueError(
+                    "This task must persist the exact deterministic pre-step result "
+                    "in the top-level output_state field; do not use outputs, "
+                    "text, or a summary instead."
+                )
+            completed = self.workflow.complete_task(
+                self.task.task_id,
+                output_state,
+            )
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "output_state": output_state,
+                }
+            )
+            _publish_workflow_progress(
+                self.repo_root,
+                self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+                reason=f"next_step {completed.task_id}",
+                stdout=self.stdout,
+                open_pull_request=False,
+                events=self.events,
+            )
+            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
+            return WorkflowActionOutcome(continue_running=False)
         if action.kind == "read_document":
             self.events.append(
                 {
@@ -647,7 +689,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "in the top-level output_state field; do not use outputs, "
                     "text, or a summary instead."
                 )
-            completed = self.workflow.complete_task(
+            completed = self.workflow.terminate_workflow(
                 self.task.task_id,
                 action.output_state,
             )
@@ -655,14 +697,14 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.repo_root,
                 self.workflow,
                 workflow_id=workflow_id_from_task_id(self.task.task_id),
-                reason=f"complete {completed.task_id}",
+                reason=f"terminate {completed.task_id}",
                 stdout=self.stdout,
                 open_pull_request=False,
                 events=self.events,
             )
             if action.text:
                 print(action.text, file=self.stdout)
-            print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
+            print(f"Terminated workflow: {completed.task_id}", file=self.stdout)
             return WorkflowActionOutcome(continue_running=False)
         if action.kind == "get-human-input":
             return self._handoff(action.human_input or {}, "human input required by")
@@ -1062,9 +1104,11 @@ def run_workflow_task(
                     file=stdout,
                 )
                 return 0
-            if workflow.tasks and all(
-                item.status is TaskStatus.COMPLETED for item in workflow.tasks
-            ):
+            if workflow.is_finished():
+                if not all(
+                    item.status is TaskStatus.COMPLETED for item in workflow.tasks
+                ):
+                    return 0
                 if workflow_git_state is not None:
                     _open_final_workflow_pull_request(
                         repo_root,
@@ -1074,6 +1118,8 @@ def run_workflow_task(
                     )
                     return 0
                 if not _is_git_worktree(repo_root):
+                    return 0
+                if config.allow_unmanaged_git:
                     return 0
                 print(
                     "Workflow is complete, but no workflow Git state was found; "
@@ -1151,6 +1197,7 @@ def run_workflow_task(
                 task,
                 repo_root=repo_root,
                 events=driver_events,
+                include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
             )
         )
         driver = WorkflowLLMExecutionDriver(
@@ -1287,6 +1334,8 @@ def _resolve_workflow_task_context(
     if not _is_git_worktree(configured_repo_root):
         return configured_repo_root, configured_workflow_dir
     if workflow_git_state is None:
+        if config.allow_unmanaged_git:
+            return configured_repo_root, configured_workflow_dir
         raise WorkflowGitInconsistency(
             json.dumps(
                 {
@@ -1359,11 +1408,15 @@ def _publish_workflow_progress(
     """
     if not _is_git_worktree(repo_root):
         return
-
     workflow_git_state = load_workflow_git_state(
         workflow.directory,
         workflow_id=workflow_id,
     )
+    if (
+        workflow_git_state is None
+        and not _git_result(repo_root, ["remote"]).stdout.strip()
+    ):
+        return
     branch = _git_output(repo_root, ["branch", "--show-current"])
     if (
         workflow_git_state is not None
@@ -1967,6 +2020,8 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "unknown workflow action",
             "must include parameters.command",
             "must include output_state",
+            "intrinsic tool requires structured operation",
+            "intrinsic tool only supports",
         )
     )
 
@@ -2025,13 +2080,40 @@ def _task_action_material_state(
     material_state: list[tuple[str, str | None]] = []
     for file_path in file_paths:
         path = _resolve_worktree_file_path(file_path, repo_root)
+        if path.is_dir():
+            material_state.append((str(path), "<directory>"))
+            continue
+        if path.exists():
+            try:
+                contents: str | None = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                contents = "<binary file>"
+        else:
+            contents = None
         material_state.append(
             (
                 str(path),
-                path.read_text(encoding="utf-8") if path.exists() else None,
+                contents,
             )
         )
     return tuple(material_state)
+
+
+def _durable_task_action_output_state(action: WorkflowAction) -> Any:
+    """Return the typed state that a task-completing action must persist.
+
+    ``output_state`` is the canonical field.  ``outputs`` remains accepted for
+    older workflow documents whose examples used the interactive handoff shape.
+    """
+    output_state = action.output_state
+    if output_state is None and action.outputs:
+        output_state = action.outputs
+    if output_state is None:
+        raise ValueError(
+            "The next_step action must include a non-null top-level "
+            "output_state object."
+        )
+    return output_state
 
 
 def _task_action_failure_reached(
@@ -2059,11 +2141,13 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
     return (
         _action_system_prompt()
         + "\nDurable workflow-task contract: this is one task that may contain "
-        "multiple actions. Use `next_step` to acknowledge an intermediate action "
-        "or a completed sub-step and continue the task; use `complete` only when "
-        "the task requirements are satisfied, with the declared `output_state`. "
-        "For durable task completion, the result MUST be under the top-level "
-        "`output_state` field; never put it under `outputs`. "
+        "multiple actions. Use `next_step` when this task is finished: it persists "
+        "this task's declared output_state and advances the workflow to the next "
+        "task. Use `complete` only for an early workflow termination when no later "
+        "task should run, such as when the proposed PR is superseded. If this is "
+        "the final task, `next_step` completes the workflow after persisting its "
+        "output. For durable task completion, the result MUST be under "
+        "the top-level `output_state` field; never put it under `outputs`. "
         "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
         "it advances this task.\n" + _interaction_style_prompt(interaction_style)
     )
@@ -2151,6 +2235,7 @@ def _run_task_deterministic_pre_step(
     *,
     repo_root: Path,
     events: list[dict[str, Any]],
+    include_invoke_tool: bool = False,
 ) -> tuple[Any, bool]:
     """Run a task's deterministic context pre-step before asking the LLM.
 
@@ -2159,8 +2244,35 @@ def _run_task_deterministic_pre_step(
     not rediscover it or replace it with a lossy summary.
     """
     pre_step = task.pre_step
-    if pre_step is None or pre_step.action != "gather_context":
+    if pre_step is None:
         return None, False
+    if pre_step.action == "invoke_tool" and include_invoke_tool:
+        handoff_records: dict[str, dict[str, Any]] = {}
+        for key, value in task.input_state.items():
+            if not isinstance(key, str) or isinstance(value, (Mapping, list, tuple)):
+                continue
+            handoff_records[key] = {"value": value}
+            normalized_key = key.replace("_", "-")
+            if normalized_key in {"feature-id", "work-item-name"}:
+                handoff_records["work-item-name"] = {"value": value}
+        _run_deterministic_pre_step(
+            task,
+            skill_name="workflow-task",
+            worktree_root=repo_root,
+            execution_events=events,
+            execution_context=[],
+            handoff_records=handoff_records,
+            step_index=0,
+            workflow_context=None,
+        )
+        result = events[-1].get("result")
+        return {task.output_state_type: result}, True
+    if pre_step.action != "gather_context":
+        if pre_step.action == "invoke_tool":
+            return None, False
+        raise RuntimeError(
+            f"Unsupported deterministic workflow-task pre-step: {pre_step.action}"
+        )
     template = _resolve_pre_step_template(
         pre_step.template,
         _task_prompt_input_values(task.input_state),

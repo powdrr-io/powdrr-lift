@@ -273,6 +273,37 @@ def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None
     ]
 
 
+def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> None:
+    class _StalledStrategy(_ExecutionStrategy):
+        def __init__(self) -> None:
+            super().__init__()
+            self.client = _Client(
+                [
+                    {"kind": "next_step"},
+                    {"kind": "next_step"},
+                    {"kind": "next_step"},
+                ]
+            )
+
+        def no_progress_threshold_exit_code(
+            self,
+            action: _Action,
+            observation: WorkflowActionObservation,
+        ) -> int:
+            _ = action, observation
+            return 7
+
+    strategy = _StalledStrategy()
+    assert (
+        WorkflowLLMExecutionDriver(max_stalled_roundtrips=1).run(
+            strategy,
+            max_roundtrips=None,
+            signature=workflow_action_signature,
+        )
+        == 7
+    )
+
+
 def test_execution_driver_never_crashes_when_observer_fails() -> None:
     class _FailingObserver:
         def response_failed(self, error: Exception) -> None:

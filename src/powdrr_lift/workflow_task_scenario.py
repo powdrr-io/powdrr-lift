@@ -5,6 +5,8 @@ from __future__ import annotations
 import io
 import json
 import shutil
+import subprocess
+import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -54,6 +56,24 @@ class LiveWorkflowTaskExchangeRecorder:
         return response
 
 
+class _TeeTextIO:
+    """Capture live-run output for the report while showing it to the operator."""
+
+    def __init__(self, capture: io.StringIO, display: Any) -> None:
+        self._capture = capture
+        self._display = display
+
+    def write(self, value: str) -> int:
+        self._capture.write(value)
+        written = self._display.write(value)
+        self._display.flush()
+        return written
+
+    def flush(self) -> None:
+        self._capture.flush()
+        self._display.flush()
+
+
 class _ScriptedWorkflowTaskClient:
     def __init__(self, responses: Sequence[Mapping[str, Any]]) -> None:
         self._responses = iter(dict(response) for response in responses)
@@ -79,6 +99,7 @@ class _ScriptedWorkflowTaskClient:
 def run_workflow_task_scenario(
     *,
     workflow_source: Path,
+    skill_definitions_source: Path | None = None,
     responses: Sequence[Mapping[str, Any]],
     task_id: str | None,
     expected_output_state: Any,
@@ -90,11 +111,13 @@ def run_workflow_task_scenario(
     max_roundtrips: int | None = None,
     max_stalled_roundtrips: int = 3,
     verbose: bool = False,
+    stream_live: bool = False,
 ) -> dict[str, Any]:
     """Run one real task, or every ready task, with scripted LLM output.
 
-    The isolated repository deliberately has no .git directory, so the task
-    agent persists task state locally and cannot publish or create a PR.
+    The isolated repository has a local Git baseline so Git-facing workflow
+    tasks exercise the same status and diff behavior as production. Publishing
+    remains disabled by the scenario's GitHub intrinsic stub.
     """
     if not workflow_source.is_dir():
         raise WorkflowTaskScenarioError(
@@ -110,7 +133,20 @@ def run_workflow_task_scenario(
             )
         else:
             repo_root.mkdir()
+        if skill_definitions_source is not None:
+            if not skill_definitions_source.is_dir():
+                raise WorkflowTaskScenarioError(
+                    "Skill definitions directory does not exist: "
+                    f"{skill_definitions_source}"
+                )
+            shutil.copytree(
+                skill_definitions_source,
+                repo_root / "skill-definitions",
+                ignore=shutil.ignore_patterns(".git"),
+            )
         shutil.copytree(workflow_source, workflow_dir)
+        _ensure_fixture_source_package(repo_root)
+        _initialize_git_repository(repo_root)
         source_tasks = WorkflowInstance.from_directory(workflow_dir).tasks
         target_task_id = task_id or source_tasks[-1].task_id
         source_task = next(
@@ -153,6 +189,9 @@ def run_workflow_task_scenario(
                         max_roundtrips=max_roundtrips,
                         max_stalled_roundtrips=max_stalled_roundtrips,
                         verbose=verbose,
+                        allow_unmanaged_git=True,
+                        run_deterministic_invoke_tool_pre_steps=live_provider
+                        is not None,
                     ),
                     source_task_for_client,
                 )
@@ -160,6 +199,8 @@ def run_workflow_task_scenario(
             client = recorder
         stdout = io.StringIO()
         stderr = io.StringIO()
+        stdout_stream: Any = _TeeTextIO(stdout, sys.stdout) if stream_live else stdout
+        stderr_stream: Any = _TeeTextIO(stderr, sys.stderr) if stream_live else stderr
         try:
             exit_code = run_workflow_task(
                 WorkflowTaskAgentConfig(
@@ -172,10 +213,12 @@ def run_workflow_task_scenario(
                     max_roundtrips=max_roundtrips,
                     max_stalled_roundtrips=max_stalled_roundtrips,
                     verbose=verbose,
+                    allow_unmanaged_git=True,
+                    run_deterministic_invoke_tool_pre_steps=live_provider is not None,
                 ),
                 client=client,
-                stdout=stdout,
-                stderr=stderr,
+                stdout=stdout_stream,
+                stderr=stderr_stream,
             )
         except WorkflowTaskScenarioError as error:
             task_path = workflow_dir / f"{target_task_id}.yaml"
@@ -215,6 +258,40 @@ def run_workflow_task_scenario(
         }
     finally:
         shutil.rmtree(temporary, ignore_errors=True)
+
+
+def _initialize_git_repository(repo_root: Path) -> None:
+    for arguments in (
+        ("init", "-b", "main"),
+        ("config", "user.name", "Workflow Scenario"),
+        ("config", "user.email", "workflow-scenario@example.invalid"),
+        ("add", "."),
+        ("commit", "-m", "Scenario fixture"),
+    ):
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise WorkflowTaskScenarioError(
+                f"Could not initialize scenario repository: git {' '.join(arguments)}: "
+                f"{result.stderr.strip()}"
+            )
+
+
+def _ensure_fixture_source_package(repo_root: Path) -> None:
+    source_directory = repo_root / "src"
+    if not source_directory.is_dir():
+        return
+    package_marker = source_directory / "__init__.py"
+    if not package_marker.exists():
+        package_marker.write_text(
+            '"""Isolated workflow scenario source package."""\n',
+            encoding="utf-8",
+        )
 
 
 def _replace_pre_step_result(value: Any, result: Any) -> Any:

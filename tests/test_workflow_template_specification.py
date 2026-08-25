@@ -410,8 +410,8 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         "<upstream-task-13>.staged-pull-request-state"
     )
     plan_details = template.task_templates[1].details or ""
-    assert '"action":"complete"' in plan_details
-    assert '"action":"next_step"' not in plan_details
+    assert '"action":"next_step"' in plan_details
+    assert '"action":"complete"' not in plan_details
     assert '"detailed-execution-plan-state"' in plan_details
     assert build_workflow_template_validation_report(
         template.to_json()

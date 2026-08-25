@@ -32,7 +32,10 @@ steps:
     gate executes. Do not edit
     documentation, workflow files, configuration, dependencies, or unrelated
     files. Do not weaken or delete tests to hide a failure. Do not run tests in
-    this step; the deterministic rerun gate is authoritative.
+    this step; the deterministic rerun gate is authoritative. Do not invoke the
+    run-tests-and-fix skill again and do not run a shell command named
+    run-tests-and-fix; this is already inside that skill. Edit the reported
+    product or test files directly, then return next_step.
 - id: rerun-all-tests
   description: Rerun the complete test suite after a repair.
   step_type: gate

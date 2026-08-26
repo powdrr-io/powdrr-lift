@@ -97,7 +97,14 @@ def workflow_git_state_filename(workflow_id: str) -> str:
 
 def workflow_id_from_task_id(task_id: str) -> str | None:
     workflow_id, separator, _task_number = task_id.rpartition("-task-")
-    return workflow_id if separator and workflow_id else None
+    if not separator or not workflow_id:
+        return None
+    # Instantiated workflows namespace task ids with the workflow instance
+    # name.  The durable metadata and integration branch use the proposed PR
+    # id without the conventional ``-workflow`` suffix.
+    if workflow_id.endswith("-workflow"):
+        workflow_id = workflow_id[: -len("-workflow")]
+    return workflow_id or None
 
 
 def workflow_git_state_path(

@@ -19,6 +19,7 @@ from powdrr_lift.workflow_git import (
     save_workflow_git_state,
     task_branch_name,
     workflow_dependencies_completion,
+    workflow_id_from_task_id,
 )
 
 
@@ -50,6 +51,9 @@ def test_workflow_git_state_round_trips_and_names_branches(tmp_path: Path) -> No
     )
     assert task_branch_name("Feature Request 17", "task-001") == (
         "powdrr/feature-request-17-task/task-001"
+    )
+    assert workflow_id_from_task_id("feature-request-17-workflow-task-001") == (
+        "feature-request-17"
     )
 
 

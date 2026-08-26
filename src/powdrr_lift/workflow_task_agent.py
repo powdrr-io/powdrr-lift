@@ -82,6 +82,7 @@ from powdrr_lift.workflow_git import (
     WorkflowGitState,
     claim_workflow_task,
     create_workflow_worktree,
+    inspect_workflow_run,
     load_workflow_git_state,
     load_workflow_git_states,
     slugify_workflow_id,
@@ -1102,6 +1103,11 @@ def run_workflow_task(
                 workflow_git_state,
                 config.task_id or f"{workflow_git_state.proposed_pr_id}-workflow",
             )
+            _validate_workflow_task_state(
+                workflow,
+                workflow_git_state,
+                project_root,
+            )
         else:
             project_root = configured_repo_root
     except WorkflowGitInconsistency as exc:
@@ -1338,6 +1344,43 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _validate_workflow_task_state(
+    workflow: WorkflowInstance,
+    workflow_git_state: WorkflowGitState,
+    repo_root: Path,
+) -> None:
+    """Reject interrupted durable runs before they look like empty workflows."""
+    locked_tasks = [task for task in workflow.tasks if task.status is TaskStatus.LOCKED]
+    if not locked_tasks:
+        return
+
+    report = inspect_workflow_run(repo_root, workflow_git_state.proposed_pr_id)
+    claim_refs = [
+        claim_ref
+        for claim_ref in report.get("claim_refs", [])
+        if isinstance(claim_ref, str)
+    ]
+    details = [
+        f"task {task.task_id} is locked and may be left by an interrupted run"
+        for task in locked_tasks
+    ]
+    if claim_refs:
+        details.append("claim refs: " + ", ".join(claim_refs))
+    raise WorkflowGitInconsistency(
+        json.dumps(
+            {
+                "proposed_pr_id": workflow_git_state.proposed_pr_id,
+                "inconsistencies": details,
+                "recovery_command": (
+                    "powdrr-lift workflow-recovery --proposed-pr-id "
+                    f"{workflow_git_state.proposed_pr_id} --cleanup"
+                ),
+            },
+            indent=2,
+        )
+    )
 
 
 def _select_ready_workflow_git_state(

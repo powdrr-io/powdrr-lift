@@ -3049,23 +3049,24 @@ def _read_task_document(
             f"{action.start_line}-{action.end_line} is invalid. "
             f"Request a range from 1 through {len(lines)}."
         )
-    if action.end_line > len(lines):
+    if action.start_line > len(lines):
         raise RuntimeError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is outside the document "
-            f"with {len(lines)} lines. Request a range from 1 through "
+            f"with {len(lines)} lines. Request a start_line from 1 through "
             f"{len(lines)}."
         )
+    end_line = min(action.end_line, len(lines))
     return {
         "path": action.file_path,
         "start_line": action.start_line,
-        "end_line": action.end_line,
+        "end_line": end_line,
         "lines": [
             {
                 "line_number": number,
                 "text": lines[number - 1],
             }
-            for number in range(action.start_line, action.end_line + 1)
+            for number in range(action.start_line, end_line + 1)
         ],
     }
 

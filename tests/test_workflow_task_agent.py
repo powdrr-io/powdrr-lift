@@ -37,13 +37,14 @@ from powdrr_lift.workflow_git import (
     WorkflowGitState,
     save_workflow_git_state,
 )
-from powdrr_lift.workflow_llm import WorkflowLLMHTTPError
+from powdrr_lift.workflow_llm import WorkflowAction, WorkflowLLMHTTPError
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,
     _build_workflow_client,
     _handle_exhausted_timeout,
     _publish_workflow_progress,
+    _read_task_document,
     _select_ready_workflow_git_state,
     _task_events_for_prompt,
     _validate_workflow_task_state,
@@ -1391,16 +1392,9 @@ def test_process_workflow_task_repairs_read_document_range_error(
                 "start_line": 1,
                 "end_line": 10,
             },
-            {
-                "kind": "read_document",
-                "file_path": "specification.yaml",
-                "start_line": 1,
-                "end_line": 2,
-            },
             {"kind": "complete", "output_state": {"read": True}},
         ]
     )
-    stderr = io.StringIO()
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -1409,17 +1403,30 @@ def test_process_workflow_task_repairs_read_document_range_error(
         ),
         client=client,
         stdout=io.StringIO(),
-        stderr=stderr,
+        stderr=io.StringIO(),
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 3
-    correction = client.messages[1][1]["content"]
-    assert "outside the document" in correction
-    assert "Request a range from 1 through 2" in correction
-    assert "corrected JSON action" in correction
-    assert "action_error" in correction
-    assert "action failed" in stderr.getvalue()
+    assert len(client.messages) == 2
+
+
+def test_read_task_document_clamps_end_line_to_document_length(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "specification.yaml").write_text("first\nsecond\n", encoding="utf-8")
+
+    result = _read_task_document(
+        WorkflowAction(
+            kind="read_document",
+            file_path="specification.yaml",
+            start_line=1,
+            end_line=50,
+        ),
+        tmp_path,
+    )
+
+    assert result["end_line"] == 2
+    assert [line["text"] for line in result["lines"]] == ["first", "second"]
 
 
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(

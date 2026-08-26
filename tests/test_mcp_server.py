@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from powdrr_lift import mcp_server
@@ -42,3 +44,25 @@ def test_build_server_registers_codebase_state_tool(
     assert "show_proposed_pr" in registered_tools
     assert "get_invariants" in registered_tools
     assert "get_current_decisions" in registered_tools
+
+
+def test_every_builtin_tool_supports_progressive_help(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registered_tools: dict[str, Any] = {}
+
+    class _FakeServer:
+        def tool(self) -> object:
+            def _decorator(func: object) -> object:
+                registered_tools[getattr(func, "__name__", "")] = func
+                return func
+
+            return _decorator
+
+    monkeypatch.setattr(mcp_server, "FastMCP", lambda _: _FakeServer())
+
+    mcp_server.build_server()
+
+    assert set(registered_tools) == set(mcp_server._TOOL_HELP)
+    for tool in registered_tools.values():
+        assert tool(help=True)

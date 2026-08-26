@@ -202,7 +202,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
-                ("run-tests-and-fix.yaml", 2),
+                ("run-tests-and-fix.yaml", 5),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -692,6 +692,49 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "specify-system",
         "start-implementing-feature",
     ]
+
+
+def test_run_tests_and_fix_has_bounded_diagnose_repair_loop() -> None:
+    skill = load_skill(
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "run-tests-and-fix.yaml"
+    )
+    steps = {step.id: step for step in skill.steps if step.id is not None}
+
+    assert [step.id for step in skill.steps] == [
+        "run-all-tests",
+        "classify-test-results",
+        "discover-failure-context",
+        "diagnose-test-results",
+        "repair-test-failures",
+        "rerun-all-tests",
+    ]
+    assert steps["classify-test-results"].outputs[0].name == "test_classification"
+    assert steps["classify-test-results"].outputs[0].required_for_next_step
+    assert steps["discover-failure-context"].inputs[0].name == "test_classification"
+    assert steps["discover-failure-context"].outputs[0].name == "failure_context"
+    assert steps["discover-failure-context"].outputs[0].required_for_next_step
+    assert steps["diagnose-test-results"].inputs[0].name == "test_classification"
+    assert steps["diagnose-test-results"].inputs[1].name == "failure_context"
+    assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
+    assert steps["diagnose-test-results"].outputs[0].required_for_next_step
+    assert steps["repair-test-failures"].inputs[0].name == "test_diagnosis"
+    assert steps["repair-test-failures"].outputs[0].name == "repair_evidence"
+    assert steps["repair-test-failures"].outputs[0].required_for_next_step
+    assert [
+        invocation.tool
+        for invocation in steps["discover-failure-context"].tool_invocations
+    ] == ["basedpyright-symbol", "basedpyright-structure"]
+    assert [
+        invocation.tool for invocation in steps["repair-test-failures"].tool_invocations
+    ] == ["basedpyright-symbol", "basedpyright-structure"]
+    assert steps["rerun-all-tests"].gate is not None
+    assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
+    assert "Do not run a test" in (steps["classify-test-results"].details or "")
+    assert "If classification is passing or" in (
+        steps["repair-test-failures"].details or ""
+    )
 
 
 def test_repository_state_invocations_use_internal_tool() -> None:

@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-workflow-task-003
-status: locked
+status: completed
 upstream_task_ids:
 - interaction-file-log-core-workflow-task-001
 - interaction-file-log-core-workflow-task-002
@@ -1211,6 +1211,22 @@ assignee_type: agent
 assignee_role: coder
 output_state_type: generated-test-diffs-state
 description: Generate the planned tests
+output_state:
+  generated-test-diffs-state:
+    test_files:
+    - tests/interaction_log/test_log_writer.py
+    - tests/interaction_log/test_interaction_source.py
+    test_names:
+    - test_log_writer_appends_entry
+    - test_log_writer_creates_directory
+    - test_log_writer_json_format
+    - test_interaction_source_feeds_writer
+    expected_failures:
+    - 'test_log_writer_appends_entry: log_writer module does not exist yet'
+    - 'test_log_writer_creates_directory: log_writer module does not exist yet'
+    - 'test_log_writer_json_format: log_writer module does not exist yet'
+    - 'test_interaction_source_feeds_writer: interaction_source module does not exist
+      yet'
 workflow_template: execute-proposed-pr
 step_type: freeform
 details: 'Perform exactly one action: edit only the test files named by the execution

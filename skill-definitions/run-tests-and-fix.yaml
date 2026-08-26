@@ -32,15 +32,15 @@ steps:
     Inspect only the latest deterministic complete-test result and the exact
     source and test locations it identifies. Do not run any test or shell
     command in this step. Do not edit any file. Do not read the workflow
-    template. For Python failures, use basedpyright-symbol to locate the
-    reported class, function, or method and basedpyright-structure to inspect
-    the named Python files before using read_document. Do not use
-    read_document to browse or discover Python source. Use read_document only
+    template. When a failure points to source that basedpyright can analyze, use
+    basedpyright-symbol to locate the reported class, function, or method and
+    basedpyright-structure to inspect the named source file before using
+    read_document. Do not use read_document to browse or discover source. Use read_document only
     for the smallest exact line range after basedpyright has identified the
     file and symbol, or for non-Python files. Record a diagnosis before advancing.
     Exact discovery calls look like these (replace only the values):
-    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"LogWriter","limit":20},"decisions_and_context":"Locate the failing Python symbol."}
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/interaction_log/log_writer.py"},"decisions_and_context":"Inspect the structure of the identified Python file."}
+    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"ExampleClass","limit":20},"decisions_and_context":"Locate the failing source symbol."}
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/package/module.py"},"decisions_and_context":"Inspect the structure of the identified source file."}
     Do not put these parameters in a shell command, do not use a filesystem
     glob, and do not omit parameters.query or parameters.path. Use the symbol
     result to choose the file, then use structure to identify the exact edit
@@ -63,9 +63,6 @@ steps:
     {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Named every failing test, root cause, approved file, and focused repair strategy."}
     For a passing result, use exactly:
     {"action":"next_step","outputs":{"test_diagnosis":{"classification":"passing","failing_tests":[],"root_causes":[],"files_to_change":[]}},"decisions_and_context":"The complete deterministic test suite passed; no repair is needed."}
-    Do not include files outside the reported failure and its direct dependency.
-    Do not weaken, delete, or rewrite tests merely to make them pass. Do not
-    invoke run-tests-and-fix recursively.
   tool_invocations:
   - tool: basedpyright-symbol
     command:
@@ -104,14 +101,14 @@ steps:
     The changed_files list must contain only files actually changed by this
     step. A narrative claim without an edit is not repair evidence. If the
     correct fix requires multiple files, edit all of them in this step and
-    list all of them. For Python files whose exact edit location is not already
+    list all of them. For source files whose exact edit location is not already
     supplied by the diagnosis, use basedpyright-symbol or basedpyright-structure
     before editing; do not browse the file with read_document. The exact calls
     are, for example:
-    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"InteractionEntry"},"decisions_and_context":"Resolve the diagnosed Python symbol before editing."}
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/interaction_log/models.py"},"decisions_and_context":"Confirm the target class and line structure."}
+    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"ExampleClass"},"decisions_and_context":"Resolve the diagnosed source symbol before editing."}
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/package/models.py"},"decisions_and_context":"Confirm the target symbol and source structure."}
     Replace the example values with the diagnosed symbol and repository-relative
-    Python path. Do not put these parameters in a shell command. Do not invoke
+    source path. Do not put these parameters in a shell command. Do not invoke
     run-tests-and-fix recursively.
   tool_invocations:
   - tool: basedpyright-symbol

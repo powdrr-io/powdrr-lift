@@ -24,52 +24,82 @@ steps:
       - dev
       - pytest
       - -q
-- id: diagnose-test-results
-  description: Classify and diagnose the latest complete test result without editing files.
+- id: classify-test-results
+  description: Classify the latest complete test result without editing files.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Inspect only the latest deterministic complete-test result and the exact
-    source and test locations it identifies. Do not run any test or shell
-    command in this step. Do not edit any file. Do not read the workflow
-    template. When a failure points to source that basedpyright can analyze, use
-    basedpyright-symbol to locate the reported class, function, or method and
-    basedpyright-structure to inspect the named source file before using
-    read_document. Do not use read_document to browse or discover source. Use read_document only
-    for the smallest exact line range after basedpyright has identified the
-    file and symbol, or for non-Python files. Record a diagnosis before advancing.
-    Exact discovery calls look like these (replace only the values):
+    Inspect only the latest deterministic complete-test result. Do not run a
+    test or shell command, edit a file, read source, or discover symbols in
+    this step. Classify the result as exactly one of passing,
+    product_or_test_failure, or environment_or_infrastructure_failure. Record
+    every failing test node id and, for an environment failure, record the
+    exact blocker. Do not call an unavailable dependency, executable,
+    provider/network problem, or test-environment setup problem a product
+    failure. Return next_step with exactly:
+    {"action":"next_step","outputs":{"test_classification":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"blocker":null}},"decisions_and_context":"Classified the deterministic test result."}
+    Use an empty failing_tests list for passing or environment failures.
+  tool_invocations:
+  outputs:
+  - name: test_classification
+    type: any
+    required_for_next_step: true
+- id: discover-failure-context
+  description: Locate the source context named by a product or test failure.
+  step_type: freeform
+  inputs:
+  - name: test_classification
+    type: any
+    required: true
+  llm_type: high_reasoning
+  details: >-
+    Use only the test_classification handoff and the latest test traceback.
+    If classification is passing or environment_or_infrastructure_failure,
+    make no discovery call and return next_step with an empty failure_context.
+    If classification is product_or_test_failure, discover only the source
+    context needed for the named failures. For source that basedpyright can
+    analyze, call these tools exactly as JSON actions, replacing the example
+    values:
     {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"ExampleClass","limit":20},"decisions_and_context":"Locate the failing source symbol."}
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/package/module.py"},"decisions_and_context":"Inspect the structure of the identified source file."}
-    Do not put these parameters in a shell command, do not use a filesystem
-    glob, and do not omit parameters.query or parameters.path. Use the symbol
-    result to choose the file, then use structure to identify the exact edit
-    area.
-    The diagnosis MUST classify
-    the result as passing, product_or_test_failure, or
-    environment_or_infrastructure_failure. For a failure, list every failing
-    test node id, explain the root cause supported
-    by the traceback, list the exact approved files that require changes, and
-    give one focused repair strategy per root cause. Do not call a failure a
-    product failure when it is caused by a missing dependency, unavailable
-    executable, provider/network problem, or test-environment setup.
-    If the result passed, use next_step with empty failing_tests and
-    root_causes lists. If the failure is environment_or_infrastructure_failure,
-    do not edit tests or product code to hide it; return next_step with
-    classification environment_or_infrastructure_failure, the exact blocker,
-    and empty root_causes. The final gate will rerun the command and preserve
-    the deterministic result for the caller. Otherwise use
-    next_step with exactly this output shape:
-    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Named every failing test, root cause, approved file, and focused repair strategy."}
-    For a passing result, use exactly:
-    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"passing","failing_tests":[],"root_causes":[],"files_to_change":[]}},"decisions_and_context":"The complete deterministic test suite passed; no repair is needed."}
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/package/module.py"},"decisions_and_context":"Inspect the identified source file."}
+    Do not put parameters in a shell command, do not use a filesystem glob,
+    and do not omit parameters.query or parameters.path. Use
+    read_document only for the smallest exact range after discovery, or for
+    non-source files. Return next_step with failure_context containing the
+    discovered repository-relative files, symbols, and relevant line ranges.
+    Do not edit files or run tests in this step.
   tool_invocations:
   - tool: basedpyright-symbol
     command:
-    - query=<failing-python-symbol>
+    - query=<failing-source-symbol>
   - tool: basedpyright-structure
     command:
-    - path=<failing-python-file>
+    - path=<failing-source-file>
+  outputs:
+  - name: failure_context
+    type: any
+    required_for_next_step: true
+- id: diagnose-test-results
+  description: Produce a traceback-supported diagnosis from the classified failure.
+  step_type: freeform
+  inputs:
+  - name: test_classification
+    type: any
+    required: true
+  - name: failure_context
+    type: any
+    required: true
+  llm_type: high_reasoning
+  details: >-
+    Use only the test_classification and failure_context handoffs plus the
+    latest deterministic traceback. Do not run tests or shell commands, edit
+    files, or rediscover source. For a passing or environment failure, preserve
+    the classification and produce empty root_causes. For a product failure,
+    explain each root cause using traceback evidence, list only exact files
+    that require changes, and give one focused repair strategy per root cause.
+    Never weaken or delete tests to conceal a defect. Return next_step with
+    exactly:
+    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Produced a traceback-supported diagnosis from the classified failure and discovered context."}
   outputs:
   - name: test_diagnosis
     type: any
@@ -83,8 +113,9 @@ steps:
     required: true
   llm_type: standard_reasoning
   details: >-
-    Use only the test_diagnosis handoff. If classification is passing, make no
-    edit and return the no-change repair evidence shown below. Otherwise make
+    Use only the test_diagnosis handoff. If classification is passing or
+    environment_or_infrastructure_failure, make no edit and return the
+    no-change repair evidence shown below. Otherwise make
     the smallest complete correction for every listed root cause, and edit only
     files listed in test_diagnosis.root_causes[*].files_to_change. Use the edit action for source or test
     changes and provide exact line ranges. Do not run tests in this step; the
@@ -93,10 +124,10 @@ steps:
     weaken or delete a failing test to conceal a product defect. If the
     diagnosis is incomplete, contradictory, or names no approved file, return
     complete with an explicit blocked explanation rather than guessing.
-    Before advancing, verify that each diagnosed root cause has a concrete
-    edit and return next_step with exactly this shape:
+    Before advancing, verify that each diagnosed product root cause has a
+    concrete edit and return next_step with exactly this shape:
     {"action":"next_step","outputs":{"repair_evidence":{"status":"repaired","changed_files":["src/example.py"],"root_causes_addressed":["Explain which diagnosis item was fixed."],"repair_summary":"Describe the focused correction."}},"decisions_and_context":"Applied a focused repair for every diagnosed root cause; the rerun gate must verify it."}
-    For a passing diagnosis, return exactly:
+    For a passing or environment diagnosis, return exactly:
     {"action":"next_step","outputs":{"repair_evidence":{"status":"no_repair_needed","changed_files":[],"root_causes_addressed":[],"repair_summary":"The complete suite already passed."}},"decisions_and_context":"No files were changed because the deterministic test result passed."}
     The changed_files list must contain only files actually changed by this
     step. A narrative claim without an edit is not repair evidence. If the

@@ -213,14 +213,24 @@ def _select_workflow_instance(
 ) -> WorkflowInstance:
     if workflow_id is None:
         return workflow
-    prefix = f"{slugify_workflow_id(workflow_id)}-task-"
+    slug = slugify_workflow_id(workflow_id)
+    prefixes = (f"{slug}-task-", f"{slug}-workflow-task-")
+
+    def belongs_to_workflow(task: WorkflowTask) -> bool:
+        if task.task_id.startswith(prefixes):
+            return True
+        input_state = task.input_state
+        return (
+            isinstance(input_state, Mapping)
+            and input_state.get("proposed_pr") == workflow_id
+        )
+
     return WorkflowInstance(
         workflow.directory,
         {
             task.task_id: task
             for task in workflow.tasks
-            if task.task_id.startswith(prefix)
-            or task.task_id.startswith("human-input-")
+            if belongs_to_workflow(task) or task.task_id.startswith("human-input-")
         },
     )
 

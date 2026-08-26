@@ -89,8 +89,8 @@ def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(
     WorkflowInstance.create(
         workflow_directory,
         (
-            replace(base_task, task_id="tool-task-001"),
-            replace(base_task, task_id="writer-task-001"),
+            replace(base_task, task_id="tool-workflow-task-001"),
+            replace(base_task, task_id="writer-workflow-task-001"),
         ),
     )
     save_workflow_git_state(

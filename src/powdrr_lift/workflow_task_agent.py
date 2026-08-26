@@ -686,6 +686,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         timeout_backoff_seconds=self.config.timeout_backoff_seconds,
                         context=action.context,
                         clean=action.clean,
+                        error_log_root=self.error_log_root,
                     ),
                 }
             )
@@ -2056,7 +2057,27 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "must include output_state",
             "intrinsic tool requires structured operation",
             "intrinsic tool only supports",
+            "workflow edit action edit kind must be",
+            "workflow edit action edits must",
+            "workflow edit action file_edits must",
         )
+    )
+
+
+def _nested_action_response_correction(error: RuntimeError) -> str:
+    """Return actionable repair guidance for a nested skill response."""
+    return (
+        f"The nested skill response was invalid: {error} "
+        "Return exactly one corrected JSON object for the current nested step. "
+        "The top-level discriminator is the string field "
+        '"action":"edit". For a normal edit, use this exact shape: '
+        '{"action":"edit","file_path":"relative/path.py","edits":['
+        '{"kind":"replace","start_line":1,"end_line":1,"text":"replacement"}]}. '
+        'Each item in "edits" must be an object, and its "kind" must be the '
+        'string "add", "remove", or "replace"; never put an object or the '
+        'top-level action value in "kind". For multiple files, use '
+        '"file_edits":[{"file_path":"relative/path.py","edits":[...]}]. '
+        "Do not return markdown, prose, or a nested action object."
     )
 
 
@@ -2548,6 +2569,7 @@ def _run_skill_for_agent(
     timeout_backoff_seconds: float,
     context: tuple[str, ...] = (),
     clean: bool = False,
+    error_log_root: Path | None = None,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     stack: list[
@@ -2678,15 +2700,61 @@ def _run_skill_for_agent(
             worktree_root=repo_root,
             catalog=catalog,
         )
-        action = action_engine.request_action(
-            client=client,
-            messages=messages,
-            parser=_parse_action_response,
-            model="nested-skill",
-            stderr=stderr,
-            max_timeout_retries=max_timeout_retries,
-            timeout_backoff_seconds=timeout_backoff_seconds,
-        )
+        try:
+            action = action_engine.request_action(
+                client=client,
+                messages=messages,
+                parser=_parse_action_response,
+                model="nested-skill",
+                stderr=stderr,
+                max_timeout_retries=max_timeout_retries,
+                timeout_backoff_seconds=timeout_backoff_seconds,
+            )
+        except RuntimeError as error:
+            if not _is_repairable_task_response_error(error):
+                raise
+            payload = action_engine.last_payload
+            correction = _nested_action_response_correction(error)
+            if error_log_root is not None:
+                record_workflow_llm_error(
+                    error_log_root,
+                    execution_mode="process_workflow_task",
+                    phase="nested_skill_llm_output_parse",
+                    error=error,
+                    context={
+                        "task_id": task.task_id,
+                        "skill_name": current_skill.skill.name,
+                        "step_id": step.id,
+                        "step_index": step_index,
+                    },
+                    llm_output=payload,
+                    guidance=correction,
+                )
+            execution_events.append(
+                {
+                    "kind": "llm_output_error",
+                    "skill": current_skill.skill.name,
+                    "step_id": step.id,
+                    "step_index": step_index,
+                    "error": str(error),
+                    "llm_output": payload,
+                    "guidance": correction,
+                }
+            )
+            execution_context.append(correction)
+            if payload is not None:
+                transcript.append(
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(payload, ensure_ascii=False),
+                    }
+                )
+            transcript.append({"role": "user", "content": correction})
+            print(
+                f"Nested skill action response needs repair: {error}",
+                file=stderr,
+            )
+            continue
         if (
             action.kind == "next_step"
             and not action.outputs

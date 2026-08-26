@@ -455,6 +455,65 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     assert len(client.messages) == 3
 
 
+def test_nested_skill_repairs_malformed_edit_action_in_place(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="nested-skill",
+            when_to_use=("Run nested work.",),
+            steps=(SkillStep(description="Perform nested work."),),
+        ),
+        skills_dir / "nested-skill.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {
+                "action": "edit",
+                "file_path": "notes.txt",
+                "edits": [
+                    {
+                        "kind": {"operation": "replace"},
+                        "start_line": 1,
+                        "end_line": 1,
+                        "text": "invalid",
+                    }
+                ],
+            },
+            {"action": "complete", "text": "Nested work complete."},
+            {"kind": "complete", "output_state": {"ok": True}},
+        ]
+    )
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 4
+    assert (
+        "Workflow edit action edit kind must be a string"
+        in client.messages[2][1]["content"]
+    )
+    assert "Nested skill action response needs repair" in stderr.getvalue()
+    error_records = [
+        json.loads(line)
+        for line in (tmp_path / "workflow-llm-errors.jsonl").read_text().splitlines()
+    ]
+    assert error_records[-1]["phase"] == "nested_skill_llm_output_parse"
+    assert error_records[-1]["context"]["skill_name"] == "nested-skill"
+
+
 def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
     tmp_path: Path,
 ) -> None:

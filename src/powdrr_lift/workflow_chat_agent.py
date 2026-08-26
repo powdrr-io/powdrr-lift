@@ -4589,6 +4589,13 @@ def _modular_action_system_prompt(
         "declared command; read_document reads a bounded file range; goto_step "
         "repeats a declared step; next_step advances after completion; complete ends "
         "the skill. "
+        "For edit, the top-level action is a string and every inner edit kind is "
+        'also a string: {"action":"edit","file_path":"src/example.py",'
+        '"edits":[{"kind":"replace","start_line":1,"end_line":1,'
+        '"text":"replacement"}]}. The inner kind must be exactly "add", '
+        '"remove", or "replace"; do not use an object in kind and do not use '
+        '"action" or "kind" as a nested action object. For multiple files, use '
+        '"file_edits":[{"file_path":"src/example.py","edits":[...]}]. '
         "The current-step contract below further restricts these options.\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "

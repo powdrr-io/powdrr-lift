@@ -54,6 +54,7 @@ from powdrr_lift.workflow_chat_agent import (
     _find_skill_by_name,
     _interaction_style_prompt,
     _invalidate_deterministic_pre_step,
+    _list_worktree_files,
     _load_skill_catalog,
     _long_context_backup_for,
     _maybe_record_llm_exchanges,
@@ -604,6 +605,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "result": _read_task_document(action, self.repo_root),
                 }
             )
+            return WorkflowActionOutcome()
+        if action.kind == "list_files":
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "result": _list_worktree_files(
+                        action.directory or ".",
+                        action.pattern,
+                        action.recursive,
+                        self.repo_root,
+                    ),
+                }
+            )
+            return WorkflowActionOutcome()
         if action.kind == "edit":
             self.events.append(
                 {
@@ -3042,6 +3057,25 @@ def _read_task_document(
     if action.file_path is None or action.start_line is None or action.end_line is None:
         raise RuntimeError("read_document action must include a file and line range.")
     path = _resolve_worktree_file_path(action.file_path, repo_root)
+    if not path.exists() or not path.is_file():
+        directory = path.parent
+        if directory.is_dir():
+            directory_files = sorted(
+                item.name for item in directory.iterdir() if item.is_file()
+            )
+            directory_context = (
+                f" Files currently in {directory.relative_to(repo_root)}: "
+                f"{', '.join(directory_files) or '<no files>'}."
+            )
+        else:
+            directory_context = (
+                f" Directory does not exist: {directory.relative_to(repo_root)}."
+            )
+        raise RuntimeError(
+            f"read_document action file does not exist: {action.file_path}."
+            f"{directory_context} Use an exact existing file path or list_files; "
+            "do not infer or compose a filename."
+        )
     lines = path.read_text(encoding="utf-8").splitlines()
     if action.start_line < 1 or action.end_line < action.start_line:
         raise RuntimeError(

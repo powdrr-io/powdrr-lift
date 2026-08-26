@@ -4358,6 +4358,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "listed tool_invocations support the tool needed for the next action.\n"
         "- read_document: choose this when you know the document path but need "
         "specific lines from that document before deciding the next action. "
+        "- list_files: choose this when you need to discover exact files in a "
+        "directory; provide directory, optional glob pattern, and recursive. "
         "Request only the smallest useful contiguous range. If a missing-file "
         "error lists files in the directory, retry only with one of those exact "
         "paths; never synthesize a filename from related names.\n"
@@ -4590,7 +4592,8 @@ def _modular_action_system_prompt(
         "structural YAML "
         "operations; file_management moves, renames, or deletes one relative file; "
         "invoke_skill runs a listed nested skill; invoke_tool runs one "
-        "declared command; read_document reads a bounded file range; goto_step "
+        "declared command; read_document reads a bounded file range; list_files "
+        "discovers exact file paths; goto_step "
         "repeats a declared step; next_step advances after completion; complete ends "
         "the skill. "
         "For edit, the top-level action is a string and every inner edit kind is "
@@ -4829,6 +4832,7 @@ def _workflow_action_handlers() -> dict[
         "yaml_edit": _handle_workflow_action_yaml_edit,
         "file_management": _handle_workflow_action_file_management,
         "read_document": _handle_workflow_action_read_document,
+        "list_files": _handle_workflow_action_list_files,
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
@@ -5348,6 +5352,76 @@ def _handle_workflow_action_read_document(
         f"Read document context {action.file_path}:{action.start_line}-"
         f"{action.end_line}",
     )
+    return True
+
+
+def _list_worktree_files(
+    directory_value: str,
+    pattern: str | None,
+    recursive: bool,
+    worktree_root: Path,
+) -> dict[str, Any]:
+    directory = _resolve_worktree_file_path(directory_value, worktree_root)
+    if not directory.exists() or not directory.is_dir():
+        raise RuntimeError(
+            f"Workflow list_files directory does not exist: {directory_value}."
+        )
+    normalized_pattern = pattern or "*"
+    paths = (
+        directory.rglob(normalized_pattern)
+        if recursive
+        else directory.glob(normalized_pattern)
+    )
+    return {
+        "directory": directory_value,
+        "pattern": normalized_pattern,
+        "recursive": recursive,
+        "files": sorted(
+            str(path.relative_to(worktree_root)) for path in paths if path.is_file()
+        ),
+    }
+
+
+def _handle_workflow_action_list_files(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = (stdout, input_func)
+    directory = action.directory or "."
+    result = _list_worktree_files(
+        directory,
+        action.pattern,
+        action.recursive,
+        state.worktree_root,
+    )
+    action_data = {
+        "kind": action.kind,
+        "directory": directory,
+        "pattern": result["pattern"],
+        "recursive": action.recursive,
+    }
+    state.transcript.extend(
+        [
+            {"role": "assistant", "content": json.dumps(action_data)},
+            {
+                "role": "user",
+                "content": json.dumps({"list_files_result": result}),
+            },
+        ]
+    )
+    state.execution_events.append(
+        {
+            **action_data,
+            "result": result,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    _verbose_print(stderr, config.verbose, f"Listed files: {result}")
     return True
 
 
@@ -6724,6 +6798,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "invoke_skill": _parse_workflow_action_invoke_skill,
         "goto_step": _parse_workflow_action_goto_step,
         "read_document": _parse_workflow_action_read_document,
+        "list_files": _parse_workflow_action_list_files,
         "next_step": _parse_workflow_action_next_step,
         "prompt_user": _parse_workflow_action_prompt_user,
     }
@@ -7162,6 +7237,10 @@ def _first_class_action_example(action_name: str) -> str:
             '{"action":"read_document","file_path":"docs/example.md",'
             '"start_line":0,"end_line":20}'
         ),
+        "list_files": (
+            '{"action":"list_files","directory":"src",'
+            '"pattern":"*.py","recursive":true}'
+        ),
         "next_step": '{"action":"next_step"}',
         "complete": '{"action":"complete"}',
     }
@@ -7228,6 +7307,30 @@ def _parse_workflow_action_read_document(
         file_path=file_path.strip(),
         start_line=start_line,
         end_line=end_line,
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
+def _parse_workflow_action_list_files(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    directory = payload.get("directory", ".")
+    if not isinstance(directory, str) or not directory.strip():
+        raise RuntimeError("Workflow list_files directory must be a non-empty string.")
+    pattern = payload.get("pattern")
+    if pattern is not None and (not isinstance(pattern, str) or not pattern.strip()):
+        raise RuntimeError("Workflow list_files pattern must be a non-empty string.")
+    recursive = payload.get("recursive", False)
+    if not isinstance(recursive, bool):
+        raise RuntimeError("Workflow list_files recursive must be a boolean.")
+    return SkillChatAction(
+        kind="list_files",
+        directory=directory.strip(),
+        pattern=pattern.strip() if isinstance(pattern, str) else None,
+        recursive=recursive,
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )

@@ -1,0 +1,41 @@
+task_id: interaction-file-log-core-workflow-task-014
+status: open
+upstream_task_ids:
+- interaction-file-log-core-workflow-task-004
+- interaction-file-log-core-workflow-task-013
+- interaction-file-log-core-workflow-task-010
+dependent_state:
+- pull-request-files-verified
+complexity: medium
+input_state:
+  implementation_diffs: interaction-file-log-core-workflow-task-004.generated-product-code-state
+  promoted_documents: interaction-file-log-core-workflow-task-013.promoted-current-state-documents
+  type_check: interaction-file-log-core-workflow-task-010.type-check-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: staged-pull-request-state
+description: Verify the pull request file set
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+details: 'The deterministic repository status is authoritative. Verify that every
+  changed path is within the approved implementation, test, and promoted-document
+  scope. Stage exactly those approved paths with the intrinsic Git add action; do
+  not use a shell command and do not stage logs, caches, or unrelated files. For example:
+  {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["src/feature.py","tests/test_feature.py","docs/current/feature"]},"decisions_and_context":"Staged
+  the verified pull-request files."} After the add succeeds, use next_step with the
+  exact staged path list in the declared output_state. Report an inconsistency rather
+  than silently accepting an unexpected file. This next_step finishes the task and
+  advances the workflow.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-core-workflow''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: simple_task
+pre_step:
+  action: invoke_tool
+  template:
+    tool: git
+    command:
+    - status
+    - --short

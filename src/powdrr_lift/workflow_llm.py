@@ -145,6 +145,9 @@ class WorkflowAction:
     file_operation: str | None = None
     start_line: int | None = None
     end_line: int | None = None
+    directory: str | None = None
+    pattern: str | None = None
+    recursive: bool = False
     text: str | None = None
     output_state: Any = None
     outputs: dict[str, Any] = field(default_factory=dict)

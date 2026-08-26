@@ -47,6 +47,7 @@ from powdrr_lift.workflow_task_agent import (
     _build_task_messages,
     _build_workflow_client,
     _handle_exhausted_timeout,
+    _list_worktree_files,
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
@@ -1466,6 +1467,54 @@ def test_read_task_document_clamps_end_line_to_document_length(
 
     assert result["end_line"] == 2
     assert [line["text"] for line in result["lines"]] == ["first", "second"]
+
+
+def test_missing_read_document_is_recoverable_and_lists_exact_files(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    source_directory = tmp_path / "src" / "pkg"
+    source_directory.mkdir(parents=True)
+    (source_directory / "actual.py").write_text("value = 1\n", encoding="utf-8")
+    client = _FakeClient(
+        [
+            {
+                "kind": "read_document",
+                "file_path": "src/pkg/missing.py",
+                "start_line": 1,
+                "end_line": 10,
+            },
+            {
+                "kind": "list_files",
+                "directory": "src/pkg",
+                "pattern": "*.py",
+            },
+            {"kind": "complete", "output_state": {"read": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(workflow_dir=workflow.directory, repo_root=tmp_path),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 3
+    assert "actual.py" in str(client.messages[1])
+
+
+def test_list_worktree_files_supports_recursive_glob(tmp_path: Path) -> None:
+    nested = tmp_path / "src" / "pkg"
+    nested.mkdir(parents=True)
+    (tmp_path / "src" / "top.py").write_text("", encoding="utf-8")
+    (nested / "nested.py").write_text("", encoding="utf-8")
+    (nested / "notes.txt").write_text("", encoding="utf-8")
+
+    result = _list_worktree_files("src", "*.py", True, tmp_path)
+
+    assert result["files"] == ["src/pkg/nested.py", "src/top.py"]
 
 
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(

@@ -281,6 +281,40 @@ def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) 
     )
 
 
+def test_cleanup_removes_integration_artifacts_when_metadata_is_missing(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+    integration_worktree, integration_branch = create_workflow_worktree(
+        tmp_path, "feature-17"
+    )
+
+    report = inspect_workflow_run(tmp_path, "feature-17")
+    assert report["inconsistencies"] == [
+        "integration branch exists but its <workflow-id>-workflow.yaml "
+        "metadata file is missing or invalid"
+    ]
+
+    cleaned = cleanup_workflow_run(tmp_path, "feature-17", report=report)
+
+    assert cleaned["integration_checkpoint_preserved"] is False
+    assert not integration_worktree.exists()
+    assert (
+        not subprocess.run(
+            ["git", "show-ref", "--verify", f"refs/heads/{integration_branch}"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
+
+
 def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
     tmp_path: Path,
 ) -> None:

@@ -94,13 +94,12 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
         command = [
             "pr",
             "create",
+            "--draft",
             "--title",
             _required_text(parameters.get("title"), "title"),
             "--body",
             _required_text(parameters.get("body"), "body"),
         ]
-        if parameters.get("draft", False):
-            command.insert(2, "--draft")
     elif operation == "pr_edit":
         command = [
             "pr",

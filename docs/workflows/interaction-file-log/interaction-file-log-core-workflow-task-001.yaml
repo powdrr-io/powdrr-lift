@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-workflow-task-001
-status: open
+status: locked
 upstream_task_ids: []
 dependent_state:
 - proposed-pr-context-gathered

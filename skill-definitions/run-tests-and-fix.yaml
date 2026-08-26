@@ -32,7 +32,13 @@ steps:
     Inspect only the latest deterministic complete-test result and the exact
     source and test locations it identifies. Do not run any test or shell
     command in this step. Do not edit any file. Do not read the workflow
-    template. Record a diagnosis before advancing. The diagnosis MUST classify
+    template. For Python failures, use basedpyright-symbol to locate the
+    reported class, function, or method and basedpyright-structure to inspect
+    the named Python files before using read_document. Do not use
+    read_document to browse or discover Python source. Use read_document only
+    for the smallest exact line range after basedpyright has identified the
+    file and symbol, or for non-Python files. Record a diagnosis before advancing.
+    The diagnosis MUST classify
     the result as passing, product_or_test_failure, or
     environment_or_infrastructure_failure. For a failure, list every failing
     test node id, explain the root cause supported
@@ -53,6 +59,13 @@ steps:
     Do not include files outside the reported failure and its direct dependency.
     Do not weaken, delete, or rewrite tests merely to make them pass. Do not
     invoke run-tests-and-fix recursively.
+  tool_invocations:
+  - tool: basedpyright-symbol
+    command:
+    - query=<failing-python-symbol>
+  - tool: basedpyright-structure
+    command:
+    - path=<failing-python-file>
   outputs:
   - name: test_diagnosis
     type: any
@@ -84,7 +97,17 @@ steps:
     The changed_files list must contain only files actually changed by this
     step. A narrative claim without an edit is not repair evidence. If the
     correct fix requires multiple files, edit all of them in this step and
-    list all of them. Do not invoke run-tests-and-fix recursively.
+    list all of them. For Python files whose exact edit location is not already
+    supplied by the diagnosis, use basedpyright-symbol or basedpyright-structure
+    before editing; do not browse the file with read_document. Do not invoke
+    run-tests-and-fix recursively.
+  tool_invocations:
+  - tool: basedpyright-symbol
+    command:
+    - query=<diagnosed-python-symbol>
+  - tool: basedpyright-structure
+    command:
+    - path=<python-file-to-edit>
   outputs:
   - name: repair_evidence
     type: any

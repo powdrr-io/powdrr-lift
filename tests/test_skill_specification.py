@@ -713,6 +713,13 @@ def test_run_tests_and_fix_has_bounded_diagnose_repair_loop() -> None:
     assert steps["repair-test-failures"].inputs[0].name == "test_diagnosis"
     assert steps["repair-test-failures"].outputs[0].name == "repair_evidence"
     assert steps["repair-test-failures"].outputs[0].required_for_next_step
+    assert [
+        invocation.tool
+        for invocation in steps["diagnose-test-results"].tool_invocations
+    ] == ["basedpyright-symbol", "basedpyright-structure"]
+    assert [
+        invocation.tool for invocation in steps["repair-test-failures"].tool_invocations
+    ] == ["basedpyright-symbol", "basedpyright-structure"]
     assert steps["rerun-all-tests"].gate is not None
     assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
     assert "Do not run any test" in (steps["diagnose-test-results"].details or "")

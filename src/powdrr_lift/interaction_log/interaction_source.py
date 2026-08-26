@@ -15,6 +15,6 @@ class InteractionSource:
         """Initialize the source with a log writer."""
         self.writer = writer or LogWriter()
 
-    def record(self, role: str, content: Any) -> None:
+    def record(self, input: Any, output: Any) -> None:
         """Record an interaction input or output through the writer."""
-        self.writer.append(InteractionEntry(role=role, content=content))
+        self.writer.append(InteractionEntry(input=input, output=output))

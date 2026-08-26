@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from typing import Any
 
 from .entities import InteractionEntry, InteractionLog
 
@@ -13,9 +11,9 @@ from .entities import InteractionEntry, InteractionLog
 class LogWriter:
     """Appends interaction entries to a JSON file under a hidden directory."""
 
-    def __init__(self, log_path: Path | None = None) -> None:
-        """Initialize the writer with the default or provided log path."""
-        self.log_path = log_path or Path(".powdrr") / "interaction-log.json"
+    def __init__(self, log_dir: Path | None = None) -> None:
+        """Initialize the writer with the default or provided log directory."""
+        self.log_path = (log_dir or Path(".powdrr")) / "interaction-log.json"
 
     def append(self, entry: InteractionEntry) -> None:
         """Append a single entry to the log file, creating the directory if needed."""
@@ -30,14 +28,11 @@ class LogWriter:
             return InteractionLog()
         with self.log_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
+        entries = data if isinstance(data, list) else data.get("entries", [])
         return InteractionLog(
             entries=[
-                InteractionEntry(
-                    role=item["role"],
-                    content=item["content"],
-                    timestamp=item.get("timestamp", ""),
-                )
-                for item in data.get("entries", [])
+                InteractionEntry(input=item["input"], output=item["output"])
+                for item in entries
             ]
         )
 

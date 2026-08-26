@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any
 
 
@@ -11,18 +10,14 @@ from typing import Any
 class InteractionEntry:
     """A single recorded human or LLM interaction."""
 
-    role: str
-    content: Any
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    input: Any
+    output: Any
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of this entry."""
         return {
-            "role": self.role,
-            "content": self.content,
-            "timestamp": self.timestamp,
+            "input": self.input,
+            "output": self.output,
         }
 
 
@@ -36,6 +31,6 @@ class InteractionLog:
         """Append an entry to the log."""
         self.entries.append(entry)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> list[dict[str, Any]]:
         """Return a JSON-serializable representation of the log."""
-        return {"entries": [entry.to_dict() for entry in self.entries]}
+        return [entry.to_dict() for entry in self.entries]

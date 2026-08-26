@@ -1,9 +1,10 @@
-from powdrr_lift.interaction_log.entities import InteractionEntry
+from pathlib import Path
+
 from powdrr_lift.interaction_log.interaction_source import InteractionSource
 from powdrr_lift.interaction_log.log_writer import LogWriter
 
 
-def test_interaction_source_feeds_writer(tmp_path):
+def test_interaction_source_feeds_writer(tmp_path: Path) -> None:
     log_dir = tmp_path / ".powdrr"
     writer = LogWriter(log_dir)
     source = InteractionSource(writer)

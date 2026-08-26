@@ -33,6 +33,7 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response,
 )
 from powdrr_lift.workflow_git import (
+    WorkflowGitInconsistency,
     WorkflowGitState,
     save_workflow_git_state,
 )
@@ -45,6 +46,7 @@ from powdrr_lift.workflow_task_agent import (
     _publish_workflow_progress,
     _select_ready_workflow_git_state,
     _task_events_for_prompt,
+    _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
 )
@@ -865,6 +867,38 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         "claim next-task",
         "terminate next-task",
     ]
+
+
+def test_locked_workflow_task_reports_recovery_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = replace(_workflow(tmp_path).tasks[0], status=TaskStatus.LOCKED)
+    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="workflow",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent.inspect_workflow_run",
+        lambda _repo_root, _proposed_pr_id: {
+            "claim_refs": [
+                "refs/agents/claims/feature-17/agent-task",
+            ]
+        },
+    )
+
+    with pytest.raises(WorkflowGitInconsistency) as raised:
+        _validate_workflow_task_state(workflow, state, tmp_path)
+
+    message = str(raised.value)
+    assert "agent-task is locked" in message
+    assert "refs/agents/claims/feature-17/agent-task" in message
+    assert (
+        "powdrr-lift workflow-recovery --proposed-pr-id feature-17 --cleanup" in message
+    )
 
 
 def test_process_workflow_task_stops_when_human_task_becomes_ready(

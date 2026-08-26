@@ -5,9 +5,14 @@ when_to_use:
 - When test failures require bounded edits followed by deterministic reruns.
 steps:
 - id: run-all-tests
-  description: Run the complete test suite before diagnosing failures.
+  description: Run the complete test suite and preserve its deterministic result.
   step_type: invoke_tool
   llm_type: simple_task
+  details: >-
+    The pre-step has already run the complete test suite. Do not run it again,
+    inspect arbitrary files, or diagnose failures in this step. Preserve the
+    complete deterministic result for the diagnosis step. Choose next_step with a
+    concise statement that the test result is ready for the gate.
   pre_step:
     action: invoke_tool
     template:
@@ -20,26 +25,80 @@ steps:
       - pytest
       - -q
 - id: diagnose-test-results
-  description: Diagnose the latest complete test result and repair failures.
+  description: Classify and diagnose the latest complete test result without editing files.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Inspect the latest deterministic full-suite result and the supplied
-    implementation and generated-test context. If returncode is zero, make no
-    edits and return next_step so the rerun gate confirms the passing result. If
-    any test fails, identify the reported causes and make all necessary focused
-    edits to approved product or test files, then return next_step so the rerun
-    gate executes. Do not edit
-    documentation, workflow files, configuration, dependencies, or unrelated
-    files. Do not weaken or delete tests to hide a failure. Do not run tests in
-    this step; the deterministic rerun gate is authoritative. Do not invoke the
-    run-tests-and-fix skill again and do not run a shell command named
-    run-tests-and-fix; this is already inside that skill. Edit the reported
-    product or test files directly, then return next_step.
+    Inspect only the latest deterministic complete-test result and the exact
+    source and test locations it identifies. Do not run any test or shell
+    command in this step. Do not edit any file. Do not read the workflow
+    template. Record a diagnosis before advancing. The diagnosis MUST classify
+    the result as passing, product_or_test_failure, or
+    environment_or_infrastructure_failure. For a failure, list every failing
+    test node id, explain the root cause supported
+    by the traceback, list the exact approved files that require changes, and
+    give one focused repair strategy per root cause. Do not call a failure a
+    product failure when it is caused by a missing dependency, unavailable
+    executable, provider/network problem, or test-environment setup.
+    If the result passed, use next_step with empty failing_tests and
+    root_causes lists. If the failure is environment_or_infrastructure_failure,
+    do not edit tests or product code to hide it; return next_step with
+    classification environment_or_infrastructure_failure, the exact blocker,
+    and empty root_causes. The final gate will rerun the command and preserve
+    the deterministic result for the caller. Otherwise use
+    next_step with exactly this output shape:
+    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Named every failing test, root cause, approved file, and focused repair strategy."}
+    For a passing result, use exactly:
+    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"passing","failing_tests":[],"root_causes":[],"files_to_change":[]}},"decisions_and_context":"The complete deterministic test suite passed; no repair is needed."}
+    Do not include files outside the reported failure and its direct dependency.
+    Do not weaken, delete, or rewrite tests merely to make them pass. Do not
+    invoke run-tests-and-fix recursively.
+  outputs:
+  - name: test_diagnosis
+    type: any
+    required_for_next_step: true
+- id: repair-test-failures
+  description: Apply the diagnosed focused repair and record evidence.
+  step_type: freeform
+  inputs:
+  - name: test_diagnosis
+    type: any
+    required: true
+  llm_type: standard_reasoning
+  details: >-
+    Use only the test_diagnosis handoff. If classification is passing, make no
+    edit and return the no-change repair evidence shown below. Otherwise make
+    the smallest complete correction for every listed root cause, and edit only
+    files listed in test_diagnosis.root_causes[*].files_to_change. Use the edit action for source or test
+    changes and provide exact line ranges. Do not run tests in this step; the
+    deterministic rerun gate is authoritative. Do not change dependencies,
+    configuration, documentation, workflow files, or unrelated code. Never
+    weaken or delete a failing test to conceal a product defect. If the
+    diagnosis is incomplete, contradictory, or names no approved file, return
+    complete with an explicit blocked explanation rather than guessing.
+    Before advancing, verify that each diagnosed root cause has a concrete
+    edit and return next_step with exactly this shape:
+    {"action":"next_step","outputs":{"repair_evidence":{"status":"repaired","changed_files":["src/example.py"],"root_causes_addressed":["Explain which diagnosis item was fixed."],"repair_summary":"Describe the focused correction."}},"decisions_and_context":"Applied a focused repair for every diagnosed root cause; the rerun gate must verify it."}
+    For a passing diagnosis, return exactly:
+    {"action":"next_step","outputs":{"repair_evidence":{"status":"no_repair_needed","changed_files":[],"root_causes_addressed":[],"repair_summary":"The complete suite already passed."}},"decisions_and_context":"No files were changed because the deterministic test result passed."}
+    The changed_files list must contain only files actually changed by this
+    step. A narrative claim without an edit is not repair evidence. If the
+    correct fix requires multiple files, edit all of them in this step and
+    list all of them. Do not invoke run-tests-and-fix recursively.
+  outputs:
+  - name: repair_evidence
+    type: any
+    required_for_next_step: true
 - id: rerun-all-tests
-  description: Rerun the complete test suite after a repair.
+  description: Rerun the complete suite after the focused repair.
   step_type: gate
   llm_type: simple_task
+  details: >-
+    This pre-step is the only authoritative proof that the repair made
+    progress. If it passes, the skill is complete. If it fails, return to
+    diagnose-test-results with the new result. Never advance based on the
+    repair_evidence alone. After a correction, every test is rerun, including
+    tests that passed before. An empty or unchanged repair is not progress.
   pre_step:
     action: invoke_tool
     template:
@@ -57,6 +116,9 @@ steps:
       equals: 0
     goto_step: diagnose-test-results
     retry_context: >-
-      The complete test suite still failed. Inspect the latest result, make all
-      necessary focused repairs to approved product or test files, and return
-      next_step so the gate reruns. All tests must pass before completion.
+      The repaired complete suite still failed. Use only the new deterministic
+      result. Compare it with the prior diagnosis, identify newly remaining or
+      regressed failures, and choose a materially different focused repair.
+      Do not repeat the previous edit unchanged. If the same failure fingerprint
+      remains, inspect the exact traceback and revise the root-cause diagnosis
+      before editing.

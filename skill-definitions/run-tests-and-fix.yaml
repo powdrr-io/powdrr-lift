@@ -38,6 +38,13 @@ steps:
     read_document to browse or discover Python source. Use read_document only
     for the smallest exact line range after basedpyright has identified the
     file and symbol, or for non-Python files. Record a diagnosis before advancing.
+    Exact discovery calls look like these (replace only the values):
+    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"LogWriter","limit":20},"decisions_and_context":"Locate the failing Python symbol."}
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/interaction_log/log_writer.py"},"decisions_and_context":"Inspect the structure of the identified Python file."}
+    Do not put these parameters in a shell command, do not use a filesystem
+    glob, and do not omit parameters.query or parameters.path. Use the symbol
+    result to choose the file, then use structure to identify the exact edit
+    area.
     The diagnosis MUST classify
     the result as passing, product_or_test_failure, or
     environment_or_infrastructure_failure. For a failure, list every failing
@@ -99,7 +106,12 @@ steps:
     correct fix requires multiple files, edit all of them in this step and
     list all of them. For Python files whose exact edit location is not already
     supplied by the diagnosis, use basedpyright-symbol or basedpyright-structure
-    before editing; do not browse the file with read_document. Do not invoke
+    before editing; do not browse the file with read_document. The exact calls
+    are, for example:
+    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"InteractionEntry"},"decisions_and_context":"Resolve the diagnosed Python symbol before editing."}
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/interaction_log/models.py"},"decisions_and_context":"Confirm the target class and line structure."}
+    Replace the example values with the diagnosed symbol and repository-relative
+    Python path. Do not put these parameters in a shell command. Do not invoke
     run-tests-and-fix recursively.
   tool_invocations:
   - tool: basedpyright-symbol

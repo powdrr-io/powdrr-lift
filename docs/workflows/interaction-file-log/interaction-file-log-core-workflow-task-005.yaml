@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-workflow-task-005
-status: open
+status: locked
 upstream_task_ids:
 - interaction-file-log-core-workflow-task-004
 - interaction-file-log-core-workflow-task-003
@@ -7,8 +7,32 @@ dependent_state:
 - all-tests-passed
 complexity: high
 input_state:
-  implementation_diffs: interaction-file-log-core-workflow-task-004.generated-product-code-state
-  generated_test_diffs: interaction-file-log-core-workflow-task-003.generated-test-diffs-state
+  implementation_diffs:
+    generated-product-code-state:
+      implementation_files:
+      - src/powdrr_lift/interaction_log/entities.py
+      - src/powdrr_lift/interaction_log/log_writer.py
+      - src/powdrr_lift/interaction_log/interaction_source.py
+      - src/powdrr_lift/interaction_log/__init__.py
+      - src/powdrr_lift/tools/log_writer.py
+      - src/powdrr_lift/tools/interaction_source.py
+      implementation_diffs: {}
+  generated_test_diffs:
+    generated-test-diffs-state:
+      test_files:
+      - tests/interaction_log/test_log_writer.py
+      - tests/interaction_log/test_interaction_source.py
+      test_names:
+      - test_log_writer_appends_entry
+      - test_log_writer_creates_directory
+      - test_log_writer_json_format
+      - test_interaction_source_feeds_writer
+      expected_failures:
+      - 'test_log_writer_appends_entry: log_writer module does not exist yet'
+      - 'test_log_writer_creates_directory: log_writer module does not exist yet'
+      - 'test_log_writer_json_format: log_writer module does not exist yet'
+      - 'test_interaction_source_feeds_writer: interaction_source module does not
+        exist yet'
   test_results: {}
 assignee_type: agent
 assignee_role: reviewer

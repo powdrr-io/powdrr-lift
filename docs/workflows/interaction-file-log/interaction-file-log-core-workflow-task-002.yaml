@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-workflow-task-002
-status: locked
+status: completed
 upstream_task_ids:
 - interaction-file-log-core-workflow-task-001
 dependent_state:
@@ -1172,6 +1172,43 @@ assignee_type: agent
 assignee_role: architect
 output_state_type: detailed-execution-plan-state
 description: Create the execution plan
+output_state:
+  detailed-execution-plan-state:
+    execution_plan:
+      criteria_to_tests:
+      - criterion_id: req-1
+        criterion_description: All human and LLM interaction inputs and outputs must
+          be recorded in a JSON file named interaction-log.json within a hidden .powdrr
+          directory.
+        test_ids:
+        - test-log-writer-appends-entry
+        - test-log-writer-creates-directory
+        - test-log-writer-json-format
+        - test-interaction-source-feeds-writer
+      implementation_files:
+      - src/powdrr_lift/interaction_log/entities.py
+      - src/powdrr_lift/interaction_log/log_writer.py
+      - src/powdrr_lift/interaction_log/interaction_source.py
+      - src/powdrr_lift/interaction_log/__init__.py
+      - src/powdrr_lift/tools/log_writer.py
+      - src/powdrr_lift/tools/interaction_source.py
+      - tests/interaction_log/test_log_writer.py
+      - tests/interaction_log/test_interaction_source.py
+      test_commands:
+      - pytest tests/interaction_log -v
+      validation_commands:
+      - pytest tests/interaction_log -v
+      - python -m compileall src/powdrr_lift/interaction_log src/powdrr_lift/tools
+      risks:
+      - risk_id: risk-secret-spillage
+        description: Interaction logs may contain sensitive content; the .powdrr directory
+          must be treated as sensitive data.
+        mitigation: Ensure the log directory is hidden and document that it contains
+          sensitive data.
+      - risk_id: risk-append-atomicity
+        description: Concurrent appends to the same JSON file could corrupt the log.
+        mitigation: Use a single writer with file locking or serialize writes through
+          the log-writer tool.
 workflow_template: execute-proposed-pr
 step_type: freeform
 details: 'Perform exactly one action: create the ordered execution plan. Read the

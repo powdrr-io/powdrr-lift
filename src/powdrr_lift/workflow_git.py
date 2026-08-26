@@ -579,7 +579,49 @@ def cleanup_workflow_run(
     errors: list[str] = []
     integration_worktree = Path(state_report["integration_worktree"])
     state_data = state_report.get("workflow_git_state")
-    if integration_worktree.is_dir() and isinstance(state_data, dict):
+    checkpoint_valid = isinstance(state_data, dict)
+    if not checkpoint_valid:
+        # Without valid metadata there is no trustworthy workflow directory or
+        # checkpoint to preserve. Treat the run as incomplete and remove the
+        # integration artifacts rather than leaving a branch that every future
+        # invocation will rediscover as inconsistent.
+        if integration_worktree.is_dir():
+            result = _git(
+                repo_root_path,
+                ["worktree", "remove", "--force", str(integration_worktree)],
+            )
+            if result.returncode == 0:
+                removed.append(f"worktree:{integration_worktree}")
+            else:
+                errors.append(
+                    f"integration-worktree:{integration_worktree}: "
+                    f"{result.stderr.strip()}"
+                )
+        if state_report["integration_branch_exists"]:
+            result = _git(
+                repo_root_path,
+                ["branch", "-D", state_report["integration_branch"]],
+            )
+            if result.returncode == 0:
+                removed.append(f"branch:{state_report['integration_branch']}")
+            elif "not found" not in result.stderr.casefold():
+                errors.append(
+                    f"branch:{state_report['integration_branch']}: "
+                    f"{result.stderr.strip()}"
+                )
+        if _remote_exists(repo_root_path, "origin"):
+            result = _git(
+                repo_root_path,
+                ["push", "origin", "--delete", state_report["integration_branch"]],
+            )
+            if result.returncode == 0:
+                removed.append(f"remote-branch:{state_report['integration_branch']}")
+            elif "remote ref does not exist" not in result.stderr.casefold():
+                errors.append(
+                    f"remote-branch:{state_report['integration_branch']}: "
+                    f"{result.stderr.strip()}"
+                )
+    elif integration_worktree.is_dir():
         relative_directory = state_data.get("workflow_relative_directory")
         if isinstance(relative_directory, str) and relative_directory:
             restore = _git(
@@ -662,8 +704,7 @@ def cleanup_workflow_run(
         "removed": removed,
         "errors": [*state_report.get("errors", []), *errors],
         "integration_checkpoint_preserved": bool(
-            state_report["integration_branch_exists"]
-            and state_report.get("workflow_git_state") is not None
+            state_report["integration_branch_exists"] and checkpoint_valid
         ),
     }
 

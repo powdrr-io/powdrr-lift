@@ -1930,6 +1930,8 @@ class OpenAIChatClient:
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
+        except ConnectionError as exc:
+            raise RuntimeError(f"OpenAI request connection dropped: {exc}") from exc
         except TimeoutError as exc:
             raise RuntimeError(
                 _provider_timeout_message(
@@ -2178,6 +2180,8 @@ class AnthropicChatClient:
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
+        except ConnectionError as exc:
+            raise RuntimeError(f"Anthropic request connection dropped: {exc}") from exc
         except TimeoutError as exc:
             raise RuntimeError(
                 _provider_timeout_message(

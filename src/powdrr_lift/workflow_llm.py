@@ -185,8 +185,19 @@ def is_timeout_error(error: RuntimeError) -> bool:
 
 def is_retryable_provider_error(error: RuntimeError) -> bool:
     """Return whether a provider failure is transient enough to retry."""
-    return is_timeout_error(error) or (
-        isinstance(error, WorkflowLLMHTTPError) and error.status_code == 429
+    return (
+        is_timeout_error(error)
+        or (isinstance(error, WorkflowLLMHTTPError) and error.status_code == 429)
+        or any(
+            phrase in str(error).casefold()
+            for phrase in (
+                "remote end closed connection",
+                "remote disconnected",
+                "connection reset",
+                "connection aborted",
+                "broken pipe",
+            )
+        )
     )
 
 
@@ -213,7 +224,16 @@ def complete_json_with_timeout_retry(
                 ) from exc
             retries += 1
             delay_seconds = timeout_backoff_seconds * (2 ** (retries - 1))
-            reason = "timed out" if is_timeout_error(exc) else "provider is overloaded"
+            reason = (
+                "timed out"
+                if is_timeout_error(exc)
+                else (
+                    "connection dropped"
+                    if is_retryable_provider_error(exc)
+                    and not isinstance(exc, WorkflowLLMHTTPError)
+                    else "provider is overloaded"
+                )
+            )
             print(
                 f"LLM request {reason} for {model}; retrying in "
                 f"{delay_seconds:g} seconds "

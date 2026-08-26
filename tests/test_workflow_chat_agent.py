@@ -3401,6 +3401,26 @@ def test_openai_read_timeout_is_reported_as_provider_runtime_error(
         client.complete_json([{"role": "user", "content": "hello"}])
 
 
+def test_openai_remote_disconnect_is_reported_as_retryable_provider_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _disconnected(request: Request, timeout: float) -> object:
+        raise ConnectionResetError("Remote end closed connection without response")
+
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _disconnected)
+    client = OpenAIChatClient(
+        model="test-model",
+        api_key="test-key",
+        base_url="https://api.openai.com/v1",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="OpenAI request connection dropped: Remote end closed connection",
+    ):
+        client.complete_json([{"role": "user", "content": "hello"}])
+
+
 def test_deepinfra_credentials_and_base_url_are_supported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

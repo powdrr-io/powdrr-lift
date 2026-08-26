@@ -1478,7 +1478,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         raise error
 
     def record_action_error(self, action: SkillChatAction, error: Exception) -> None:
-        if _validation_gate_enabled(self.current_step) and action.kind == "invoke_tool":
+        if (
+            _validation_gate_enabled(self.current_step)
+            and action.kind == "invoke_tool"
+            and not isinstance(error, _WorkflowToolValidationError)
+        ):
             _validation_gate_state(
                 self.state, self.current_step
             ).correction_required = True
@@ -1659,7 +1663,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 (
                     item
                     for item in gate_state.obligations.values()
-                    if item.expected_action == actual and item.semantic_stalls >= 2
+                    if _validation_actions_match(item.expected_action, actual)
+                    and item.semantic_stalls >= 2
                 ),
                 None,
             )
@@ -5691,6 +5696,46 @@ def _action_template_matches(
     return True
 
 
+def _validation_actions_match(
+    expected: Mapping[str, Any],
+    actual: Mapping[str, Any],
+) -> bool:
+    """Match equivalent shell commands regardless of JSON string/list shape."""
+    expected_parameters = expected.get("parameters")
+    actual_parameters = actual.get("parameters")
+    if not isinstance(expected_parameters, Mapping) or not isinstance(
+        actual_parameters, Mapping
+    ):
+        return expected == actual
+
+    def normalize_command(command: Any) -> Any:
+        if isinstance(command, str):
+            try:
+                return tuple(shlex.split(command))
+            except ValueError:
+                return None
+        if isinstance(command, Sequence) and not isinstance(
+            command, (bytes, bytearray)
+        ):
+            return tuple(command)
+        return command
+
+    expected_command = normalize_command(expected_parameters.get("command"))
+    actual_command = normalize_command(actual_parameters.get("command"))
+
+    normalized_expected = dict(expected)
+    normalized_actual = dict(actual)
+    normalized_expected["parameters"] = {
+        **expected_parameters,
+        "command": expected_command,
+    }
+    normalized_actual["parameters"] = {
+        **actual_parameters,
+        "command": actual_command,
+    }
+    return normalized_expected == normalized_actual
+
+
 def _discover_validation_obligations(
     result: Mapping[str, Any],
     *,
@@ -5955,7 +6000,10 @@ def _validate_dynamic_validation_gate_action(
     if action.kind in {"next_step", "goto_step", "complete"}:
         return
     obligations = gate_state.obligations.values()
-    if not any(obligation.expected_action == actual for obligation in obligations):
+    if not any(
+        _validation_actions_match(obligation.expected_action, actual)
+        for obligation in obligations
+    ):
         declared = "; ".join(
             json.dumps(obligation.expected_action, sort_keys=True)
             for obligation in gate_state.obligations.values()
@@ -5994,7 +6042,7 @@ def _record_dynamic_validation_result(
         (
             item
             for item in gate_state.obligations.values()
-            if item.expected_action == actual
+            if _validation_actions_match(item.expected_action, actual)
         ),
         None,
     )

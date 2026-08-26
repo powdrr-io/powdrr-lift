@@ -622,6 +622,13 @@ def cleanup_workflow_run(
                     f"{result.stderr.strip()}"
                 )
     elif integration_worktree.is_dir():
+        recovery = _restore_interrupted_workflow_checkpoint(
+            repo_root_path,
+            state_report,
+            integration_worktree,
+        )
+        removed.extend(recovery["removed"])
+        errors.extend(recovery["errors"])
         relative_directory = (
             state_data.get("workflow_relative_directory")
             if isinstance(state_data, dict)
@@ -710,6 +717,119 @@ def cleanup_workflow_run(
         "integration_checkpoint_preserved": bool(
             state_report["integration_branch_exists"] and checkpoint_valid
         ),
+    }
+
+
+def _restore_interrupted_workflow_checkpoint(
+    repo_root: Path,
+    report: Mapping[str, Any],
+    integration_worktree: Path,
+) -> dict[str, list[str]]:
+    """Roll back committed task claims before removing their stale artifacts."""
+    locked_tasks = [
+        item
+        for item in report.get("tasks", [])
+        if isinstance(item, dict) and item.get("status") == "locked"
+    ]
+    if not locked_tasks:
+        return {"removed": [], "errors": []}
+
+    checkpoints: list[str] = []
+    errors: list[str] = []
+    for task in locked_tasks:
+        task_path_value = task.get("path")
+        task_id = task.get("task_id", "<unknown>")
+        if not isinstance(task_path_value, str):
+            errors.append(f"task:{task_id}: missing task path")
+            continue
+        task_path = Path(task_path_value)
+        try:
+            relative_path = task_path.relative_to(integration_worktree)
+        except ValueError:
+            errors.append(f"task:{task_id}: task path is outside integration worktree")
+            continue
+        history = _git(
+            integration_worktree,
+            ["log", "--format=%H", "--", str(relative_path)],
+        )
+        checkpoint: str | None = None
+        for commit in history.stdout.splitlines():
+            current = _git(
+                integration_worktree,
+                ["show", f"{commit}:{relative_path}"],
+            )
+            if current.returncode != 0:
+                continue
+            try:
+                current_data = yaml.safe_load(current.stdout)
+            except yaml.YAMLError:
+                continue
+            if (
+                not isinstance(current_data, dict)
+                or current_data.get("status") != "locked"
+            ):
+                continue
+            parent = _git(
+                integration_worktree,
+                ["rev-parse", f"{commit}^"],
+            )
+            if parent.returncode != 0:
+                continue
+            previous = _git(
+                integration_worktree,
+                ["show", f"{parent.stdout.strip()}:{relative_path}"],
+            )
+            try:
+                previous_data = yaml.safe_load(previous.stdout)
+            except yaml.YAMLError:
+                previous_data = None
+            if (
+                isinstance(previous_data, dict)
+                and previous_data.get("status") != "locked"
+            ):
+                checkpoint = parent.stdout.strip()
+                break
+        if checkpoint is None:
+            errors.append(
+                f"task:{task_id}: could not identify the last consistent checkpoint"
+            )
+        else:
+            checkpoints.append(checkpoint)
+
+    if errors or not checkpoints:
+        return {"removed": [], "errors": errors}
+    checkpoint = checkpoints[0]
+    reset = _git(integration_worktree, ["reset", "--hard", checkpoint])
+    if reset.returncode != 0:
+        return {
+            "removed": [],
+            "errors": [
+                "integration-worktree: could not restore interrupted checkpoint: "
+                + (reset.stderr.strip() or reset.stdout.strip())
+            ],
+        }
+    push = _git(
+        integration_worktree,
+        [
+            "push",
+            "--force-with-lease",
+            "origin",
+            report["integration_branch"],
+        ],
+    )
+    if push.returncode != 0:
+        return {
+            "removed": [],
+            "errors": [
+                "integration-branch: could not publish restored checkpoint: "
+                + (push.stderr.strip() or push.stdout.strip())
+            ],
+        }
+    return {
+        "removed": [
+            f"restored-interrupted-checkpoint:{report['integration_branch']}:{checkpoint}"
+        ],
+        "errors": [],
     }
 
 

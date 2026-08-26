@@ -25,6 +25,9 @@ how_to_fill_this_out:
 - The final task should use `next_step` after persisting its output; the runner
   observes that all tasks are complete and finishes the workflow. Use `complete`
   only for an early termination condition.
+- When the workflow publishes its changes through `create-pull-request`, a new
+  pull request must always be opened as a draft. Preserve the `--draft` flag;
+  never create a ready-for-review pull request from this workflow.
 - Do not modify product code before the test-generation task completes. After
   product code is emitted, the test-run/fix skill must report a passing full
   suite before the remaining validation and review tasks begin. Do not create

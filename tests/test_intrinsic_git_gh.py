@@ -58,7 +58,15 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
             "operation": "pr_create",
             "title": "Add feature",
             "body": "Summary",
-            "draft": True,
+        },
+        tool="gh",
+    ) == ["pr", "create", "--draft", "--title", "Add feature", "--body", "Summary"]
+    assert intrinsic_command(
+        {
+            "operation": "pr_create",
+            "title": "Add feature",
+            "body": "Summary",
+            "draft": False,
         },
         tool="gh",
     ) == ["pr", "create", "--draft", "--title", "Add feature", "--body", "Summary"]

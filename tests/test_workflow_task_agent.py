@@ -37,7 +37,11 @@ from powdrr_lift.workflow_git import (
     WorkflowGitState,
     save_workflow_git_state,
 )
-from powdrr_lift.workflow_llm import WorkflowAction, WorkflowLLMHTTPError
+from powdrr_lift.workflow_llm import (
+    WorkflowAction,
+    WorkflowLLMHTTPError,
+    complete_json_with_timeout_retry,
+)
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,
@@ -1179,6 +1183,41 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
     assert calls == 3
     assert sleeps == [1.5, 3.0]
     assert stderr.getvalue().count("provider is overloaded") == 2
+
+
+def test_workflow_retries_dropped_provider_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeClient([])
+    calls = 0
+    sleeps: list[float] = []
+
+    def _complete(messages: list[dict[str, str]]) -> dict[str, object]:
+        nonlocal calls
+        client.messages.append(messages)
+        calls += 1
+        if calls < 3:
+            raise RuntimeError(
+                "OpenAI request connection dropped: "
+                "Remote end closed connection without response"
+            )
+        return {"action": "next_step"}
+
+    client.complete_json = _complete  # type: ignore[method-assign]
+    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
+
+    result = complete_json_with_timeout_retry(
+        client,
+        [{"role": "user", "content": "hello"}],
+        model="test-model",
+        stderr=io.StringIO(),
+        max_timeout_retries=2,
+        timeout_backoff_seconds=1.5,
+    )
+
+    assert result == {"action": "next_step"}
+    assert calls == 3
+    assert sleeps == [1.5, 3.0]
 
 
 def test_exhausted_timeout_keeps_workflow_worktree_for_resume(

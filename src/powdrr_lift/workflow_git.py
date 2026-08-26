@@ -622,7 +622,11 @@ def cleanup_workflow_run(
                     f"{result.stderr.strip()}"
                 )
     elif integration_worktree.is_dir():
-        relative_directory = state_data.get("workflow_relative_directory")
+        relative_directory = (
+            state_data.get("workflow_relative_directory")
+            if isinstance(state_data, dict)
+            else None
+        )
         if isinstance(relative_directory, str) and relative_directory:
             restore = _git(
                 integration_worktree,

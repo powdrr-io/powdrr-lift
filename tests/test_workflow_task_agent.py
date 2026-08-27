@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from powdrr_lift import workflow_task_agent
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -17,6 +18,7 @@ from powdrr_lift.core import (
     Skill,
     SkillStep,
     SkillStepPreStep,
+    SkillToolInvocation,
     TaskComplexity,
     TaskStatus,
     WorkflowInstance,
@@ -461,6 +463,72 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
         0
     ].output_state == {"ok": True}
     assert len(client.messages) == 3
+
+
+def test_process_workflow_task_propagates_verbose_to_nested_tools(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="nested-skill",
+            when_to_use=("Run nested work.",),
+            steps=(
+                SkillStep(
+                    description="Run nested command.",
+                    tool_invocations=(
+                        SkillToolInvocation(
+                            tool="shell",
+                            command=("printf", "nested"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        skills_dir / "nested-skill.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": "printf nested"},
+            },
+            {"kind": "complete", "text": "Nested work complete."},
+            {"kind": "complete", "output_state": {"ok": True}},
+        ]
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    observed_verbose: list[bool] = []
+    original_execute_shell_tool = workflow_task_agent._execute_shell_tool
+
+    def capture_verbose(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        observed_verbose.append(kwargs["verbose"])
+        return original_execute_shell_tool(*args, **kwargs)
+
+    monkeypatch.setattr(
+        workflow_task_agent,
+        "_execute_shell_tool",
+        capture_verbose,
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+            verbose=True,
+        ),
+        client=client,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert observed_verbose == [True]
 
 
 def test_nested_skill_repairs_malformed_edit_action_in_place(

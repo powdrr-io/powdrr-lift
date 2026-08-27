@@ -11,8 +11,10 @@ steps:
   details: >-
     The pre-step has already run the complete test suite. Do not run it again,
     inspect files, or diagnose failures in this step. Preserve the exact shell
-    tool result so the following deterministic enrich step can consume it.
-    Return next_step with a concise statement that the test result is ready.
+    tool result. The runner stores that result as the required output named
+    test_tool_result; the following enrich-test-results step consumes that exact
+    named output. Return next_step with a concise statement that test_tool_result
+    is ready.
   outputs:
   - name: test_tool_result
     type: any
@@ -37,12 +39,13 @@ steps:
     required: true
   llm_type: simple_task
   details: >-
-    The pre-step deterministically calls the intrinsic enrich tool. It receives
-    the exact result from run-all-tests through the previous_tool_output wiring
-    shown below. Do not run pytest, call enrich yourself, inspect files, or
-    reconstruct the result. Return next_step after confirming that the
-    structured result is ready for diagnosis. The enriched result is available
-    to the next step as the latest deterministic tool result, under output.
+    The pre-step deterministically calls the intrinsic enrich tool. Its
+    tool_output is wired to the required input named test_tool_result, which is
+    the exact raw result published by run-all-tests. Do not run pytest, call
+    enrich yourself, inspect files, or reconstruct the result. The runner stores
+    the structured result as the required output named enriched_test_result.
+    Return next_step after confirming that enriched_test_result is ready for
+    diagnosis.
   pre_step:
     action: invoke_tool
     template:
@@ -64,8 +67,9 @@ steps:
     required: true
   llm_type: high_reasoning
   details: >-
-    Use the structured output from the deterministic enrich step as the
-    authoritative test result. Do not run tests or shell commands, call enrich,
+    Consume the required input named enriched_test_result, which is the
+    structured output from the deterministic enrich step and the authoritative
+    test result. Do not run tests or shell commands, call enrich,
     or rediscover the failure by parsing raw output. If status is passed, or
     the result identifies an environment failure, produce empty root_causes.
     Otherwise explain every failure using its node_id, exception, message,

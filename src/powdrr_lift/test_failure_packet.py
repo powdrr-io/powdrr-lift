@@ -28,8 +28,7 @@ def build_test_failure_packet(
     cwd: str,
 ) -> dict[str, Any] | None:
     """Return a stable pytest result packet, or None for other commands."""
-    command_items = _command_items(command)
-    if "pytest" not in command_items:
+    if not is_pytest_command(command):
         return None
 
     output = f"{stdout}\n{stderr}"
@@ -49,6 +48,11 @@ def build_test_failure_packet(
             }
         ]
     return {"status": "failed", "failures": failures}
+
+
+def is_pytest_command(command: str | Sequence[str]) -> bool:
+    """Return whether a command invokes pytest."""
+    return "pytest" in _command_items(command)
 
 
 def _command_items(command: str | Sequence[str]) -> list[str]:

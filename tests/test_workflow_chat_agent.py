@@ -8914,6 +8914,30 @@ def test_passing_pytest_result_includes_empty_failure_packet() -> None:
     ) == {"status": "passed", "failures": []}
 
 
+def test_non_pytest_shell_result_does_not_build_failure_packet(
+    tmp_path: Path,
+) -> None:
+    with (
+        patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run,
+        patch(
+            "powdrr_lift.workflow_chat_agent.build_test_failure_packet"
+        ) as build_packet,
+    ):
+        run.return_value.returncode = 0
+        run.return_value.stdout = "ok\n"
+        run.return_value.stderr = ""
+
+        _execute_shell_tool(
+            {"command": ["echo", "ok"]},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+        )
+
+    build_packet.assert_not_called()
+
+
 def test_execute_shell_tool_can_suppress_stdout_without_losing_result(
     tmp_path: Path,
 ) -> None:

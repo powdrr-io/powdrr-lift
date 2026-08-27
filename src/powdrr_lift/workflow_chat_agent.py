@@ -78,7 +78,10 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
-from powdrr_lift.test_failure_packet import build_test_failure_packet
+from powdrr_lift.test_failure_packet import (
+    build_test_failure_packet,
+    is_pytest_command,
+)
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
     ProgressDecision,
@@ -7552,15 +7555,14 @@ def _execute_shell_tool(
         "stderr": process.stderr,
         "no_op": original_returncode != 0 and process.returncode == 0,
     }
-    failure_packet = build_test_failure_packet(
-        command=validation_command,
-        returncode=process.returncode,
-        stdout=process.stdout,
-        stderr=process.stderr,
-        cwd=str(resolved_cwd),
-    )
-    if failure_packet is not None:
-        result["test_failure_packet"] = failure_packet
+    if is_pytest_command(validation_command):
+        result["test_failure_packet"] = build_test_failure_packet(
+            command=validation_command,
+            returncode=process.returncode,
+            stdout=process.stdout,
+            stderr=process.stderr,
+            cwd=str(resolved_cwd),
+        )
     if len(attempted_commands) > 1:
         result["attempted_commands"] = attempted_commands
     return result

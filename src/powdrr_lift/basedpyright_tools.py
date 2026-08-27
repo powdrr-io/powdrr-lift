@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from powdrr_lift.builtin_tool_help import builtin_tool_help
+
 BASEDPYRIGHT_SYMBOL_TOOL = "basedpyright-symbol"
 BASEDPYRIGHT_STRUCTURE_TOOL = "basedpyright-structure"
 BASEDPYRIGHT_TOOLS = frozenset({BASEDPYRIGHT_SYMBOL_TOOL, BASEDPYRIGHT_STRUCTURE_TOOL})
@@ -24,6 +26,8 @@ def execute_basedpyright_tool(
     *,
     worktree_root: Path,
 ) -> dict[str, Any]:
+    if parameters.get("help") is True:
+        return builtin_tool_help(tool)
     if tool == BASEDPYRIGHT_SYMBOL_TOOL:
         return _find_symbols(parameters, worktree_root=worktree_root)
     if tool == BASEDPYRIGHT_STRUCTURE_TOOL:

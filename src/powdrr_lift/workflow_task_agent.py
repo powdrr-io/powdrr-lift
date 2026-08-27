@@ -15,6 +15,7 @@ from powdrr_lift.basedpyright_tools import (
     execute_basedpyright_tool,
     is_basedpyright_tool,
 )
+from powdrr_lift.builtin_tool_help import builtin_tool_help
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -835,10 +836,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "stderr": command_error,
             }
         elif action.tool in {"shell", "internal"}:
-            if action.tool == "internal":
+            if action.tool == "internal" and action.parameters.get("help") is not True:
                 _validate_internal_command(action.parameters.get("command"))
             result = _execute_shell_tool(
-                action.parameters,
+                {**action.parameters, "_tool_name": action.tool},
                 worktree_root=self.repo_root,
                 stdout=self.stdout,
                 stderr=self.stderr,
@@ -1954,54 +1955,23 @@ def _build_task_messages(
                     "workflow_files": _workflow_file_names(workflow.directory),
                     "available_tools": [
                         {
-                            "name": "shell",
+                            "name": tool,
                             "description": (
-                                "Execute a shell command in the current worktree."
+                                str(builtin_tool_help(tool)["summary"])
+                                + " Set parameters.help=true for the tool's "
+                                "conventional --help guidance, parameters, and "
+                                "examples."
                             ),
-                        },
-                        {
-                            "name": "internal",
-                            "description": (
-                                "Execute a powdrr-lift CLI command. This tool is "
-                                "always available, but may invoke only powdrr-lift."
-                            ),
-                        },
-                        {
-                            "name": GIT_TOOL,
-                            "description": (
-                                "Intrinsic Git tool; supports status, add, and move. "
-                                "Use invoke_tool with parameters.operation."
-                            ),
-                        },
-                        {
-                            "name": GH_TOOL,
-                            "description": (
-                                "Intrinsic GitHub tool for pull-request creation, "
-                                "inspection, and inline review comments. Use "
-                                "parameters.operation."
-                            ),
-                        },
-                        {
-                            "name": "fuzzy-match",
-                            "description": (
-                                "Search worktree paths with find-like filters and "
-                                "fuzzy name matching."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_SYMBOL_TOOL,
-                            "description": (
-                                "Find Python symbols by name across the worktree. "
-                                "Parameters: query and optional limit."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_STRUCTURE_TOOL,
-                            "description": (
-                                "Discover the classes, functions, methods, and "
-                                "variables in a Python file. Parameter: path."
-                            ),
-                        },
+                        }
+                        for tool in (
+                            "shell",
+                            "internal",
+                            GIT_TOOL,
+                            GH_TOOL,
+                            "fuzzy-match",
+                            BASEDPYRIGHT_SYMBOL_TOOL,
+                            BASEDPYRIGHT_STRUCTURE_TOOL,
+                        )
                     ],
                     "available_skills": available_skills,
                 },
@@ -2304,7 +2274,12 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
         "output. For durable task completion, the result MUST be under "
         "the top-level `output_state` field; never put it under `outputs`. "
         "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
-        "it advances this task.\n" + _interaction_style_prompt(interaction_style)
+        "it advances this task. Every builtin tool accepts "
+        "parameters.help = true without normal command arguments; this is the "
+        "tool's conventional --help option. Invoke that form when you need "
+        "that form when you need detailed parameters, examples, or usage "
+        "guidance. A help response does not count as a successful task tool "
+        "invocation.\n" + _interaction_style_prompt(interaction_style)
     )
 
 
@@ -2984,10 +2959,13 @@ def _run_skill_for_agent(
             continue
         if action.kind == "invoke_tool":
             if action.tool in {"shell", "internal"}:
-                if action.tool == "internal":
+                if (
+                    action.tool == "internal"
+                    and action.parameters.get("help") is not True
+                ):
                     _validate_internal_command(action.parameters.get("command"))
                 result = _execute_shell_tool(
-                    action.parameters,
+                    {**action.parameters, "_tool_name": action.tool},
                     worktree_root=repo_root,
                     stdout=stdout,
                     stderr=stderr,

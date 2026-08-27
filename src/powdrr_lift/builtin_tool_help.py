@@ -26,7 +26,7 @@ _HELP: dict[str, dict[str, Any]] = {
             "command": "A command string or argv array.",
             "cwd": "Optional directory inside the worktree.",
             "env": "Optional string-to-string environment overrides.",
-            "help": "Set true to return this guidance without running a command.",
+            "--help": "Set true to return this guidance without running a command.",
         },
         "examples": [
             {"command": ["rg", "TODO", "src"]},
@@ -42,7 +42,7 @@ _HELP: dict[str, dict[str, Any]] = {
         ),
         "parameters": {
             "command": "An argv array beginning with powdrr-lift.",
-            "help": "Set true to return this guidance without running a command.",
+            "--help": "Set true to return this guidance without running a command.",
         },
         "examples": [
             {"command": ["powdrr-lift", "repository-state"]},
@@ -60,7 +60,7 @@ _HELP: dict[str, dict[str, Any]] = {
             "paths": "Relative paths for add.",
             "source": "Relative source path for move.",
             "destination": "Relative destination path for move.",
-            "help": "Set true to return this guidance without running Git.",
+            "--help": "Set true to return this guidance without running Git.",
         },
         "examples": [
             {"operation": "status"},
@@ -83,7 +83,7 @@ _HELP: dict[str, dict[str, Any]] = {
             "pr_reference": (
                 "Pull-request number for operations that inspect or edit one."
             ),
-            "help": "Set true to return this guidance without contacting GitHub.",
+            "--help": "Set true to return this guidance without contacting GitHub.",
         },
         "examples": [
             {"operation": "pr_view", "pr_reference": "394"},
@@ -107,7 +107,7 @@ _HELP: dict[str, dict[str, Any]] = {
                 "An argv array beginning with fuzzy-match and a root, followed by "
                 "-name and a query."
             ),
-            "help": "Set true to return this guidance without searching.",
+            "--help": "Set true to return this guidance without searching.",
         },
         "examples": [
             {"command": ["fuzzy-match", ".", "-name", "workflow"]},
@@ -123,7 +123,7 @@ _HELP: dict[str, dict[str, Any]] = {
         "parameters": {
             "query": "A symbol-name search string.",
             "limit": "Optional result limit from 1 through 200.",
-            "help": "Set true to return this guidance without starting analysis.",
+            "--help": "Set true to return this guidance without starting analysis.",
         },
         "examples": [
             {"query": "WorkflowAction"},
@@ -138,7 +138,7 @@ _HELP: dict[str, dict[str, Any]] = {
         ),
         "parameters": {
             "path": "A relative path to a Python file in the worktree.",
-            "help": "Set true to return this guidance without starting analysis.",
+            "--help": "Set true to return this guidance without starting analysis.",
         },
         "examples": [
             {"path": "src/powdrr_lift/workflow_chat_agent.py"},
@@ -154,4 +154,4 @@ def builtin_tool_help(tool: str) -> dict[str, Any]:
         guidance = _HELP[tool]
     except KeyError as error:
         raise ValueError(f"Unknown builtin tool: {tool!r}") from error
-    return {"tool": tool, "help": True, **guidance}
+    return {"tool": tool, "--help": True, **guidance}

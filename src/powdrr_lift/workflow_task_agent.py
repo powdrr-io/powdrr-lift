@@ -820,7 +820,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "stderr": command_error,
             }
         elif action.tool in {"shell", "internal"}:
-            if action.tool == "internal" and action.parameters.get("help") is not True:
+            if (
+                action.tool == "internal"
+                and action.parameters.get("--help") is not True
+            ):
                 _validate_internal_command(action.parameters.get("command"))
             result = _execute_shell_tool(
                 {**action.parameters, "_tool_name": action.tool},
@@ -1942,7 +1945,7 @@ def _build_task_messages(
                             "name": tool,
                             "description": (
                                 str(builtin_tool_help(tool)["summary"])
-                                + " Set parameters.help=true for detailed usage, "
+                                + ' Set parameters["--help"]=true for detailed usage, '
                                 "parameters, and examples."
                             ),
                         }
@@ -2257,7 +2260,11 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
         "output. For durable task completion, the result MUST be under "
         "the top-level `output_state` field; never put it under `outputs`. "
         "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
-        "it advances this task.\n" + _interaction_style_prompt(interaction_style)
+        "it advances this task. Every builtin tool accepts "
+        'parameters["--help"] = true without normal command arguments; invoke '
+        "that form when you need detailed parameters, examples, or usage "
+        "guidance. A help response does not count as a successful task tool "
+        "invocation.\n" + _interaction_style_prompt(interaction_style)
     )
 
 
@@ -2938,7 +2945,7 @@ def _run_skill_for_agent(
             if action.tool in {"shell", "internal"}:
                 if (
                     action.tool == "internal"
-                    and action.parameters.get("help") is not True
+                    and action.parameters.get("--help") is not True
                 ):
                     _validate_internal_command(action.parameters.get("command"))
                 result = _execute_shell_tool(

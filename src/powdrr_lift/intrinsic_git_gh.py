@@ -20,7 +20,7 @@ def execute_intrinsic_git_gh_tool(
     worktree_root: Path,
 ) -> dict[str, Any]:
     """Execute one allow-listed Git/GitHub command in the active worktree."""
-    if parameters.get("help") is True:
+    if parameters.get("--help") is True:
         return builtin_tool_help(tool)
     if tool == GIT_TOOL:
         command = _git_command(parameters)

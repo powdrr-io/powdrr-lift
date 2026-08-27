@@ -8914,6 +8914,27 @@ def test_passing_pytest_result_includes_empty_failure_packet() -> None:
     ) == {"status": "passed", "failures": []}
 
 
+def test_shell_tool_returns_raw_result_without_format_specific_enrichment(
+    tmp_path: Path,
+) -> None:
+    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+        run.return_value.returncode = 0
+        run.return_value.stdout = "10 passed\n"
+        run.return_value.stderr = ""
+
+        result = _execute_shell_tool(
+            {"command": ["uv", "run", "pytest", "-q"]},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+        )
+
+    assert result["command"] == "rtk uv run pytest -q"
+    assert result["returncode"] == 0
+    assert "test_failure_packet" not in result
+
+
 def test_execute_shell_tool_can_suppress_stdout_without_losing_result(
     tmp_path: Path,
 ) -> None:

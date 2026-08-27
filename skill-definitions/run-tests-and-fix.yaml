@@ -11,8 +11,10 @@ steps:
   details: >-
     The pre-step has already run the complete test suite. Do not run it again,
     inspect arbitrary files, or diagnose failures in this step. Preserve the
-    complete deterministic result for the diagnosis step. Choose next_step with a
-    concise statement that the test result is ready for the gate.
+    complete deterministic result for the diagnosis step. For pytest, the
+    result includes test_failure_packet with status and normalized failure
+    records. Do not reconstruct that packet from raw output. Choose next_step
+    with a concise statement that the test result and packet are ready.
   pre_step:
     action: invoke_tool
     template:
@@ -29,11 +31,13 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Inspect only the latest deterministic complete-test result. Do not run a
-    test or shell command, edit a file, read source, or discover symbols in
-    this step. Classify the result as exactly one of passing,
+    Inspect only the latest deterministic complete-test result and its
+    test_failure_packet. Do not run a test or shell command, edit a file, read
+    source, or discover symbols in this step. Use packet.status and
+    packet.failures as authoritative; do not parse or summarize raw pytest
+    output yourself. Classify the result as exactly one of passing,
     product_or_test_failure, or environment_or_infrastructure_failure. Record
-    every failing test node id and, for an environment failure, record the
+    every packet failure node_id and, for an environment failure, record the
     exact blocker. Do not call an unavailable dependency, executable,
     provider/network problem, or test-environment setup problem a product
     failure. Return next_step with exactly:
@@ -53,7 +57,13 @@ steps:
     required: true
   llm_type: high_reasoning
   details: >-
-    Use only the test_classification handoff and the latest test traceback.
+    Use only the test_classification handoff and the latest
+    test_failure_packet. If packet.status is passed or the classification is
+    an environment failure, make no discovery call and return next_step with
+    an empty failure_context. If packet.status is failed, use each packet
+    failure's source_files, traceback_file, and traceback_line first; do not
+    rediscover paths already present in the packet. Discover only missing
+    symbol structure needed to understand a product failure.
     If classification is passing or environment_or_infrastructure_failure,
     make no discovery call and return next_step with an empty failure_context.
     If classification is product_or_test_failure, discover only the source
@@ -92,8 +102,8 @@ steps:
   llm_type: high_reasoning
   details: >-
     Use only the test_classification and failure_context handoffs plus the
-    latest deterministic traceback. Do not run tests or shell commands, edit
-    files, or rediscover source. For a passing or environment failure, preserve
+    current deterministic test_failure_packet. Do not run tests or shell
+    commands, edit files, or rediscover source. For a passing or environment failure, preserve
     the classification and produce empty root_causes. For a product failure,
     explain each root cause using traceback evidence, list only exact files
     that require changes, and give one focused repair strategy per root cause.

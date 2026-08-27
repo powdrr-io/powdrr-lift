@@ -732,6 +732,9 @@ def test_run_tests_and_fix_has_bounded_diagnose_repair_loop() -> None:
     assert steps["rerun-all-tests"].gate is not None
     assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
     assert "Do not run a test" in (steps["classify-test-results"].details or "")
+    assert "test_failure_packet" in (steps["classify-test-results"].details or "")
+    assert "packet failure" in (steps["discover-failure-context"].details or "")
+    assert "Do not reconstruct that packet" in (steps["run-all-tests"].details or "")
     assert "If classification is passing or" in (
         steps["repair-test-failures"].details or ""
     )

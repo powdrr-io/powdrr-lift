@@ -54,6 +54,7 @@ from powdrr_lift.core.workflow_task_specification import (
 )
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
+from powdrr_lift.test_failure_packet import build_test_failure_packet
 from powdrr_lift.workflow_chat_agent import (
     ALL_LLM_TYPES,
     ALL_PROVIDERS,
@@ -8873,6 +8874,44 @@ def test_execute_shell_tool_verbose_prints_stdout(
         )
 
     assert "[verbose] Shell tool stdout:\ntool stdout" in stderr.getvalue()
+
+
+def test_pytest_result_includes_deterministic_failure_packet() -> None:
+    result = build_test_failure_packet(
+        command=["uv", "run", "pytest", "-q"],
+        returncode=1,
+        stdout=(
+            "FAILED tests/test_log_writer.py::test_json_format - TypeError: bad\n"
+            "E   TypeError: bad\n"
+            "E   src/log.py:12: in write\n"
+        ),
+        stderr="",
+        cwd="/repo",
+    )
+
+    assert result == {
+        "status": "failed",
+        "failures": [
+            {
+                "node_id": "tests/test_log_writer.py::test_json_format",
+                "exception": "TypeError",
+                "message": "bad",
+                "traceback_file": "src/log.py",
+                "traceback_line": 12,
+                "source_files": ["tests/test_log_writer.py", "src/log.py"],
+            }
+        ],
+    }
+
+
+def test_passing_pytest_result_includes_empty_failure_packet() -> None:
+    assert build_test_failure_packet(
+        command="uv run pytest -q",
+        returncode=0,
+        stdout="5 passed in 0.2s\n",
+        stderr="",
+        cwd="/repo",
+    ) == {"status": "passed", "failures": []}
 
 
 def test_execute_shell_tool_can_suppress_stdout_without_losing_result(

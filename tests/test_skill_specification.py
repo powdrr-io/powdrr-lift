@@ -181,6 +181,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 12),
                 ("execute-proposed-pr.yaml", 13),
                 ("start-implementing-feature.yaml", 7),
+                ("run-tests-and-fix.yaml", 1),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
                 ("start-implementing-feature.yaml", 18),
@@ -202,7 +203,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
-                ("run-tests-and-fix.yaml", 5),
+                ("run-tests-and-fix.yaml", 4),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -694,7 +695,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
     ]
 
 
-def test_run_tests_and_fix_has_bounded_diagnose_repair_loop() -> None:
+def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     skill = load_skill(
         Path(__file__).resolve().parents[1]
         / "skill-definitions"
@@ -704,37 +705,31 @@ def test_run_tests_and_fix_has_bounded_diagnose_repair_loop() -> None:
 
     assert [step.id for step in skill.steps] == [
         "run-all-tests",
-        "classify-test-results",
-        "discover-failure-context",
+        "enrich-test-results",
         "diagnose-test-results",
         "repair-test-failures",
         "rerun-all-tests",
     ]
-    assert steps["classify-test-results"].outputs[0].name == "test_classification"
-    assert steps["classify-test-results"].outputs[0].required_for_next_step
-    assert steps["discover-failure-context"].inputs[0].name == "test_classification"
-    assert steps["discover-failure-context"].outputs[0].name == "failure_context"
-    assert steps["discover-failure-context"].outputs[0].required_for_next_step
-    assert steps["diagnose-test-results"].inputs[0].name == "test_classification"
-    assert steps["diagnose-test-results"].inputs[1].name == "failure_context"
+    assert steps["run-all-tests"].pre_step is not None
+    assert steps["enrich-test-results"].pre_step is not None
+    assert steps["enrich-test-results"].pre_step.template == {
+        "tool": "enrich",
+        "format": "pytest",
+        "tool_output": {"source": "previous_tool_output"},
+    }
+    assert steps["enrich-test-results"].outputs[0].name == "test_result"
+    assert steps["enrich-test-results"].outputs[0].required_for_next_step
+    assert steps["diagnose-test-results"].inputs[0].name == "test_result"
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
     assert steps["repair-test-failures"].inputs[0].name == "test_diagnosis"
     assert steps["repair-test-failures"].outputs[0].name == "repair_evidence"
     assert steps["repair-test-failures"].outputs[0].required_for_next_step
-    assert [
-        invocation.tool
-        for invocation in steps["discover-failure-context"].tool_invocations
-    ] == ["basedpyright-symbol", "basedpyright-structure"]
-    assert [
-        invocation.tool for invocation in steps["repair-test-failures"].tool_invocations
-    ] == ["basedpyright-symbol", "basedpyright-structure"]
     assert steps["rerun-all-tests"].gate is not None
     assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
-    assert "Do not run a test" in (steps["classify-test-results"].details or "")
-    assert "test_failure_packet" in (steps["classify-test-results"].details or "")
-    assert "packet failure" in (steps["discover-failure-context"].details or "")
-    assert "Do not reconstruct that packet" in (steps["run-all-tests"].details or "")
+    assert "Do not run it again" in (steps["run-all-tests"].details or "")
+    assert "previous_tool_output" in (steps["enrich-test-results"].details or "")
+    assert "deterministic enrich" in (steps["diagnose-test-results"].details or "")
     assert "If classification is passing or" in (
         steps["repair-test-failures"].details or ""
     )

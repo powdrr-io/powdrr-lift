@@ -67,6 +67,7 @@ from powdrr_lift.core.validation_messages import (
 )
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.intrinsic_enrich import ENRICH_TOOL, execute_enrich_tool
 from powdrr_lift.intrinsic_git_gh import (
     GH_TOOL,
     GIT_TOOL,
@@ -77,10 +78,6 @@ from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
     record_pull_request_workflow,
-)
-from powdrr_lift.test_failure_packet import (
-    build_test_failure_packet,
-    is_pytest_command,
 )
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
@@ -3925,6 +3922,30 @@ def _resolve_pre_step_template(
     return value
 
 
+def _wire_previous_tool_output(
+    parameters: dict[str, Any],
+    execution_events: Sequence[Mapping[str, Any]],
+) -> None:
+    reference = parameters.get("tool_output")
+    if reference != {"source": "previous_tool_output"}:
+        return
+    previous = next(
+        (
+            event.get("result")
+            for event in reversed(execution_events)
+            if event.get("kind") == "deterministic_pre_step"
+            and isinstance(event.get("result"), Mapping)
+        ),
+        None,
+    )
+    if previous is None:
+        raise RuntimeError(
+            "enrich tool_output source previous_tool_output requires a prior "
+            "deterministic tool result."
+        )
+    parameters["tool_output"] = previous
+
+
 def _run_deterministic_pre_step(
     step: Any,
     *,
@@ -3967,7 +3988,11 @@ def _run_deterministic_pre_step(
         parameters.pop("tool", None)
         if tool in {GIT_TOOL, GH_TOOL}:
             parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
-        if tool == "fuzzy-match":
+        if tool == ENRICH_TOOL:
+            parameters.pop("tool", None)
+            _wire_previous_tool_output(parameters, execution_events)
+            result = execute_enrich_tool(parameters)
+        elif tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
                 parameters,
                 worktree_root=worktree_root,
@@ -4168,7 +4193,7 @@ def _build_step_execution_messages(
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
         }
-        | {_INTERNAL_TOOL, GIT_TOOL, GH_TOOL}
+        | {_INTERNAL_TOOL, GIT_TOOL, GH_TOOL, ENRICH_TOOL}
     )
     tool_descriptions = {
         "shell": (
@@ -4202,6 +4227,10 @@ def _build_step_execution_messages(
         BASEDPYRIGHT_SYMBOL_TOOL: "Find Python symbols by name across the worktree.",
         BASEDPYRIGHT_STRUCTURE_TOOL: (
             "Discover the classes, functions, methods, and variables in a Python file."
+        ),
+        ENRICH_TOOL: (
+            "Convert a deterministic tool output into structured data. "
+            "Use format pytest and pass the complete tool result as tool_output."
         ),
     }
     prompt_data: dict[str, Any] = {
@@ -5516,6 +5545,8 @@ def _handle_workflow_action_invoke_tool(
             worktree_root=state.worktree_root,
             path_cache=state.fuzzy_match_cache,
         )
+    elif action.tool == ENRICH_TOOL:
+        tool_result = execute_enrich_tool(action.parameters)
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL:
             _validate_internal_command(action.parameters.get("command"))
@@ -5552,7 +5583,7 @@ def _handle_workflow_action_invoke_tool(
     else:
         raise RuntimeError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
-            "internal, git, gh, fuzzy-match, basedpyright-symbol, and "
+            "internal, git, gh, enrich, fuzzy-match, basedpyright-symbol, and "
             "basedpyright-structure."
         )
     if (
@@ -7147,6 +7178,14 @@ def _parse_workflow_action_invoke_tool(
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
         )
+    if normalized_tool == ENRICH_TOOL:
+        return SkillChatAction(
+            kind="invoke_tool",
+            tool=normalized_tool,
+            parameters=dict(parameters),
+            decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
+        )
     if is_basedpyright_tool(normalized_tool):
         return SkillChatAction(
             kind="invoke_tool",
@@ -7555,14 +7594,6 @@ def _execute_shell_tool(
         "stderr": process.stderr,
         "no_op": original_returncode != 0 and process.returncode == 0,
     }
-    if is_pytest_command(validation_command):
-        result["test_failure_packet"] = build_test_failure_packet(
-            command=validation_command,
-            returncode=process.returncode,
-            stdout=process.stdout,
-            stderr=process.stderr,
-            cwd=str(resolved_cwd),
-        )
     if len(attempted_commands) > 1:
         result["attempted_commands"] = attempted_commands
     return result

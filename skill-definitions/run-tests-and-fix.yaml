@@ -2,19 +2,17 @@
 name: run-tests-and-fix
 when_to_use:
 - When implementation and generated tests are present and the complete test suite must pass.
-- When test failures require bounded edits followed by deterministic reruns.
+- When test failures require focused edits followed by deterministic reruns.
 steps:
 - id: run-all-tests
-  description: Run the complete test suite and preserve its deterministic result.
+  description: Run the complete test suite and preserve its raw tool result.
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
     The pre-step has already run the complete test suite. Do not run it again,
-    inspect arbitrary files, or diagnose failures in this step. Preserve the
-    complete deterministic result for the diagnosis step. For pytest, the
-    result includes test_failure_packet with status and normalized failure
-    records. Do not reconstruct that packet from raw output. Choose next_step
-    with a concise statement that the test result and packet are ready.
+    inspect files, or diagnose failures in this step. Preserve the exact shell
+    tool result so the following deterministic enrich step can consume it.
+    Return next_step with a concise statement that the test result is ready.
   pre_step:
     action: invoke_tool
     template:
@@ -26,90 +24,46 @@ steps:
       - dev
       - pytest
       - -q
-- id: classify-test-results
-  description: Classify the latest complete test result without editing files.
-  step_type: freeform
-  llm_type: high_reasoning
+- id: enrich-test-results
+  description: Convert the preceding test tool result into structured failure data.
+  step_type: invoke_tool
+  llm_type: simple_task
   details: >-
-    Inspect only the latest deterministic complete-test result and its
-    test_failure_packet. Do not run a test or shell command, edit a file, read
-    source, or discover symbols in this step. Use packet.status and
-    packet.failures as authoritative; do not parse or summarize raw pytest
-    output yourself. Classify the result as exactly one of passing,
-    product_or_test_failure, or environment_or_infrastructure_failure. Record
-    every packet failure node_id and, for an environment failure, record the
-    exact blocker. Do not call an unavailable dependency, executable,
-    provider/network problem, or test-environment setup problem a product
-    failure. Return next_step with exactly:
-    {"action":"next_step","outputs":{"test_classification":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"blocker":null}},"decisions_and_context":"Classified the deterministic test result."}
-    Use an empty failing_tests list for passing or environment failures.
-  tool_invocations:
+    The pre-step deterministically calls the intrinsic enrich tool. It receives
+    the exact result from run-all-tests through the previous_tool_output wiring
+    shown below. Do not run pytest, call enrich yourself, inspect files, or
+    reconstruct the result. Return next_step after confirming that the
+    structured result is ready for diagnosis. The enriched result is available
+    to the next step as the latest deterministic tool result, under output.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: enrich
+      format: pytest
+      tool_output:
+        source: previous_tool_output
   outputs:
-  - name: test_classification
-    type: any
-    required_for_next_step: true
-- id: discover-failure-context
-  description: Locate the source context named by a product or test failure.
-  step_type: freeform
-  inputs:
-  - name: test_classification
-    type: any
-    required: true
-  llm_type: high_reasoning
-  details: >-
-    Use only the test_classification handoff and the latest
-    test_failure_packet. If packet.status is passed or the classification is
-    an environment failure, make no discovery call and return next_step with
-    an empty failure_context. If packet.status is failed, use each packet
-    failure's source_files, traceback_file, and traceback_line first; do not
-    rediscover paths already present in the packet. Discover only missing
-    symbol structure needed to understand a product failure.
-    If classification is passing or environment_or_infrastructure_failure,
-    make no discovery call and return next_step with an empty failure_context.
-    If classification is product_or_test_failure, discover only the source
-    context needed for the named failures. For source that basedpyright can
-    analyze, call these tools exactly as JSON actions, replacing the example
-    values:
-    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"ExampleClass","limit":20},"decisions_and_context":"Locate the failing source symbol."}
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/package/module.py"},"decisions_and_context":"Inspect the identified source file."}
-    Do not put parameters in a shell command, do not use a filesystem glob,
-    and do not omit parameters.query or parameters.path. Use
-    read_document only for the smallest exact range after discovery, or for
-    non-source files. Return next_step with failure_context containing the
-    discovered repository-relative files, symbols, and relevant line ranges.
-    Do not edit files or run tests in this step.
-  tool_invocations:
-  - tool: basedpyright-symbol
-    command:
-    - query=<failing-source-symbol>
-  - tool: basedpyright-structure
-    command:
-    - path=<failing-source-file>
-  outputs:
-  - name: failure_context
+  - name: test_result
     type: any
     required_for_next_step: true
 - id: diagnose-test-results
-  description: Produce a traceback-supported diagnosis from the classified failure.
+  description: Produce a traceback-supported diagnosis from the structured test result.
   step_type: freeform
   inputs:
-  - name: test_classification
-    type: any
-    required: true
-  - name: failure_context
+  - name: test_result
     type: any
     required: true
   llm_type: high_reasoning
   details: >-
-    Use only the test_classification and failure_context handoffs plus the
-    current deterministic test_failure_packet. Do not run tests or shell
-    commands, edit files, or rediscover source. For a passing or environment failure, preserve
-    the classification and produce empty root_causes. For a product failure,
-    explain each root cause using traceback evidence, list only exact files
-    that require changes, and give one focused repair strategy per root cause.
-    Never weaken or delete tests to conceal a defect. Return next_step with
-    exactly:
-    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Produced a traceback-supported diagnosis from the classified failure and discovered context."}
+    Use the structured output from the deterministic enrich step as the
+    authoritative test result. Do not run tests or shell commands, call enrich,
+    or rediscover the failure by parsing raw output. If status is passed, or
+    the result identifies an environment failure, produce empty root_causes.
+    Otherwise explain every failure using its node_id, exception, message,
+    traceback_file, traceback_line, and source_files. List only exact files
+    requiring changes and give one focused repair strategy per root cause. Never
+    weaken or delete tests to conceal a defect. Return next_step with exactly:
+    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Produced a traceback-supported diagnosis from the deterministic enriched test result."}
   outputs:
   - name: test_diagnosis
     type: any
@@ -125,39 +79,21 @@ steps:
   details: >-
     Use only the test_diagnosis handoff. If classification is passing or
     environment_or_infrastructure_failure, make no edit and return the
-    no-change repair evidence shown below. Otherwise make
-    the smallest complete correction for every listed root cause, and edit only
-    files listed in test_diagnosis.root_causes[*].files_to_change. Use the edit action for source or test
-    changes and provide exact line ranges. Do not run tests in this step; the
-    deterministic rerun gate is authoritative. Do not change dependencies,
-    configuration, documentation, workflow files, or unrelated code. Never
-    weaken or delete a failing test to conceal a product defect. If the
+    no-change repair evidence shown below. Otherwise make the smallest complete
+    correction for every listed root cause, and edit only files listed in
+    root_causes[*].files_to_change. Use the edit action with exact line ranges.
+    Do not run tests in this step; the deterministic rerun gate is authoritative.
+    Never weaken or delete a failing test to conceal a product defect. If the
     diagnosis is incomplete, contradictory, or names no approved file, return
     complete with an explicit blocked explanation rather than guessing.
     Before advancing, verify that each diagnosed product root cause has a
     concrete edit and return next_step with exactly this shape:
-    {"action":"next_step","outputs":{"repair_evidence":{"status":"repaired","changed_files":["src/example.py"],"root_causes_addressed":["Explain which diagnosis item was fixed."],"repair_summary":"Describe the focused correction."}},"decisions_and_context":"Applied a focused repair for every diagnosed root cause; the rerun gate must verify it."}
+    {"action":"next_step","outputs":{"repair_evidence":{"status":"repaired","changed_files":["src/example.py"],"root_causes_addressed":["Explain which diagnosis item was fixed."],"repair_summary":"Describe the focused correction."}},"decisions_and_context":"Applied a focused repair; the deterministic rerun gate must verify it."}
     For a passing or environment diagnosis, return exactly:
-    {"action":"next_step","outputs":{"repair_evidence":{"status":"no_repair_needed","changed_files":[],"root_causes_addressed":[],"repair_summary":"The complete suite already passed."}},"decisions_and_context":"No files were changed because the deterministic test result passed."}
+    {"action":"next_step","outputs":{"repair_evidence":{"status":"no_repair_needed","changed_files":[],"root_causes_addressed":[],"repair_summary":"The complete suite already passed or cannot run because of the environment."}},"decisions_and_context":"No files were changed because no product repair was required."}
     The changed_files list must contain only files actually changed by this
     step. A narrative claim without an edit is not repair evidence. If the
-    correct fix requires multiple files, edit all of them in this step and
-    list all of them. For source files whose exact edit location is not already
-    supplied by the diagnosis, use basedpyright-symbol or basedpyright-structure
-    before editing; do not browse the file with read_document. The exact calls
-    are, for example:
-    {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"ExampleClass"},"decisions_and_context":"Resolve the diagnosed source symbol before editing."}
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/package/models.py"},"decisions_and_context":"Confirm the target symbol and source structure."}
-    Replace the example values with the diagnosed symbol and repository-relative
-    source path. Do not put these parameters in a shell command. Do not invoke
-    run-tests-and-fix recursively.
-  tool_invocations:
-  - tool: basedpyright-symbol
-    command:
-    - query=<diagnosed-python-symbol>
-  - tool: basedpyright-structure
-    command:
-    - path=<python-file-to-edit>
+    correct fix requires multiple files, edit all of them and list all of them.
   outputs:
   - name: repair_evidence
     type: any
@@ -169,8 +105,8 @@ steps:
   details: >-
     This pre-step is the only authoritative proof that the repair made
     progress. If it passes, the skill is complete. If it fails, return to
-    diagnose-test-results with the new result. Never advance based on the
-    repair_evidence alone. After a correction, every test is rerun, including
+    diagnose-test-results with the new deterministic result. Never advance based
+    on repair_evidence alone. After a correction, every test is rerun, including
     tests that passed before. An empty or unchanged repair is not progress.
   pre_step:
     action: invoke_tool
@@ -189,9 +125,8 @@ steps:
       equals: 0
     goto_step: diagnose-test-results
     retry_context: >-
-      The repaired complete suite still failed. Use only the new deterministic
-      result. Compare it with the prior diagnosis, identify newly remaining or
-      regressed failures, and choose a materially different focused repair.
-      Do not repeat the previous edit unchanged. If the same failure fingerprint
-      remains, inspect the exact traceback and revise the root-cause diagnosis
-      before editing.
+      The repaired complete suite still failed. Use the new deterministic
+      enriched result, identify remaining or regressed failures, and choose a
+      materially different focused repair. Do not repeat the previous edit
+      unchanged. If the same fingerprint remains, revise the root-cause
+      diagnosis before editing.

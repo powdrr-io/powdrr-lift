@@ -26,7 +26,7 @@ def execute_basedpyright_tool(
     *,
     worktree_root: Path,
 ) -> dict[str, Any]:
-    if parameters.get("--help") is True:
+    if parameters.get("help") is True:
         return builtin_tool_help(tool)
     if tool == BASEDPYRIGHT_SYMBOL_TOOL:
         return _find_symbols(parameters, worktree_root=worktree_root)

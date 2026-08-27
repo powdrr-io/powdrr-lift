@@ -3973,7 +3973,7 @@ def _run_deterministic_pre_step(
                 worktree_root=worktree_root,
             )
         elif tool in {"shell", _INTERNAL_TOOL}:
-            if tool == _INTERNAL_TOOL and parameters.get("--help") is not True:
+            if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
                 _validate_internal_command(parameters.get("command"))
             result = _execute_shell_tool(
                 {**parameters, "_tool_name": tool},
@@ -4174,18 +4174,20 @@ def _build_step_execution_messages(
         "shell": (
             "Execute a shell command in the current worktree. Commands run with "
             "the worktree as cwd; any explicit cwd must remain inside it. Set "
-            'parameters["--help"]=true for detailed usage and examples.'
+            "parameters.help=true for the tool's conventional --help guidance."
         ),
         _INTERNAL_TOOL: (
             "Execute a powdrr-lift CLI command. This tool is always available, "
             "but its command must invoke only the powdrr-lift binary and runs "
-            'with the current worktree as cwd. Set parameters["--help"]=true for '
+            "with the current worktree as cwd. Set parameters.help=true for the "
+            "tool's conventional --help guidance and detailed examples."
             "detailed usage and examples."
         ),
         GIT_TOOL: (
             "Intrinsic Git tool; supports status, add, and move only. Example: "
             '{"action":"invoke_tool","tool":"git","parameters":'
-            '{"operation":"status"}}. Set parameters["--help"]=true for detailed '
+            '{"operation":"status"}}. Set parameters.help=true for the tool\'s '
+            "conventional --help guidance and detailed examples."
             "usage and examples."
         ),
         GH_TOOL: (
@@ -4198,19 +4200,23 @@ def _build_step_execution_messages(
             '"repository":"owner/repo","pr_reference":"394",'
             '"body":"Finding","commit_id":"sha",'
             '"path":"docs/design.yaml","line":12,"side":"RIGHT"}}.'
-            ' Set parameters["--help"]=true for detailed usage and examples.'
+            " Set parameters.help=true for the tool's conventional --help "
+            "guidance and detailed examples."
         ),
         "fuzzy-match": (
             "Search worktree paths with find-like filters and fuzzy name matching. "
-            'Set parameters["--help"]=true for detailed usage and examples.'
+            "Set parameters.help=true for the tool's conventional --help "
+            "guidance and detailed examples."
         ),
         BASEDPYRIGHT_SYMBOL_TOOL: (
             "Find Python symbols by name across the worktree. Set "
-            'parameters["--help"]=true for detailed usage and examples.'
+            "parameters.help=true for the tool's conventional --help guidance "
+            "and detailed examples."
         ),
         BASEDPYRIGHT_STRUCTURE_TOOL: (
             "Discover the classes, functions, methods, and variables in a Python "
-            'file. Set parameters["--help"]=true for detailed usage and examples.'
+            "file. Set parameters.help=true for the tool's conventional --help "
+            "guidance and detailed examples."
         ),
     }
     prompt_data: dict[str, Any] = {
@@ -4404,7 +4410,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "tool_invocations. Shell and internal require parameters.command as a "
         "non-empty string or string array. The intrinsic git and gh tools use "
         "parameters.operation and never accept a shell command array. "
-        'Every builtin tool accepts parameters["--help"] = true without its '
+        "Every builtin tool accepts parameters.help = true without its "
         "normal command arguments; use it to discover that tool's parameters, "
         "examples, and when to use it. A help response is informational and does "
         "not satisfy a required successful tool invocation. "
@@ -4531,7 +4537,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "fuzzy-match searches, or basedpyright "
         "symbol and structure queries.\n"
         "If unsure how to use any listed builtin tool, first invoke it with "
-        'parameters {"--help":true} and use the returned guidance.\n'
+        'parameters {"help":true} (the tool\'s conventional --help option) '
+        "and use the returned guidance.\n"
         "Use goto_step only with an id declared on a step in the current skill. "
         "The target step becomes current and receives accumulated context; the "
         "jump must identify the remaining item or changed condition requiring "
@@ -5458,14 +5465,11 @@ def _handle_workflow_action_invoke_tool(
             path_cache=state.fuzzy_match_cache,
         )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
-        if (
-            action.tool == _INTERNAL_TOOL
-            and action.parameters.get("--help") is not True
-        ):
+        if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
             _validate_internal_command(action.parameters.get("command"))
         command_items = (
             []
-            if action.parameters.get("--help") is True
+            if action.parameters.get("help") is True
             else _command_items_for_validation(action.parameters.get("command"))
         )
         tool_result = _execute_shell_tool(
@@ -6450,7 +6454,7 @@ def _validate_workflow_step_transition(
         if isinstance(result, Mapping) and result.get("returncode") not in (None, 0):
             return False
         parameters = event.get("parameters")
-        if isinstance(parameters, Mapping) and parameters.get("--help") is True:
+        if isinstance(parameters, Mapping) and parameters.get("help") is True:
             return False
         if not isinstance(parameters, Mapping) or parameters.get("command") is None:
             return True
@@ -6486,7 +6490,7 @@ def _validate_workflow_action_for_step_unwrapped(
     """Validate a tool action while preserving the original error wording."""
     if (
         action.kind == "invoke_tool"
-        and action.parameters.get("--help") is True
+        and action.parameters.get("help") is True
         and action.tool in BUILTIN_TOOL_NAMES
     ):
         return
@@ -6651,7 +6655,7 @@ def _execute_fuzzy_match_tool(
     worktree_root: Path,
     path_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] | None = None,
 ) -> dict[str, Any]:
-    if parameters.get("--help") is True:
+    if parameters.get("help") is True:
         return builtin_tool_help("fuzzy-match")
     command = parameters.get("command")
     if not isinstance(command, (str, list, tuple)):
@@ -7316,7 +7320,7 @@ def _execute_shell_tool(
     announce: bool = True,
     print_stdout: bool = True,
 ) -> dict[str, Any]:
-    if parameters.get("--help") is True:
+    if parameters.get("help") is True:
         return builtin_tool_help(str(parameters.get("_tool_name", "shell")))
     command = parameters.get("command")
     validation_command: str | Sequence[str]

@@ -1707,7 +1707,15 @@ def _validate_gather_context_pre_step(
                         ),
                     )
                 )
-            if template.get("tool_output") != {"source": "previous_tool_output"}:
+            tool_output = template.get("tool_output")
+            valid_tool_output = tool_output == {"source": "previous_tool_output"}
+            if isinstance(tool_output, Mapping):
+                valid_tool_output = (
+                    tool_output.get("source") == "handoff"
+                    and isinstance(tool_output.get("name"), str)
+                    and bool(tool_output.get("name"))
+                )
+            if not valid_tool_output:
                 issues.append(
                     SkillValidationIssue(
                         code="invalid_enrich_input",
@@ -1854,7 +1862,15 @@ def _parse_enrich_invocation(raw_tool_invocation: object) -> SkillToolInvocation
         raise ValueError("Enrich invocations must use tool enrich.")
     if raw_tool_invocation.get("format") != "pytest":
         raise ValueError("Enrich invocations currently require format pytest.")
-    if raw_tool_invocation.get("tool_output") != {"source": "previous_tool_output"}:
+    tool_output = raw_tool_invocation.get("tool_output")
+    valid_tool_output = tool_output == {"source": "previous_tool_output"}
+    if isinstance(tool_output, Mapping):
+        valid_tool_output = (
+            tool_output.get("source") == "handoff"
+            and isinstance(tool_output.get("name"), str)
+            and bool(tool_output.get("name"))
+        )
+    if not valid_tool_output:
         raise ValueError("Enrich invocations must consume previous_tool_output.")
     return SkillToolInvocation(tool="enrich", command=())
 

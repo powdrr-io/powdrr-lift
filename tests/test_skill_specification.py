@@ -711,15 +711,18 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
         "rerun-all-tests",
     ]
     assert steps["run-all-tests"].pre_step is not None
+    assert steps["run-all-tests"].outputs[0].name == "test_tool_result"
+    assert steps["run-all-tests"].outputs[0].required_for_next_step
     assert steps["enrich-test-results"].pre_step is not None
     assert steps["enrich-test-results"].pre_step.template == {
         "tool": "enrich",
         "format": "pytest",
-        "tool_output": {"source": "previous_tool_output"},
+        "tool_output": {"source": "handoff", "name": "test_tool_result"},
     }
-    assert steps["enrich-test-results"].outputs[0].name == "test_result"
+    assert steps["enrich-test-results"].inputs[0].name == "test_tool_result"
+    assert steps["enrich-test-results"].outputs[0].name == "enriched_test_result"
     assert steps["enrich-test-results"].outputs[0].required_for_next_step
-    assert steps["diagnose-test-results"].inputs[0].name == "test_result"
+    assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
     assert steps["repair-test-failures"].inputs[0].name == "test_diagnosis"

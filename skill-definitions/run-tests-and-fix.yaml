@@ -13,6 +13,10 @@ steps:
     inspect files, or diagnose failures in this step. Preserve the exact shell
     tool result so the following deterministic enrich step can consume it.
     Return next_step with a concise statement that the test result is ready.
+  outputs:
+  - name: test_tool_result
+    type: any
+    required_for_next_step: true
   pre_step:
     action: invoke_tool
     template:
@@ -27,6 +31,10 @@ steps:
 - id: enrich-test-results
   description: Convert the preceding test tool result into structured failure data.
   step_type: invoke_tool
+  inputs:
+  - name: test_tool_result
+    type: any
+    required: true
   llm_type: simple_task
   details: >-
     The pre-step deterministically calls the intrinsic enrich tool. It receives
@@ -41,16 +49,17 @@ steps:
       tool: enrich
       format: pytest
       tool_output:
-        source: previous_tool_output
+        source: handoff
+        name: test_tool_result
   outputs:
-  - name: test_result
+  - name: enriched_test_result
     type: any
     required_for_next_step: true
 - id: diagnose-test-results
   description: Produce a traceback-supported diagnosis from the structured test result.
   step_type: freeform
   inputs:
-  - name: test_result
+  - name: enriched_test_result
     type: any
     required: true
   llm_type: high_reasoning

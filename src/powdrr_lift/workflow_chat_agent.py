@@ -3925,8 +3925,18 @@ def _resolve_pre_step_template(
 def _wire_previous_tool_output(
     parameters: dict[str, Any],
     execution_events: Sequence[Mapping[str, Any]],
+    handoff_records: Mapping[str, Mapping[str, Any]],
 ) -> None:
     reference = parameters.get("tool_output")
+    if isinstance(reference, Mapping) and reference.get("source") == "handoff":
+        name = reference.get("name")
+        record = handoff_records.get(name) if isinstance(name, str) else None
+        if record is None or "value" not in record:
+            raise RuntimeError(
+                "enrich tool_output handoff source requires a prior named output."
+            )
+        parameters["tool_output"] = record["value"]
+        return
     if reference != {"source": "previous_tool_output"}:
         return
     previous = next(
@@ -3990,7 +4000,7 @@ def _run_deterministic_pre_step(
             parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
         if tool == ENRICH_TOOL:
             parameters.pop("tool", None)
-            _wire_previous_tool_output(parameters, execution_events)
+            _wire_previous_tool_output(parameters, execution_events, handoff_records)
             result = execute_enrich_tool(parameters)
         elif tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
@@ -4033,6 +4043,18 @@ def _run_deterministic_pre_step(
             "step_index": step_index,
         }
         execution_events.append(event)
+        if isinstance(handoff_records, dict):
+            for output in step.outputs:
+                handoff_records[output.name] = {
+                    "name": output.name,
+                    "type": output.type,
+                    "value": result,
+                    "produced_by": {
+                        "step_index": step_index,
+                        "action": "deterministic_pre_step",
+                    },
+                    "scope": output.scope,
+                }
         execution_context.append(
             "Deterministic invoke_tool result:\n"
             + json.dumps(result, ensure_ascii=False)
@@ -4077,6 +4099,19 @@ def _run_deterministic_pre_step(
         "step_index": step_index,
     }
     execution_events.append(event)
+    if isinstance(handoff_records, dict):
+        for output in step.outputs:
+            if output.required_for_next_step:
+                handoff_records[output.name] = {
+                    "name": output.name,
+                    "type": output.type,
+                    "value": result,
+                    "produced_by": {
+                        "step_index": step_index,
+                        "action": "deterministic_pre_step",
+                    },
+                    "scope": output.scope,
+                }
     execution_context.append(
         "Deterministic pre-step gather_context result:\n"
         + json.dumps(result, ensure_ascii=False)

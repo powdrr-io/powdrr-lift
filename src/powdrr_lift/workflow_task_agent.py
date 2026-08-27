@@ -700,6 +700,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         stderr=self.stderr,
                         max_timeout_retries=self.config.max_timeout_retries,
                         timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                        verbose=self.config.verbose,
                         context=action.context,
                         clean=action.clean,
                         error_log_root=self.error_log_root,
@@ -2625,6 +2626,7 @@ def _run_skill_for_agent(
     stderr: TextIO,
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
+    verbose: bool = False,
     context: tuple[str, ...] = (),
     clean: bool = False,
     error_log_root: Path | None = None,
@@ -2703,7 +2705,7 @@ def _run_skill_for_agent(
                 workflow_context=None,
                 stdout=stdout,
                 stderr=stderr,
-                verbose=False,
+                verbose=verbose,
             )
             target_index = step_index + 1
             if not passed:
@@ -2744,7 +2746,7 @@ def _run_skill_for_agent(
                 workflow_context=None,
                 stdout=stdout,
                 stderr=stderr,
-                verbose=False,
+                verbose=verbose,
             )
         messages = _build_step_execution_messages(
             selected_skill=current_skill,
@@ -2989,7 +2991,7 @@ def _run_skill_for_agent(
                     worktree_root=repo_root,
                     stdout=stdout,
                     stderr=stderr,
-                    verbose=False,
+                    verbose=verbose,
                 )
             elif action.tool == "fuzzy-match":
                 result = _execute_fuzzy_match_tool(

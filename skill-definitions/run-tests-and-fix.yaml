@@ -2,19 +2,13 @@
 name: run-tests-and-fix
 when_to_use:
 - When implementation and generated tests are present and the complete test suite must pass.
-- When test failures require focused edits followed by deterministic reruns.
+- When test failures require a structured repair followed by deterministic reruns.
 steps:
 - id: run-all-tests
   description: Run the complete test suite and preserve its raw tool result.
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The pre-step has already run the complete test suite. Do not run it again,
-    inspect files, or diagnose failures in this step. Preserve the exact shell
-    tool result. The runner stores that result as the required output named
-    test_tool_result; the following enrich-test-results step consumes that exact
-    named output. Return next_step with a concise statement that test_tool_result
-    is ready.
+  details: The deterministic pre-step has already run pytest. Return next_step; do not run it again.
   outputs:
   - name: test_tool_result
     type: any
@@ -23,43 +17,28 @@ steps:
     action: invoke_tool
     template:
       tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
+      command: [uv, run, --extra, dev, pytest, -q]
 - id: enrich-test-results
-  description: Convert the preceding test tool result into structured failure data.
+  description: Convert the raw test result into structured failure data.
   step_type: invoke_tool
   inputs:
   - name: test_tool_result
     type: any
     required: true
   llm_type: simple_task
-  details: >-
-    The pre-step deterministically calls the intrinsic enrich tool. Its
-    tool_output is wired to the required input named test_tool_result, which is
-    the exact raw result published by run-all-tests. Do not run pytest, call
-    enrich yourself, inspect files, or reconstruct the result. The runner stores
-    the structured result as the required output named enriched_test_result.
-    Return next_step after confirming that enriched_test_result is ready for
-    diagnosis.
+  details: The deterministic pre-step has already called enrich with the exact test_tool_result and stored enriched_test_result. Return next_step; do not call enrich again.
   pre_step:
     action: invoke_tool
     template:
       tool: enrich
       format: pytest
-      tool_output:
-        source: handoff
-        name: test_tool_result
+      tool_output: {source: handoff, name: test_tool_result}
   outputs:
   - name: enriched_test_result
     type: any
     required_for_next_step: true
 - id: diagnose-test-results
-  description: Produce a traceback-supported diagnosis from the structured test result.
+  description: Produce a traceback-supported diagnosis from structured test results.
   step_type: freeform
   inputs:
   - name: enriched_test_result
@@ -67,22 +46,17 @@ steps:
     required: true
   llm_type: high_reasoning
   details: >-
-    Consume the required input named enriched_test_result, which is the
-    structured output from the deterministic enrich step and the authoritative
-    test result. Do not run tests or shell commands, call enrich,
-    or rediscover the failure by parsing raw output. If status is passed, or
-    the result identifies an environment failure, produce empty root_causes.
-    Otherwise explain every failure using its node_id, exception, message,
-    traceback_file, traceback_line, and source_files. List only exact files
-    requiring changes and give one focused repair strategy per root cause. Never
-    weaken or delete tests to conceal a defect. Return next_step with exactly:
-    {"action":"next_step","outputs":{"test_diagnosis":{"classification":"product_or_test_failure","failing_tests":["tests/test_example.py::test_case"],"root_causes":[{"cause":"Explain the traceback-supported cause.","files_to_change":["src/example.py"],"repair_strategy":"Make one focused correction."}]}},"decisions_and_context":"Produced a traceback-supported diagnosis from the deterministic enriched test result."}
+    Consume only enriched_test_result. Identify every failing test and its exact
+    root cause. List only approved source or test files that require changes.
+    Return next_step with test_diagnosis containing classification, failing_tests,
+    and root_causes; each root cause must contain cause, files_to_change, and
+    repair_strategy. Do not edit files in this step and do not run commands.
   outputs:
   - name: test_diagnosis
     type: any
     required_for_next_step: true
-- id: repair-test-failures
-  description: Apply the diagnosed focused repair and record evidence.
+- id: produce-repair-edit
+  description: Produce one deferred edit for all diagnosed failures.
   step_type: freeform
   inputs:
   - name: test_diagnosis
@@ -90,63 +64,118 @@ steps:
     required: true
   llm_type: standard_reasoning
   details: >-
-    Use only the test_diagnosis handoff. If classification is passing or
-    environment_or_infrastructure_failure, make no edit and return the
-    no-change repair evidence shown below. Otherwise make the smallest complete
-    correction for every listed root cause, and edit only files listed in
-    root_causes[*].files_to_change. Use the edit action with exact line ranges.
-    The required shape for one source-file replacement is exactly:
-    {"action":"edit","file_path":"src/example.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"corrected implementation"}],"decisions_and_context":"Applied the diagnosed correction."}
-    For multiple files, use one action with file_edits:
-    {"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"corrected implementation"}]},{"file_path":"tests/test_example.py","edits":[{"kind":"replace","start_line":4,"end_line":4,"text":"updated test"}]}],"decisions_and_context":"Applied the focused correction across the approved files."}
-    Each edit kind must be the string add, remove, or replace. Never use
-    line_number or content in an edit; those names belong to read-document
-    output, not edit input. Never put an edit object in kind.
-    Do not run tests in this step; the deterministic rerun gate is authoritative.
-    Never weaken or delete a failing test to conceal a product defect. If the
-    diagnosis is incomplete, contradictory, or names no approved file, return
-    complete with an explicit blocked explanation rather than guessing.
-    Before advancing, verify that each diagnosed product root cause has a
-    concrete edit and return next_step with exactly this shape:
-    {"action":"next_step","outputs":{"repair_evidence":{"status":"repaired","changed_files":["src/example.py"],"root_causes_addressed":["Explain which diagnosis item was fixed."],"repair_summary":"Describe the focused correction."}},"decisions_and_context":"Applied a focused repair; the deterministic rerun gate must verify it."}
-    For a passing or environment diagnosis, return exactly:
-    {"action":"next_step","outputs":{"repair_evidence":{"status":"no_repair_needed","changed_files":[],"root_causes_addressed":[],"repair_summary":"The complete suite already passed or cannot run because of the environment."}},"decisions_and_context":"No files were changed because no product repair was required."}
-    The changed_files list must contain only files actually changed by this
-    step. A narrative claim without an edit is not repair evidence. If the
-    correct fix requires multiple files, edit all of them and list all of them.
+    Use only test_diagnosis. Produce one complete deferred edit in the required
+    output named repair_edit; do not apply it yet. Before composing it, use
+    read_document for every file in root_causes[*].files_to_change and derive
+    exact ranges from the returned numbered lines. The edit must be a complete
+    canonical action object, never a partial edit or prose. Use this exact shape:
+    {"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}
+    Every inner kind is the string add, remove, or replace. Never use line_number,
+    content, or an object in kind. Include every required file in one file_edits
+    array. Do not guess line 1, use traceback line numbers as edit ranges, or
+    claim the repair is applied. Return next_step with exactly:
+    {"action":"next_step","outputs":{"repair_edit":{"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}},"decisions_and_context":"Produced one deferred edit for validation."}
+    If no repair is needed, set repair_edit to null and explain why.
   outputs:
-  - name: repair_evidence
+  - name: repair_edit
+    type: any
+    required_for_next_step: true
+- id: validate-repair-edit
+  description: Validate the deferred edit without changing files.
+  step_type: invoke_tool
+  inputs:
+  - name: repair_edit
+    type: any
+    required: true
+  llm_type: simple_task
+  details: The deterministic validator checks the complete repair_edit output. Do not edit or apply files here.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: validate_edit
+      edit: <repair_edit>
+  outputs:
+  - name: edit_validation
+    type: any
+    required_for_next_step: true
+- id: repair-invalid-edit
+  description: Correct the deferred edit using deterministic validation feedback.
+  step_type: freeform
+  inputs:
+  - name: repair_edit
+    type: any
+    required: true
+  - name: edit_validation
+    type: any
+    required: true
+  llm_type: standard_reasoning
+  details: >-
+    Use the repair_edit and edit_validation handoffs. If edit_validation has
+    returncode 0, return the exact same repair_edit unchanged. If it failed,
+    correct only the reported validation issue and return next_step with a new
+    repair_edit. Re-read any target file needed to determine exact in-bounds
+    lines. The output must remain one complete canonical edit action object;
+    never use line_number or content, and never apply files in this step.
+    Return next_step with outputs.repair_edit containing the full corrected
+    object, not a prose description.
+  outputs:
+  - name: repair_edit
+    type: any
+    required_for_next_step: true
+- id: validate-repair-edit-gate
+  description: Require the corrected deferred edit to pass validation.
+  step_type: gate
+  inputs:
+  - name: repair_edit
+    type: any
+    required: true
+  llm_type: simple_task
+  details: The deterministic validator is authoritative; do not apply files in this gate.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: validate_edit
+      edit: <repair_edit>
+  gate:
+    outcome: {path: returncode, equals: 0}
+    goto_step: repair-invalid-edit
+    retry_context: >-
+      The corrected repair_edit is still invalid. Use the new validation result,
+      re-read every target file, and return a materially corrected canonical edit.
+      Do not repeat the invalid output or apply any edit until validation passes.
+- id: apply-repair-edit
+  description: Apply the validated deferred edit.
+  step_type: invoke_tool
+  inputs:
+  - name: repair_edit
+    type: any
+    required: true
+  llm_type: simple_task
+  details: The deterministic pre-step applies the already validated repair_edit. Return next_step; do not edit manually or run tests here.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: apply_edit
+      edit: <repair_edit>
+  outputs:
+  - name: applied_edit
     type: any
     required_for_next_step: true
 - id: rerun-all-tests
-  description: Rerun the complete suite after the focused repair.
+  description: Rerun the complete suite after applying the repair.
   step_type: gate
+  inputs:
+  - name: applied_edit
+    type: any
+    required: true
   llm_type: simple_task
-  details: >-
-    This pre-step is the only authoritative proof that the repair made
-    progress. If it passes, the skill is complete. If it fails, return to
-    diagnose-test-results with the new deterministic result. Never advance based
-    on repair_evidence alone. After a correction, every test is rerun, including
-    tests that passed before. An empty or unchanged repair is not progress.
+  details: The deterministic rerun is authoritative. If it passes, complete the skill; otherwise return to diagnose-test-results with the new result.
   pre_step:
     action: invoke_tool
     template:
       tool: shell
-      command:
-      - uv
-      - run
-      - --extra
-      - dev
-      - pytest
-      - -q
+      command: [uv, run, --extra, dev, pytest, -q]
   gate:
-    outcome:
-      path: returncode
-      equals: 0
+    outcome: {path: returncode, equals: 0}
     goto_step: diagnose-test-results
-    retry_context: >-
-      The repaired complete suite still failed. Use the new deterministic
-      enriched result, identify remaining or regressed failures, and choose a
-      materially different focused repair. Do not repeat the previous edit
-      unchanged. If the same fingerprint remains, revise the root-cause
-      diagnosis before editing.
+    retry_context: The repaired suite still fails; diagnose the new result and produce a different deferred edit.

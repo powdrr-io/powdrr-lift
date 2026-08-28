@@ -15,7 +15,19 @@ from powdrr_lift.core.validation_messages import (
 )
 
 SUPPORTED_SKILL_TOOL_TYPES = (
-    frozenset({"shell", "internal", "git", "gh", "fuzzy-match", "enrich", "ref"})
+    frozenset(
+        {
+            "shell",
+            "internal",
+            "git",
+            "gh",
+            "fuzzy-match",
+            "enrich",
+            "validate_edit",
+            "apply_edit",
+            "ref",
+        }
+    )
     | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
@@ -1494,6 +1506,8 @@ def _parse_pre_step(value: object) -> SkillStepPreStep | None:
     if action == "invoke_tool":
         if template.get("tool") == "enrich":
             _parse_enrich_invocation(template)
+        elif template.get("tool") in {"validate_edit", "apply_edit"}:
+            _parse_deferred_edit_invocation(template)
         else:
             _parse_tool_invocation(template)
         return SkillStepPreStep(action=action, template=dict(template))
@@ -1678,6 +1692,8 @@ def _validate_gather_context_pre_step(
         allowed_keys = {"tool", "command", "cwd", "env"}
         if template.get("tool") == "enrich":
             allowed_keys = {"tool", "format", "tool_output"}
+        elif template.get("tool") in {"validate_edit", "apply_edit"}:
+            allowed_keys = {"tool", "edit"}
         _validate_unknown_keys(
             template,
             allowed_keys,
@@ -1725,6 +1741,21 @@ def _validate_gather_context_pre_step(
                         ),
                         path=_child_path(
                             _child_path(pre_step_path, "template"), "tool_output"
+                        ),
+                    )
+                )
+            return
+        if tool in {"validate_edit", "apply_edit"}:
+            if not isinstance(template.get("edit"), (str, Mapping)):
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_deferred_edit_input",
+                        message=(
+                            "Deferred edit pre-steps must include an edit object "
+                            "or a complete-value placeholder."
+                        ),
+                        path=_child_path(
+                            _child_path(pre_step_path, "template"), "edit"
                         ),
                     )
                 )
@@ -1873,6 +1904,17 @@ def _parse_enrich_invocation(raw_tool_invocation: object) -> SkillToolInvocation
     if not valid_tool_output:
         raise ValueError("Enrich invocations must consume previous_tool_output.")
     return SkillToolInvocation(tool="enrich", command=())
+
+
+def _parse_deferred_edit_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
+    if not isinstance(raw_tool_invocation, Mapping):
+        raise ValueError("Deferred edit invocations must be objects.")
+    tool = raw_tool_invocation.get("tool")
+    if tool not in {"validate_edit", "apply_edit"}:
+        raise ValueError("Deferred edit invocation has an unsupported tool.")
+    if "edit" not in raw_tool_invocation:
+        raise ValueError("Deferred edit invocations must include edit.")
+    return SkillToolInvocation(tool=cast(str, tool), command=())
 
 
 def _optional_string(value: object) -> str | None:

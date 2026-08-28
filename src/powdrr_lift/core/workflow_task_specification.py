@@ -12,6 +12,7 @@ import yaml
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
+    SkillStepAction,
     SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
@@ -86,6 +87,7 @@ class WorkflowTask:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
+    actions: tuple[SkillStepAction, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -129,6 +131,8 @@ class WorkflowTask:
         }
         if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
+        if self.actions:
+            step_data["actions"] = [action.to_data() for action in self.actions]
         if self.pre_step is not None:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -384,6 +388,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
+        actions=step.actions,
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,
@@ -587,6 +592,7 @@ def build_workflow_task_validation_report(
             "uses_skills",
             "tool_invocations",
             "prompt_catalogs",
+            "actions",
             "pre_step",
             "gate",
             "workflow_template",

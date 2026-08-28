@@ -4375,10 +4375,10 @@ def _build_step_execution_messages(
             }
             for entry in catalog
         ]
-    if _step_needs_prompt_catalog(current_step, "actions"):
-        prompt_data["available_actions"] = list(
-            getattr(current_step, "allowed_actions", ()) or ()
-        )
+    prompt_data["available_actions"] = [
+        {"name": name, "instructions": instructions}
+        for name, instructions in _step_actions(current_step)
+    ]
     if validation_gate is not None:
         prompt_data["validation_gate"] = dict(validation_gate)
     pre_step_event = _latest_deterministic_pre_step(
@@ -4707,37 +4707,17 @@ def _modular_action_system_prompt(
     """Build a compact action prompt with explicitly selected guidance sections."""
     include_context = _step_needs_prompt_catalog(current_step, "context_types")
     include_skills = _step_needs_prompt_catalog(current_step, "skills")
-    configured_actions = tuple(getattr(current_step, "allowed_actions", ()) or ())
-    action_restriction = (
-        " For this step, the only allowed actions are: "
-        + ", ".join(configured_actions)
-        + ". Any other action is invalid and must not be attempted."
-        if configured_actions and _step_needs_prompt_catalog(current_step, "actions")
-        else ""
+    action_lines = "\n".join(
+        f"- {name}: {instructions}"
+        for name, instructions in _step_actions(current_step)
     )
     prompt = (
         "Task: execute the supplied details using the handoff inputs, latest action "
-        "result, and available actions. Choose one "
-        "action that makes progress without asking for information already present.\n"
-        "Available actions (choose exactly one): gather_context discovers checked-in "
-        "specifications; prompt_user asks one necessary human question; edit applies "
-        "line-based edits to files, including YAML as a fallback; yaml_edit applies "
-        "structural YAML "
-        "operations; file_management moves, renames, or deletes one relative file; "
-        "invoke_skill runs a listed nested skill; invoke_tool runs one "
-        "declared command; read_document reads a bounded file range; list_files "
-        "discovers exact file paths; goto_step "
-        "repeats a declared step; next_step advances after completion; complete ends "
-        "the skill. "
-        "For edit, the top-level action is a string and every inner edit kind is "
-        'also a string: {"action":"edit","file_path":"src/example.py",'
-        '"edits":[{"kind":"replace","start_line":1,"end_line":1,'
-        '"text":"replacement"}]}. The inner kind must be exactly "add", '
-        '"remove", or "replace"; do not use an object in kind and do not use '
-        '"action" or "kind" as a nested action object. For multiple files, use '
-        '"file_edits":[{"file_path":"src/example.py","edits":[...]}]. '
-        "The current-step contract below further restricts these options."
-        + action_restriction
+        "result, and available actions. Choose exactly one action.\n"
+        "Available actions for this step (and only this step; choose exactly one):\n"
+        + action_lines
+        + "\nThe current-step contract below is authoritative. Do not use action "
+        "instructions or action names from any previous step.\n"
         + "\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "
@@ -4751,28 +4731,38 @@ def _modular_action_system_prompt(
         "Return exactly one JSON object with a top-level action field. The action "
         "field is the discriminator: never use kind or action_input. Include "
         "decisions_and_context when a later step needs it, and include outputs "
-        "using the declared names. For example, a declared internal command is "
-        "represented as: "
-        '{"action":"invoke_tool","tool":"internal","parameters":{"command":'
-        '["powdrr-lift","system-specification","--work-item-name",'
-        '"example-feature"]},"decisions_and_context":"Generated the system template."}.'
-        " A completed step is represented as: "
+        "using the declared names. A completed step is represented as: "
         '{"action":"next_step","decisions_and_context":"The current step "'
         '"is complete."}.\n'
-        "file_management uses operation delete, move, or rename plus a relative "
-        "file_path; move and rename also require destination_path. Never use '..' "
-        "or absolute paths.\n"
-        "prompt_user is always allowed when a specific human decision or fact is "
-        "needed. It requires the question in the text field; never use prompt, "
-        "question, or action_input. For example: "
-        '{"action":"prompt_user","text":"What specific success criteria '
-        'should this feature meet?","decisions_and_context":"More information '
-        'is required before continuing."}.\n'
-        "Use goto_step only with a declared step id and include the progress requiring "
-        "another pass. Use next_step when the current details are complete and "
-        "complete when the skill is finished.\n"
+        "Use the field names required by the selected action and do not combine "
+        "actions.\n"
     )
     prompt += _interaction_style_prompt(interaction_style)
+    action_names = {name for name, _ in _step_actions(current_step)}
+    if "invoke_tool" in action_names:
+        prompt += (
+            "A declared internal command is represented as: "
+            '{"action":"invoke_tool","tool":"internal","parameters":{"command":'
+            '["powdrr-lift","system-specification","--work-item-name",'
+            '"example-feature"]},"decisions_and_context":"Generated the '
+            'system template."}.\n'
+        )
+    if "prompt_user" in action_names:
+        prompt += (
+            "prompt_user requires the question in the text field; never use prompt, "
+            "question, or action_input. Example: "
+            '{"action":"prompt_user","text":"What specific success criteria '
+            'should this feature meet?","decisions_and_context":"More information '
+            'is required before continuing."}.\n'
+        )
+    if "file_management" in action_names:
+        prompt += (
+            "file_management uses operation delete, move, or rename plus a relative "
+            "file_path; move and rename also require destination_path. Never use '..' "
+            "or absolute paths.\n"
+        )
+    if "goto_step" in action_names:
+        prompt += "Use goto_step only with a declared prior step id.\n"
     if include_context:
         context_type_lines = "\n".join(
             f"- {name}: {description}" for name, description in _context_type_catalog()
@@ -4802,7 +4792,9 @@ def _modular_action_system_prompt(
             '"provider_role":"adversarial","clean":true}.\n'
         )
     nested_skills = tuple(getattr(current_step, "uses_skills", ()) or ())
-    if nested_skills:
+    if nested_skills and "invoke_skill" in {
+        name for name, _ in _step_actions(current_step)
+    }:
         prompt += (
             "This step delegates to a nested skill; use invoke_skill, "
             "not invoke_tool or an internal CLI command. The only listed nested "
@@ -4851,7 +4843,7 @@ def _modular_action_system_prompt(
         "prior step in this skill, never the current or a later step, and complete "
         "is invalid while any gate remains later in this skill.\n"
     )
-    if getattr(current_step, "prompt_catalogs", None) is None or include_context:
+    if action_names & {"yaml_edit", "read_document", "edit"} or include_context:
         prompt += (
             "Structured-file guidance: use yaml_edit for YAML specifications, combine "
             "independent corrections in one operations array, and preserve document "
@@ -4873,7 +4865,9 @@ def _modular_action_system_prompt(
             '{"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml",'
             '"operations":[{"op":"set_value","path":["title"],"value":"..."}]}\n'
         )
-    if current_step.tool_invocations:
+    if current_step.tool_invocations and "invoke_tool" in {
+        name for name, _ in _step_actions(current_step)
+    }:
         prompt += (
             "Tool guidance: invoke one of the declared tool_invocations successfully "
             "before next_step or complete. A prose summary is not a tool invocation.\n"
@@ -4888,27 +4882,7 @@ def _modular_action_system_prompt(
             "additional reasoning or edits in this step.\n"
         )
     prompt += (
-        "A yaml_edit action uses the exact fields file_path and operations; each "
-        "operation must be complete. A set_value operation is exactly "
-        '{"op":"set_value","path":["title"],"value":"..."}; an upsert_item '
-        "operation is exactly "
-        '{"op":"upsert_item","section":"requirements","id":"req-1",'
-        '"value":{"description":"...","state":"added"}}. Do not omit '
-        "path, section, id, or value. A set_value path must be a non-empty array "
-        "of mapping keys and non-negative list indexes; use upsert_item with the "
-        "section, existing-or-new item id, and complete mapping when replacing a "
-        "whole list item. The only supported operation names are "
-        "set_value, upsert_item, remove_item, and remove_key; never use remove "
-        "or replace. Never use set_value with null to delete a key. "
-        "Use remove_item with an existing item id from the current document, or "
-        "use the exact validator-reported list index when removing boilerplate. "
-        "Template comments and boilerplate disappear when a valid yaml_edit "
-        "rewrites the file; do not model comments as list items.\n"
-        "When a validation result contains corrective_action, apply it before "
-        "retrying; do not repeat the same failed validation unchanged. Use edit "
-        "only when current "
-        "file context is sufficient. The worktree is the command root; use relative "
-        "paths. Do not output markdown."
+        "The worktree is the command root; use relative paths. Do not output markdown."
     )
     return prompt
 
@@ -5842,15 +5816,13 @@ def _record_skill_pull_request(
 
 def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
     """Reject tool actions that do not match a current-step invocation."""
-    allowed_actions = tuple(getattr(step, "allowed_actions", ()) or ())
-    if allowed_actions and action.kind not in allowed_actions:
+    allowed_actions = _declared_action_names(step)
+    if allowed_actions is not None and action.kind not in allowed_actions:
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="workflow_action_not_allowed",
-                message=(
-                    f"The {action.kind} action is not allowed in this step. "
-                    "Use one of: " + ", ".join(allowed_actions) + "."
-                ),
+                message=(f"The {action.kind} action is not allowed in this step. "
+                         "Use one of: " + ", ".join(allowed_actions) + "."),
                 path="kind",
             )
         )
@@ -6693,8 +6665,8 @@ def _validate_workflow_action_for_step_unwrapped(
     action: SkillChatAction, step: Any
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
-    allowed_actions = tuple(getattr(step, "allowed_actions", ()) or ())
-    if allowed_actions and action.kind not in allowed_actions:
+    allowed_actions = _declared_action_names(step)
+    if allowed_actions is not None and action.kind not in allowed_actions:
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="workflow_action_not_allowed",
@@ -9479,40 +9451,16 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
-    # Keep the complete first-class action catalog in the contract unless the
-    # skill explicitly narrows it for this step.
-    allowed_actions: list[str] = list(getattr(step, "allowed_actions", ()) or ()) or [
-        "edit",
-        "yaml_edit",
-        "file_management",
-        "read_document",
-        "prompt_user",
-        "next_step",
-    ]
-    if not getattr(step, "allowed_actions", ()) and invocations:
-        allowed_actions.insert(0, "invoke_tool")
-    if not getattr(step, "allowed_actions", ()) and nested_skills:
-        allowed_actions.insert(0, "invoke_skill")
-    if not getattr(step, "allowed_actions", ()) and _validation_gate_enabled(step):
-        allowed_actions = [
-            "invoke_tool",
-            "edit",
-            "yaml_edit",
-            "file_management",
-            "prompt_user",
-            "next_step",
-        ]
-    if (
-        not getattr(step, "allowed_actions", ())
-        and getattr(step, "step_type", "freeform") == "invoke_tool"
-    ):
-        allowed_actions = ["next_step"]
+    actions = _step_actions(step)
     return {
         "step_type": getattr(step, "step_type", "freeform"),
         "outputs": [
             output.to_data() for output in (getattr(step, "outputs", ()) or ())
         ],
-        "allowed_actions": allowed_actions,
+        "actions": [
+            {"name": name, "instructions": instructions}
+            for name, instructions in actions
+        ],
         "declared_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in invocations
         ],
@@ -9524,6 +9472,80 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     }
 
 
+_DEFAULT_ACTION_INSTRUCTIONS = {
+    "gather_context": "Discover checked-in specifications relevant to this step.",
+    "prompt_user": "Ask one necessary human question.",
+    "edit": "Apply a known line-based change to a file.",
+    "yaml_edit": "Apply a structural change to a YAML file.",
+    "file_management": "Move, rename, or delete one relative file.",
+    "invoke_skill": "Run one listed nested skill.",
+    "invoke_tool": "Run one command declared by this step.",
+    "read_document": "Read a bounded range from a known document.",
+    "list_files": "Discover exact file paths.",
+    "goto_step": "Repeat one declared prior step when another pass is needed.",
+    "next_step": "Advance after this step is complete.",
+    "complete": "End the skill after all work is finished.",
+}
+
+
+def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
+    """Return only this step's declared actions, always including next_step."""
+    declared = tuple(getattr(step, "actions", ()) or ())
+    if declared:
+        actions = [(item.name, item.instructions) for item in declared]
+    else:
+        # Compatibility for definitions written before the per-step action
+        # contract. This fallback is intentionally isolated here so no other
+        # metadata can silently add actions once a step declares actions.
+        names = list(getattr(step, "allowed_actions", ()) or ()) or [
+            "edit", "yaml_edit", "file_management", "read_document", "prompt_user"
+        ]
+        if not getattr(step, "allowed_actions", ()):
+            if getattr(step, "tool_invocations", ()):
+                names.insert(0, "invoke_tool")
+            if getattr(step, "uses_skills", ()):
+                names.insert(0, "invoke_skill")
+            if _validation_gate_enabled(step):
+                names = [
+                    "invoke_tool",
+                    "edit",
+                    "yaml_edit",
+                    "file_management",
+                    "prompt_user",
+                ]
+            if getattr(step, "step_type", "freeform") == "invoke_tool":
+                names = []
+        actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
+    action_names = {name for name, _ in actions}
+    if "next_step" not in action_names:
+        actions.append(("next_step", "Advance only after this step is complete."))
+    outputs = tuple(
+        output
+        for output in (getattr(step, "outputs", ()) or ())
+        if getattr(output, "required_for_next_step", False)
+    )
+    if outputs:
+        suffix = (
+            " Include outputs: "
+            + ", ".join(output.name for output in outputs)
+            + "."
+        )
+        actions = [
+            (name, instructions + suffix if name == "next_step" else instructions)
+            for name, instructions in actions
+        ]
+    return tuple(actions)
+
+
+def _declared_action_names(step: Any) -> tuple[str, ...] | None:
+    """Return the validation allow-list when the step explicitly declares one."""
+    if getattr(step, "actions", ()):
+        return tuple(name for name, _ in _step_actions(step))
+    if getattr(step, "allowed_actions", ()):
+        return tuple(name for name, _ in _step_actions(step))
+    return None
+
+
 def _action_repair_prompt(
     selected_skill: SkillCatalogEntry,
     *,
@@ -9533,15 +9555,9 @@ def _action_repair_prompt(
 ) -> str:
     prompt = (
         "Generate a JSON document selecting the best action based on this "
-        "context. The available actions are: gather_context to discover "
-        "repository specifications before deciding; prompt_user to ask one "
-        "necessary human question; edit to make a known line-based file change; "
-        "file_management to safely delete, move, or rename one relative file; "
-        "invoke_skill to run a listed nested skill; yaml_edit to make a "
-        "structural YAML change; invoke_tool to run a shell, "
-        "fuzzy-match, or basedpyright query; read_document to "
-        "request a bounded line range from a known document; next_step when the "
-        "current step is complete; and complete when the skill is finished.\n"
+        "context. The current step's action declarations below are the only "
+        "actions available. Do not use action names or instructions from a "
+        "previous step.\n"
         "If the original action response was empty, choose next_step when the "
         "current step is complete instead of returning an empty response. If "
         "this corrective response is also empty, the system will interpret it "
@@ -9572,6 +9588,10 @@ def _action_repair_prompt(
             + json.dumps(_current_step_contract(current_step), ensure_ascii=False)
             + ". "
         )
+        prompt += "\nAvailable actions for this step:\n" + "\n".join(
+            f"- {name}: {instructions}"
+            for name, instructions in _step_actions(current_step)
+        ) + "\n"
         prompt += (
             "\nThe current step is the only authority for what may be done. "
             f"Step description: {current_step.description}. "

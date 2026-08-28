@@ -9,6 +9,7 @@ import yaml
 from powdrr_lift.core import (
     Skill,
     SkillStep,
+    SkillStepAction,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
@@ -248,6 +249,36 @@ def test_allowed_actions_require_actions_catalog_and_round_trip() -> None:
     invalid["steps"][0].pop("prompt_catalogs")
     with pytest.raises(ValueError, match="requires the actions prompt catalog"):
         skill_from_json(json.dumps(invalid))
+
+
+def test_step_actions_round_trip_with_local_instructions() -> None:
+    skill = Skill(
+        name="action-instructions",
+        when_to_use=("Test local action instructions.",),
+        steps=(
+            SkillStep(
+                description="Inspect then hand off.",
+                actions=(
+                    SkillStepAction(
+                        name="read_document",
+                        instructions=(
+                            "Read the exact file range needed for the diagnosis."
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+
+    assert parsed == skill
+    assert json.loads(skill_to_json(skill))["steps"][0]["actions"] == [
+        {
+            "name": "read_document",
+            "instructions": "Read the exact file range needed for the diagnosis.",
+        }
+    ]
 
 
 def test_skill_step_contracts_round_trip_and_validate() -> None:

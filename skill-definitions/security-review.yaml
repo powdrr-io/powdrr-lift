@@ -7,6 +7,19 @@ when_to_use:
 - When security findings must be reported directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the pull request, feature scope, and security-relevant change surface.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: long_context
@@ -37,6 +50,19 @@ steps:
     - <pr-reference>
     - --patch
 - description: Build a threat model for the changed behavior.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -62,6 +88,19 @@ steps:
     - "auth|permission|role|scope|token|secret|password|credential|encrypt|decrypt|upload|download|deserialize|subprocess|shell|eval|exec|url|redirect|sql|query|template|cookie|session|cors|csrf|rate.limit|audit|log"
     - <changed-files-or-repository>
 - description: Review identity, access control, and session boundaries.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -77,6 +116,19 @@ steps:
     Require negative tests for unauthenticated, cross-user, cross-tenant, and
     insufficient-privilege cases where applicable.
 - description: Review input, output, and execution safety.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -92,6 +144,19 @@ steps:
     input. Look for unsafe dynamic evaluation, shell construction, format
     strings, and confused-deputy behavior.
 - description: Review cryptography, secrets, privacy, and data lifecycle.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -105,6 +170,19 @@ steps:
     validation, certificate handling, and whether analytics or third-party
     integrations receive more data than intended.
 - description: Review configuration, dependencies, and supply-chain controls.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -127,6 +205,19 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Review resilience, observability, and security test evidence.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -147,6 +238,19 @@ steps:
   - tool: ref
     label: security-review
 - description: Evaluate findings against current OWASP guidance and severity.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -179,6 +283,19 @@ steps:
     - -sS
     - https://owasp.org/www-project-threat-modeling/
 - description: Post actionable security findings as inline pull-request comments.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -219,6 +336,19 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the security review and report residual risk.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

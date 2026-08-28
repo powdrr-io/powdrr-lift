@@ -89,6 +89,12 @@ class WorkflowTaskTemplate:
         )
         object.__setattr__(self, "assignee_type", assignee_type)
         object.__setattr__(self, "assignee_role", assignee_role)
+        if not self.actions:
+            object.__setattr__(
+                self,
+                "actions",
+                (SkillStepAction("next_step", "Advance after this task is complete."),),
+            )
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {

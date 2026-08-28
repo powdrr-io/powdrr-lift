@@ -877,8 +877,12 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
 def test_step_allowed_actions_reject_direct_edit() -> None:
     step = SkillStep(
         description="Produce a deferred edit.",
-        prompt_catalogs=("actions",),
-        allowed_actions=("read_document", "next_step"),
+        actions=(
+            SkillStepAction(
+                name="read_document",
+                instructions="Read the exact range needed for this step.",
+            ),
+        ),
     )
 
     with pytest.raises(RuntimeError, match="edit action is not allowed"):

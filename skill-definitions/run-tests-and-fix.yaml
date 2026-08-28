@@ -6,6 +6,9 @@ when_to_use:
 steps:
 - id: run-all-tests
   description: Run the complete test suite and preserve its raw tool result.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic test result is available.
   step_type: invoke_tool
   llm_type: simple_task
   details: The deterministic pre-step has already run pytest. Return next_step; do not run it again.
@@ -20,6 +23,9 @@ steps:
       command: [uv, run, --extra, dev, pytest, -q]
 - id: enrich-test-results
   description: Convert the raw test result into structured failure data.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic enrichment result is available.
   step_type: invoke_tool
   inputs:
   - name: test_tool_result
@@ -93,6 +99,9 @@ steps:
     instructions: Return the complete repair_edit output and do not apply it.
 - id: validate-repair-edit
   description: Validate the deferred edit without changing files.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic validation result is available.
   step_type: invoke_tool
   inputs:
   - name: repair_edit
@@ -140,6 +149,9 @@ steps:
     required_for_next_step: true
 - id: validate-repair-edit-gate
   description: Require the corrected deferred edit to pass validation.
+  actions:
+    - name: next_step
+      instructions: Advance only after the deterministic validation gate passes.
   step_type: gate
   inputs:
   - name: repair_edit
@@ -161,6 +173,9 @@ steps:
       Do not repeat the invalid output or apply any edit until validation passes.
 - id: apply-repair-edit
   description: Apply the validated deferred edit.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic edit result is available.
   step_type: invoke_tool
   inputs:
   - name: repair_edit
@@ -179,6 +194,9 @@ steps:
     required_for_next_step: true
 - id: rerun-all-tests
   description: Rerun the complete suite after applying the repair.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic test rerun result is available.
   step_type: gate
   inputs:
   - name: applied_edit

@@ -7,6 +7,19 @@ when_to_use:
 - When the review must report findings directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the referenced pull request and its feature relationship.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -37,6 +50,19 @@ steps:
     - <pr-reference>
     - --patch
 - description: Decide whether the referenced PR is the final proposed PR.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
@@ -55,6 +81,19 @@ steps:
     Use the returned records to determine the ordered proposed-PR set and
     status rather than relying only on PR prose.
 - description: Review the current PR against the selected functionality scope.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -80,6 +119,19 @@ steps:
     explicit gap. This deterministic matrix is the basis for deciding whether
     the feature is complete.
 - description: Post every actionable finding as an inline pull-request comment.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -122,6 +174,19 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

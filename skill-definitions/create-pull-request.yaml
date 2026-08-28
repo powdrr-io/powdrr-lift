@@ -4,6 +4,9 @@ when_to_use:
 - When an existing pull request for the current branch must receive the prescribed description and updated commit.
 steps:
 - description: Generate the pull request description template.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -21,6 +24,19 @@ steps:
       - --kind
       - feature
 - description: Fill in the pull request description template.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -36,6 +52,19 @@ steps:
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
 - description: Stage the exact files that belong in the pull request.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -59,6 +88,19 @@ steps:
     - add
     - <files-to-publish>
 - description: Commit the validated changes.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -90,6 +132,19 @@ steps:
     - -m
     - <commit-message>
 - description: Push the committed changes.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -106,6 +161,19 @@ steps:
     - origin
     - HEAD
 - description: Create a draft pull request when none exists.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -133,6 +201,19 @@ steps:
     - --body
     - <populated-pr-description>
 - description: Update the existing pull request.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-

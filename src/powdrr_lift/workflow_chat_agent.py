@@ -9497,24 +9497,23 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
         # Compatibility for definitions written before the per-step action
         # contract. This fallback is intentionally isolated here so no other
         # metadata can silently add actions once a step declares actions.
-        names = list(getattr(step, "allowed_actions", ()) or ()) or [
+        names = [
             "edit", "yaml_edit", "file_management", "read_document", "prompt_user"
         ]
-        if not getattr(step, "allowed_actions", ()):
-            if getattr(step, "tool_invocations", ()):
-                names.insert(0, "invoke_tool")
-            if getattr(step, "uses_skills", ()):
-                names.insert(0, "invoke_skill")
-            if _validation_gate_enabled(step):
-                names = [
-                    "invoke_tool",
-                    "edit",
-                    "yaml_edit",
-                    "file_management",
-                    "prompt_user",
-                ]
-            if getattr(step, "step_type", "freeform") == "invoke_tool":
-                names = []
+        if getattr(step, "tool_invocations", ()):
+            names.insert(0, "invoke_tool")
+        if getattr(step, "uses_skills", ()):
+            names.insert(0, "invoke_skill")
+        if _validation_gate_enabled(step):
+            names = [
+                "invoke_tool",
+                "edit",
+                "yaml_edit",
+                "file_management",
+                "prompt_user",
+            ]
+        if getattr(step, "step_type", "freeform") == "invoke_tool":
+            names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
     if "next_step" not in action_names:
@@ -9537,13 +9536,8 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     return tuple(actions)
 
 
-def _declared_action_names(step: Any) -> tuple[str, ...] | None:
-    """Return the validation allow-list when the step explicitly declares one."""
-    if getattr(step, "actions", ()):
-        return tuple(name for name, _ in _step_actions(step))
-    if getattr(step, "allowed_actions", ()):
-        return tuple(name for name, _ in _step_actions(step))
-    return None
+def _declared_action_names(step: Any) -> tuple[str, ...]:
+    return tuple(name for name, _ in _step_actions(step))
 
 
 def _action_repair_prompt(

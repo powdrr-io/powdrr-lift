@@ -177,9 +177,6 @@ class SkillStep:
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[SkillStepAction, ...] = field(default_factory=tuple)
-    # Deprecated input retained for a gradual definition migration. Runtime
-    # consumers prefer actions whenever it is present.
-    allowed_actions: tuple[str, ...] = field(default_factory=tuple)
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -187,6 +184,35 @@ class SkillStep:
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
     validation_gate: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        # Programmatic callers from the pre-actions API are normalized too;
+        # serialized definitions and parsed YAML still require an explicit
+        # actions field.
+        if self.actions:
+            return
+        names = [
+            "edit",
+            "yaml_edit",
+            "file_management",
+            "read_document",
+            "prompt_user",
+        ]
+        if self.tool_invocations:
+            names.insert(0, "invoke_tool")
+        if self.uses_skills:
+            names.insert(0, "invoke_skill")
+        if self.step_type in {"invoke_tool", "gate"}:
+            names = []
+        names.append("next_step")
+        object.__setattr__(
+            self,
+            "actions",
+            tuple(
+                SkillStepAction(name=name, instructions="Available for this step.")
+                for name in names
+            ),
+        )
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -211,8 +237,6 @@ class SkillStep:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.actions:
             data["actions"] = [action.to_data() for action in self.actions]
-        if self.allowed_actions:
-            data["allowed_actions"] = list(self.allowed_actions)
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -517,7 +541,6 @@ def build_skill_validation_report(
                     "tool_invocations",
                     "prompt_catalogs",
                     "actions",
-                    "allowed_actions",
                     "pre_step",
                     "gate",
                     "validation_gate",
@@ -926,92 +949,6 @@ def build_skill_validation_report(
                             seen_catalogs.add(normalized_catalog)
 
             _validate_step_actions(step_mapping.get("actions"), step_path, issues)
-            allowed_actions = step_mapping.get("allowed_actions")
-            if step_mapping.get("actions") is not None and allowed_actions is not None:
-                issues.append(
-                    SkillValidationIssue(
-                        code="conflicting_action_declarations",
-                        message=(
-                            "Skill steps must use actions instead of combining it "
-                            "with deprecated allowed_actions."
-                        ),
-                        path=_child_path(step_path, "actions"),
-                    )
-                )
-            if allowed_actions is not None:
-                if not isinstance(allowed_actions, Sequence) or isinstance(
-                    allowed_actions, (str, bytes, bytearray)
-                ):
-                    issues.append(
-                        SkillValidationIssue(
-                            code="invalid_allowed_actions_type",
-                            message="Skill step allowed_actions must be an array.",
-                            path=_child_path(step_path, "allowed_actions"),
-                        )
-                    )
-                else:
-                    if not allowed_actions:
-                        issues.append(
-                            SkillValidationIssue(
-                                code="empty_allowed_actions",
-                                message="Skill step allowed_actions must not be empty.",
-                                path=_child_path(step_path, "allowed_actions"),
-                            )
-                        )
-                    seen_actions: set[str] = set()
-                    for action_index, action_value in enumerate(allowed_actions):
-                        normalized_action = _optional_string(action_value)
-                        action_path = _sequence_path(
-                            step_path, "allowed_actions", action_index
-                        )
-                        if normalized_action is None:
-                            issues.append(
-                                SkillValidationIssue(
-                                    code="invalid_allowed_action",
-                                    message=(
-                                        "Skill step allowed_actions must contain "
-                                        "non-empty strings."
-                                    ),
-                                    path=action_path,
-                                )
-                            )
-                        elif normalized_action not in SUPPORTED_STEP_ACTIONS:
-                            issues.append(
-                                SkillValidationIssue(
-                                    code="unsupported_allowed_action",
-                                    message=(
-                                        "Skill step allowed_actions contains an "
-                                        f"unsupported action: {normalized_action}."
-                                    ),
-                                    path=action_path,
-                                )
-                            )
-                        elif normalized_action in seen_actions:
-                            issues.append(
-                                SkillValidationIssue(
-                                    code="duplicate_allowed_action",
-                                    message=(
-                                        "Skill step allowed_actions must not contain "
-                                        "duplicates."
-                                    ),
-                                    path=action_path,
-                                )
-                            )
-                        else:
-                            seen_actions.add(normalized_action)
-                    if "actions" not in set(
-                        _optional_string(item) for item in (prompt_catalogs or ())
-                    ):
-                        issues.append(
-                            SkillValidationIssue(
-                                code="allowed_actions_without_catalog",
-                                message=(
-                                    "Skill step allowed_actions requires the actions "
-                                    "prompt catalog."
-                                ),
-                                path=_child_path(step_path, "allowed_actions"),
-                            )
-                        )
 
             _validate_step_contracts(step_mapping, step_path, issues)
 
@@ -1539,15 +1476,6 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
-    allowed_actions = _optional_allowed_actions(data.get("allowed_actions"))
-    if actions and allowed_actions:
-        raise ValueError(
-            "Skill step actions cannot be combined with deprecated allowed_actions."
-        )
-    if allowed_actions and "actions" not in prompt_catalogs:
-        raise ValueError(
-            "Skill step allowed_actions requires the actions prompt catalog."
-        )
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
     raw_validation_gate = data.get("validation_gate")
@@ -1618,7 +1546,6 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
         actions=actions,
-        allowed_actions=allowed_actions,
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,
@@ -1782,7 +1709,7 @@ def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
 
 def _optional_step_actions(value: object) -> tuple[SkillStepAction, ...]:
     if value is None:
-        return ()
+        raise ValueError("Skill steps must include an actions array.")
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step actions must be an array.")
     if not value:
@@ -1809,6 +1736,14 @@ def _validate_step_actions(
     issues: list[SkillValidationIssue],
 ) -> None:
     if value is None:
+        if not issues:
+            issues.append(
+                SkillValidationIssue(
+                    code="missing_actions",
+                    message="Skill steps must include an actions array.",
+                    path=_child_path(step_path, "actions"),
+                )
+            )
         return
     try:
         _optional_step_actions(value)
@@ -1820,25 +1755,6 @@ def _validate_step_actions(
                 path=_child_path(step_path, "actions"),
             )
         )
-
-
-def _optional_allowed_actions(value: object) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
-        raise ValueError("Skill step allowed_actions must be an array.")
-    if not value:
-        raise ValueError("Skill step allowed_actions must not be empty.")
-    result = tuple(_required_string({"value": item}, "value") for item in value)
-    unsupported = sorted(set(result) - SUPPORTED_STEP_ACTIONS)
-    if unsupported:
-        raise ValueError(
-            "Skill step allowed_actions contains unsupported values: "
-            + ", ".join(unsupported)
-        )
-    if len(result) != len(set(result)):
-        raise ValueError("Skill step allowed_actions must not contain duplicates.")
-    return result
 
 
 def _validate_gather_context_pre_step(

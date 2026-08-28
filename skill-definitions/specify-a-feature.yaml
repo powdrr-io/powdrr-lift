@@ -6,6 +6,19 @@ when_to_use:
 steps:
 - id: capture-feature-name
   description: Capture the feature name.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -24,6 +37,19 @@ steps:
     required_for_next_step: true
 - id: capture-feature-context
   description: Capture the feature goal and success criteria.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -36,6 +62,9 @@ steps:
     {"action":"prompt_user","text":"What should this feature record, what should happen when it fails, and how will we test it?"}
 - id: generate-system-specification
   description: Generate the system specification template.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -54,6 +83,19 @@ steps:
       - "<work-item-name>"
 - id: fill-system-specification
   description: Fill the system requirements and approach.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -63,6 +105,11 @@ steps:
     records and an approach describing the log writer.
 - id: review-system-context
   description: Review the system context before deciding the feature shape.
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -72,6 +119,9 @@ steps:
   - review-system
 - id: evaluate-system-specification
   description: Gate the filled system specification.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the system evaluator reports zero issues.
@@ -93,6 +143,9 @@ steps:
       then rerun the complete specification evaluation gate.
 - id: generate-architecture-specification
   description: Generate the architecture specification template.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -112,6 +165,19 @@ steps:
       - "--all-entity-types"
 - id: fill-architecture-specification
   description: Fill the architecture entities and relationships.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -123,6 +189,11 @@ steps:
     and relationship must explain which current requirement or approach it serves.
 - id: review-architecture-context
   description: Review architecture before implementation.
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -132,6 +203,9 @@ steps:
   - review-architecture
 - id: evaluate-architecture-specification
   description: Gate the filled architecture specification.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the architecture evaluator reports zero issues.
@@ -153,6 +227,9 @@ steps:
       yaml_edit, then rerun the complete specification evaluation gate.
 - id: generate-implementation-specification
   description: Generate the implementation specification template.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -171,11 +248,27 @@ steps:
       - "<work-item-name>"
 - id: fill-implementation-specification
   description: Fill the implementation features and decisions.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: standard_reasoning
   details: Use yaml_edit to complete the generated implementation template; do not invoke tools or rewrite the YAML as prose, then choose next_step.
 - id: evaluate-implementation-specification
   description: Gate the filled implementation specification.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the implementation evaluator reports zero issues.
@@ -197,6 +290,9 @@ steps:
       yaml_edit, then rerun the complete specification evaluation gate.
 - id: evaluate-feature-specifications
   description: Deterministically evaluate every generated specification before implementation.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -213,6 +309,19 @@ steps:
       - docs/proposals/<work-item-name>
 - id: repair-feature-specifications
   description: Fix every reported specification issue with yaml_edit.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -230,6 +339,9 @@ steps:
     For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not invoke tools other than gather_context in this repair step; gather_context is allowed when the latest evaluator result reports a missing or unknown id. Use the evaluator's suggested context types and keywords, then apply the correction without guessing. The evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use gather_context or read_document, then apply yaml_edit without guessing. For entity_type_not_allowed, use the exact allowed_entity_types list from the latest evaluator result and edit only the reported entities[N].type path. Never confuse that field with entity_relationships[*].source or target: those fields contain entity ids and must not be changed to entity type names. Never alternate between File and Source file, change a different entity, or modify a value that already matches the latest allowed list. After the edit, choose next_step so deterministic evaluation can verify the current file; do not claim that your own reasoning proves validation passed.
 - id: gate-feature-specifications
   description: Confirm that every generated specification evaluates cleanly.
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the directory evaluator exits successfully with zero issues.
@@ -252,6 +364,19 @@ steps:
       YAML with yaml_edit, and rerun deterministic evaluation before continuing.
 - id: stage-specification-artifacts
   description: Stage the validated specification artifacts for pull request preparation.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: Inspect the worktree and stage only the validated specification
@@ -268,6 +393,11 @@ steps:
     - docs/proposals/<work-item-name>
 - id: prepare-pull-request
   description: Run finish-pr-prep before creating the pull request.
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -280,6 +410,11 @@ steps:
   - finish-pr-prep
 - id: create-feature-pull-request
   description: Create or update the pull request for the validated feature.
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-

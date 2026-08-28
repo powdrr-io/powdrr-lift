@@ -6,6 +6,19 @@ when_to_use:
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
 - description: Check whether the project-structure artifact already exists.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
@@ -20,6 +33,19 @@ steps:
     does not exist, record that result and choose next_step so the discovery
     step can begin.
 - description: Discover the project-wide modules, tools, tests, and development commands.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -63,6 +89,19 @@ steps:
     - scripts
     - README.md
 - description: Reuse an existing project-structure artifact or create its template.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
@@ -85,6 +124,19 @@ steps:
     - powdrr-lift
     - project-structure
 - description: Populate the project-structure artifact from codebase evidence.
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -111,6 +163,19 @@ steps:
     verified syntax instead of guessing. Use the edit action to write the
     artifact and pass the changed path and edit summary onward.
 - description: Validate the project-structure artifact and discovery evidence.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -152,6 +217,19 @@ steps:
     - powdrr-lift
     - repository-state
 - description: Stage the validated project-structure artifact.
+  actions:
+    - name: invoke_tool
+      instructions: Run the declared command or validation obligation for this step.
+    - name: edit
+      instructions: Apply the required correction to a file.
+    - name: yaml_edit
+      instructions: Apply the required structural YAML correction.
+    - name: read_document
+      instructions: Read the exact file range needed for this step.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -169,6 +247,11 @@ steps:
     - add
     - docs/project_structure/project-structure.yaml
 - description: Run finish-pr-prep on the validated project-structure artifact.
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -179,6 +262,11 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Commit the project-structure artifact and open a draft pull request.
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   llm_type: simple_task
   details: >-

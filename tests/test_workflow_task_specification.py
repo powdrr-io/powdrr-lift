@@ -54,8 +54,14 @@ def test_workflow_task_round_trips_through_json() -> None:
         "assignee_type": "agent",
         "assignee_role": "coder",
         "output_state_type": "state",
-        "description": "Prepare the deployment environment.",
-        "step_type": "freeform",
+            "description": "Prepare the deployment environment.",
+            "step_type": "freeform",
+            "actions": [
+                {
+                    "name": "next_step",
+                    "instructions": "Advance after this task is complete.",
+                }
+            ],
     }
 
 

@@ -8,6 +8,11 @@ how_to_fill_this_out:
 - Each nested review skill must post its findings as inline comments on the referenced pull request.
 task_templates:
 - description: Review feature functionality and completeness
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -29,6 +34,11 @@ task_templates:
   dependent_state:
   - functionality-review-complete
 - description: Review feature test coverage
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -51,6 +61,11 @@ task_templates:
   dependent_state:
   - test-coverage-review-complete
 - description: Review pull request security
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent

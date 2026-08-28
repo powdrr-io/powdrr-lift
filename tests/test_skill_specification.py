@@ -41,6 +41,12 @@ def test_skill_round_trips_through_json() -> None:
                 id="capture-goal",
                 details="Record the user-visible outcome first.",
                 prompt_catalogs=(),
+                actions=(
+                    SkillStepAction(
+                        name="prompt_user",
+                        instructions="Ask one necessary question about the goal.",
+                    ),
+                ),
             ),
             SkillStep(
                 description="Pull in the system context.",
@@ -58,8 +64,21 @@ def test_skill_round_trips_through_json() -> None:
                         ),
                     ),
                 ),
+                actions=(
+                    SkillStepAction(
+                        name="invoke_tool",
+                        instructions="Run the declared context command.",
+                    ),
+                ),
             ),
-            SkillStep(description="Summarize the result."),
+            SkillStep(
+                description="Summarize the result.",
+                actions=(
+                    SkillStepAction(
+                        name="next_step", instructions="Advance with the summary."
+                    ),
+                ),
+            ),
         ),
         adversarial=True,
     )
@@ -82,9 +101,17 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
-                "step_type": "freeform",
-                "id": "capture-goal",
-                "details": "Record the user-visible outcome first.",
+                    "step_type": "freeform",
+                    "id": "capture-goal",
+                    "details": "Record the user-visible outcome first.",
+                    "actions": [
+                        {
+                            "name": "prompt_user",
+                            "instructions": (
+                                "Ask one necessary question about the goal."
+                            ),
+                        }
+                    ],
             },
             {
                 "description": "Pull in the system context.",
@@ -92,7 +119,7 @@ def test_skill_round_trips_through_json() -> None:
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
                 "prompt_catalogs": ["context_types", "skills"],
-                "tool_invocations": [
+                    "tool_invocations": [
                     {
                         "tool": "internal",
                         "command": [
@@ -101,12 +128,24 @@ def test_skill_round_trips_through_json() -> None:
                             "--work-item-name",
                             "<work-item-name>",
                         ],
-                    }
-                ],
+                        }
+                    ],
+                    "actions": [
+                        {
+                            "name": "invoke_tool",
+                            "instructions": "Run the declared context command.",
+                        }
+                    ],
             },
             {
-                "description": "Summarize the result.",
-                "step_type": "freeform",
+                    "description": "Summarize the result.",
+                    "step_type": "freeform",
+                    "actions": [
+                        {
+                            "name": "next_step",
+                            "instructions": "Advance with the summary.",
+                        }
+                    ],
             },
         ],
     }
@@ -229,15 +268,19 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 }
 
 
-def test_allowed_actions_require_actions_catalog_and_round_trip() -> None:
+def test_actions_require_instructions_and_round_trip() -> None:
     skill = Skill(
         name="action-contract",
         when_to_use=("Test step action restrictions.",),
         steps=(
             SkillStep(
                 description="Inspect then hand off.",
-                prompt_catalogs=("actions",),
-                allowed_actions=("read_document", "next_step"),
+                actions=(
+                    SkillStepAction(
+                        name="read_document",
+                        instructions="Read the exact range needed for this step.",
+                    ),
+                ),
             ),
         ),
     )
@@ -246,8 +289,8 @@ def test_allowed_actions_require_actions_catalog_and_round_trip() -> None:
     assert parsed == skill
 
     invalid = yaml.safe_load(skill_to_json(skill))
-    invalid["steps"][0].pop("prompt_catalogs")
-    with pytest.raises(ValueError, match="requires the actions prompt catalog"):
+    invalid["steps"][0].pop("actions")
+    with pytest.raises(ValueError, match="actions array"):
         skill_from_json(json.dumps(invalid))
 
 
@@ -356,11 +399,13 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
     report = build_skill_validation_report(
         "name: repeated\n"
         "when_to_use: [review]\n"
-        "steps:\n"
-        "- id: repeat\n"
-        "  description: First\n"
-        "- id: repeat\n"
-        "  description: Second\n",
+            "steps:\n"
+            "- id: repeat\n"
+            "  description: First\n"
+            "  actions: [{name: next_step, instructions: Continue}]\n"
+            "- id: repeat\n"
+            "  description: Second\n"
+            "  actions: [{name: next_step, instructions: Continue}]\n",
         source_path=Path("repeated.yaml"),
     )
 
@@ -376,8 +421,14 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
                 "when_to_use": ["When gathered context needs filtering."],
                 "steps": [
                     {
-                        "description": "Filter gathered requirements.",
-                        "step_type": "invoke_tool",
+                            "description": "Filter gathered requirements.",
+                            "step_type": "invoke_tool",
+                            "actions": [
+                                {
+                                    "name": "next_step",
+                                    "instructions": "Advance after gathering.",
+                                }
+                            ],
                         "pre_step": {
                             "action": "gather_context",
                             "template": {

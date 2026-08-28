@@ -38,6 +38,9 @@ invariants:
   cardinality: exactly_one
 task_templates:
 - description: Gather context about the proposed PR
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high
@@ -72,6 +75,19 @@ task_templates:
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create the execution plan
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -93,6 +109,19 @@ task_templates:
   dependent_state:
   - execution-plan-created
 - description: Generate the planned tests
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -116,6 +145,19 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Implement the planned product code
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -141,6 +183,11 @@ task_templates:
   dependent_state:
   - product-code-generated
 - description: Run all tests and fix failures
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -166,6 +213,19 @@ task_templates:
   dependent_state:
   - all-tests-passed
 - description: Review specification completeness
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -189,6 +249,19 @@ task_templates:
   dependent_state:
   - specification-complete
 - description: Repair specification completeness gaps
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -210,6 +283,9 @@ task_templates:
   dependent_state:
   - completeness-repair-complete
 - description: Run formatting checks
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -234,6 +310,9 @@ task_templates:
   dependent_state:
   - formatting-checked
 - description: Run lint checks
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -257,6 +336,9 @@ task_templates:
   dependent_state:
   - lint-checked
 - description: Run type checks
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -279,6 +361,19 @@ task_templates:
   dependent_state:
   - type-checked
 - description: Review the final diff for scope
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: medium
   assignee_type: agent
@@ -307,6 +402,19 @@ task_templates:
   dependent_state:
   - final-scope-reviewed
 - description: Repair final diff scope issues
+  actions:
+    - name: edit
+      instructions: Apply a known line-based change to a file.
+    - name: yaml_edit
+      instructions: Apply a structural change to a YAML file.
+    - name: file_management
+      instructions: Move, rename, or delete one relative file.
+    - name: read_document
+      instructions: Read a bounded range from a known document.
+    - name: prompt_user
+      instructions: Ask one necessary human question.
+    - name: next_step
+      instructions: Advance after this step is complete.
   step_type: freeform
   complexity: medium
   assignee_type: agent
@@ -328,6 +436,9 @@ task_templates:
   dependent_state:
   - final-scope-repair-complete
 - description: Promote the feature documents
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -355,6 +466,9 @@ task_templates:
   dependent_state:
   - current-state-documents-promoted
 - description: Verify the pull request file set
+  actions:
+    - name: next_step
+      instructions: Advance after the deterministic step result is available.
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -386,6 +500,11 @@ task_templates:
   dependent_state:
   - pull-request-files-verified
 - description: Finish pull request preparation
+  actions:
+    - name: invoke_skill
+      instructions: Run the listed nested skill for this step.
+    - name: next_step
+      instructions: Advance after the nested skill result is complete.
   step_type: freeform
   complexity: medium
   assignee_type: agent

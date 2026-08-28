@@ -6,7 +6,6 @@ when_to_use:
 steps:
 - id: run-all-tests
   description: Run the complete test suite and preserve its raw tool result.
-  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: The deterministic pre-step has already run pytest. Return next_step; do not run it again.
@@ -21,7 +20,6 @@ steps:
       command: [uv, run, --extra, dev, pytest, -q]
 - id: enrich-test-results
   description: Convert the raw test result into structured failure data.
-  actions: []
   step_type: invoke_tool
   inputs:
   - name: test_tool_result
@@ -47,7 +45,6 @@ steps:
     type: any
     required: true
   llm_type: high_reasoning
-  actions: []
   details: >-
     Consume only enriched_test_result. Identify every failing test and its exact
     root cause. List only approved source or test files that require changes.
@@ -87,7 +84,6 @@ steps:
   actions: [read_document, next_step]
 - id: validate-repair-edit
   description: Validate the deferred edit without changing files.
-  actions: []
   step_type: invoke_tool
   inputs:
   - name: repair_edit
@@ -131,7 +127,6 @@ steps:
     required_for_next_step: true
 - id: validate-repair-edit-gate
   description: Require the corrected deferred edit to pass validation.
-  actions: []
   step_type: gate
   inputs:
   - name: repair_edit
@@ -153,7 +148,6 @@ steps:
       Do not repeat the invalid output or apply any edit until validation passes.
 - id: apply-repair-edit
   description: Apply the validated deferred edit.
-  actions: []
   step_type: invoke_tool
   inputs:
   - name: repair_edit
@@ -172,7 +166,6 @@ steps:
     required_for_next_step: true
 - id: rerun-all-tests
   description: Rerun the complete suite after applying the repair.
-  actions: []
   step_type: gate
   inputs:
   - name: applied_edit

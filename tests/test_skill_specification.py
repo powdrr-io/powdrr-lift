@@ -236,7 +236,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 }
 
 
-def test_actions_round_trip_and_are_required() -> None:
+def test_actions_round_trip_and_default_to_next_step() -> None:
     skill = Skill(
         name="action-contract",
         when_to_use=("Test step action restrictions.",),
@@ -254,8 +254,8 @@ def test_actions_round_trip_and_are_required() -> None:
     assert parsed == skill
 
     invalid = yaml.safe_load(skill_to_json(skill))
-    invalid["steps"][0].pop("actions")
-    with pytest.raises(ValueError, match="actions array"):
+    invalid["steps"][0]["actions"] = ["not-an-action"]
+    with pytest.raises(ValueError, match="unsupported action"):
         skill_from_json(json.dumps(invalid))
 
 

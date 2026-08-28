@@ -1699,7 +1699,7 @@ def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
 
 def _optional_step_actions(value: object) -> tuple[str, ...]:
     if value is None:
-        raise ValueError("Skill steps must include an actions array.")
+        return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step actions must be an array.")
     if not value:
@@ -1725,14 +1725,6 @@ def _validate_step_actions(
     issues: list[SkillValidationIssue],
 ) -> None:
     if value is None:
-        if not issues:
-            issues.append(
-                SkillValidationIssue(
-                    code="missing_actions",
-                    message="Skill steps must include an actions array.",
-                    path=_child_path(step_path, "actions"),
-                )
-            )
         return
     try:
         _optional_step_actions(value)

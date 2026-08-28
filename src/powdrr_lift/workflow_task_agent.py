@@ -74,6 +74,7 @@ from powdrr_lift.workflow_chat_agent import (
     _run_gate,
     _step_index_by_id,
     _validate_internal_command,
+    _validate_workflow_action_for_step,
     _validate_workflow_action_outputs,
     _validate_workflow_handoff,
     execute_intrinsic_git_gh_tool,
@@ -2803,6 +2804,7 @@ def _run_skill_for_agent(
             # the canonical output_state spelling when it carries the current
             # skill step's declared handoff outputs.
             action = replace(action, outputs=dict(action.output_state))
+        _validate_workflow_action_for_step(action, step)
         _validate_workflow_action_outputs(action, step)
         observation = action_engine.observe_action(
             action,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from powdrr_lift.core import (
@@ -220,7 +221,33 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             )
             if "prompt_catalogs" in step:
                 assert step["prompt_catalogs"], f"{path}:{step_key}[{index}]"
-                assert set(step["prompt_catalogs"]) <= {"context_types", "skills"}
+                assert set(step["prompt_catalogs"]) <= {
+                    "context_types",
+                    "skills",
+                    "actions",
+                }
+
+
+def test_allowed_actions_require_actions_catalog_and_round_trip() -> None:
+    skill = Skill(
+        name="action-contract",
+        when_to_use=("Test step action restrictions.",),
+        steps=(
+            SkillStep(
+                description="Inspect then hand off.",
+                prompt_catalogs=("actions",),
+                allowed_actions=("read_document", "next_step"),
+            ),
+        ),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+    assert parsed == skill
+
+    invalid = yaml.safe_load(skill_to_json(skill))
+    invalid["steps"][0].pop("prompt_catalogs")
+    with pytest.raises(ValueError, match="requires the actions prompt catalog"):
+        skill_from_json(json.dumps(invalid))
 
 
 def test_skill_step_contracts_round_trip_and_validate() -> None:

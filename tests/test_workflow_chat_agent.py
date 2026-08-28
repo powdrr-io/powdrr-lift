@@ -873,6 +873,33 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         )
 
 
+def test_step_allowed_actions_reject_direct_edit() -> None:
+    step = SkillStep(
+        description="Produce a deferred edit.",
+        prompt_catalogs=("actions",),
+        allowed_actions=("read_document", "next_step"),
+    )
+
+    with pytest.raises(RuntimeError, match="edit action is not allowed"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "action": "edit",
+                    "file_path": "src/example.py",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "end_line": 1,
+                            "text": "replacement",
+                        }
+                    ],
+                }
+            ),
+            step,
+        )
+
+
 def test_workflow_can_advance_after_empty_gather_context_result() -> None:
     _validate_workflow_step_transition(
         _parse_action_response({"kind": "next_step"}),

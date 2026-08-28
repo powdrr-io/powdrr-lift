@@ -3556,7 +3556,7 @@ def _interaction_style_prompt(style: str | None) -> str:
 
 def _step_needs_prompt_catalog(step: Any, capability: str) -> bool:
     configured_catalogs = getattr(step, "prompt_catalogs", ())
-    if capability not in {"context_types", "skills"}:
+    if capability not in {"context_types", "skills", "actions"}:
         raise ValueError(f"Unknown prompt catalog capability: {capability}")
     return capability in configured_catalogs
 
@@ -4375,6 +4375,10 @@ def _build_step_execution_messages(
             }
             for entry in catalog
         ]
+    if _step_needs_prompt_catalog(current_step, "actions"):
+        prompt_data["available_actions"] = list(
+            getattr(current_step, "allowed_actions", ()) or ()
+        )
     if validation_gate is not None:
         prompt_data["validation_gate"] = dict(validation_gate)
     pre_step_event = _latest_deterministic_pre_step(
@@ -4703,6 +4707,14 @@ def _modular_action_system_prompt(
     """Build a compact action prompt with explicitly selected guidance sections."""
     include_context = _step_needs_prompt_catalog(current_step, "context_types")
     include_skills = _step_needs_prompt_catalog(current_step, "skills")
+    configured_actions = tuple(getattr(current_step, "allowed_actions", ()) or ())
+    action_restriction = (
+        " For this step, the only allowed actions are: "
+        + ", ".join(configured_actions)
+        + ". Any other action is invalid and must not be attempted."
+        if configured_actions and _step_needs_prompt_catalog(current_step, "actions")
+        else ""
+    )
     prompt = (
         "Task: execute the supplied details using the handoff inputs, latest action "
         "result, and available actions. Choose one "
@@ -4724,7 +4736,9 @@ def _modular_action_system_prompt(
         '"remove", or "replace"; do not use an object in kind and do not use '
         '"action" or "kind" as a nested action object. For multiple files, use '
         '"file_edits":[{"file_path":"src/example.py","edits":[...]}]. '
-        "The current-step contract below further restricts these options.\n"
+        "The current-step contract below further restricts these options."
+        + action_restriction
+        + "\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "
         "its exact declared name. A statement in decisions_and_context is not an "
@@ -5828,6 +5842,18 @@ def _record_skill_pull_request(
 
 def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
     """Reject tool actions that do not match a current-step invocation."""
+    allowed_actions = tuple(getattr(step, "allowed_actions", ()) or ())
+    if allowed_actions and action.kind not in allowed_actions:
+        raise _WorkflowToolValidationError(
+            ValidationError(
+                code="workflow_action_not_allowed",
+                message=(
+                    f"The {action.kind} action is not allowed in this step. "
+                    "Use one of: " + ", ".join(allowed_actions) + "."
+                ),
+                path="kind",
+            )
+        )
     if action.kind != "invoke_tool":
         return
     try:
@@ -6667,6 +6693,18 @@ def _validate_workflow_action_for_step_unwrapped(
     action: SkillChatAction, step: Any
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
+    allowed_actions = tuple(getattr(step, "allowed_actions", ()) or ())
+    if allowed_actions and action.kind not in allowed_actions:
+        raise _WorkflowToolValidationError(
+            ValidationError(
+                code="workflow_action_not_allowed",
+                message=(
+                    f"The {action.kind} action is not allowed in this step. "
+                    "Use one of: " + ", ".join(allowed_actions) + "."
+                ),
+                path="kind",
+            )
+        )
     if (
         action.kind == "invoke_tool"
         and action.parameters.get("help") is True
@@ -9441,9 +9479,11 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
-    # Keep the complete first-class action catalog in the contract. The declared
-    # tool list constrains invoke_tool; it does not hide file/context actions.
-    allowed_actions = [
+    # Keep the complete first-class action catalog in the contract unless the
+    # skill explicitly narrows it for this step.
+    allowed_actions: list[str] = list(
+        getattr(step, "allowed_actions", ()) or ()
+    ) or [
         "edit",
         "yaml_edit",
         "file_management",
@@ -9451,11 +9491,11 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         "prompt_user",
         "next_step",
     ]
-    if invocations:
+    if not getattr(step, "allowed_actions", ()) and invocations:
         allowed_actions.insert(0, "invoke_tool")
-    if nested_skills:
+    if not getattr(step, "allowed_actions", ()) and nested_skills:
         allowed_actions.insert(0, "invoke_skill")
-    if _validation_gate_enabled(step):
+    if not getattr(step, "allowed_actions", ()) and _validation_gate_enabled(step):
         allowed_actions = [
             "invoke_tool",
             "edit",
@@ -9464,7 +9504,10 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
             "prompt_user",
             "next_step",
         ]
-    if getattr(step, "step_type", "freeform") == "invoke_tool":
+    if (
+        not getattr(step, "allowed_actions", ())
+        and getattr(step, "step_type", "freeform") == "invoke_tool"
+    ):
         allowed_actions = ["next_step"]
     return {
         "step_type": getattr(step, "step_type", "freeform"),

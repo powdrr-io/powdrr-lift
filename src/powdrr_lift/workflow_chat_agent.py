@@ -9494,7 +9494,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     """Return only this step's declared actions, always including next_step."""
     declared = tuple(getattr(step, "actions", ()) or ())
     if declared:
-        actions = [(item.name, item.instructions) for item in declared]
+        actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
     else:
         # Compatibility for definitions written before the per-step action
         # contract. This fallback is intentionally isolated here so no other

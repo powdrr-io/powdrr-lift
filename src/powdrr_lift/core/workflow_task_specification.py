@@ -12,7 +12,6 @@ import yaml
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
-    SkillStepAction,
     SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
@@ -87,7 +86,7 @@ class WorkflowTask:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
-    actions: tuple[SkillStepAction, ...] = field(default_factory=tuple)
+    actions: tuple[str, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -106,7 +105,7 @@ class WorkflowTask:
             object.__setattr__(
                 self,
                 "actions",
-                (SkillStepAction("next_step", "Advance after this task is complete."),),
+                ("next_step",),
             )
 
     def to_data(self) -> dict[str, Any]:
@@ -138,7 +137,7 @@ class WorkflowTask:
         if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.actions:
-            step_data["actions"] = [action.to_data() for action in self.actions]
+            step_data["actions"] = list(self.actions)
         if self.pre_step is not None:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:

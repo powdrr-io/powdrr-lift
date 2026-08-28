@@ -10,19 +10,7 @@ when_to_use:
   comments.
 steps:
 - description: Discover the pull request and establish the exact change surface.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -56,19 +44,7 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Challenge framework and dependency choices.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -100,19 +76,7 @@ steps:
     - --
     - <changed-files>
 - description: Challenge readability and control-flow complexity.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -144,19 +108,7 @@ steps:
     - <head-sha>
     - --check
 - description: Validate findings and teach the production-level alternative.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -186,19 +138,7 @@ steps:
     - <existing-framework-or-pattern>
     - <repository-paths>
 - description: Post actionable findings as inline pull-request comments.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -239,19 +179,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the adversarial review and report the result.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

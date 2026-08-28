@@ -9,19 +9,7 @@ when_to_use:
   critique.
 steps:
 - id: resolve-target
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   prompt_catalogs: [skills]
   description: Resolve and read the target definition.
@@ -46,19 +34,7 @@ steps:
     - f
     - -print
 - id: inventory-steps
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   description: Inventory every target step and its execution surface.
   llm_type: standard_reasoning
@@ -75,19 +51,7 @@ steps:
     unmentioned follow-up command as separate calls. Do not infer missing
     instructions from repository conventions.
 - id: score-steps
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   description: Score directive quality and identify scope-preserving rewrites.
   llm_type: high_reasoning
@@ -104,19 +68,7 @@ steps:
     validation or evidence check merely to lower a count. For each finding,
     state the smallest safe change and the requirement it preserves.
 - id: draft-rewrites
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   description: Draft concise, directive replacement steps.
   llm_type: high_reasoning
@@ -132,19 +84,7 @@ steps:
     Present original text, proposed text, tool count, action-clause count, and
     preserved requirements for every rewrite.
 - id: independent-review
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   description: Obtain an independent adversarial completeness review.
   llm_type: high_reasoning
@@ -165,19 +105,7 @@ steps:
     that remain ambiguous. Do not edit the target while the independent review
     is running.
 - id: reconcile-rewrites
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   description: Reconcile feedback and iterate until the rewrite is complete.
   llm_type: high_reasoning
@@ -192,19 +120,7 @@ steps:
     one tool call, no more than three action clauses unless justified, explicit
     invocation instructions, and a complete preserved-requirement list.
 - id: apply-and-publish
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   description: Apply and validate the accepted definition.
   llm_type: fast_iteration
@@ -220,19 +136,7 @@ steps:
     update a pull request in this step.
 
 - id: verify-target-change
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   description: Confirm the reviewed definition changed before preparing a pull request.
   llm_type: simple_task
@@ -254,19 +158,7 @@ steps:
     - <target-definition-path>
 
 - id: stage-for-pull-request
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   description: Stage the reviewed definition for pull-request preparation.
   llm_type: simple_task
@@ -284,11 +176,7 @@ steps:
     - <target-definition-path>
 
 - id: finish-pull-request-prep
-  actions:
-    - name: invoke_skill
-      instructions: Run the listed nested skill for this step.
-    - name: next_step
-      instructions: Advance after the nested skill result is complete.
+  actions: [invoke_skill, next_step]
   step_type: freeform
   description: Run final pull-request preparation checks.
   llm_type: simple_task
@@ -301,11 +189,7 @@ steps:
   - finish-pr-prep
 
 - id: create-pull-request
-  actions:
-    - name: invoke_skill
-      instructions: Run the listed nested skill for this step.
-    - name: next_step
-      instructions: Advance after the nested skill result is complete.
+  actions: [invoke_skill, next_step]
   step_type: freeform
   description: Create or update the pull request for the reviewed definition.
   llm_type: simple_task

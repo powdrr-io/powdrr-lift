@@ -27,7 +27,6 @@ from powdrr_lift.cli import main
 from powdrr_lift.core import (
     Skill,
     SkillStep,
-    SkillStepAction,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
@@ -878,10 +877,7 @@ def test_step_allowed_actions_reject_direct_edit() -> None:
     step = SkillStep(
         description="Produce a deferred edit.",
         actions=(
-            SkillStepAction(
-                name="read_document",
-                instructions="Read the exact range needed for this step.",
-            ),
+            "read_document",
         ),
     )
 
@@ -5443,10 +5439,7 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
         SkillStep(
             description="Ask a question.",
             actions=(
-                SkillStepAction(
-                    name="prompt_user",
-                    instructions="Ask the one missing question needed to continue.",
-                ),
+                "prompt_user",
             ),
         )
     )

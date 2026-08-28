@@ -157,17 +157,6 @@ class SkillStepGate:
 
 
 @dataclass(frozen=True, slots=True)
-class SkillStepAction:
-    """An action the model may return for one step and its local guidance."""
-
-    name: str
-    instructions: str
-
-    def to_data(self) -> dict[str, Any]:
-        return {"name": self.name, "instructions": self.instructions}
-
-
-@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -176,7 +165,7 @@ class SkillStep:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
-    actions: tuple[SkillStepAction, ...] = field(default_factory=tuple)
+    actions: tuple[str, ...] = field(default_factory=tuple)
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -192,6 +181,7 @@ class SkillStep:
         if self.actions:
             return
         names = [
+            "invoke_tool",
             "edit",
             "yaml_edit",
             "file_management",
@@ -209,7 +199,7 @@ class SkillStep:
             self,
             "actions",
             tuple(
-                SkillStepAction(name=name, instructions="Available for this step.")
+                name
                 for name in names
             ),
         )
@@ -236,7 +226,7 @@ class SkillStep:
         if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.actions:
-            data["actions"] = [action.to_data() for action in self.actions]
+            data["actions"] = list(self.actions)
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -1707,26 +1697,25 @@ def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
     return result
 
 
-def _optional_step_actions(value: object) -> tuple[SkillStepAction, ...]:
+def _optional_step_actions(value: object) -> tuple[str, ...]:
     if value is None:
         raise ValueError("Skill steps must include an actions array.")
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step actions must be an array.")
     if not value:
-        raise ValueError("Skill step actions must not be empty.")
-    result: list[SkillStepAction] = []
+        return ()
+    result: list[str] = []
     seen: set[str] = set()
     for item in value:
-        if not isinstance(item, Mapping):
-            raise ValueError("Skill step actions must contain objects.")
-        name = _required_string(item, "name")
-        instructions = _required_string(item, "instructions")
+        name = _optional_string(item)
+        if name is None:
+            raise ValueError("Skill step actions must contain non-empty strings.")
         if name not in SUPPORTED_STEP_ACTIONS:
             raise ValueError(f"Skill step actions contains unsupported action: {name}.")
         if name in seen:
             raise ValueError("Skill step actions must not contain duplicates.")
         seen.add(name)
-        result.append(SkillStepAction(name=name, instructions=instructions))
+        result.append(name)
     return tuple(result)
 
 

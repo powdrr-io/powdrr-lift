@@ -6,19 +6,7 @@ when_to_use:
 - When no other skill is currently running and no listed skill is a better match.
 steps:
 - description: Handle what the user asked for.
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -29,19 +17,7 @@ steps:
     workflow context and do not create a new worktree. Do not invent a larger
     task or a new feature when the request is an ad-hoc follow-up.
 - description: Run finish-pr-prep when files changed.
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-

@@ -9,7 +9,6 @@ import yaml
 from powdrr_lift.core import (
     Skill,
     SkillStep,
-    SkillStepAction,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
@@ -41,12 +40,7 @@ def test_skill_round_trips_through_json() -> None:
                 id="capture-goal",
                 details="Record the user-visible outcome first.",
                 prompt_catalogs=(),
-                actions=(
-                    SkillStepAction(
-                        name="prompt_user",
-                        instructions="Ask one necessary question about the goal.",
-                    ),
-                ),
+                actions=("prompt_user",),
             ),
             SkillStep(
                 description="Pull in the system context.",
@@ -64,20 +58,11 @@ def test_skill_round_trips_through_json() -> None:
                         ),
                     ),
                 ),
-                actions=(
-                    SkillStepAction(
-                        name="invoke_tool",
-                        instructions="Run the declared context command.",
-                    ),
-                ),
+                    actions=("invoke_tool",),
             ),
             SkillStep(
                 description="Summarize the result.",
-                actions=(
-                    SkillStepAction(
-                        name="next_step", instructions="Advance with the summary."
-                    ),
-                ),
+                actions=("next_step",),
             ),
         ),
         adversarial=True,
@@ -104,14 +89,7 @@ def test_skill_round_trips_through_json() -> None:
                     "step_type": "freeform",
                     "id": "capture-goal",
                     "details": "Record the user-visible outcome first.",
-                    "actions": [
-                        {
-                            "name": "prompt_user",
-                            "instructions": (
-                                "Ask one necessary question about the goal."
-                            ),
-                        }
-                    ],
+                    "actions": ["prompt_user"],
             },
             {
                 "description": "Pull in the system context.",
@@ -130,22 +108,12 @@ def test_skill_round_trips_through_json() -> None:
                         ],
                         }
                     ],
-                    "actions": [
-                        {
-                            "name": "invoke_tool",
-                            "instructions": "Run the declared context command.",
-                        }
-                    ],
+                    "actions": ["invoke_tool"],
             },
             {
                     "description": "Summarize the result.",
                     "step_type": "freeform",
-                    "actions": [
-                        {
-                            "name": "next_step",
-                            "instructions": "Advance with the summary.",
-                        }
-                    ],
+                    "actions": ["next_step"],
             },
         ],
     }
@@ -268,7 +236,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 }
 
 
-def test_actions_require_instructions_and_round_trip() -> None:
+def test_actions_round_trip_and_are_required() -> None:
     skill = Skill(
         name="action-contract",
         when_to_use=("Test step action restrictions.",),
@@ -276,10 +244,7 @@ def test_actions_require_instructions_and_round_trip() -> None:
             SkillStep(
                 description="Inspect then hand off.",
                 actions=(
-                    SkillStepAction(
-                        name="read_document",
-                        instructions="Read the exact range needed for this step.",
-                    ),
+                    "read_document",
                 ),
             ),
         ),
@@ -302,12 +267,7 @@ def test_step_actions_round_trip_with_local_instructions() -> None:
             SkillStep(
                 description="Inspect then hand off.",
                 actions=(
-                    SkillStepAction(
-                        name="read_document",
-                        instructions=(
-                            "Read the exact file range needed for the diagnosis."
-                        ),
-                    ),
+                    "read_document",
                 ),
             ),
         ),
@@ -317,10 +277,7 @@ def test_step_actions_round_trip_with_local_instructions() -> None:
 
     assert parsed == skill
     assert json.loads(skill_to_json(skill))["steps"][0]["actions"] == [
-        {
-            "name": "read_document",
-            "instructions": "Read the exact file range needed for the diagnosis.",
-        }
+        "read_document"
     ]
 
 
@@ -402,10 +359,10 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
             "steps:\n"
             "- id: repeat\n"
             "  description: First\n"
-            "  actions: [{name: next_step, instructions: Continue}]\n"
+            "  actions: [next_step]\n"
             "- id: repeat\n"
             "  description: Second\n"
-            "  actions: [{name: next_step, instructions: Continue}]\n",
+            "  actions: [next_step]\n",
         source_path=Path("repeated.yaml"),
     )
 
@@ -423,12 +380,7 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
                     {
                             "description": "Filter gathered requirements.",
                             "step_type": "invoke_tool",
-                            "actions": [
-                                {
-                                    "name": "next_step",
-                                    "instructions": "Advance after gathering.",
-                                }
-                            ],
+                            "actions": ["next_step"],
                         "pre_step": {
                             "action": "gather_context",
                             "template": {
@@ -616,7 +568,7 @@ def test_skill_validation_accepts_adversarial_values() -> None:
         "name: adversarial\n"
         "adversarial: true\n"
         "when_to_use: [review]\n"
-        "steps: [{description: challenge}]\n",
+        "steps: [{description: challenge, actions: [next_step]}]\n",
         source_path=Path("adversarial.yaml"),
     )
 
@@ -637,7 +589,7 @@ def test_skill_validation_accepts_inherited_adversarial_value() -> None:
         "name: inherited\n"
         "adversarial: null\n"
         "when_to_use: [review]\n"
-        "steps: [{description: challenge}]\n",
+        "steps: [{description: challenge, actions: [next_step]}]\n",
         source_path=Path("inherited.yaml"),
     )
 

@@ -6,9 +6,7 @@ when_to_use:
 steps:
 - id: run-all-tests
   description: Run the complete test suite and preserve its raw tool result.
-  actions:
-    - name: next_step
-      instructions: Advance after the deterministic test result is available.
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: The deterministic pre-step has already run pytest. Return next_step; do not run it again.
@@ -23,9 +21,7 @@ steps:
       command: [uv, run, --extra, dev, pytest, -q]
 - id: enrich-test-results
   description: Convert the raw test result into structured failure data.
-  actions:
-    - name: next_step
-      instructions: Advance after the deterministic enrichment result is available.
+  actions: []
   step_type: invoke_tool
   inputs:
   - name: test_tool_result
@@ -51,11 +47,7 @@ steps:
     type: any
     required: true
   llm_type: high_reasoning
-  actions:
-  - name: next_step
-    instructions: >-
-      Advance only after the diagnosis is complete and include the required
-      test_diagnosis output.
+  actions: []
   details: >-
     Consume only enriched_test_result. Identify every failing test and its exact
     root cause. List only approved source or test files that require changes.
@@ -92,16 +84,10 @@ steps:
   - name: repair_edit
     type: any
     required_for_next_step: true
-  actions:
-  - name: read_document
-    instructions: Read every named source or test file before composing the edit.
-  - name: next_step
-    instructions: Return the complete repair_edit output and do not apply it.
+  actions: [read_document, next_step]
 - id: validate-repair-edit
   description: Validate the deferred edit without changing files.
-  actions:
-    - name: next_step
-      instructions: Advance after the deterministic validation result is available.
+  actions: []
   step_type: invoke_tool
   inputs:
   - name: repair_edit
@@ -129,11 +115,7 @@ steps:
     type: any
     required: true
   llm_type: standard_reasoning
-  actions:
-  - name: read_document
-    instructions: Re-read each target file needed to correct the validation issue.
-  - name: next_step
-    instructions: Return the complete corrected repair_edit output and do not apply it.
+  actions: [read_document, next_step]
   details: >-
     Use the repair_edit and edit_validation handoffs. If edit_validation has
     returncode 0, return the exact same repair_edit unchanged. If it failed,
@@ -149,9 +131,7 @@ steps:
     required_for_next_step: true
 - id: validate-repair-edit-gate
   description: Require the corrected deferred edit to pass validation.
-  actions:
-    - name: next_step
-      instructions: Advance only after the deterministic validation gate passes.
+  actions: []
   step_type: gate
   inputs:
   - name: repair_edit
@@ -173,9 +153,7 @@ steps:
       Do not repeat the invalid output or apply any edit until validation passes.
 - id: apply-repair-edit
   description: Apply the validated deferred edit.
-  actions:
-    - name: next_step
-      instructions: Advance after the deterministic edit result is available.
+  actions: []
   step_type: invoke_tool
   inputs:
   - name: repair_edit
@@ -194,9 +172,7 @@ steps:
     required_for_next_step: true
 - id: rerun-all-tests
   description: Rerun the complete suite after applying the repair.
-  actions:
-    - name: next_step
-      instructions: Advance after the deterministic test rerun result is available.
+  actions: []
   step_type: gate
   inputs:
   - name: applied_edit

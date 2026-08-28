@@ -8,19 +8,7 @@ when_to_use:
   pull-request comments.
 steps:
 - description: Discover the referenced pull request and its feature relationship.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -49,19 +37,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Select the feature test scope for the current pull request.
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
@@ -78,19 +54,7 @@ steps:
     only on PR prose. Record the exact requested
     test cases, acceptance criteria that require tests, and validation commands.
 - description: Build the requested-test coverage matrix.
-  actions:
-    - name: edit
-      instructions: Apply a known line-based change to a file.
-    - name: yaml_edit
-      instructions: Apply a structural change to a YAML file.
-    - name: file_management
-      instructions: Move, rename, or delete one relative file.
-    - name: read_document
-      instructions: Read a bounded range from a known document.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -110,19 +74,7 @@ steps:
     as an unjustified scope finding. Do not demand tests for behavior explicitly
     outside the feature's scope. The matrix is the basis for findings.
 - description: Post every actionable test coverage finding inline.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -161,19 +113,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted coverage review and report the audit result.
-  actions:
-    - name: invoke_tool
-      instructions: Run the declared command or validation obligation for this step.
-    - name: edit
-      instructions: Apply the required correction to a file.
-    - name: yaml_edit
-      instructions: Apply the required structural YAML correction.
-    - name: read_document
-      instructions: Read the exact file range needed for this step.
-    - name: prompt_user
-      instructions: Ask one necessary human question.
-    - name: next_step
-      instructions: Advance after this step is complete.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

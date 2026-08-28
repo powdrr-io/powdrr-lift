@@ -82,7 +82,7 @@ steps:
     required_for_next_step: true
 - id: validate-repair-edit
   description: Validate the deferred edit without changing files.
-  step_type: gate
+  step_type: invoke_tool
   inputs:
   - name: repair_edit
     type: any
@@ -94,13 +94,55 @@ steps:
     template:
       tool: validate_edit
       edit: <repair_edit>
+  outputs:
+  - name: edit_validation
+    type: any
+    required_for_next_step: true
+- id: repair-invalid-edit
+  description: Correct the deferred edit using deterministic validation feedback.
+  step_type: freeform
+  inputs:
+  - name: repair_edit
+    type: any
+    required: true
+  - name: edit_validation
+    type: any
+    required: true
+  llm_type: standard_reasoning
+  details: >-
+    Use the repair_edit and edit_validation handoffs. If edit_validation has
+    returncode 0, return the exact same repair_edit unchanged. If it failed,
+    correct only the reported validation issue and return next_step with a new
+    repair_edit. Re-read any target file needed to determine exact in-bounds
+    lines. The output must remain one complete canonical edit action object;
+    never use line_number or content, and never apply files in this step.
+    Return next_step with outputs.repair_edit containing the full corrected
+    object, not a prose description.
+  outputs:
+  - name: repair_edit
+    type: any
+    required_for_next_step: true
+- id: validate-repair-edit-gate
+  description: Require the corrected deferred edit to pass validation.
+  step_type: gate
+  inputs:
+  - name: repair_edit
+    type: any
+    required: true
+  llm_type: simple_task
+  details: The deterministic validator is authoritative; do not apply files in this gate.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: validate_edit
+      edit: <repair_edit>
   gate:
     outcome: {path: returncode, equals: 0}
-    goto_step: produce-repair-edit
+    goto_step: repair-invalid-edit
     retry_context: >-
-      repair_edit is invalid. Re-read every target file and produce a materially
-      corrected canonical edit with exact in-bounds ranges. Do not repeat the
-      invalid output or apply any edit until validation passes.
+      The corrected repair_edit is still invalid. Use the new validation result,
+      re-read every target file, and return a materially corrected canonical edit.
+      Do not repeat the invalid output or apply any edit until validation passes.
 - id: apply-repair-edit
   description: Apply the validated deferred edit.
   step_type: invoke_tool

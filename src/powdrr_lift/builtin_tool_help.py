@@ -12,6 +12,8 @@ BUILTIN_TOOL_NAMES = (
     "fuzzy-match",
     "basedpyright-symbol",
     "basedpyright-structure",
+    "validate_edit",
+    "apply_edit",
 )
 
 _HELP: dict[str, dict[str, Any]] = {
@@ -143,6 +145,50 @@ _HELP: dict[str, dict[str, Any]] = {
         "examples": [
             {"path": "src/powdrr_lift/workflow_chat_agent.py"},
             {"path": "tests/test_workflow_chat_agent.py"},
+        ],
+    },
+    "validate_edit": {
+        "summary": "Validate a deferred edit without changing files.",
+        "when_to_use": (
+            "Use before applying an edit stored in a workflow handoff output."
+        ),
+        "parameters": {"edit": "The complete canonical edit action object."},
+        "examples": [
+            {
+                "edit": {
+                    "action": "edit",
+                    "file_path": "src/example.py",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "end_line": 1,
+                            "text": "replacement",
+                        }
+                    ],
+                }
+            }
+        ],
+    },
+    "apply_edit": {
+        "summary": "Apply a previously validated deferred edit.",
+        "when_to_use": "Use only after validate_edit returns returncode 0.",
+        "parameters": {"edit": "The complete canonical edit action object."},
+        "examples": [
+            {
+                "edit": {
+                    "action": "edit",
+                    "file_path": "src/example.py",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "end_line": 1,
+                            "text": "replacement",
+                        }
+                    ],
+                }
+            }
         ],
     },
 }

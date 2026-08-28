@@ -175,6 +175,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
                 ("run-tests-and-fix.yaml", 0),
+                ("run-tests-and-fix.yaml", 4),
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 8),
                 ("execute-proposed-pr.yaml", 9),
@@ -182,7 +183,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 13),
                 ("start-implementing-feature.yaml", 7),
                 ("run-tests-and-fix.yaml", 1),
-                ("run-tests-and-fix.yaml", 5),
+                ("run-tests-and-fix.yaml", 7),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
                 ("start-implementing-feature.yaml", 18),
@@ -204,8 +205,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
-                ("run-tests-and-fix.yaml", 4),
                 ("run-tests-and-fix.yaml", 6),
+                ("run-tests-and-fix.yaml", 8),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -711,6 +712,8 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
         "diagnose-test-results",
         "produce-repair-edit",
         "validate-repair-edit",
+        "repair-invalid-edit",
+        "validate-repair-edit-gate",
         "apply-repair-edit",
         "rerun-all-tests",
     ]
@@ -737,8 +740,18 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
         "tool": "validate_edit",
         "edit": "<repair_edit>",
     }
-    assert steps["validate-repair-edit"].gate is not None
-    assert steps["validate-repair-edit"].gate.goto_step == "produce-repair-edit"
+    assert steps["validate-repair-edit"].outputs[0].name == "edit_validation"
+    assert steps["validate-repair-edit"].outputs[0].required_for_next_step
+    assert steps["repair-invalid-edit"].inputs[0].name == "repair_edit"
+    assert steps["repair-invalid-edit"].inputs[1].name == "edit_validation"
+    assert steps["repair-invalid-edit"].outputs[0].name == "repair_edit"
+    assert steps["validate-repair-edit-gate"].gate is not None
+    assert steps["validate-repair-edit-gate"].gate.goto_step == "repair-invalid-edit"
+    assert steps["validate-repair-edit-gate"].pre_step is not None
+    assert steps["validate-repair-edit-gate"].pre_step.template == {
+        "tool": "validate_edit",
+        "edit": "<repair_edit>",
+    }
     assert steps["apply-repair-edit"].pre_step is not None
     assert steps["apply-repair-edit"].pre_step.template == {
         "tool": "apply_edit",

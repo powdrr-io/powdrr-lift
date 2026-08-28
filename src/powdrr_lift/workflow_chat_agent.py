@@ -9481,9 +9481,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
     # Keep the complete first-class action catalog in the contract unless the
     # skill explicitly narrows it for this step.
-    allowed_actions: list[str] = list(
-        getattr(step, "allowed_actions", ()) or ()
-    ) or [
+    allowed_actions: list[str] = list(getattr(step, "allowed_actions", ()) or ()) or [
         "edit",
         "yaml_edit",
         "file_management",

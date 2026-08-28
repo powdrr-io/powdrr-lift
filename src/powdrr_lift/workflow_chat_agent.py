@@ -4718,6 +4718,8 @@ def _modular_action_system_prompt(
         + action_lines
         + "\nThe current-step contract below is authoritative. Do not use action "
         "instructions or action names from any previous step.\n"
+        "next_step is always allowed with the default completion behavior; it is "
+        "listed below only when this step needs output-specific handoff guidance.\n"
         + "\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "
@@ -9516,7 +9518,13 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
-    if "next_step" not in action_names:
+    has_required_outputs = any(
+        getattr(output, "required_for_next_step", False)
+        for output in (getattr(step, "outputs", ()) or ())
+    )
+    if not has_required_outputs:
+        actions = [item for item in actions if item[0] != "next_step"]
+    if has_required_outputs and "next_step" not in action_names:
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(
         output
@@ -9537,7 +9545,9 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
 
 
 def _declared_action_names(step: Any) -> tuple[str, ...]:
-    return tuple(name for name, _ in _step_actions(step))
+    # next_step is an implicit runtime action; its output-specific guidance is
+    # rendered only when the step declares required handoff outputs.
+    return tuple(name for name, _ in _step_actions(step)) + ("next_step",)
 
 
 def _action_repair_prompt(

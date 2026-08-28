@@ -152,7 +152,10 @@ _HELP: dict[str, dict[str, Any]] = {
         "when_to_use": (
             "Use before applying an edit stored in a workflow handoff output."
         ),
-        "parameters": {"edit": "The complete canonical edit action object."},
+        "parameters": {
+            "edit": "The complete canonical edit action object.",
+            "help": "Set true to request the tool's conventional --help guidance.",
+        },
         "examples": [
             {
                 "edit": {
@@ -173,7 +176,10 @@ _HELP: dict[str, dict[str, Any]] = {
     "apply_edit": {
         "summary": "Apply a previously validated deferred edit.",
         "when_to_use": "Use only after validate_edit returns returncode 0.",
-        "parameters": {"edit": "The complete canonical edit action object."},
+        "parameters": {
+            "edit": "The complete canonical edit action object.",
+            "help": "Set true to request the tool's conventional --help guidance.",
+        },
         "examples": [
             {
                 "edit": {

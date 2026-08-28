@@ -738,6 +738,11 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert "If classification is passing or" in (
         steps["repair-test-failures"].details or ""
     )
+    repair_details = steps["repair-test-failures"].details or ""
+    assert "read_document for every target file" in repair_details
+    assert "never guess line 1" in repair_details
+    assert "real mutation" in repair_details
+    assert '"kind":"replace","start_line":12,"end_line":14' in repair_details
 
 
 def test_repository_state_invocations_use_internal_tool() -> None:

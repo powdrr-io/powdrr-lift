@@ -95,6 +95,20 @@ steps:
     no-change repair evidence shown below. Otherwise make the smallest complete
     correction for every listed root cause, and edit only files listed in
     root_causes[*].files_to_change. Use the edit action with exact line ranges.
+    Before producing any edit, use read_document for every target file listed
+    in files_to_change and inspect the returned numbered lines. Derive
+    start_line and end_line from those lines; never guess line 1, copy a line
+    number from the traceback as an edit range, or replace a whole file from a
+    guessed location. A read_document request may end past EOF and will return
+    the available lines, but the edit range itself must be within the actual
+    file. The repair action must be a real mutation: its replacement text must
+    differ from the selected source range and the changed_files list must match
+    files actually changed by the edit.
+    For example, after reading a file and finding the target on lines 12-14,
+    produce exactly:
+    {"action":"edit","file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}],"decisions_and_context":"Applied the diagnosed correction to the lines read from src/example.py."}
+    Do not use a one-line range for a multi-line replacement, and do not claim
+    repair_evidence until the edit has been accepted by the runner.
     Do not run tests in this step; the deterministic rerun gate is authoritative.
     Never weaken or delete a failing test to conceal a product defect. If the
     diagnosis is incomplete, contradictory, or names no approved file, return

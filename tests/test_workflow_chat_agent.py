@@ -422,7 +422,9 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Context guidance:" not in ordinary_system_prompt
     assert "Nested-skill guidance:" not in ordinary_system_prompt
     assert "entity-relationships" not in ordinary_system_prompt
-    assert "prompt_user requires the question in the text field" in ordinary_system_prompt
+    assert (
+        "prompt_user requires the question in the text field" in ordinary_system_prompt
+    )
 
     gather_prompt = json.loads(
         _build_step_execution_messages(
@@ -876,9 +878,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
 def test_step_allowed_actions_reject_direct_edit() -> None:
     step = SkillStep(
         description="Produce a deferred edit.",
-        actions=(
-            "read_document",
-        ),
+        actions=("read_document",),
     )
 
     with pytest.raises(RuntimeError, match="edit action is not allowed"):
@@ -5438,9 +5438,7 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
     prompt = _modular_action_system_prompt(
         SkillStep(
             description="Ask a question.",
-            actions=(
-                "prompt_user",
-            ),
+            actions=("prompt_user",),
         )
     )
 

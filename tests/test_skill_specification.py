@@ -58,7 +58,7 @@ def test_skill_round_trips_through_json() -> None:
                         ),
                     ),
                 ),
-                    actions=("invoke_tool",),
+                actions=("invoke_tool",),
             ),
             SkillStep(
                 description="Summarize the result.",
@@ -86,10 +86,10 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
-                    "step_type": "freeform",
-                    "id": "capture-goal",
-                    "details": "Record the user-visible outcome first.",
-                    "actions": ["prompt_user"],
+                "step_type": "freeform",
+                "id": "capture-goal",
+                "details": "Record the user-visible outcome first.",
+                "actions": ["prompt_user"],
             },
             {
                 "description": "Pull in the system context.",
@@ -97,7 +97,7 @@ def test_skill_round_trips_through_json() -> None:
                 "details": "Use the system spec and related context.",
                 "uses_skills": ["specify-system"],
                 "prompt_catalogs": ["context_types", "skills"],
-                    "tool_invocations": [
+                "tool_invocations": [
                     {
                         "tool": "internal",
                         "command": [
@@ -106,14 +106,14 @@ def test_skill_round_trips_through_json() -> None:
                             "--work-item-name",
                             "<work-item-name>",
                         ],
-                        }
-                    ],
-                    "actions": ["invoke_tool"],
+                    }
+                ],
+                "actions": ["invoke_tool"],
             },
             {
-                    "description": "Summarize the result.",
-                    "step_type": "freeform",
-                    "actions": ["next_step"],
+                "description": "Summarize the result.",
+                "step_type": "freeform",
+                "actions": ["next_step"],
             },
         ],
     }
@@ -243,9 +243,7 @@ def test_actions_round_trip_and_default_to_next_step() -> None:
         steps=(
             SkillStep(
                 description="Inspect then hand off.",
-                actions=(
-                    "read_document",
-                ),
+                actions=("read_document",),
             ),
         ),
     )
@@ -266,9 +264,7 @@ def test_step_actions_round_trip_with_local_instructions() -> None:
         steps=(
             SkillStep(
                 description="Inspect then hand off.",
-                actions=(
-                    "read_document",
-                ),
+                actions=("read_document",),
             ),
         ),
     )
@@ -276,9 +272,7 @@ def test_step_actions_round_trip_with_local_instructions() -> None:
     parsed = skill_from_json(skill_to_json(skill))
 
     assert parsed == skill
-    assert json.loads(skill_to_json(skill))["steps"][0]["actions"] == [
-        "read_document"
-    ]
+    assert json.loads(skill_to_json(skill))["steps"][0]["actions"] == ["read_document"]
 
 
 def test_skill_step_contracts_round_trip_and_validate() -> None:
@@ -356,13 +350,13 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
     report = build_skill_validation_report(
         "name: repeated\n"
         "when_to_use: [review]\n"
-            "steps:\n"
-            "- id: repeat\n"
-            "  description: First\n"
-            "  actions: [next_step]\n"
-            "- id: repeat\n"
-            "  description: Second\n"
-            "  actions: [next_step]\n",
+        "steps:\n"
+        "- id: repeat\n"
+        "  description: First\n"
+        "  actions: [next_step]\n"
+        "- id: repeat\n"
+        "  description: Second\n"
+        "  actions: [next_step]\n",
         source_path=Path("repeated.yaml"),
     )
 
@@ -378,9 +372,9 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
                 "when_to_use": ["When gathered context needs filtering."],
                 "steps": [
                     {
-                            "description": "Filter gathered requirements.",
-                            "step_type": "invoke_tool",
-                            "actions": ["next_step"],
+                        "description": "Filter gathered requirements.",
+                        "step_type": "invoke_tool",
+                        "actions": ["next_step"],
                         "pre_step": {
                             "action": "gather_context",
                             "template": {

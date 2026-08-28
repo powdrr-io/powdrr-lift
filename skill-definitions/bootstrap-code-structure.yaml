@@ -6,7 +6,7 @@ when_to_use:
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
 - description: Check whether the project-structure artifact already exists.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
@@ -21,7 +21,7 @@ steps:
     does not exist, record that result and choose next_step so the discovery
     step can begin.
 - description: Discover the project-wide modules, tools, tests, and development commands.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -65,7 +65,7 @@ steps:
     - scripts
     - README.md
 - description: Reuse an existing project-structure artifact or create its template.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
@@ -88,7 +88,7 @@ steps:
     - powdrr-lift
     - project-structure
 - description: Populate the project-structure artifact from codebase evidence.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -115,7 +115,7 @@ steps:
     verified syntax instead of guessing. Use the edit action to write the
     artifact and pass the changed path and edit summary onward.
 - description: Validate the project-structure artifact and discovery evidence.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -157,7 +157,7 @@ steps:
     - powdrr-lift
     - repository-state
 - description: Stage the validated project-structure artifact.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -175,7 +175,7 @@ steps:
     - add
     - docs/project_structure/project-structure.yaml
 - description: Run finish-pr-prep on the validated project-structure artifact.
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -186,7 +186,7 @@ steps:
   uses_skills:
   - finish-pr-prep
 - description: Commit the project-structure artifact and open a draft pull request.
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   llm_type: simple_task
   details: >-

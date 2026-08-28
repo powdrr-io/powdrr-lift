@@ -5823,8 +5823,10 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="workflow_action_not_allowed",
-                message=(f"The {action.kind} action is not allowed in this step. "
-                         "Use one of: " + ", ".join(allowed_actions) + "."),
+                message=(
+                    f"The {action.kind} action is not allowed in this step. "
+                    "Use one of: " + ", ".join(allowed_actions) + "."
+                ),
                 path="kind",
             )
         )
@@ -9499,9 +9501,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
         # Compatibility for definitions written before the per-step action
         # contract. This fallback is intentionally isolated here so no other
         # metadata can silently add actions once a step declares actions.
-        names = [
-            "edit", "yaml_edit", "file_management", "read_document", "prompt_user"
-        ]
+        names = ["edit", "yaml_edit", "file_management", "read_document", "prompt_user"]
         if getattr(step, "tool_invocations", ()):
             names.insert(0, "invoke_tool")
         if getattr(step, "uses_skills", ()):
@@ -9533,9 +9533,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     )
     if outputs:
         suffix = (
-            " Include outputs: "
-            + ", ".join(output.name for output in outputs)
-            + "."
+            " Include outputs: " + ", ".join(output.name for output in outputs) + "."
         )
         actions = [
             (name, instructions + suffix if name == "next_step" else instructions)
@@ -9592,10 +9590,14 @@ def _action_repair_prompt(
             + json.dumps(_current_step_contract(current_step), ensure_ascii=False)
             + ". "
         )
-        prompt += "\nAvailable actions for this step:\n" + "\n".join(
-            f"- {name}: {instructions}"
-            for name, instructions in _step_actions(current_step)
-        ) + "\n"
+        prompt += (
+            "\nAvailable actions for this step:\n"
+            + "\n".join(
+                f"- {name}: {instructions}"
+                for name, instructions in _step_actions(current_step)
+            )
+            + "\n"
+        )
         prompt += (
             "\nThe current step is the only authority for what may be done. "
             f"Step description: {current_step.description}. "

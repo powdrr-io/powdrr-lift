@@ -198,10 +198,7 @@ class SkillStep:
         object.__setattr__(
             self,
             "actions",
-            tuple(
-                name
-                for name in names
-            ),
+            tuple(name for name in names),
         )
 
     def to_data(self) -> dict[str, Any]:

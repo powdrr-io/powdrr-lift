@@ -175,6 +175,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 3),
                 ("execute-proposed-pr.yaml", 0),
                 ("run-tests-and-fix.yaml", 0),
+                ("run-tests-and-fix.yaml", 4),
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 8),
                 ("execute-proposed-pr.yaml", 9),
@@ -182,6 +183,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 13),
                 ("start-implementing-feature.yaml", 7),
                 ("run-tests-and-fix.yaml", 1),
+                ("run-tests-and-fix.yaml", 7),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
                 ("start-implementing-feature.yaml", 18),
@@ -203,7 +205,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
-                ("run-tests-and-fix.yaml", 4),
+                ("run-tests-and-fix.yaml", 6),
+                ("run-tests-and-fix.yaml", 8),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -707,7 +710,11 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
         "run-all-tests",
         "enrich-test-results",
         "diagnose-test-results",
-        "repair-test-failures",
+        "produce-repair-edit",
+        "validate-repair-edit",
+        "repair-invalid-edit",
+        "validate-repair-edit-gate",
+        "apply-repair-edit",
         "rerun-all-tests",
     ]
     assert steps["run-all-tests"].pre_step is not None
@@ -725,23 +732,40 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
-    assert steps["repair-test-failures"].inputs[0].name == "test_diagnosis"
-    assert steps["repair-test-failures"].outputs[0].name == "repair_evidence"
-    assert steps["repair-test-failures"].outputs[0].required_for_next_step
+    assert steps["produce-repair-edit"].inputs[0].name == "test_diagnosis"
+    assert steps["produce-repair-edit"].outputs[0].name == "repair_edit"
+    assert steps["produce-repair-edit"].outputs[0].required_for_next_step
+    assert steps["validate-repair-edit"].pre_step is not None
+    assert steps["validate-repair-edit"].pre_step.template == {
+        "tool": "validate_edit",
+        "edit": "<repair_edit>",
+    }
+    assert steps["validate-repair-edit"].outputs[0].name == "edit_validation"
+    assert steps["validate-repair-edit"].outputs[0].required_for_next_step
+    assert steps["repair-invalid-edit"].inputs[0].name == "repair_edit"
+    assert steps["repair-invalid-edit"].inputs[1].name == "edit_validation"
+    assert steps["repair-invalid-edit"].outputs[0].name == "repair_edit"
+    assert steps["validate-repair-edit-gate"].gate is not None
+    assert steps["validate-repair-edit-gate"].gate.goto_step == "repair-invalid-edit"
+    assert steps["validate-repair-edit-gate"].pre_step is not None
+    assert steps["validate-repair-edit-gate"].pre_step.template == {
+        "tool": "validate_edit",
+        "edit": "<repair_edit>",
+    }
+    assert steps["apply-repair-edit"].pre_step is not None
+    assert steps["apply-repair-edit"].pre_step.template == {
+        "tool": "apply_edit",
+        "edit": "<repair_edit>",
+    }
     assert steps["rerun-all-tests"].gate is not None
     assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
-    assert "Do not run it again" in (steps["run-all-tests"].details or "")
-    assert "test_tool_result" in (steps["run-all-tests"].details or "")
+    assert "do not run it again" in (steps["run-all-tests"].details or "")
     assert "test_tool_result" in (steps["enrich-test-results"].details or "")
     assert "enriched_test_result" in (steps["enrich-test-results"].details or "")
-    assert "deterministic enrich" in (steps["diagnose-test-results"].details or "")
-    assert "If classification is passing or" in (
-        steps["repair-test-failures"].details or ""
-    )
-    repair_details = steps["repair-test-failures"].details or ""
-    assert '"action":"edit"' in repair_details
-    assert '"kind":"replace"' in repair_details
-    assert "Never use line_number or content in an edit" in repair_details
+    repair_details = steps["produce-repair-edit"].details or ""
+    assert "read_document for every file" in repair_details
+    assert "Do not guess line 1" in repair_details
+    assert '"kind":"replace","start_line":12,"end_line":14' in repair_details
 
 
 def test_repository_state_invocations_use_internal_tool() -> None:

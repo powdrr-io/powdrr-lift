@@ -71,6 +71,12 @@ from powdrr_lift.core.validation_messages import (
 )
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.intrinsic_edit import (
+    APPLY_EDIT_TOOL,
+    VALIDATE_EDIT_TOOL,
+    execute_apply_edit_tool,
+    execute_validate_edit_tool,
+)
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL, execute_enrich_tool
 from powdrr_lift.intrinsic_git_gh import (
     GH_TOOL,
@@ -3847,8 +3853,8 @@ def _pre_step_context_values(
 ) -> dict[str, Any]:
     values: dict[str, Any] = {}
 
-    def add(name: object, value: object) -> None:
-        if not isinstance(name, str) or value is None:
+    def add(name: object, value: object, *, include_none: bool = False) -> None:
+        if not isinstance(name, str) or (value is None and not include_none):
             return
         normalized = re.sub(r"[-\s]+", "_", name.strip().lower())
         if normalized:
@@ -3859,7 +3865,7 @@ def _pre_step_context_values(
             add(name, value)
     for name, record in handoff_records.items():
         if isinstance(record, Mapping):
-            add(name, record.get("value"))
+            add(name, record.get("value"), include_none="value" in record)
     for event in execution_events:
         parameters = event.get("parameters")
         if not isinstance(parameters, Mapping):
@@ -4006,6 +4012,12 @@ def _run_deterministic_pre_step(
             parameters.pop("tool", None)
             _wire_previous_tool_output(parameters, execution_events, handoff_records)
             result = execute_enrich_tool(parameters)
+        elif tool == VALIDATE_EDIT_TOOL:
+            parameters.pop("tool", None)
+            result = execute_validate_edit_tool(parameters, worktree_root=worktree_root)
+        elif tool == APPLY_EDIT_TOOL:
+            parameters.pop("tool", None)
+            result = execute_apply_edit_tool(parameters, worktree_root=worktree_root)
         elif tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
                 parameters,
@@ -4232,7 +4244,14 @@ def _build_step_execution_messages(
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
         }
-        | {_INTERNAL_TOOL, GIT_TOOL, GH_TOOL, ENRICH_TOOL}
+        | {
+            _INTERNAL_TOOL,
+            GIT_TOOL,
+            GH_TOOL,
+            ENRICH_TOOL,
+            VALIDATE_EDIT_TOOL,
+            APPLY_EDIT_TOOL,
+        }
     )
     tool_descriptions = {
         "shell": (
@@ -4285,6 +4304,14 @@ def _build_step_execution_messages(
         ENRICH_TOOL: (
             "Convert a deterministic tool output into structured data. "
             "Use format pytest and pass the complete tool result as tool_output."
+        ),
+        VALIDATE_EDIT_TOOL: (
+            "Validate a deferred edit without changing files. Pass the complete "
+            "edit action in parameters.edit."
+        ),
+        APPLY_EDIT_TOOL: (
+            "Apply a previously validated deferred edit. Pass the complete edit "
+            "action in parameters.edit."
         ),
     }
     prompt_data: dict[str, Any] = {
@@ -5608,6 +5635,14 @@ def _handle_workflow_action_invoke_tool(
         )
     elif action.tool == ENRICH_TOOL:
         tool_result = execute_enrich_tool(action.parameters)
+    elif action.tool == VALIDATE_EDIT_TOOL:
+        tool_result = execute_validate_edit_tool(
+            action.parameters, worktree_root=state.worktree_root
+        )
+    elif action.tool == APPLY_EDIT_TOOL:
+        tool_result = execute_apply_edit_tool(
+            action.parameters, worktree_root=state.worktree_root
+        )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
             _validate_internal_command(action.parameters.get("command"))
@@ -5648,8 +5683,8 @@ def _handle_workflow_action_invoke_tool(
     else:
         raise RuntimeError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
-            "internal, git, gh, enrich, fuzzy-match, basedpyright-symbol, and "
-            "basedpyright-structure."
+            "internal, git, gh, enrich, validate_edit, apply_edit, fuzzy-match, "
+            "basedpyright-symbol, and basedpyright-structure."
         )
     if (
         action.tool == GIT_TOOL
@@ -7253,7 +7288,11 @@ def _parse_workflow_action_invoke_tool(
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
         )
-    if normalized_tool == ENRICH_TOOL:
+    if normalized_tool in {
+        ENRICH_TOOL,
+        VALIDATE_EDIT_TOOL,
+        APPLY_EDIT_TOOL,
+    }:
         return SkillChatAction(
             kind="invoke_tool",
             tool=normalized_tool,

@@ -116,7 +116,20 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-isolate-run-worktree",
         action="store_true",
-        help="Run directly in --repo-root instead of an ephemeral harness worktree.",
+        help="Deprecated compatibility alias; normal harness runs are direct.",
+    )
+    parser.add_argument(
+        "--isolate-run-worktree",
+        action="store_true",
+        help="Opt into the legacy ephemeral harness worktree mode.",
+    )
+    parser.add_argument(
+        "--preserve-workflow-state",
+        action="store_true",
+        help=(
+            "Do not synchronize workflow documents from main before running; "
+            "use the existing durable workflow state as the harness fixture."
+        ),
     )
     parser.add_argument("--error-log", type=Path, default=DEFAULT_ERROR_LOG)
     parser.add_argument("--transcript-dir", type=Path, default=DEFAULT_TRANSCRIPT_DIR)
@@ -181,13 +194,17 @@ def _workflow_instance(
     workflow = WorkflowInstance.from_directory(workflow_dir)
     if workflow_id is None:
         return workflow
-    prefix = f"{slugify_workflow_id(workflow_id)}-task-"
+    workflow_slug = slugify_workflow_id(workflow_id)
+    task_prefixes = (
+        f"{workflow_slug}-task-",
+        f"{workflow_slug}-workflow-task-",
+    )
     return WorkflowInstance(
         workflow.directory,
         {
             task.task_id: task
             for task in workflow.tasks
-            if task.task_id.startswith(prefix)
+            if any(task.task_id.startswith(prefix) for prefix in task_prefixes)
         },
     )
 
@@ -740,6 +757,16 @@ def _run_iteration(
         status = "failed"
     elif workflow_state["outcome"] == "agent_work_remaining":
         status = "incomplete"
+    if (
+        task is not None
+        and any(
+            item["task_id"] == task.task_id
+            and item["status"] == TaskStatus.COMPLETED.value
+            for item in workflow_state["tasks"]
+        )
+        and status == "incomplete"
+    ):
+        status = "clean"
     return {
         "status": status,
         "returncode": process.returncode,
@@ -865,7 +892,7 @@ def main() -> int:
     if source_template_path is not None and not source_template_path.is_absolute():
         source_template_path = repo_root / source_template_path
     run_root = repo_root
-    isolated = not args.no_isolate_run_worktree
+    isolated = args.isolate_run_worktree and not args.no_isolate_run_worktree
     if isolated:
         run_root = _create_run_worktree(repo_root)
     try:
@@ -894,11 +921,12 @@ def main() -> int:
         if not template_path.is_file():
             raise SystemExit(f"Workflow template does not exist: {template_path}")
 
-        _sync_workflow_branch_from_main(
-            run_root,
-            workflow_dir,
-            workflow_id=args.workflow_id,
-        )
+        if isolated and not args.preserve_workflow_state:
+            _sync_workflow_branch_from_main(
+                run_root,
+                workflow_dir,
+                workflow_id=args.workflow_id,
+            )
 
         log_root = _log_root(run_root)
         error_log = _resolve_path(args.error_log, log_root=log_root)
@@ -925,7 +953,7 @@ def main() -> int:
                 observed_workflow_dir,
                 workflow_id=args.workflow_id,
             )
-            if before["outcome"] in {"completed", "human_handoff"}:
+            if isolated and before["outcome"] in {"completed", "human_handoff"}:
                 reports.append(
                     {
                         "iteration": iteration,
@@ -942,7 +970,7 @@ def main() -> int:
                     f"{before['outcome']} after {iteration - 1} workflow run(s)."
                 )
                 return 0
-            if before["outcome"] == "stalled":
+            if isolated and before["outcome"] == "stalled":
                 reports.append(
                     {
                         "iteration": iteration,
@@ -955,7 +983,7 @@ def main() -> int:
                 observed_workflow_dir,
                 workflow_id=args.workflow_id,
             )
-            if workflow_state is not None:
+            if isolated and workflow_state is not None:
                 dependencies_complete, incomplete_dependencies = (
                     workflow_dependencies_completion(
                         resolve_git_repository_root(run_root),
@@ -1034,10 +1062,14 @@ def main() -> int:
                     "Workflow state repeated without progress three times; stopping.",
                     file=sys.stderr,
                 )
-            if result["status"] == "clean" and after["outcome"] in {
-                "completed",
-                "human_handoff",
-            }:
+            task_completed = args.task_id is not None and any(
+                item["task_id"] == args.task_id
+                and item["status"] == TaskStatus.COMPLETED.value
+                for item in after["tasks"]
+            )
+            if result["status"] == "clean" and (
+                after["outcome"] in {"completed", "human_handoff"} or task_completed
+            ):
                 report_path.write_text(
                     json.dumps(reports, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8",
@@ -1046,12 +1078,13 @@ def main() -> int:
                 return 0
             if result["status"] in {"timeout", "interrupted"}:
                 break
-            _reopen_locked_tasks(
-                run_root,
-                observed_workflow_dir,
-                list(after.get("locked_task_ids", [])),
-                workflow_id=args.workflow_id,
-            )
+            if isolated:
+                _reopen_locked_tasks(
+                    run_root,
+                    observed_workflow_dir,
+                    list(after.get("locked_task_ids", [])),
+                    workflow_id=args.workflow_id,
+                )
             if not args.repair_command:
                 print(
                     "Iteration failed; inspect the transcript and structured errors.",

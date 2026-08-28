@@ -95,6 +95,13 @@ steps:
     no-change repair evidence shown below. Otherwise make the smallest complete
     correction for every listed root cause, and edit only files listed in
     root_causes[*].files_to_change. Use the edit action with exact line ranges.
+    The required shape for one source-file replacement is exactly:
+    {"action":"edit","file_path":"src/example.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"corrected implementation"}],"decisions_and_context":"Applied the diagnosed correction."}
+    For multiple files, use one action with file_edits:
+    {"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"corrected implementation"}]},{"file_path":"tests/test_example.py","edits":[{"kind":"replace","start_line":4,"end_line":4,"text":"updated test"}]}],"decisions_and_context":"Applied the focused correction across the approved files."}
+    Each edit kind must be the string add, remove, or replace. Never use
+    line_number or content in an edit; those names belong to read-document
+    output, not edit input. Never put an edit object in kind.
     Do not run tests in this step; the deterministic rerun gate is authoritative.
     Never weaken or delete a failing test to conceal a product defect. If the
     diagnosis is incomplete, contradictory, or names no approved file, return

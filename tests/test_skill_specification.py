@@ -738,6 +738,10 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert "If classification is passing or" in (
         steps["repair-test-failures"].details or ""
     )
+    repair_details = steps["repair-test-failures"].details or ""
+    assert '"action":"edit"' in repair_details
+    assert '"kind":"replace"' in repair_details
+    assert "Never use line_number or content in an edit" in repair_details
 
 
 def test_repository_state_invocations_use_internal_tool() -> None:

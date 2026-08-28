@@ -38,6 +38,10 @@ from powdrr_lift.basedpyright_tools import (
     execute_basedpyright_tool,
     is_basedpyright_tool,
 )
+from powdrr_lift.builtin_tool_help import (
+    BUILTIN_TOOL_NAMES,
+    builtin_tool_help,
+)
 from powdrr_lift.core import (
     Skill,
     architecture_specification_default_output_path,
@@ -67,6 +71,7 @@ from powdrr_lift.core.validation_messages import (
 )
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.intrinsic_enrich import ENRICH_TOOL, execute_enrich_tool
 from powdrr_lift.intrinsic_git_gh import (
     GH_TOOL,
     GIT_TOOL,
@@ -1930,6 +1935,8 @@ class OpenAIChatClient:
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
+        except ConnectionError as exc:
+            raise RuntimeError(f"OpenAI request connection dropped: {exc}") from exc
         except TimeoutError as exc:
             raise RuntimeError(
                 _provider_timeout_message(
@@ -2178,6 +2185,8 @@ class AnthropicChatClient:
             ) from exc
         except URLError as exc:
             raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
+        except ConnectionError as exc:
+            raise RuntimeError(f"Anthropic request connection dropped: {exc}") from exc
         except TimeoutError as exc:
             raise RuntimeError(
                 _provider_timeout_message(
@@ -3917,6 +3926,40 @@ def _resolve_pre_step_template(
     return value
 
 
+def _wire_previous_tool_output(
+    parameters: dict[str, Any],
+    execution_events: Sequence[Mapping[str, Any]],
+    handoff_records: Mapping[str, Mapping[str, Any]],
+) -> None:
+    reference = parameters.get("tool_output")
+    if isinstance(reference, Mapping) and reference.get("source") == "handoff":
+        name = reference.get("name")
+        record = handoff_records.get(name) if isinstance(name, str) else None
+        if record is None or "value" not in record:
+            raise RuntimeError(
+                "enrich tool_output handoff source requires a prior named output."
+            )
+        parameters["tool_output"] = record["value"]
+        return
+    if reference != {"source": "previous_tool_output"}:
+        return
+    previous = next(
+        (
+            event.get("result")
+            for event in reversed(execution_events)
+            if event.get("kind") == "deterministic_pre_step"
+            and isinstance(event.get("result"), Mapping)
+        ),
+        None,
+    )
+    if previous is None:
+        raise RuntimeError(
+            "enrich tool_output source previous_tool_output requires a prior "
+            "deterministic tool result."
+        )
+    parameters["tool_output"] = previous
+
+
 def _run_deterministic_pre_step(
     step: Any,
     *,
@@ -3959,16 +4002,20 @@ def _run_deterministic_pre_step(
         parameters.pop("tool", None)
         if tool in {GIT_TOOL, GH_TOOL}:
             parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
-        if tool == "fuzzy-match":
+        if tool == ENRICH_TOOL:
+            parameters.pop("tool", None)
+            _wire_previous_tool_output(parameters, execution_events, handoff_records)
+            result = execute_enrich_tool(parameters)
+        elif tool == "fuzzy-match":
             result = _execute_fuzzy_match_tool(
                 parameters,
                 worktree_root=worktree_root,
             )
         elif tool in {"shell", _INTERNAL_TOOL}:
-            if tool == _INTERNAL_TOOL:
+            if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
                 _validate_internal_command(parameters.get("command"))
             result = _execute_shell_tool(
-                parameters,
+                {**parameters, "_tool_name": tool},
                 worktree_root=worktree_root,
                 stdout=stdout,
                 stderr=stderr,
@@ -4000,6 +4047,18 @@ def _run_deterministic_pre_step(
             "step_index": step_index,
         }
         execution_events.append(event)
+        if isinstance(handoff_records, dict):
+            for output in step.outputs:
+                handoff_records[output.name] = {
+                    "name": output.name,
+                    "type": output.type,
+                    "value": result,
+                    "produced_by": {
+                        "step_index": step_index,
+                        "action": "deterministic_pre_step",
+                    },
+                    "scope": output.scope,
+                }
         execution_context.append(
             "Deterministic invoke_tool result:\n"
             + json.dumps(result, ensure_ascii=False)
@@ -4044,6 +4103,19 @@ def _run_deterministic_pre_step(
         "step_index": step_index,
     }
     execution_events.append(event)
+    if isinstance(handoff_records, dict):
+        for output in step.outputs:
+            if output.required_for_next_step:
+                handoff_records[output.name] = {
+                    "name": output.name,
+                    "type": output.type,
+                    "value": result,
+                    "produced_by": {
+                        "step_index": step_index,
+                        "action": "deterministic_pre_step",
+                    },
+                    "scope": output.scope,
+                }
     execution_context.append(
         "Deterministic pre-step gather_context result:\n"
         + json.dumps(result, ensure_ascii=False)
@@ -4160,22 +4232,27 @@ def _build_step_execution_messages(
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
         }
-        | {_INTERNAL_TOOL, GIT_TOOL, GH_TOOL}
+        | {_INTERNAL_TOOL, GIT_TOOL, GH_TOOL, ENRICH_TOOL}
     )
     tool_descriptions = {
         "shell": (
             "Execute a shell command in the current worktree. Commands run with "
-            "the worktree as cwd; any explicit cwd must remain inside it."
+            "the worktree as cwd; any explicit cwd must remain inside it. Set "
+            "parameters.help=true for the tool's conventional --help guidance."
         ),
         _INTERNAL_TOOL: (
             "Execute a powdrr-lift CLI command. This tool is always available, "
             "but its command must invoke only the powdrr-lift binary and runs "
-            "with the current worktree as cwd."
+            "with the current worktree as cwd. Set parameters.help=true for the "
+            "tool's conventional --help guidance and detailed examples."
+            "detailed usage and examples."
         ),
         GIT_TOOL: (
             "Intrinsic Git tool; supports status, add, and move only. Example: "
             '{"action":"invoke_tool","tool":"git","parameters":'
-            '{"operation":"status"}}.'
+            '{"operation":"status"}}. Set parameters.help=true for the tool\'s '
+            "conventional --help guidance and detailed examples."
+            "usage and examples."
         ),
         GH_TOOL: (
             "Intrinsic GitHub tool for pull-request creation, inspection, and "
@@ -4187,13 +4264,27 @@ def _build_step_execution_messages(
             '"repository":"owner/repo","pr_reference":"394",'
             '"body":"Finding","commit_id":"sha",'
             '"path":"docs/design.yaml","line":12,"side":"RIGHT"}}.'
+            " Set parameters.help=true for the tool's conventional --help "
+            "guidance and detailed examples."
         ),
         "fuzzy-match": (
-            "Search worktree paths with find-like filters and fuzzy name matching."
+            "Search worktree paths with find-like filters and fuzzy name matching. "
+            "Set parameters.help=true for the tool's conventional --help "
+            "guidance and detailed examples."
         ),
-        BASEDPYRIGHT_SYMBOL_TOOL: "Find Python symbols by name across the worktree.",
+        BASEDPYRIGHT_SYMBOL_TOOL: (
+            "Find Python symbols by name across the worktree. Set "
+            "parameters.help=true for the tool's conventional --help guidance "
+            "and detailed examples."
+        ),
         BASEDPYRIGHT_STRUCTURE_TOOL: (
-            "Discover the classes, functions, methods, and variables in a Python file."
+            "Discover the classes, functions, methods, and variables in a Python "
+            "file. Set parameters.help=true for the tool's conventional --help "
+            "guidance and detailed examples."
+        ),
+        ENRICH_TOOL: (
+            "Convert a deterministic tool output into structured data. "
+            "Use format pytest and pass the complete tool result as tool_output."
         ),
     }
     prompt_data: dict[str, Any] = {
@@ -4354,6 +4445,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "listed tool_invocations support the tool needed for the next action.\n"
         "- read_document: choose this when you know the document path but need "
         "specific lines from that document before deciding the next action. "
+        "- list_files: choose this when you need to discover exact files in a "
+        "directory; provide directory, optional glob pattern, and recursive. "
         "Request only the smallest useful contiguous range. If a missing-file "
         "error lists files in the directory, retry only with one of those exact "
         "paths; never synthesize a filename from related names.\n"
@@ -4387,6 +4480,10 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "tool_invocations. Shell and internal require parameters.command as a "
         "non-empty string or string array. The intrinsic git and gh tools use "
         "parameters.operation and never accept a shell command array. "
+        "Every builtin tool accepts parameters.help = true without its "
+        "normal command arguments; use it to discover that tool's parameters, "
+        "examples, and when to use it. A help response is informational and does "
+        "not satisfy a required successful tool invocation. "
         "a shell command. For git use operation status, add, or move; for gh "
         "use pr_view, pr_diff, pr_checks, pr_create, pr_edit, pr_comments, or "
         "pr_review_comment. "
@@ -4509,6 +4606,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         '{"operation":"pr_view","pr_reference":"394"}}. '
         "fuzzy-match searches, or basedpyright "
         "symbol and structure queries.\n"
+        "If unsure how to use any listed builtin tool, first invoke it with "
+        'parameters {"help":true} (the tool\'s conventional --help option) '
+        "and use the returned guidance.\n"
         "Use goto_step only with an id declared on a step in the current skill. "
         "The target step becomes current and receives accumulated context; the "
         "jump must identify the remaining item or changed condition requiring "
@@ -4586,9 +4686,17 @@ def _modular_action_system_prompt(
         "structural YAML "
         "operations; file_management moves, renames, or deletes one relative file; "
         "invoke_skill runs a listed nested skill; invoke_tool runs one "
-        "declared command; read_document reads a bounded file range; goto_step "
+        "declared command; read_document reads a bounded file range; list_files "
+        "discovers exact file paths; goto_step "
         "repeats a declared step; next_step advances after completion; complete ends "
         "the skill. "
+        "For edit, the top-level action is a string and every inner edit kind is "
+        'also a string: {"action":"edit","file_path":"src/example.py",'
+        '"edits":[{"kind":"replace","start_line":1,"end_line":1,'
+        '"text":"replacement"}]}. The inner kind must be exactly "add", '
+        '"remove", or "replace"; do not use an object in kind and do not use '
+        '"action" or "kind" as a nested action object. For multiple files, use '
+        '"file_edits":[{"file_path":"src/example.py","edits":[...]}]. '
         "The current-step contract below further restricts these options.\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "
@@ -4818,6 +4926,7 @@ def _workflow_action_handlers() -> dict[
         "yaml_edit": _handle_workflow_action_yaml_edit,
         "file_management": _handle_workflow_action_file_management,
         "read_document": _handle_workflow_action_read_document,
+        "list_files": _handle_workflow_action_list_files,
         "next_step": _handle_workflow_action_next_step,
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
@@ -5340,6 +5449,76 @@ def _handle_workflow_action_read_document(
     return True
 
 
+def _list_worktree_files(
+    directory_value: str,
+    pattern: str | None,
+    recursive: bool,
+    worktree_root: Path,
+) -> dict[str, Any]:
+    directory = _resolve_worktree_file_path(directory_value, worktree_root)
+    if not directory.exists() or not directory.is_dir():
+        raise RuntimeError(
+            f"Workflow list_files directory does not exist: {directory_value}."
+        )
+    normalized_pattern = pattern or "*"
+    paths = (
+        directory.rglob(normalized_pattern)
+        if recursive
+        else directory.glob(normalized_pattern)
+    )
+    return {
+        "directory": directory_value,
+        "pattern": normalized_pattern,
+        "recursive": recursive,
+        "files": sorted(
+            str(path.relative_to(worktree_root)) for path in paths if path.is_file()
+        ),
+    }
+
+
+def _handle_workflow_action_list_files(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = (stdout, input_func)
+    directory = action.directory or "."
+    result = _list_worktree_files(
+        directory,
+        action.pattern,
+        action.recursive,
+        state.worktree_root,
+    )
+    action_data = {
+        "kind": action.kind,
+        "directory": directory,
+        "pattern": result["pattern"],
+        "recursive": action.recursive,
+    }
+    state.transcript.extend(
+        [
+            {"role": "assistant", "content": json.dumps(action_data)},
+            {
+                "role": "user",
+                "content": json.dumps({"list_files_result": result}),
+            },
+        ]
+    )
+    state.execution_events.append(
+        {
+            **action_data,
+            "result": result,
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
+    _verbose_print(stderr, config.verbose, f"Listed files: {result}")
+    return True
+
+
 def _handle_workflow_action_next_step(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
@@ -5427,12 +5606,18 @@ def _handle_workflow_action_invoke_tool(
             worktree_root=state.worktree_root,
             path_cache=state.fuzzy_match_cache,
         )
+    elif action.tool == ENRICH_TOOL:
+        tool_result = execute_enrich_tool(action.parameters)
     elif action.tool in {"shell", _INTERNAL_TOOL}:
-        if action.tool == _INTERNAL_TOOL:
+        if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
             _validate_internal_command(action.parameters.get("command"))
-        command_items = _command_items_for_validation(action.parameters.get("command"))
+        command_items = (
+            []
+            if action.parameters.get("help") is True
+            else _command_items_for_validation(action.parameters.get("command"))
+        )
         tool_result = _execute_shell_tool(
-            action.parameters,
+            {**action.parameters, "_tool_name": action.tool},
             worktree_root=state.worktree_root,
             stdout=stdout,
             stderr=stderr,
@@ -5463,7 +5648,7 @@ def _handle_workflow_action_invoke_tool(
     else:
         raise RuntimeError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
-            "internal, git, gh, fuzzy-match, basedpyright-symbol, and "
+            "internal, git, gh, enrich, fuzzy-match, basedpyright-symbol, and "
             "basedpyright-structure."
         )
     if (
@@ -6413,6 +6598,8 @@ def _validate_workflow_step_transition(
         if isinstance(result, Mapping) and result.get("returncode") not in (None, 0):
             return False
         parameters = event.get("parameters")
+        if isinstance(parameters, Mapping) and parameters.get("help") is True:
+            return False
         if not isinstance(parameters, Mapping) or parameters.get("command") is None:
             return True
         try:
@@ -6445,6 +6632,12 @@ def _validate_workflow_action_for_step_unwrapped(
     action: SkillChatAction, step: Any
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
+    if (
+        action.kind == "invoke_tool"
+        and action.parameters.get("help") is True
+        and action.tool in BUILTIN_TOOL_NAMES
+    ):
+        return
     supported_invocations = tuple(
         invocation for invocation in step.tool_invocations if invocation.tool != "ref"
     )
@@ -6606,6 +6799,8 @@ def _execute_fuzzy_match_tool(
     worktree_root: Path,
     path_cache: dict[tuple[str, int, int | None], tuple[Path, ...]] | None = None,
 ) -> dict[str, Any]:
+    if parameters.get("help") is True:
+        return builtin_tool_help("fuzzy-match")
     command = parameters.get("command")
     if not isinstance(command, (str, list, tuple)):
         raise RuntimeError(
@@ -6713,6 +6908,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "invoke_skill": _parse_workflow_action_invoke_skill,
         "goto_step": _parse_workflow_action_goto_step,
         "read_document": _parse_workflow_action_read_document,
+        "list_files": _parse_workflow_action_list_files,
         "next_step": _parse_workflow_action_next_step,
         "prompt_user": _parse_workflow_action_prompt_user,
     }
@@ -7057,6 +7253,14 @@ def _parse_workflow_action_invoke_tool(
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
         )
+    if normalized_tool == ENRICH_TOOL:
+        return SkillChatAction(
+            kind="invoke_tool",
+            tool=normalized_tool,
+            parameters=dict(parameters),
+            decisions_and_context=decisions_and_context,
+            llm_type=llm_type,
+        )
     if is_basedpyright_tool(normalized_tool):
         return SkillChatAction(
             kind="invoke_tool",
@@ -7151,6 +7355,10 @@ def _first_class_action_example(action_name: str) -> str:
             '{"action":"read_document","file_path":"docs/example.md",'
             '"start_line":0,"end_line":20}'
         ),
+        "list_files": (
+            '{"action":"list_files","directory":"src",'
+            '"pattern":"*.py","recursive":true}'
+        ),
         "next_step": '{"action":"next_step"}',
         "complete": '{"action":"complete"}',
     }
@@ -7222,6 +7430,30 @@ def _parse_workflow_action_read_document(
     )
 
 
+def _parse_workflow_action_list_files(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    directory = payload.get("directory", ".")
+    if not isinstance(directory, str) or not directory.strip():
+        raise RuntimeError("Workflow list_files directory must be a non-empty string.")
+    pattern = payload.get("pattern")
+    if pattern is not None and (not isinstance(pattern, str) or not pattern.strip()):
+        raise RuntimeError("Workflow list_files pattern must be a non-empty string.")
+    recursive = payload.get("recursive", False)
+    if not isinstance(recursive, bool):
+        raise RuntimeError("Workflow list_files recursive must be a boolean.")
+    return SkillChatAction(
+        kind="list_files",
+        directory=directory.strip(),
+        pattern=pattern.strip() if isinstance(pattern, str) else None,
+        recursive=recursive,
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
 def _parse_workflow_action_next_step(
     payload: dict[str, Any],
     decisions_and_context: str | None,
@@ -7269,6 +7501,8 @@ def _execute_shell_tool(
     announce: bool = True,
     print_stdout: bool = True,
 ) -> dict[str, Any]:
+    if parameters.get("help") is True:
+        return builtin_tool_help(str(parameters.get("_tool_name", "shell")))
     command = parameters.get("command")
     validation_command: str | Sequence[str]
     retry_command_source: list[str] | None = None

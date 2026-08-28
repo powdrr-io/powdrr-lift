@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.builtin_tool_help import builtin_tool_help
+
 GIT_TOOL = "git"
 GH_TOOL = "gh"
 
@@ -18,6 +20,8 @@ def execute_intrinsic_git_gh_tool(
     worktree_root: Path,
 ) -> dict[str, Any]:
     """Execute one allow-listed Git/GitHub command in the active worktree."""
+    if parameters.get("help") is True:
+        return builtin_tool_help(tool)
     if tool == GIT_TOOL:
         command = _git_command(parameters)
         executable = "git"
@@ -94,13 +98,12 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
         command = [
             "pr",
             "create",
+            "--draft",
             "--title",
             _required_text(parameters.get("title"), "title"),
             "--body",
             _required_text(parameters.get("body"), "body"),
         ]
-        if parameters.get("draft", False):
-            command.insert(2, "--draft")
     elif operation == "pr_edit":
         command = [
             "pr",

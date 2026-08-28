@@ -181,6 +181,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 12),
                 ("execute-proposed-pr.yaml", 13),
                 ("start-implementing-feature.yaml", 7),
+                ("run-tests-and-fix.yaml", 1),
                 ("start-implementing-feature.yaml", 9),
                 ("start-implementing-feature.yaml", 15),
                 ("start-implementing-feature.yaml", 18),
@@ -202,7 +203,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
-                ("run-tests-and-fix.yaml", 2),
+                ("run-tests-and-fix.yaml", 4),
             }
             expected_step_type = (
                 "invoke_tool"
@@ -692,6 +693,55 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "specify-system",
         "start-implementing-feature",
     ]
+
+
+def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
+    skill = load_skill(
+        Path(__file__).resolve().parents[1]
+        / "skill-definitions"
+        / "run-tests-and-fix.yaml"
+    )
+    steps = {step.id: step for step in skill.steps if step.id is not None}
+
+    assert [step.id for step in skill.steps] == [
+        "run-all-tests",
+        "enrich-test-results",
+        "diagnose-test-results",
+        "repair-test-failures",
+        "rerun-all-tests",
+    ]
+    assert steps["run-all-tests"].pre_step is not None
+    assert steps["run-all-tests"].outputs[0].name == "test_tool_result"
+    assert steps["run-all-tests"].outputs[0].required_for_next_step
+    assert steps["enrich-test-results"].pre_step is not None
+    assert steps["enrich-test-results"].pre_step.template == {
+        "tool": "enrich",
+        "format": "pytest",
+        "tool_output": {"source": "handoff", "name": "test_tool_result"},
+    }
+    assert steps["enrich-test-results"].inputs[0].name == "test_tool_result"
+    assert steps["enrich-test-results"].outputs[0].name == "enriched_test_result"
+    assert steps["enrich-test-results"].outputs[0].required_for_next_step
+    assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
+    assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
+    assert steps["diagnose-test-results"].outputs[0].required_for_next_step
+    assert steps["repair-test-failures"].inputs[0].name == "test_diagnosis"
+    assert steps["repair-test-failures"].outputs[0].name == "repair_evidence"
+    assert steps["repair-test-failures"].outputs[0].required_for_next_step
+    assert steps["rerun-all-tests"].gate is not None
+    assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
+    assert "Do not run it again" in (steps["run-all-tests"].details or "")
+    assert "test_tool_result" in (steps["run-all-tests"].details or "")
+    assert "test_tool_result" in (steps["enrich-test-results"].details or "")
+    assert "enriched_test_result" in (steps["enrich-test-results"].details or "")
+    assert "deterministic enrich" in (steps["diagnose-test-results"].details or "")
+    assert "If classification is passing or" in (
+        steps["repair-test-failures"].details or ""
+    )
+    repair_details = steps["repair-test-failures"].details or ""
+    assert '"action":"edit"' in repair_details
+    assert '"kind":"replace"' in repair_details
+    assert "Never use line_number or content in an edit" in repair_details
 
 
 def test_repository_state_invocations_use_internal_tool() -> None:

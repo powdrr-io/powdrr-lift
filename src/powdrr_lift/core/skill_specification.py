@@ -15,7 +15,7 @@ from powdrr_lift.core.validation_messages import (
 )
 
 SUPPORTED_SKILL_TOOL_TYPES = (
-    frozenset({"shell", "internal", "git", "gh", "fuzzy-match", "ref"})
+    frozenset({"shell", "internal", "git", "gh", "fuzzy-match", "enrich", "ref"})
     | BASEDPYRIGHT_TOOLS
 )
 SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
@@ -1492,7 +1492,10 @@ def _parse_pre_step(value: object) -> SkillStepPreStep | None:
     if not isinstance(template, Mapping):
         raise ValueError("Skill step pre_step template must be an object.")
     if action == "invoke_tool":
-        _parse_tool_invocation(template)
+        if template.get("tool") == "enrich":
+            _parse_enrich_invocation(template)
+        else:
+            _parse_tool_invocation(template)
         return SkillStepPreStep(action=action, template=dict(template))
     feature_id = _optional_string(template.get("feature_id"))
     if feature_id is None:
@@ -1672,9 +1675,12 @@ def _validate_gather_context_pre_step(
                 )
             )
             return
+        allowed_keys = {"tool", "command", "cwd", "env"}
+        if template.get("tool") == "enrich":
+            allowed_keys = {"tool", "format", "tool_output"}
         _validate_unknown_keys(
             template,
-            {"tool", "command", "cwd", "env"},
+            allowed_keys,
             issues,
             path=_child_path(pre_step_path, "template") or "",
             subject="invoke_tool pre-step template",
@@ -1690,6 +1696,39 @@ def _validate_gather_context_pre_step(
                     path=_child_path(_child_path(pre_step_path, "template"), "tool"),
                 )
             )
+        if tool == "enrich":
+            if template.get("format") != "pytest":
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_enrich_format",
+                        message="Enrich pre-steps currently require format pytest.",
+                        path=_child_path(
+                            _child_path(pre_step_path, "template"), "format"
+                        ),
+                    )
+                )
+            tool_output = template.get("tool_output")
+            valid_tool_output = tool_output == {"source": "previous_tool_output"}
+            if isinstance(tool_output, Mapping):
+                valid_tool_output = (
+                    tool_output.get("source") == "handoff"
+                    and isinstance(tool_output.get("name"), str)
+                    and bool(tool_output.get("name"))
+                )
+            if not valid_tool_output:
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_enrich_input",
+                        message=(
+                            "Enrich pre-steps must consume the previous tool result "
+                            "with {source: previous_tool_output}."
+                        ),
+                        path=_child_path(
+                            _child_path(pre_step_path, "template"), "tool_output"
+                        ),
+                    )
+                )
+            return
         command = template.get("command")
         if (
             not isinstance(command, Sequence)
@@ -1813,6 +1852,27 @@ def _parse_tool_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
         cwd=cwd,
         env=env,
     )
+
+
+def _parse_enrich_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
+    """Validate the declarative, non-shell enrich intrinsic invocation."""
+    if not isinstance(raw_tool_invocation, Mapping):
+        raise ValueError("Skill tool invocations must be objects.")
+    if raw_tool_invocation.get("tool") != "enrich":
+        raise ValueError("Enrich invocations must use tool enrich.")
+    if raw_tool_invocation.get("format") != "pytest":
+        raise ValueError("Enrich invocations currently require format pytest.")
+    tool_output = raw_tool_invocation.get("tool_output")
+    valid_tool_output = tool_output == {"source": "previous_tool_output"}
+    if isinstance(tool_output, Mapping):
+        valid_tool_output = (
+            tool_output.get("source") == "handoff"
+            and isinstance(tool_output.get("name"), str)
+            and bool(tool_output.get("name"))
+        )
+    if not valid_tool_output:
+        raise ValueError("Enrich invocations must consume previous_tool_output.")
+    return SkillToolInvocation(tool="enrich", command=())
 
 
 def _optional_string(value: object) -> str | None:

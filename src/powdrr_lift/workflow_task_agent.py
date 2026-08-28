@@ -15,6 +15,7 @@ from powdrr_lift.basedpyright_tools import (
     execute_basedpyright_tool,
     is_basedpyright_tool,
 )
+from powdrr_lift.builtin_tool_help import builtin_tool_help
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -30,6 +31,7 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.file_management import manage_worktree_file
+from powdrr_lift.intrinsic_enrich import ENRICH_TOOL, execute_enrich_tool
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
@@ -54,6 +56,7 @@ from powdrr_lift.workflow_chat_agent import (
     _find_skill_by_name,
     _interaction_style_prompt,
     _invalidate_deterministic_pre_step,
+    _list_worktree_files,
     _load_skill_catalog,
     _long_context_backup_for,
     _maybe_record_llm_exchanges,
@@ -82,6 +85,7 @@ from powdrr_lift.workflow_git import (
     WorkflowGitState,
     claim_workflow_task,
     create_workflow_worktree,
+    inspect_workflow_run,
     load_workflow_git_state,
     load_workflow_git_states,
     slugify_workflow_id,
@@ -603,6 +607,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "result": _read_task_document(action, self.repo_root),
                 }
             )
+            return WorkflowActionOutcome()
+        if action.kind == "list_files":
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "result": _list_worktree_files(
+                        action.directory or ".",
+                        action.pattern,
+                        action.recursive,
+                        self.repo_root,
+                    ),
+                }
+            )
+            return WorkflowActionOutcome()
         if action.kind == "edit":
             self.events.append(
                 {
@@ -684,8 +702,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         stderr=self.stderr,
                         max_timeout_retries=self.config.max_timeout_retries,
                         timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                        verbose=self.config.verbose,
                         context=action.context,
                         clean=action.clean,
+                        error_log_root=self.error_log_root,
                     ),
                 }
             )
@@ -817,15 +837,17 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "stderr": command_error,
             }
         elif action.tool in {"shell", "internal"}:
-            if action.tool == "internal":
+            if action.tool == "internal" and action.parameters.get("help") is not True:
                 _validate_internal_command(action.parameters.get("command"))
             result = _execute_shell_tool(
-                action.parameters,
+                {**action.parameters, "_tool_name": action.tool},
                 worktree_root=self.repo_root,
                 stdout=self.stdout,
                 stderr=self.stderr,
                 verbose=self.config.verbose,
             )
+        elif action.tool == ENRICH_TOOL:
+            result = execute_enrich_tool(action.parameters)
         elif action.tool in {GIT_TOOL, GH_TOOL}:
             result = execute_intrinsic_git_gh_tool(
                 action.tool,
@@ -1101,6 +1123,11 @@ def run_workflow_task(
                 workflow_git_state,
                 config.task_id or f"{workflow_git_state.proposed_pr_id}-workflow",
             )
+            _validate_workflow_task_state(
+                workflow,
+                workflow_git_state,
+                project_root,
+            )
         else:
             project_root = configured_repo_root
     except WorkflowGitInconsistency as exc:
@@ -1337,6 +1364,43 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _validate_workflow_task_state(
+    workflow: WorkflowInstance,
+    workflow_git_state: WorkflowGitState,
+    repo_root: Path,
+) -> None:
+    """Reject interrupted durable runs before they look like empty workflows."""
+    locked_tasks = [task for task in workflow.tasks if task.status is TaskStatus.LOCKED]
+    if not locked_tasks:
+        return
+
+    report = inspect_workflow_run(repo_root, workflow_git_state.proposed_pr_id)
+    claim_refs = [
+        claim_ref
+        for claim_ref in report.get("claim_refs", [])
+        if isinstance(claim_ref, str)
+    ]
+    details = [
+        f"task {task.task_id} is locked and may be left by an interrupted run"
+        for task in locked_tasks
+    ]
+    if claim_refs:
+        details.append("claim refs: " + ", ".join(claim_refs))
+    raise WorkflowGitInconsistency(
+        json.dumps(
+            {
+                "proposed_pr_id": workflow_git_state.proposed_pr_id,
+                "inconsistencies": details,
+                "recovery_command": (
+                    "powdrr-lift workflow-recovery --proposed-pr-id "
+                    f"{workflow_git_state.proposed_pr_id} --cleanup"
+                ),
+            },
+            indent=2,
+        )
+    )
 
 
 def _select_ready_workflow_git_state(
@@ -1894,54 +1958,23 @@ def _build_task_messages(
                     "workflow_files": _workflow_file_names(workflow.directory),
                     "available_tools": [
                         {
-                            "name": "shell",
+                            "name": tool,
                             "description": (
-                                "Execute a shell command in the current worktree."
+                                str(builtin_tool_help(tool)["summary"])
+                                + " Set parameters.help=true for the tool's "
+                                "conventional --help guidance, parameters, and "
+                                "examples."
                             ),
-                        },
-                        {
-                            "name": "internal",
-                            "description": (
-                                "Execute a powdrr-lift CLI command. This tool is "
-                                "always available, but may invoke only powdrr-lift."
-                            ),
-                        },
-                        {
-                            "name": GIT_TOOL,
-                            "description": (
-                                "Intrinsic Git tool; supports status, add, and move. "
-                                "Use invoke_tool with parameters.operation."
-                            ),
-                        },
-                        {
-                            "name": GH_TOOL,
-                            "description": (
-                                "Intrinsic GitHub tool for pull-request creation, "
-                                "inspection, and inline review comments. Use "
-                                "parameters.operation."
-                            ),
-                        },
-                        {
-                            "name": "fuzzy-match",
-                            "description": (
-                                "Search worktree paths with find-like filters and "
-                                "fuzzy name matching."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_SYMBOL_TOOL,
-                            "description": (
-                                "Find Python symbols by name across the worktree. "
-                                "Parameters: query and optional limit."
-                            ),
-                        },
-                        {
-                            "name": BASEDPYRIGHT_STRUCTURE_TOOL,
-                            "description": (
-                                "Discover the classes, functions, methods, and "
-                                "variables in a Python file. Parameter: path."
-                            ),
-                        },
+                        }
+                        for tool in (
+                            "shell",
+                            "internal",
+                            GIT_TOOL,
+                            GH_TOOL,
+                            "fuzzy-match",
+                            BASEDPYRIGHT_SYMBOL_TOOL,
+                            BASEDPYRIGHT_STRUCTURE_TOOL,
+                        )
                     ],
                     "available_skills": available_skills,
                 },
@@ -2056,7 +2089,27 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "must include output_state",
             "intrinsic tool requires structured operation",
             "intrinsic tool only supports",
+            "workflow edit action edit kind must be",
+            "workflow edit action edits must",
+            "workflow edit action file_edits must",
         )
+    )
+
+
+def _nested_action_response_correction(error: RuntimeError) -> str:
+    """Return actionable repair guidance for a nested skill response."""
+    return (
+        f"The nested skill response was invalid: {error} "
+        "Return exactly one corrected JSON object for the current nested step. "
+        "The top-level discriminator is the string field "
+        '"action":"edit". For a normal edit, use this exact shape: '
+        '{"action":"edit","file_path":"relative/path.py","edits":['
+        '{"kind":"replace","start_line":1,"end_line":1,"text":"replacement"}]}. '
+        'Each item in "edits" must be an object, and its "kind" must be the '
+        'string "add", "remove", or "replace"; never put an object or the '
+        'top-level action value in "kind". For multiple files, use '
+        '"file_edits":[{"file_path":"relative/path.py","edits":[...]}]. '
+        "Do not return markdown, prose, or a nested action object."
     )
 
 
@@ -2224,7 +2277,12 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
         "output. For durable task completion, the result MUST be under "
         "the top-level `output_state` field; never put it under `outputs`. "
         "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
-        "it advances this task.\n" + _interaction_style_prompt(interaction_style)
+        "it advances this task. Every builtin tool accepts "
+        "parameters.help = true without normal command arguments; this is the "
+        "tool's conventional --help option. Invoke that form when you need "
+        "that form when you need detailed parameters, examples, or usage "
+        "guidance. A help response does not count as a successful task tool "
+        "invocation.\n" + _interaction_style_prompt(interaction_style)
     )
 
 
@@ -2546,8 +2604,10 @@ def _run_skill_for_agent(
     stderr: TextIO,
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
+    verbose: bool = False,
     context: tuple[str, ...] = (),
     clean: bool = False,
+    error_log_root: Path | None = None,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     stack: list[
@@ -2623,7 +2683,7 @@ def _run_skill_for_agent(
                 workflow_context=None,
                 stdout=stdout,
                 stderr=stderr,
-                verbose=False,
+                verbose=verbose,
             )
             target_index = step_index + 1
             if not passed:
@@ -2664,7 +2724,7 @@ def _run_skill_for_agent(
                 workflow_context=None,
                 stdout=stdout,
                 stderr=stderr,
-                verbose=False,
+                verbose=verbose,
             )
         messages = _build_step_execution_messages(
             selected_skill=current_skill,
@@ -2678,15 +2738,61 @@ def _run_skill_for_agent(
             worktree_root=repo_root,
             catalog=catalog,
         )
-        action = action_engine.request_action(
-            client=client,
-            messages=messages,
-            parser=_parse_action_response,
-            model="nested-skill",
-            stderr=stderr,
-            max_timeout_retries=max_timeout_retries,
-            timeout_backoff_seconds=timeout_backoff_seconds,
-        )
+        try:
+            action = action_engine.request_action(
+                client=client,
+                messages=messages,
+                parser=_parse_action_response,
+                model="nested-skill",
+                stderr=stderr,
+                max_timeout_retries=max_timeout_retries,
+                timeout_backoff_seconds=timeout_backoff_seconds,
+            )
+        except RuntimeError as error:
+            if not _is_repairable_task_response_error(error):
+                raise
+            payload = action_engine.last_payload
+            correction = _nested_action_response_correction(error)
+            if error_log_root is not None:
+                record_workflow_llm_error(
+                    error_log_root,
+                    execution_mode="process_workflow_task",
+                    phase="nested_skill_llm_output_parse",
+                    error=error,
+                    context={
+                        "task_id": task.task_id,
+                        "skill_name": current_skill.skill.name,
+                        "step_id": step.id,
+                        "step_index": step_index,
+                    },
+                    llm_output=payload,
+                    guidance=correction,
+                )
+            execution_events.append(
+                {
+                    "kind": "llm_output_error",
+                    "skill": current_skill.skill.name,
+                    "step_id": step.id,
+                    "step_index": step_index,
+                    "error": str(error),
+                    "llm_output": payload,
+                    "guidance": correction,
+                }
+            )
+            execution_context.append(correction)
+            if payload is not None:
+                transcript.append(
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(payload, ensure_ascii=False),
+                    }
+                )
+            transcript.append({"role": "user", "content": correction})
+            print(
+                f"Nested skill action response needs repair: {error}",
+                file=stderr,
+            )
+            continue
         if (
             action.kind == "next_step"
             and not action.outputs
@@ -2856,15 +2962,20 @@ def _run_skill_for_agent(
             continue
         if action.kind == "invoke_tool":
             if action.tool in {"shell", "internal"}:
-                if action.tool == "internal":
+                if (
+                    action.tool == "internal"
+                    and action.parameters.get("help") is not True
+                ):
                     _validate_internal_command(action.parameters.get("command"))
                 result = _execute_shell_tool(
-                    action.parameters,
+                    {**action.parameters, "_tool_name": action.tool},
                     worktree_root=repo_root,
                     stdout=stdout,
                     stderr=stderr,
-                    verbose=False,
+                    verbose=verbose,
                 )
+            elif action.tool == ENRICH_TOOL:
+                result = execute_enrich_tool(action.parameters)
             elif action.tool == "fuzzy-match":
                 result = _execute_fuzzy_match_tool(
                     action.parameters,
@@ -2931,6 +3042,25 @@ def _read_task_document(
     if action.file_path is None or action.start_line is None or action.end_line is None:
         raise RuntimeError("read_document action must include a file and line range.")
     path = _resolve_worktree_file_path(action.file_path, repo_root)
+    if not path.exists() or not path.is_file():
+        directory = path.parent
+        if directory.is_dir():
+            directory_files = sorted(
+                item.name for item in directory.iterdir() if item.is_file()
+            )
+            directory_context = (
+                f" Files currently in {directory.relative_to(repo_root)}: "
+                f"{', '.join(directory_files) or '<no files>'}."
+            )
+        else:
+            directory_context = (
+                f" Directory does not exist: {directory.relative_to(repo_root)}."
+            )
+        raise RuntimeError(
+            f"read_document action file does not exist: {action.file_path}."
+            f"{directory_context} Use an exact existing file path or list_files; "
+            "do not infer or compose a filename."
+        )
     lines = path.read_text(encoding="utf-8").splitlines()
     if action.start_line < 1 or action.end_line < action.start_line:
         raise RuntimeError(
@@ -2938,23 +3068,24 @@ def _read_task_document(
             f"{action.start_line}-{action.end_line} is invalid. "
             f"Request a range from 1 through {len(lines)}."
         )
-    if action.end_line > len(lines):
+    if action.start_line > len(lines):
         raise RuntimeError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is outside the document "
-            f"with {len(lines)} lines. Request a range from 1 through "
+            f"with {len(lines)} lines. Request a start_line from 1 through "
             f"{len(lines)}."
         )
+    end_line = min(action.end_line, len(lines))
     return {
         "path": action.file_path,
         "start_line": action.start_line,
-        "end_line": action.end_line,
+        "end_line": end_line,
         "lines": [
             {
                 "line_number": number,
                 "text": lines[number - 1],
             }
-            for number in range(action.start_line, action.end_line + 1)
+            for number in range(action.start_line, end_line + 1)
         ],
     }
 

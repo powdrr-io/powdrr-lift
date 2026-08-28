@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from powdrr_lift import workflow_task_agent
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -17,6 +18,7 @@ from powdrr_lift.core import (
     Skill,
     SkillStep,
     SkillStepPreStep,
+    SkillToolInvocation,
     TaskComplexity,
     TaskStatus,
     WorkflowInstance,
@@ -33,18 +35,26 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response,
 )
 from powdrr_lift.workflow_git import (
+    WorkflowGitInconsistency,
     WorkflowGitState,
     save_workflow_git_state,
 )
-from powdrr_lift.workflow_llm import WorkflowLLMHTTPError
+from powdrr_lift.workflow_llm import (
+    WorkflowAction,
+    WorkflowLLMHTTPError,
+    complete_json_with_timeout_retry,
+)
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,
     _build_workflow_client,
     _handle_exhausted_timeout,
+    _list_worktree_files,
     _publish_workflow_progress,
+    _read_task_document,
     _select_ready_workflow_git_state,
     _task_events_for_prompt,
+    _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
 )
@@ -455,6 +465,131 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     assert len(client.messages) == 3
 
 
+def test_process_workflow_task_propagates_verbose_to_nested_tools(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="nested-skill",
+            when_to_use=("Run nested work.",),
+            steps=(
+                SkillStep(
+                    description="Run nested command.",
+                    tool_invocations=(
+                        SkillToolInvocation(
+                            tool="shell",
+                            command=("printf", "nested"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        skills_dir / "nested-skill.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {
+                "kind": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": "printf nested"},
+            },
+            {"kind": "complete", "text": "Nested work complete."},
+            {"kind": "complete", "output_state": {"ok": True}},
+        ]
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    observed_verbose: list[bool] = []
+    original_execute_shell_tool = workflow_task_agent._execute_shell_tool
+
+    def capture_verbose(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        observed_verbose.append(kwargs["verbose"])
+        return original_execute_shell_tool(*args, **kwargs)
+
+    monkeypatch.setattr(
+        workflow_task_agent,
+        "_execute_shell_tool",
+        capture_verbose,
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+            verbose=True,
+        ),
+        client=client,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert observed_verbose == [True]
+
+
+def test_nested_skill_repairs_malformed_edit_action_in_place(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="nested-skill",
+            when_to_use=("Run nested work.",),
+            steps=(SkillStep(description="Perform nested work."),),
+        ),
+        skills_dir / "nested-skill.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {
+                "action": "edit",
+                "file_path": "notes.txt",
+                "edits": [
+                    {
+                        "kind": {"operation": "replace"},
+                        "start_line": 1,
+                        "end_line": 1,
+                        "text": "invalid",
+                    }
+                ],
+            },
+            {"action": "complete", "text": "Nested work complete."},
+            {"kind": "complete", "output_state": {"ok": True}},
+        ]
+    )
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 4
+    assert (
+        "Workflow edit action edit kind must be a string"
+        in client.messages[2][1]["content"]
+    )
+    assert "Nested skill action response needs repair" in stderr.getvalue()
+    error_records = [
+        json.loads(line)
+        for line in (tmp_path / "workflow-llm-errors.jsonl").read_text().splitlines()
+    ]
+    assert error_records[-1]["phase"] == "nested_skill_llm_output_parse"
+    assert error_records[-1]["context"]["skill_name"] == "nested-skill"
+
+
 def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
     tmp_path: Path,
 ) -> None:
@@ -808,6 +943,38 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
     ]
 
 
+def test_locked_workflow_task_reports_recovery_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = replace(_workflow(tmp_path).tasks[0], status=TaskStatus.LOCKED)
+    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="workflow",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_task_agent.inspect_workflow_run",
+        lambda _repo_root, _proposed_pr_id: {
+            "claim_refs": [
+                "refs/agents/claims/feature-17/agent-task",
+            ]
+        },
+    )
+
+    with pytest.raises(WorkflowGitInconsistency) as raised:
+        _validate_workflow_task_state(workflow, state, tmp_path)
+
+    message = str(raised.value)
+    assert "agent-task is locked" in message
+    assert "refs/agents/claims/feature-17/agent-task" in message
+    assert (
+        "powdrr-lift workflow-recovery --proposed-pr-id feature-17 --cleanup" in message
+    )
+
+
 def test_process_workflow_task_stops_when_human_task_becomes_ready(
     tmp_path: Path,
 ) -> None:
@@ -1087,6 +1254,41 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
     assert stderr.getvalue().count("provider is overloaded") == 2
 
 
+def test_workflow_retries_dropped_provider_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _FakeClient([])
+    calls = 0
+    sleeps: list[float] = []
+
+    def _complete(messages: list[dict[str, str]]) -> dict[str, object]:
+        nonlocal calls
+        client.messages.append(messages)
+        calls += 1
+        if calls < 3:
+            raise RuntimeError(
+                "OpenAI request connection dropped: "
+                "Remote end closed connection without response"
+            )
+        return {"action": "next_step"}
+
+    client.complete_json = _complete  # type: ignore[method-assign]
+    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
+
+    result = complete_json_with_timeout_retry(
+        client,
+        [{"role": "user", "content": "hello"}],
+        model="test-model",
+        stderr=io.StringIO(),
+        max_timeout_retries=2,
+        timeout_backoff_seconds=1.5,
+    )
+
+    assert result == {"action": "next_step"}
+    assert calls == 3
+    assert sleeps == [1.5, 3.0]
+
+
 def test_exhausted_timeout_keeps_workflow_worktree_for_resume(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1298,16 +1500,9 @@ def test_process_workflow_task_repairs_read_document_range_error(
                 "start_line": 1,
                 "end_line": 10,
             },
-            {
-                "kind": "read_document",
-                "file_path": "specification.yaml",
-                "start_line": 1,
-                "end_line": 2,
-            },
             {"kind": "complete", "output_state": {"read": True}},
         ]
     )
-    stderr = io.StringIO()
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -1316,17 +1511,78 @@ def test_process_workflow_task_repairs_read_document_range_error(
         ),
         client=client,
         stdout=io.StringIO(),
-        stderr=stderr,
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 2
+
+
+def test_read_task_document_clamps_end_line_to_document_length(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "specification.yaml").write_text("first\nsecond\n", encoding="utf-8")
+
+    result = _read_task_document(
+        WorkflowAction(
+            kind="read_document",
+            file_path="specification.yaml",
+            start_line=1,
+            end_line=50,
+        ),
+        tmp_path,
+    )
+
+    assert result["end_line"] == 2
+    assert [line["text"] for line in result["lines"]] == ["first", "second"]
+
+
+def test_missing_read_document_is_recoverable_and_lists_exact_files(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    source_directory = tmp_path / "src" / "pkg"
+    source_directory.mkdir(parents=True)
+    (source_directory / "actual.py").write_text("value = 1\n", encoding="utf-8")
+    client = _FakeClient(
+        [
+            {
+                "kind": "read_document",
+                "file_path": "src/pkg/missing.py",
+                "start_line": 1,
+                "end_line": 10,
+            },
+            {
+                "kind": "list_files",
+                "directory": "src/pkg",
+                "pattern": "*.py",
+            },
+            {"kind": "complete", "output_state": {"read": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(workflow_dir=workflow.directory, repo_root=tmp_path),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
     )
 
     assert exit_code == 0
     assert len(client.messages) == 3
-    correction = client.messages[1][1]["content"]
-    assert "outside the document" in correction
-    assert "Request a range from 1 through 2" in correction
-    assert "corrected JSON action" in correction
-    assert "action_error" in correction
-    assert "action failed" in stderr.getvalue()
+    assert "actual.py" in str(client.messages[1])
+
+
+def test_list_worktree_files_supports_recursive_glob(tmp_path: Path) -> None:
+    nested = tmp_path / "src" / "pkg"
+    nested.mkdir(parents=True)
+    (tmp_path / "src" / "top.py").write_text("", encoding="utf-8")
+    (nested / "nested.py").write_text("", encoding="utf-8")
+    (nested / "notes.txt").write_text("", encoding="utf-8")
+
+    result = _list_worktree_files("src", "*.py", True, tmp_path)
+
+    assert result["files"] == ["src/pkg/nested.py", "src/top.py"]
 
 
 def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(

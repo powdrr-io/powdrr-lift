@@ -192,6 +192,10 @@ steps:
       - <feature-name>
       - --output
       - docs/proposals/<feature-name>/proposed-pr-specification.yaml
+  outputs:
+  - name: proposed_pr_specification_template
+    type: any
+    required_for_next_step: true
 - id: fill-proposed-pr-specification
   description: Fill the complete proposed PR specification.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
@@ -228,6 +232,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<feature-name>
+  outputs:
+  - name: proposed_pr_specification_evaluation
+    type: any
+    required_for_next_step: true
 - id: repair-proposed-pr-specification
   description: Repair every reported proposed PR specification issue.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
@@ -362,6 +370,10 @@ steps:
       command:
       - powdrr-lift
       - repository-state
+  outputs:
+  - name: instantiated_repository_state
+    type: any
+    required_for_next_step: true
 - id: verify-workflow-artifacts
   description: Verify workflow artifacts are in the active worktree.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
@@ -418,6 +430,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<feature-name>
+  outputs:
+  - name: workflow_artifact_evaluation
+    type: any
+    required_for_next_step: true
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
   actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
@@ -447,6 +463,10 @@ steps:
       command:
       - powdrr-lift
       - repository-state
+  outputs:
+  - name: staged_artifact_repository_state
+    type: any
+    required_for_next_step: true
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
   actions: [invoke_skill, next_step]

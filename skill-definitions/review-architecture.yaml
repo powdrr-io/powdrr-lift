@@ -45,6 +45,10 @@ steps:
       - "--work-item-name"
       - "<work-item-name>"
       - "--all-entity-types"
+  outputs:
+  - name: architecture_specification_template
+    type: any
+    required_for_next_step: true
 - id: fill-architecture
   description: Fill the architecture specification with the required updates.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
@@ -68,6 +72,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/architecture-specification.yaml
+  outputs:
+  - name: architecture_evaluation
+    type: any
+    required_for_next_step: true
 - id: repair-architecture
   description: Repair every reported architecture specification issue.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]

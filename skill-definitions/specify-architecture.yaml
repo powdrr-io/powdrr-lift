@@ -36,6 +36,10 @@ steps:
       - "--work-item-name"
       - "<work-item-name>"
       - "--all-entity-types"
+  outputs:
+  - name: architecture_specification_template
+    type: any
+    required_for_next_step: true
 - id: fill-architecture
   description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
@@ -62,6 +66,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/architecture-specification.yaml
+  outputs:
+  - name: architecture_evaluation
+    type: any
+    required_for_next_step: true
 - id: repair-architecture
   description: Use yaml_edit to fix every issue reported by the architecture evaluator.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]

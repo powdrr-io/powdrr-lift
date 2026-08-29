@@ -34,6 +34,10 @@ steps:
       - implementation-specification
       - "--work-item-name"
       - "<work-item-name>"
+  outputs:
+  - name: implementation_specification_template
+    type: any
+    required_for_next_step: true
 - id: fill-implementation
   description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
@@ -59,6 +63,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/implementation-specification.yaml
+  outputs:
+  - name: implementation_evaluation
+    type: any
+    required_for_next_step: true
 - id: repair-implementation
   description: Use yaml_edit to fix every issue reported by the implementation evaluator.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]

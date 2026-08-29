@@ -21,6 +21,10 @@ steps:
       - pull-request-description
       - --kind
       - feature
+  outputs:
+  - name: pull_request_description_template
+    type: any
+    required_for_next_step: true
 - description: Fill in the pull request description template.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform

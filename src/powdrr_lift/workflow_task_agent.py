@@ -2642,12 +2642,17 @@ def _run_skill_for_agent(
         )
     if not clean:
         resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
+        # A nested skill owns its own step/output contract.  Passing the parent
+        # durable task's details here causes the model to copy the parent's
+        # output_state_type into a nested step's `outputs` object (for example,
+        # `all-tests-results-state` into run-tests-and-fix's `test_tool_result`).
+        # Keep the task inputs, but do not leak the parent task's completion
+        # instructions into the nested skill prompt.
         execution_context = [
             (
                 "Task input: "
                 f"{json.dumps(resolved_task_data['input_state'], ensure_ascii=False)}"
             ),
-            resolved_task_data.get("details") or "",
             *execution_context,
         ]
     action_engine = WorkflowLLMActionEngine(max_stalled_roundtrips=3)
@@ -2799,6 +2804,9 @@ def _run_skill_for_agent(
             and not action.outputs
             and isinstance(action.output_state, Mapping)
             and step.outputs
+            and set(action.output_state).issubset(
+                {output.name for output in step.outputs}
+            )
         ):
             # Nested skills use the same action schema as durable tasks. Accept
             # the canonical output_state spelling when it carries the current

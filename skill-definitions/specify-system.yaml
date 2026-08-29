@@ -34,6 +34,10 @@ steps:
       - system-specification
       - "--work-item-name"
       - "<work-item-name>"
+  outputs:
+  - name: system_specification_template
+    type: any
+    required_for_next_step: true
 - id: fill-system
   description: Fill out the requirements and approach sections with concise, testable
     statements.
@@ -59,6 +63,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/system-specification.yaml
+  outputs:
+  - name: system_evaluation
+    type: any
+    required_for_next_step: true
 - id: repair-system
   description: Use yaml_edit to fix every issue reported by the system evaluator.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]

@@ -554,7 +554,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     def _execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None
         if workflow_action_signature(action) == self.observer_rejected_action_signature:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "The observer rejected this exact action after it failed to "
                 "make progress. Choose a materially different action."
             )
@@ -641,10 +641,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return WorkflowActionOutcome()
         if action.kind == "yaml_edit":
             if action.file_path is None:
-                raise RuntimeError("yaml_edit action must include file_path.")
+                raise PowdrrExecutionError("yaml_edit action must include file_path.")
             path = _resolve_worktree_file_path(action.file_path, self.repo_root)
             if not path.exists():
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     f"yaml_edit target {action.file_path!r} does not exist. "
                     "Read or generate the YAML document first."
                 )
@@ -674,7 +674,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return WorkflowActionOutcome()
         if action.kind == "file_management":
             if action.file_operation is None or action.file_path is None:
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "file_management action requires operation and file_path."
                 )
             result = manage_worktree_file(
@@ -697,7 +697,9 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return self._handoff(_prompt_user_handoff(action, self.task), "handoff")
         if action.kind == "invoke_skill":
             if action.skill_name is None:
-                raise RuntimeError("invoke_skill action must include a skill name.")
+                raise PowdrrExecutionError(
+                    "invoke_skill action must include a skill name."
+                )
             self.events.append(
                 {
                     "kind": action.kind,
@@ -751,7 +753,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return WorkflowActionOutcome(continue_running=False)
         if action.kind == "get-human-input":
             return self._handoff(action.human_input or {}, "human input required by")
-        raise RuntimeError(f"Unsupported workflow task action: {action.kind}")
+        raise PowdrrExecutionError(f"Unsupported workflow task action: {action.kind}")
 
     def apply_observer_decision(
         self,
@@ -880,7 +882,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 worktree_root=self.repo_root,
             )
         else:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"Unsupported workflow task tool {action.tool!r}; supported tools "
                 "are shell, internal, git, gh, fuzzy-match, basedpyright-symbol, and "
                 "basedpyright-structure."
@@ -989,7 +991,7 @@ def _record_task_pull_request(
         return
     number = pull_request_number(output)
     if number is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "GitHub did not return a pull-request URL, so the workflow record "
             "could not be named under docs/prs/<pr-number>.yaml."
         )
@@ -1221,7 +1223,9 @@ def run_workflow_task(
             provider=provider,
         )
         if mapping is None:
-            raise RuntimeError(f"Workflow task has no LLM mapping: {task.task_id}")
+            raise PowdrrExecutionError(
+                f"Workflow task has no LLM mapping: {task.task_id}"
+            )
         model = mapping.model
         if client_was_provided:
             assert client is not None
@@ -1623,7 +1627,7 @@ def _publish_workflow_progress(
         check=False,
     )
     if created_pr.returncode != 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Could not create workflow progress pull request: "
             f"{created_pr.stderr.strip()}"
         )
@@ -1669,7 +1673,7 @@ def _write_workflow_record(
 ) -> None:
     number = pull_request_number(pull_request_output)
     if number is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "GitHub did not return a pull-request URL, so the workflow record "
             "could not be named under docs/prs/<pr-number>.yaml."
         )
@@ -1786,7 +1790,7 @@ def _open_final_workflow_pull_request(
         check=False,
     )
     if created_pr.returncode != 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Could not create final workflow pull request: {created_pr.stderr.strip()}"
         )
     _write_workflow_record(
@@ -1835,7 +1839,9 @@ def _noninteractive_environment() -> dict[str, str]:
 def _run_git(repo_root: Path, arguments: list[str]) -> str:
     result = _git_result(repo_root, arguments)
     if result.returncode != 0:
-        raise RuntimeError(f"git {' '.join(arguments)} failed: {result.stderr.strip()}")
+        raise PowdrrExecutionError(
+            f"git {' '.join(arguments)} failed: {result.stderr.strip()}"
+        )
     return result.stdout.strip()
 
 
@@ -2061,7 +2067,7 @@ def _compact_workflow_task_context(
     )
     compacted_context = response.get("compacted_context")
     if not isinstance(compacted_context, dict):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Context compaction response must include a compacted_context object."
         )
     # The compaction model may summarize aggressively, but it must never be
@@ -2413,7 +2419,7 @@ def _run_task_deterministic_pre_step(
     if pre_step.action != "gather_context":
         if pre_step.action == "invoke_tool":
             return None, False
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Unsupported deterministic workflow-task pre-step: {pre_step.action}"
         )
     template = _resolve_pre_step_template(
@@ -2421,7 +2427,7 @@ def _run_task_deterministic_pre_step(
         _task_prompt_input_values(task.input_state),
     )
     if not isinstance(template, Mapping):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Deterministic gather_context template must resolve to an object."
         )
     raw_types = template.get("types")
@@ -2433,7 +2439,7 @@ def _run_task_deterministic_pre_step(
         or not isinstance(feature_id, str)
         or not feature_id.strip()
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Deterministic gather_context pre-step requires types and feature_id."
         )
     keywords = template.get("keywords")
@@ -2686,7 +2692,7 @@ def _run_skill_for_agent(
         step = current_skill.skill.steps[step_index]
         if step.step_type == "gate":
             if step.gate is None:
-                raise RuntimeError("gate steps require gate settings.")
+                raise PowdrrExecutionError("gate steps require gate settings.")
             passed = _run_gate(
                 step,
                 skill_name=current_skill.skill.name,
@@ -2908,10 +2914,12 @@ def _run_skill_for_agent(
             continue
         if action.kind == "invoke_skill":
             if action.skill_name is None:
-                raise RuntimeError("invoke_skill action must include a skill name.")
+                raise PowdrrExecutionError(
+                    "invoke_skill action must include a skill name."
+                )
             nested_skill = _find_skill_by_name(catalog, action.skill_name)
             if any(entry.path == nested_skill.path for entry, *_ in stack):
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     f"Recursive skill invocation is not allowed: {action.skill_name!r}."
                 )
             nested_context = list(action.context)
@@ -3007,7 +3015,9 @@ def _run_skill_for_agent(
                     worktree_root=repo_root,
                 )
             else:
-                raise RuntimeError(f"Unsupported nested skill tool: {action.tool!r}")
+                raise PowdrrExecutionError(
+                    f"Unsupported nested skill tool: {action.tool!r}"
+                )
             _record_skill_pull_request(
                 action,
                 repo_root,
@@ -3029,8 +3039,10 @@ def _run_skill_for_agent(
             _record_task_action_outputs(action, handoff_records, step, step_index)
             continue
         if action.kind == "prompt_user":
-            raise RuntimeError("Nested skills in agent workflows cannot prompt users.")
-        raise RuntimeError(f"Unsupported nested skill action: {action.kind!r}")
+            raise PowdrrExecutionError(
+                "Nested skills in agent workflows cannot prompt users."
+            )
+        raise PowdrrExecutionError(f"Unsupported nested skill action: {action.kind!r}")
     return {"skill": skill_name, "events": execution_events}
 
 
@@ -3059,7 +3071,9 @@ def _read_task_document(
     repo_root: Path,
 ) -> dict[str, Any]:
     if action.file_path is None or action.start_line is None or action.end_line is None:
-        raise RuntimeError("read_document action must include a file and line range.")
+        raise PowdrrExecutionError(
+            "read_document action must include a file and line range."
+        )
     path = _resolve_worktree_file_path(action.file_path, repo_root)
     if not path.exists() or not path.is_file():
         directory = path.parent
@@ -3075,20 +3089,20 @@ def _read_task_document(
             directory_context = (
                 f" Directory does not exist: {directory.relative_to(repo_root)}."
             )
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"read_document action file does not exist: {action.file_path}."
             f"{directory_context} Use an exact existing file path or list_files; "
             "do not infer or compose a filename."
         )
     lines = path.read_text(encoding="utf-8").splitlines()
     if action.start_line < 1 or action.end_line < action.start_line:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is invalid. "
             f"Request a range from 1 through {len(lines)}."
         )
     if action.start_line > len(lines):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is outside the document "
             f"with {len(lines)} lines. Request a start_line from 1 through "
@@ -3117,7 +3131,7 @@ def _apply_task_edits(
         edit_groups = [(group.file_path, group.edits) for group in action.file_edits]
     else:
         if action.file_path is None:
-            raise RuntimeError("edit action must include a file path.")
+            raise PowdrrExecutionError("edit action must include a file path.")
         edit_groups = [(action.file_path, action.edits)]
     results: list[dict[str, Any]] = []
     for file_path, edits in edit_groups:
@@ -3219,7 +3233,9 @@ def _build_workflow_client(
         provider=provider,
     )
     if mapping is None:
-        raise RuntimeError(f"Workflow task has no llm_type mapping: {task.task_id}")
+        raise PowdrrExecutionError(
+            f"Workflow task has no llm_type mapping: {task.task_id}"
+        )
     return _build_workflow_client_for_mapping(
         config,
         task,

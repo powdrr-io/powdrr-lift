@@ -408,7 +408,7 @@ def _provider_definition(provider: str) -> LLMProviderDefinition:
     try:
         return LLM_PROVIDERS[provider]
     except KeyError as exc:
-        raise RuntimeError(f"Unsupported LLM provider {provider!r}.") from exc
+        raise PowdrrExecutionError(f"Unsupported LLM provider {provider!r}.") from exc
 
 
 def _default_llm_mappings(provider: str) -> Mapping[str, LLMModelMapping]:
@@ -1316,7 +1316,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     def _execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         action_signature = _workflow_action_signature(action)
         if action_signature == self.observer_rejected_action_signature:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "The observer rejected this exact action after it failed to "
                 "make progress. Choose a materially different action."
             )
@@ -1328,7 +1328,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             record.get("action_signature") == action_failure_signature
             for record in self.state.stalled_step_context
         ):
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "This action was already identified as stalled for the current "
                 "step. Choose a materially different action; changing only "
                 "decisions_and_context is not sufficient."
@@ -1348,7 +1348,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.provider = mapping.provider
         if action.kind == "invoke_skill":
             if action.skill_name is None:
-                raise RuntimeError("invoke_skill action must include a skill name.")
+                raise PowdrrExecutionError(
+                    "invoke_skill action must include a skill name."
+                )
             nested_skill = _find_skill_by_name(self.catalog, action.skill_name)
             context = list(action.context)
             if action.decisions_and_context is not None:
@@ -1460,7 +1462,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.failure_kind = "action_error"
         handler = _workflow_action_handlers().get(action.kind)
         if handler is None:
-            raise RuntimeError(f"Unsupported workflow action kind: {action.kind!r}")
+            raise PowdrrExecutionError(
+                f"Unsupported workflow action kind: {action.kind!r}"
+            )
         should_continue = handler(
             action,
             self.state,
@@ -1950,11 +1954,13 @@ class OpenAIChatClient:
                 exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
-            raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
+            raise PowdrrExecutionError(f"OpenAI request failed: {exc.reason}") from exc
         except ConnectionError as exc:
-            raise RuntimeError(f"OpenAI request connection dropped: {exc}") from exc
+            raise PowdrrExecutionError(
+                f"OpenAI request connection dropped: {exc}"
+            ) from exc
         except TimeoutError as exc:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 _provider_timeout_message(
                     provider="OpenAI-compatible",
                     model=self._model,
@@ -1976,16 +1982,18 @@ class OpenAIChatClient:
         self.last_usage = dict(usage) if isinstance(usage, dict) else {}
         choices = loaded_response.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise RuntimeError("OpenAI response did not include any choices.")
+            raise PowdrrExecutionError("OpenAI response did not include any choices.")
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise RuntimeError("OpenAI response choice was not an object.")
+            raise PowdrrExecutionError("OpenAI response choice was not an object.")
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise RuntimeError("OpenAI response choice message was not an object.")
+            raise PowdrrExecutionError(
+                "OpenAI response choice message was not an object."
+            )
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise RuntimeError("OpenAI response message content was empty.")
+            raise PowdrrExecutionError("OpenAI response message content was empty.")
 
         return _parse_json_object(content, "OpenAI response content")
 
@@ -2032,7 +2040,7 @@ def _read_openai_response(
         try:
             event = json.loads(event_payload)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"OpenAI streaming response contained invalid JSON: {exc.msg}"
             ) from exc
         if not isinstance(event, dict):
@@ -2060,9 +2068,11 @@ def _read_openai_response(
                 )
 
     if response_metadata is None:
-        raise RuntimeError("OpenAI streaming response did not include any events.")
+        raise PowdrrExecutionError(
+            "OpenAI streaming response did not include any events."
+        )
     if not content_parts:
-        raise RuntimeError("OpenAI streaming response content was empty.")
+        raise PowdrrExecutionError("OpenAI streaming response content was empty.")
     response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
     return json.dumps(response_metadata)
 
@@ -2080,20 +2090,22 @@ class LocalLlamaChatClient:
                 llama_supports_gpu_offload,
             )
         except ImportError as exc:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Local provider requires llama-cpp-python. Install the local "
                 "extra (with Metal support on macOS): "
                 "CMAKE_ARGS='-DGGML_METAL=on' uv sync --extra local."
             ) from exc
         if not model_path.is_file():
-            raise RuntimeError(f"Local GGUF model file does not exist: {model_path}")
+            raise PowdrrExecutionError(
+                f"Local GGUF model file does not exist: {model_path}"
+            )
         if "q5_k_m" not in model_path.name.casefold():
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
                 "model filename containing 'q5_k_m'."
             )
         if not llama_supports_gpu_offload():
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Local model execution requires GPU offload support, but the "
                 "installed llama-cpp-python build cannot use a GPU. Reinstall "
                 "the local extra with Metal or CUDA support."
@@ -2129,16 +2141,18 @@ class LocalLlamaChatClient:
             ) from exc
         choices = response.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise RuntimeError("Local LLM response did not include any choices.")
+            raise PowdrrExecutionError(
+                "Local LLM response did not include any choices."
+            )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise RuntimeError("Local LLM response choice was not an object.")
+            raise PowdrrExecutionError("Local LLM response choice was not an object.")
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise RuntimeError("Local LLM response message was not an object.")
+            raise PowdrrExecutionError("Local LLM response message was not an object.")
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise RuntimeError("Local LLM response content was empty.")
+            raise PowdrrExecutionError("Local LLM response content was empty.")
         return _parse_json_object(content, "Local LLM response content")
 
 
@@ -2200,11 +2214,15 @@ class AnthropicChatClient:
                 exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
-            raise RuntimeError(f"Anthropic request failed: {exc.reason}") from exc
+            raise PowdrrExecutionError(
+                f"Anthropic request failed: {exc.reason}"
+            ) from exc
         except ConnectionError as exc:
-            raise RuntimeError(f"Anthropic request connection dropped: {exc}") from exc
+            raise PowdrrExecutionError(
+                f"Anthropic request connection dropped: {exc}"
+            ) from exc
         except TimeoutError as exc:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 _provider_timeout_message(
                     provider="Anthropic",
                     model=self._model,
@@ -2224,7 +2242,9 @@ class AnthropicChatClient:
         )
         content = loaded_response.get("content")
         if not isinstance(content, list) or not content:
-            raise RuntimeError("Anthropic response did not include any content.")
+            raise PowdrrExecutionError(
+                "Anthropic response did not include any content."
+            )
 
         text_parts: list[str] = []
         for block in content:
@@ -2238,7 +2258,7 @@ class AnthropicChatClient:
 
         response_text = "".join(text_parts).strip()
         if not response_text:
-            raise RuntimeError("Anthropic response content was empty.")
+            raise PowdrrExecutionError("Anthropic response content was empty.")
 
         return _parse_json_object(response_text, "Anthropic response content")
 
@@ -2331,7 +2351,7 @@ def _request_token_budget(
         limits.context_window - estimated_input_tokens - _CONTEXT_SAFETY_MARGIN_TOKENS
     )
     if available_output_tokens < 1:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Model context window is exhausted: "
             f"estimated input is {estimated_input_tokens} tokens, "
             f"context window is {limits.context_window} tokens."
@@ -2957,16 +2977,20 @@ def _parse_selection_response(
 ) -> SkillChatSelection:
     selected_skill_path_value = payload.get("selected_skill_path")
     if not isinstance(selected_skill_path_value, str) or not selected_skill_path_value:
-        raise RuntimeError("Skill selection response must include selected_skill_path.")
+        raise PowdrrExecutionError(
+            "Skill selection response must include selected_skill_path."
+        )
     selected_skill_path = _resolve_skill_path(selected_skill_path_value, catalog)
     selected_skill_reason = payload.get("selected_skill_reason")
     if not isinstance(selected_skill_reason, str) or not selected_skill_reason:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Skill selection response must include selected_skill_reason."
         )
     next_question = payload.get("next_question")
     if next_question is not None and not isinstance(next_question, str):
-        raise RuntimeError("Skill selection response next_question must be a string.")
+        raise PowdrrExecutionError(
+            "Skill selection response next_question must be a string."
+        )
     if next_question is not None:
         next_question = _validate_user_question(
             next_question,
@@ -2974,16 +2998,16 @@ def _parse_selection_response(
         )
     ready_to_execute_value = payload.get("ready_to_execute")
     if not isinstance(ready_to_execute_value, bool):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Skill selection response ready_to_execute must be a boolean."
         )
     ready_to_execute = ready_to_execute_value
     if ready_to_execute and next_question is not None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Skill selection response must not include next_question when ready."
         )
     if not ready_to_execute and next_question is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Skill selection response must include next_question when not ready."
         )
     llm_type = _optional_llm_type(payload.get("llm_type"))
@@ -3003,7 +3027,7 @@ def _validate_user_question(value: str, *, field_name: str) -> str:
         or not re.search(r"[A-Za-z]", normalized_value)
         or not normalized_value.endswith("?")
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"{field_name} must be a non-empty, properly formed English question."
         )
     return normalized_value
@@ -3027,7 +3051,7 @@ def _resolve_skill_path(
             or _path_without_suffix(skill_path_value) == entry_value_no_suffix
         ):
             return entry.path
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         f"Skill selection response referenced unknown skill {skill_path_value!r}."
     )
 
@@ -3360,7 +3384,7 @@ def _resolve_worktree_context(
     branch_name = _generate_worktree_branch_name()
     script_path = resolved_repo_root / "scripts" / "create-worktree.sh"
     if not script_path.is_file():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Could not find the worktree creation script at {script_path}."
         )
 
@@ -3378,7 +3402,7 @@ def _resolve_worktree_context(
     )
     worktree_path = Path(process.stdout.strip().splitlines()[-1]).expanduser().resolve()
     if not worktree_path.exists():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Worktree creation script did not return an existing path: {worktree_path}"
         )
     _verbose_print(stderr, verbose, f"Using dedicated worktree at {worktree_path}")
@@ -3392,12 +3416,12 @@ def _resolve_project_root(configured_repo_root: Path, worktree_root: Path) -> Pa
     worktree_parts = worktree_root.parts
     worktree_marker = ".worktrees"
     if worktree_marker not in worktree_parts:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Could not determine project root for worktree {worktree_root}."
         )
     marker_index = worktree_parts.index(worktree_marker)
     if marker_index == 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Could not determine project root for worktree {worktree_root}."
         )
     return Path(*worktree_parts[:marker_index])
@@ -3418,7 +3442,7 @@ def _find_catalog_entry(
     for entry in catalog:
         if entry.path == template_path:
             return entry
-    raise RuntimeError(f"Could not find skill {template_path}.")
+    raise PowdrrExecutionError(f"Could not find skill {template_path}.")
 
 
 def _find_skill_by_name(
@@ -3429,7 +3453,7 @@ def _find_skill_by_name(
     for entry in catalog:
         if entry.skill.name.casefold() == normalized_name:
             return entry
-    raise RuntimeError(f"Could not find referenced skill {skill_name!r}.")
+    raise PowdrrExecutionError(f"Could not find referenced skill {skill_name!r}.")
 
 
 def _next_skill_dependency(
@@ -3468,7 +3492,7 @@ def _push_nested_skill(
     active_skill_paths = {str(frame.parent_skill.path) for frame in stack}
     active_skill_paths.add(str(current_skill.path))
     if str(nested_skill.path) in active_skill_paths:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Recursive skill invocation is not allowed: {nested_skill.skill.name!r}."
         )
     stack.append(
@@ -3907,7 +3931,7 @@ def _resolve_pre_step_template(
         if exact is not None:
             key = re.sub(r"[-\s]+", "_", exact.group(1).strip().lower())
             if key not in context_values:
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     f"Deterministic pre-step placeholder <{exact.group(1)}> "
                     "is not present in the input context."
                 )
@@ -3916,7 +3940,7 @@ def _resolve_pre_step_template(
         def replace_match(match: re.Match[str]) -> str:
             key = re.sub(r"[-\s]+", "_", match.group(1).strip().lower())
             if key not in context_values:
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     f"Deterministic pre-step placeholder <{match.group(1)}> "
                     "is not present in the input context."
                 )
@@ -3924,7 +3948,7 @@ def _resolve_pre_step_template(
             if isinstance(replacement, (Mapping, Sequence)) and not isinstance(
                 replacement, (str, bytes, bytearray)
             ):
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     f"Deterministic pre-step placeholder <{match.group(1)}> "
                     "must be the complete template value when its context value "
                     "is structured."
@@ -3952,7 +3976,7 @@ def _wire_previous_tool_output(
         name = reference.get("name")
         record = handoff_records.get(name) if isinstance(name, str) else None
         if record is None or "value" not in record:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "enrich tool_output handoff source requires a prior named output."
             )
         parameters["tool_output"] = record["value"]
@@ -3969,7 +3993,7 @@ def _wire_previous_tool_output(
         None,
     )
     if previous is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "enrich tool_output source previous_tool_output requires a prior "
             "deterministic tool result."
         )
@@ -3999,7 +4023,7 @@ def _run_deterministic_pre_step(
         return
     pre_step = step.pre_step
     if pre_step is None:
-        raise RuntimeError("invoke_tool steps require a pre_step.")
+        raise PowdrrExecutionError("invoke_tool steps require a pre_step.")
     template = _resolve_pre_step_template(
         pre_step.template,
         _pre_step_context_values(
@@ -4009,11 +4033,13 @@ def _run_deterministic_pre_step(
         ),
     )
     if not isinstance(template, Mapping):
-        raise RuntimeError("Deterministic pre-step template must resolve to an object.")
+        raise PowdrrExecutionError(
+            "Deterministic pre-step template must resolve to an object."
+        )
     if pre_step.action == "invoke_tool":
         tool = template.get("tool")
         if not isinstance(tool, str):
-            raise RuntimeError("Invoke tool pre-step template requires a tool.")
+            raise PowdrrExecutionError("Invoke tool pre-step template requires a tool.")
         parameters = dict(template)
         parameters.pop("tool", None)
         if tool in {GIT_TOOL, GH_TOOL}:
@@ -4057,7 +4083,9 @@ def _run_deterministic_pre_step(
                 worktree_root=worktree_root,
             )
         else:
-            raise RuntimeError(f"Unsupported invoke_tool pre-step tool: {tool!r}")
+            raise PowdrrExecutionError(
+                f"Unsupported invoke_tool pre-step tool: {tool!r}"
+            )
         event = {
             "kind": "deterministic_pre_step",
             "skill_name": skill_name,
@@ -4087,7 +4115,7 @@ def _run_deterministic_pre_step(
         )
         return
     if pre_step.action != "gather_context":
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "invoke_tool pre-steps must use gather_context or invoke_tool."
         )
     raw_types = template.get("types")
@@ -4096,10 +4124,14 @@ def _run_deterministic_pre_step(
         or isinstance(raw_types, (str, bytes, bytearray))
         or not raw_types
     ):
-        raise RuntimeError("Deterministic gather_context template requires types.")
+        raise PowdrrExecutionError(
+            "Deterministic gather_context template requires types."
+        )
     feature_id = template.get("feature_id")
     if not isinstance(feature_id, str) or not feature_id.strip():
-        raise RuntimeError("Deterministic gather_context template requires feature_id.")
+        raise PowdrrExecutionError(
+            "Deterministic gather_context template requires feature_id."
+        )
     keywords = template.get("keywords")
     filters = template.get("filters")
     gathered_context = gather_specification_context(
@@ -4170,7 +4202,9 @@ def _run_gate(
     verbose: bool,
 ) -> bool:
     if step.gate is None or step.pre_step is None:
-        raise RuntimeError("gate steps require gate and invoke_tool pre_step settings.")
+        raise PowdrrExecutionError(
+            "gate steps require gate and invoke_tool pre_step settings."
+        )
     before = len(execution_events)
     _run_deterministic_pre_step(
         step,
@@ -4188,7 +4222,7 @@ def _run_gate(
     )
     event = execution_events[-1] if len(execution_events) > before else None
     if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
-        raise RuntimeError("Gate tool did not produce a structured result.")
+        raise PowdrrExecutionError("Gate tool did not produce a structured result.")
     passed = _gate_outcome_matches(event["result"], step.gate.outcome)
     gate_event = {
         "kind": "gate",
@@ -5035,11 +5069,11 @@ def _workflow_action_material_state(
 
 def _step_index_by_id(skill: SkillCatalogEntry, step_id: str | None) -> int:
     if step_id is None:
-        raise RuntimeError("Workflow goto_step action must include step_id.")
+        raise PowdrrExecutionError("Workflow goto_step action must include step_id.")
     for index, step in enumerate(skill.skill.steps):
         if step.id == step_id:
             return index
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         f"Workflow goto_step target {step_id!r} is not declared in skill "
         f"{skill.skill.name!r}."
     )
@@ -5129,7 +5163,7 @@ def _handle_workflow_action_edit(
     file_edits = action.file_edits
     if not file_edits:
         if action.file_path is None:
-            raise RuntimeError("Workflow edit action must include file_path.")
+            raise PowdrrExecutionError("Workflow edit action must include file_path.")
         file_edits = (SkillChatFileEdits(action.file_path, action.edits),)
 
     pending_writes: list[tuple[Path, str]] = []
@@ -5296,7 +5330,9 @@ def _handle_workflow_action_file_management(
 ) -> bool:
     _ = input_func
     if action.file_operation is None or action.file_path is None:
-        raise RuntimeError("file_management action requires operation and file_path.")
+        raise PowdrrExecutionError(
+            "file_management action requires operation and file_path."
+        )
     result = manage_worktree_file(
         state.worktree_root,
         operation=action.file_operation,
@@ -5365,18 +5401,20 @@ def _handle_workflow_action_read_document(
     _ = stdout
     _ = input_func
     if action.file_path is None:
-        raise RuntimeError("Workflow read_document action must include file_path.")
+        raise PowdrrExecutionError(
+            "Workflow read_document action must include file_path."
+        )
     if action.start_line is None or action.end_line is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow read_document action must include start_line and end_line."
         )
     if action.end_line < action.start_line:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
         )
     requested_line_count = action.end_line - action.start_line + 1
     if requested_line_count > _MAX_DOCUMENT_CONTEXT_LINES:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow read_document action may request at most "
             f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."
         )
@@ -5397,14 +5435,14 @@ def _handle_workflow_action_read_document(
                 f" Directory does not exist: "
                 f"{directory.relative_to(state.worktree_root)}."
             )
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow read_document action file does not exist: {action.file_path}."
             f"{directory_context} Use an exact existing file path; do not infer or "
             "compose a filename from the template id or workflow description."
         )
     lines = target_path.read_text(encoding="utf-8").splitlines()
     if action.start_line > len(lines) and lines:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow read_document action line range {action.start_line}-"
             f"{action.end_line} is outside the document, which has "
             f"{len(lines)} lines."
@@ -5483,7 +5521,7 @@ def _list_worktree_files(
 ) -> dict[str, Any]:
     directory = _resolve_worktree_file_path(directory_value, worktree_root)
     if not directory.exists() or not directory.is_dir():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow list_files directory does not exist: {directory_value}."
         )
     normalized_pattern = pattern or "*"
@@ -5680,7 +5718,7 @@ def _handle_workflow_action_invoke_tool(
             worktree_root=state.worktree_root,
         )
     else:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Unsupported workflow tool {action.tool!r}; supported tools are shell, "
             "internal, git, gh, enrich, validate_edit, apply_edit, fuzzy-match, "
             "basedpyright-symbol, and basedpyright-structure."
@@ -5785,7 +5823,7 @@ def _record_skill_pull_request(
         return
     number = pull_request_number(output)
     if number is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "GitHub did not return a pull-request URL, so the workflow record "
             "could not be named under docs/prs/<pr-number>.yaml."
         )
@@ -5807,7 +5845,9 @@ def _record_skill_pull_request(
     )
     branch = branch_result.stdout.strip()
     if not branch:
-        raise RuntimeError("Could not determine the branch for the workflow record.")
+        raise PowdrrExecutionError(
+            "Could not determine the branch for the workflow record."
+        )
     record_pull_request_workflow(
         repo_root,
         number,
@@ -5884,7 +5924,7 @@ def _validation_gate_id(step: Any) -> str:
     config = _validation_gate_config(step)
     gate_id = config.get("id") if config is not None else None
     if not isinstance(gate_id, str) or not gate_id.strip():
-        raise RuntimeError("Every validation gate must have a non-empty id.")
+        raise PowdrrExecutionError("Every validation gate must have a non-empty id.")
     return gate_id.strip()
 
 
@@ -5995,21 +6035,23 @@ def _discover_validation_obligations(
     assert config is not None
     discovery = config.get("discovery")
     if not isinstance(discovery, Mapping):
-        raise RuntimeError("Validation gate discovery must be an object.")
+        raise PowdrrExecutionError("Validation gate discovery must be an object.")
     configured_discovery_action = discovery.get("action")
     if configured_discovery_action is not None and not isinstance(
         configured_discovery_action, Mapping
     ):
-        raise RuntimeError("Validation gate discovery.action must be an action object.")
+        raise PowdrrExecutionError(
+            "Validation gate discovery.action must be an action object."
+        )
     if configured_discovery_action is None and not isinstance(
         discovery.get("input_ref"), str
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Validation gate discovery must declare an action or input_ref."
         )
     obligation_config = config.get("obligations")
     if not isinstance(obligation_config, Mapping):
-        raise RuntimeError("Validation gate obligations must be an object.")
+        raise PowdrrExecutionError("Validation gate obligations must be an object.")
     matches = _nested_value(
         result,
         str(obligation_config.get("source", discovery.get("result_path", "matches"))),
@@ -6017,15 +6059,17 @@ def _discover_validation_obligations(
     if not isinstance(matches, Sequence) or isinstance(
         matches, (str, bytes, bytearray)
     ):
-        raise RuntimeError("Validation tool discovery did not return matches.")
+        raise PowdrrExecutionError("Validation tool discovery did not return matches.")
     obligations: dict[str, _ValidationObligation] = {}
     filter_values = obligation_config.get("filter", {})
     if not isinstance(filter_values, Mapping):
-        raise RuntimeError("Validation gate obligations.filter must be an object.")
+        raise PowdrrExecutionError(
+            "Validation gate obligations.filter must be an object."
+        )
     id_path = obligation_config.get("id")
     action_path = obligation_config.get("action")
     if not isinstance(id_path, str) or not isinstance(action_path, str):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Validation gate obligations must declare id and action projections."
         )
     for match in matches:
@@ -6035,16 +6079,18 @@ def _discover_validation_obligations(
             continue
         raw_id = _nested_value(match, id_path)
         if not isinstance(raw_id, str) or not raw_id.strip():
-            raise RuntimeError("Every discovered validation item must have an id.")
+            raise PowdrrExecutionError(
+                "Every discovered validation item must have an id."
+            )
         normalized_id = raw_id.strip()
         if normalized_id in obligations:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Validation discovery returned duplicate obligation id "
                 f"{normalized_id!r}."
             )
         expected_action = _nested_value(match, action_path)
         if not isinstance(expected_action, Mapping):
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"Validation item {normalized_id!r} must provide action at "
                 f"{action_path}."
             )
@@ -6113,7 +6159,7 @@ def _register_validation_gate_discovery(
             if not isinstance(event, Mapping) or not isinstance(
                 event.get("result"), Mapping
             ):
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "Validation discovery action did not produce a result."
                 )
             _discover_validation_obligations(
@@ -6412,7 +6458,7 @@ def _validate_workflow_action_outputs(action: SkillChatAction, step: Any) -> Non
     declared_names = {output.name for output in step.outputs}
     unexpected = sorted(set(action.outputs) - declared_names)
     if unexpected:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow action outputs are not declared by the current step: "
             + ", ".join(unexpected)
         )
@@ -6511,7 +6557,7 @@ def _validate_workflow_handoff(
         if name not in records or not is_current_step_record(records[name])
     )
     if missing_outputs:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Cannot advance: the current step has not produced required outputs: "
             + ", ".join(missing_outputs)
         )
@@ -6535,7 +6581,7 @@ def _validate_workflow_handoff(
         ):
             missing_inputs.append(input_spec.name)
     if missing_inputs:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Cannot advance: the next step is missing required inputs: "
             + ", ".join(missing_inputs)
         )
@@ -6550,7 +6596,7 @@ def _validate_workflow_handoff(
                 f"got {record.get('type')})"
             )
     if mismatched:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Cannot advance: handoff input types do not match: " + ", ".join(mismatched)
         )
 
@@ -6567,19 +6613,19 @@ def _validate_workflow_step_transition(
         return
     if action.kind == "goto_step":
         if state is None:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow goto_step validation requires the current skill state."
             )
         target_index = _step_index_by_id(state.selected_skill, action.step_id)
         if target_index >= current_step_index:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow goto_step may target only a prior step in the current "
                 f"skill; {action.step_id!r} is not before step "
                 f"{current_step_index}."
             )
     if action.kind == "complete":
         if state is None:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow complete validation requires the current skill state."
             )
         later_gates = tuple(
@@ -6588,7 +6634,7 @@ def _validate_workflow_step_transition(
             if index > current_step_index and step.step_type == "gate"
         )
         if later_gates:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Cannot complete the skill while later gate steps remain: "
                 + ", ".join(later_gates)
             )
@@ -6742,7 +6788,7 @@ def _validate_workflow_action_for_step_unwrapped(
                 {invocation.tool for invocation in supported_invocations}
             )
             supported_tools_text = ", ".join(supported_tools) or "none"
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "The internal tool is not declared by the current workflow step. "
                 f"The step explicitly supports: {supported_tools_text}."
             )
@@ -6755,7 +6801,7 @@ def _validate_workflow_action_for_step_unwrapped(
             declared = "; ".join(
                 " ".join(invocation.command) for invocation in internal_invocations
             )
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "The internal command is not declared by the current workflow "
                 f"step. Use one of: {declared}."
             )
@@ -6777,7 +6823,7 @@ def _validate_workflow_action_for_step_unwrapped(
             {invocation.tool for invocation in supported_invocations}
         )
         supported_tools_text = ", ".join(supported_tools) or "none"
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Tool {action.tool!r} is not supported by the current workflow step. "
             f"The step explicitly supports: {supported_tools_text}."
         )
@@ -6795,7 +6841,7 @@ def _validate_workflow_action_for_step_unwrapped(
     expected_commands = "; ".join(
         " ".join(invocation.command) for invocation in matching_invocations
     )
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         f"Tool {action.tool!r} command {' '.join(command_items)!r} does not match "
         f"the command shape explicitly supported by the current workflow step: "
         f"{expected_commands}."
@@ -6807,7 +6853,7 @@ def _command_items_for_validation(command: object) -> list[str]:
         try:
             command_items = shlex.split(command)
         except ValueError as exc:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow tool command is not valid shell syntax."
             ) from exc
     elif isinstance(command, Sequence) and not isinstance(
@@ -6815,11 +6861,11 @@ def _command_items_for_validation(command: object) -> list[str]:
     ):
         command_items = list(command)
     else:
-        raise RuntimeError("Workflow tool action must include a command.")
+        raise PowdrrExecutionError("Workflow tool action must include a command.")
     if not command_items or any(
         not isinstance(item, str) or not item for item in command_items
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow tool action command must contain non-empty strings."
         )
     return command_items
@@ -6893,7 +6939,7 @@ def _execute_fuzzy_match_tool(
         return builtin_tool_help("fuzzy-match")
     command = parameters.get("command")
     if not isinstance(command, (str, list, tuple)):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow fuzzy-match tool parameters must include a command array."
         )
     return {
@@ -6961,25 +7007,25 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     if action is None and legacy_kind is not None:
         action = legacy_kind
     if action is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow action response must include action. Return one JSON object "
             'with a top-level "action" field; do not use action_input.'
         )
     if not isinstance(action, str):
-        raise RuntimeError("Workflow action response action must be a string.")
+        raise PowdrrExecutionError("Workflow action response action must be a string.")
     normalized_kind = action.strip()
     if not normalized_kind:
-        raise RuntimeError("Workflow action response action must not be empty.")
+        raise PowdrrExecutionError("Workflow action response action must not be empty.")
     decisions_and_context = _optional_string(payload.get("decisions_and_context"))
     llm_type = _optional_llm_type(payload.get("llm_type"))
     parser = _workflow_action_parsers().get(normalized_kind)
     if parser is None:
-        raise RuntimeError(f"Unknown workflow action: {normalized_kind!r}")
+        raise PowdrrExecutionError(f"Unknown workflow action: {normalized_kind!r}")
     raw_outputs = payload.get("outputs", {})
     if not isinstance(raw_outputs, Mapping) or any(
         not isinstance(name, str) or not name.strip() for name in raw_outputs
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow action outputs must be an object with named values."
         )
     action = parser(payload, decisions_and_context, llm_type)
@@ -7011,20 +7057,20 @@ def _parse_workflow_action_invoke_skill(
 ) -> SkillChatAction:
     skill_name = payload.get("skill")
     if not isinstance(skill_name, str) or not skill_name.strip():
-        raise RuntimeError("Workflow invoke_skill action must include skill.")
+        raise PowdrrExecutionError("Workflow invoke_skill action must include skill.")
     provider_role = payload.get("provider_role")
     if provider_role is not None and provider_role not in {"normal", "adversarial"}:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             'provider_role must be "normal" or "adversarial" when provided.'
         )
     clean = payload.get("clean", False)
     if not isinstance(clean, bool):
-        raise RuntimeError("clean must be a boolean when provided.")
+        raise PowdrrExecutionError("clean must be a boolean when provided.")
     raw_context = payload.get("context", [])
     if not isinstance(raw_context, list) or not all(
         isinstance(value, str) and value.strip() for value in raw_context
     ):
-        raise RuntimeError("context must be a list of non-empty strings.")
+        raise PowdrrExecutionError("context must be a list of non-empty strings.")
     return SkillChatAction(
         kind="invoke_skill",
         skill_name=skill_name.strip(),
@@ -7043,7 +7089,7 @@ def _parse_workflow_action_goto_step(
 ) -> SkillChatAction:
     step_id = payload.get("step_id")
     if not isinstance(step_id, str) or not step_id.strip():
-        raise RuntimeError("Workflow goto_step action must include step_id.")
+        raise PowdrrExecutionError("Workflow goto_step action must include step_id.")
     return SkillChatAction(
         kind="goto_step",
         step_id=step_id.strip(),
@@ -7059,7 +7105,7 @@ def _parse_workflow_action_complete(
 ) -> SkillChatAction:
     text = payload.get("text")
     if text is not None and not isinstance(text, str):
-        raise RuntimeError("Workflow complete action text must be a string.")
+        raise PowdrrExecutionError("Workflow complete action text must be a string.")
     return SkillChatAction(
         kind="complete",
         text=(text.strip() if text else None),
@@ -7076,11 +7122,13 @@ def _parse_workflow_action_human_input(
 ) -> SkillChatAction:
     value = payload.get("human_input")
     if not isinstance(value, Mapping):
-        raise RuntimeError("get-human-input must include human_input.")
+        raise PowdrrExecutionError("get-human-input must include human_input.")
     human_task = _parse_human_input_task(value.get("human_task"), "human_task")
     instructions = value.get("incorporation_instructions")
     if not isinstance(instructions, str) or not instructions.strip():
-        raise RuntimeError("get-human-input must include incorporation_instructions.")
+        raise PowdrrExecutionError(
+            "get-human-input must include incorporation_instructions."
+        )
     follow_up_value = value.get("follow_up_task")
     follow_up = (
         _parse_human_input_task(follow_up_value, "follow_up_task")
@@ -7101,18 +7149,18 @@ def _parse_workflow_action_human_input(
 
 def _parse_human_input_task(value: object, field_name: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
-        raise RuntimeError(f"{field_name} must be an object.")
+        raise PowdrrExecutionError(f"{field_name} must be an object.")
     description = value.get("description")
     role = value.get("role")
     output_state_type = value.get("output_state_type")
     if not isinstance(description, str) or not description.strip():
-        raise RuntimeError(f"{field_name}.description must be non-empty.")
+        raise PowdrrExecutionError(f"{field_name}.description must be non-empty.")
     if not isinstance(role, str) or not role.strip():
-        raise RuntimeError(f"{field_name}.role must be provided.")
+        raise PowdrrExecutionError(f"{field_name}.role must be provided.")
     if not isinstance(output_state_type, str) or not output_state_type.strip():
-        raise RuntimeError(f"{field_name}.output_state_type must be non-empty.")
+        raise PowdrrExecutionError(f"{field_name}.output_state_type must be non-empty.")
     if "input_state" not in value:
-        raise RuntimeError(f"{field_name}.input_state must be provided.")
+        raise PowdrrExecutionError(f"{field_name}.input_state must be provided.")
     return {
         "description": description.strip(),
         "role": role.strip(),
@@ -7137,7 +7185,7 @@ def _parse_workflow_action_edit(
         )
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise RuntimeError("Workflow edit action must include file_path.")
+        raise PowdrrExecutionError("Workflow edit action must include file_path.")
     edits = _required_edit_operations(payload.get("edits"))
     return SkillChatAction(
         kind="edit",
@@ -7155,18 +7203,18 @@ def _parse_workflow_action_yaml_edit(
 ) -> SkillChatAction:
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "yaml_edit requires file_path. Use a repository-relative .yaml or "
             ".yml path."
         )
     if not file_path.strip().lower().endswith((".yaml", ".yml")):
-        raise RuntimeError("yaml_edit file_path must end in .yaml or .yml.")
+        raise PowdrrExecutionError("yaml_edit file_path must end in .yaml or .yml.")
     raw_operations = payload.get("operations")
     if not isinstance(raw_operations, Sequence) or isinstance(
         raw_operations,
         (str, bytes, bytearray),
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "yaml_edit requires a non-empty operations array. Supported "
             "operations are upsert_item, remove_item, remove_key, and set_value. "
             "Include "
@@ -7174,7 +7222,7 @@ def _parse_workflow_action_yaml_edit(
         )
     operations = tuple(_parse_yaml_operation(item) for item in raw_operations)
     if not operations:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "yaml_edit operations must not be empty. Use upsert_item, "
             "remove_item, remove_key, or set_value. Try to include multiple "
             "independent "
@@ -7191,14 +7239,14 @@ def _parse_workflow_action_yaml_edit(
 
 def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
     if not isinstance(value, Mapping):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             'yaml_edit operations must be objects. Example: {"op": '
             '"upsert_item", "section": "features", "id": '
             '"feature-id", "value": {...}}.'
         )
     operation = value.get("op")
     if operation not in {"upsert_item", "remove_item", "remove_key", "set_value"}:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"yaml_edit operation op must be upsert_item, remove_item, remove_key, or "
             f"set_value; received {operation!r}."
         )
@@ -7217,7 +7265,7 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
                 for item in raw_path
             )
         ):
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "yaml_edit set_value requires a non-empty path array of mapping "
                 'keys or non-negative list indexes, for example ["title"].'
             )
@@ -7227,7 +7275,7 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
                 path=tuple(str(item).strip() for item in raw_path),
             )
         if "value" not in value:
-            raise RuntimeError("yaml_edit set_value requires value.")
+            raise PowdrrExecutionError("yaml_edit set_value requires value.")
         return SkillChatYamlOperation(
             operation=operation,
             path=tuple(str(item).strip() for item in raw_path),
@@ -7238,7 +7286,7 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
     item_id = value.get("id")
     item_index = value.get("index")
     if not isinstance(section, str) or not section.strip():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"yaml_edit {operation} requires a non-empty section, such as "
             "features or decisions."
         )
@@ -7248,14 +7296,14 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
         and not isinstance(item_index, bool)
     ):
         if item_index < 0:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "yaml_edit remove_item index must be non-negative. Corrective "
                 "action: use the zero-based list index reported by the validator, "
                 'for example {"op":"remove_item","section":"requirements",'
                 '"index":0}; do not use a negative index.'
             )
         if item_id is not None:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "yaml_edit remove_item must use exactly one of id or index. "
                 "Corrective action: remove id when using the validator-reported "
                 'index, for example {"op":"remove_item",'
@@ -7267,12 +7315,12 @@ def _parse_yaml_operation(value: object) -> SkillChatYamlOperation:
             item_index=item_index,
         )
     if not isinstance(item_id, str) or not item_id.strip():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"yaml_edit {operation} requires a non-empty id. Use read_document "
             "to discover the existing item id."
         )
     if operation == "upsert_item" and not isinstance(value.get("value"), Mapping):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "yaml_edit upsert_item requires value to be a mapping containing the "
             "complete item fields."
         )
@@ -7302,7 +7350,7 @@ def _parse_workflow_action_gather_context(
     if feature_id is not None and (
         not isinstance(feature_id, str) or not feature_id.strip()
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow gather_context action feature_id must be a non-empty string."
         )
     try:
@@ -7310,7 +7358,7 @@ def _parse_workflow_action_gather_context(
             normalize_context_type(context_type) for context_type in types
         )
     except ValueError as exc:
-        raise RuntimeError(str(exc)) from exc
+        raise PowdrrExecutionError(str(exc)) from exc
     return SkillChatAction(
         kind="gather_context",
         types=normalized_types,
@@ -7329,10 +7377,12 @@ def _parse_workflow_action_invoke_tool(
 ) -> SkillChatAction:
     tool = payload.get("tool", "shell")
     if not isinstance(tool, str) or not tool.strip():
-        raise RuntimeError("Workflow invoke_tool action must include tool.")
+        raise PowdrrExecutionError("Workflow invoke_tool action must include tool.")
     parameters = payload.get("parameters")
     if not isinstance(parameters, dict):
-        raise RuntimeError("Workflow invoke_tool action must include parameters.")
+        raise PowdrrExecutionError(
+            "Workflow invoke_tool action must include parameters."
+        )
     normalized_tool = tool.strip()
     if normalized_tool in {GIT_TOOL, GH_TOOL}:
         intrinsic_command(parameters, tool=normalized_tool)
@@ -7366,7 +7416,7 @@ def _parse_workflow_action_invoke_tool(
     command = parameters.get("command")
     first_class_action = _first_class_action_from_command(command)
     if normalized_tool in {"internal", "shell"} and first_class_action is not None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Use the first-class action `{first_class_action}`, not "
             f"`invoke_tool` with a {normalized_tool} command. Return this "
             "kind of action directly: "
@@ -7376,7 +7426,9 @@ def _parse_workflow_action_invoke_tool(
         normalized_parameters = dict(parameters)
         normalized_command = command.strip()
         if not normalized_command:
-            raise RuntimeError("Workflow invoke_tool action command must be non-empty.")
+            raise PowdrrExecutionError(
+                "Workflow invoke_tool action command must be non-empty."
+            )
         normalized_parameters["command"] = normalized_command
         return SkillChatAction(
             kind="invoke_tool",
@@ -7393,7 +7445,9 @@ def _parse_workflow_action_invoke_tool(
             _required_shell_command_item(item) for item in command
         ]
         if not normalized_command_list:
-            raise RuntimeError("Workflow invoke_tool action command must not be empty.")
+            raise PowdrrExecutionError(
+                "Workflow invoke_tool action command must not be empty."
+            )
         normalized_parameters = dict(parameters)
         normalized_parameters["command"] = normalized_command_list
         return SkillChatAction(
@@ -7403,7 +7457,9 @@ def _parse_workflow_action_invoke_tool(
             decisions_and_context=decisions_and_context,
             llm_type=llm_type,
         )
-    raise RuntimeError("Workflow invoke_tool action command must be a string or array.")
+    raise PowdrrExecutionError(
+        "Workflow invoke_tool action command must be a string or array."
+    )
 
 
 def _first_class_action_from_command(command: object) -> str | None:
@@ -7466,17 +7522,21 @@ def _parse_workflow_action_file_management(
 ) -> SkillChatAction:
     operation = payload.get("operation")
     if operation not in {"delete", "move", "rename"}:
-        raise RuntimeError("file_management operation must be delete, move, or rename.")
+        raise PowdrrExecutionError(
+            "file_management operation must be delete, move, or rename."
+        )
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise RuntimeError("file_management action requires file_path.")
+        raise PowdrrExecutionError("file_management action requires file_path.")
     destination_path = payload.get("destination_path")
     if operation in {"move", "rename"} and (
         not isinstance(destination_path, str) or not destination_path.strip()
     ):
-        raise RuntimeError(f"file_management {operation} requires destination_path.")
+        raise PowdrrExecutionError(
+            f"file_management {operation} requires destination_path."
+        )
     if destination_path is not None and not isinstance(destination_path, str):
-        raise RuntimeError("file_management destination_path must be a string.")
+        raise PowdrrExecutionError("file_management destination_path must be a string.")
     return SkillChatAction(
         kind="file_management",
         file_operation=operation,
@@ -7496,7 +7556,9 @@ def _parse_workflow_action_read_document(
 ) -> SkillChatAction:
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise RuntimeError("Workflow read_document action must include file_path.")
+        raise PowdrrExecutionError(
+            "Workflow read_document action must include file_path."
+        )
     start_line = _required_document_line_number(
         payload.get("start_line"),
         field_name="start_line",
@@ -7506,11 +7568,11 @@ def _parse_workflow_action_read_document(
         field_name="end_line",
     )
     if end_line < start_line:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
         )
     if end_line - start_line + 1 > _MAX_DOCUMENT_CONTEXT_LINES:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow read_document action may request at most "
             f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."
         )
@@ -7531,13 +7593,17 @@ def _parse_workflow_action_list_files(
 ) -> SkillChatAction:
     directory = payload.get("directory", ".")
     if not isinstance(directory, str) or not directory.strip():
-        raise RuntimeError("Workflow list_files directory must be a non-empty string.")
+        raise PowdrrExecutionError(
+            "Workflow list_files directory must be a non-empty string."
+        )
     pattern = payload.get("pattern")
     if pattern is not None and (not isinstance(pattern, str) or not pattern.strip()):
-        raise RuntimeError("Workflow list_files pattern must be a non-empty string.")
+        raise PowdrrExecutionError(
+            "Workflow list_files pattern must be a non-empty string."
+        )
     recursive = payload.get("recursive", False)
     if not isinstance(recursive, bool):
-        raise RuntimeError("Workflow list_files recursive must be a boolean.")
+        raise PowdrrExecutionError("Workflow list_files recursive must be a boolean.")
     return SkillChatAction(
         kind="list_files",
         directory=directory.strip(),
@@ -7569,7 +7635,7 @@ def _parse_workflow_action_prompt_user(
 ) -> SkillChatAction:
     text = payload.get("text")
     if not isinstance(text, str):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow prompt_user action requires a string text field; use "
             '"text", not "prompt", "question", or "action_input".'
         )
@@ -7623,7 +7689,7 @@ def _execute_shell_tool(
         validation_command = normalized_command
         retry_command_source = normalized_command
     else:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow invoke_tool action parameters must include a command."
         )
 
@@ -7648,12 +7714,12 @@ def _execute_shell_tool(
         ).resolve(strict=False)
         resolved_worktree_root = worktree_root.resolve(strict=False)
         if not resolved_cwd.is_relative_to(resolved_worktree_root):
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow shell tool cwd must stay within the current worktree: "
                 f"{resolved_worktree_root}"
             )
     else:
-        raise RuntimeError("Workflow invoke_tool action cwd must be a string.")
+        raise PowdrrExecutionError("Workflow invoke_tool action cwd must be a string.")
 
     env_value = parameters.get("env")
     env = os.environ.copy()
@@ -7667,14 +7733,16 @@ def _execute_shell_tool(
     )
     if env_value is not None:
         if not isinstance(env_value, dict):
-            raise RuntimeError("Workflow invoke_tool action env must be an object.")
+            raise PowdrrExecutionError(
+                "Workflow invoke_tool action env must be an object."
+            )
         for key, value in env_value.items():
             if not isinstance(key, str) or not key:
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "Workflow invoke_tool action env keys must be non-empty strings."
                 )
             if not isinstance(value, str):
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "Workflow invoke_tool action env values must be strings."
                 )
             env[key] = value
@@ -7777,7 +7845,7 @@ def _structured_intrinsic_pre_step_parameters(
     command = parameters.get("command")
     if tool == GIT_TOOL and command == ["status", "--short"]:
         return {"operation": "status"}
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         f"Intrinsic {tool} pre-steps must declare a supported structured operation."
     )
 
@@ -7887,7 +7955,9 @@ def _empty_pull_request_error(
 def _validate_internal_command(command: object) -> None:
     command_items = _command_items_for_validation(command)
     if command_items[0] != _INTERNAL_BINARY:
-        raise RuntimeError("The internal tool may invoke only the powdrr-lift binary.")
+        raise PowdrrExecutionError(
+            "The internal tool may invoke only the powdrr-lift binary."
+        )
 
 
 def _skill_step_to_data(step: Any) -> dict[str, Any]:
@@ -7915,7 +7985,7 @@ def _tool_invocation_to_data(tool_invocation: Any) -> dict[str, Any]:
 
 def _required_shell_command_item(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow invoke_tool action command items must be non-empty strings."
         )
     return value.strip()
@@ -7962,7 +8032,7 @@ def _shell_command_is_unwrapped(command: str) -> bool:
 
 def _required_action_string_item(value: object, *, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow gather_context action "
             f"{field_name} must contain non-empty strings."
         )
@@ -7978,7 +8048,7 @@ def _required_action_string_sequence(
         value,
         (str, bytes, bytearray),
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow gather_context action {field_name} must be an array."
         )
 
@@ -7986,7 +8056,7 @@ def _required_action_string_sequence(
         _required_action_string_item(item, field_name=field_name) for item in value
     )
     if not normalized_values:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow gather_context action {field_name} must not be empty."
         )
     return normalized_values
@@ -8003,7 +8073,7 @@ def _optional_action_string_sequence(
         value,
         (str, bytes, bytearray),
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow gather_context action {field_name} must be an array."
         )
     return tuple(
@@ -8015,7 +8085,9 @@ def _optional_action_filters(value: object) -> dict[str, object]:
     if value is None:
         return {}
     if not isinstance(value, dict):
-        raise RuntimeError("Workflow gather_context action filters must be an object.")
+        raise PowdrrExecutionError(
+            "Workflow gather_context action filters must be an object."
+        )
     filters: dict[str, object] = {}
     for raw_field, raw_values in value.items():
         field = _required_action_string_item(raw_field, field_name="filters")
@@ -8027,11 +8099,11 @@ def _optional_action_filters(value: object) -> dict[str, object]:
                 for item in raw_values
             )
         else:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"Workflow gather_context action filters.{field} must be an array."
             )
         if not values:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"Workflow gather_context action filters.{field} must not be empty."
             )
         filters[field] = values
@@ -8043,11 +8115,11 @@ def _required_edit_operations(value: object) -> tuple[SkillChatEdit, ...]:
         value,
         (str, bytes, bytearray),
     ):
-        raise RuntimeError("Workflow edit action edits must be an array.")
+        raise PowdrrExecutionError("Workflow edit action edits must be an array.")
 
     edits = tuple(_required_edit_operation(item) for item in value)
     if not edits:
-        raise RuntimeError("Workflow edit action edits must not be empty.")
+        raise PowdrrExecutionError("Workflow edit action edits must not be empty.")
     return edits
 
 
@@ -8056,15 +8128,17 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
         value,
         (str, bytes, bytearray),
     ):
-        raise RuntimeError("Workflow edit action file_edits must be an array.")
+        raise PowdrrExecutionError("Workflow edit action file_edits must be an array.")
 
     file_edits: list[SkillChatFileEdits] = []
     for item in value:
         if not isinstance(item, dict):
-            raise RuntimeError("Workflow edit action file_edits must contain objects.")
+            raise PowdrrExecutionError(
+                "Workflow edit action file_edits must contain objects."
+            )
         file_path = item.get("file_path")
         if not isinstance(file_path, str) or not file_path.strip():
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow edit action file_edits entries must include file_path."
             )
         file_edits.append(
@@ -8074,20 +8148,20 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
             )
         )
     if not file_edits:
-        raise RuntimeError("Workflow edit action file_edits must not be empty.")
+        raise PowdrrExecutionError("Workflow edit action file_edits must not be empty.")
     return tuple(file_edits)
 
 
 def _required_edit_operation(value: object) -> SkillChatEdit:
     if not isinstance(value, dict):
-        raise RuntimeError("Workflow edit action edits must be objects.")
+        raise PowdrrExecutionError("Workflow edit action edits must be objects.")
 
     kind = value.get("kind")
     if not isinstance(kind, str) or not kind.strip():
-        raise RuntimeError("Workflow edit action edit kind must be a string.")
+        raise PowdrrExecutionError("Workflow edit action edit kind must be a string.")
     normalized_kind = kind.strip()
     if normalized_kind not in {"add", "remove", "replace"}:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Workflow edit action edit kind must be add, remove, or replace."
         )
 
@@ -8100,18 +8174,20 @@ def _required_edit_operation(value: object) -> SkillChatEdit:
     if end_line_value is not None:
         end_line = _required_edit_line_number(end_line_value, field_name="end_line")
         if end_line < start_line:
-            raise RuntimeError("Workflow edit action end_line must be >= start_line.")
+            raise PowdrrExecutionError(
+                "Workflow edit action end_line must be >= start_line."
+            )
 
     text_value = value.get("text")
     if normalized_kind in {"add", "replace"}:
         if not isinstance(text_value, str):
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow edit action add/replace edits must include text."
             )
         text = text_value
     else:
         if text_value is not None:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Workflow edit action remove edits must not include text."
             )
         text = None
@@ -8128,7 +8204,7 @@ def _required_edit_operation(value: object) -> SkillChatEdit:
 
 def _required_edit_line_number(value: object, *, field_name: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow edit action {field_name} must be a positive integer."
         )
     return value
@@ -8136,7 +8212,7 @@ def _required_edit_line_number(value: object, *, field_name: str) -> int:
 
 def _required_document_line_number(value: object, *, field_name: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow read_document action {field_name} must be a "
             "non-negative integer."
         )
@@ -8147,7 +8223,9 @@ def _optional_string(value: object) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise RuntimeError("Workflow action decisions_and_context must be a string.")
+        raise PowdrrExecutionError(
+            "Workflow action decisions_and_context must be a string."
+        )
     normalized_value = value.strip()
     return normalized_value or None
 
@@ -8156,7 +8234,7 @@ def _optional_llm_type(value: object) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError("Workflow llm_type must be a non-empty string.")
+        raise PowdrrExecutionError("Workflow llm_type must be a non-empty string.")
     return value.strip().lower().replace("-", "_")
 
 
@@ -8186,7 +8264,9 @@ def _resolve_llm_mapping(
     if llm_type is None:
         return None
     if not _provider_supports_llm_mappings(provider):
-        raise RuntimeError(f"LLM mappings are not supported for provider {provider!r}.")
+        raise PowdrrExecutionError(
+            f"LLM mappings are not supported for provider {provider!r}."
+        )
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
     mapping = dict(_default_llm_mappings(provider))
     mapping.update(
@@ -8194,7 +8274,7 @@ def _resolve_llm_mapping(
     )
     resolved_mapping = mapping.get(normalized_llm_type)
     if resolved_mapping is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"No LLM mapping is configured for llm_type {llm_type!r} "
             f"with provider {provider!r}."
         )
@@ -8506,7 +8586,7 @@ def _complete_json_with_repair(
                         if _is_invalid_user_question_error(repair_exc):
                             empty_question_reprompts += 1
                             if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
-                                raise RuntimeError(
+                                raise PowdrrExecutionError(
                                     f"{context} LLM repeatedly returned an invalid "
                                     "user question."
                                 ) from repair_exc
@@ -8659,7 +8739,7 @@ def _complete_json_with_repair(
                     if _is_invalid_user_question_error(repair_exc):
                         empty_question_reprompts += 1
                         if empty_question_reprompts > _MAX_EMPTY_QUESTION_REPROMPTS:
-                            raise RuntimeError(
+                            raise PowdrrExecutionError(
                                 f"{context} LLM repeatedly returned an invalid user "
                                 "question."
                             ) from repair_exc
@@ -8793,12 +8873,12 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         parsed_content = _extract_embedded_json_object(normalized_content)
         if parsed_content is None:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"{context} was not valid JSON: {exc.msg} at line "
                 f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}"
             ) from exc
     if not isinstance(parsed_content, dict):
-        raise RuntimeError(f"{context} must be a JSON object.")
+        raise PowdrrExecutionError(f"{context} must be a JSON object.")
     return cast("dict[str, Any]", parsed_content)
 
 
@@ -9254,7 +9334,7 @@ def _resolve_worktree_file_path(file_path_value: str, worktree_root: Path) -> Pa
 
     resolved_worktree_root = worktree_root.resolve(strict=False)
     if not candidate_path.is_relative_to(resolved_worktree_root):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Workflow edit action file_path must stay within {resolved_worktree_root}."
         )
     return candidate_path
@@ -9319,7 +9399,7 @@ def _command_items(command: object) -> list[str]:
         items: list[str] = []
         for item in command:
             if not isinstance(item, str):
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "Workflow invoke_tool action command items must be strings."
                 )
             normalized_item = item.strip()
@@ -9998,7 +10078,7 @@ def choose_workflow_provider(
     """Present configured API providers and return the user's selection."""
     providers = available_workflow_providers()
     if not providers:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "No workflow-chat providers are configured. Set an API key for at "
             "least one supported provider before starting workflow-chat."
         )
@@ -10048,12 +10128,12 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
         if codex_token is not None:
             return codex_token, _codex_auth_path_description()
     if provider == "openai":
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
             "sign in with Codex so ~/.codex/auth.json is available."
         )
     credential_names = " or ".join(definition.api_key_env_names)
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         f"No {definition.display_name} credentials found. Set {credential_names}, "
         "or pass --api-key."
     )
@@ -10063,7 +10143,7 @@ def _resolve_local_model_path(model_cache_dir: Path) -> Path:
     cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
     if _has_all_local_model_shards(cached_model_paths):
         return cached_model_paths[0]
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         "The local Qwen model is not fully cached. Run "
         "`powdrr-lift download-qwen-model` before starting workflow-chat. "
         f"Expected cache={model_cache_dir}."
@@ -10079,7 +10159,7 @@ def download_local_qwen_model(model_cache_dir: Path) -> Path:
     try:
         from huggingface_hub import snapshot_download
     except ImportError as exc:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Automatic local model downloads require huggingface-hub."
         ) from exc
     try:
@@ -10091,14 +10171,14 @@ def download_local_qwen_model(model_cache_dir: Path) -> Path:
             )
         )
     except Exception as exc:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Could not download the Qwen Q5_K_M model from Hugging Face. "
             f"Repository={_LOCAL_MODEL_REPOSITORY}, cache={model_cache_dir}. "
             f"Underlying error: {type(exc).__name__}: {exc}"
         ) from exc
     model_paths = sorted(snapshot_directory.glob(_LOCAL_MODEL_PATTERN))
     if not _has_all_local_model_shards(model_paths):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "The Hugging Face Qwen repository did not provide all Q5_K_M GGUF shards."
         )
     return model_paths[0]
@@ -10119,12 +10199,12 @@ def _resolve_local_model_context() -> int:
     try:
         context = int(configured_context)
     except ValueError as exc:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
             f"{configured_context!r}."
         ) from exc
     if context <= 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
             f"{configured_context!r}."
         )
@@ -10208,12 +10288,12 @@ def _anthropic_message(message: dict[str, str]) -> dict[str, Any]:
     role = message.get("role")
     content = message.get("content")
     if role not in {"user", "assistant"}:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Anthropic messages must use user or assistant roles after splitting "
             "the system prompt."
         )
     if not isinstance(content, str):
-        raise RuntimeError("Anthropic message content must be a string.")
+        raise PowdrrExecutionError("Anthropic message content must be a string.")
     return {
         "role": role,
         "content": [{"type": "text", "text": content}],

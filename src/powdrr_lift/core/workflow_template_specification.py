@@ -74,6 +74,7 @@ class WorkflowTaskTemplate:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
+    actions: tuple[str, ...] = field(default_factory=tuple)
     output_state_type: str = "state"
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
@@ -110,6 +111,8 @@ class WorkflowTaskTemplate:
         }
         if self.prompt_catalogs:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
+        if self.actions:
+            step_data["actions"] = list(self.actions)
         if self.pre_step is not None:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -590,6 +593,7 @@ def build_workflow_template_validation_report(
                 "uses_skills",
                 "tool_invocations",
                 "prompt_catalogs",
+                "actions",
                 "pre_step",
                 "output_state_type",
                 "dependent_state",
@@ -1044,6 +1048,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         uses_skills=step.uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
+        actions=step.actions,
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,

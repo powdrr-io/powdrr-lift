@@ -38,6 +38,7 @@ invariants:
   cardinality: exactly_one
 task_templates:
 - description: Gather context about the proposed PR
+  actions: [next_step]
   step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high
@@ -72,6 +73,7 @@ task_templates:
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create the execution plan
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -93,6 +95,7 @@ task_templates:
   dependent_state:
   - execution-plan-created
 - description: Generate the planned tests
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -116,6 +119,7 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Implement the planned product code
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -141,6 +145,7 @@ task_templates:
   dependent_state:
   - product-code-generated
 - description: Run all tests and fix failures
+  actions: [invoke_skill, next_step]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -166,6 +171,7 @@ task_templates:
   dependent_state:
   - all-tests-passed
 - description: Review specification completeness
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -189,6 +195,7 @@ task_templates:
   dependent_state:
   - specification-complete
 - description: Repair specification completeness gaps
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -210,6 +217,7 @@ task_templates:
   dependent_state:
   - completeness-repair-complete
 - description: Run formatting checks
+  actions: [next_step]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -234,6 +242,7 @@ task_templates:
   dependent_state:
   - formatting-checked
 - description: Run lint checks
+  actions: [next_step]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -257,6 +266,7 @@ task_templates:
   dependent_state:
   - lint-checked
 - description: Run type checks
+  actions: [next_step]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -279,6 +289,7 @@ task_templates:
   dependent_state:
   - type-checked
 - description: Review the final diff for scope
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: medium
   assignee_type: agent
@@ -307,6 +318,7 @@ task_templates:
   dependent_state:
   - final-scope-reviewed
 - description: Repair final diff scope issues
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: medium
   assignee_type: agent
@@ -328,6 +340,7 @@ task_templates:
   dependent_state:
   - final-scope-repair-complete
 - description: Promote the feature documents
+  actions: [next_step]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -355,6 +368,7 @@ task_templates:
   dependent_state:
   - current-state-documents-promoted
 - description: Verify the pull request file set
+  actions: [next_step]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -386,6 +400,7 @@ task_templates:
   dependent_state:
   - pull-request-files-verified
 - description: Finish pull request preparation
+  actions: [invoke_skill, next_step]
   step_type: freeform
   complexity: medium
   assignee_type: agent

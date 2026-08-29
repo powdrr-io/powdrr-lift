@@ -7,6 +7,7 @@ when_to_use:
 steps:
 - description: Gather the entities, entity relationships, invariants, and guidance
     context.
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
@@ -16,6 +17,7 @@ steps:
     judging whether it needs to change. Do not use architecture or relationships
     as context types; those are not valid catalog tokens.
 - description: Decide whether the current architecture specification needs to change.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -25,6 +27,7 @@ steps:
     otherwise choose next_step.
 - id: generate-architecture
   description: Deterministically generate the architecture specification template.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -44,6 +47,7 @@ steps:
       - "--all-entity-types"
 - id: fill-architecture
   description: Fill the architecture specification with the required updates.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -52,6 +56,7 @@ steps:
     invoke_tool for YAML edits.
 - id: evaluate-architecture
   description: Deterministically evaluate the updated architecture specification.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: Invoke the evaluator exactly once; do not edit the file in this step.
@@ -65,6 +70,7 @@ steps:
       - docs/proposals/<work-item-name>/architecture-specification.yaml
 - id: repair-architecture
   description: Repair every reported architecture specification issue.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -76,6 +82,7 @@ steps:
     instead of repeating the same repair.
 - id: gate-architecture
   description: Confirm that architecture evaluation reports zero issues.
+  actions: [next_step]
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when evaluation exits successfully with zero issues.

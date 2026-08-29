@@ -30,7 +30,23 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     )
     | BASEDPYRIGHT_TOOLS
 )
-SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills"})
+SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills", "actions"})
+SUPPORTED_STEP_ACTIONS = frozenset(
+    {
+        "gather_context",
+        "prompt_user",
+        "edit",
+        "yaml_edit",
+        "file_management",
+        "invoke_skill",
+        "invoke_tool",
+        "read_document",
+        "list_files",
+        "goto_step",
+        "next_step",
+        "complete",
+    }
+)
 SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate"})
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
@@ -149,6 +165,7 @@ class SkillStep:
     uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
+    actions: tuple[str, ...] = field(default_factory=tuple)
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -178,6 +195,8 @@ class SkillStep:
             ]
         if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
+        if self.actions:
+            data["actions"] = list(self.actions)
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -481,6 +500,7 @@ def build_skill_validation_report(
                     "uses_skills",
                     "tool_invocations",
                     "prompt_catalogs",
+                    "actions",
                     "pre_step",
                     "gate",
                     "validation_gate",
@@ -869,7 +889,7 @@ def build_skill_validation_report(
                                     code="unsupported_prompt_catalog",
                                     message=(
                                         "Skill step prompt_catalogs currently "
-                                        "support context_types and skills."
+                                        "support context_types, skills, and actions."
                                     ),
                                     path=catalog_path,
                                 )
@@ -887,6 +907,8 @@ def build_skill_validation_report(
                             )
                         else:
                             seen_catalogs.add(normalized_catalog)
+
+            _validate_step_actions(step_mapping.get("actions"), step_path, issues)
 
             _validate_step_contracts(step_mapping, step_path, issues)
 
@@ -1413,6 +1435,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         data.get("tool_invocations"),
     )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
+    actions = _optional_step_actions(data.get("actions"))
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
     raw_validation_gate = data.get("validation_gate")
@@ -1482,6 +1505,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         uses_skills=uses_skills,
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
+        actions=actions,
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,
@@ -1641,6 +1665,47 @@ def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:
     if len(result) != len(set(result)):
         raise ValueError("Skill step prompt_catalogs must not contain duplicates.")
     return result
+
+
+def _optional_step_actions(value: object) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("Skill step actions must be an array.")
+    if not value:
+        return ()
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        name = _optional_string(item)
+        if name is None:
+            raise ValueError("Skill step actions must contain non-empty strings.")
+        if name not in SUPPORTED_STEP_ACTIONS:
+            raise ValueError(f"Skill step actions contains unsupported action: {name}.")
+        if name in seen:
+            raise ValueError("Skill step actions must not contain duplicates.")
+        seen.add(name)
+        result.append(name)
+    return tuple(result)
+
+
+def _validate_step_actions(
+    value: object,
+    step_path: str,
+    issues: list[SkillValidationIssue],
+) -> None:
+    if value is None:
+        return
+    try:
+        _optional_step_actions(value)
+    except ValueError as exc:
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_actions",
+                message=str(exc),
+                path=_child_path(step_path, "actions"),
+            )
+        )
 
 
 def _validate_gather_context_pre_step(

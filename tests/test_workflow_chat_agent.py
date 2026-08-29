@@ -422,7 +422,9 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Context guidance:" not in ordinary_system_prompt
     assert "Nested-skill guidance:" not in ordinary_system_prompt
     assert "entity-relationships" not in ordinary_system_prompt
-    assert "prompt_user is always allowed" in ordinary_system_prompt
+    assert (
+        "prompt_user requires the question in the text field" in ordinary_system_prompt
+    )
 
     gather_prompt = json.loads(
         _build_step_execution_messages(
@@ -870,6 +872,32 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
                 }
             ),
             SkillStep(description="Report the result."),
+        )
+
+
+def test_step_allowed_actions_reject_direct_edit() -> None:
+    step = SkillStep(
+        description="Produce a deferred edit.",
+        actions=("read_document",),
+    )
+
+    with pytest.raises(RuntimeError, match="edit action is not allowed"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "action": "edit",
+                    "file_path": "src/example.py",
+                    "edits": [
+                        {
+                            "kind": "replace",
+                            "start_line": 1,
+                            "end_line": 1,
+                            "text": "replacement",
+                        }
+                    ],
+                }
+            ),
+            step,
         )
 
 
@@ -5407,24 +5435,20 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
 
 
 def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
-    prompt = _modular_action_system_prompt(SkillStep(description="Ask a question."))
+    prompt = _modular_action_system_prompt(
+        SkillStep(
+            description="Ask a question.",
+            actions=("prompt_user",),
+        )
+    )
 
     assert '"action":"prompt_user"' in prompt
     assert '"text":"What specific success criteria should this feature meet?"' in prompt
     assert "never use prompt, question, or action_input" in prompt
-    for action_name in (
-        "gather_context",
-        "prompt_user",
-        "edit",
-        "yaml_edit",
-        "invoke_skill",
-        "invoke_tool",
-        "read_document",
-        "goto_step",
-        "next_step",
-        "complete",
-    ):
-        assert action_name in prompt
+    assert "gather_context" not in prompt
+    assert "invoke_tool" not in prompt
+    assert "prompt_user" in prompt
+    assert "next_step" in prompt
     assert "powdrr-lift yaml-edit" not in prompt
 
 
@@ -8092,7 +8116,9 @@ def test_run_workflow_chat_repairs_missing_action_fields(
                 assert "Generate a JSON document selecting the best action" in (
                     repair_request
                 )
-                assert "The available actions are" in repair_request
+                assert "The current step's action declarations below are the only" in (
+                    repair_request
+                )
                 assert "kind" in repair_request
                 return {
                     "kind": "complete",

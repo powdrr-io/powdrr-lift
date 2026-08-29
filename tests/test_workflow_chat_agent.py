@@ -4447,6 +4447,50 @@ def test_read_document_action_clamps_range_past_end_of_short_document(
     assert [line["text"] for line in context["lines"]] == ["one", "two", "three"]
 
 
+def test_read_document_action_accepts_zero_to_max_lines_range(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "long.md"
+    document.write_text(
+        "\n".join(f"line-{index}" for index in range(1, 2001)),
+        encoding="utf-8",
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "kind": "read_document",
+            "file_path": "long.md",
+            "start_line": 0,
+            "end_line": 2000,
+        }
+    )
+
+    assert (
+        _handle_workflow_action_read_document(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    context = json.loads(state.transcript[-1]["content"])["document_context"]
+    assert context["start_line"] == 1
+    assert context["end_line"] == 2000
+    assert len(context["lines"]) == 2000
+    assert context["lines"][0]["line_number"] == 1
+    assert context["lines"][-1]["line_number"] == 2000
+
+
 def test_read_document_missing_file_lists_directory_files(
     tmp_path: Path,
 ) -> None:

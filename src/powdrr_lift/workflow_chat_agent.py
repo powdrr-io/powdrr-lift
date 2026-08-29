@@ -4521,9 +4521,12 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "specific lines from that document before deciding the next action. "
         "- list_files: choose this when you need to discover exact files in a "
         "directory; provide directory, optional glob pattern, and recursive. "
-        "Request only the smallest useful contiguous range. If a missing-file "
-        "error lists files in the directory, retry only with one of those exact "
-        "paths; never synthesize a filename from related names.\n"
+        "Request only the smallest useful contiguous range. If read_document "
+        "reports that a file does not exist, do not retry that same path. Use "
+        "list_files on the existing parent directory and then read one exact "
+        "returned path; if the error lists candidate files, choose only one of "
+        "those exact paths. Never synthesize a filename from a task id, template "
+        "id, package name, or related name.\n"
         "- next_step: choose this when the current step is complete and the next "
         "skill step should receive the accumulated context.\n"
         "- complete: choose this when the skill has finished and no more action "
@@ -4546,7 +4549,10 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "text containing exactly one clear English question ending in '?'; edit "
         "requires either file_path plus a non-empty edits array or a non-empty "
         "file_edits array, with each edit using add, remove, or replace and valid "
-        "line numbers; prefer yaml_edit for .yaml or .yml files, but use edit as "
+        "line numbers. Edit line numbers are 1-based: start_line and end_line "
+        "must be positive integers (1 or greater), never 0; end_line must be "
+        "greater than or equal to start_line. Prefer yaml_edit for .yaml or .yml "
+        "files, but use edit as "
         "a fallback when a structural operation cannot express the repair. "
         "file_management requires operation (delete, move, or rename) and "
         "file_path; move and rename also require destination_path.\n"
@@ -5408,11 +5414,12 @@ def _handle_workflow_action_read_document(
         raise PowdrrExecutionError(
             "Workflow read_document action must include start_line and end_line."
         )
-    if action.end_line < action.start_line:
+    effective_start_line = max(1, action.start_line)
+    if action.end_line < effective_start_line:
         raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
         )
-    requested_line_count = action.end_line - action.start_line + 1
+    requested_line_count = action.end_line - effective_start_line + 1
     if requested_line_count > _MAX_DOCUMENT_CONTEXT_LINES:
         raise PowdrrExecutionError(
             "Workflow read_document action may request at most "
@@ -7567,11 +7574,12 @@ def _parse_workflow_action_read_document(
         payload.get("end_line"),
         field_name="end_line",
     )
-    if end_line < start_line:
+    effective_start_line = max(1, start_line)
+    if end_line < effective_start_line:
         raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
         )
-    if end_line - start_line + 1 > _MAX_DOCUMENT_CONTEXT_LINES:
+    if end_line - effective_start_line + 1 > _MAX_DOCUMENT_CONTEXT_LINES:
         raise PowdrrExecutionError(
             "Workflow read_document action may request at most "
             f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."

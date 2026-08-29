@@ -9590,7 +9590,10 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
 def _declared_action_names(step: Any) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
-    return tuple(name for name, _ in _step_actions(step)) + ("next_step",)
+    names = [name for name, _ in _step_actions(step)]
+    if "next_step" not in names:
+        names.append("next_step")
+    return tuple(names)
 
 
 def _action_repair_prompt(

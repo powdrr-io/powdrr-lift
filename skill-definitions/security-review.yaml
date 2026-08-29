@@ -7,7 +7,7 @@ when_to_use:
 - When security findings must be reported directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the pull request, feature scope, and security-relevant change surface.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [gather_context, invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: long_context

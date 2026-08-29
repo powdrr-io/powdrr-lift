@@ -6,7 +6,7 @@ when_to_use:
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
 - description: Check whether the project-structure artifact already exists.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task

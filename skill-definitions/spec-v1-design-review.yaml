@@ -58,7 +58,7 @@ steps:
     - --patch
 - id: gather-design-context
   description: Gather the repository context needed to review the proposed design.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   llm_type: simple_task
   details: >-

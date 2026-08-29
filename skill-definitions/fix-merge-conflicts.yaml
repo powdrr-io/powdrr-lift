@@ -6,7 +6,7 @@ when_to_use:
 - When the resolved branch must be validated through the repository's PR-preparation workflow.
 steps:
 - description: Inspect the pull request and confirm its GitHub merge status.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [gather_context, invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: simple_task
   details: >-

@@ -7,7 +7,7 @@ when_to_use:
 steps:
 - description: Gather the entities, entity relationships, invariants, and guidance
     context.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task

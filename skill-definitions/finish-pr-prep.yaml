@@ -42,7 +42,7 @@ steps:
     - --cached
     - --stat
 - description: Discover validation tools for the staged languages.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: high_reasoning

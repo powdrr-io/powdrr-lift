@@ -10,6 +10,7 @@ when_to_use:
   comments.
 steps:
 - description: Discover the pull request and establish the exact change surface.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -43,6 +44,7 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Challenge framework and dependency choices.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -74,6 +76,7 @@ steps:
     - --
     - <changed-files>
 - description: Challenge readability and control-flow complexity.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -105,6 +108,7 @@ steps:
     - <head-sha>
     - --check
 - description: Validate findings and teach the production-level alternative.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -134,6 +138,7 @@ steps:
     - <existing-framework-or-pattern>
     - <repository-paths>
 - description: Post actionable findings as inline pull-request comments.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -174,6 +179,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the adversarial review and report the result.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

@@ -10,6 +10,7 @@ when_to_use:
 steps:
 - id: discover-proposed-feature
   description: Discover proposed feature specification candidates.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -31,6 +32,7 @@ steps:
     - -print
 - id: discover-current-feature
   description: Discover current feature specification candidates.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -52,6 +54,7 @@ steps:
     - -print
 - id: discover-feature-workflows
   description: Discover execution workflow candidates.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -73,6 +76,7 @@ steps:
     - -print
 - id: select-feature-context
   description: Select the canonical feature and workflow context.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -107,6 +111,7 @@ steps:
     required_for_next_step: true
 - id: bootstrap-project-structure
   description: Bootstrap the project-wide module and tool structure.
+  actions: [invoke_skill, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   uses_skills:
@@ -114,6 +119,7 @@ steps:
   details: Invoke bootstrap-code-structure with the selected feature context. The nested skill is project-wide and must not ask for a feature or target module.
 - id: confirm-project-structure
   description: Confirm the project-structure artifact is available.
+  actions: [next_step]
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the project-structure artifact exists in the active worktree.
@@ -135,6 +141,7 @@ steps:
       Rerun bootstrap-code-structure, then retry this gate.
 - id: plan-proposed-prs
   description: Plan the proposed PR implementation sequence.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -164,6 +171,7 @@ steps:
     required_for_next_step: true
 - id: generate-proposed-pr-specification
   description: Generate the single proposed PR specification template.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -186,6 +194,7 @@ steps:
       - docs/proposals/<feature-name>/proposed-pr-specification.yaml
 - id: fill-proposed-pr-specification
   description: Fill the complete proposed PR specification.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -207,6 +216,7 @@ steps:
     single file is fully populated.
 - id: evaluate-proposed-pr-specification
   description: Evaluate the proposed PR specification deterministically.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: Invoke the evaluator exactly once for the selected feature directory; do not edit files in this step.
@@ -220,6 +230,7 @@ steps:
       - docs/proposals/<feature-name>
 - id: repair-proposed-pr-specification
   description: Repair every reported proposed PR specification issue.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -235,6 +246,7 @@ steps:
     the validation gate.
 - id: gate-proposed-pr-specification
   description: Confirm the proposed PR specification is valid.
+  actions: [next_step]
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the directory evaluator exits successfully with zero issues.
@@ -257,6 +269,7 @@ steps:
       rerun deterministic evaluation before continuing.
 - id: plan-workflow-instantiation
   description: Plan execution workflow instantiation.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -284,6 +297,7 @@ steps:
     every created or reused workflow and its proposed-PR relationship onward.
 - id: instantiate-execution-workflows
   description: Instantiate each missing execution workflow.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -315,6 +329,7 @@ steps:
     - templates/execute-proposed-pr.yaml
 - id: verify-workflow-dependencies
   description: Verify workflow-level dependency metadata.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -336,6 +351,7 @@ steps:
     path. Continue only after the persisted metadata exactly matches the plan.
 - id: inspect-workflow-repository-state
   description: Inspect generated workflow repository state.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: Inspect the active repository state after workflow instantiation.
@@ -348,6 +364,7 @@ steps:
       - repository-state
 - id: verify-workflow-artifacts
   description: Verify workflow artifacts are in the active worktree.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -359,6 +376,7 @@ steps:
     stage or create a pull request.
 - id: review-workflow-proposed-pr-links
   description: Review the bidirectional workflow and proposed-PR mapping.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -382,6 +400,7 @@ steps:
     `{"action":"next_step","decisions_and_context":"Every proposed PR maps to exactly one workflow, and every workflow maps to exactly one proposed PR."}`.
 - id: evaluate-workflow-artifacts
   description: Evaluate workflow tasks and relationship invariants deterministically.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -401,6 +420,7 @@ steps:
       - docs/proposals/<feature-name>
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -416,6 +436,7 @@ steps:
     - docs/workflows
 - id: verify-staged-artifacts
   description: Verify the staged artifact set.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: Confirm that only the validated planning artifacts are staged before pull request preparation.
@@ -428,6 +449,7 @@ steps:
       - repository-state
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
+  actions: [invoke_skill, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: Run finish-pr-prep after the validated planning artifacts are staged. If cleanup changes files, restage only those artifacts before continuing. Do not implement any proposed PR in this skill.
@@ -435,6 +457,7 @@ steps:
   - finish-pr-prep
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
+  actions: [invoke_skill, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -450,6 +473,7 @@ steps:
   - create-pull-request
 - id: handoff-feature-pull-request
   description: Hand the draft pull request to the user for review.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: Show the pull request URL. Summarize the selected feature, every proposed PR, every execution workflow, and their dependency relationships. State that implementation has not begun and the draft pull request is ready for review.

@@ -9,12 +9,14 @@ steps:
 - id: capture-system-context
   description: Ask for the work item name and the minimum context needed to draft
     the requirements and approach.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: Collect just enough context to make the template specific without overloading
     the user with questions.
 - id: generate-system
   description: Generate the system specification template.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -35,6 +37,7 @@ steps:
 - id: fill-system
   description: Fill out the requirements and approach sections with concise, testable
     statements.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -42,6 +45,7 @@ steps:
     {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}},{"op":"upsert_item","section":"approach","id":"approach-id","value":{"description":"...","state":"added"}}]}. Use set_value with a JSON path array for scalar or top-level list fields, and upsert_item with section, id, and a complete value mapping for list entries. Keep each statement concrete enough that it can be validated against the work item without interpretation.
 - id: evaluate-system
   description: Deterministically evaluate the filled system specification.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -57,6 +61,7 @@ steps:
       - docs/proposals/<work-item-name>/system-specification.yaml
 - id: repair-system
   description: Use yaml_edit to fix every issue reported by the system evaluator.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -67,6 +72,7 @@ steps:
     value mapping for requirements or approach entries. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-system"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
 - id: gate-system
   description: Confirm that system evaluation reports zero issues.
+  actions: [next_step]
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the evaluator exits successfully with zero issues.

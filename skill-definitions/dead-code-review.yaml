@@ -9,6 +9,7 @@ when_to_use:
   as inline pull-request comments.
 steps:
 - description: Discover the pull request and establish the exact change surface.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -45,6 +46,7 @@ steps:
     - <base-sha>
     - <head-sha>
 - description: Identify code made dead or duplicative by the pull request.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -89,6 +91,7 @@ steps:
     command:
     - path=<candidate-python-file>
 - description: Validate each candidate and prepare precise inline findings.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -119,6 +122,7 @@ steps:
     - <candidate-symbol>
     - <repository-paths>
 - description: Post every actionable dead-code or duplication finding inline.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -159,6 +163,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

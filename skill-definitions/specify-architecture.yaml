@@ -7,6 +7,7 @@ when_to_use:
 steps:
 - id: review-system-context
   description: Review the system context first.
+  actions: [invoke_skill, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: Use the system review flow to confirm the requirements, approach, and current
@@ -15,6 +16,7 @@ steps:
   - review-system
 - id: generate-architecture
   description: Generate the architecture specification template.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -37,6 +39,7 @@ steps:
 - id: fill-architecture
   description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -45,6 +48,7 @@ steps:
   
 - id: evaluate-architecture
   description: Deterministically evaluate the filled architecture specification.
+  actions: [next_step]
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -60,6 +64,7 @@ steps:
       - docs/proposals/<work-item-name>/architecture-specification.yaml
 - id: repair-architecture
   description: Use yaml_edit to fix every issue reported by the architecture evaluator.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -80,6 +85,7 @@ steps:
     it; do not claim that the edit passed validation yourself. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"architecture-id"},{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"Service","name":"Example","description":"..."}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-architecture"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
 - id: gate-architecture
   description: Confirm that architecture evaluation reports zero issues.
+  actions: [next_step]
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the evaluator exits successfully with zero issues.

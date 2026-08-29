@@ -1311,7 +1311,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         except PowdrrExecutionError:
             raise
         except (RuntimeError, ValueError) as exc:
-            raise PowdrrExecutionError(str(exc)) from exc
+            raise PowdrrExecutionError(str(exc), cause_error=exc) from exc
 
     def _execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         action_signature = _workflow_action_signature(action)
@@ -1498,10 +1498,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         raise error
 
     def record_action_error(self, action: SkillChatAction, error: Exception) -> None:
+        underlying_error = _underlying_execution_error(error)
         if (
             _validation_gate_enabled(self.current_step)
             and action.kind == "invoke_tool"
-            and not isinstance(error, _WorkflowToolValidationError)
+            and not isinstance(underlying_error, _WorkflowToolValidationError)
         ):
             _validation_gate_state(
                 self.state, self.current_step
@@ -1542,8 +1543,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             source="action_error",
         )
         validator_data = (
-            validation_error_to_data(error.validation_error)
-            if isinstance(error, _WorkflowToolValidationError)
+            validation_error_to_data(underlying_error.validation_error)
+            if isinstance(underlying_error, _WorkflowToolValidationError)
             else None
         )
         validation_result = {
@@ -9182,6 +9183,7 @@ def _workflow_edit_failure_feedback(
     error: Exception,
     current_file_context: dict[str, Any] | None,
 ) -> str:
+    error = _underlying_execution_error(error)
     feedback = (
         f"Workflow {action.kind} action failed: {error}. "
         "Re-read the current file context and return a corrected action."
@@ -9217,6 +9219,13 @@ def _workflow_edit_failure_feedback(
             "headers, and rerun the validator."
         )
     return feedback
+
+
+def _underlying_execution_error(error: Exception) -> Exception:
+    """Recover the concrete Powdrr action error for specialized feedback."""
+    if isinstance(error, PowdrrExecutionError) and error.cause_error is not None:
+        return error.cause_error
+    return error
 
 
 def _rejected_edit_guidance(action: SkillChatAction) -> str:

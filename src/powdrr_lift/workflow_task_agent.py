@@ -549,7 +549,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         except PowdrrExecutionError:
             raise
         except (RuntimeError, ValueError) as exc:
-            raise PowdrrExecutionError(str(exc)) from exc
+            raise PowdrrExecutionError(str(exc), cause_error=exc) from exc
 
     def _execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None

@@ -51,6 +51,10 @@ class WorkflowLLMExecutionAborted(RuntimeError):
 class PowdrrExecutionError(RuntimeError):
     """An action failed in Powdrr and should be corrected by the agent."""
 
+    def __init__(self, message: str, *, cause_error: Exception | None = None) -> None:
+        super().__init__(message)
+        self.cause_error = cause_error
+
 
 ActionT = TypeVar("ActionT")
 StrategyActionT = TypeVar("StrategyActionT", contravariant=True)

@@ -41,6 +41,10 @@ steps:
       - system-specification
       - "--work-item-name"
       - "<work-item-name>"
+  outputs:
+  - name: system_specification_template
+    type: any
+    required_for_next_step: true
 - id: fill-system
   description: Fill the system requirements and approach sections.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
@@ -64,6 +68,10 @@ steps:
       - powdrr-lift
       - evaluate
       - docs/proposals/<work-item-name>/system-specification.yaml
+  outputs:
+  - name: system_evaluation
+    type: any
+    required_for_next_step: true
 - id: repair-system
   description: Repair every reported system specification issue.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]

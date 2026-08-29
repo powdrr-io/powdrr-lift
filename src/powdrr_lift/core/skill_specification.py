@@ -174,33 +174,6 @@ class SkillStep:
     gate: SkillStepGate | None = None
     validation_gate: Mapping[str, Any] | None = None
 
-    def __post_init__(self) -> None:
-        # Programmatic callers from the pre-actions API are normalized too;
-        # serialized definitions and parsed YAML still require an explicit
-        # actions field.
-        if self.actions:
-            return
-        names = [
-            "invoke_tool",
-            "edit",
-            "yaml_edit",
-            "file_management",
-            "read_document",
-            "prompt_user",
-        ]
-        if self.tool_invocations:
-            names.insert(0, "invoke_tool")
-        if self.uses_skills:
-            names.insert(0, "invoke_skill")
-        if self.step_type in {"invoke_tool", "gate"}:
-            names = []
-        names.append("next_step")
-        object.__setattr__(
-            self,
-            "actions",
-            tuple(name for name in names),
-        )
-
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "description": self.description,

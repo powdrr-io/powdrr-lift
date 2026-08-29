@@ -4376,8 +4376,7 @@ def _build_step_execution_messages(
             for entry in catalog
         ]
     prompt_data["available_actions"] = [
-        {"name": name, "instructions": instructions}
-        for name, instructions in _step_actions(current_step)
+        name for name, _instructions in _step_actions(current_step)
     ]
     if validation_gate is not None:
         prompt_data["validation_gate"] = dict(validation_gate)
@@ -5819,13 +5818,29 @@ def _record_skill_pull_request(
 def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
     """Reject tool actions that do not match a current-step invocation."""
     allowed_actions = _declared_action_names(step)
-    if allowed_actions is not None and action.kind not in allowed_actions:
+    if (
+        allowed_actions is not None
+        and action.kind not in allowed_actions
+        and action.kind != "complete"
+        and not (action.kind == "invoke_tool" and action.tool == "internal")
+    ):
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="workflow_action_not_allowed",
                 message=(
                     f"The {action.kind} action is not allowed in this step. "
-                    "Use one of: " + ", ".join(allowed_actions) + "."
+                    + (
+                        "This step explicitly supports: none; next_step is implicit."
+                        if (
+                            allowed_actions == ("next_step",)
+                            or (
+                                action.kind == "invoke_tool"
+                                and action.tool == "shell"
+                                and not getattr(step, "tool_invocations", ())
+                            )
+                        )
+                        else "Use one of: " + ", ".join(allowed_actions) + "."
+                    )
                 ),
                 path="kind",
             )
@@ -6670,13 +6685,29 @@ def _validate_workflow_action_for_step_unwrapped(
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
     allowed_actions = _declared_action_names(step)
-    if allowed_actions is not None and action.kind not in allowed_actions:
+    if (
+        allowed_actions is not None
+        and action.kind not in allowed_actions
+        and action.kind != "complete"
+        and not (action.kind == "invoke_tool" and action.tool == "internal")
+    ):
         raise _WorkflowToolValidationError(
             ValidationError(
                 code="workflow_action_not_allowed",
                 message=(
                     f"The {action.kind} action is not allowed in this step. "
-                    "Use one of: " + ", ".join(allowed_actions) + "."
+                    + (
+                        "This step explicitly supports: none; next_step is implicit."
+                        if (
+                            allowed_actions == ("next_step",)
+                            or (
+                                action.kind == "invoke_tool"
+                                and action.tool == "shell"
+                                and not getattr(step, "tool_invocations", ())
+                            )
+                        )
+                        else "Use one of: " + ", ".join(allowed_actions) + "."
+                    )
                 ),
                 path="kind",
             )
@@ -9461,10 +9492,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         "outputs": [
             output.to_data() for output in (getattr(step, "outputs", ()) or ())
         ],
-        "actions": [
-            {"name": name, "instructions": instructions}
-            for name, instructions in actions
-        ],
+        "actions": [name for name, _instructions in actions],
         "declared_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in invocations
         ],
@@ -9501,7 +9529,24 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
         # Compatibility for definitions written before the per-step action
         # contract. This fallback is intentionally isolated here so no other
         # metadata can silently add actions once a step declares actions.
-        names = ["edit", "yaml_edit", "file_management", "read_document", "prompt_user"]
+        names: list[str] = []
+        if (
+            getattr(step, "details", None)
+            or getattr(step, "tool_invocations", ())
+            or getattr(step, "uses_skills", ())
+        ):
+            names.extend(
+                [
+                    "gather_context",
+                    "edit",
+                    "yaml_edit",
+                    "file_management",
+                    "read_document",
+                    "prompt_user",
+                ]
+            )
+        else:
+            names.append("invoke_skill")
         if getattr(step, "tool_invocations", ()):
             names.insert(0, "invoke_tool")
         if getattr(step, "uses_skills", ()):

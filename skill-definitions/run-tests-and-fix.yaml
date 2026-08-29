@@ -74,7 +74,9 @@ steps:
     Every inner kind is the string add, remove, or replace. Never use line_number,
     content, or an object in kind. Include every required file in one file_edits
     array. Do not guess line 1, use traceback line numbers as edit ranges, or
-    claim the repair is applied. Return next_step with exactly:
+    claim the repair is applied. Edit line numbers are 1-based: start_line and
+    end_line must be positive integers (1 or greater), never 0; end_line must be
+    greater than or equal to start_line. Return next_step with exactly:
     {"action":"next_step","outputs":{"repair_edit":{"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}},"decisions_and_context":"Produced one deferred edit for validation."}
     If no repair is needed, set repair_edit to null and explain why.
   outputs:

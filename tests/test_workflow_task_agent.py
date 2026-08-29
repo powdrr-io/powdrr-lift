@@ -1422,10 +1422,56 @@ def test_process_workflow_task_repairs_fuzzy_match_tool_error(
 
     assert exit_code == 0
     assert len(client.messages) == 3
-    correction = client.messages[1][1]["content"]
+    correction = "\n".join(
+        message["content"]
+        for message in client.messages[1]
+        if message["role"] == "user"
+    )
     assert "fuzzy-match requires -name <query>" in correction
     assert "corrected JSON action" in correction
     assert "tool_error" in correction
+
+
+def test_process_workflow_task_repairs_invalid_edit_line_number(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {
+                "action": "edit",
+                "file_path": "candidate.py",
+                "edits": [
+                    {
+                        "kind": "add",
+                        "start_line": 0,
+                        "text": "value = 1\n",
+                    }
+                ],
+            },
+            {"kind": "complete", "output_state": {"fixed": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 2
+    correction = "\n".join(
+        message["content"]
+        for message in client.messages[1]
+        if message["role"] == "user"
+    )
+    assert "positive integer" in correction
+    assert "complete JSON object" in correction
 
 
 def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) -> None:
@@ -1537,6 +1583,29 @@ def test_read_task_document_clamps_end_line_to_document_length(
     assert [line["text"] for line in result["lines"]] == ["first", "second"]
 
 
+def test_read_task_document_accepts_zero_to_max_lines_range(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "document.md").write_text(
+        "\n".join(f"line-{index}" for index in range(1, 2001)),
+        encoding="utf-8",
+    )
+
+    result = _read_task_document(
+        WorkflowAction(
+            kind="read_document",
+            file_path="document.md",
+            start_line=0,
+            end_line=2000,
+        ),
+        tmp_path,
+    )
+
+    assert result["start_line"] == 1
+    assert result["end_line"] == 2000
+    assert len(result["lines"]) == 2000
+
+
 def test_missing_read_document_is_recoverable_and_lists_exact_files(
     tmp_path: Path,
 ) -> None:
@@ -1571,6 +1640,8 @@ def test_missing_read_document_is_recoverable_and_lists_exact_files(
     assert exit_code == 0
     assert len(client.messages) == 3
     assert "actual.py" in str(client.messages[1])
+    assert "do not retry that same path" in str(client.messages[1])
+    assert "list_files" in str(client.messages[1])
 
 
 def test_list_worktree_files_supports_recursive_glob(tmp_path: Path) -> None:

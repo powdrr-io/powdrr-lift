@@ -2093,6 +2093,8 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "workflow edit action edit kind must be",
             "workflow edit action edits must",
             "workflow edit action file_edits must",
+            "workflow edit action start_line must be a positive integer",
+            "workflow edit action end_line must be a positive integer",
         )
     )
 
@@ -2136,6 +2138,14 @@ def _action_response_correction(
             "end_line greater than or equal to start_line, and keep the entire "
             "range within the document line count stated in the error."
         )
+        if "read_document action file does not exist" in str(error).casefold():
+            correction += (
+                " The requested file does not exist: do not retry that same path. "
+                "Use list_files on the existing parent directory and then read "
+                "one exact returned file path, or choose another exact file path "
+                "already present in the current context. Never invent a filename "
+                "from a task id, template id, package name, or description."
+            )
     return correction
 
 
@@ -3072,13 +3082,14 @@ def _read_task_document(
             "do not infer or compose a filename."
         )
     lines = path.read_text(encoding="utf-8").splitlines()
-    if action.start_line < 1 or action.end_line < action.start_line:
+    effective_start_line = max(1, action.start_line)
+    if action.end_line < effective_start_line:
         raise RuntimeError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is invalid. "
             f"Request a range from 1 through {len(lines)}."
         )
-    if action.start_line > len(lines):
+    if effective_start_line > len(lines):
         raise RuntimeError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is outside the document "
@@ -3088,14 +3099,14 @@ def _read_task_document(
     end_line = min(action.end_line, len(lines))
     return {
         "path": action.file_path,
-        "start_line": action.start_line,
+        "start_line": effective_start_line,
         "end_line": end_line,
         "lines": [
             {
                 "line_number": number,
                 "text": lines[number - 1],
             }
-            for number in range(action.start_line, end_line + 1)
+            for number in range(effective_start_line, end_line + 1)
         ],
     }
 

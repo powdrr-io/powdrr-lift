@@ -91,6 +91,7 @@ from powdrr_lift.pr_workflow_record import (
 )
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
+    PowdrrExecutionError,
     ProgressDecision,
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -1305,6 +1306,14 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _ChatActionProgressStrategy(self.state).record_no_progress(action, observation)
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
+        try:
+            return self._execute_action(action)
+        except PowdrrExecutionError:
+            raise
+        except (RuntimeError, ValueError) as exc:
+            raise PowdrrExecutionError(str(exc)) from exc
+
+    def _execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         action_signature = _workflow_action_signature(action)
         if action_signature == self.observer_rejected_action_signature:
             raise RuntimeError(

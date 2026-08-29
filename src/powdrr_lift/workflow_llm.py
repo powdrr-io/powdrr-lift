@@ -48,6 +48,10 @@ class WorkflowLLMExecutionAborted(RuntimeError):
         self.exit_code = exit_code
 
 
+class PowdrrExecutionError(RuntimeError):
+    """An action failed in Powdrr and should be corrected by the agent."""
+
+
 ActionT = TypeVar("ActionT")
 StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
@@ -427,7 +431,7 @@ class WorkflowLLMExecutionDriver:
             before_state = strategy.material_state(action)
             try:
                 outcome = strategy.execute_action(action)
-            except (RuntimeError, ValueError) as exc:
+            except PowdrrExecutionError as exc:
                 strategy.record_action_error(action, exc)
                 failure_decision = None
                 if self.observer is not None:

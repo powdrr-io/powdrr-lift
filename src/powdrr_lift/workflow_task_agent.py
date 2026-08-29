@@ -95,6 +95,7 @@ from powdrr_lift.workflow_git import (
     workflow_id_from_task_id,
 )
 from powdrr_lift.workflow_llm import (
+    PowdrrExecutionError,
     ProgressDecision,
     WorkflowAction,
     WorkflowActionObservation,
@@ -543,6 +544,14 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
 
     def execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
+        try:
+            return self._execute_action(action)
+        except PowdrrExecutionError:
+            raise
+        except (RuntimeError, ValueError) as exc:
+            raise PowdrrExecutionError(str(exc)) from exc
+
+    def _execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None
         if workflow_action_signature(action) == self.observer_rejected_action_signature:
             raise RuntimeError(

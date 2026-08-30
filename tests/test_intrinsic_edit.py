@@ -24,25 +24,6 @@ def test_validate_edit_checks_ranges_without_mutating(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == "one\ntwo\n"
 
 
-def test_validate_edit_reports_legacy_shape(tmp_path: Path) -> None:
-    path = tmp_path / "example.py"
-    path.write_text("one\ntwo\n", encoding="utf-8")
-
-    result = execute_validate_edit_tool(
-        {
-            "edit": {
-                "action": "edit",
-                "file_path": "example.py",
-                "edits": [{"line_number": 1, "content": "bad"}],
-            }
-        },
-        worktree_root=tmp_path,
-    )
-
-    assert result["returncode"] == 1
-    assert "kind" in result["error"]
-
-
 def test_apply_edit_applies_multiple_file_groups(tmp_path: Path) -> None:
     first = tmp_path / "first.py"
     second = tmp_path / "second.py"

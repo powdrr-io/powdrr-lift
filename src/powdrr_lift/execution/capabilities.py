@@ -175,6 +175,12 @@ class CapabilityBroker:
         if adapter is None:
             return CapabilityResolution(CapabilityResolutionKind.DENIED, "unknown tool")
         manifest = adapter.manifest
+        effects_for = getattr(adapter, "effects_for", None)
+        effective_effects = (
+            effects_for(context, request.arguments)
+            if callable(effects_for)
+            else frozenset(manifest.effects)
+        )
         if request.semantic_action not in manifest.semantic_actions:
             return CapabilityResolution(
                 CapabilityResolutionKind.DENIED, "action is not supported by tool"
@@ -183,7 +189,7 @@ class CapabilityBroker:
             return CapabilityResolution(
                 CapabilityResolutionKind.DENIED, "action is not allowed in this step"
             )
-        missing_effects = set(manifest.effects) - set(context.allowed_effects)
+        missing_effects = set(effective_effects) - set(context.allowed_effects)
         if missing_effects:
             effects = ", ".join(sorted(effect.value for effect in missing_effects))
             kind = (

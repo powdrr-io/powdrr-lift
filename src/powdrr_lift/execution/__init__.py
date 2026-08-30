@@ -1,5 +1,10 @@
 """Typed execution-kernel building blocks."""
 
+from powdrr_lift.execution.builtin_tools import (
+    EnrichmentAdapter,
+    IntrinsicRepositoryAdapter,
+    builtin_tool_registry,
+)
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityExceptionStore,
@@ -94,6 +99,7 @@ __all__ = [
     "satisfy_obligation",
     "unresolved_obligations",
     "CapabilityBroker",
+    "EnrichmentAdapter",
     "Checkpoint",
     "ContentAddressedCheckpointStore",
     "CapabilityExceptionStore",
@@ -101,6 +107,7 @@ __all__ = [
     "CapabilityResolution",
     "CapabilityResolutionKind",
     "FileCapabilityExceptionStore",
+    "IntrinsicRepositoryAdapter",
     "DiagnosticResult",
     "EvidenceRequirement",
     "FindingDisposition",
@@ -118,4 +125,5 @@ __all__ = [
     "compact_execution_context",
     "evaluate_review_agreement",
     "invalidate_evidence",
+    "builtin_tool_registry",
 ]

@@ -36,7 +36,7 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
 )
-from powdrr_lift.workflow_llm import WorkflowLLMExecutionDriver
+from powdrr_lift.workflow_llm import WorkflowStepRunner
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
 
 WORKFLOW_SCENARIO_SCHEMA_VERSION = 1
@@ -383,7 +383,7 @@ def _run_scripted_skill(
         provider_role="normal",
         current_model="scripted",
         provider="local",
-        driver=WorkflowLLMExecutionDriver(max_stalled_roundtrips=2),
+        driver=WorkflowStepRunner(max_stalled_roundtrips=2),
     )
     with _stub_github_intrinsic():
         try:

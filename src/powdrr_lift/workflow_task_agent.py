@@ -105,8 +105,8 @@ from powdrr_lift.workflow_llm import (
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
-    WorkflowLLMExecutionDriver,
     WorkflowLLMTimeoutExhausted,
+    WorkflowStepRunner,
     complete_json_with_timeout_retry,
     prompt_size_breakdown,
     prune_execution_events,
@@ -305,7 +305,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     Its policy is intentionally limited to durable task state, publishing, and
     human handoff. Requesting, parsing, retrying, failure thresholds, and
-    no-progress correction are all owned by ``WorkflowLLMExecutionDriver``.
+    no-progress correction are all owned by ``WorkflowStepRunner``.
     """
 
     config: WorkflowTaskAgentConfig
@@ -548,8 +548,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return self._execute_action(action)
         except PowdrrExecutionError:
             raise
-        except (RuntimeError, ValueError) as exc:
-            raise PowdrrExecutionError(str(exc), cause_error=exc) from exc
+        except (RuntimeError, ValueError) as error:
+            raise PowdrrExecutionError(str(error), cause_error=error) from error
 
     def _execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None
@@ -1259,7 +1259,7 @@ def run_workflow_task(
                 include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
             )
         )
-        driver = WorkflowLLMExecutionDriver(
+        driver = WorkflowStepRunner(
             max_stalled_roundtrips=config.max_stalled_roundtrips
         )
         strategy = _TaskWorkflowExecutionStrategy(
@@ -2619,7 +2619,455 @@ def _repair_workflow_file_command(
     return repaired_parameters
 
 
-def _run_skill_for_agent(
+@dataclass(slots=True)
+class _NestedSkillExecutionFrame:
+    skill: SkillCatalogEntry
+    step_index: int
+    clean_context: bool
+    parent_transcript: list[dict[str, str]]
+    parent_events: list[dict[str, Any]]
+    parent_context: list[str]
+    parent_handoff_records: dict[str, dict[str, Any]]
+
+
+@dataclass(slots=True)
+class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
+    """Run a durable task's nested skill through the shared step runner."""
+
+    catalog: tuple[SkillCatalogEntry, ...]
+    client: WorkflowLLMClient
+    task: WorkflowTask
+    repo_root: Path
+    stdout: TextIO
+    stderr: TextIO
+    max_timeout_retries: int
+    timeout_backoff_seconds: float
+    verbose: bool
+    error_log_root: Path | None
+    transcript: list[dict[str, str]]
+    execution_events: list[dict[str, Any]]
+    execution_context: list[str]
+    handoff_records: dict[str, dict[str, Any]]
+    stack: list[_NestedSkillExecutionFrame]
+    current_skill: SkillCatalogEntry | None = None
+    current_step: Any = None
+    current_step_index: int = 0
+    driver: WorkflowStepRunner | None = None
+
+    def _restore_completed_skill(self, frame: _NestedSkillExecutionFrame) -> None:
+        if frame.clean_context:
+            self.transcript = frame.parent_transcript
+            self.execution_events = frame.parent_events
+            self.execution_context = frame.parent_context
+            self.handoff_records = frame.parent_handoff_records
+
+    def next_request(self) -> WorkflowActionRequest | None:
+        while self.stack:
+            frame = self.stack[-1]
+            if frame.step_index >= len(frame.skill.skill.steps):
+                self.stack.pop()
+                self._restore_completed_skill(frame)
+                continue
+            self.current_skill = frame.skill
+            self.current_step_index = frame.step_index
+            self.current_step = frame.skill.skill.steps[frame.step_index]
+            step = self.current_step
+            if step.step_type == "gate":
+                if step.gate is None:
+                    raise PowdrrExecutionError("gate steps require gate settings.")
+                passed = _run_gate(
+                    step,
+                    skill_name=frame.skill.skill.name,
+                    worktree_root=self.repo_root,
+                    execution_events=self.execution_events,
+                    execution_context=self.execution_context,
+                    handoff_records=self.handoff_records,
+                    step_index=frame.step_index,
+                    workflow_context=None,
+                    stdout=self.stdout,
+                    stderr=self.stderr,
+                    verbose=self.verbose,
+                )
+                target_index = frame.step_index + 1
+                if not passed:
+                    target_index = _step_index_by_id(frame.skill, step.gate.goto_step)
+                    _invalidate_deterministic_pre_step(
+                        self.execution_events,
+                        skill_name=frame.skill.skill.name,
+                        step_index=target_index,
+                    )
+                    self.execution_events.append(
+                        {
+                            "kind": "goto_step",
+                            "skill": frame.skill.skill.name,
+                            "step_id": step.gate.goto_step,
+                            "target_step_index": target_index,
+                            "source": "gate",
+                        }
+                    )
+                frame.step_index = target_index
+                continue
+            if step.step_type == "invoke_tool" and step.pre_step is not None:
+                _run_deterministic_pre_step(
+                    step,
+                    skill_name=frame.skill.skill.name,
+                    worktree_root=self.repo_root,
+                    execution_events=self.execution_events,
+                    execution_context=self.execution_context,
+                    handoff_records=self.handoff_records,
+                    step_index=frame.step_index,
+                    workflow_context=None,
+                    stdout=self.stdout,
+                    stderr=self.stderr,
+                    verbose=self.verbose,
+                )
+            return WorkflowActionRequest(
+                client=self.client,
+                messages=_build_step_execution_messages(
+                    selected_skill=frame.skill,
+                    current_step=step,
+                    current_step_index=frame.step_index,
+                    transcript=self.transcript,
+                    execution_events=self.execution_events,
+                    execution_context=self.execution_context,
+                    handoff_records=self.handoff_records,
+                    current_file_path=None,
+                    worktree_root=self.repo_root,
+                    catalog=self.catalog,
+                ),
+                parser=_parse_action_response,
+                model="nested-skill",
+                stderr=self.stderr,
+                max_timeout_retries=self.max_timeout_retries,
+                timeout_backoff_seconds=self.timeout_backoff_seconds,
+            )
+        return None
+
+    def material_state(self, action: WorkflowAction) -> object:
+        if action.kind not in {"edit", "invoke_tool"}:
+            return None
+        paths = (
+            [group.file_path for group in action.file_edits]
+            if action.file_edits
+            else ([action.file_path] if action.file_path is not None else [])
+        )
+        return tuple(
+            (
+                file_path,
+                (
+                    _resolve_worktree_file_path(file_path, self.repo_root).read_text(
+                        encoding="utf-8"
+                    )
+                    if _resolve_worktree_file_path(file_path, self.repo_root).exists()
+                    else None
+                ),
+            )
+            for file_path in paths
+        )
+
+    def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:
+        if self.verbose:
+            print(
+                f"Nested skill LLM action:\n{workflow_action_signature(action)}",
+                file=self.stdout,
+                flush=True,
+            )
+        print(
+            f"Nested skill roundtrip {roundtrip}: {workflow_action_summary(action)}",
+            file=self.stdout,
+            flush=True,
+        )
+
+    def record_no_progress(
+        self,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation,
+    ) -> None:
+        self.execution_events.append(
+            {
+                "kind": "no_progress",
+                "skill": self.current_skill.skill.name if self.current_skill else None,
+                "action_kind": action.kind,
+                "message": observation.correction,
+            }
+        )
+        self.execution_context.append(
+            "The previous nested workflow action made no progress; choose "
+            "a different action or next_step."
+        )
+
+    def record_response_error(
+        self,
+        error: RuntimeError,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        if not _is_repairable_task_response_error(error):
+            raise error
+        correction = _nested_action_response_correction(error)
+        if self.error_log_root is not None:
+            record_workflow_llm_error(
+                self.error_log_root,
+                execution_mode="process_workflow_task",
+                phase="nested_skill_llm_output_parse",
+                error=error,
+                context={
+                    "task_id": self.task.task_id,
+                    "skill_name": (
+                        self.current_skill.skill.name if self.current_skill else None
+                    ),
+                    "step_id": getattr(self.current_step, "id", None),
+                    "step_index": self.current_step_index,
+                },
+                llm_output=payload,
+                guidance=correction,
+            )
+        self.execution_events.append(
+            {
+                "kind": "llm_output_error",
+                "skill": self.current_skill.skill.name if self.current_skill else None,
+                "step_id": getattr(self.current_step, "id", None),
+                "step_index": self.current_step_index,
+                "error": str(error),
+                "llm_output": payload,
+                "guidance": correction,
+            }
+        )
+        self.execution_context.append(correction)
+        if payload is not None:
+            self.transcript.append(
+                {
+                    "role": "assistant",
+                    "content": json.dumps(payload, ensure_ascii=False),
+                }
+            )
+        self.transcript.append({"role": "user", "content": correction})
+        print(f"Nested skill action response needs repair: {error}", file=self.stderr)
+
+    def execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
+        if self.current_skill is None or self.current_step is None:
+            raise PowdrrExecutionError("Nested skill action has no active step.")
+        frame = self.stack[-1]
+        step = self.current_step
+        if (
+            action.kind == "next_step"
+            and not action.outputs
+            and isinstance(action.output_state, Mapping)
+            and step.outputs
+            and set(action.output_state).issubset(
+                {output.name for output in step.outputs}
+            )
+        ):
+            action = replace(action, outputs=dict(action.output_state))
+        _validate_workflow_action_for_step(action, step)
+        _validate_workflow_action_outputs(action, step)
+        if action.kind in {"complete", "next_step"}:
+            _record_task_action_outputs(
+                action, self.handoff_records, step, frame.step_index
+            )
+        if action.kind == "complete":
+            self.stack.pop()
+            self._restore_completed_skill(frame)
+            self.execution_events.append(
+                {"kind": action.kind, "skill": self.current_skill.skill.name}
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "next_step":
+            next_step = (
+                frame.skill.skill.steps[frame.step_index + 1]
+                if frame.step_index + 1 < len(frame.skill.skill.steps)
+                else None
+            )
+            _validate_workflow_handoff(
+                step,
+                next_step,
+                self.handoff_records,
+                current_step_index=frame.step_index,
+            )
+            frame.step_index += 1
+            self.execution_events.append(
+                {"kind": action.kind, "skill": frame.skill.skill.name}
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "goto_step":
+            target_index = _step_index_by_id(frame.skill, action.step_id)
+            frame.step_index = target_index
+            if action.decisions_and_context:
+                self.execution_context.append(action.decisions_and_context)
+            self.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "skill": frame.skill.skill.name,
+                    "step_id": action.step_id,
+                    "target_step_index": target_index,
+                    "decisions_and_context": action.decisions_and_context,
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "invoke_skill":
+            if action.skill_name is None:
+                raise PowdrrExecutionError(
+                    "invoke_skill action must include a skill name."
+                )
+            nested_skill = _find_skill_by_name(self.catalog, action.skill_name)
+            if any(entry.skill.path == nested_skill.path for entry in self.stack):
+                raise PowdrrExecutionError(
+                    f"Recursive skill invocation is not allowed: {action.skill_name!r}."
+                )
+            nested_context = list(action.context)
+            if action.decisions_and_context is not None:
+                nested_context.append(action.decisions_and_context)
+            self.stack.append(
+                _NestedSkillExecutionFrame(
+                    skill=nested_skill,
+                    step_index=0,
+                    clean_context=action.clean,
+                    parent_transcript=list(self.transcript),
+                    parent_events=list(self.execution_events),
+                    parent_context=list(self.execution_context),
+                    parent_handoff_records=(
+                        dict(self.handoff_records)
+                        if action.clean
+                        else self.handoff_records
+                    ),
+                )
+            )
+            self.execution_events.append(
+                {"kind": action.kind, "skill": action.skill_name}
+            )
+            if action.clean:
+                self.transcript = []
+                self.execution_events = []
+                self.execution_context = nested_context
+                self.handoff_records = {}
+            else:
+                self.execution_context.extend(nested_context)
+            return WorkflowActionOutcome()
+        if action.kind == "gather_context":
+            report = gather_specification_context(
+                self.repo_root,
+                types=list(action.types),
+                feature_id=action.feature_id,
+                keywords=list(action.keywords),
+            )
+            self.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": json.loads(render_gather_context_report(report)),
+                }
+            )
+            _record_task_action_outputs(
+                action, self.handoff_records, step, frame.step_index
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "read_document":
+            self.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": _read_task_document(action, self.repo_root),
+                }
+            )
+            _record_task_action_outputs(
+                action, self.handoff_records, step, frame.step_index
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "edit":
+            self.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "result": _apply_task_edits(action, self.repo_root),
+                }
+            )
+            _record_task_action_outputs(
+                action, self.handoff_records, step, frame.step_index
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "invoke_tool":
+            if action.tool in {"shell", "internal"}:
+                if (
+                    action.tool == "internal"
+                    and action.parameters.get("help") is not True
+                ):
+                    _validate_internal_command(action.parameters.get("command"))
+                result = _execute_shell_tool(
+                    {**action.parameters, "_tool_name": action.tool},
+                    worktree_root=self.repo_root,
+                    stdout=self.stdout,
+                    stderr=self.stderr,
+                    verbose=self.verbose,
+                )
+            elif action.tool == ENRICH_TOOL:
+                result = execute_enrich_tool(action.parameters)
+            elif action.tool == "fuzzy-match":
+                result = _execute_fuzzy_match_tool(
+                    action.parameters, worktree_root=self.repo_root
+                )
+            elif is_basedpyright_tool(action.tool or ""):
+                result = execute_basedpyright_tool(
+                    action.tool or "", action.parameters, worktree_root=self.repo_root
+                )
+            else:
+                raise PowdrrExecutionError(
+                    f"Unsupported nested skill tool: {action.tool!r}"
+                )
+            _record_skill_pull_request(
+                action,
+                self.repo_root,
+                frame.skill,
+                self.execution_events,
+                result,
+                step_index=frame.step_index,
+            )
+            self.execution_events.append(
+                {
+                    "kind": action.kind,
+                    "tool": action.tool,
+                    "parameters": action.parameters,
+                    "result": result,
+                    "decisions_and_context": action.decisions_and_context,
+                    "step_index": frame.step_index,
+                }
+            )
+            _record_task_action_outputs(
+                action, self.handoff_records, step, frame.step_index
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "prompt_user":
+            raise PowdrrExecutionError(
+                "Nested skills in agent workflows cannot prompt users."
+            )
+        raise PowdrrExecutionError(f"Unsupported nested skill action: {action.kind!r}")
+
+    def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
+        raise error
+
+    def no_progress_threshold_exit_code(
+        self,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation,
+    ) -> int | None:
+        _ = action, observation
+        if self.driver is not None:
+            self.driver.action_engine.reset_progress()
+        return None
+
+    def action_failure_exit_code(self, action: WorkflowAction) -> int:
+        _ = action
+        return 1
+
+    def observe_outcome(
+        self,
+        action: WorkflowAction,
+        observation: WorkflowActionObservation,
+        outcome: WorkflowActionOutcome,
+    ) -> WorkflowActionOutcome:
+        _ = action, observation
+        return outcome
+
+    def exhausted_roundtrips_exit_code(self) -> int:
+        return 2
+
+
+def _run_skill_for_agent_with_shared_runner(
     skill_name: str,
     *,
     catalog: tuple[SkillCatalogEntry, ...],
@@ -2636,17 +3084,6 @@ def _run_skill_for_agent(
     error_log_root: Path | None = None,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
-    stack: list[
-        tuple[
-            SkillCatalogEntry,
-            int,
-            bool,
-            list[dict[str, str]],
-            list[dict[str, Any]],
-            list[str],
-            dict[str, dict[str, Any]],
-        ]
-    ] = [(selected_skill, 0, False, [], [], [], {})]
     transcript = [] if clean else [{"role": "user", "content": task.description}]
     execution_events: list[dict[str, Any]] = []
     execution_context = list(context)
@@ -2667,12 +3104,6 @@ def _run_skill_for_agent(
         )
     if not clean:
         resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
-        # A nested skill owns its own step/output contract.  Passing the parent
-        # durable task's details here causes the model to copy the parent's
-        # output_state_type into a nested step's `outputs` object (for example,
-        # `all-tests-results-state` into run-tests-and-fix's `test_tool_result`).
-        # Keep the task inputs, but do not leak the parent task's completion
-        # instructions into the nested skill prompt.
         execution_context = [
             (
                 "Task input: "
@@ -2680,380 +3111,78 @@ def _run_skill_for_agent(
             ),
             *execution_context,
         ]
-    action_engine = WorkflowLLMActionEngine(max_stalled_roundtrips=3)
-    while stack:
-        (
-            current_skill,
-            step_index,
-            clean_context,
-            parent_transcript,
-            parent_events,
-            parent_context,
-            parent_handoff_records,
-        ) = stack[-1]
-        if step_index >= len(current_skill.skill.steps):
-            stack.pop()
-            if clean_context:
-                transcript = parent_transcript
-                execution_events = parent_events
-                execution_context = parent_context
-                handoff_records = parent_handoff_records
-            continue
-        step = current_skill.skill.steps[step_index]
-        if step.step_type == "gate":
-            if step.gate is None:
-                raise PowdrrExecutionError("gate steps require gate settings.")
-            passed = _run_gate(
-                step,
-                skill_name=current_skill.skill.name,
-                worktree_root=repo_root,
-                execution_events=execution_events,
-                execution_context=execution_context,
-                handoff_records=handoff_records,
-                step_index=step_index,
-                workflow_context=None,
-                stdout=stdout,
-                stderr=stderr,
-                verbose=verbose,
+    strategy = _NestedSkillExecutionStrategy(
+        catalog=catalog,
+        client=client,
+        task=task,
+        repo_root=repo_root,
+        stdout=stdout,
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+        verbose=verbose,
+        error_log_root=error_log_root,
+        transcript=transcript,
+        execution_events=execution_events,
+        execution_context=execution_context,
+        handoff_records=handoff_records,
+        stack=[
+            _NestedSkillExecutionFrame(
+                skill=selected_skill,
+                step_index=0,
+                clean_context=False,
+                parent_transcript=[],
+                parent_events=[],
+                parent_context=[],
+                parent_handoff_records={},
             )
-            target_index = step_index + 1
-            if not passed:
-                target_index = _step_index_by_id(current_skill, step.gate.goto_step)
-                _invalidate_deterministic_pre_step(
-                    execution_events,
-                    skill_name=current_skill.skill.name,
-                    step_index=target_index,
-                )
-                execution_events.append(
-                    {
-                        "kind": "goto_step",
-                        "skill": current_skill.skill.name,
-                        "step_id": step.gate.goto_step,
-                        "target_step_index": target_index,
-                        "source": "gate",
-                    }
-                )
-            stack[-1] = (
-                current_skill,
-                target_index,
-                clean_context,
-                parent_transcript,
-                parent_events,
-                parent_context,
-                handoff_records,
-            )
-            continue
-        if step.step_type == "invoke_tool" and step.pre_step is not None:
-            _run_deterministic_pre_step(
-                step,
-                skill_name=current_skill.skill.name,
-                worktree_root=repo_root,
-                execution_events=execution_events,
-                execution_context=execution_context,
-                handoff_records=handoff_records,
-                step_index=step_index,
-                workflow_context=None,
-                stdout=stdout,
-                stderr=stderr,
-                verbose=verbose,
-            )
-        messages = _build_step_execution_messages(
-            selected_skill=current_skill,
-            current_step=step,
-            current_step_index=step_index,
-            transcript=transcript,
-            execution_events=execution_events,
-            execution_context=execution_context,
-            handoff_records=handoff_records,
-            current_file_path=None,
-            worktree_root=repo_root,
-            catalog=catalog,
+        ],
+    )
+    driver = WorkflowStepRunner(max_stalled_roundtrips=3)
+    strategy.driver = driver
+    exit_code = driver.run(
+        strategy,
+        max_roundtrips=None,
+        signature=workflow_action_signature,
+    )
+    if exit_code != 0:
+        raise PowdrrExecutionError(
+            f"Nested skill {skill_name!r} stopped with exit code {exit_code}."
         )
-        try:
-            action = action_engine.request_action(
-                client=client,
-                messages=messages,
-                parser=_parse_action_response,
-                model="nested-skill",
-                stderr=stderr,
-                max_timeout_retries=max_timeout_retries,
-                timeout_backoff_seconds=timeout_backoff_seconds,
-            )
-        except RuntimeError as error:
-            if not _is_repairable_task_response_error(error):
-                raise
-            payload = action_engine.last_payload
-            correction = _nested_action_response_correction(error)
-            if error_log_root is not None:
-                record_workflow_llm_error(
-                    error_log_root,
-                    execution_mode="process_workflow_task",
-                    phase="nested_skill_llm_output_parse",
-                    error=error,
-                    context={
-                        "task_id": task.task_id,
-                        "skill_name": current_skill.skill.name,
-                        "step_id": step.id,
-                        "step_index": step_index,
-                    },
-                    llm_output=payload,
-                    guidance=correction,
-                )
-            execution_events.append(
-                {
-                    "kind": "llm_output_error",
-                    "skill": current_skill.skill.name,
-                    "step_id": step.id,
-                    "step_index": step_index,
-                    "error": str(error),
-                    "llm_output": payload,
-                    "guidance": correction,
-                }
-            )
-            execution_context.append(correction)
-            if payload is not None:
-                transcript.append(
-                    {
-                        "role": "assistant",
-                        "content": json.dumps(payload, ensure_ascii=False),
-                    }
-                )
-            transcript.append({"role": "user", "content": correction})
-            print(
-                f"Nested skill action response needs repair: {error}",
-                file=stderr,
-            )
-            continue
-        if (
-            action.kind == "next_step"
-            and not action.outputs
-            and isinstance(action.output_state, Mapping)
-            and step.outputs
-            and set(action.output_state).issubset(
-                {output.name for output in step.outputs}
-            )
-        ):
-            # Nested skills use the same action schema as durable tasks. Accept
-            # the canonical output_state spelling when it carries the current
-            # skill step's declared handoff outputs.
-            action = replace(action, outputs=dict(action.output_state))
-        _validate_workflow_action_for_step(action, step)
-        _validate_workflow_action_outputs(action, step)
-        observation = action_engine.observe_action(
-            action,
-            signature=workflow_action_signature,
-            before_state=None,
-            after_state=None,
-        )
-        if observation.decision == ProgressDecision.THRESHOLD:
-            execution_events.append(
-                {
-                    "kind": "no_progress",
-                    "action_kind": action.kind,
-                    "message": "Repeated nested workflow action made no progress.",
-                }
-            )
-            execution_context.append(
-                "The previous nested workflow action made no progress; choose "
-                "a different action or next_step."
-            )
-            action_engine.reset_progress()
-            continue
-        if action.kind == "complete":
-            _validate_workflow_action_outputs(action, step)
-            _record_task_action_outputs(action, handoff_records, step, step_index)
-            stack.pop()
-            if clean_context:
-                transcript = parent_transcript
-                execution_events = parent_events
-                execution_context = parent_context
-                handoff_records = parent_handoff_records
-            execution_events.append(
-                {"kind": action.kind, "skill": current_skill.skill.name}
-            )
-            continue
-        if action.kind == "next_step":
-            _validate_workflow_action_outputs(action, step)
-            _record_task_action_outputs(action, handoff_records, step, step_index)
-            next_step = (
-                current_skill.skill.steps[step_index + 1]
-                if step_index + 1 < len(current_skill.skill.steps)
-                else None
-            )
-            _validate_workflow_handoff(
-                step,
-                next_step,
-                handoff_records,
-                current_step_index=step_index,
-            )
-            stack[-1] = (
-                current_skill,
-                step_index + 1,
-                clean_context,
-                parent_transcript,
-                parent_events,
-                parent_context,
-                handoff_records,
-            )
-            execution_events.append(
-                {"kind": action.kind, "skill": current_skill.skill.name}
-            )
-            continue
-        if action.kind == "goto_step":
-            target_index = _step_index_by_id(current_skill, action.step_id)
-            stack[-1] = (
-                current_skill,
-                target_index,
-                clean_context,
-                parent_transcript,
-                parent_events,
-                parent_context,
-                handoff_records,
-            )
-            if action.decisions_and_context:
-                execution_context.append(action.decisions_and_context)
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "skill": current_skill.skill.name,
-                    "step_id": action.step_id,
-                    "target_step_index": target_index,
-                    "decisions_and_context": action.decisions_and_context,
-                }
-            )
-            continue
-        if action.kind == "invoke_skill":
-            if action.skill_name is None:
-                raise PowdrrExecutionError(
-                    "invoke_skill action must include a skill name."
-                )
-            nested_skill = _find_skill_by_name(catalog, action.skill_name)
-            if any(entry.path == nested_skill.path for entry, *_ in stack):
-                raise PowdrrExecutionError(
-                    f"Recursive skill invocation is not allowed: {action.skill_name!r}."
-                )
-            nested_context = list(action.context)
-            if action.decisions_and_context is not None:
-                nested_context.append(action.decisions_and_context)
-            stack[-1] = (
-                current_skill,
-                step_index,
-                clean_context,
-                parent_transcript,
-                parent_events,
-                parent_context,
-                handoff_records,
-            )
-            stack.append(
-                (
-                    nested_skill,
-                    0,
-                    action.clean,
-                    list(transcript),
-                    list(execution_events),
-                    list(execution_context),
-                    dict(handoff_records) if action.clean else handoff_records,
-                )
-            )
-            execution_events.append({"kind": action.kind, "skill": action.skill_name})
-            if action.clean:
-                transcript = []
-                execution_events = []
-                execution_context = nested_context
-                handoff_records = {}
-            else:
-                execution_context.extend(nested_context)
-            continue
-        if action.kind == "gather_context":
-            report = gather_specification_context(
-                repo_root,
-                types=list(action.types),
-                feature_id=action.feature_id,
-                keywords=list(action.keywords),
-            )
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "result": json.loads(render_gather_context_report(report)),
-                }
-            )
-            _record_task_action_outputs(action, handoff_records, step, step_index)
-            continue
-        if action.kind == "read_document":
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "result": _read_task_document(action, repo_root),
-                }
-            )
-            _record_task_action_outputs(action, handoff_records, step, step_index)
-            continue
-        if action.kind == "edit":
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "result": _apply_task_edits(action, repo_root),
-                }
-            )
-            _record_task_action_outputs(action, handoff_records, step, step_index)
-            continue
-        if action.kind == "invoke_tool":
-            if action.tool in {"shell", "internal"}:
-                if (
-                    action.tool == "internal"
-                    and action.parameters.get("help") is not True
-                ):
-                    _validate_internal_command(action.parameters.get("command"))
-                result = _execute_shell_tool(
-                    {**action.parameters, "_tool_name": action.tool},
-                    worktree_root=repo_root,
-                    stdout=stdout,
-                    stderr=stderr,
-                    verbose=verbose,
-                )
-            elif action.tool == ENRICH_TOOL:
-                result = execute_enrich_tool(action.parameters)
-            elif action.tool == "fuzzy-match":
-                result = _execute_fuzzy_match_tool(
-                    action.parameters,
-                    worktree_root=repo_root,
-                )
-            elif is_basedpyright_tool(action.tool or ""):
-                result = execute_basedpyright_tool(
-                    action.tool or "",
-                    action.parameters,
-                    worktree_root=repo_root,
-                )
-            else:
-                raise PowdrrExecutionError(
-                    f"Unsupported nested skill tool: {action.tool!r}"
-                )
-            _record_skill_pull_request(
-                action,
-                repo_root,
-                current_skill,
-                execution_events,
-                result,
-                step_index=step_index,
-            )
-            execution_events.append(
-                {
-                    "kind": action.kind,
-                    "tool": action.tool,
-                    "parameters": action.parameters,
-                    "result": result,
-                    "decisions_and_context": action.decisions_and_context,
-                    "step_index": step_index,
-                }
-            )
-            _record_task_action_outputs(action, handoff_records, step, step_index)
-            continue
-        if action.kind == "prompt_user":
-            raise PowdrrExecutionError(
-                "Nested skills in agent workflows cannot prompt users."
-            )
-        raise PowdrrExecutionError(f"Unsupported nested skill action: {action.kind!r}")
-    return {"skill": skill_name, "events": execution_events}
+    return {"skill": skill_name, "events": strategy.execution_events}
+
+
+def _run_skill_for_agent(
+    skill_name: str,
+    *,
+    catalog: tuple[SkillCatalogEntry, ...],
+    client: WorkflowLLMClient,
+    task: WorkflowTask,
+    repo_root: Path,
+    stdout: TextIO,
+    stderr: TextIO,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+    verbose: bool = False,
+    context: tuple[str, ...] = (),
+    clean: bool = False,
+    error_log_root: Path | None = None,
+) -> dict[str, Any]:
+    return _run_skill_for_agent_with_shared_runner(
+        skill_name,
+        catalog=catalog,
+        client=client,
+        task=task,
+        repo_root=repo_root,
+        stdout=stdout,
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+        verbose=verbose,
+        context=context,
+        clean=clean,
+        error_log_root=error_log_root,
+    )
 
 
 def _record_task_action_outputs(

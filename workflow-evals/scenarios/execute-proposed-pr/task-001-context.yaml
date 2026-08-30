@@ -7,7 +7,7 @@ fixture: fixtures/task-001
 provider:
   mode: scripted
   responses:
-    - kind: complete
+    - action: complete
       output_state: $deterministic_pre_step
 expect:
   output_state: $deterministic_pre_step

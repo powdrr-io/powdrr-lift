@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import io
 import json
 import os
@@ -12,16 +11,12 @@ from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from threading import Thread
 from typing import Any, TextIO, cast
 from unittest.mock import patch
 from urllib.request import Request
 
 import pytest
 import yaml
-from textual.containers import ScrollableContainer
-from textual.events import Key
-from textual.widgets import Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -154,11 +149,6 @@ from powdrr_lift.workflow_chat_agent import (
     missing_executable_output,
     run_workflow_chat,
 )
-from powdrr_lift.workflow_chat_tui import (
-    WorkflowChatApp,
-    _TextualStdoutOutput,
-    _visible_step_indices,
-)
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 
 # ruff: noqa: E501
@@ -167,7 +157,7 @@ from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 def test_goto_step_action_requires_a_step_id() -> None:
     action = _parse_action_response(
         {
-            "kind": "goto_step",
+            "action": "goto_step",
             "step_id": "process-next-item",
             "decisions_and_context": "More items remain.",
         }
@@ -176,7 +166,7 @@ def test_goto_step_action_requires_a_step_id() -> None:
     assert action.kind == "goto_step"
     assert action.step_id == "process-next-item"
     with pytest.raises(RuntimeError, match="must include step_id"):
-        _parse_action_response({"kind": "goto_step"})
+        _parse_action_response({"action": "goto_step"})
 
 
 def test_execution_events_for_prompt_compacts_results_without_mutating_summary_data() -> (
@@ -215,7 +205,7 @@ def test_latest_execution_event_keeps_only_the_latest_result_for_prompt() -> Non
 def test_prompt_transcript_omits_action_observations_represented_by_events() -> None:
     transcript = [
         {"role": "user", "content": "Implement the change."},
-        {"role": "assistant", "content": '{"kind":"read_document"}'},
+        {"role": "assistant", "content": '{"action":"read_document"}'},
         {"role": "user", "content": '{"document_context":{"lines":[]}}'},
         {"role": "assistant", "content": "I need one decision."},
         {"role": "user", "content": "Use the existing interface."},
@@ -711,7 +701,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
     _validate_workflow_action_for_step(
         _parse_action_response(
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "shell",
                 "parameters": {"command": ["rg", "--files"]},
             }
@@ -723,7 +713,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         _validate_workflow_action_for_step(
             _parse_action_response(
                 {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "shell",
                     "parameters": {"command": ["rg", "--files", "extra"]},
                 }
@@ -733,14 +723,14 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
 
     with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
         _validate_workflow_step_transition(
-            _parse_action_response({"kind": "next_step"}),
+            _parse_action_response({"action": "next_step"}),
             step,
             [],
             0,
         )
 
     _validate_workflow_step_transition(
-        _parse_action_response({"kind": "next_step"}),
+        _parse_action_response({"action": "next_step"}),
         step,
         [
             {
@@ -756,7 +746,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
 
     with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
         _validate_workflow_step_transition(
-            _parse_action_response({"kind": "next_step"}),
+            _parse_action_response({"action": "next_step"}),
             step,
             [
                 {
@@ -783,7 +773,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
     )
     with pytest.raises(RuntimeError, match="requires a successful tool invocation"):
         _validate_workflow_step_transition(
-            _parse_action_response({"kind": "next_step"}),
+            _parse_action_response({"action": "next_step"}),
             commit_step,
             [
                 {
@@ -806,7 +796,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
     _validate_workflow_action_for_step(
         _parse_action_response(
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "shell",
                 "parameters": {"command": ["rg", "--path=src"]},
             }
@@ -833,7 +823,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
     _validate_workflow_action_for_step(
         _parse_action_response(
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "shell",
                 "parameters": {
                     "command": [
@@ -854,7 +844,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         _validate_workflow_action_for_step(
             _parse_action_response(
                 {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "fuzzy-match",
                     "parameters": {"command": ["fuzzy-match", ".", "-name", "src"]},
                 }
@@ -866,7 +856,7 @@ def test_workflow_tool_action_must_be_declared_by_current_step() -> None:
         _validate_workflow_action_for_step(
             _parse_action_response(
                 {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "shell",
                     "parameters": {"command": ["rg", "--files"]},
                 }
@@ -902,12 +892,20 @@ def test_step_allowed_actions_reject_direct_edit() -> None:
 
 
 def test_workflow_can_advance_after_empty_gather_context_result() -> None:
-    _validate_workflow_step_transition(
-        _parse_action_response({"kind": "next_step"}),
-        SkillStep(description="Discover optional PR-preparation tools."),
-        [{"kind": "gather_context", "result": {"matches": []}}],
-        0,
-    )
+    validated = False
+    try:
+        _validate_workflow_step_transition(
+            _parse_action_response({"action": "next_step"}),
+            SkillStep(description="Discover optional PR-preparation tools."),
+            [{"kind": "gather_context", "result": {"matches": []}}],
+            0,
+        )
+    except RuntimeError:
+        pass
+    else:
+        validated = True
+
+    assert validated is True
 
 
 def test_goto_step_can_only_target_a_prior_step() -> None:
@@ -928,7 +926,7 @@ def test_goto_step_can_only_target_a_prior_step() -> None:
     )
 
     _validate_workflow_step_transition(
-        _parse_action_response({"kind": "goto_step", "step_id": "prior"}),
+        _parse_action_response({"action": "goto_step", "step_id": "prior"}),
         current,
         [],
         1,
@@ -937,7 +935,7 @@ def test_goto_step_can_only_target_a_prior_step() -> None:
     for target in ("current", "later"):
         with pytest.raises(RuntimeError, match="only a prior step"):
             _validate_workflow_step_transition(
-                _parse_action_response({"kind": "goto_step", "step_id": target}),
+                _parse_action_response({"action": "goto_step", "step_id": target}),
                 current,
                 [],
                 1,
@@ -972,7 +970,7 @@ def test_complete_cannot_bypass_a_later_gate() -> None:
 
     with pytest.raises(RuntimeError, match="later gate steps remain"):
         _validate_workflow_step_transition(
-            _parse_action_response({"kind": "complete"}),
+            _parse_action_response({"action": "complete"}),
             current,
             [],
             0,
@@ -981,7 +979,7 @@ def test_complete_cannot_bypass_a_later_gate() -> None:
 
     state.step_index = 1
     _validate_workflow_step_transition(
-        _parse_action_response({"kind": "complete"}),
+        _parse_action_response({"action": "complete"}),
         later_gate,
         [],
         1,
@@ -994,7 +992,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         description="Run discovered checks.",
         validation_gate={
             "id": "checks",
-            "discovery": {"action": {"kind": "gather_context"}},
+            "discovery": {"action": {"action": "gather_context"}},
             "obligations": {
                 "source": "matches",
                 "filter": {"section": "tools"},
@@ -1015,7 +1013,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         step_index=0,
         worktree_root=Path("."),
     )
-    next_step = _parse_action_response({"kind": "next_step"})
+    next_step = _parse_action_response({"action": "next_step"})
 
     with pytest.raises(RuntimeError, match="cannot be skipped"):
         _validate_workflow_step_transition(
@@ -1064,7 +1062,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
     _validate_dynamic_validation_gate_action(
         _parse_action_response(
             {
-                "kind": "gather_context",
+                "action": "gather_context",
                 "types": ["requirements"],
             }
         ),
@@ -1087,7 +1085,7 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         _validate_dynamic_validation_gate_action(
             _parse_action_response(
                 {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "shell",
                     "parameters": {"command": ["uv", "run", "ruff"]},
                 }
@@ -1101,12 +1099,12 @@ def test_dynamic_validation_gate_matches_shell_command_string_and_argument_list(
     None
 ):
     expected = {
-        "kind": "invoke_tool",
+        "action": "invoke_tool",
         "tool": "shell",
         "parameters": {"command": "uv run --extra dev ruff format ."},
     }
     actual = {
-        "kind": "invoke_tool",
+        "action": "invoke_tool",
         "tool": "shell",
         "parameters": {
             "command": ["uv", "run", "--extra", "dev", "ruff", "format", "."]
@@ -1123,7 +1121,7 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
         validation_gate={
             "id": "repository-checks",
             "discovery": {
-                "action": {"kind": "gather_context"},
+                "action": {"action": "gather_context"},
             },
             "obligations": {
                 "source": "matches",
@@ -1138,7 +1136,7 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
         validation_gate={
             "id": "deployment-checks",
             "discovery": {
-                "action": {"kind": "gather_context"},
+                "action": {"action": "gather_context"},
             },
             "obligations": {
                 "source": "matches",
@@ -1166,7 +1164,7 @@ def test_dynamic_validation_gates_are_multiple_and_action_generic() -> None:
                 "item": {
                     "id": "check-one",
                     "validation_action": {
-                        "kind": "invoke_tool",
+                        "action": "invoke_tool",
                         "tool": "internal",
                         "parameters": {"command": ["repository-state"]},
                     },
@@ -1240,7 +1238,7 @@ def test_validation_failure_context_contains_exact_tool_result() -> None:
     _record_dynamic_validation_result(
         _parse_action_response(
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "shell",
                 "parameters": {"command": ["uv", "run", "mypy"]},
             }
@@ -1500,1242 +1498,6 @@ def test_prompt_user_reports_llm_call_after_input() -> None:
     assert status_stream.getvalue() == "[workflow] calling LLM...\n"
 
 
-def test_textual_response_grows_and_submits_on_return(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    received: list[str] = []
-
-    def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
-        kwargs["stdout"].write("What do you want to do? ")
-        kwargs["stdout"].flush()
-        received.append(kwargs["input_func"]())
-        if len(received) == 1:
-            skill_path = Path("skill-definitions/bootstrap-code-structure.yaml")
-            skill = SkillCatalogEntry(skill_path, load_skill(skill_path))
-            kwargs["progress_callback"](
-                skill,
-                len(skill.skill.steps),
-                "bootstrap-code-structure skill completed",
-                None,
-                None,
-            )
-        return 0 if len(received) == 1 else 1
-
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
-        fake_run_workflow_chat,
-    )
-
-    async def exercise() -> int:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            assert "What do you want to do?" in str(
-                app.query_one("#status", Static).render()
-            )
-            response = app.query_one("#response", TextArea)
-            response.text = "line one\nline two"
-            await pilot.pause()
-            height_style = response.styles.height
-            assert height_style is not None
-            height = int(height_style.value)
-            await pilot.press("enter")
-            for _ in range(20):
-                await pilot.pause(0.05)
-                if received:
-                    break
-            assert "skill completed" in str(app.query_one("#status", Static).render())
-            response.text = "follow-up request"
-            await pilot.press("enter")
-            await pilot.pause(0.1)
-            return height
-
-    height = asyncio.run(exercise())
-
-    assert height >= 4
-    assert received == ["line one\nline two", "follow-up request"]
-
-
-def test_textual_response_grows_for_trailing_newline() -> None:
-    async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "line one\n"
-            await pilot.pause()
-            height_style = response.styles.height
-            assert height_style is not None
-            return int(height_style.value), response.scroll_y
-
-    height, scroll_y = asyncio.run(exercise())
-    assert height >= 4
-    assert scroll_y == 0
-
-
-def test_textual_response_grows_for_wrapped_text() -> None:
-    async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "x" * 200
-            await pilot.pause()
-            height_style = response.styles.height
-            assert height_style is not None
-            height = int(height_style.value)
-            return height, response.scroll_y
-
-    height, scroll_y = asyncio.run(exercise())
-    assert height > 3
-    assert scroll_y == 0
-
-
-def test_textual_response_grows_beyond_previous_thirty_row_cap() -> None:
-    async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test(size=(80, 50)) as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "\n".join(f"line {number}" for number in range(35))
-            await pilot.pause()
-            height_style = response.styles.height
-            assert height_style is not None
-            return int(height_style.value), response.scroll_y
-
-    height, scroll_y = asyncio.run(exercise())
-    assert height >= 37
-    assert scroll_y == 0
-
-
-def test_textual_status_textarea_does_not_reserve_hidden_label_row() -> None:
-    async def exercise() -> tuple[int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            status_container = app.query_one("#status-container", ScrollableContainer)
-            status = app.query_one("#status-text", TextArea)
-            return status.region.y, status_container.region.y
-
-    status_y, container_y = asyncio.run(exercise())
-    assert status_y == container_y + 1
-
-
-def test_textual_startup_shows_initial_question(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def fake_run_workflow_chat(config: Any, **kwargs: Any) -> int:
-        kwargs["stdout"].write("What do you want to do? ")
-        kwargs["stdout"].flush()
-        kwargs["input_func"]()
-        return 1
-
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
-        fake_run_workflow_chat,
-    )
-
-    async def exercise() -> tuple[str, bool]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            response = app.query_one("#response", TextArea)
-            return str(app.query_one("#status", Static).render()), response.disabled
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nWhat do you want to do?",
-        False,
-    )
-
-
-def test_textual_quit_unblocks_workflow_input() -> None:
-    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-
-    app.action_quit_workflow()
-
-    assert app._answers.get_nowait() == ""
-
-
-def test_textual_input_marker_preserves_follow_up_question() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            app._set_message("Which requirements should this feature satisfy?")
-            app._show_prompt("> ")
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nWhich requirements should this feature satisfy?"
-    )
-
-
-def test_textual_submit_shows_user_response_before_calling_llm() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "Build the feature"
-            app._submit_response()
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "----------------------------------------\n"
-        "> Build the feature\n"
-        "----------------------------------------\n\n"
-        "calling LLM..."
-    )
-
-
-def test_textual_submit_ignores_empty_response() -> None:
-    async def exercise() -> tuple[str, str, bool, bool]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "  \n  "
-            app._submit_response()
-            await pilot.pause()
-            return (
-                str(app.query_one("#status", Static).render()),
-                response.text,
-                response.disabled,
-                app._request_submitted.is_set(),
-            )
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1",
-        "  \n  ",
-        False,
-        False,
-    )
-
-
-def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            app._show_initial_prompt("What do you want to do?")
-            response = app.query_one("#response", TextArea)
-            response.text = "Build the feature"
-            app._submit_response()
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "What do you want to do?\n\n"
-        "----------------------------------------\n"
-        "> Build the feature\n"
-        "----------------------------------------\n\n"
-        "calling LLM..."
-    )
-
-
-def test_textual_status_retains_multiple_user_responses() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            app._show_initial_prompt("What do you want to do?")
-            response = app.query_one("#response", TextArea)
-            response.text = "First answer"
-            app._submit_response()
-            await pilot.pause()
-            response.disabled = False
-            response.text = "Second answer"
-            app._submit_response()
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "What do you want to do?\n\n"
-        "----------------------------------------\n"
-        "> First answer\n"
-        "----------------------------------------\n\n"
-        "calling LLM...\n\n"
-        "----------------------------------------\n"
-        "> Second answer\n"
-        "----------------------------------------\n\n"
-        "calling LLM..."
-    )
-
-
-def test_textual_status_is_visible_and_not_collapsed() -> None:
-    async def exercise() -> tuple[str, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            status = app.query_one("#status", Static)
-            status_container = app.query_one("#status-container")
-            await pilot.pause()
-            app._set_status("x" * 200)
-            await pilot.pause()
-            return (
-                str(status.render()),
-                status_container.region.height,
-                status_container.region.width,
-            )
-
-    rendered, height, width = asyncio.run(exercise())
-    assert rendered.endswith("x" * 200)
-    assert height > 4
-    assert width == 80
-
-
-def test_textual_panels_have_the_same_width() -> None:
-    async def exercise() -> tuple[int, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            return (
-                app.query_one("#steps", ListView).region.width,
-                app.query_one("#status-container").region.width,
-                app.query_one("#response", TextArea).region.width,
-            )
-
-    assert asyncio.run(exercise()) == (0, 80, 80)
-
-
-def test_textual_files_panel_preserves_add_order_without_duplicates() -> None:
-    async def exercise() -> list[str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            app._record_added_files(("docs/first.yaml", "src/first.py"))
-            app._record_added_files(("docs/first.yaml", "tests/first.py"))
-            app._record_added_files(("./docs/first.yaml",))
-            await pilot.pause()
-            return [
-                str(label.render())
-                for label in app.query_one("#files", ListView).query(Label)
-            ]
-
-    assert asyncio.run(exercise()) == [
-        "docs/first.yaml",
-        "src/first.py",
-        "tests/first.py",
-    ]
-
-
-def test_textual_files_panel_limits_retained_history() -> None:
-    async def exercise() -> list[str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            app._record_added_files(tuple(f"file-{index}.py" for index in range(81)))
-            await pilot.pause()
-            return [
-                str(label.render())
-                for label in app.query_one("#files", ListView).query(Label)
-            ]
-
-    files = asyncio.run(exercise())
-    assert len(files) == 80
-    assert files[0] == "file-1.py"
-    assert files[-1] == "file-80.py"
-
-
-def test_textual_orange_panels_share_the_width() -> None:
-    async def exercise() -> tuple[int, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
-        async with app.run_test() as pilot:
-            app._apply_progress(skill, current_step_index=0, status="running")
-            await pilot.pause()
-            return (
-                app.query_one("#steps", ListView).region.width,
-                app.query_one("#files", ListView).region.width,
-                app.query_one("#workflow-panels").region.height,
-            )
-
-    assert asyncio.run(exercise()) == (40, 40, 12)
-
-
-def test_textual_panels_place_green_output_above_orange_steps() -> None:
-    async def exercise() -> tuple[int, int, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
-            steps = app.query_one("#steps", ListView)
-            status = app.query_one("#status", Static)
-            empty_height = steps.region.height
-            app._apply_progress(skill, current_step_index=0, status="running")
-            await pilot.pause()
-            return (
-                status.region.y,
-                steps.region.y,
-                empty_height,
-                steps.region.height,
-            )
-
-    status_y, steps_y, empty_height, populated_height = asyncio.run(exercise())
-    assert status_y < steps_y
-    assert empty_height == 0
-    assert populated_height > 0
-
-
-def test_visible_step_window_is_limited_to_ten_steps() -> None:
-    assert _visible_step_indices(10, 5) == tuple(range(10))
-    assert _visible_step_indices(20, 5) == (4, 5, 6, 7, 8, 9, 10, 11, 12, 19)
-    assert _visible_step_indices(20, 0) == (0, 1, 2, 3, 4, 5, 6, 7, 19)
-    assert _visible_step_indices(20, 19) == (18, 19)
-
-
-def test_textual_long_step_list_shows_requested_window() -> None:
-    async def exercise() -> tuple[list[str], float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        skill = SkillCatalogEntry(
-            Path("long-skill.yaml"),
-            Skill(
-                name="long-skill",
-                when_to_use=(),
-                steps=tuple(
-                    SkillStep(description=f"Step {index}") for index in range(1, 21)
-                ),
-            ),
-        )
-        async with app.run_test() as pilot:
-            app._apply_progress(skill, current_step_index=5, status="running")
-            await pilot.pause()
-            steps = app.query_one("#steps", ListView)
-            return (
-                [str(label.render()) for label in steps.query(Label)],
-                steps.scroll_y,
-            )
-
-    labels, scroll_y = asyncio.run(exercise())
-    assert labels == [
-        "5. Step 5",
-        "6. Step 6",
-        "7. Step 7",
-        "8. Step 8",
-        "9. Step 9",
-        "10. Step 10",
-        "11. Step 11",
-        "12. Step 12",
-        "13. Step 13",
-        "20. Step 20",
-    ]
-    assert scroll_y == 0
-
-
-def test_textual_nested_steps_fit_without_scrolling() -> None:
-    async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        parent = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
-        nested = SkillCatalogEntry(Path("nested.yaml"), _build_skill())
-        async with app.run_test() as pilot:
-            app._apply_progress(
-                nested,
-                current_step_index=0,
-                status="running",
-                parent_skill=parent,
-                parent_step_index=0,
-            )
-            await pilot.pause()
-            steps = app.query_one("#steps", ListView)
-            return steps.region.height, steps.scroll_y
-
-    height, scroll_y = asyncio.run(exercise())
-    assert height == 12
-    assert scroll_y == 0
-
-
-def test_textual_completed_skill_removes_orange_step_list() -> None:
-    async def exercise() -> tuple[int, int, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
-            steps = app.query_one("#steps", ListView)
-            app._apply_progress(skill, current_step_index=0, status="running")
-            await pilot.pause()
-            app._apply_progress(
-                skill,
-                current_step_index=len(skill.skill.steps),
-                status="skill complete",
-            )
-            await pilot.pause()
-            return (
-                len(steps.children),
-                steps.region.height,
-                str(app.query_one("#status", Static).render()),
-            )
-
-    child_count, height, status = asyncio.run(exercise())
-    assert child_count == 0
-    assert height == 0
-    assert status.endswith("skill complete")
-
-
-def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> None:
-    async def exercise() -> list[str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            parent_skill = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
-            nested_skill = SkillCatalogEntry(
-                Path("nested.yaml"),
-                Skill(
-                    name="nested",
-                    when_to_use=("Run nested work.",),
-                    steps=(SkillStep(description="Nested step."),),
-                ),
-            )
-            app._apply_progress(
-                nested_skill,
-                current_step_index=0,
-                status="running nested skill",
-                parent_skill=parent_skill,
-                parent_step_index=0,
-            )
-            await pilot.pause()
-            steps = app.query_one("#steps", ListView)
-            border_title = steps.border_title
-            assert border_title is not None
-            return [str(label.render()) for label in steps.query(Label)] + [
-                border_title
-            ]
-
-    assert asyncio.run(exercise()) == [
-        "1. Capture the feature goal.",
-        "-------",
-        "1. Nested step.",
-        "specify-a-feature > nested",
-    ]
-
-
-def test_textual_parent_progress_is_colored_after_nested_completion() -> None:
-    async def exercise() -> list[tuple[str, bool, bool]]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            parent_skill = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
-            nested_skill = SkillCatalogEntry(
-                Path("nested.yaml"),
-                Skill(
-                    name="nested",
-                    when_to_use=("Run nested work.",),
-                    steps=(SkillStep(description="Nested step."),),
-                ),
-            )
-            app._apply_progress(
-                nested_skill,
-                current_step_index=0,
-                status="running nested skill",
-                parent_skill=parent_skill,
-                parent_step_index=0,
-            )
-            app._apply_progress(parent_skill, current_step_index=1, status="resuming")
-            await pilot.pause()
-            return [
-                (
-                    str(item.query_one(Label).render()),
-                    item.has_class("completed"),
-                    item.has_class("current"),
-                )
-                for item in app.query_one("#steps", ListView).query(ListItem)
-            ]
-
-    assert asyncio.run(exercise()) == [
-        ("1. Capture the feature goal.", True, False),
-        ("2. Summarize the result.", False, True),
-    ]
-
-
-def test_textual_skill_path_tracks_deep_nesting_and_parent_resume() -> None:
-    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-    parent = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
-    child = SkillCatalogEntry(
-        Path("child.yaml"),
-        Skill(
-            name="child",
-            when_to_use=("Run child work.",),
-            steps=(SkillStep(description="Child step."),),
-        ),
-    )
-    grandchild = SkillCatalogEntry(
-        Path("grandchild.yaml"),
-        Skill(
-            name="grandchild",
-            when_to_use=("Run grandchild work.",),
-            steps=(SkillStep(description="Grandchild step."),),
-        ),
-    )
-
-    assert app._resolve_skill_path(parent, None) == ("specify-a-feature",)
-    assert app._resolve_skill_path(child, parent) == (
-        "specify-a-feature",
-        "child",
-    )
-    assert app._resolve_skill_path(grandchild, child) == (
-        "specify-a-feature",
-        "child",
-        "grandchild",
-    )
-    assert app._resolve_skill_path(child, parent) == (
-        "specify-a-feature",
-        "child",
-    )
-
-
-def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
-    async def exercise() -> tuple[str, float, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test(size=(80, 12)) as pilot:
-            status = app.query_one("#status", Static)
-            for number in range(20):
-                app._set_message(f"output-{number}")
-            await pilot.pause()
-            return (
-                str(status.render()),
-                app.query_one("#status-container").scroll_y,
-                app.query_one("#status-container").region.height,
-                app.query_one("#status-container").virtual_size.height,
-            )
-
-    rendered, scroll_y, region_height, virtual_height = asyncio.run(exercise())
-    assert "output-19" in rendered
-    assert virtual_height > region_height
-    assert scroll_y > 0
-
-
-def test_textual_status_history_is_bounded() -> None:
-    async def exercise() -> tuple[int, int, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            for number in range(200):
-                app._set_message(f"output-{number}-" + ("x" * 500))
-            await pilot.pause()
-            return (
-                len(app._message_history),
-                app._message_history_chars,
-                str(app.query_one("#status", Static).render()),
-            )
-
-    history_count, history_chars, rendered = asyncio.run(exercise())
-    assert history_count <= 80
-    assert history_chars <= 24_000
-    assert "output-199" in rendered
-    assert "output-0" not in rendered
-
-
-def test_textual_status_truncates_large_messages() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            app._set_message("start-" + ("x" * 20_000) + "-end")
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    rendered = asyncio.run(exercise())
-    assert "status message truncated" in rendered
-    assert len(rendered) < 9_000
-
-
-def test_textual_failure_retains_diagnostics_instead_of_unknown_error(
-    tmp_path: Path,
-) -> None:
-    async def exercise(repo_root: Path) -> str:
-        app = WorkflowChatApp(
-            SkillChatConfig(skills_dir=Path("skill-definitions"), repo_root=repo_root)
-        )
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            app._record_output("stderr", "yaml.parser.ParserError: invalid syntax")
-            app._record_output("stderr", "  line 12, column 7")
-            app._record_output("progress", "Editing project-structure.yaml")
-            app._exit_code = 1
-            app._finish()
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    rendered = asyncio.run(exercise(tmp_path))
-    assert "unknown error" not in rendered
-    assert "workflow exited with status 1" in rendered
-    assert "yaml.parser.ParserError: invalid syntax" in rendered
-    assert "line 12, column 7" in rendered
-    assert "Editing project-structure.yaml" in rendered
-    assert "Press Ctrl+Q to exit." in rendered
-    assert "Press Ctrl+C to exit." not in rendered
-    error_log = (tmp_path / "agent_error.txt").read_text(encoding="utf-8")
-    assert "Workflow error:" in error_log
-    assert "Editing project-structure.yaml" in error_log
-
-
-def test_textual_status_shows_latest_output() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            for message in ("first", "second", "third", "fourth"):
-                app._set_message(message)
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nfirst\n\nsecond\n\nthird\n\nfourth"
-    )
-
-
-def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            app._set_status("calling LLM...")
-            writer = Thread(
-                target=app._output_line,
-                args=("stderr", "waiting for test-model LLM response..."),
-            )
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "calling LLM...\n\nwaiting for test-model LLM response..."
-    )
-
-
-def test_textual_status_retains_full_empty_response_prompt() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        exchange = (
-            "[workflow] Empty-response exchange: "
-            'prompt=[{"role":"user","content":"Proceed with instantiating the workflow?"}] '
-            "response=<empty>"
-        )
-
-        def write_output() -> None:
-            app._output_line("stderr", exchange)
-            app._output_line("stderr", "[workflow] calling LLM...")
-
-        async with app.run_test() as pilot:
-            writer = Thread(target=write_output)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    rendered = asyncio.run(exercise())
-    assert "Empty-response exchange: prompt=" in rendered
-    assert '"content":"Proceed with instantiating the workflow?"' in rendered
-    assert "response=<empty>" in rendered
-    assert "calling LLM..." in rendered
-
-
-def test_textual_status_keeps_all_questions_visible() -> None:
-    async def exercise() -> tuple[str, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            status = app.query_one("#status-text", TextArea)
-            for question in (
-                "1. What should be logged?",
-                "2. Which file format should be used?",
-                "3. Which platforms should be supported?",
-                "4. What should be redacted?",
-                "5. What performance constraints apply?",
-            ):
-                app._set_message(question)
-            await pilot.pause()
-            return status.text, status.region.height
-
-    rendered, height = asyncio.run(exercise())
-    assert all(f"{number}." in rendered for number in range(1, 6))
-    assert height > 4
-
-
-def test_textual_output_hides_debug_and_promotes_question() -> None:
-    async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            output = _TextualStdoutOutput(app)
-
-            def write_output() -> None:
-                output.write("Matched skill: internal-debug\n")
-                output.write("Which requirements should this feature satisfy?\n")
-                output.write("> ")
-
-            writer = Thread(target=write_output)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            status = app.query_one("#status", Static)
-            return str(status.render()), str(status.render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
-        "Powdrr Agent v0.0.1\n\n"
-        "Matched skill: internal-debug\n\nWhich requirements should this feature satisfy?",
-    )
-
-
-def test_textual_output_keeps_multiline_question_complete() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            output = _TextualStdoutOutput(app)
-
-            def write_output() -> None:
-                output.write("What do you want to do? ")
-                output.flush()
-                output.write("Matched skill: specify-a-feature\n")
-                output.write(
-                    "1. What is the feature goal?\n"
-                    "2. Which requirements matter?\n"
-                    "Please answer whichever of these you can.\n"
-                )
-                output.flush()
-                output.write("Matched skill: next-skill\n")
-                output.write("Next question?\n")
-                output.flush()
-
-            writer = Thread(target=write_output)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "What do you want to do?\n\n"
-        "Matched skill: specify-a-feature\n\n"
-        "1. What is the feature goal?\n"
-        "2. Which requirements matter?\n"
-        "Please answer whichever of these you can.\n\n"
-        "Matched skill: next-skill\n\n"
-        "Next question?"
-    )
-
-
-def test_textual_output_buffers_partial_writes_until_the_line_is_complete() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            output = _TextualStdoutOutput(app)
-
-            def write_output() -> None:
-                output.write("ok workf")
-                output.write("low chat\n")
-                output.flush()
-
-            writer = Thread(target=write_output)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == ("Powdrr Agent v0.0.1\n\nok workflow chat")
-
-
-def test_textual_execution_transition_retains_output_history() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
-            app._set_message("Matched skill: specify-a-feature")
-            app._apply_progress(
-                skill,
-                current_step_index=0,
-                status="waiting on LLM response...",
-            )
-            app._show_prompt("What is the feature goal?")
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    rendered = asyncio.run(exercise())
-    assert rendered == (
-        "Powdrr Agent v0.0.1\n\n"
-        "Matched skill: specify-a-feature\n\n"
-        "waiting on LLM response...\n\n"
-        "What is the feature goal?"
-    )
-
-
-def test_textual_status_surfaces_provider_warning() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            writer = Thread(
-                target=app._output_line,
-                args=("stderr", "WARNING: reviews might be limited"),
-            )
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nWARNING: reviews might be limited"
-    )
-
-
-def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            app._set_status("waiting for model LLM response...")
-            app._show_prompt("")
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "waiting for model LLM response...\n\n"
-        "WARNING: received empty response but need human input"
-    )
-
-
-def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            app._set_status("waiting for model LLM response...")
-            output = _TextualStdoutOutput(app)
-            writer = Thread(target=output.write, args=("> ",))
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nwaiting for model LLM response..."
-    )
-
-
-def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            app._set_status("calling LLM...")
-            output = _TextualStdoutOutput(app)
-            writer = Thread(
-                target=lambda: (
-                    output.write("What do you want to do? "),
-                    output.write("\n"),
-                    output.write("> "),
-                ),
-            )
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\ncalling LLM...\n\nWhat do you want to do?"
-    )
-
-
-def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            output = _TextualStdoutOutput(app)
-
-            def write_prompt() -> None:
-                output.write("The LLM returned an empty response. Retry this request? ")
-                output.flush()
-
-            writer = Thread(target=write_prompt)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nThe LLM returned an empty response. Retry this request?"
-    )
-
-
-def test_textual_each_execution_step_retains_status_history() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
-            app._apply_progress(
-                skill,
-                current_step_index=0,
-                status="first step is running",
-            )
-            app._set_message("first step output")
-            app._apply_progress(
-                skill,
-                current_step_index=1,
-                status="second step is running",
-            )
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\n"
-        "first step is running\n\n"
-        "first step output\n\n"
-        "second step is running"
-    )
-
-
-def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            output = _TextualStdoutOutput(app)
-
-            def write_initial_prompt() -> None:
-                output.write("What do you want to do? ")
-                output.flush()
-
-            writer = Thread(target=write_initial_prompt)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            response = app.query_one("#response", TextArea)
-            response.text = "Specify the feature"
-            app._submit_response()
-            await pilot.pause()
-
-            def write_matched_skill() -> None:
-                output.write("Matched skill: specify-a-feature\n")
-                output.flush()
-
-            writer = Thread(target=write_matched_skill)
-            writer.start()
-            await pilot.pause()
-            writer.join()
-            await pilot.pause()
-            return str(app.query_one("#status", Static).render())
-
-    rendered = asyncio.run(exercise())
-    assert rendered == (
-        "Powdrr Agent v0.0.1\n\n"
-        "What do you want to do?\n\n"
-        "----------------------------------------\n"
-        "> Specify the feature\n"
-        "----------------------------------------\n\n"
-        "calling LLM...\n\n"
-        "Matched skill: specify-a-feature"
-    )
-    assert "thinking..." not in rendered
-
-
-def test_textual_response_supports_copy() -> None:
-    async def exercise() -> tuple[bool, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "copy this output"
-            response.select_all()
-            response.focus()
-            app.action_copy_selection()
-            await pilot.pause()
-            return response.read_only, app.clipboard
-
-    assert asyncio.run(exercise()) == (False, "copy this output")
-
-
-def test_textual_copy_uses_native_macos_clipboard(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-    monkeypatch.setattr(sys, "platform", "darwin")
-    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
-        app.copy_to_clipboard("copy this output")
-
-    assert app.clipboard == "copy this output"
-    run.assert_called_once_with(
-        ["pbcopy"],
-        input="copy this output",
-        text=True,
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-
-def test_textual_response_supports_cut_through_app_action() -> None:
-    async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "cut this response"
-            response.select_all()
-            response.focus()
-            app.action_cut_selection()
-            await pilot.pause()
-            return response.text, app.clipboard
-
-    assert asyncio.run(exercise()) == ("", "cut this response")
-
-
-def test_textual_response_supports_cut_key_without_beeping() -> None:
-    async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "cut this response"
-            response.select_all()
-            response.focus()
-            await pilot.press("ctrl+x")
-            await pilot.pause()
-            return response.text, app.clipboard
-
-    assert asyncio.run(exercise()) == ("", "cut this response")
-
-
-def test_textual_response_supports_command_copy_and_cut_keys() -> None:
-    async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.text = "copy and cut this response"
-            response.select_all()
-            response.focus()
-            await pilot.press("super+c")
-            await pilot.pause()
-            copied = app.clipboard
-            response.select_all()
-            await pilot.press("super+x")
-            await pilot.pause()
-            return response.text, copied
-
-    assert asyncio.run(exercise()) == ("", "copy and cut this response")
-
-
-def test_textual_kitty_protocol_decodes_command_key_sequence() -> None:
-    """Verify the terminal sequence emitted for Cmd+C reaches Textual."""
-    from textual._xterm_parser import XTermParser
-
-    events = list(XTermParser().feed("\x1b[99;9u"))
-
-    assert len(events) == 1
-    assert isinstance(events[0], Key)
-    assert events[0].key == "super+c"
-    assert events[0].character is None
-
-
-def test_textual_response_supports_command_paste_from_native_clipboard(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            response = app.query_one("#response", TextArea)
-            response.focus()
-            await pilot.press("super+v")
-            await pilot.pause()
-            return response.text
-
-    monkeypatch.setattr(sys, "platform", "darwin")
-    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
-        run.return_value.stdout = "pasted from macOS"
-        run.return_value.returncode = 0
-        assert asyncio.run(exercise()) == "pasted from macOS"
-    run.assert_called_once_with(
-        ["pbpaste"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
-def test_textual_read_only_panels_support_copy_and_cut() -> None:
-    async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        app._workflow_active = True
-        async with app.run_test() as pilot:
-            skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
-            app._apply_progress(skill, current_step_index=0, status="running")
-            app._set_message("green output")
-            status_container = app.query_one("#status-container", ScrollableContainer)
-            status_container.focus()
-            await pilot.pause()
-            await pilot.press("super+c")
-            green_clipboard = app.clipboard
-            steps = app.query_one("#steps", ListView)
-            steps.focus()
-            await pilot.pause()
-            await pilot.press("super+x")
-            await pilot.pause()
-            return green_clipboard, app.clipboard
-
-    assert asyncio.run(exercise()) == (
-        "Powdrr Agent v0.0.1\n\nrunning\n\ngreen output",
-        "1. Capture the feature goal.\n2. Summarize the result.",
-    )
-
-
-def test_textual_status_textarea_supports_range_copy_and_cut() -> None:
-    async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
-        app._stop_requested.set()
-        async with app.run_test() as pilot:
-            status = app.query_one("#status-text", TextArea)
-            status.text = "copy only this range"
-            status.select_all()
-            status.focus()
-            await pilot.press("super+c")
-            await pilot.pause()
-            copied = app.clipboard
-            await pilot.press("super+x")
-            await pilot.pause()
-            return status.text, copied
-
-    assert asyncio.run(exercise()) == ("copy only this range", "copy only this range")
-
-
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)
@@ -2770,7 +1532,7 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
         _workflow_action_progress_status(
             _parse_action_response(
                 {
-                    "kind": "edit",
+                    "action": "edit",
                     "file_path": "README.md",
                     "edits": [{"kind": "replace", "start_line": 1, "text": "Updated"}],
                 }
@@ -2782,7 +1544,7 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
         _workflow_action_progress_status(
             _parse_action_response(
                 {
-                    "kind": "read_document",
+                    "action": "read_document",
                     "file_path": "README.md",
                     "start_line": 1,
                     "end_line": 2,
@@ -2795,7 +1557,7 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
         _workflow_action_progress_status(
             _parse_action_response(
                 {
-                    "kind": "gather_context",
+                    "action": "gather_context",
                     "types": ["requirements"],
                 }
             )
@@ -2806,7 +1568,7 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
         _workflow_action_progress_status(
             _parse_action_response(
                 {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "shell",
                     "parameters": {"command": ["git", "status", "--short"]},
                 }
@@ -2818,7 +1580,7 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
         _workflow_action_progress_status(
             _parse_action_response(
                 {
-                    "kind": "next_step",
+                    "action": "next_step",
                 }
             )
         )
@@ -2842,7 +1604,7 @@ def test_repeated_document_reads_do_not_count_as_material_progress(
     )
     action = _parse_action_response(
         {
-            "kind": "read_document",
+            "action": "read_document",
             "file_path": "README.md",
             "start_line": 1,
             "end_line": 2,
@@ -3045,12 +1807,12 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     class _FakeClient:
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             assert messages == [{"role": "user", "content": "request"}]
-            return {"kind": "complete", "text": "done"}
+            return {"action": "complete", "text": "done"}
 
     recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
 
     assert recorder.complete_json([{"role": "user", "content": "request"}]) == {
-        "kind": "complete",
+        "action": "complete",
         "text": "done",
     }
 
@@ -3058,7 +1820,7 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     assert len(dump_paths) == 1
     exchange = json.loads(dump_paths[0].read_text(encoding="utf-8"))
     assert exchange["input"] == [{"role": "user", "content": "request"}]
-    assert exchange["output"] == {"kind": "complete", "text": "done"}
+    assert exchange["output"] == {"action": "complete", "text": "done"}
     assert exchange["timestamp"]
 
 
@@ -3083,7 +1845,7 @@ def test_llm_exchange_recorder_reuses_client_serialized_messages(
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             assert messages == [{"role": "user", "content": "request"}]
-            return {"kind": "complete"}
+            return {"action": "complete"}
 
     recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
     recorder.complete_json([{"role": "user", "content": "request"}])
@@ -3119,7 +1881,7 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
             return json.dumps(
                 {
                     "choices": [
-                        {"message": {"content": '{"kind":"complete"}'}},
+                        {"message": {"content": '{"action":"complete"}'}},
                     ]
                 }
             ).encode("utf-8")
@@ -3143,7 +1905,7 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
     )
 
     assert client.complete_json([{"role": "user", "content": "request"}]) == {
-        "kind": "complete"
+        "action": "complete"
     }
     assert serialization_calls == 1
     assert request_bodies[0]["messages"] == [{"role": "user", "content": "request"}]
@@ -3188,7 +1950,7 @@ def test_llm_exchange_recorder_includes_normalized_cache_usage(
         }
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-            return {"kind": "complete"}
+            return {"action": "complete"}
 
     recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
     recorder.complete_json([{"role": "user", "content": "request"}])
@@ -3817,14 +2579,14 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
                 }
             if 1 <= call_index <= 6:
                 return {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "shell",
                     "parameters": {"command": f"printf progress-{call_index}"},
                 }
             if call_index == 7:
-                return {"kind": "next_step"}
+                return {"action": "next_step"}
             if call_index == 8:
-                return {"kind": "complete", "text": "Done."}
+                return {"action": "complete", "text": "Done."}
             raise AssertionError(f"Unexpected LLM call index: {call_index}")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -3915,7 +2677,7 @@ def test_workflow_execution_retries_stalled_step_with_clean_context(
                 }
             if self.call_index <= 5:
                 return {
-                    "kind": "edit",
+                    "action": "edit",
                     "file_path": "step-change.txt",
                     "edits": [
                         {
@@ -3931,7 +2693,7 @@ def test_workflow_execution_retries_stalled_step_with_clean_context(
                         else {}
                     ),
                 }
-            return {"kind": "complete", "text": "Recovered."}
+            return {"action": "complete", "text": "Recovered."}
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
@@ -4078,7 +2840,7 @@ def test_run_workflow_chat_generates_skill_summary(
                 "ready_to_execute": True,
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Skill execution complete.",
             },
         ]
@@ -4178,8 +2940,8 @@ def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
                 "next_question": None,
                 "ready_to_execute": True,
             },
-            {"kind": "complete", "text": "Child complete."},
-            {"kind": "complete", "text": "Parent complete."},
+            {"action": "complete", "text": "Child complete."},
+            {"action": "complete", "text": "Parent complete."},
         ]
     )
 
@@ -4233,7 +2995,6 @@ def test_workflow_chat_action_prompt_mentions_gather_context() -> None:
     assert "start_line" in prompt
     assert "end_line" in prompt
     assert "top-level action field" in prompt
-    assert "never use kind or action_input" in prompt
     assert "multiple independent edits" in prompt
     assert 'action":"yaml_edit"' in prompt
 
@@ -4272,7 +3033,7 @@ def test_step_prompt_includes_interaction_style_guidance(tmp_path: Path) -> None
 def test_invoke_skill_supports_adversarial_provider_and_clean_context() -> None:
     action = _parse_action_response(
         {
-            "kind": "invoke_skill",
+            "action": "invoke_skill",
             "skill": "adversarial-review",
             "provider_role": "adversarial",
             "clean": True,
@@ -4353,7 +3114,7 @@ def test_workflow_handoff_prompt_excludes_unrelated_records() -> None:
 def test_action_outputs_are_preserved_in_the_parsed_action() -> None:
     action = _parse_action_response(
         {
-            "kind": "next_step",
+            "action": "next_step",
             "outputs": {"validation_result": {"ok": True}},
         }
     )
@@ -4379,7 +3140,7 @@ def test_read_document_action_returns_requested_lines_as_next_context(
     )
     action = _parse_action_response(
         {
-            "kind": "read_document",
+            "action": "read_document",
             "file_path": "docs/specification.yaml",
             "start_line": 2,
             "end_line": 3,
@@ -4423,7 +3184,7 @@ def test_read_document_action_clamps_range_past_end_of_short_document(
     )
     action = _parse_action_response(
         {
-            "kind": "read_document",
+            "action": "read_document",
             "file_path": "short.md",
             "start_line": 0,
             "end_line": 200,
@@ -4465,7 +3226,7 @@ def test_read_document_action_accepts_zero_to_max_lines_range(
     )
     action = _parse_action_response(
         {
-            "kind": "read_document",
+            "action": "read_document",
             "file_path": "long.md",
             "start_line": 0,
             "end_line": 2000,
@@ -4509,7 +3270,7 @@ def test_read_document_missing_file_lists_directory_files(
     )
     action = _parse_action_response(
         {
-            "kind": "read_document",
+            "action": "read_document",
             "file_path": "docs/workflows/feature/wrong-workflow.yaml",
             "start_line": 1,
             "end_line": 10,
@@ -4655,7 +3416,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 "ready_to_execute": True,
             },
             {
-                "kind": "gather_context",
+                "action": "gather_context",
                 "feature_id": "display-related-photos",
                 "types": ["requirements"],
                 "keywords": ["related photos"],
@@ -4664,11 +3425,11 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 ),
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "Requirements gathered.",
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Context gathered.",
                 "decisions_and_context": "Ready to summarize the requirements.",
             },
@@ -4826,7 +3587,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
                 "ready_to_execute": True,
             },
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "internal",
                 "parameters": {
                     "command": [
@@ -4839,7 +3600,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
                 "decisions_and_context": "Create the system spec template.",
             },
             {
-                "kind": "yaml_edit",
+                "action": "yaml_edit",
                 "file_path": (
                     "docs/proposals/display-related-photos/system-specification.yaml"
                 ),
@@ -4853,11 +3614,11 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
                 "decisions_and_context": "Set the system spec id.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "System template updated.",
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Done.",
                 "decisions_and_context": "Edit complete.",
             },
@@ -5058,7 +3819,7 @@ def test_apply_file_edits_uses_original_line_numbers_for_interleaved_edits(
 def test_empty_replace_text_removes_the_selected_lines() -> None:
     action = _parse_action_response(
         {
-            "kind": "edit",
+            "action": "edit",
             "file_path": "notes.txt",
             "edits": [
                 {
@@ -5077,7 +3838,7 @@ def test_empty_replace_text_removes_the_selected_lines() -> None:
 def test_yaml_edit_preserves_section_keys_and_updates_items_structurally() -> None:
     action = _parse_action_response(
         {
-            "kind": "yaml_edit",
+            "action": "yaml_edit",
             "file_path": "docs/specification.yaml",
             "operations": [
                 {
@@ -5120,7 +3881,7 @@ def test_yaml_edit_preserves_section_keys_and_updates_items_structurally() -> No
 def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
     with pytest.raises(RuntimeError, match="non-empty operations array"):
         _parse_action_response(
-            {"kind": "yaml_edit", "file_path": "docs/specification.yaml"}
+            {"action": "yaml_edit", "file_path": "docs/specification.yaml"}
         )
 
     with pytest.raises(
@@ -5128,7 +3889,7 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
     ):
         _parse_action_response(
             {
-                "kind": "yaml_edit",
+                "action": "yaml_edit",
                 "file_path": "docs/specification.yaml",
                 "operations": [{"op": "replace_lines"}],
             }
@@ -5136,7 +3897,7 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
 
     action = _parse_action_response(
         {
-            "kind": "yaml_edit",
+            "action": "yaml_edit",
             "file_path": "docs/specification.yaml",
             "operations": [
                 {
@@ -5167,7 +3928,7 @@ def test_yaml_edit_invalid_shape_returns_progressive_usage_guidance() -> None:
 def test_yaml_edit_set_value_supports_validator_list_indices() -> None:
     action = _parse_action_response(
         {
-            "kind": "yaml_edit",
+            "action": "yaml_edit",
             "file_path": "docs/architecture.yaml",
             "operations": [
                 {
@@ -5191,7 +3952,7 @@ def test_yaml_edit_set_value_supports_validator_list_indices() -> None:
 def test_yaml_edit_remove_item_supports_validator_list_indices() -> None:
     action = _parse_action_response(
         {
-            "kind": "yaml_edit",
+            "action": "yaml_edit",
             "file_path": "docs/system-specification.yaml",
             "operations": [
                 {
@@ -5215,7 +3976,7 @@ def test_yaml_edit_remove_item_supports_validator_list_indices() -> None:
 def test_yaml_edit_remove_key_deletes_top_level_key() -> None:
     action = _parse_action_response(
         {
-            "kind": "yaml_edit",
+            "action": "yaml_edit",
             "file_path": "docs/system-specification.yaml",
             "operations": [{"op": "remove_key", "path": ["0"]}],
         }
@@ -5234,7 +3995,7 @@ def test_yaml_edit_index_errors_include_repair_guidance() -> None:
     with pytest.raises(RuntimeError, match="Corrective action"):
         _parse_action_response(
             {
-                "kind": "yaml_edit",
+                "action": "yaml_edit",
                 "file_path": "docs/system-specification.yaml",
                 "operations": [
                     {
@@ -5249,7 +4010,7 @@ def test_yaml_edit_index_errors_include_repair_guidance() -> None:
     with pytest.raises(RuntimeError, match="exactly one of id or index"):
         _parse_action_response(
             {
-                "kind": "yaml_edit",
+                "action": "yaml_edit",
                 "file_path": "docs/system-specification.yaml",
                 "operations": [
                     {
@@ -5295,7 +4056,7 @@ def test_edit_action_can_update_multiple_files_in_one_response(
     second_path.write_text("second\n", encoding="utf-8")
     action = _parse_action_response(
         {
-            "kind": "edit",
+            "action": "edit",
             "file_edits": [
                 {
                     "file_path": "first.txt",
@@ -5343,52 +4104,10 @@ def test_edit_action_can_update_multiple_files_in_one_response(
     assert len(state.execution_events[0]["result"]) == 2
 
 
-def test_edit_action_accepts_yaml_fallback_shape(tmp_path: Path) -> None:
-    yaml_path = tmp_path / "project-structure.yaml"
-    yaml_path.write_text("name: original\n", encoding="utf-8")
-    action = _parse_action_response(
-        {
-            "kind": "edit",
-            "file_path": yaml_path.name,
-            "edits": [
-                {
-                    "kind": "replace",
-                    "start_line": 1,
-                    "text": "name: [",
-                }
-            ],
-        }
-    )
-
-    assert action.kind == "edit"
-
-
-def test_edit_action_accepts_yaml_file_edits_fallback_shape() -> None:
-    action = _parse_action_response(
-        {
-            "kind": "edit",
-            "file_edits": [
-                {
-                    "file_path": "docs/structure.yml",
-                    "edits": [
-                        {
-                            "kind": "replace",
-                            "start_line": 1,
-                            "text": "name: changed",
-                        }
-                    ],
-                }
-            ],
-        }
-    )
-
-    assert action.kind == "edit"
-
-
 def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
     action = _parse_action_response(
         {
-            "kind": "edit",
+            "action": "edit",
             "file_path": "implementation-specification.txt",
             "edits": [
                 {
@@ -5424,7 +4143,7 @@ def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
 def test_action_repair_prompt_includes_the_rejected_edit() -> None:
     action = _parse_action_response(
         {
-            "kind": "edit",
+            "action": "edit",
             "file_path": "implementation-specification.txt",
             "edits": [
                 {
@@ -5466,8 +4185,7 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
         SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
         current_step=step,
         validation_error=(
-            "Workflow prompt_user action requires a string text field; use "
-            '"text", not "prompt", "question", or "action_input".'
+            'Workflow prompt_user action requires a string text field; use "text".'
         ),
     )
 
@@ -5488,7 +4206,6 @@ def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
 
     assert '"action":"prompt_user"' in prompt
     assert '"text":"What specific success criteria should this feature meet?"' in prompt
-    assert "never use prompt, question, or action_input" in prompt
     assert "gather_context" not in prompt
     assert "invoke_tool" not in prompt
     assert "prompt_user" in prompt
@@ -5523,7 +4240,7 @@ def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) ->
     json_path.write_text('{"name": "original"}\n', encoding="utf-8")
     action = _parse_action_response(
         {
-            "kind": "edit",
+            "action": "edit",
             "file_path": json_path.name,
             "edits": [
                 {
@@ -5560,7 +4277,7 @@ def test_edit_action_rejects_invalid_json_before_writing(tmp_path: Path) -> None
     json_path.write_text('{"name": "original"}\n', encoding="utf-8")
     action = _parse_action_response(
         {
-            "kind": "edit",
+            "action": "edit",
             "file_path": json_path.name,
             "edits": [
                 {
@@ -5595,13 +4312,13 @@ def test_edit_action_rejects_invalid_json_before_writing(tmp_path: Path) -> None
 
 def test_parse_json_object_accepts_fenced_json_and_surrounding_prose() -> None:
     assert _parse_json_object(
-        'Here is the response:\n```json\n{"kind": "next_step"}\n```',
+        'Here is the response:\n```json\n{"action": "next_step"}\n```',
         "workflow response",
-    ) == {"kind": "next_step"}
+    ) == {"action": "next_step"}
     assert _parse_json_object(
-        'I chose this action: {"kind": "complete", "text": "done"}',
+        'I chose this action: {"action": "complete", "text": "done"}',
         "workflow response",
-    ) == {"kind": "complete", "text": "done"}
+    ) == {"action": "complete", "text": "done"}
 
 
 def test_prompt_user_action_requires_nonempty_text() -> None:
@@ -5609,7 +4326,7 @@ def test_prompt_user_action_requires_nonempty_text() -> None:
         RuntimeError,
         match="properly formed English question",
     ):
-        _parse_action_response({"kind": "prompt_user", "text": "  "})
+        _parse_action_response({"action": "prompt_user", "text": "  "})
 
 
 def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
@@ -5643,7 +4360,7 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
                 }
             if call_index == 1:
                 return {
-                    "kind": "edit",
+                    "action": "edit",
                     "file_path": "notes.txt",
                     "edits": [
                         {
@@ -5664,7 +4381,7 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
                 }
                 assert "line 5" in prompt["transcript"][-1]["content"]
                 return {
-                    "kind": "edit",
+                    "action": "edit",
                     "file_path": "notes.txt",
                     "edits": [
                         {
@@ -5676,9 +4393,9 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
                     ],
                 }
             if call_index == 3:
-                return {"kind": "next_step"}
+                return {"action": "next_step"}
             if call_index == 4:
-                return {"kind": "complete", "text": "Done."}
+                return {"action": "complete", "text": "Done."}
             raise AssertionError(f"Unexpected call index: {call_index}")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -5767,7 +4484,7 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
                 }
             if call_index == 1:
                 return {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "fuzzy-match",
                     "parameters": {"command": ["fuzzy-match", "."]},
                 }
@@ -5785,7 +4502,7 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
                     in (prompt["transcript"][-1]["content"])
                 )
                 return {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "fuzzy-match",
                     "parameters": {
                         "command": [
@@ -5799,7 +4516,7 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
                     },
                 }
             if call_index == 3:
-                return {"kind": "complete", "text": "Done."}
+                return {"action": "complete", "text": "Done."}
             raise AssertionError(f"Unexpected call index: {call_index}")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -6256,7 +4973,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         parsed = yaml.safe_load(yaml_text)
         assert isinstance(parsed, dict)
         return {
-            "kind": "yaml_edit",
+            "action": "yaml_edit",
             "file_path": current_file["path"],
             "operations": [
                 {"op": "set_value", "path": [key], "value": value}
@@ -6357,7 +5074,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 }
                 self._nested_event_count += 1
                 return {
-                    "kind": "complete",
+                    "action": "complete",
                     "text": "The existing specification already satisfies this review.",
                 }
             elif 3 <= self._call_index <= 17:
@@ -6386,7 +5103,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     and latest_action.get("kind") == "invoke_tool"
                 ):
                     generic_response = {
-                        "kind": "invoke_tool",
+                        "action": "invoke_tool",
                         "tool": "git",
                         "parameters": {
                             "operation": "add",
@@ -6395,12 +5112,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     }
                 elif step_id == "stage-specification-artifacts":
                     generic_response = {
-                        "kind": "complete",
+                        "action": "complete",
                         "text": "Feature specification complete.",
                     }
                 else:
                     generic_response = {
-                        "kind": "next_step",
+                        "action": "next_step",
                         "decisions_and_context": "Completed the current step.",
                     }
                 self._call_index += 1
@@ -6424,7 +5141,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_event_count=0,
                 )
                 response = {
-                    "kind": "prompt_user",
+                    "action": "prompt_user",
                     "text": "What feature are you specifying?",
                     "decisions_and_context": (
                         "Need the feature goal and success criteria."
@@ -6442,7 +5159,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="prompt_user",
                 )
                 response = {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "outputs": {"work_item_name": "display-related-photos"},
                     "decisions_and_context": (
                         "Feature name captured: display-related-photos."
@@ -6471,7 +5188,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "<work-item-name>",
                 ]
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "internal",
                     "parameters": {
                         "command": [
@@ -6520,7 +5237,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="yaml_edit",
                 )
                 response = {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "decisions_and_context": (
                         "System template filled; move to system review."
                     ),
@@ -6546,7 +5263,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "docs/proposals/<work-item-name>",
                 ]
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "internal",
                     "parameters": {
                         "command": [
@@ -6571,7 +5288,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "decisions_and_context": (
                         "System review complete: keep changes in the current worktree and use shell tools."
                     ),
@@ -6600,7 +5317,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "<type>",
                 ]
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "internal",
                     "parameters": {
                         "command": [
@@ -6650,7 +5367,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="yaml_edit",
                 )
                 response = {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "decisions_and_context": (
                         "Architecture template filled; move to architecture review."
                     ),
@@ -6676,7 +5393,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "docs/proposals/<work-item-name>",
                 ]
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "internal",
                     "parameters": {
                         "command": [
@@ -6701,7 +5418,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "decisions_and_context": (
                         "Architecture review complete: align with existing entities and invariants."
                     ),
@@ -6728,7 +5445,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "<work-item-name>",
                 ]
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "internal",
                     "parameters": {
                         "command": [
@@ -6776,7 +5493,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="yaml_edit",
                 )
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "internal",
                     "parameters": {
                         "command": [
@@ -6801,7 +5518,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "decisions_and_context": (
                         "Implementation step complete; use this spec for PR scope."
                     ),
@@ -6816,7 +5533,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="gate",
                 )
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "git",
                     "parameters": {
                         "operation": "add",
@@ -6834,7 +5551,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "complete",
+                    "action": "complete",
                     "text": "Feature specification complete.",
                     "decisions_and_context": "Specification validation is complete.",
                 }
@@ -6850,7 +5567,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="gate",
                 )
                 response = {
-                    "kind": "invoke_tool",
+                    "action": "invoke_tool",
                     "tool": "git",
                     "parameters": {
                         "operation": "add",
@@ -6870,7 +5587,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "complete",
+                    "action": "complete",
                     "text": "Feature specification complete.",
                     "decisions_and_context": "Specification validation is complete.",
                 }
@@ -6886,7 +5603,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     expected_last_event_kind="invoke_tool",
                 )
                 response = {
-                    "kind": "complete",
+                    "action": "complete",
                     "text": "Feature specification complete.",
                     "decisions_and_context": "Specification validation is complete.",
                 }
@@ -7022,35 +5739,35 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "ready_to_execute": True,
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The feature and work item are confirmed.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The project structure bootstrap is complete.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The workflow candidates are discovered.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "outputs": {"feature_name": "display-related-photos"},
                 "decisions_and_context": "The canonical feature context is selected.",
             },
             {
-                "kind": "read_document",
+                "action": "read_document",
                 "file_path": "templates/execute-proposed-pr.yaml",
                 "start_line": 1,
                 "end_line": 260,
                 "decisions_and_context": "The execute-proposed-pr template is selected.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The generated task graph is appropriate.",
             },
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "internal",
                 "parameters": {
                     "command": [
@@ -7067,39 +5784,39 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 "decisions_and_context": "The durable implementation workflow is created.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The first task is ready for review.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The generated workflow looks correct.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The validated planning artifacts are staged.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "Pull request preparation checks are complete.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The pull request description template is generated.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The pull request description is filled in.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The draft pull request is created.",
             },
             {
-                "kind": "next_step",
+                "action": "next_step",
                 "decisions_and_context": "The draft pull request is ready.",
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Implementation workflow ready for review.",
                 "decisions_and_context": "Stop until the user approves implementation.",
             },
@@ -7157,12 +5874,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._bootstrap_invoked_steps.add(step_index)
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "shell",
                             "parameters": {"command": shell_invocations[0]["command"]},
                         }
                     self._call_index += 1
-                    return {"kind": "next_step"}
+                    return {"action": "next_step"}
                 if prompt["selected_skill"]["name"] == "finish-pr-prep":
                     step_index = int(prompt["current_step_index"])
                     assert step_index < 5
@@ -7170,7 +5887,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._finish_scope_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "shell",
                             "parameters": {
                                 "command": ["git", "diff", "--cached", "--stat"]
@@ -7180,7 +5897,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._finish_context_gathered = True
                         self._call_index += 1
                         return {
-                            "kind": "gather_context",
+                            "action": "gather_context",
                             "types": ["tools"],
                             "filters": {
                                 "labels": ["pr-prep", "python"],
@@ -7217,7 +5934,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             self._finish_validation_index += 1
                             self._call_index += 1
                             return {
-                                "kind": "invoke_tool",
+                                "action": "invoke_tool",
                                 "tool": "shell",
                                 "parameters": {"command": command},
                             }
@@ -7235,12 +5952,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._finish_invoked_steps.add(step_index)
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "shell",
                             "parameters": {"command": shell_invocations[0]["command"]},
                         }
                     self._call_index += 1
-                    return {"kind": "next_step"}
+                    return {"action": "next_step"}
                 if prompt["selected_skill"]["name"] == "create-pull-request":
                     assert prompt["current_step_index"] < 7
                     if (
@@ -7250,7 +5967,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._pr_template_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "internal",
                             "parameters": {
                                 "command": [
@@ -7265,7 +5982,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._pr_stage_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "shell",
                             "parameters": {
                                 "command": [
@@ -7282,7 +5999,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._pr_commit_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "shell",
                             "parameters": {"command": ["git", "commit", "-m", "test"]},
                         }
@@ -7290,7 +6007,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._pr_push_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "shell",
                             "parameters": {
                                 "command": [
@@ -7309,7 +6026,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._pr_create_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "gh",
                             "parameters": {
                                 "operation": "pr_create",
@@ -7325,7 +6042,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         self._pr_update_invoked = True
                         self._call_index += 1
                         return {
-                            "kind": "invoke_tool",
+                            "action": "invoke_tool",
                             "tool": "gh",
                             "parameters": {
                                 "operation": "pr_edit",
@@ -7335,7 +6052,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             },
                         }
                     self._call_index += 1
-                    return {"kind": "next_step"}
+                    return {"action": "next_step"}
                 assert prompt["selected_skill"]["name"] == (
                     "start-implementing-feature"
                 )
@@ -7360,20 +6077,20 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         for part in invocation["command"]
                     ]
                     return {
-                        "kind": "invoke_tool",
+                        "action": "invoke_tool",
                         "tool": invocation["tool"],
                         "parameters": {"command": command},
                     }
                 if prompt["current_step"].get("id") == "select-feature-context":
                     self._call_index += 1
                     return {
-                        "kind": "next_step",
+                        "action": "next_step",
                         "outputs": {"feature_name": "display-related-photos"},
                     }
                 if prompt["current_step"].get("id") == "plan-proposed-prs":
                     self._call_index += 1
                     return {
-                        "kind": "next_step",
+                        "action": "next_step",
                         "outputs": {
                             "proposed_pr_names": ["display-related-photos-pr-001"]
                         },
@@ -7385,7 +6102,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ):
                     self._call_index += 1
                     return {
-                        "kind": "next_step",
+                        "action": "next_step",
                         "outputs": {
                             "implementation_specification_paths": [
                                 "docs/proposals/display-related-photos/"
@@ -7394,7 +6111,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         },
                     }
                 self._call_index += 1
-                return {"kind": "next_step"}
+                return {"action": "next_step"}
             response = next(start_responses)
             self._call_index += 1
             return response
@@ -7703,7 +6420,7 @@ def test_run_workflow_chat_verbose_prints_progress(
                 "ready_to_execute": True,
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Skill execution complete.",
             },
         ]
@@ -7765,7 +6482,7 @@ def test_run_workflow_chat_verbose_prints_progress(
     assert "[verbose] skill selection LLM output (model=test-model):" in stderr_value
     assert '"selected_skill_path":' in stderr_value
     assert "[verbose] workflow execution for step 1/2 LLM input" in stderr_value
-    assert '"kind": "complete"' in stderr_value
+    assert '"action": "complete"' in stderr_value
     assert "Workflow chat LLM action:" in stderr_value
     assert "test-key" not in stderr_value
     assert "[verbose] Prepared execution summary for specify-a-feature" in stderr_value
@@ -7803,7 +6520,7 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
                 "next_question": None,
                 "ready_to_execute": True,
             },
-            {"kind": "complete", "text": "Skill execution complete."},
+            {"action": "complete", "text": "Skill execution complete."},
         ]
     )
 
@@ -7875,7 +6592,7 @@ def test_run_workflow_chat_uses_anthropic_provider(
                 "ready_to_execute": True,
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Skill execution complete.",
             },
         ]
@@ -7956,7 +6673,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
                 "ready_to_execute": True,
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Skill execution complete.",
             },
         ]
@@ -8053,7 +6770,7 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
                 }
             if call_index == 1:
                 return {
-                    "kind": "next_step",
+                    "action": "next_step",
                     "decisions_and_context": "Step 1 complete.",
                 }
             if call_index in (2, 3, 4):
@@ -8063,7 +6780,7 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
                 )
             if call_index == 5:
                 return {
-                    "kind": "complete",
+                    "action": "complete",
                     "text": "Skill execution complete.",
                 }
             raise AssertionError(f"Unexpected call index: {call_index}")
@@ -8165,7 +6882,7 @@ def test_run_workflow_chat_repairs_missing_action_fields(
                 )
                 assert "kind" in repair_request
                 return {
-                    "kind": "complete",
+                    "action": "complete",
                     "text": "Skill execution complete.",
                 }
             raise AssertionError(f"Unexpected call index: {call_index}")
@@ -8241,15 +6958,15 @@ def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
                     "ready_to_execute": True,
                 }
             if calls in {2, 3}:
-                return {"kind": "prompt_user", "text": "   "}
+                return {"action": "prompt_user", "text": "   "}
             if calls == 4:
                 assert "non-empty" in messages[-1]["content"]
                 return {
-                    "kind": "prompt_user",
+                    "action": "prompt_user",
                     "text": "What should this feature accomplish?",
                 }
             if calls == 5:
-                return {"kind": "complete", "text": "Skill execution complete."}
+                return {"action": "complete", "text": "Skill execution complete."}
             raise AssertionError(f"Unexpected call count: {calls}")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -8313,7 +7030,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
                     "ready_to_execute": True,
                 }
             if calls == 2:
-                return {"kind": "invoke_tool"}
+                return {"action": "invoke_tool"}
             if calls == 3:
                 raise RuntimeError("OpenAI response message content was empty.")
             if calls == 4:
@@ -8322,7 +7039,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
             if calls == 5:
                 raise RuntimeError("OpenAI response message content was empty.")
             if calls == 6:
-                return {"kind": "complete", "text": "Skill execution complete."}
+                return {"action": "complete", "text": "Skill execution complete."}
             raise AssertionError(f"Unexpected call count: {calls}")
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -8550,7 +7267,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
                 "ready_to_execute": True,
             },
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "internal",
                 "parameters": {
                     "command": [
@@ -8562,7 +7279,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
                 },
             },
             {
-                "kind": "complete",
+                "action": "complete",
                 "text": "Skill execution complete.",
             },
         ]

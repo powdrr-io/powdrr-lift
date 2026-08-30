@@ -4488,7 +4488,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "complete; do not leave the gathered result only in the tool history.\n"
         "When a feature's proposal must be scoped, pass its feature_id to "
         "gather_context. It includes current specifications and only YAML files "
-        "under docs/proposed/<feature_id>. Do not use fuzzy-match to locate the "
+        "under docs/proposals/<feature_id>. Do not use fuzzy-match to locate the "
         "feature proposal or substitute another feature's proposal.\n"
         "- prompt_user: choose this only when a specific human decision or fact "
         "is genuinely required to continue; ask exactly one clear question.\n"
@@ -4537,8 +4537,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "receives only validated handoff inputs; do not rely on hidden transcript "
         "history.\n"
         "Response: return exactly one JSON object with a top-level action field, "
-        "matching exactly one of these outcome shapes. never use kind or "
-        "action_input. Include decisions_and_context when there is information "
+        "matching exactly one of these outcome shapes. Include "
+        "decisions_and_context when there is information "
         "a later step needs. Include llm_type only when the next roundtrip needs "
         "a different capability; otherwise use null or omit it.\n"
         "Response field requirements by outcome: gather_context requires a non-"
@@ -4778,7 +4778,7 @@ def _modular_action_system_prompt(
         "output name produced by a previous step, and never include a name that "
         "is absent from the current-step contract.\n"
         "Return exactly one JSON object with a top-level action field. The action "
-        "field is the discriminator: never use kind or action_input. Include "
+        "field is the discriminator. Include "
         "decisions_and_context when a later step needs it, and include outputs "
         "using the declared names. A completed step is represented as: "
         '{"action":"next_step","decisions_and_context":"The current step "'
@@ -4798,8 +4798,7 @@ def _modular_action_system_prompt(
         )
     if "prompt_user" in action_names:
         prompt += (
-            "prompt_user requires the question in the text field; never use prompt, "
-            "question, or action_input. Example: "
+            "prompt_user requires the question in the text field. Example: "
             '{"action":"prompt_user","text":"What specific success criteria '
             'should this feature meet?","decisions_and_context":"More information '
             'is required before continuing."}.\n'
@@ -7008,13 +7007,10 @@ def _handle_workflow_action_gather_context(
 
 def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     action = payload.get("action")
-    legacy_kind = payload.get("kind")
-    if action is None and legacy_kind is not None:
-        action = legacy_kind
     if action is None:
         raise PowdrrExecutionError(
             "Workflow action response must include action. Return one JSON object "
-            'with a top-level "action" field; do not use action_input.'
+            'with a top-level "action" field.'
         )
     if not isinstance(action, str):
         raise PowdrrExecutionError("Workflow action response action must be a string.")
@@ -7642,8 +7638,7 @@ def _parse_workflow_action_prompt_user(
     text = payload.get("text")
     if not isinstance(text, str):
         raise PowdrrExecutionError(
-            "Workflow prompt_user action requires a string text field; use "
-            '"text", not "prompt", "question", or "action_input".'
+            'Workflow prompt_user action requires a string text field; use "text".'
         )
     text = _validate_user_question(
         text,
@@ -7847,7 +7842,7 @@ def _execute_shell_tool(
 def _structured_intrinsic_pre_step_parameters(
     tool: str, parameters: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Translate legacy declarative pre-step commands to structured actions."""
+    """Translate declarative pre-step commands to structured actions."""
     command = parameters.get("command")
     if tool == GIT_TOOL and command == ["status", "--short"]:
         return {"operation": "status"}
@@ -9630,9 +9625,9 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     if declared:
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
     else:
-        # Compatibility for definitions written before the per-step action
-        # contract. This fallback is intentionally isolated here so no other
-        # metadata can silently add actions once a step declares actions.
+        # Older skill definitions may omit an explicit action catalog. Infer the
+        # available actions from their declared capabilities until those definitions
+        # are migrated to the explicit per-step contract.
         names: list[str] = []
         if (
             getattr(step, "details", None)
@@ -9717,7 +9712,7 @@ def _action_repair_prompt(
         "this corrective response is also empty, the system will interpret it "
         "as next_step.\n"
         'Return exactly one JSON object with a top-level "action" field and the '
-        "fields required by that action. Never use kind or action_input. Use "
+        "fields required by that action. Use "
         "file_path and edits or file_edits for edit, operation and file_path "
         "for file_management (plus destination_path for move or rename), file_path "
         "and operations for yaml_edit, tool and "
@@ -9725,8 +9720,7 @@ def _action_repair_prompt(
         "with positive start_line "
         "and end_line for read_document, non-empty types for gather_context, "
         'and text containing a clear English question ending in "?" for '
-        "prompt_user; never use prompt, question, or action_input for that "
-        "action. Do not "
+        "prompt_user. Do not "
         "combine actions or output markdown. For yaml_edit, combine all "
         "independent corrections for the same file in one operations array."
     )
@@ -9819,7 +9813,7 @@ def _action_repair_prompt(
                 " The previous response used the wrong prompt_user field. "
                 'prompt_user requires a string in "text"; rename "prompt" to '
                 '"text" and return the complete corrected action. Do not use '
-                '"prompt", "question", or "action_input".'
+                '"text".'
             )
     if failed_action is not None:
         prompt += (

@@ -32,7 +32,6 @@ from powdrr_lift.core.spec_context import (
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     _action_system_prompt,
-    _parse_action_response,
 )
 from powdrr_lift.workflow_git import (
     WorkflowGitInconsistency,
@@ -144,7 +143,7 @@ def test_process_workflow_task_completes_claimed_agent_task(
     verbose: bool,
 ) -> None:
     workflow = _workflow(tmp_path)
-    client = _FakeClient([{"kind": "complete", "output_state": {"version": "v2"}}])
+    client = _FakeClient([{"action": "complete", "output_state": {"version": "v2"}}])
     stderr = io.StringIO()
     stdout = io.StringIO()
 
@@ -175,7 +174,7 @@ def test_process_workflow_task_completes_claimed_agent_task(
     displayed = stderr.getvalue()
     assert ("Workflow task LLM input:" in displayed) is verbose
     assert ("Workflow task LLM output:" in displayed) is verbose
-    assert ('"kind": "complete"' in displayed) is verbose
+    assert ('"action": "complete"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
     assert ("Workflow task LLM action:" in stdout.getvalue()) is verbose
     assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
@@ -232,9 +231,9 @@ def test_deterministic_gather_context_must_be_persisted_exactly(
     )
     client = _FakeClient(
         [
-            {"kind": "complete", "output_state": {"context-state": "summary"}},
+            {"action": "complete", "output_state": {"context-state": "summary"}},
             {
-                "kind": "complete",
+                "action": "complete",
                 "output_state": {"context-state": expected_context},
             },
         ]
@@ -279,7 +278,7 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
             ),
         ),
     )
-    client = _FakeClient([{"kind": "complete", "output_state": {"ok": True}}])
+    client = _FakeClient([{"action": "complete", "output_state": {"ok": True}}])
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -404,10 +403,10 @@ def test_task_prompt_preserves_latest_failed_result_separately() -> None:
     prompt_events = _task_events_for_prompt(
         [
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "result": {"returncode": 2, "stderr": "validation failed"},
             },
-            {"kind": "next_step"},
+            {"action": "next_step"},
         ]
     )
 
@@ -442,9 +441,9 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     workflow = _workflow(tmp_path)
     client = _FakeClient(
         [
-            {"kind": "invoke_skill", "skill": "nested-skill"},
-            {"kind": "complete", "text": "Nested work complete."},
-            {"kind": "complete", "output_state": {"ok": True}},
+            {"action": "invoke_skill", "skill": "nested-skill"},
+            {"action": "complete", "text": "Nested work complete."},
+            {"action": "complete", "output_state": {"ok": True}},
         ]
     )
 
@@ -491,14 +490,14 @@ def test_process_workflow_task_propagates_verbose_to_nested_tools(
     workflow = _workflow(tmp_path)
     client = _FakeClient(
         [
-            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {"action": "invoke_skill", "skill": "nested-skill"},
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "shell",
                 "parameters": {"command": "printf nested"},
             },
-            {"kind": "complete", "text": "Nested work complete."},
-            {"kind": "complete", "output_state": {"ok": True}},
+            {"action": "complete", "text": "Nested work complete."},
+            {"action": "complete", "output_state": {"ok": True}},
         ]
     )
     stdout = io.StringIO()
@@ -546,13 +545,13 @@ def test_nested_skill_repairs_malformed_edit_action_in_place(
     workflow = _workflow(tmp_path)
     client = _FakeClient(
         [
-            {"kind": "invoke_skill", "skill": "nested-skill"},
+            {"action": "invoke_skill", "skill": "nested-skill"},
             {
                 "action": "edit",
                 "file_path": "notes.txt",
                 "edits": [
                     {
-                        "kind": {"operation": "replace"},
+                        "action": {"operation": "replace"},
                         "start_line": 1,
                         "end_line": 1,
                         "text": "invalid",
@@ -560,7 +559,7 @@ def test_nested_skill_repairs_malformed_edit_action_in_place(
                 ],
             },
             {"action": "complete", "text": "Nested work complete."},
-            {"kind": "complete", "output_state": {"ok": True}},
+            {"action": "complete", "output_state": {"ok": True}},
         ]
     )
     stderr = io.StringIO()
@@ -614,7 +613,7 @@ def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
     client = _FakeClient(
         [
             {
-                "kind": "invoke_skill",
+                "action": "invoke_skill",
                 "skill": "review-skill",
                 "clean": True,
                 "context": [
@@ -624,7 +623,7 @@ def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
                 ],
             },
             {
-                "kind": "invoke_skill",
+                "action": "invoke_skill",
                 "skill": "independent-review",
                 "provider_role": "adversarial",
                 "clean": True,
@@ -634,9 +633,9 @@ def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
                     "Proposed step: invoke the adversarial reviewer with context",
                 ],
             },
-            {"kind": "complete", "text": "Independent review complete."},
-            {"kind": "complete", "text": "Review complete."},
-            {"kind": "complete", "output_state": {"ok": True}},
+            {"action": "complete", "text": "Independent review complete."},
+            {"action": "complete", "text": "Review complete."},
+            {"action": "complete", "output_state": {"ok": True}},
         ]
     )
 
@@ -798,7 +797,7 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
             workflow_dir=workflow_dir,
             repo_root=primary_root,
         ),
-        client=_FakeClient([{"kind": "complete", "output_state": {"ok": True}}]),
+        client=_FakeClient([{"action": "complete", "output_state": {"ok": True}}]),
         stdout=io.StringIO(),
         stderr=io.StringIO(),
     )
@@ -910,8 +909,8 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
     )
     client = _FakeClient(
         [
-            {"kind": "next_step", "output_state": {"plan": ["step"]}},
-            {"kind": "complete", "output_state": {"result": "done"}},
+            {"action": "next_step", "output_state": {"plan": ["step"]}},
+            {"action": "complete", "output_state": {"result": "done"}},
         ]
     )
 
@@ -1000,7 +999,7 @@ def test_process_workflow_task_stops_when_human_task_becomes_ready(
             repo_root=tmp_path,
         ),
         client=_FakeClient(
-            [{"kind": "next_step", "output_state": {"result": "ready"}}]
+            [{"action": "next_step", "output_state": {"result": "ready"}}]
         ),
         stdout=stdout,
         stderr=io.StringIO(),
@@ -1030,7 +1029,7 @@ def test_process_workflow_task_repairs_invalid_json_response(
                 raise RuntimeError(
                     "OpenAI response content was not valid JSON: Expecting value"
                 )
-            return {"kind": "complete", "output_state": {"version": "v2"}}
+            return {"action": "complete", "output_state": {"version": "v2"}}
 
     client = _InvalidThenCompleteClient()
     stderr = io.StringIO()
@@ -1056,15 +1055,6 @@ def test_process_workflow_task_repairs_invalid_json_response(
     )
 
 
-def test_workflow_task_accepts_workflow_chat_action_field() -> None:
-    action = _parse_action_response(
-        {"action": "complete", "output_state": {"result": "shared contract"}}
-    )
-
-    assert action.kind == "complete"
-    assert action.output_state == {"result": "shared contract"}
-
-
 def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1073,7 +1063,7 @@ def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
     client = _FakeClient(
         [
             {"compacted_context": {"necessary": ["keep this"]}},
-            {"kind": "complete", "output_state": {"version": "v2"}},
+            {"action": "complete", "output_state": {"version": "v2"}},
         ]
     )
 
@@ -1134,7 +1124,7 @@ def test_process_workflow_task_compacts_at_proactive_threshold(
     client = _FakeClient(
         [
             {"compacted_context": {"necessary": ["keep this"]}},
-            {"kind": "complete", "output_state": {"version": "v2"}},
+            {"action": "complete", "output_state": {"version": "v2"}},
         ]
     )
 
@@ -1187,7 +1177,7 @@ def test_process_workflow_task_retries_llm_timeouts_with_backoff(
         calls += 1
         if calls < 3:
             raise RuntimeError("OpenAI-compatible request timed out")
-        return {"kind": "complete", "output_state": {"version": "v2"}}
+        return {"action": "complete", "output_state": {"version": "v2"}}
 
     client.complete_json = _complete  # type: ignore[method-assign]
     monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
@@ -1230,7 +1220,7 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
                 429,
                 '{"error":{"code":"engine_overloaded"}}',
             )
-        return {"kind": "complete", "output_state": {"version": "v2"}}
+        return {"action": "complete", "output_state": {"version": "v2"}}
 
     client.complete_json = _complete  # type: ignore[method-assign]
     monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
@@ -1360,7 +1350,7 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
                     ]
                 },
             },
-            {"kind": "complete", "output_state": {"found": True}},
+            {"action": "complete", "output_state": {"found": True}},
         ]
     )
 
@@ -1393,7 +1383,7 @@ def test_process_workflow_task_repairs_fuzzy_match_tool_error(
                 "parameters": {"command": ["fuzzy-match", "."]},
             },
             {
-                "kind": "invoke_tool",
+                "action": "invoke_tool",
                 "tool": "fuzzy-match",
                 "parameters": {
                     "command": [
@@ -1406,7 +1396,7 @@ def test_process_workflow_task_repairs_fuzzy_match_tool_error(
                     ]
                 },
             },
-            {"kind": "complete", "output_state": {"found": True}},
+            {"action": "complete", "output_state": {"found": True}},
         ]
     )
 
@@ -1449,7 +1439,7 @@ def test_process_workflow_task_repairs_invalid_edit_line_number(
                     }
                 ],
             },
-            {"kind": "complete", "output_state": {"fixed": True}},
+            {"action": "complete", "output_state": {"fixed": True}},
         ]
     )
 
@@ -1485,11 +1475,11 @@ def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) ->
     client = _FakeClient(
         [
             {
-                "kind": "gather_context",
+                "action": "gather_context",
                 "types": ["proposed_prs"],
                 "keywords": ["example-pr"],
             },
-            {"kind": "complete", "output_state": {"found": True}},
+            {"action": "complete", "output_state": {"found": True}},
         ]
     )
 
@@ -1514,9 +1504,9 @@ def test_process_workflow_task_can_advance_after_empty_gather_context(
     workflow = _workflow(tmp_path)
     client = _FakeClient(
         [
-            {"kind": "gather_context", "types": ["proposed_prs"]},
-            {"kind": "next_step"},
-            {"kind": "complete", "output_state": {"found": False}},
+            {"action": "gather_context", "types": ["proposed_prs"]},
+            {"action": "next_step"},
+            {"action": "complete", "output_state": {"found": False}},
         ]
     )
 
@@ -1541,12 +1531,12 @@ def test_process_workflow_task_repairs_read_document_range_error(
     client = _FakeClient(
         [
             {
-                "kind": "read_document",
+                "action": "read_document",
                 "file_path": "specification.yaml",
                 "start_line": 1,
                 "end_line": 10,
             },
-            {"kind": "complete", "output_state": {"read": True}},
+            {"action": "complete", "output_state": {"read": True}},
         ]
     )
 
@@ -1616,17 +1606,17 @@ def test_missing_read_document_is_recoverable_and_lists_exact_files(
     client = _FakeClient(
         [
             {
-                "kind": "read_document",
+                "action": "read_document",
                 "file_path": "src/pkg/missing.py",
                 "start_line": 1,
                 "end_line": 10,
             },
             {
-                "kind": "list_files",
+                "action": "list_files",
                 "directory": "src/pkg",
                 "pattern": "*.py",
             },
-            {"kind": "complete", "output_state": {"read": True}},
+            {"action": "complete", "output_state": {"read": True}},
         ]
     )
 
@@ -1770,7 +1760,7 @@ def test_process_workflow_task_blocks_with_human_handoff_and_follow_up(
     client = _FakeClient(
         [
             {
-                "kind": "get-human-input",
+                "action": "get-human-input",
                 "human_input": {
                     "human_task": {
                         "description": "Choose v1 or v2.",

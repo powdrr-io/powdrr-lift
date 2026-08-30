@@ -1,0 +1,152 @@
+schema_version: delivery-profile-v1
+profile_id: default-software-delivery
+personas:
+  - persona_id: architect
+    persona_type: architect
+    model_profile: architecture
+    prompt_catalogs:
+      - architect-responsibilities
+    skill_references:
+      - specify-feature
+  - persona_id: engineering-manager
+    persona_type: engineering_manager
+    model_profile: planning
+    prompt_catalogs:
+      - engineering-manager-responsibilities
+    skill_references:
+      - start-implementing-feature
+  - persona_id: engineer
+    persona_type: engineer
+    model_profile: implementation
+    prompt_catalogs:
+      - engineer-responsibilities
+    skill_references:
+      - execute-proposed-pr
+  - persona_id: specification-reviewer
+    persona_type: specification_reviewer
+    model_profile: review
+    prompt_catalogs:
+      - specification-reviewer-responsibilities
+  - persona_id: code-reviewer
+    persona_type: code_reviewer
+    model_profile: review
+    prompt_catalogs:
+      - code-reviewer-responsibilities
+    skill_references:
+      - review-proposed-pr
+phases:
+  - phase_type: intake
+    persona_id: architect
+    output_artifacts: [request]
+  - phase_type: specify
+    persona_id: architect
+    input_artifacts: [request]
+    output_artifacts: [specification]
+    validation_profiles: [specification-validation]
+  - phase_type: review_specifications
+    persona_id: specification-reviewer
+    input_artifacts: [specification]
+    output_artifacts: [specification_review]
+    validation_profiles: [specification-validation]
+  - phase_type: decompose
+    persona_id: engineering-manager
+    input_artifacts: [specification_review]
+    output_artifacts: [proposed_pr]
+    validation_profiles: [proposed-pr-validation]
+  - phase_type: review_proposed_prs
+    persona_id: specification-reviewer
+    input_artifacts: [proposed_pr]
+    output_artifacts: [proposed_pr_review]
+    validation_profiles: [proposed-pr-validation]
+  - phase_type: plan_pr
+    persona_id: engineer
+    input_artifacts: [proposed_pr, proposed_pr_review]
+    output_artifacts: [execution_plan]
+    validation_profiles: [execution-plan-validation]
+  - phase_type: await_plan_decision
+    persona_id: engineering-manager
+    input_artifacts: [execution_plan]
+  - phase_type: build
+    persona_id: engineer
+    input_artifacts: [execution_plan]
+    output_artifacts: [implementation]
+  - phase_type: validate
+    persona_id: engineer
+    input_artifacts: [implementation]
+    output_artifacts: [validation_evidence]
+    validation_profiles: [repository-validation]
+  - phase_type: review_pr
+    persona_id: code-reviewer
+    input_artifacts: [implementation, validation_evidence]
+    output_artifacts: [code_findings]
+    validation_profiles: [repository-validation]
+  - phase_type: resolve_findings
+    persona_id: engineer
+    input_artifacts: [code_findings]
+    output_artifacts: [implementation]
+  - phase_type: confirm_readiness
+    persona_id: code-reviewer
+    input_artifacts: [implementation, validation_evidence, code_findings]
+    output_artifacts: [readiness_report]
+    validation_profiles: [repository-validation]
+  - phase_type: publish_pr
+    persona_id: engineering-manager
+    input_artifacts: [readiness_report]
+    output_artifacts: [published_pr]
+  - phase_type: complete_feature
+    persona_id: engineering-manager
+    input_artifacts: [published_pr]
+artifact_handoffs:
+  - source_phase: intake
+    destination_phase: specify
+    artifact_type: request
+    owner_persona_id: architect
+  - source_phase: specify
+    destination_phase: review_specifications
+    artifact_type: specification
+    owner_persona_id: architect
+  - source_phase: review_specifications
+    destination_phase: decompose
+    artifact_type: specification_review
+    owner_persona_id: specification-reviewer
+  - source_phase: decompose
+    destination_phase: review_proposed_prs
+    artifact_type: proposed_pr
+    owner_persona_id: engineering-manager
+  - source_phase: review_proposed_prs
+    destination_phase: plan_pr
+    artifact_type: proposed_pr_review
+    owner_persona_id: specification-reviewer
+  - source_phase: plan_pr
+    destination_phase: build
+    artifact_type: execution_plan
+    owner_persona_id: engineer
+  - source_phase: build
+    destination_phase: validate
+    artifact_type: implementation
+    owner_persona_id: engineer
+  - source_phase: validate
+    destination_phase: review_pr
+    artifact_type: validation_evidence
+    owner_persona_id: engineer
+  - source_phase: review_pr
+    destination_phase: resolve_findings
+    artifact_type: code_findings
+    owner_persona_id: code-reviewer
+  - source_phase: confirm_readiness
+    destination_phase: publish_pr
+    artifact_type: readiness_report
+    owner_persona_id: code-reviewer
+  - source_phase: publish_pr
+    destination_phase: complete_feature
+    artifact_type: published_pr
+    owner_persona_id: engineering-manager
+reviews:
+  - reviewer_persona_id: specification-reviewer
+    artifact_types: [specification, proposed_pr]
+    independent: true
+    blocking_severities: [blocking, major]
+  - reviewer_persona_id: code-reviewer
+    artifact_types: [implementation, validation_evidence]
+    independent: true
+    blocking_severities: [blocking, major]

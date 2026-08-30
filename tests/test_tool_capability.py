@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -23,11 +24,11 @@ class FakeTool:
     )
 
     def validate(
-        self, context: ToolContext, arguments: dict[str, Any]
+        self, context: ToolContext, arguments: Mapping[str, Any]
     ) -> ToolValidationReport:
         return ToolValidationReport()
 
-    def execute(self, context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
         return ToolResult(
             output=arguments["path"],
             observed_effects=frozenset({ToolEffect.WORKSPACE_READ}),

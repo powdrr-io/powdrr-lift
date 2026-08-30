@@ -8,6 +8,14 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolutionKind,
     FileCapabilityExceptionStore,
 )
+from powdrr_lift.execution.personas import (
+    HandoffValidation,
+    PersonaPacket,
+    PersonaRun,
+    PersonaRunStatus,
+    build_persona_packet,
+    validate_handoff,
+)
 from powdrr_lift.execution.phases import (
     DEFAULT_PHASE_TRANSITIONS,
     PhaseController,
@@ -32,9 +40,15 @@ __all__ = [
     "ExecutionStateConflict",
     "ExecutionStateStore",
     "FileExecutionStateStore",
+    "HandoffValidation",
     "PhaseController",
     "PhaseTransitionDecision",
+    "PersonaPacket",
+    "PersonaRun",
+    "PersonaRunStatus",
     "ShadowExecutionRecorder",
+    "build_persona_packet",
+    "validate_handoff",
     "CapabilityBroker",
     "CapabilityExceptionStore",
     "CapabilityRequest",

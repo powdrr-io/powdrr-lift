@@ -2,33 +2,57 @@
 
 ## The software factory for agents that need to ship
 
-Most coding agents are impressive right up until they are not. Give one a large repo,
-a long conversation, and permission to act, and familiar failure modes appear quickly:
+### Stop Prompting. Start Engineering.
 
-* Context gets compressed. The agent forgets why it started, loses the dependency chain,
-  and edits the first plausible file it finds.
-* A small request turns into an unreviewed refactor because “clean this up” becomes the
-  agent's new definition of success.
-* A failed patch is retried with slightly different wording until the agent declares
-  victory, leaving a half-fixed codebase behind.
-* An autonomous run reports “done” without proving that the change matches the request,
-  the repository's rules, or the decisions made earlier.
+Powdrr turns your prompts into a durable, verifiable plan. Every prompt and decision
+evolves that plan for confirmation before implementation. No more crafting prompts to
+give your agent all the relevant context again. Powdrr's structured plans provide the
+context for planning, implementation, validation, and review, keeping your project on
+track toward its long-term goals.
 
-**Powdrr Lift is built for the other outcome.**
+It is safer by design: tool access is scoped to the workflow and its worktree, actions
+are declared and validated, and the agent stops when it cannot prove progress. You do
+not have to blindly approve a stream of surprising commands. Your architectural
+decisions become durable workflow context instead of disappearing when a conversation
+ends. And detailed steps stay detailed—the agent follows the workflow rather than
+quietly skipping to “done.”
 
-It is a software factory: a human-facing workflow chat client for directing work, plus
-fully autonomous agents that can keep a task moving through planning, implementation,
-validation, review, and handoff. The factory is powered by structured, self-validating
-workflows instead of an ever-growing prompt. Every task has an explicit shape, every
-step has a purpose, and every action is checked against the step that authorized it.
+### Why teams try it
 
-That is the fundamental difference. A generic agent can lose the plot and improvise a
-new one. Powdrr Lift cannot silently turn a focused workflow into free-form work: the
-agent operates inside a well-formulated plan, receives targeted context, uses declared
-actions, works in a dedicated worktree, and stops when it cannot make validated progress.
-The result is autonomy with a contract.
+* **Safe-by-design autonomy.** Sandboxed tools, isolated worktrees, declared actions,
+  and validation gates make the safe path the default.
+* **Design memory that lasts.** Decisions, constraints, dependencies, and intent are
+  recorded as structured context that survives compaction, handoffs, and new sessions.
+* **Workflow fidelity.** Ordered steps, explicit outputs, and self-validating actions
+  keep the agent doing the complete job—not the shortest job it can narrate.
+* **Human control without micromanagement.** Direct the work in chat, inspect the
+  execution trail, and intervene at meaningful boundaries instead of approving every
+  low-level move.
 
-## Why engineers use Powdrr Lift
+### The agent problems Powdrr is designed to prevent
+
+**“It forgot the architecture we agreed on.”** A new session should not reset the
+design. Powdrr carries decisions, invariants, and rationale forward as workflow data,
+so the next step starts from the same engineering context. Design memory is part of the
+system, not a hope pinned to chat history.
+
+**“It skipped half the checklist and said it was done.”** Powdrr workflows define the
+steps, actions, outputs, and validation required for completion. The agent cannot
+silently replace a ten-step plan with a plausible summary; it must produce the declared
+outputs or stop with a useful failure state.
+
+**“It asked me to approve everything until ‘yes’ became muscle memory.”** Repeated
+low-value prompts train people to click through the moment that matters. Powdrr scopes
+tools and changes to the workflow's execution boundary, so it asks for human judgment
+at meaningful decision points—not for every routine operation. Attention stays focused
+on the moments worth thinking about.
+
+**“It edited the first plausible file and quietly widened the scope.”** Powdrr grounds
+each action in the active workflow step, the repository's declared context, and an
+isolated worktree. The agent follows an authorized change path instead of improvising
+its own definition of “close enough.”
+
+## How Powdrr Lift delivers it
 
 ### Direct the work in chat—or let it run
 

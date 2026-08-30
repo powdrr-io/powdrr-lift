@@ -11,7 +11,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowActionRequest,
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
-    WorkflowLLMExecutionDriver,
+    WorkflowStepRunner,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
@@ -259,7 +259,7 @@ def test_action_engine_reports_stalls_through_the_runner_strategy() -> None:
 def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None:
     strategy = _ExecutionStrategy()
 
-    exit_code = WorkflowLLMExecutionDriver(max_stalled_roundtrips=1).run(
+    exit_code = WorkflowStepRunner(max_stalled_roundtrips=1).run(
         strategy,
         max_roundtrips=3,
         signature=workflow_action_signature,
@@ -295,7 +295,7 @@ def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> N
 
     strategy = _StalledStrategy()
     assert (
-        WorkflowLLMExecutionDriver(max_stalled_roundtrips=1).run(
+        WorkflowStepRunner(max_stalled_roundtrips=1).run(
             strategy,
             max_roundtrips=None,
             signature=workflow_action_signature,
@@ -325,7 +325,7 @@ def test_execution_driver_never_crashes_when_observer_fails() -> None:
             raise RuntimeError("observer failed")
 
     strategy = _ExecutionStrategy()
-    driver = WorkflowLLMExecutionDriver(
+    driver = WorkflowStepRunner(
         max_stalled_roundtrips=1,
         observer=_FailingObserver(),
     )
@@ -360,7 +360,7 @@ def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
 
     strategy.next_request = next_request  # type: ignore[method-assign]
 
-    exit_code = WorkflowLLMExecutionDriver(max_stalled_roundtrips=1).run(
+    exit_code = WorkflowStepRunner(max_stalled_roundtrips=1).run(
         strategy,
         max_roundtrips=1,
         signature=workflow_action_signature,

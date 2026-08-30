@@ -499,11 +499,6 @@ class WorkflowStepRunner:
         return strategy.exhausted_roundtrips_exit_code()
 
 
-# Compatibility for callers that used the original implementation name. New
-# workflow code should depend on the mode-independent step-runner name.
-WorkflowLLMExecutionDriver = WorkflowStepRunner
-
-
 class WorkflowLLMActionEngine:
     """Own JSON parsing and repeated-action accounting for a workflow session."""
 

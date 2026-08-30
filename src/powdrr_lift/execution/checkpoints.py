@@ -1,0 +1,107 @@
+"""Content-addressed checkpoints and bounded post-action diagnostics."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True, slots=True)
+class Checkpoint:
+    checkpoint_id: str
+    workspace_root: str
+    objects: Mapping[str, str]
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "checkpoint_id": self.checkpoint_id,
+            "workspace_root": self.workspace_root,
+            "objects": dict(self.objects),
+        }
+
+
+class ContentAddressedCheckpointStore:
+    def __init__(self, directory: str | Path) -> None:
+        self.root = Path(directory)
+        self.objects = self.root / "objects"
+        self.manifests = self.root / "manifests"
+
+    def create(self, workspace_root: str | Path, checkpoint_id: str) -> Checkpoint:
+        workspace = Path(workspace_root).resolve()
+        objects: dict[str, str] = {}
+        for path in _workspace_files(workspace):
+            content = path.read_bytes()
+            digest = hashlib.sha256(content).hexdigest()
+            object_path = self.objects / digest
+            object_path.parent.mkdir(parents=True, exist_ok=True)
+            if not object_path.exists():
+                object_path.write_bytes(content)
+            objects[str(path.relative_to(workspace))] = digest
+        checkpoint = Checkpoint(checkpoint_id, str(workspace), objects)
+        self.manifests.mkdir(parents=True, exist_ok=True)
+        (self.manifests / f"{checkpoint_id}.json").write_text(
+            json.dumps(checkpoint.to_data(), indent=2) + "\n", encoding="utf-8"
+        )
+        return checkpoint
+
+    def load(self, checkpoint_id: str) -> Checkpoint:
+        data = json.loads(
+            (self.manifests / f"{checkpoint_id}.json").read_text(encoding="utf-8")
+        )
+        return Checkpoint(
+            data["checkpoint_id"], data["workspace_root"], data["objects"]
+        )
+
+    def restore(
+        self, checkpoint: Checkpoint, workspace_root: str | Path | None = None
+    ) -> None:
+        workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
+        expected = set(checkpoint.objects)
+        for path in _workspace_files(workspace):
+            if str(path.relative_to(workspace)) not in expected:
+                path.unlink()
+        for relative, digest in checkpoint.objects.items():
+            target = (workspace / relative).resolve()
+            target.relative_to(workspace)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(self.objects / digest, target)
+
+
+@dataclass(frozen=True, slots=True)
+class DiagnosticResult:
+    name: str
+    successful: bool
+    output: str
+    truncated: bool = False
+
+
+def run_diagnostics(
+    workspace_root: str | Path,
+    hooks: Iterable[tuple[str, Callable[[Path], str]]],
+    *,
+    max_output_chars: int = 8_000,
+) -> tuple[DiagnosticResult, ...]:
+    results: list[DiagnosticResult] = []
+    for name, hook in hooks:
+        try:
+            output = hook(Path(workspace_root).resolve())
+            truncated = len(output) > max_output_chars
+            results.append(
+                DiagnosticResult(name, True, output[:max_output_chars], truncated)
+            )
+        except Exception as error:  # diagnostics are evidence, not execution control
+            results.append(DiagnosticResult(name, False, str(error)[:max_output_chars]))
+    return tuple(results)
+
+
+def _workspace_files(workspace: Path) -> tuple[Path, ...]:
+    return tuple(
+        path
+        for path in workspace.rglob("*")
+        if path.is_file() and ".git" not in path.relative_to(workspace).parts
+    )

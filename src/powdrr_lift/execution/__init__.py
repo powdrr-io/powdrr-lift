@@ -8,6 +8,12 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolutionKind,
     FileCapabilityExceptionStore,
 )
+from powdrr_lift.execution.checkpoints import (
+    Checkpoint,
+    ContentAddressedCheckpointStore,
+    DiagnosticResult,
+    run_diagnostics,
+)
 from powdrr_lift.execution.guidance import load_applicable_guidance
 from powdrr_lift.execution.kernel import (
     ActionKernel,
@@ -74,14 +80,18 @@ __all__ = [
     "satisfy_obligation",
     "unresolved_obligations",
     "CapabilityBroker",
+    "Checkpoint",
+    "ContentAddressedCheckpointStore",
     "CapabilityExceptionStore",
     "CapabilityRequest",
     "CapabilityResolution",
     "CapabilityResolutionKind",
     "FileCapabilityExceptionStore",
+    "DiagnosticResult",
     "ToolAdapter",
     "ToolContext",
     "ToolRegistry",
     "ToolResult",
     "ToolValidationReport",
+    "run_diagnostics",
 ]

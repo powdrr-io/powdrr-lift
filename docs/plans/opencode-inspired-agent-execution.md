@@ -1,5 +1,10 @@
 # OpenCode-Inspired Agent Execution Proposal
 
+The companion
+[`engineering implementation plan`](opencode-inspired-agent-execution-engineering-plan.md)
+defines the concrete contracts, module boundaries, migration sequence, tests,
+and acceptance gates for this proposal.
+
 ## Decision requested
 
 Adopt a typed phase controller around Powdrr's existing specifications, proposed

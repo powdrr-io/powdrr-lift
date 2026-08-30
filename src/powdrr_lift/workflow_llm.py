@@ -358,6 +358,18 @@ class WorkflowExecutionObserver(Protocol):
     ) -> Any: ...
 
 
+class WorkflowShadowRecorder(Protocol):
+    """Optional best-effort event sink used while the kernel is in shadow mode."""
+
+    def record_action(
+        self,
+        event_type: str,
+        action: Any,
+        *,
+        error_code: str | None = None,
+    ) -> None: ...
+
+
 class WorkflowStepRunner:
     """Run workflow steps through one shared control loop.
 
@@ -371,11 +383,13 @@ class WorkflowStepRunner:
         *,
         max_stalled_roundtrips: int,
         observer: WorkflowExecutionObserver | None = None,
+        shadow_recorder: WorkflowShadowRecorder | None = None,
     ) -> None:
         self.action_engine = WorkflowLLMActionEngine(
             max_stalled_roundtrips=max_stalled_roundtrips
         )
         self.observer = observer
+        self.shadow_recorder = shadow_recorder
 
     def run(
         self,
@@ -418,6 +432,7 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            self._record_shadow("action_proposed", action)
             proposal_decision = None
             if self.observer is not None:
                 propose = getattr(self.observer, "action_proposed", None)
@@ -436,6 +451,9 @@ class WorkflowStepRunner:
             try:
                 outcome = strategy.execute_action(action)
             except PowdrrExecutionError as exc:
+                self._record_shadow(
+                    "action_failed", action, error_code=type(exc).__name__
+                )
                 strategy.record_action_error(action, exc)
                 failure_decision = None
                 if self.observer is not None:
@@ -456,6 +474,8 @@ class WorkflowStepRunner:
                 ):
                     return strategy.action_failure_exit_code(action)
                 continue
+
+            self._record_shadow("action_completed", action)
 
             observation = self.action_engine.observe_action(
                 action,
@@ -497,6 +517,25 @@ class WorkflowStepRunner:
             if not outcome.continue_running:
                 return 0
         return strategy.exhausted_roundtrips_exit_code()
+
+    def _record_shadow(
+        self,
+        event_type: str,
+        action: Any,
+        *,
+        error_code: str | None = None,
+    ) -> None:
+        if self.shadow_recorder is None:
+            return
+        try:
+            self.shadow_recorder.record_action(
+                event_type,
+                action,
+                error_code=error_code,
+            )
+        except Exception:
+            # Shadow observation cannot make a working legacy execution fail.
+            return
 
 
 class WorkflowLLMActionEngine:

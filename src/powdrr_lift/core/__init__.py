@@ -4,6 +4,24 @@
 
 from typing import Any
 
+from powdrr_lift.core.execution_state import (
+    EXECUTION_STATE_SCHEMA_VERSION,
+    ActionRecord,
+    ActionStatus,
+    ExecutionArtifact,
+    ExecutionEvent,
+    ExecutionEventType,
+    ExecutionEvidence,
+    ExecutionFinding,
+    ExecutionMode,
+    ExecutionObligation,
+    ExecutionState,
+    FindingStatus,
+    ObligationStatus,
+    initial_execution_state,
+    reduce_execution_event,
+    reduce_execution_events,
+)
 from powdrr_lift.core.delivery_profile import (
     DELIVERY_PROFILE_SCHEMA_VERSION,
     SUPPORTED_ARTIFACT_TYPES,
@@ -263,6 +281,7 @@ from powdrr_lift.core.workflow_template_specification import (
 )
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
+_EXECUTION_STATE = "powdrr_lift.core.execution_state"
 _DELIVERY_PROFILE = "powdrr_lift.core.delivery_profile"
 _BLAME_VIEW = "powdrr_lift.core.blame_view"
 _CODEBASE_STATE = "powdrr_lift.core.codebase_state"
@@ -283,6 +302,19 @@ _WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
 _WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.core.workflow_template_specification"
 
 _EXPORTS: dict[str, str] = {
+    "EXECUTION_STATE_SCHEMA_VERSION": _EXECUTION_STATE,
+    "ActionRecord": _EXECUTION_STATE,
+    "ActionStatus": _EXECUTION_STATE,
+    "ExecutionArtifact": _EXECUTION_STATE,
+    "ExecutionEvent": _EXECUTION_STATE,
+    "ExecutionEventType": _EXECUTION_STATE,
+    "ExecutionEvidence": _EXECUTION_STATE,
+    "ExecutionFinding": _EXECUTION_STATE,
+    "ExecutionMode": _EXECUTION_STATE,
+    "ExecutionObligation": _EXECUTION_STATE,
+    "ExecutionState": _EXECUTION_STATE,
+    "FindingStatus": _EXECUTION_STATE,
+    "ObligationStatus": _EXECUTION_STATE,
     "DELIVERY_PROFILE_SCHEMA_VERSION": _DELIVERY_PROFILE,
     "SUPPORTED_ARTIFACT_TYPES": _DELIVERY_PROFILE,
     "ArtifactHandoff": _DELIVERY_PROFILE,
@@ -375,6 +407,7 @@ _EXPORTS: dict[str, str] = {
     "blame_tree_node_to_data": _BLAME_VIEW,
     "blame_view_state_to_data": _BLAME_VIEW,
     "build_architecture_specification_validation_report": _ARCHITECTURE,
+    "initial_execution_state": _EXECUTION_STATE,
     "build_delivery_profile_validation_report": _DELIVERY_PROFILE,
     "build_blame_file_view": _BLAME_VIEW,
     "build_blame_view_state": _BLAME_VIEW,
@@ -469,6 +502,8 @@ _EXPORTS: dict[str, str] = {
     "validate_workflow_task_json_file": _WORKFLOW_TASK_SPECIFICATION,
     "validate_workflow_template_json": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "validate_workflow_template_json_file": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "reduce_execution_event": _EXECUTION_STATE,
+    "reduce_execution_events": _EXECUTION_STATE,
     "workflow_task_from_data": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_from_json": _WORKFLOW_TASK_SPECIFICATION,
     "workflow_task_to_json": _WORKFLOW_TASK_SPECIFICATION,

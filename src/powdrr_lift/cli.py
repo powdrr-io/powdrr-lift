@@ -18,6 +18,7 @@ from powdrr_lift.core import (
     architecture_specification_default_output_path,
     build_architecture_specification_validation_report,
     build_current_decisions_report,
+    build_delivery_profile_validation_report,
     build_implementation_specification_validation_report,
     build_invariants_report,
     build_pr_specification_validation_report,
@@ -347,6 +348,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root and checked-out PR worktree to validate.",
     )
     validate_pr_files_parser.set_defaults(func=_run_validate_pr_files)
+
+    delivery_profile_parser = subparsers.add_parser(
+        "validate-delivery-profile",
+        aliases=["validate_delivery_profile"],
+        help="Validate a typed delivery profile.",
+    )
+    delivery_profile_parser.add_argument(
+        "profile",
+        type=Path,
+        help="Delivery profile YAML file to validate.",
+    )
+    delivery_profile_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the machine-readable validation report.",
+    )
+    delivery_profile_parser.set_defaults(func=_run_validate_delivery_profile)
 
     edit_context_parser = subparsers.add_parser(
         "edit-context",
@@ -3029,6 +3047,24 @@ def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
         print(f"Workflow definition valid: {report.definition}")
     else:
         print(f"Workflow definition invalid: {report.definition}", file=sys.stderr)
+        for issue in report.issues:
+            print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
+    return 0 if report.validation_successful else 1
+
+
+def _run_validate_delivery_profile(args: argparse.Namespace) -> int:
+    profile_path = args.profile
+    content = profile_path.read_text(encoding="utf-8")
+    report = build_delivery_profile_validation_report(
+        content,
+        source_path=profile_path,
+    )
+    if args.json:
+        print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
+    elif report.validation_successful:
+        print(f"Delivery profile valid: {profile_path}")
+    else:
+        print(f"Delivery profile invalid: {profile_path}", file=sys.stderr)
         for issue in report.issues:
             print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
     return 0 if report.validation_successful else 1

@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
@@ -81,6 +82,8 @@ class WorkflowTaskTemplate:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    phase_type: PhaseType | None = None
+    persona_id: str | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -117,6 +120,10 @@ class WorkflowTaskTemplate:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             step_data["gate"] = self.gate.to_data()
+        if self.phase_type is not None:
+            data["phase_type"] = self.phase_type.value
+        if self.persona_id is not None:
+            data["persona_id"] = self.persona_id
         data.update({key: value for key, value in step_data.items() if value})
         if self.generation is not None:
             data["generation"] = self.generation.to_data()
@@ -339,6 +346,8 @@ def instantiate_workflow_template(
             ),
             dependent_state=task_template.dependent_state,
             workflow_template=template_identity,
+            phase_type=task_template.phase_type,
+            persona_id=task_template.persona_id,
         )
         task_path = output_directory / f"{task.task_id}.yaml"
         if task_path.exists():
@@ -599,11 +608,37 @@ def build_workflow_template_validation_report(
                 "dependent_state",
                 "generation",
                 "gate",
+                "phase_type",
+                "persona_id",
             },
             issues,
             path=task_template_path or "",
             subject="workflow task template",
         )
+
+        raw_phase_type = raw_task_template_mapping.get("phase_type")
+        if raw_phase_type is not None:
+            try:
+                _optional_phase_type(raw_phase_type)
+            except ValueError as exc:
+                issues.append(
+                    WorkflowTemplateValidationIssue(
+                        code="invalid_phase_type",
+                        message=str(exc),
+                        path=_child_path(task_template_path, "phase_type"),
+                    )
+                )
+        raw_persona_id = raw_task_template_mapping.get("persona_id")
+        if raw_persona_id is not None and _optional_persona_id(raw_persona_id) is None:
+            issues.append(
+                WorkflowTemplateValidationIssue(
+                    code="invalid_persona_id",
+                    message=(
+                        "Workflow task template persona_id must be a non-empty string."
+                    ),
+                    path=_child_path(task_template_path, "persona_id"),
+                )
+            )
 
         step_type = raw_task_template_mapping.get("step_type", "freeform")
         if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
@@ -1032,6 +1067,8 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
     step = skill_step_from_data(data)
     output_state_type = _required_string(data, "output_state_type")
     dependent_state = _required_string_sequence(data, "dependent_state")
+    phase_type = _optional_phase_type(data.get("phase_type"))
+    persona_id = _optional_persona_id(data.get("persona_id"))
     generation = data.get("generation")
     parsed_generation = None
     if generation is not None:
@@ -1055,6 +1092,8 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         output_state_type=output_state_type,
         dependent_state=dependent_state,
         generation=parsed_generation,
+        phase_type=phase_type,
+        persona_id=persona_id,
     )
 
 
@@ -1165,6 +1204,24 @@ def _optional_string(value: object) -> str | None:
         return None
     normalized = value.strip()
     return normalized if normalized else None
+
+
+def _optional_phase_type(value: object) -> PhaseType | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Workflow task template phase_type must be a string.")
+    try:
+        return PhaseType(value)
+    except ValueError as exc:
+        allowed = ", ".join(phase.value for phase in PhaseType)
+        raise ValueError(
+            "Workflow task template phase_type must be one of " + allowed + "."
+        ) from exc
+
+
+def _optional_persona_id(value: object) -> str | None:
+    return _optional_string(value)
 
 
 def _optional_int_sequence(

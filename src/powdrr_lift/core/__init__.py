@@ -4,6 +4,22 @@
 
 from typing import Any
 
+from powdrr_lift.core.delivery_profile import (
+    DELIVERY_PROFILE_SCHEMA_VERSION,
+    SUPPORTED_ARTIFACT_TYPES,
+    ArtifactHandoff,
+    DeliveryProfile,
+    DeliveryProfileValidationIssue,
+    DeliveryProfileValidationReport,
+    PersonaDefinition,
+    PersonaType,
+    PhaseAssignment,
+    PhaseType,
+    ReviewAssignment,
+    build_delivery_profile_validation_report,
+    load_delivery_profile,
+    validate_delivery_profile_yaml,
+)
 from powdrr_lift.core.architecture_specification import (
     ArchitectureSpecificationValidationIssue,
     ArchitectureSpecificationValidationReport,
@@ -247,6 +263,7 @@ from powdrr_lift.core.workflow_template_specification import (
 )
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
+_DELIVERY_PROFILE = "powdrr_lift.core.delivery_profile"
 _BLAME_VIEW = "powdrr_lift.core.blame_view"
 _CODEBASE_STATE = "powdrr_lift.core.codebase_state"
 _CODE_INDEX = "powdrr_lift.core.code_index"
@@ -266,6 +283,17 @@ _WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
 _WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.core.workflow_template_specification"
 
 _EXPORTS: dict[str, str] = {
+    "DELIVERY_PROFILE_SCHEMA_VERSION": _DELIVERY_PROFILE,
+    "SUPPORTED_ARTIFACT_TYPES": _DELIVERY_PROFILE,
+    "ArtifactHandoff": _DELIVERY_PROFILE,
+    "DeliveryProfile": _DELIVERY_PROFILE,
+    "DeliveryProfileValidationIssue": _DELIVERY_PROFILE,
+    "DeliveryProfileValidationReport": _DELIVERY_PROFILE,
+    "PersonaDefinition": _DELIVERY_PROFILE,
+    "PersonaType": _DELIVERY_PROFILE,
+    "PhaseAssignment": _DELIVERY_PROFILE,
+    "PhaseType": _DELIVERY_PROFILE,
+    "ReviewAssignment": _DELIVERY_PROFILE,
     "BranchDiffEntry": _PR_ANALYSIS,
     "BranchState": _CODE_INDEX,
     "BlameChunk": _BLAME_VIEW,
@@ -347,6 +375,7 @@ _EXPORTS: dict[str, str] = {
     "blame_tree_node_to_data": _BLAME_VIEW,
     "blame_view_state_to_data": _BLAME_VIEW,
     "build_architecture_specification_validation_report": _ARCHITECTURE,
+    "build_delivery_profile_validation_report": _DELIVERY_PROFILE,
     "build_blame_file_view": _BLAME_VIEW,
     "build_blame_view_state": _BLAME_VIEW,
     "build_codebase_state_report": _CODEBASE_STATE,
@@ -385,6 +414,7 @@ _EXPORTS: dict[str, str] = {
     "lookup_entity_references": _ENTITY_CONTEXT,
     "lookup_entity_relationships": _ENTITY_CONTEXT,
     "load_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
+    "load_delivery_profile": _DELIVERY_PROFILE,
     "load_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
     "load_workflow_task_documents": _WORKFLOW_TASK_SPECIFICATION,
     "load_skill": _SKILL,
@@ -423,6 +453,7 @@ _EXPORTS: dict[str, str] = {
     "system_specification_default_output_path": _SYSTEM,
     "system_map_specification_default_output_path": _FEATURE_PLANNING,
     "validate_architecture_specification_yaml": _ARCHITECTURE,
+    "validate_delivery_profile_yaml": _DELIVERY_PROFILE,
     "build_validation_report": _VALIDATE,
     "validate_change_log_yaml": _VALIDATE,
     "validate_implementation_specification_yaml": _IMPLEMENTATION,

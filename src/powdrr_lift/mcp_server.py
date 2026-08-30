@@ -9,6 +9,7 @@ from powdrr_lift.core import (
     blame_view_state_to_data,
     build_blame_view_state,
     build_current_decisions_report,
+    build_delivery_profile_validation_report,
     build_invariants_report,
     codebase_state_default_output_path,
     create_architecture_specification_template,
@@ -79,6 +80,12 @@ def build_server() -> Any:
         )
 
     server: Any = FastMCP("powdrr-lift")
+
+    @server.tool()
+    def validate_delivery_profile(delivery_profile_yaml: str) -> str:
+        """Validate a typed delivery profile without executing it."""
+        report = build_delivery_profile_validation_report(delivery_profile_yaml)
+        return json.dumps(report.to_data(), ensure_ascii=False)
 
     @server.tool()
     def init_change_log_template(

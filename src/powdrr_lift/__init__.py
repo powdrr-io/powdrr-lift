@@ -45,10 +45,24 @@ __all__ = [
     "CodebaseStateSource",
     "ArchitectureSpecificationValidationIssue",
     "ArchitectureSpecificationValidationReport",
+    "ArtifactHandoff",
+    "DELIVERY_PROFILE_SCHEMA_VERSION",
+    "DeliveryProfile",
+    "DeliveryProfileValidationIssue",
+    "DeliveryProfileValidationReport",
     "ImplementationSpecificationValidationIssue",
     "ImplementationSpecificationValidationReport",
     "SystemSpecificationValidationIssue",
     "SystemSpecificationValidationReport",
+    "PersonaDefinition",
+    "PersonaType",
+    "PhaseAssignment",
+    "PhaseType",
+    "ReviewAssignment",
+    "SUPPORTED_ARTIFACT_TYPES",
+    "build_delivery_profile_validation_report",
+    "load_delivery_profile",
+    "validate_delivery_profile_yaml",
     "TaskComplexity",
     "TaskStatus",
     "WorkflowTaskTemplate",
@@ -201,6 +215,58 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
+    if name in {
+        "ArtifactHandoff",
+        "DELIVERY_PROFILE_SCHEMA_VERSION",
+        "DeliveryProfile",
+        "DeliveryProfileValidationIssue",
+        "DeliveryProfileValidationReport",
+        "PersonaDefinition",
+        "PersonaType",
+        "PhaseAssignment",
+        "PhaseType",
+        "ReviewAssignment",
+        "SUPPORTED_ARTIFACT_TYPES",
+        "build_delivery_profile_validation_report",
+        "load_delivery_profile",
+        "validate_delivery_profile_yaml",
+    }:
+        from powdrr_lift.core.delivery_profile import (
+            DELIVERY_PROFILE_SCHEMA_VERSION,
+            SUPPORTED_ARTIFACT_TYPES,
+            ArtifactHandoff,
+            DeliveryProfile,
+            DeliveryProfileValidationIssue,
+            DeliveryProfileValidationReport,
+            PersonaDefinition,
+            PersonaType,
+            PhaseAssignment,
+            PhaseType,
+            ReviewAssignment,
+            build_delivery_profile_validation_report,
+            load_delivery_profile,
+            validate_delivery_profile_yaml,
+        )
+
+        return {
+            "ArtifactHandoff": ArtifactHandoff,
+            "DELIVERY_PROFILE_SCHEMA_VERSION": DELIVERY_PROFILE_SCHEMA_VERSION,
+            "DeliveryProfile": DeliveryProfile,
+            "DeliveryProfileValidationIssue": DeliveryProfileValidationIssue,
+            "DeliveryProfileValidationReport": DeliveryProfileValidationReport,
+            "PersonaDefinition": PersonaDefinition,
+            "PersonaType": PersonaType,
+            "PhaseAssignment": PhaseAssignment,
+            "PhaseType": PhaseType,
+            "ReviewAssignment": ReviewAssignment,
+            "SUPPORTED_ARTIFACT_TYPES": SUPPORTED_ARTIFACT_TYPES,
+            "build_delivery_profile_validation_report": (
+                build_delivery_profile_validation_report
+            ),
+            "load_delivery_profile": load_delivery_profile,
+            "validate_delivery_profile_yaml": validate_delivery_profile_yaml,
+        }[name]
+
     if name == "create_change_log_template":
         from powdrr_lift.change_log_template import create_change_log_template
 

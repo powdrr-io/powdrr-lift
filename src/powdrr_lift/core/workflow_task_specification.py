@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
@@ -94,6 +95,8 @@ class WorkflowTask:
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
     workflow_template: str | None = None
+    phase_type: PhaseType | None = None
+    persona_id: str | None = None
 
     def __post_init__(self) -> None:
         assignee_type, assignee_role = validate_assignee(
@@ -138,6 +141,10 @@ class WorkflowTask:
             step_data["gate"] = self.gate.to_data()
         if self.workflow_template is not None:
             data["workflow_template"] = self.workflow_template
+        if self.phase_type is not None:
+            data["phase_type"] = self.phase_type.value
+        if self.persona_id is not None:
+            data["persona_id"] = self.persona_id
         data.update({key: value for key, value in step_data.items() if value})
         return data
 
@@ -371,6 +378,8 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     assignee_type, assignee_role = _required_assignee(data)
     step = skill_step_from_data(data)
     output_state_type = _required_string(data, "output_state_type")
+    phase_type = _optional_phase_type(data.get("phase_type"))
+    persona_id = _optional_persona_id(data.get("persona_id"))
 
     return WorkflowTask(
         task_id=task_id,
@@ -395,6 +404,8 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
         dependent_state=dependent_state,
+        phase_type=phase_type,
+        persona_id=persona_id,
     )
 
 
@@ -595,11 +606,35 @@ def build_workflow_task_validation_report(
             "pre_step",
             "gate",
             "workflow_template",
+            "phase_type",
+            "persona_id",
         },
         issues,
         path=_format_path(source_path) or "",
         subject="workflow task",
     )
+
+    raw_phase_type = raw_task.get("phase_type")
+    if raw_phase_type is not None:
+        try:
+            _optional_phase_type(raw_phase_type)
+        except ValueError as exc:
+            issues.append(
+                WorkflowTaskValidationIssue(
+                    code="invalid_phase_type",
+                    message=str(exc),
+                    path=_format_child_path(source_path, "phase_type"),
+                )
+            )
+    raw_persona_id = raw_task.get("persona_id")
+    if raw_persona_id is not None and _optional_persona_id(raw_persona_id) is None:
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_persona_id",
+                message="Workflow task persona_id must be a non-empty string.",
+                path=_format_child_path(source_path, "persona_id"),
+            )
+        )
 
     step_type = raw_task.get("step_type", "freeform")
     if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
@@ -1139,6 +1174,22 @@ def _required_status(data: Mapping[str, Any], key: str) -> TaskStatus:
             "Workflow task status must be one of open, completed, superceded, "
             "abandoned, or locked."
         ) from exc
+
+
+def _optional_phase_type(value: object) -> PhaseType | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Workflow task phase_type must be a string.")
+    try:
+        return PhaseType(value)
+    except ValueError as exc:
+        allowed = ", ".join(phase.value for phase in PhaseType)
+        raise ValueError(f"Workflow task phase_type must be one of {allowed}.") from exc
+
+
+def _optional_persona_id(value: object) -> str | None:
+    return _optional_string(value)
 
 
 def _required_assignee(

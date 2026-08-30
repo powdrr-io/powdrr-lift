@@ -114,6 +114,24 @@ class FileCapabilityExceptionStore:
             data["exception"]
         ), CapabilityExceptionDecision.from_data(data["decision"])
 
+    def load_request(self, exception_id: str) -> CapabilityExceptionRequest | None:
+        path = self.root / f"{exception_id.replace(':', '_')}.request.json"
+        if not path.exists():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return CapabilityExceptionRequest.from_data(data["exception"])
+
+    def pending(self) -> tuple[CapabilityExceptionRequest, ...]:
+        if not self.root.exists():
+            return ()
+        requests: list[CapabilityExceptionRequest] = []
+        for path in sorted(self.root.glob("*.request.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            request = CapabilityExceptionRequest.from_data(data["exception"])
+            if self.load(request.exception_id) is None:
+                requests.append(request)
+        return tuple(requests)
+
 
 class CapabilityBroker:
     def __init__(

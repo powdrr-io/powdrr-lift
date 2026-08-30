@@ -56,6 +56,22 @@ class CapabilityExceptionRequest:
             "max_uses": self.max_uses,
         }
 
+    def decision_packet(self) -> dict[str, Any]:
+        """Return the exact context a human needs to approve this request."""
+        return {
+            "exception_id": self.exception_id,
+            "execution_id": self.execution_id,
+            "tool_name": self.tool_name,
+            "semantic_action": self.semantic_action,
+            "arguments": self.arguments,
+            "manifest_fingerprint": self.manifest_fingerprint,
+            "effects": [effect.value for effect in self.effects],
+            "reason": self.reason,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "max_uses": self.max_uses,
+        }
+
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> CapabilityExceptionRequest:
         return cls(

@@ -22,6 +22,15 @@ from powdrr_lift.core.execution_state import (
     reduce_execution_event,
     reduce_execution_events,
 )
+from powdrr_lift.core.execution_plan import (
+    EXECUTION_PLAN_SCHEMA_VERSION,
+    ExecutionPlan,
+    ExecutionPlanAmendment,
+    ExecutionUnit,
+    FileExecutionPlanStore,
+    PlanEvaluation,
+    evaluate_execution_plan,
+)
 from powdrr_lift.core.tool_manifest import (
     TOOL_MANIFEST_SCHEMA_VERSION,
     IdempotencyKind,

@@ -31,6 +31,7 @@ from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import (
     EvidenceRequirement,
     FindingDisposition,
+    PublishRequirements,
     ReadinessEvaluator,
     ReadinessReport,
     dispose_finding,
@@ -128,6 +129,7 @@ __all__ = [
     "run_diagnostics",
     "ReadinessEvaluator",
     "ReadinessReport",
+    "PublishRequirements",
     "dispose_finding",
     "compile_execution_plan",
     "compatibility_diagnostic",

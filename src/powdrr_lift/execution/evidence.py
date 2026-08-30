@@ -27,6 +27,16 @@ class ReadinessReport:
     satisfied_requirements: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class PublishRequirements:
+    """Kernel-owned requirements for crossing the publish boundary."""
+
+    plan_fingerprint: str | None = None
+    proposed_pr_fingerprint: str | None = None
+    require_independent_review: bool = False
+    reviewer_findings: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+
 class ReadinessEvaluator:
     """Pure readiness gate; no model or filesystem state is consulted."""
 
@@ -36,6 +46,7 @@ class ReadinessEvaluator:
         *,
         required_evidence: tuple[EvidenceRequirement, ...] = (),
         required_artifact_types: tuple[str, ...] = (),
+        publish: PublishRequirements | None = None,
     ) -> ReadinessReport:
         reasons: list[str] = []
         satisfied: list[str] = []
@@ -72,6 +83,25 @@ class ReadinessEvaluator:
                 for artifact in state.artifacts
             ):
                 reasons.append(f"missing accepted artifact: {artifact_type}")
+        if publish is not None:
+            accepted_refs = {
+                artifact.content_ref
+                for artifact in state.artifacts
+                if artifact.accepted
+            }
+            for label, fingerprint in (
+                ("plan", publish.plan_fingerprint),
+                ("proposed PR", publish.proposed_pr_fingerprint),
+            ):
+                if fingerprint is not None and fingerprint not in accepted_refs:
+                    reasons.append(f"current accepted {label} fingerprint is missing")
+            if publish.require_independent_review:
+                agreement = evaluate_review_agreement(publish.reviewer_findings)
+                if not agreement.sufficient:
+                    reasons.extend(
+                        f"review agreement: {reason}"
+                        for reason in agreement.disagreement_reasons
+                    )
         return ReadinessReport(not reasons, tuple(reasons), tuple(satisfied))
 
 

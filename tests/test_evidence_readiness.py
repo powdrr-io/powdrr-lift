@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from powdrr_lift.core.execution_state import (
+    ExecutionArtifact,
     ExecutionEvidence,
     ExecutionFinding,
     FindingStatus,
@@ -10,6 +11,7 @@ from powdrr_lift.core.execution_state import (
 )
 from powdrr_lift.execution.evidence import (
     EvidenceRequirement,
+    PublishRequirements,
     ReadinessEvaluator,
     dispose_finding,
     evaluate_review_agreement,
@@ -80,3 +82,43 @@ def test_edit_invalidation_and_review_disagreement() -> None:
         (("reviewer-a", ("finding-1",)), ("reviewer-b", ("finding-2",)))
     )
     assert not agreement.sufficient
+
+
+def test_publish_gate_requires_current_accepted_artifacts_and_agreement() -> None:
+    state = initial_execution_state("run-1", profile_id="profile")
+    blocked = ReadinessEvaluator().evaluate(
+        state,
+        publish=PublishRequirements(
+            plan_fingerprint="plan-current",
+            proposed_pr_fingerprint="pr-current",
+            require_independent_review=True,
+            reviewer_findings=(
+                ("reviewer-a", ("finding-1",)),
+                ("reviewer-b", ("finding-2",)),
+            ),
+        ),
+    )
+    assert not blocked.ready
+    assert any("fingerprint" in reason for reason in blocked.reasons)
+    assert any("review agreement" in reason for reason in blocked.reasons)
+    state = replace(
+        state,
+        artifacts=(
+            # Accepted artifacts carry the content fingerprint used by the gate.
+            ExecutionArtifact("plan", "plan", "v1", "architect", "plan-current", True),
+            ExecutionArtifact("pr", "proposed-pr", "v1", "manager", "pr-current", True),
+        ),
+    )
+    ready = ReadinessEvaluator().evaluate(
+        state,
+        publish=PublishRequirements(
+            plan_fingerprint="plan-current",
+            proposed_pr_fingerprint="pr-current",
+            require_independent_review=True,
+            reviewer_findings=(
+                ("reviewer-a", ("finding-1",)),
+                ("reviewer-b", ("finding-1",)),
+            ),
+        ),
+    )
+    assert ready.ready

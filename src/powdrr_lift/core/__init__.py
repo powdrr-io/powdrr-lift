@@ -22,6 +22,31 @@ from powdrr_lift.core.execution_state import (
     reduce_execution_event,
     reduce_execution_events,
 )
+from powdrr_lift.core.execution_plan import (
+    EXECUTION_PLAN_SCHEMA_VERSION,
+    ExecutionPlan,
+    ExecutionPlanAmendment,
+    ExecutionUnit,
+    FileExecutionPlanStore,
+    PlanEvaluation,
+    evaluate_execution_plan,
+)
+from powdrr_lift.core.behavior_rule import (
+    BEHAVIOR_RULE_SCHEMA_VERSION,
+    BehaviorRule,
+    FileBehaviorRuleStore,
+    applicable_behavior_rules,
+    nominate_behavior_rule,
+    normalize_behavior_text,
+)
+from powdrr_lift.core.action_relationship import (
+    BUILTIN_ACTION_RELATIONSHIPS,
+    ActionFact,
+    ActionRelationship,
+    RelationshipObligation,
+    expand_action_relationships,
+    validate_relationship_graph,
+)
 from powdrr_lift.core.tool_manifest import (
     TOOL_MANIFEST_SCHEMA_VERSION,
     IdempotencyKind,
@@ -31,6 +56,11 @@ from powdrr_lift.core.tool_manifest import (
     ToolManifestValidationReport,
     build_tool_manifest_validation_report,
     validate_tool_manifest,
+)
+from powdrr_lift.core.capability_exception import (
+    CapabilityExceptionAuthority,
+    CapabilityExceptionDecision,
+    CapabilityExceptionRequest,
 )
 from powdrr_lift.core.delivery_profile import (
     DELIVERY_PROFILE_SCHEMA_VERSION,

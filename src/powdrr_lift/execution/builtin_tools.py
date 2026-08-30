@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
@@ -135,6 +135,72 @@ class EnrichmentAdapter:
         self, context: ToolContext, arguments: Mapping[str, Any]
     ) -> frozenset[ToolEffect]:
         return frozenset({ToolEffect.WORKSPACE_READ})
+
+
+class ShellAdapter:
+    """Constrained adapter for argv-based process execution.
+
+    The executor is supplied by the workflow boundary so the capability layer
+    owns validation while the presentation layer retains stdout/stderr policy.
+    """
+
+    manifest = ToolManifest(
+        "process",
+        ("run_process",),
+        (ToolEffect.PROCESS_EXECUTION,),
+        scope="worktree",
+        sandbox_profile="workspace-process",
+        reversible=False,
+    )
+
+    def __init__(self, executor: Callable[[Mapping[str, Any]], Any]) -> None:
+        self._executor = executor
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        command = arguments.get("command")
+        if not isinstance(command, (list, tuple)) or not command:
+            return ToolValidationReport(("process command must be a non-empty argv",))
+        if not all(isinstance(item, str) and item for item in command):
+            return ToolValidationReport(
+                ("process argv items must be non-empty strings",)
+            )
+        env = arguments.get("env", {})
+        if not isinstance(env, Mapping) or any(
+            not isinstance(key, str) or not key or not isinstance(value, str)
+            for key, value in env.items()
+        ):
+            return ToolValidationReport(("process env must map strings to strings",))
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        return ToolResult(
+            self._executor(arguments),
+            frozenset({ToolEffect.PROCESS_EXECUTION}),
+        )
+
+
+def invoke_shell_capability(
+    arguments: Mapping[str, Any],
+    *,
+    worktree_root: Any,
+    executor: Callable[[Mapping[str, Any]], Any],
+) -> Any:
+    """Run one argv process after broker validation and scope checks."""
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset({"run_process"}),
+        allowed_effects=frozenset(ToolEffect),
+    )
+    result = CapabilityBroker(ToolRegistry((ShellAdapter(executor),))).invoke(
+        context,
+        CapabilityRequest("process", "run_process", dict(arguments)),
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(f"Process capability request was not executable: {result.reason}")
 
 
 def builtin_tool_registry() -> ToolRegistry:

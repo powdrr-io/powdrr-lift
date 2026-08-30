@@ -69,7 +69,10 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
-from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
+from powdrr_lift.execution.builtin_tools import (
+    invoke_intrinsic_capability,
+    invoke_shell_capability,
+)
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.intrinsic_edit import (
@@ -2086,7 +2089,7 @@ class LocalLlamaChatClient:
         n_ctx: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
     ) -> None:
         try:
-            from llama_cpp import (  # type: ignore[import-not-found]
+            from llama_cpp import (
                 Llama,
                 llama_supports_gpu_offload,
             )
@@ -4063,13 +4066,17 @@ def _run_deterministic_pre_step(
         elif tool in {"shell", _INTERNAL_TOOL}:
             if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
                 _validate_internal_command(parameters.get("command"))
-            result = _execute_shell_tool(
+            result = invoke_shell_capability(
                 {**parameters, "_tool_name": tool},
                 worktree_root=worktree_root,
-                stdout=stdout,
-                stderr=stderr,
-                verbose=verbose,
-                announce=False,
+                executor=lambda invocation: _execute_shell_tool(
+                    dict(invocation),
+                    worktree_root=worktree_root,
+                    stdout=stdout,
+                    stderr=stderr,
+                    verbose=verbose,
+                    announce=False,
+                ),
             )
         elif tool in {GIT_TOOL, GH_TOOL}:
             result = invoke_intrinsic_capability(
@@ -5695,16 +5702,20 @@ def _handle_workflow_action_invoke_tool(
             if action.parameters.get("help") is True
             else _command_items_for_validation(action.parameters.get("command"))
         )
-        tool_result = _execute_shell_tool(
+        tool_result = invoke_shell_capability(
             {**action.parameters, "_tool_name": action.tool},
             worktree_root=state.worktree_root,
-            stdout=stdout,
-            stderr=stderr,
-            verbose=config.verbose,
-            announce=False,
-            print_stdout=not (
-                action.tool == _INTERNAL_TOOL
-                and command_items[1:2] == ["pull-request-description"]
+            executor=lambda invocation: _execute_shell_tool(
+                dict(invocation),
+                worktree_root=state.worktree_root,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=config.verbose,
+                announce=False,
+                print_stdout=not (
+                    action.tool == _INTERNAL_TOOL
+                    and command_items[1:2] == ["pull-request-description"]
+                ),
             ),
         )
     elif action.tool in {GIT_TOOL, GH_TOOL}:

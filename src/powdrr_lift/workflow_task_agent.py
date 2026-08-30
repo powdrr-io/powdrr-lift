@@ -30,7 +30,10 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
-from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
+from powdrr_lift.execution.builtin_tools import (
+    invoke_intrinsic_capability,
+    invoke_shell_capability,
+)
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.pr_workflow_record import (
@@ -851,12 +854,16 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         elif action.tool in {"shell", "internal"}:
             if action.tool == "internal" and action.parameters.get("help") is not True:
                 _validate_internal_command(action.parameters.get("command"))
-            result = _execute_shell_tool(
+            result = invoke_shell_capability(
                 {**action.parameters, "_tool_name": action.tool},
                 worktree_root=self.repo_root,
-                stdout=self.stdout,
-                stderr=self.stderr,
-                verbose=self.config.verbose,
+                executor=lambda parameters: _execute_shell_tool(
+                    dict(parameters),
+                    worktree_root=self.repo_root,
+                    stdout=self.stdout,
+                    stderr=self.stderr,
+                    verbose=self.config.verbose,
+                ),
             )
         elif action.tool == ENRICH_TOOL:
             result = invoke_intrinsic_capability(
@@ -2988,12 +2995,16 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     and action.parameters.get("help") is not True
                 ):
                     _validate_internal_command(action.parameters.get("command"))
-                result = _execute_shell_tool(
+                result = invoke_shell_capability(
                     {**action.parameters, "_tool_name": action.tool},
                     worktree_root=self.repo_root,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.verbose,
+                    executor=lambda parameters: _execute_shell_tool(
+                        dict(parameters),
+                        worktree_root=self.repo_root,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.verbose,
+                    ),
                 )
             elif action.tool == ENRICH_TOOL:
                 result = invoke_intrinsic_capability(

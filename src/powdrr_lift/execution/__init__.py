@@ -3,8 +3,10 @@
 from powdrr_lift.execution.builtin_tools import (
     EnrichmentAdapter,
     IntrinsicRepositoryAdapter,
+    ShellAdapter,
     builtin_tool_registry,
     invoke_intrinsic_capability,
+    invoke_shell_capability,
 )
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
@@ -134,4 +136,6 @@ __all__ = [
     "invalidate_evidence",
     "builtin_tool_registry",
     "invoke_intrinsic_capability",
+    "invoke_shell_capability",
+    "ShellAdapter",
 ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -160,12 +161,28 @@ class ShellAdapter:
         self, context: ToolContext, arguments: Mapping[str, Any]
     ) -> ToolValidationReport:
         command = arguments.get("command")
-        if not isinstance(command, (list, tuple)) or not command:
-            return ToolValidationReport(("process command must be a non-empty argv",))
-        if not all(isinstance(item, str) and item for item in command):
-            return ToolValidationReport(
-                ("process argv items must be non-empty strings",)
-            )
+        if isinstance(command, str):
+            try:
+                command_items = shlex.split(command)
+            except ValueError:
+                return ToolValidationReport(
+                    ("process command is not valid shell syntax",)
+                )
+            if not command_items:
+                return ToolValidationReport(("process command must not be empty",))
+            if any(item in {";", "&&", "||", "|", ">", ">>"} for item in command_items):
+                return ToolValidationReport(
+                    ("process command contains shell control syntax",)
+                )
+        elif isinstance(command, (list, tuple)):
+            if not command or not all(
+                isinstance(item, str) and item for item in command
+            ):
+                return ToolValidationReport(
+                    ("process argv items must be non-empty strings",)
+                )
+        else:
+            return ToolValidationReport(("process command must be a string or argv",))
         env = arguments.get("env", {})
         if not isinstance(env, Mapping) or any(
             not isinstance(key, str) or not key or not isinstance(value, str)

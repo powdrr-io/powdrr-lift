@@ -71,7 +71,7 @@ def test_shell_capability_rejects_string_commands_and_escape(tmp_path: Path) -> 
         raise AssertionError("invalid process must not execute")
 
     for arguments in (
-        {"command": "pytest"},
+        {"command": "pytest ; touch escaped"},
         {"command": ["pytest"], "cwd": "../outside"},
     ):
         try:

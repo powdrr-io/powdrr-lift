@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,12 @@ from powdrr_lift.core import (
 from powdrr_lift.core import (
     start_planning_feature as _start_planning_feature,
 )
+from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
+from powdrr_lift.execution.capabilities import (
+    CapabilityBroker,
+    FileCapabilityExceptionStore,
+)
+from powdrr_lift.execution.tools import ToolRegistry
 
 
 def _load_fastmcp() -> Any:
@@ -86,6 +93,45 @@ def build_server() -> Any:
         """Validate a typed delivery profile without executing it."""
         report = build_delivery_profile_validation_report(delivery_profile_yaml)
         return json.dumps(report.to_data(), ensure_ascii=False)
+
+    @server.tool()
+    def execution_exceptions(
+        workflow_dir: str,
+        exception_id: str | None = None,
+        decision: str | None = None,
+        decided_by: str = "human",
+    ) -> str:
+        """Inspect or approve/deny one exact pending capability request."""
+        store = FileCapabilityExceptionStore(workflow_dir)
+        if decision is None:
+            if exception_id is None:
+                return json.dumps(
+                    [item.decision_packet() for item in store.pending()],
+                    ensure_ascii=False,
+                )
+            request = store.load_request(exception_id)
+            if request is None:
+                raise ValueError(f"Unknown exception: {exception_id}")
+            return json.dumps(request.decision_packet(), ensure_ascii=False)
+        if decision not in {"approve", "deny"} or exception_id is None:
+            raise ValueError("decision must be approve/deny and include exception_id")
+        request = store.load_request(exception_id)
+        if request is None:
+            raise ValueError(f"Unknown pending exception: {exception_id}")
+        secret = os.environ.get("POWDRR_CAPABILITY_SECRET")
+        if not secret:
+            raise ValueError(
+                "POWDRR_CAPABILITY_SECRET is required to decide exceptions"
+            )
+        broker = CapabilityBroker(
+            ToolRegistry(), CapabilityExceptionAuthority(secret.encode()), store
+        )
+        return json.dumps(
+            broker.decide_exception(
+                request, approved=decision == "approve", decided_by=decided_by
+            ).to_data(),
+            ensure_ascii=False,
+        )
 
     @server.tool()
     def init_change_log_template(

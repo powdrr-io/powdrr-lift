@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import inspect
 import json
 import math
@@ -2089,10 +2090,9 @@ class LocalLlamaChatClient:
         n_ctx: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
     ) -> None:
         try:
-            from llama_cpp import (
-                Llama,
-                llama_supports_gpu_offload,
-            )
+            llama_module = importlib.import_module("llama_cpp")
+            Llama = llama_module.Llama
+            llama_supports_gpu_offload = llama_module.llama_supports_gpu_offload
         except ImportError as exc:
             raise PowdrrExecutionError(
                 "Local provider requires llama-cpp-python. Install the local "

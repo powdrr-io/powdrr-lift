@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from pathlib import Path
@@ -68,9 +69,8 @@ from powdrr_lift.execution.tools import ToolRegistry
 
 def _load_fastmcp() -> Any:
     try:
-        from mcp.server.fastmcp import (
-            FastMCP as fastmcp,
-        )
+        module = importlib.import_module("mcp.server.fastmcp")
+        fastmcp = module.FastMCP
     except ImportError:  # pragma: no cover
         return None
 

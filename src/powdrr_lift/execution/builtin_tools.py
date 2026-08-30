@@ -6,14 +6,13 @@ from collections.abc import Mapping
 from typing import Any
 
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.execution.capabilities import CapabilityBroker, CapabilityRequest
 from powdrr_lift.execution.tools import (
     ToolContext,
     ToolRegistry,
     ToolResult,
     ToolValidationReport,
 )
-from powdrr_lift.intrinsic_enrich import execute_enrich_tool
-from powdrr_lift.intrinsic_git_gh import execute_intrinsic_git_gh_tool
 
 
 class IntrinsicRepositoryAdapter:
@@ -59,6 +58,8 @@ class IntrinsicRepositoryAdapter:
         return ToolValidationReport()
 
     def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        from powdrr_lift.intrinsic_git_gh import execute_intrinsic_git_gh_tool
+
         operation = str(arguments.get("operation", ""))
         tool = "gh" if operation.startswith("pr_") else "git"
         result = execute_intrinsic_git_gh_tool(
@@ -123,6 +124,8 @@ class EnrichmentAdapter:
         return ToolValidationReport()
 
     def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        from powdrr_lift.intrinsic_enrich import execute_enrich_tool
+
         return ToolResult(
             execute_enrich_tool(arguments),
             frozenset({ToolEffect.WORKSPACE_READ}),
@@ -138,3 +141,60 @@ def builtin_tool_registry() -> ToolRegistry:
     """Return built-ins that have been migrated to capability execution."""
 
     return ToolRegistry((IntrinsicRepositoryAdapter(), EnrichmentAdapter()))
+
+
+def invoke_intrinsic_capability(
+    tool: str,
+    arguments: Mapping[str, Any],
+    *,
+    worktree_root: Any,
+) -> Any:
+    """Execute legacy git/gh/enrich calls through the typed broker.
+
+    The workflow adapters deliberately grant the effects already represented by
+    their existing action contracts. The broker still owns registration,
+    operation validation, worktree scoping, and the resulting decision.
+    """
+    operation = str(arguments.get("operation", ""))
+    if tool == "enrich":
+        semantic_action = "enrich_test_output"
+        request_tool = "enrich"
+    elif tool == "git":
+        semantic_action = (
+            "mutate_repository"
+            if operation in {"add", "move", "rename"}
+            else "inspect_repository"
+        )
+        request_tool = "repository"
+    elif tool == "gh":
+        semantic_action = (
+            "mutate_pull_request"
+            if operation in {"pr_create", "pr_edit", "pr_review_comment"}
+            else "inspect_pull_request"
+        )
+        request_tool = "repository"
+    else:
+        raise ValueError(f"Unsupported intrinsic capability: {tool}")
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset(
+            {
+                "inspect_repository",
+                "mutate_repository",
+                "inspect_pull_request",
+                "mutate_pull_request",
+                "enrich_test_output",
+            }
+        ),
+        allowed_effects=frozenset(ToolEffect),
+    )
+    result = CapabilityBroker(builtin_tool_registry()).invoke(
+        context,
+        CapabilityRequest(request_tool, semantic_action, dict(arguments)),
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(
+        f"Intrinsic capability request was not executable: {result.reason}"
+    )

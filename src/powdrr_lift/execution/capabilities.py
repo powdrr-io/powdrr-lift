@@ -49,6 +49,17 @@ class CapabilityResolution:
     manifest_fingerprint: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class CapabilityDecision:
+    """Auditable result of resolving one tool request."""
+
+    tool_name: str
+    semantic_action: str
+    kind: CapabilityResolutionKind
+    reason: str
+    manifest_fingerprint: str | None = None
+
+
 class CapabilityExceptionStore(Protocol):
     def save(
         self,
@@ -59,6 +70,8 @@ class CapabilityExceptionStore(Protocol):
     def load(
         self, exception_id: str
     ) -> tuple[CapabilityExceptionRequest, CapabilityExceptionDecision] | None: ...
+
+    def save_request(self, exception: CapabilityExceptionRequest) -> None: ...
 
 
 class FileCapabilityExceptionStore:
@@ -78,6 +91,15 @@ class FileCapabilityExceptionStore:
                 indent=2,
             )
             + "\n",
+            encoding="utf-8",
+        )
+
+    def save_request(self, exception: CapabilityExceptionRequest) -> None:
+        """Persist a pending request before a human decision exists."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        path = self.root / f"{exception.exception_id.replace(':', '_')}.request.json"
+        path.write_text(
+            json.dumps({"exception": exception.to_data()}, indent=2) + "\n",
             encoding="utf-8",
         )
 
@@ -105,6 +127,11 @@ class CapabilityBroker:
         self.exception_store = exception_store
         self._decisions: dict[str, CapabilityExceptionDecision] = {}
         self._exceptions: dict[str, CapabilityExceptionRequest] = {}
+        self._decision_log: list[CapabilityDecision] = []
+
+    @property
+    def decision_log(self) -> tuple[CapabilityDecision, ...]:
+        return tuple(self._decision_log)
 
     def create_exception_request(
         self,
@@ -123,6 +150,12 @@ class CapabilityBroker:
             or request.semantic_action not in adapter.manifest.semantic_actions
         ):
             return None
+        effects_for = getattr(adapter, "effects_for", None)
+        effects = (
+            tuple(effects_for(context, request.arguments))
+            if callable(effects_for)
+            else adapter.manifest.effects
+        )
         if max_uses < 1:
             raise ValueError("max_uses must be positive")
         exception = CapabilityExceptionRequest(
@@ -132,13 +165,16 @@ class CapabilityBroker:
             semantic_action=request.semantic_action,
             arguments=dict(request.arguments),
             manifest_fingerprint=adapter.manifest.fingerprint(),
-            effects=adapter.manifest.effects,
+            effects=effects,
             reason=reason,
             created_at=utc_now().isoformat(),
             expires_at=expires_at,
             max_uses=max_uses,
         )
         self._exceptions[exception.exception_id] = exception
+        save_request = getattr(self.exception_store, "save_request", None)
+        if callable(save_request):
+            save_request(exception)
         return exception
 
     def decide_exception(
@@ -164,6 +200,19 @@ class CapabilityBroker:
             token,
         )
         self._decisions[exception.exception_id] = decision
+        self._decision_log.append(
+            CapabilityDecision(
+                exception.tool_name,
+                exception.semantic_action,
+                (
+                    CapabilityResolutionKind.EXECUTABLE
+                    if approved
+                    else CapabilityResolutionKind.DENIED
+                ),
+                "exception approved" if approved else "exception denied",
+                exception.manifest_fingerprint,
+            )
+        )
         if self.exception_store is not None:
             self.exception_store.save(exception, decision)
         return decision
@@ -173,7 +222,10 @@ class CapabilityBroker:
     ) -> CapabilityResolution:
         adapter = self.registry.get(request.tool_name)
         if adapter is None:
-            return CapabilityResolution(CapabilityResolutionKind.DENIED, "unknown tool")
+            return self._record(
+                request,
+                CapabilityResolution(CapabilityResolutionKind.DENIED, "unknown tool"),
+            )
         manifest = adapter.manifest
         effects_for = getattr(adapter, "effects_for", None)
         effective_effects = (
@@ -182,12 +234,21 @@ class CapabilityBroker:
             else frozenset(manifest.effects)
         )
         if request.semantic_action not in manifest.semantic_actions:
-            return CapabilityResolution(
-                CapabilityResolutionKind.DENIED, "action is not supported by tool"
+            return self._record(
+                request,
+                CapabilityResolution(
+                    CapabilityResolutionKind.DENIED, "action is not supported by tool"
+                ),
+                manifest.fingerprint(),
             )
         if request.semantic_action not in context.semantic_actions:
-            return CapabilityResolution(
-                CapabilityResolutionKind.DENIED, "action is not allowed in this step"
+            return self._record(
+                request,
+                CapabilityResolution(
+                    CapabilityResolutionKind.DENIED,
+                    "action is not allowed in this step",
+                ),
+                manifest.fingerprint(),
             )
         missing_effects = set(effective_effects) - set(context.allowed_effects)
         if missing_effects:
@@ -240,33 +301,68 @@ class CapabilityBroker:
                             decision.uses + 1,
                         )
                     )
-                    return CapabilityResolution(
-                        CapabilityResolutionKind.EXECUTABLE,
-                        "approved exception",
-                        adapter,
-                        request.arguments,
+                    return self._record(
+                        request,
+                        CapabilityResolution(
+                            CapabilityResolutionKind.EXECUTABLE,
+                            "approved exception",
+                            adapter,
+                            request.arguments,
+                            manifest.fingerprint(),
+                        ),
                         manifest.fingerprint(),
                     )
-            return CapabilityResolution(
-                kind, f"tool requires unavailable effects: {effects}"
+            return self._record(
+                request,
+                CapabilityResolution(
+                    kind, f"tool requires unavailable effects: {effects}"
+                ),
+                manifest.fingerprint(),
             )
         scope_error = _scope_error(context.worktree_root, request.arguments)
         if scope_error:
-            return CapabilityResolution(
-                CapabilityResolutionKind.CORRECTABLE, scope_error
+            return self._record(
+                request,
+                CapabilityResolution(CapabilityResolutionKind.CORRECTABLE, scope_error),
+                manifest.fingerprint(),
             )
         validation = adapter.validate(context, request.arguments)
         if not validation.valid:
-            return CapabilityResolution(
-                CapabilityResolutionKind.CORRECTABLE, "; ".join(validation.errors)
+            return self._record(
+                request,
+                CapabilityResolution(
+                    CapabilityResolutionKind.CORRECTABLE, "; ".join(validation.errors)
+                ),
+                manifest.fingerprint(),
             )
-        return CapabilityResolution(
-            CapabilityResolutionKind.EXECUTABLE,
-            "request satisfies manifest and step constraints",
-            adapter,
-            request.arguments,
+        return self._record(
+            request,
+            CapabilityResolution(
+                CapabilityResolutionKind.EXECUTABLE,
+                "request satisfies manifest and step constraints",
+                adapter,
+                request.arguments,
+                manifest.fingerprint(),
+            ),
             manifest.fingerprint(),
         )
+
+    def _record(
+        self,
+        request: CapabilityRequest,
+        resolution: CapabilityResolution,
+        fingerprint: str | None = None,
+    ) -> CapabilityResolution:
+        self._decision_log.append(
+            CapabilityDecision(
+                request.tool_name,
+                request.semantic_action,
+                resolution.kind,
+                resolution.reason,
+                fingerprint or resolution.manifest_fingerprint,
+            )
+        )
+        return resolution
 
     def invoke(
         self, context: ToolContext, request: CapabilityRequest

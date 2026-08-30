@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from powdrr_lift.core.action_relationship import (
     BUILTIN_ACTION_RELATIONSHIPS,
@@ -12,12 +13,16 @@ from powdrr_lift.core.action_relationship import (
     expand_action_relationships,
     validate_relationship_graph,
 )
-from powdrr_lift.core.execution_state import ExecutionObligation, ObligationStatus
+from powdrr_lift.core.execution_state import (
+    ExecutionObligation,
+    ExecutionState,
+    ObligationStatus,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class RelationshipExpansion:
-    obligations: tuple[RelationshipObligation, ...]
+    obligations: tuple[Any, ...]
     errors: tuple[str, ...] = ()
 
     @property
@@ -35,6 +40,47 @@ def expand_obligations(
         return RelationshipExpansion((), errors)
     return RelationshipExpansion(
         expand_action_relationships(facts, relationships=relationships)
+    )
+
+
+def expand_execution_obligations(
+    state: ExecutionState,
+    *,
+    action_instance_id: str,
+    action: str,
+    attributes: frozenset[str] = frozenset(),
+    relationships: tuple[ActionRelationship, ...] = BUILTIN_ACTION_RELATIONSHIPS,
+) -> RelationshipExpansion:
+    """Expand an action into durable, instance-bound obligations."""
+    _ = state
+    expansion = expand_obligations(
+        (ActionFact(action, attributes),), relationships=relationships
+    )
+    return RelationshipExpansion(
+        tuple(
+            ExecutionObligation(
+                obligation_id=f"{action_instance_id}:{item.obligation_id}",
+                description=item.description,
+                source_action_instance_id=action_instance_id,
+                required_action=item.required_action,
+                relationship_id=item.relationship_id,
+            )
+            for item in expansion.obligations
+        ),
+        expansion.errors,
+    )
+
+
+def satisfy_execution_obligation(
+    obligation: ExecutionObligation,
+    *,
+    action_instance_id: str,
+    action: str,
+) -> bool:
+    """Close an obligation only with its exact source action instance."""
+    return (
+        obligation.source_action_instance_id == action_instance_id
+        and obligation.required_action == action
     )
 
 

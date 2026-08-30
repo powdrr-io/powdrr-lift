@@ -30,8 +30,9 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
+from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
 from powdrr_lift.file_management import manage_worktree_file
-from powdrr_lift.intrinsic_enrich import ENRICH_TOOL, execute_enrich_tool
+from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
@@ -77,7 +78,6 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_action_for_step,
     _validate_workflow_action_outputs,
     _validate_workflow_handoff,
-    execute_intrinsic_git_gh_tool,
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
@@ -859,12 +859,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 verbose=self.config.verbose,
             )
         elif action.tool == ENRICH_TOOL:
-            result = execute_enrich_tool(action.parameters)
+            result = invoke_intrinsic_capability(
+                ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
+            )
         elif action.tool in {GIT_TOOL, GH_TOOL}:
-            result = execute_intrinsic_git_gh_tool(
-                action.tool,
-                action.parameters,
-                worktree_root=self.repo_root,
+            result = invoke_intrinsic_capability(
+                action.tool, action.parameters, worktree_root=self.repo_root
             )
             if result.get("stdout"):
                 print(str(result["stdout"]), end="", file=self.stdout)
@@ -2996,7 +2996,9 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     verbose=self.verbose,
                 )
             elif action.tool == ENRICH_TOOL:
-                result = execute_enrich_tool(action.parameters)
+                result = invoke_intrinsic_capability(
+                    ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
+                )
             elif action.tool == "fuzzy-match":
                 result = _execute_fuzzy_match_tool(
                     action.parameters, worktree_root=self.repo_root

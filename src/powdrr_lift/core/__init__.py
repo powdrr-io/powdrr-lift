@@ -32,6 +32,11 @@ from powdrr_lift.core.tool_manifest import (
     build_tool_manifest_validation_report,
     validate_tool_manifest,
 )
+from powdrr_lift.core.capability_exception import (
+    CapabilityExceptionAuthority,
+    CapabilityExceptionDecision,
+    CapabilityExceptionRequest,
+)
 from powdrr_lift.core.delivery_profile import (
     DELIVERY_PROFILE_SCHEMA_VERSION,
     SUPPORTED_ARTIFACT_TYPES,

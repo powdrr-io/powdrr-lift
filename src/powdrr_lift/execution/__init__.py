@@ -2,9 +2,11 @@
 
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
+    CapabilityExceptionStore,
     CapabilityRequest,
     CapabilityResolution,
     CapabilityResolutionKind,
+    FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.phases import (
     DEFAULT_PHASE_TRANSITIONS,
@@ -34,9 +36,11 @@ __all__ = [
     "PhaseTransitionDecision",
     "ShadowExecutionRecorder",
     "CapabilityBroker",
+    "CapabilityExceptionStore",
     "CapabilityRequest",
     "CapabilityResolution",
     "CapabilityResolutionKind",
+    "FileCapabilityExceptionStore",
     "ToolAdapter",
     "ToolContext",
     "ToolRegistry",

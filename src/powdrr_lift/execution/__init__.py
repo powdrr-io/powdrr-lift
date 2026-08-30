@@ -14,6 +14,13 @@ from powdrr_lift.execution.checkpoints import (
     DiagnosticResult,
     run_diagnostics,
 )
+from powdrr_lift.execution.evidence import (
+    EvidenceRequirement,
+    FindingDisposition,
+    ReadinessEvaluator,
+    ReadinessReport,
+    dispose_finding,
+)
 from powdrr_lift.execution.guidance import load_applicable_guidance
 from powdrr_lift.execution.kernel import (
     ActionKernel,
@@ -88,10 +95,15 @@ __all__ = [
     "CapabilityResolutionKind",
     "FileCapabilityExceptionStore",
     "DiagnosticResult",
+    "EvidenceRequirement",
+    "FindingDisposition",
     "ToolAdapter",
     "ToolContext",
     "ToolRegistry",
     "ToolResult",
     "ToolValidationReport",
     "run_diagnostics",
+    "ReadinessEvaluator",
+    "ReadinessReport",
+    "dispose_finding",
 ]

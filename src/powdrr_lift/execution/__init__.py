@@ -22,6 +22,14 @@ from powdrr_lift.execution.phases import (
     PhaseController,
     PhaseTransitionDecision,
 )
+from powdrr_lift.execution.relationships import (
+    RelationshipExpansion,
+    action_can_complete,
+    expand_obligations,
+    explain_obligation,
+    satisfy_obligation,
+    unresolved_obligations,
+)
 from powdrr_lift.execution.shadow import ShadowExecutionRecorder
 from powdrr_lift.execution.store import (
     ExecutionStateConflict,
@@ -51,6 +59,12 @@ __all__ = [
     "build_persona_packet",
     "validate_handoff",
     "load_applicable_guidance",
+    "RelationshipExpansion",
+    "action_can_complete",
+    "expand_obligations",
+    "explain_obligation",
+    "satisfy_obligation",
+    "unresolved_obligations",
     "CapabilityBroker",
     "CapabilityExceptionStore",
     "CapabilityRequest",

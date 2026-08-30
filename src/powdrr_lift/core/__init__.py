@@ -39,6 +39,14 @@ from powdrr_lift.core.behavior_rule import (
     nominate_behavior_rule,
     normalize_behavior_text,
 )
+from powdrr_lift.core.action_relationship import (
+    BUILTIN_ACTION_RELATIONSHIPS,
+    ActionFact,
+    ActionRelationship,
+    RelationshipObligation,
+    expand_action_relationships,
+    validate_relationship_graph,
+)
 from powdrr_lift.core.tool_manifest import (
     TOOL_MANIFEST_SCHEMA_VERSION,
     IdempotencyKind,

@@ -8,7 +8,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.spec_paths import PROPOSED_PR_SPECIFICATION_FILENAME
 
 _CONTEXT_TYPE_ALIASES: dict[str, str] = {
@@ -102,6 +101,8 @@ def gather_specification_context(
     filters: dict[str, object] | None = None,
     feature_id: str | None = None,
 ) -> GatherContextReport:
+    from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
+
     repo_root_path = _resolve_repo_root(repo_root)
     if feature_id is not None:
         feature_id = feature_id.strip()
@@ -158,6 +159,8 @@ def gather_specification_context(
 
 def proposed_pr_id_exists(repo_root: str | Path, proposed_pr_id: str) -> bool:
     """Resolve a proposed PR id using the same discovery as gather_context."""
+    from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
+
     repo_root_path = _resolve_repo_root(repo_root)
     normalized_id = proposed_pr_id.strip().casefold()
     if not normalized_id:

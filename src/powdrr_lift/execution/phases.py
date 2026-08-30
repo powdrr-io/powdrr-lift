@@ -48,6 +48,8 @@ class PhaseController:
         self,
         state: ExecutionState,
         target_phase: PhaseType,
+        *,
+        open_obligations: tuple[str, ...] = (),
     ) -> PhaseTransitionDecision:
         allowed_targets = self._transitions.get(state.current_phase, frozenset())
         if target_phase not in allowed_targets:
@@ -58,6 +60,24 @@ class PhaseController:
                 guards=(
                     f"Transition from {state.current_phase.value} to "
                     f"{target_phase.value} is not allowed.",
+                ),
+            )
+        if (
+            target_phase
+            in {
+                PhaseType.CONFIRM_READINESS,
+                PhaseType.PUBLISH_PR,
+                PhaseType.COMPLETE_FEATURE,
+            }
+            and open_obligations
+        ):
+            return PhaseTransitionDecision(
+                allowed=False,
+                current_phase=state.current_phase,
+                target_phase=target_phase,
+                guards=tuple(
+                    f"Open relationship obligation blocks transition: {item}"
+                    for item in open_obligations
                 ),
             )
         return PhaseTransitionDecision(

@@ -6,7 +6,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.change_log_template import _resolve_repo_root
 from powdrr_lift.core.code_index import CodeIndexStore, _current_branch
 from powdrr_lift.core.index import (
     ChangelogDocument,
@@ -17,6 +16,7 @@ from powdrr_lift.core.index import (
     _file_change_entity_ids,
     _normalize_entity_id,
 )
+from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 
 
 @dataclass(frozen=True, slots=True)

@@ -10,8 +10,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.core.template_generation import merge_existing_template_content
-
 
 @dataclass(frozen=True, slots=True)
 class BranchDiffEntry:
@@ -61,6 +59,8 @@ def create_change_log_template(
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> Path:
+    from powdrr_lift.core.template_generation import merge_existing_template_content
+
     repo_root_path = _resolve_repo_root(repo_root)
     resolved_branch_name = branch_name or _current_branch(repo_root_path)
     output_path = _resolve_output_path(repo_root_path, output_path)
@@ -104,6 +104,8 @@ def create_change_log_template_from_plan_diff(
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> Path:
+    from powdrr_lift.core.template_generation import merge_existing_template_content
+
     repo_root_path = _resolve_repo_root(repo_root)
     output_path = _resolve_output_path(repo_root_path, output_path)
     default_branch_name = default_branch or _resolve_default_branch(repo_root_path)

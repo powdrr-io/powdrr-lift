@@ -81,6 +81,28 @@ class ContentAddressedCheckpointStore:
             return None
         return (self.objects / checkpoint.state_ref).read_text(encoding="utf-8")
 
+    def garbage_collect(
+        self, referenced_checkpoint_ids: Iterable[str]
+    ) -> tuple[str, ...]:
+        """Remove unreferenced manifests and content objects safely."""
+        referenced = set(referenced_checkpoint_ids)
+        kept_objects: set[str] = set()
+        removed: list[str] = []
+        for manifest in self.manifests.glob("*.json"):
+            checkpoint_id = manifest.stem
+            if checkpoint_id in referenced:
+                checkpoint = self.load(checkpoint_id)
+                kept_objects.update(checkpoint.objects.values())
+                if checkpoint.state_ref is not None:
+                    kept_objects.add(checkpoint.state_ref)
+            else:
+                manifest.unlink()
+                removed.append(checkpoint_id)
+        for object_path in self.objects.iterdir() if self.objects.exists() else ():
+            if object_path.is_file() and object_path.name not in kept_objects:
+                object_path.unlink()
+        return tuple(sorted(removed))
+
     def restore(
         self, checkpoint: Checkpoint, workspace_root: str | Path | None = None
     ) -> None:

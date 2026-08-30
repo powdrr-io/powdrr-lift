@@ -1,7 +1,12 @@
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from powdrr_lift.core.tool_manifest import ToolEffect
-from powdrr_lift.execution.builtin_tools import builtin_tool_registry
+from powdrr_lift.execution.builtin_tools import (
+    builtin_tool_registry,
+    invoke_shell_capability,
+)
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityRequest,
@@ -43,3 +48,35 @@ def test_builtin_mutation_requires_the_declared_effect(tmp_path: Path) -> None:
         ),
     )
     assert result.kind is CapabilityResolutionKind.EXCEPTION_REQUIRED
+
+
+def test_shell_capability_requires_argv_and_scopes_cwd(tmp_path: Path) -> None:
+    seen: list[Mapping[str, Any]] = []
+
+    def execute(arguments: Mapping[str, Any]) -> dict[str, object]:
+        seen.append(arguments)
+        return {"returncode": 0}
+
+    result = invoke_shell_capability(
+        {"command": ["pytest"], "cwd": "tests"},
+        worktree_root=tmp_path,
+        executor=execute,
+    )
+    assert result == {"returncode": 0}
+    assert seen[0]["command"] == ["pytest"]
+
+
+def test_shell_capability_rejects_string_commands_and_escape(tmp_path: Path) -> None:
+    def execute(arguments: Mapping[str, Any]) -> object:
+        raise AssertionError("invalid process must not execute")
+
+    for arguments in (
+        {"command": "pytest ; touch escaped"},
+        {"command": ["pytest"], "cwd": "../outside"},
+    ):
+        try:
+            invoke_shell_capability(arguments, worktree_root=tmp_path, executor=execute)
+        except ValueError as error:
+            assert "not executable" in str(error)
+        else:
+            raise AssertionError("invalid process should fail")

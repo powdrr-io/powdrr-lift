@@ -76,6 +76,30 @@ def test_exception_requires_execution_context(tmp_path: Path) -> None:
     )
 
 
+def test_file_store_lists_pending_requests_and_decision_packet(tmp_path: Path) -> None:
+    from powdrr_lift.execution.capabilities import FileCapabilityExceptionStore
+
+    store = FileCapabilityExceptionStore(tmp_path)
+    broker = CapabilityBroker(
+        ToolRegistry([WriteTool()]),
+        CapabilityExceptionAuthority(b"secret"),
+        store,
+    )
+    context = ToolContext(
+        tmp_path, tmp_path, frozenset({"edit"}), frozenset(), execution_id="run-3"
+    )
+    request = broker.create_exception_request(
+        context,
+        CapabilityRequest("write-file", "edit", {"path": "one.txt"}),
+        "needs review",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    assert request is not None
+    pending = store.pending()
+    assert [item.exception_id for item in pending] == [request.exception_id]
+    assert pending[0].decision_packet()["arguments"] == {"path": "one.txt"}
+
+
 def test_pending_and_denied_exception_decisions_are_durable(tmp_path: Path) -> None:
     store = FileCapabilityExceptionStore(tmp_path)
     broker = CapabilityBroker(

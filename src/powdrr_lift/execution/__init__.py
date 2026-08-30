@@ -14,6 +14,11 @@ from powdrr_lift.execution.checkpoints import (
     DiagnosticResult,
     run_diagnostics,
 )
+from powdrr_lift.execution.compaction import (
+    compact_execution_context,
+    compatibility_diagnostic,
+)
+from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import (
     EvidenceRequirement,
     FindingDisposition,
@@ -108,6 +113,9 @@ __all__ = [
     "ReadinessEvaluator",
     "ReadinessReport",
     "dispose_finding",
+    "compile_execution_plan",
+    "compatibility_diagnostic",
+    "compact_execution_context",
     "evaluate_review_agreement",
     "invalidate_evidence",
 ]

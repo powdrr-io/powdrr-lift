@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, TypeVar, cast
 
+from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.workflow_execution import (
     ProgressDecision,
     WorkflowExecutionController,
@@ -51,8 +52,21 @@ class WorkflowLLMExecutionAborted(RuntimeError):
 class PowdrrExecutionError(RuntimeError):
     """An action failed in Powdrr and should be corrected by the agent."""
 
-    def __init__(self, message: str, *, cause_error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "action_error",
+        action_kind: str | None = None,
+        remediation: str | None = None,
+        details: Mapping[str, str] | None = None,
+        cause_error: Exception | None = None,
+    ) -> None:
         super().__init__(message)
+        self.error_code = error_code
+        self.action_kind = action_kind
+        self.remediation = remediation
+        self.details = dict(details or {})
         self.cause_error = cause_error
 
 
@@ -390,6 +404,7 @@ class WorkflowStepRunner:
         )
         self.observer = observer
         self.shadow_recorder = shadow_recorder
+        self.kernel = ActionKernel()
 
     def run(
         self,
@@ -432,6 +447,7 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            self.kernel.propose(action)
             self._record_shadow("action_proposed", action)
             proposal_decision = None
             if self.observer is not None:
@@ -449,8 +465,10 @@ class WorkflowStepRunner:
                     continue
             before_state = strategy.material_state(action)
             try:
+                self.kernel.start(action)
                 outcome = strategy.execute_action(action)
             except PowdrrExecutionError as exc:
+                self.kernel.fail(action, exc)
                 self._record_shadow(
                     "action_failed", action, error_code=type(exc).__name__
                 )
@@ -475,6 +493,7 @@ class WorkflowStepRunner:
                     return strategy.action_failure_exit_code(action)
                 continue
 
+            self.kernel.complete(action)
             self._record_shadow("action_completed", action)
 
             observation = self.action_engine.observe_action(

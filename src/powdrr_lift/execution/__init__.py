@@ -9,6 +9,11 @@ from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.guidance import load_applicable_guidance
+from powdrr_lift.execution.kernel import (
+    ActionKernel,
+    ActionLifecycleEvent,
+    ActionLifecyclePhase,
+)
 from powdrr_lift.execution.personas import (
     HandoffValidation,
     PersonaPacket,
@@ -59,6 +64,9 @@ __all__ = [
     "build_persona_packet",
     "validate_handoff",
     "load_applicable_guidance",
+    "ActionKernel",
+    "ActionLifecycleEvent",
+    "ActionLifecyclePhase",
     "RelationshipExpansion",
     "action_can_complete",
     "expand_obligations",

@@ -358,12 +358,12 @@ class WorkflowExecutionObserver(Protocol):
     ) -> Any: ...
 
 
-class WorkflowLLMExecutionDriver:
-    """Run workflow action roundtrips through one shared control loop.
+class WorkflowStepRunner:
+    """Run workflow steps through one shared control loop.
 
     This is deliberately the only loop that combines an LLM response with
-    action execution.  Chat and durable-task adapters cannot independently
-    drift in parsing, corrective-action thresholds, or no-progress behavior.
+    step execution. Chat and durable-task adapters cannot independently drift
+    in parsing, corrective-action thresholds, or no-progress behavior.
     """
 
     def __init__(
@@ -497,6 +497,11 @@ class WorkflowLLMExecutionDriver:
             if not outcome.continue_running:
                 return 0
         return strategy.exhausted_roundtrips_exit_code()
+
+
+# Compatibility for callers that used the original implementation name. New
+# workflow code should depend on the mode-independent step-runner name.
+WorkflowLLMExecutionDriver = WorkflowStepRunner
 
 
 class WorkflowLLMActionEngine:

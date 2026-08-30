@@ -100,8 +100,8 @@ from powdrr_lift.workflow_llm import (
     WorkflowExecutionStrategy,
     WorkflowLLMClient,
     WorkflowLLMExecutionAborted,
-    WorkflowLLMExecutionDriver,
     WorkflowLLMHTTPError,
+    WorkflowStepRunner,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_failure_signature,
@@ -852,7 +852,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     provider_role: LLMProviderRole
     current_model: str
     provider: str
-    driver: WorkflowLLMExecutionDriver
+    driver: WorkflowStepRunner
     skill_stack: list[_SkillExecutionFrame] = field(default_factory=list)
     completed_dependencies: set[tuple[str, int, str]] = field(default_factory=set)
     last_failed_action: SkillChatAction | None = None
@@ -2714,9 +2714,7 @@ def run_workflow_chat(
         handoff_records=_workflow_context_handoff_records(workflow_context),
         file_added_callback=file_added_callback,
     )
-    driver = WorkflowLLMExecutionDriver(
-        max_stalled_roundtrips=config.max_stalled_roundtrips
-    )
+    driver = WorkflowStepRunner(max_stalled_roundtrips=config.max_stalled_roundtrips)
     execution_strategy = _ChatWorkflowExecutionStrategy(
         config=config,
         selection=selection,

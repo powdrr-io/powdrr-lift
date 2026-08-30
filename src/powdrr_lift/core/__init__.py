@@ -31,6 +31,14 @@ from powdrr_lift.core.execution_plan import (
     PlanEvaluation,
     evaluate_execution_plan,
 )
+from powdrr_lift.core.behavior_rule import (
+    BEHAVIOR_RULE_SCHEMA_VERSION,
+    BehaviorRule,
+    FileBehaviorRuleStore,
+    applicable_behavior_rules,
+    nominate_behavior_rule,
+    normalize_behavior_text,
+)
 from powdrr_lift.core.tool_manifest import (
     TOOL_MANIFEST_SCHEMA_VERSION,
     IdempotencyKind,

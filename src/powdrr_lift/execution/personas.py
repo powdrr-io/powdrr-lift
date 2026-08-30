@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
+from powdrr_lift.core.behavior_rule import BehaviorRule
 from powdrr_lift.core.delivery_profile import (
     DeliveryProfile,
     PersonaDefinition,
@@ -40,9 +41,14 @@ class PersonaPacket:
     allowed_actions: frozenset[str]
     allowed_effects: frozenset[ToolEffect]
     input_artifact_ids: tuple[str, ...] = ()
+    guidance_rules: tuple[BehaviorRule, ...] = ()
 
     def prompt_catalog(self) -> tuple[str, ...]:
-        return (self.responsibility, self.posture)
+        return (
+            self.responsibility,
+            self.posture,
+            *(rule.text for rule in self.guidance_rules),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +78,7 @@ def build_persona_packet(
     persona_actions: Mapping[str, frozenset[str]],
     allowed_effects: frozenset[ToolEffect],
     input_artifact_ids: tuple[str, ...] = (),
+    guidance_rules: tuple[BehaviorRule, ...] = (),
 ) -> PersonaPacket:
     phase = next(
         (item for item in profile.phases if item.phase_type is phase_type), None
@@ -97,6 +104,7 @@ def build_persona_packet(
         actions,
         allowed_effects,
         input_artifact_ids,
+        guidance_rules,
     )
 
 

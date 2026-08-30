@@ -8,6 +8,7 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolutionKind,
     FileCapabilityExceptionStore,
 )
+from powdrr_lift.execution.guidance import load_applicable_guidance
 from powdrr_lift.execution.personas import (
     HandoffValidation,
     PersonaPacket,
@@ -49,6 +50,7 @@ __all__ = [
     "ShadowExecutionRecorder",
     "build_persona_packet",
     "validate_handoff",
+    "load_applicable_guidance",
     "CapabilityBroker",
     "CapabilityExceptionStore",
     "CapabilityRequest",

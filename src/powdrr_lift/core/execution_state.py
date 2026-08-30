@@ -42,6 +42,7 @@ class ExecutionEventType(StrEnum):
     FINDING_DISPOSED = "finding_disposed"
     CHECKPOINT_CREATED = "checkpoint_created"
     CHECKPOINT_REVERTED = "checkpoint_reverted"
+    CAPABILITY_DECISION = "capability_decision"
 
 
 class ActionStatus(StrEnum):
@@ -119,6 +120,8 @@ class ExecutionObligation:
     description: str
     status: ObligationStatus = ObligationStatus.OPEN
     source_action_instance_id: str | None = None
+    required_action: str | None = None
+    relationship_id: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -128,6 +131,10 @@ class ExecutionObligation:
         }
         if self.source_action_instance_id is not None:
             data["source_action_instance_id"] = self.source_action_instance_id
+        if self.required_action is not None:
+            data["required_action"] = self.required_action
+        if self.relationship_id is not None:
+            data["relationship_id"] = self.relationship_id
         return data
 
 
@@ -404,6 +411,7 @@ def reduce_execution_event(
         ExecutionEventType.CREATED,
         ExecutionEventType.CHECKPOINT_CREATED,
         ExecutionEventType.CHECKPOINT_REVERTED,
+        ExecutionEventType.CAPABILITY_DECISION,
     }:
         next_state = state
 
@@ -549,6 +557,8 @@ def _parse_obligation(data: Mapping[str, Any]) -> ExecutionObligation:
         source_action_instance_id=_optional_string(
             data.get("source_action_instance_id")
         ),
+        required_action=_optional_string(data.get("required_action")),
+        relationship_id=_optional_string(data.get("relationship_id")),
     )
 
 

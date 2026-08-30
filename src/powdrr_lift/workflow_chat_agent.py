@@ -69,6 +69,7 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
+from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.intrinsic_edit import (
@@ -77,11 +78,11 @@ from powdrr_lift.intrinsic_edit import (
     execute_apply_edit_tool,
     execute_validate_edit_tool,
 )
-from powdrr_lift.intrinsic_enrich import ENRICH_TOOL, execute_enrich_tool
+from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import (
     GH_TOOL,
     GIT_TOOL,
-    execute_intrinsic_git_gh_tool,
+    execute_intrinsic_git_gh_tool,  # noqa: F401 - compatibility monkeypatch seam
     intrinsic_command,
 )
 from powdrr_lift.pr_workflow_record import (
@@ -4045,7 +4046,9 @@ def _run_deterministic_pre_step(
         if tool == ENRICH_TOOL:
             parameters.pop("tool", None)
             _wire_previous_tool_output(parameters, execution_events, handoff_records)
-            result = execute_enrich_tool(parameters)
+            result = invoke_intrinsic_capability(
+                ENRICH_TOOL, parameters, worktree_root=worktree_root
+            )
         elif tool == VALIDATE_EDIT_TOOL:
             parameters.pop("tool", None)
             result = execute_validate_edit_tool(parameters, worktree_root=worktree_root)
@@ -4069,10 +4072,8 @@ def _run_deterministic_pre_step(
                 announce=False,
             )
         elif tool in {GIT_TOOL, GH_TOOL}:
-            result = execute_intrinsic_git_gh_tool(
-                tool,
-                parameters,
-                worktree_root=worktree_root,
+            result = invoke_intrinsic_capability(
+                tool, parameters, worktree_root=worktree_root
             )
         elif is_basedpyright_tool(tool):
             result = execute_basedpyright_tool(
@@ -5675,7 +5676,9 @@ def _handle_workflow_action_invoke_tool(
             path_cache=state.fuzzy_match_cache,
         )
     elif action.tool == ENRICH_TOOL:
-        tool_result = execute_enrich_tool(action.parameters)
+        tool_result = invoke_intrinsic_capability(
+            ENRICH_TOOL, action.parameters, worktree_root=state.worktree_root
+        )
     elif action.tool == VALIDATE_EDIT_TOOL:
         tool_result = execute_validate_edit_tool(
             action.parameters, worktree_root=state.worktree_root
@@ -5705,10 +5708,8 @@ def _handle_workflow_action_invoke_tool(
             ),
         )
     elif action.tool in {GIT_TOOL, GH_TOOL}:
-        tool_result = execute_intrinsic_git_gh_tool(
-            action.tool,
-            action.parameters,
-            worktree_root=state.worktree_root,
+        tool_result = invoke_intrinsic_capability(
+            action.tool, action.parameters, worktree_root=state.worktree_root
         )
         if tool_result.get("stdout"):
             print(str(tool_result["stdout"]), end="", file=stdout)

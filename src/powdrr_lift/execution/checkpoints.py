@@ -16,12 +16,14 @@ class Checkpoint:
     checkpoint_id: str
     workspace_root: str
     objects: Mapping[str, str]
+    state_ref: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
             "checkpoint_id": self.checkpoint_id,
             "workspace_root": self.workspace_root,
             "objects": dict(self.objects),
+            **({"state_ref": self.state_ref} if self.state_ref is not None else {}),
         }
 
 
@@ -31,7 +33,13 @@ class ContentAddressedCheckpointStore:
         self.objects = self.root / "objects"
         self.manifests = self.root / "manifests"
 
-    def create(self, workspace_root: str | Path, checkpoint_id: str) -> Checkpoint:
+    def create(
+        self,
+        workspace_root: str | Path,
+        checkpoint_id: str,
+        *,
+        state_json: str | None = None,
+    ) -> Checkpoint:
         workspace = Path(workspace_root).resolve()
         objects: dict[str, str] = {}
         for path in _workspace_files(workspace):
@@ -42,7 +50,14 @@ class ContentAddressedCheckpointStore:
             if not object_path.exists():
                 object_path.write_bytes(content)
             objects[str(path.relative_to(workspace))] = digest
-        checkpoint = Checkpoint(checkpoint_id, str(workspace), objects)
+        state_ref = None
+        if state_json is not None:
+            state_ref = hashlib.sha256(state_json.encode("utf-8")).hexdigest()
+            state_path = self.objects / state_ref
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            if not state_path.exists():
+                state_path.write_text(state_json, encoding="utf-8")
+        checkpoint = Checkpoint(checkpoint_id, str(workspace), objects, state_ref)
         self.manifests.mkdir(parents=True, exist_ok=True)
         (self.manifests / f"{checkpoint_id}.json").write_text(
             json.dumps(checkpoint.to_data(), indent=2) + "\n", encoding="utf-8"
@@ -54,8 +69,17 @@ class ContentAddressedCheckpointStore:
             (self.manifests / f"{checkpoint_id}.json").read_text(encoding="utf-8")
         )
         return Checkpoint(
-            data["checkpoint_id"], data["workspace_root"], data["objects"]
+            data["checkpoint_id"],
+            data["workspace_root"],
+            data["objects"],
+            data.get("state_ref"),
         )
+
+    def load_state_json(self, checkpoint: Checkpoint) -> str | None:
+        """Return the logical execution snapshot captured with a checkpoint."""
+        if checkpoint.state_ref is None:
+            return None
+        return (self.objects / checkpoint.state_ref).read_text(encoding="utf-8")
 
     def restore(
         self, checkpoint: Checkpoint, workspace_root: str | Path | None = None

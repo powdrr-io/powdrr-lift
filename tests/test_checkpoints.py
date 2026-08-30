@@ -21,6 +21,14 @@ def test_checkpoint_restores_exact_workspace_and_reuses_objects(tmp_path: Path) 
     assert checkpoint.objects
 
 
+def test_checkpoint_can_capture_logical_execution_state(tmp_path: Path) -> None:
+    store = ContentAddressedCheckpointStore(tmp_path / "checkpoints")
+    checkpoint = store.create(tmp_path, "with-state", state_json='{"version": 3}')
+    loaded = store.load("with-state")
+    assert loaded.state_ref == checkpoint.state_ref
+    assert store.load_state_json(loaded) == '{"version": 3}'
+
+
 def test_diagnostics_are_bounded_and_failures_are_evidence(tmp_path: Path) -> None:
     def long(root: Path) -> str:
         return "x" * 20

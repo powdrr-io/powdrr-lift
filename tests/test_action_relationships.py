@@ -4,10 +4,13 @@ from powdrr_lift.core.action_relationship import (
     expand_action_relationships,
     validate_relationship_graph,
 )
+from powdrr_lift.core.execution_state import initial_execution_state
 from powdrr_lift.execution.relationships import (
     action_can_complete,
+    expand_execution_obligations,
     expand_obligations,
     explain_obligation,
+    satisfy_execution_obligation,
     satisfy_obligation,
 )
 
@@ -58,3 +61,28 @@ def test_relationships_are_deduplicated_and_cycles_rejected() -> None:
     )
     assert validate_relationship_graph(cycle)
     assert not expand_obligations(facts, relationships=cycle).valid
+
+
+def test_execution_obligations_are_bound_to_the_source_instance() -> None:
+    expansion = expand_execution_obligations(
+        initial_execution_state("run-1", profile_id="default"),
+        action_instance_id="action-7",
+        action="change_mutable_row",
+    )
+    obligation = expansion.obligations[0]
+    assert obligation.source_action_instance_id == "action-7"
+    assert obligation.required_action in {
+        "add_optimistic_lock",
+        "run_concurrency_test",
+    }
+    assert obligation.relationship_id
+    assert satisfy_execution_obligation(
+        obligation,
+        action_instance_id="action-7",
+        action=obligation.required_action,
+    )
+    assert not satisfy_execution_obligation(
+        obligation,
+        action_instance_id="action-8",
+        action=obligation.required_action,
+    )

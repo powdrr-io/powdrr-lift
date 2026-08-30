@@ -68,6 +68,7 @@ from powdrr_lift.core import (
     validate_workflow_task_directory,
     validate_workflow_template_json,
 )
+from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
@@ -90,6 +91,11 @@ from powdrr_lift.core.workflow_template_specification import (
     instantiated_workflow_relationships,
     load_workflow_template,
 )
+from powdrr_lift.execution.capabilities import (
+    CapabilityBroker,
+    FileCapabilityExceptionStore,
+)
+from powdrr_lift.execution.tools import ToolRegistry
 from powdrr_lift.openai_proxy import (
     OpenAIProxyConfig,
     default_openai_proxy_log_dir,
@@ -1466,6 +1472,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     process_human_task_parser.set_defaults(func=_run_process_human_task)
 
+    exceptions_parser = subparsers.add_parser(
+        "execution-exceptions",
+        aliases=["execution_exceptions"],
+        help="Inspect or decide pending capability exception requests.",
+    )
+    exceptions_parser.add_argument("--workflow-dir", type=Path, required=True)
+    exceptions_parser.add_argument("--exception-id")
+    exceptions_parser.add_argument(
+        "--decision", choices=["approve", "deny"], help="Decision to record."
+    )
+    exceptions_parser.add_argument("--decided-by", default="human")
+    exceptions_parser.add_argument("--json", action="store_true")
+    exceptions_parser.set_defaults(func=_run_execution_exceptions)
+
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
         aliases=["workflow_recovery"],
@@ -1759,6 +1779,43 @@ def _run_process_human_task(args: argparse.Namespace) -> int:
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
+
+
+def _run_execution_exceptions(args: argparse.Namespace) -> int:
+    """Inspect or decide durable capability exception requests."""
+    store = FileCapabilityExceptionStore(args.workflow_dir)
+    if args.decision and not args.exception_id:
+        print("--exception-id is required with --decision", file=sys.stderr)
+        return 2
+    if args.decision:
+        request = store.load_request(args.exception_id)
+        if request is None:
+            print(f"Unknown pending exception: {args.exception_id}", file=sys.stderr)
+            return 1
+        secret = os.environ.get("POWDRR_CAPABILITY_SECRET")
+        if not secret:
+            print(
+                "POWDRR_CAPABILITY_SECRET is required to decide exceptions",
+                file=sys.stderr,
+            )
+            return 2
+        broker = CapabilityBroker(
+            ToolRegistry(), CapabilityExceptionAuthority(secret.encode("utf-8")), store
+        )
+        decision = broker.decide_exception(
+            request, approved=args.decision == "approve", decided_by=args.decided_by
+        )
+        payload: object = decision.to_data()
+    elif args.exception_id:
+        request = store.load_request(args.exception_id)
+        if request is None:
+            print(f"Unknown exception: {args.exception_id}", file=sys.stderr)
+            return 1
+        payload = request.decision_packet()
+    else:
+        payload = [request.decision_packet() for request in store.pending()]
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    return 0
 
 
 def _run_workflow_recovery(args: argparse.Namespace) -> int:

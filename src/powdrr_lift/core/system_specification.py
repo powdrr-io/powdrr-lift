@@ -9,7 +9,7 @@ from typing import Any, cast
 import yaml
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
-from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.spec_paths import (
     SPECIFICATION_SCHEMA_URL,
     system_specification_path,

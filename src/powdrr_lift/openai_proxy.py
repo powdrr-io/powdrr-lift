@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import SplitResult, urlsplit
 
-from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 
 _HOP_BY_HOP_HEADERS = {
     "connection",

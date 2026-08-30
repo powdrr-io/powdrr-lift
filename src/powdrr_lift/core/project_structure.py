@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.change_log_template import _resolve_repo_root
+from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.specification_v1 import (
     normalize_specification_v1_file,
     validate_module_tool_sections,

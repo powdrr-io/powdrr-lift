@@ -20,6 +20,8 @@ from powdrr_lift.execution.evidence import (
     ReadinessEvaluator,
     ReadinessReport,
     dispose_finding,
+    evaluate_review_agreement,
+    invalidate_evidence,
 )
 from powdrr_lift.execution.guidance import load_applicable_guidance
 from powdrr_lift.execution.kernel import (
@@ -106,4 +108,6 @@ __all__ = [
     "ReadinessEvaluator",
     "ReadinessReport",
     "dispose_finding",
+    "evaluate_review_agreement",
+    "invalidate_evidence",
 ]

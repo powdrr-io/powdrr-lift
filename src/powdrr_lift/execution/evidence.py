@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from powdrr_lift.core.execution_state import (
+    ExecutionEvidence,
     ExecutionFinding,
     ExecutionState,
     FindingStatus,
@@ -79,6 +80,7 @@ class FindingDisposition:
     finding: ExecutionFinding
     previous_status: FindingStatus
     actor_id: str
+    evidence_ids: tuple[str, ...] = ()
 
 
 def dispose_finding(
@@ -86,7 +88,64 @@ def dispose_finding(
     *,
     status: FindingStatus,
     actor_id: str,
+    supporting_evidence: tuple[ExecutionEvidence, ...] = (),
 ) -> FindingDisposition:
-    if status in {FindingStatus.OPEN, FindingStatus.ACCEPTED}:
-        raise ValueError("A finding disposition must be a terminal disposition.")
-    return FindingDisposition(replace(finding, status=status), finding.status, actor_id)
+    if status is FindingStatus.OPEN:
+        raise ValueError("A finding disposition must be terminal or accepted.")
+    if status in {
+        FindingStatus.FIXED,
+        FindingStatus.NOT_APPLICABLE,
+        FindingStatus.ACCEPTED,
+    } and not any(
+        evidence.successful and evidence.fresh for evidence in supporting_evidence
+    ):
+        raise ValueError("This finding disposition requires fresh successful evidence.")
+    return FindingDisposition(
+        replace(finding, status=status),
+        finding.status,
+        actor_id,
+        tuple(evidence.evidence_id for evidence in supporting_evidence),
+    )
+
+
+def invalidate_evidence(
+    state: ExecutionState, changed_input_fingerprints: frozenset[str]
+) -> ExecutionState:
+    """Invalidate only evidence whose exact input fingerprint changed."""
+
+    return replace(
+        state,
+        evidence=tuple(
+            replace(evidence, fresh=False)
+            if evidence.input_fingerprint in changed_input_fingerprints
+            else evidence
+            for evidence in state.evidence
+        ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewAgreement:
+    independent_reviewers: int
+    agreeing_reviewers: int
+    disagreement_reasons: tuple[str, ...] = ()
+
+    @property
+    def sufficient(self) -> bool:
+        return self.independent_reviewers > 0 and not self.disagreement_reasons
+
+
+def evaluate_review_agreement(
+    reviewer_findings: tuple[tuple[str, tuple[str, ...]], ...],
+) -> ReviewAgreement:
+    """Compare normalized finding signatures from independent reviewers."""
+
+    if not reviewer_findings:
+        return ReviewAgreement(0, 0, ("no independent reviewer findings",))
+    signatures = {tuple(sorted(findings)) for _, findings in reviewer_findings}
+    reasons = () if len(signatures) == 1 else ("independent reviewers disagree",)
+    return ReviewAgreement(
+        len(reviewer_findings),
+        len(reviewer_findings) if not reasons else 0,
+        reasons,
+    )

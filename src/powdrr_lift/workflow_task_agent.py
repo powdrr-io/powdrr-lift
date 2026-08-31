@@ -3082,11 +3082,21 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.execution_context.extend(nested_context)
             return WorkflowActionOutcome()
         if action.kind == "gather_context":
-            report = gather_specification_context(
-                self.repo_root,
-                types=list(action.types),
-                feature_id=action.feature_id,
-                keywords=list(action.keywords),
+            report = invoke_repository_read(
+                "gather_context",
+                {
+                    "types": list(action.types),
+                    "feature_id": action.feature_id,
+                    "keywords": list(action.keywords),
+                },
+                worktree_root=self.repo_root,
+                executor=lambda _arguments: gather_specification_context(
+                    self.repo_root,
+                    types=list(action.types),
+                    feature_id=action.feature_id,
+                    keywords=list(action.keywords),
+                ),
+                runtime=self.runtime,
             )
             self.execution_events.append(
                 {

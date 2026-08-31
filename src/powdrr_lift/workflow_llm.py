@@ -433,6 +433,7 @@ class WorkflowStepRunner:
                 request = replace(
                     request,
                     messages=[
+                        *request.messages,
                         {
                             "role": "system",
                             "content": (
@@ -441,7 +442,6 @@ class WorkflowStepRunner:
                                 + json.dumps(compacted, ensure_ascii=False)
                             ),
                         },
-                        *request.messages,
                     ],
                 )
             try:

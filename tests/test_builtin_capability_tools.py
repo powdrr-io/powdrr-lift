@@ -8,6 +8,7 @@ from powdrr_lift.core.tool_manifest import ToolEffect
 from powdrr_lift.execution.builtin_tools import (
     BasedPyrightAdapter,
     FuzzyMatchAdapter,
+    RepositoryReadAdapter,
     builtin_tool_registry,
     invoke_file_mutation,
     invoke_shell_capability,
@@ -158,3 +159,26 @@ def test_fuzzy_match_capability_requires_a_structured_command(tmp_path: Path) ->
     assert adapter.validate(context, {"command": ["fuzzy-match", "."]}).valid
     assert not adapter.validate(context, {"command": []}).valid
     assert not adapter.validate(context, {"command": ""}).valid
+
+
+def test_repository_read_capability_bounds_paths_and_ranges(tmp_path: Path) -> None:
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"read_document"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    adapter = RepositoryReadAdapter("read_document", lambda _arguments: None)
+
+    assert adapter.validate(
+        context,
+        {"file_path": "README.md", "start_line": 1, "end_line": 20},
+    ).valid
+    assert not adapter.validate(
+        context,
+        {"file_path": "../README.md", "start_line": 1, "end_line": 20},
+    ).valid
+    assert not adapter.validate(
+        context,
+        {"file_path": "README.md", "start_line": 1, "end_line": 2001},
+    ).valid

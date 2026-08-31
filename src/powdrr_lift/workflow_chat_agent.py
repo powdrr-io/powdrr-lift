@@ -74,6 +74,7 @@ from powdrr_lift.execution.builtin_tools import (
     invoke_file_mutation,
     invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
+    invoke_repository_read,
     invoke_shell_capability,
 )
 from powdrr_lift.file_management import manage_worktree_file
@@ -5588,11 +5589,20 @@ def _handle_workflow_action_list_files(
 ) -> bool:
     _ = (stdout, input_func)
     directory = action.directory or "."
-    result = _list_worktree_files(
-        directory,
-        action.pattern,
-        action.recursive,
-        state.worktree_root,
+    result = invoke_repository_read(
+        "list_files",
+        {
+            "directory": directory,
+            "pattern": action.pattern,
+            "recursive": action.recursive,
+        },
+        worktree_root=state.worktree_root,
+        executor=lambda _arguments: _list_worktree_files(
+            directory,
+            action.pattern,
+            action.recursive,
+            state.worktree_root,
+        ),
     )
     action_data = {
         "kind": action.kind,

@@ -34,6 +34,7 @@ from powdrr_lift.execution.builtin_tools import (
     invoke_file_mutation,
     invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
+    invoke_repository_read,
     invoke_shell_capability,
 )
 from powdrr_lift.file_management import manage_worktree_file
@@ -618,7 +619,18 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.events.append(
                 {
                     "kind": action.kind,
-                    "result": _read_task_document(action, self.repo_root),
+                    "result": invoke_repository_read(
+                        "read_document",
+                        {
+                            "file_path": action.file_path,
+                            "start_line": action.start_line,
+                            "end_line": action.end_line,
+                        },
+                        worktree_root=self.repo_root,
+                        executor=lambda _arguments: _read_task_document(
+                            action, self.repo_root
+                        ),
+                    ),
                 }
             )
             return WorkflowActionOutcome()
@@ -626,11 +638,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.events.append(
                 {
                     "kind": action.kind,
-                    "result": _list_worktree_files(
-                        action.directory or ".",
-                        action.pattern,
-                        action.recursive,
-                        self.repo_root,
+                    "result": invoke_repository_read(
+                        "list_files",
+                        {
+                            "directory": action.directory or ".",
+                            "pattern": action.pattern,
+                            "recursive": action.recursive,
+                        },
+                        worktree_root=self.repo_root,
+                        executor=lambda _arguments: _list_worktree_files(
+                            action.directory or ".",
+                            action.pattern,
+                            action.recursive,
+                            self.repo_root,
+                        ),
                     ),
                 }
             )
@@ -2988,7 +3009,18 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": _read_task_document(action, self.repo_root),
+                    "result": invoke_repository_read(
+                        "read_document",
+                        {
+                            "file_path": action.file_path,
+                            "start_line": action.start_line,
+                            "end_line": action.end_line,
+                        },
+                        worktree_root=self.repo_root,
+                        executor=lambda _arguments: _read_task_document(
+                            action, self.repo_root
+                        ),
+                    ),
                 }
             )
             _record_task_action_outputs(

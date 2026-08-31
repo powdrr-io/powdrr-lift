@@ -404,6 +404,87 @@ def invoke_fuzzy_match_capability(
     raise ValueError(f"Fuzzy-match capability was not executable: {result.reason}")
 
 
+class RepositoryReadAdapter:
+    """Adapter for bounded, read-only repository discovery operations."""
+
+    def __init__(
+        self, operation: str, executor: Callable[[Mapping[str, Any]], Any]
+    ) -> None:
+        self._operation = operation
+        self._executor = executor
+        self.manifest = ToolManifest(
+            f"repository-{operation}",
+            (operation,),
+            (ToolEffect.WORKSPACE_READ,),
+            scope="worktree",
+            sandbox_profile="workspace-read",
+            reversible=True,
+        )
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        path_value = arguments.get("file_path", arguments.get("directory", "."))
+        if not isinstance(path_value, str) or not path_value.strip():
+            return ToolValidationReport((f"{self._operation} path must be non-empty",))
+        path = Path(path_value)
+        if path.is_absolute():
+            return ToolValidationReport((f"{self._operation} path must be relative",))
+        root = context.worktree_root.resolve()
+        try:
+            (root / path).resolve().relative_to(root)
+        except ValueError:
+            return ToolValidationReport((f"{self._operation} path escapes worktree",))
+        if self._operation == "read_document":
+            start_line = arguments.get("start_line")
+            end_line = arguments.get("end_line")
+            if (
+                isinstance(start_line, bool)
+                or not isinstance(start_line, int)
+                or isinstance(end_line, bool)
+                or not isinstance(end_line, int)
+                or start_line < 1
+                or end_line < start_line
+                or end_line - start_line + 1 > 2000
+            ):
+                return ToolValidationReport(
+                    ("read_document requires a valid range of at most 2000 lines",)
+                )
+        elif not isinstance(arguments.get("recursive", False), bool):
+            return ToolValidationReport(("list_files recursive must be a boolean",))
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        return ToolResult(
+            self._executor(arguments),
+            frozenset({ToolEffect.WORKSPACE_READ}),
+        )
+
+
+def invoke_repository_read(
+    operation: str,
+    arguments: Mapping[str, Any],
+    *,
+    worktree_root: Path,
+    executor: Callable[[Mapping[str, Any]], Any],
+) -> Any:
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset({operation}),
+        allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    result = CapabilityBroker(
+        ToolRegistry((RepositoryReadAdapter(operation, executor),))
+    ).invoke(
+        context,
+        CapabilityRequest(f"repository-{operation}", operation, dict(arguments)),
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(f"Repository read was not executable: {result.reason}")
+
+
 def invoke_file_mutation(
     paths: tuple[str, ...],
     *,

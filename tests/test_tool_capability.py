@@ -88,3 +88,49 @@ def test_broker_requires_exception_for_unavailable_effect(tmp_path: Path) -> Non
     request = CapabilityRequest("write-file", "edit", {"path": "file.txt"})
     resolution = broker.resolve(context(tmp_path, frozenset({"edit"})), request)
     assert resolution.kind is CapabilityResolutionKind.EXCEPTION_REQUIRED
+
+
+def test_broker_checkpoints_mutations_before_execution(tmp_path: Path) -> None:
+    checkpoints: list[tuple[str, str | None]] = []
+
+    class Checkpoints:
+        def create(
+            self,
+            workspace_root: str | Path,
+            checkpoint_id: str,
+            *,
+            state_json: str | None = None,
+        ) -> None:
+            checkpoints.append((checkpoint_id, state_json))
+
+    class MutableTool:
+        manifest = ToolManifest("mutable", ("edit",), (ToolEffect.WORKSPACE_WRITE,))
+
+        def validate(
+            self, context: ToolContext, arguments: Mapping[str, Any]
+        ) -> ToolValidationReport:
+            return ToolValidationReport()
+
+        def execute(
+            self, context: ToolContext, arguments: Mapping[str, Any]
+        ) -> ToolResult:
+            return ToolResult(output="ok")
+
+    broker = CapabilityBroker(
+        ToolRegistry([MutableTool()]),
+        checkpoint_store=Checkpoints(),
+        state_json_provider=lambda context: '{"state": 1}',
+    )
+    result = broker.invoke(
+        ToolContext(
+            tmp_path,
+            tmp_path,
+            frozenset({"edit"}),
+            frozenset({ToolEffect.WORKSPACE_WRITE}),
+            execution_id="run-1",
+        ),
+        CapabilityRequest("mutable", "edit", {"path": "one.txt"}),
+    )
+    assert isinstance(result, ToolResult)
+    assert result.checkpoint_id == checkpoints[0][0]
+    assert checkpoints[0][1] == '{"state": 1}'

@@ -31,6 +31,7 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.execution.builtin_tools import (
+    invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
@@ -638,7 +639,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.events.append(
                 {
                     "kind": action.kind,
-                    "result": _apply_task_edits(action, self.repo_root),
+                    "result": invoke_file_mutation(
+                        _task_edit_paths(action),
+                        worktree_root=self.repo_root,
+                        executor=lambda: _apply_task_edits(action, self.repo_root),
+                    ),
                 }
             )
             return WorkflowActionOutcome()
@@ -2981,7 +2986,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": _apply_task_edits(action, self.repo_root),
+                    "result": invoke_file_mutation(
+                        _task_edit_paths(action),
+                        worktree_root=self.repo_root,
+                        executor=lambda: _apply_task_edits(action, self.repo_root),
+                    ),
                 }
             )
             _record_task_action_outputs(
@@ -3297,6 +3306,14 @@ def _apply_task_edits(
             {"file_path": file_path, "line_count": len(updated.splitlines())}
         )
     return results
+
+
+def _task_edit_paths(action: WorkflowAction) -> tuple[str, ...]:
+    if action.file_edits:
+        return tuple(group.file_path for group in action.file_edits)
+    if action.file_path is None:
+        raise PowdrrExecutionError("edit action must include a file path.")
+    return (action.file_path,)
 
 
 def _prompt_user_handoff(

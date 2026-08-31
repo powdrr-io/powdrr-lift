@@ -2,14 +2,17 @@
 
 from powdrr_lift.execution.builtin_tools import (
     EnrichmentAdapter,
+    FileMutationAdapter,
     IntrinsicRepositoryAdapter,
     ShellAdapter,
     builtin_tool_registry,
+    invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
+    CapabilityCheckpointStore,
     CapabilityDecision,
     CapabilityExceptionStore,
     CapabilityRequest,
@@ -108,6 +111,7 @@ __all__ = [
     "satisfy_execution_obligation",
     "unresolved_obligations",
     "CapabilityBroker",
+    "CapabilityCheckpointStore",
     "CapabilityDecision",
     "EnrichmentAdapter",
     "Checkpoint",
@@ -140,4 +144,6 @@ __all__ = [
     "invoke_intrinsic_capability",
     "invoke_shell_capability",
     "ShellAdapter",
+    "FileMutationAdapter",
+    "invoke_file_mutation",
 ]

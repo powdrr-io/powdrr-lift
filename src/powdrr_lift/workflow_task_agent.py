@@ -329,6 +329,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     stderr: TextIO
     action_engine: WorkflowLLMActionEngine
     events: list[dict[str, Any]]
+    runtime: ExecutionRuntime | None = None
     deterministic_output_state: Any = None
     requires_deterministic_output_state: bool = False
     response_correction: str | None = None
@@ -632,6 +633,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         executor=lambda _arguments: _read_task_document(
                             action, self.repo_root
                         ),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -654,6 +656,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                             action.recursive,
                             self.repo_root,
                         ),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -666,6 +669,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         _task_edit_paths(action),
                         worktree_root=self.repo_root,
                         executor=lambda: _apply_task_edits(action, self.repo_root),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -688,6 +692,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 (action.file_path,),
                 worktree_root=self.repo_root,
                 executor=lambda: path.write_text(updated, encoding="utf-8"),
+                runtime=self.runtime,
             )
             self.events.append(
                 {
@@ -726,6 +731,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     file_path=file_path,
                     destination_path=action.destination_path,
                 ),
+                runtime=self.runtime,
             )
             self.events.append(
                 {
@@ -905,14 +911,37 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stderr=self.stderr,
                     verbose=self.config.verbose,
                 ),
+                runtime=self.runtime,
             )
         elif action.tool == ENRICH_TOOL:
             result = invoke_intrinsic_capability(
-                ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
+                ENRICH_TOOL,
+                action.parameters,
+                worktree_root=self.repo_root,
+                runtime=self.runtime,
             )
         elif action.tool in {GIT_TOOL, GH_TOOL}:
+            if (
+                action.tool == GH_TOOL
+                and action.parameters.get("operation") == "pr_create"
+                and self.runtime is not None
+            ):
+                readiness = self.runtime.readiness()
+                if not readiness.ready:
+                    raise PowdrrExecutionError(
+                        "Pull-request creation is blocked by execution readiness: "
+                        + "; ".join(readiness.reasons),
+                        error_code="readiness_blocked",
+                        action_kind=action.kind,
+                        remediation=(
+                            "satisfy all obligations and validation requirements"
+                        ),
+                    )
             result = invoke_intrinsic_capability(
-                action.tool, action.parameters, worktree_root=self.repo_root
+                action.tool,
+                action.parameters,
+                worktree_root=self.repo_root,
+                runtime=self.runtime,
             )
             if result.get("stdout"):
                 print(str(result["stdout"]), end="", file=self.stdout)
@@ -922,12 +951,14 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             result = invoke_fuzzy_match_capability(
                 action.parameters,
                 worktree_root=self.repo_root,
+                runtime=self.runtime,
             )
         elif action.tool is not None and is_basedpyright_tool(action.tool):
             result = invoke_basedpyright_capability(
                 action.tool,
                 action.parameters,
                 worktree_root=self.repo_root,
+                runtime=self.runtime,
             )
         else:
             raise PowdrrExecutionError(
@@ -1335,6 +1366,7 @@ def run_workflow_task(
             stdout=stdout,
             stderr=stderr,
             action_engine=driver.action_engine,
+            runtime=runtime,
             events=driver_events,
             deterministic_output_state=deterministic_output_state,
             requires_deterministic_output_state=requires_deterministic_output_state,

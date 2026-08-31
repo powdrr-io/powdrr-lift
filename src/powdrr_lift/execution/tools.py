@@ -68,6 +68,13 @@ class ToolRegistry:
         self._adapters[manifest.tool_name] = adapter
         self._fingerprints[manifest.tool_name] = manifest.fingerprint()
 
+    def replace(self, adapter: ToolAdapter) -> None:
+        """Install the current invocation adapter for a shared runtime."""
+        manifest = adapter.manifest
+        validate_tool_manifest(manifest)
+        self._adapters[manifest.tool_name] = adapter
+        self._fingerprints[manifest.tool_name] = manifest.fingerprint()
+
     def get(self, tool_name: str) -> ToolAdapter | None:
         return self._adapters.get(tool_name)
 

@@ -72,6 +72,7 @@ from powdrr_lift.core.validation_messages import (
 )
 from powdrr_lift.execution.builtin_tools import (
     invoke_basedpyright_capability,
+    invoke_deferred_edit_capability,
     invoke_file_mutation,
     invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
@@ -84,8 +85,6 @@ from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.intrinsic_edit import (
     APPLY_EDIT_TOOL,
     VALIDATE_EDIT_TOOL,
-    execute_apply_edit_tool,
-    execute_validate_edit_tool,
 )
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import (
@@ -598,6 +597,7 @@ class _WorkflowExecutionState:
     step_checkpoint: _WorkflowStepCheckpoint | None = None
     stalled_step_context: list[dict[str, Any]] = field(default_factory=list)
     file_added_callback: Callable[[tuple[str, ...]], None] | None = None
+    runtime: ExecutionRuntime | None = None
 
 
 @dataclass(slots=True)
@@ -2711,6 +2711,18 @@ def run_workflow_chat(
 
     progress = _WorkflowProgressDisplay(stderr, on_update=progress_callback)
     root_skill = selected_skill
+    execution_id = config.execution_id or (
+        "chat-"
+        + hashlib.sha256(
+            f"{selection.selected_skill_path}:{user_request}".encode()
+        ).hexdigest()[:24]
+    )
+    runtime = ExecutionRuntime(
+        execution_id,
+        profile_id=selected_skill.skill.name,
+        workflow_directory=project_root / ".powdrr",
+        repo_root=repo_root,
+    )
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
         root_skill=root_skill,
@@ -2723,18 +2735,7 @@ def run_workflow_chat(
         error_log_root=project_root,
         handoff_records=_workflow_context_handoff_records(workflow_context),
         file_added_callback=file_added_callback,
-    )
-    execution_id = config.execution_id or (
-        "chat-"
-        + hashlib.sha256(
-            f"{selection.selected_skill_path}:{user_request}".encode()
-        ).hexdigest()[:24]
-    )
-    runtime = ExecutionRuntime(
-        execution_id,
-        profile_id=selected_skill.skill.name,
-        workflow_directory=project_root / ".powdrr",
-        repo_root=repo_root,
+        runtime=runtime,
     )
     driver = WorkflowStepRunner(
         max_stalled_roundtrips=config.max_stalled_roundtrips,
@@ -4076,10 +4077,18 @@ def _run_deterministic_pre_step(
             )
         elif tool == VALIDATE_EDIT_TOOL:
             parameters.pop("tool", None)
-            result = execute_validate_edit_tool(parameters, worktree_root=worktree_root)
+            result = invoke_deferred_edit_capability(
+                VALIDATE_EDIT_TOOL,
+                parameters,
+                worktree_root=worktree_root,
+            )
         elif tool == APPLY_EDIT_TOOL:
             parameters.pop("tool", None)
-            result = execute_apply_edit_tool(parameters, worktree_root=worktree_root)
+            result = invoke_deferred_edit_capability(
+                APPLY_EDIT_TOOL,
+                parameters,
+                worktree_root=worktree_root,
+            )
         elif tool == "fuzzy-match":
             result = invoke_fuzzy_match_capability(
                 parameters,
@@ -5228,6 +5237,7 @@ def _handle_workflow_action_edit(
         ),
         worktree_root=state.worktree_root,
         executor=lambda: _write_pending_file_mutations(pending_writes),
+        runtime=state.runtime,
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
@@ -5318,6 +5328,7 @@ def _handle_workflow_action_yaml_edit(
         (action.file_path,),
         worktree_root=state.worktree_root,
         executor=lambda: target_path.write_text(updated_text, encoding="utf-8"),
+        runtime=state.runtime,
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
@@ -5395,6 +5406,7 @@ def _handle_workflow_action_file_management(
             file_path=file_path,
             destination_path=action.destination_path,
         ),
+        runtime=state.runtime,
     )
     if state.file_added_callback is not None:
         changed_paths = [action.file_path]
@@ -5736,18 +5748,28 @@ def _handle_workflow_action_invoke_tool(
             action.parameters,
             worktree_root=state.worktree_root,
             path_cache=state.fuzzy_match_cache,
+            runtime=state.runtime,
         )
     elif action.tool == ENRICH_TOOL:
         tool_result = invoke_intrinsic_capability(
-            ENRICH_TOOL, action.parameters, worktree_root=state.worktree_root
+            ENRICH_TOOL,
+            action.parameters,
+            worktree_root=state.worktree_root,
+            runtime=state.runtime,
         )
     elif action.tool == VALIDATE_EDIT_TOOL:
-        tool_result = execute_validate_edit_tool(
-            action.parameters, worktree_root=state.worktree_root
+        tool_result = invoke_deferred_edit_capability(
+            VALIDATE_EDIT_TOOL,
+            action.parameters,
+            worktree_root=state.worktree_root,
+            runtime=state.runtime,
         )
     elif action.tool == APPLY_EDIT_TOOL:
-        tool_result = execute_apply_edit_tool(
-            action.parameters, worktree_root=state.worktree_root
+        tool_result = invoke_deferred_edit_capability(
+            APPLY_EDIT_TOOL,
+            action.parameters,
+            worktree_root=state.worktree_root,
+            runtime=state.runtime,
         )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
@@ -5772,10 +5794,28 @@ def _handle_workflow_action_invoke_tool(
                     and command_items[1:2] == ["pull-request-description"]
                 ),
             ),
+            runtime=state.runtime,
         )
     elif action.tool in {GIT_TOOL, GH_TOOL}:
+        if (
+            action.tool == GH_TOOL
+            and action.parameters.get("operation") == "pr_create"
+            and state.runtime is not None
+        ):
+            readiness = state.runtime.readiness()
+            if not readiness.ready:
+                raise PowdrrExecutionError(
+                    "Pull-request creation is blocked by execution readiness: "
+                    + "; ".join(readiness.reasons),
+                    error_code="readiness_blocked",
+                    action_kind=action.kind,
+                    remediation="satisfy all obligations and validation requirements",
+                )
         tool_result = invoke_intrinsic_capability(
-            action.tool, action.parameters, worktree_root=state.worktree_root
+            action.tool,
+            action.parameters,
+            worktree_root=state.worktree_root,
+            runtime=state.runtime,
         )
         if tool_result.get("stdout"):
             print(str(tool_result["stdout"]), end="", file=stdout)
@@ -5787,6 +5827,7 @@ def _handle_workflow_action_invoke_tool(
             action.tool,
             action.parameters,
             worktree_root=state.worktree_root,
+            runtime=state.runtime,
         )
     else:
         raise PowdrrExecutionError(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -150,7 +152,71 @@ class ExecutionRuntime:
         decisions = self.broker.decision_log[before:]
         if decisions:
             self._append_capability_decisions(decisions)
+            if isinstance(result, ToolResult) and any(
+                decision.kind.value == "executable" for decision in decisions
+            ):
+                fingerprint = hashlib.sha256(
+                    json.dumps(
+                        {
+                            "tool": request.tool_name,
+                            "action": request.semantic_action,
+                            "arguments": dict(request.arguments),
+                        },
+                        sort_keys=True,
+                        default=str,
+                    ).encode()
+                ).hexdigest()
+                self.record_evidence(
+                    evidence_id=f"evidence-{self.state.event_sequence + 1}",
+                    producer_action_instance_id=(
+                        context.active_unit_id or request.semantic_action
+                    ),
+                    evidence_type=f"capability:{request.tool_name}",
+                    input_fingerprint=fingerprint,
+                    successful=True,
+                )
         return result
+
+    def invoke_adapter(
+        self,
+        adapter: ToolAdapter,
+        context: ToolContext,
+        request: CapabilityRequest,
+    ) -> ToolResult | CapabilityResolution:
+        """Run a context-bound adapter through this runtime's broker."""
+        self.broker.registry.replace(adapter)
+        return self.invoke(context, request)
+
+    def record_evidence(
+        self,
+        *,
+        evidence_id: str,
+        producer_action_instance_id: str,
+        evidence_type: str,
+        input_fingerprint: str,
+        successful: bool,
+    ) -> ExecutionState:
+        """Append a typed validation result to the durable evidence ledger."""
+        sequence = self.state.event_sequence + 1
+        event = ExecutionEvent(
+            self.execution_id,
+            sequence,
+            self.state.state_version,
+            ExecutionEventType.EVIDENCE_RECORDED,
+            {
+                "evidence_id": evidence_id,
+                "producer_action_instance_id": producer_action_instance_id,
+                "evidence_type": evidence_type,
+                "input_fingerprint": input_fingerprint,
+                "successful": successful,
+                "fresh": True,
+            },
+            f"{self.execution_id}:{sequence}",
+        )
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, (event,)
+        )
+        return self.state
 
     def sync_kernel(self, *, phase_type: str, actor_id: str) -> ExecutionState:
         pending = self.kernel.events[self._projected_kernel_events :]

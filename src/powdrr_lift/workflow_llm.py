@@ -447,6 +447,17 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            proposal_errors = self.kernel.validate_proposal(action)
+            if proposal_errors:
+                error = PowdrrExecutionError(
+                    " ".join(proposal_errors),
+                    error_code="relationship_obligation_open",
+                    action_kind=str(getattr(action, "kind", "action")),
+                    remediation="perform the required follow-up action first",
+                )
+                strategy.record_action_error(action, error)
+                self.kernel.fail(action, error)
+                continue
             self.kernel.propose(action)
             self._record_shadow("action_proposed", action)
             proposal_decision = None

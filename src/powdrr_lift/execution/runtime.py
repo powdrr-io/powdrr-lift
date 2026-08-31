@@ -12,8 +12,10 @@ from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan, FileExecutionPlanStore
 from powdrr_lift.core.execution_state import (
+    ExecutionArtifact,
     ExecutionEvent,
     ExecutionEventType,
+    ExecutionFinding,
     ExecutionMode,
     ExecutionState,
 )
@@ -26,11 +28,19 @@ from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
-from powdrr_lift.execution.compaction import compact_execution_context
+from powdrr_lift.execution.compaction import (
+    FileContextRetrievalStore,
+    compact_execution_context,
+    compact_with_retrieval,
+)
 from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import ReadinessEvaluator, ReadinessReport
 from powdrr_lift.execution.kernel import ActionKernel
-from powdrr_lift.execution.personas import PersonaPacket, build_persona_packet
+from powdrr_lift.execution.personas import (
+    PersonaPacket,
+    build_persona_packet,
+    validate_handoff,
+)
 from powdrr_lift.execution.phases import PhaseController, PhaseTransitionDecision
 from powdrr_lift.execution.store import (
     ExecutionStateConflict,
@@ -63,8 +73,10 @@ class ExecutionRuntime:
         mode: ExecutionMode = ExecutionMode.ENFORCE,
         state_store: ExecutionStateStore | None = None,
         behavior_rule_store: FileBehaviorRuleStore | None = None,
+        profile: DeliveryProfile | None = None,
     ) -> None:
         self.execution_id = execution_id
+        self.profile = profile
         self.repo_root = Path(repo_root).resolve()
         self.state_store = state_store or FileExecutionStateStore(workflow_directory)
         try:
@@ -81,6 +93,7 @@ class ExecutionRuntime:
             workflow_directory
         )
         self.plan_store = FileExecutionPlanStore(workflow_directory)
+        self.context_store = FileContextRetrievalStore(workflow_directory)
         self.checkpoint_store = ContentAddressedCheckpointStore(
             Path(workflow_directory) / "execution" / "checkpoints"
         )
@@ -136,6 +149,36 @@ class ExecutionRuntime:
 
         return load_applicable_guidance(self.behavior_rule_store, context)
 
+    def remember_guidance(
+        self, rule: Any, *, expected_version: int | None = None
+    ) -> Any:
+        """Persist a user-requested behavior rule with optimistic versioning."""
+        return self.behavior_rule_store.save(rule, expected_version=expected_version)
+
+    def revoke_guidance(self, rule_id: str, *, expected_version: int) -> Any:
+        return self.behavior_rule_store.revoke(
+            rule_id, expected_version=expected_version
+        )
+
+    def record_artifact(self, artifact: ExecutionArtifact) -> ExecutionState:
+        return self._append_event(
+            ExecutionEventType.ARTIFACT_PRODUCED, artifact.to_data()
+        )
+
+    def accept_artifact(self, artifact_id: str) -> ExecutionState:
+        return self._append_event(
+            ExecutionEventType.ARTIFACT_ACCEPTED, {"artifact_id": artifact_id}
+        )
+
+    def record_finding(self, finding: ExecutionFinding) -> ExecutionState:
+        return self._append_event(ExecutionEventType.FINDING_OPENED, finding.to_data())
+
+    def dispose_finding(self, finding_id: str, status: str) -> ExecutionState:
+        return self._append_event(
+            ExecutionEventType.FINDING_DISPOSED,
+            {"finding_id": finding_id, "status": status},
+        )
+
     def save_plan(self, plan: ExecutionPlan) -> Path:
         """Persist the plan artifact owned by this execution."""
         return self.plan_store.save(plan)
@@ -153,6 +196,16 @@ class ExecutionRuntime:
         """Compile a typed plan through the runtime-owned plan boundary."""
         self.save_plan(plan)
         return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
+
+    def compact_prompt_context(self, context: dict[str, Any]) -> dict[str, Any]:
+        """Compact arbitrary prompt data while retaining runtime references."""
+        return compact_with_retrieval(
+            {**context, "runtime_state": self.prompt_context()},
+            self.context_store,
+        )
+
+    def retrieve_prompt_context(self, reference: str) -> dict[str, Any]:
+        return self.context_store.load(reference)
 
     def persona_packet(
         self,
@@ -198,6 +251,23 @@ class ExecutionRuntime:
                 obligation.description for obligation in self.kernel.open_obligations
             ),
         )
+        if decision.allowed and self.profile is not None:
+            handoff = validate_handoff(
+                self.profile,
+                self.state,
+                source_phase=self.state.current_phase,
+                destination_phase=target_phase,
+                artifact_ids=tuple(
+                    artifact.artifact_id for artifact in self.state.artifacts
+                ),
+            )
+            if not handoff.valid:
+                return PhaseTransitionDecision(
+                    False,
+                    decision.current_phase,
+                    decision.target_phase,
+                    handoff.errors,
+                )
         if not decision.allowed:
             return decision
         sequence = self.state.event_sequence + 1
@@ -216,6 +286,10 @@ class ExecutionRuntime:
             self.execution_id, self.state.state_version, (event,)
         )
         return decision
+
+    def publish_readiness(self, **kwargs: Any) -> ReadinessReport:
+        """Evaluate the publish boundary using the current durable state."""
+        return self.readiness_evaluator.evaluate(self.state, **kwargs)
 
     def verify(self) -> ExecutionState:
         """Rebuild state from the durable event log and verify its cache."""
@@ -293,6 +367,23 @@ class ExecutionRuntime:
                 "successful": successful,
                 "fresh": True,
             },
+            f"{self.execution_id}:{sequence}",
+        )
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, (event,)
+        )
+        return self.state
+
+    def _append_event(
+        self, event_type: ExecutionEventType, payload: dict[str, Any]
+    ) -> ExecutionState:
+        sequence = self.state.event_sequence + 1
+        event = ExecutionEvent(
+            self.execution_id,
+            sequence,
+            self.state.state_version,
+            event_type,
+            payload,
             f"{self.execution_id}:{sequence}",
         )
         self.state = self.state_store.append(

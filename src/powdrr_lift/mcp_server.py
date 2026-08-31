@@ -61,12 +61,10 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.execution.capabilities import (
-    CapabilityBroker,
     FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.execution.tools import ToolRegistry
 
 
 def _load_fastmcp() -> Any:
@@ -125,11 +123,16 @@ def build_server() -> Any:
             raise ValueError(
                 "POWDRR_CAPABILITY_SECRET is required to decide exceptions"
             )
-        broker = CapabilityBroker(
-            ToolRegistry(), CapabilityExceptionAuthority(secret.encode()), store
+        runtime = ExecutionRuntime(
+            request.execution_id,
+            profile_id="exception-decision",
+            workflow_directory=workflow_dir,
+            repo_root=workflow_dir,
+            exception_authority=CapabilityExceptionAuthority(secret.encode()),
+            exception_store=store,
         )
         return json.dumps(
-            broker.decide_exception(
+            runtime.decide_capability_exception(
                 request, approved=decision == "approve", decided_by=decided_by
             ).to_data(),
             ensure_ascii=False,

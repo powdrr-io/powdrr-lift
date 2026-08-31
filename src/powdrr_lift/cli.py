@@ -92,12 +92,10 @@ from powdrr_lift.core.workflow_template_specification import (
     load_workflow_template,
 )
 from powdrr_lift.execution.capabilities import (
-    CapabilityBroker,
     FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.execution.tools import ToolRegistry
 from powdrr_lift.openai_proxy import (
     OpenAIProxyConfig,
     default_openai_proxy_log_dir,
@@ -1815,10 +1813,15 @@ def _run_execution_exceptions(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
-        broker = CapabilityBroker(
-            ToolRegistry(), CapabilityExceptionAuthority(secret.encode("utf-8")), store
+        runtime = ExecutionRuntime(
+            request.execution_id,
+            profile_id="exception-decision",
+            workflow_directory=args.workflow_dir,
+            repo_root=args.repo_root or Path.cwd(),
+            exception_authority=CapabilityExceptionAuthority(secret.encode("utf-8")),
+            exception_store=store,
         )
-        decision = broker.decide_exception(
+        decision = runtime.decide_capability_exception(
             request, approved=args.decision == "approve", decided_by=args.decided_by
         )
         payload: object = decision.to_data()

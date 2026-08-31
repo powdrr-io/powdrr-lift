@@ -76,6 +76,7 @@ from powdrr_lift.execution.relationships import (
     satisfy_obligation,
     unresolved_obligations,
 )
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.shadow import ShadowExecutionRecorder
 from powdrr_lift.execution.store import (
     ExecutionStateConflict,
@@ -108,6 +109,7 @@ __all__ = [
     "ActionKernel",
     "ActionLifecycleEvent",
     "ActionLifecyclePhase",
+    "ExecutionRuntime",
     "RelationshipExpansion",
     "action_can_complete",
     "expand_obligations",

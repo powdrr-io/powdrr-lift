@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib
 import inspect
 import json
@@ -77,6 +78,7 @@ from powdrr_lift.execution.builtin_tools import (
     invoke_repository_read,
     invoke_shell_capability,
 )
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.intrinsic_edit import (
@@ -475,6 +477,7 @@ class SkillChatConfig:
     provider_retry_attempts: int = 3
     provider_retry_delay_seconds: float = 30.0
     verbose: bool = False
+    execution_id: str | None = None
 
     @property
     def templates_dir(self) -> Path:
@@ -2721,7 +2724,23 @@ def run_workflow_chat(
         handoff_records=_workflow_context_handoff_records(workflow_context),
         file_added_callback=file_added_callback,
     )
-    driver = WorkflowStepRunner(max_stalled_roundtrips=config.max_stalled_roundtrips)
+    execution_id = config.execution_id or (
+        "chat-"
+        + hashlib.sha256(
+            f"{selection.selected_skill_path}:{user_request}".encode()
+        ).hexdigest()[:24]
+    )
+    runtime = ExecutionRuntime(
+        execution_id,
+        profile_id=selected_skill.skill.name,
+        workflow_directory=project_root / ".powdrr",
+        repo_root=repo_root,
+    )
+    driver = WorkflowStepRunner(
+        max_stalled_roundtrips=config.max_stalled_roundtrips,
+        runtime=runtime,
+        actor_id="workflow-chat-agent",
+    )
     execution_strategy = _ChatWorkflowExecutionStrategy(
         config=config,
         selection=selection,

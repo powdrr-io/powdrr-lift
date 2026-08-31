@@ -25,6 +25,7 @@ from powdrr_lift.core import (
     WorkflowTask,
     resolve_repo_root,
 )
+from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -37,6 +38,7 @@ from powdrr_lift.execution.builtin_tools import (
     invoke_repository_read,
     invoke_shell_capability,
 )
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.pr_workflow_record import (
@@ -1273,6 +1275,14 @@ def run_workflow_task(
                 f"Workflow task has no LLM mapping: {task.task_id}"
             )
         model = mapping.model
+        execution_phase = task.phase_type or PhaseType.BUILD
+        runtime = ExecutionRuntime(
+            task.task_id,
+            profile_id=task.persona_id or task.assignee_role.value,
+            workflow_directory=workflow_dir,
+            repo_root=repo_root,
+            phase=execution_phase,
+        )
         if client_was_provided:
             assert client is not None
             task_client = client
@@ -1306,7 +1316,10 @@ def run_workflow_task(
             )
         )
         driver = WorkflowStepRunner(
-            max_stalled_roundtrips=config.max_stalled_roundtrips
+            max_stalled_roundtrips=config.max_stalled_roundtrips,
+            runtime=runtime,
+            phase_type=execution_phase.value,
+            actor_id=task.persona_id or task.assignee_role.value,
         )
         strategy = _TaskWorkflowExecutionStrategy(
             config=config,

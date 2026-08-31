@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from powdrr_lift.execution.kernel import ActionKernel
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workflow_execution import (
     ProgressDecision,
     WorkflowExecutionController,
@@ -398,13 +399,19 @@ class WorkflowStepRunner:
         max_stalled_roundtrips: int,
         observer: WorkflowExecutionObserver | None = None,
         shadow_recorder: WorkflowShadowRecorder | None = None,
+        runtime: ExecutionRuntime | None = None,
+        phase_type: str = "build",
+        actor_id: str = "workflow-agent",
     ) -> None:
         self.action_engine = WorkflowLLMActionEngine(
             max_stalled_roundtrips=max_stalled_roundtrips
         )
         self.observer = observer
         self.shadow_recorder = shadow_recorder
-        self.kernel = ActionKernel()
+        self.runtime = runtime
+        self.phase_type = phase_type
+        self.actor_id = actor_id
+        self.kernel = runtime.kernel if runtime is not None else ActionKernel()
 
     def run(
         self,
@@ -457,8 +464,10 @@ class WorkflowStepRunner:
                 )
                 strategy.record_action_error(action, error)
                 self.kernel.fail(action, error)
+                self._sync_runtime()
                 continue
             self.kernel.propose(action)
+            self._sync_runtime()
             self._record_shadow("action_proposed", action)
             proposal_decision = None
             if self.observer is not None:
@@ -477,9 +486,11 @@ class WorkflowStepRunner:
             before_state = strategy.material_state(action)
             try:
                 self.kernel.start(action)
+                self._sync_runtime()
                 outcome = strategy.execute_action(action)
             except PowdrrExecutionError as exc:
                 self.kernel.fail(action, exc)
+                self._sync_runtime()
                 self._record_shadow(
                     "action_failed", action, error_code=type(exc).__name__
                 )
@@ -505,6 +516,7 @@ class WorkflowStepRunner:
                 continue
 
             self.kernel.complete(action)
+            self._sync_runtime()
             self._record_shadow("action_completed", action)
 
             observation = self.action_engine.observe_action(
@@ -566,6 +578,13 @@ class WorkflowStepRunner:
         except Exception:
             # Shadow observation cannot make a working legacy execution fail.
             return
+
+    def _sync_runtime(self) -> None:
+        if self.runtime is not None:
+            self.runtime.sync_kernel(
+                phase_type=self.phase_type,
+                actor_id=self.actor_id,
+            )
 
 
 class WorkflowLLMActionEngine:

@@ -2884,7 +2884,10 @@ def run_workflow_chat(
         )
     exit_code = driver.run(
         execution_strategy,
-        max_roundtrips=None,
+        # Skill selection and execution have different turn budgets. Keep a
+        # bounded execution ceiling so malformed provider responses cannot
+        # spin forever, while allowing multi-phase skills to finish.
+        max_roundtrips=max(config.max_turns, 64),
         signature=_workflow_action_signature,
     )
     if exit_code != 0:

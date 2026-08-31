@@ -50,6 +50,10 @@ def test_guidance_survives_restart_and_is_explainable(tmp_path: Path) -> None:
         FileBehaviorRuleStore(tmp_path),
         {"repository": "powdrr-lift", "phase": "resolve_findings"},
     ) == (saved,)
+    explanation = store.explain(saved.rule_id)
+    assert explanation["rule"]["rule_id"] == saved.rule_id
+    assert explanation["superseded_by"] == ()
+    assert explanation["applicable"] is True
 
 
 def test_stale_update_and_revoke_are_rejected(tmp_path: Path) -> None:
@@ -62,6 +66,7 @@ def test_stale_update_and_revoke_are_rejected(tmp_path: Path) -> None:
     revoked = store.revoke(saved.rule_id, expected_version=updated.version)
     assert not revoked.active
     assert store.list() == ()
+    assert store.explain(saved.rule_id)["applicable"] is False
 
 
 def test_empty_rule_is_not_nominated() -> None:

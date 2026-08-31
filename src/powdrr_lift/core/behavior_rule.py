@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
+import os
+import tempfile
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -97,8 +102,21 @@ def applicable_behavior_rules(
 class FileBehaviorRuleStore:
     def __init__(self, workflow_directory: str | Path) -> None:
         self.path = Path(workflow_directory) / "guidance" / "behavior-rules.json"
+        self.lock_path = self.path.with_suffix(".lock")
 
-    def list(self, *, include_inactive: bool = False) -> tuple[BehaviorRule, ...]:
+    @contextmanager
+    def _locked(self) -> Generator[None, None, None]:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def _list_unlocked(
+        self, *, include_inactive: bool = False
+    ) -> tuple[BehaviorRule, ...]:
         if not self.path.exists():
             return ()
         rules = tuple(
@@ -109,61 +127,104 @@ class FileBehaviorRuleStore:
             rules if include_inactive else tuple(rule for rule in rules if rule.active)
         )
 
+    def list(self, *, include_inactive: bool = False) -> tuple[BehaviorRule, ...]:
+        with self._locked():
+            return self._list_unlocked(include_inactive=include_inactive)
+
+    def explain(self, rule_id: str) -> dict[str, Any]:
+        """Return the durable rule and its replacement lineage for inspection."""
+        with self._locked():
+            rules = self._list_unlocked(include_inactive=True)
+        current = next((item for item in rules if item.rule_id == rule_id), None)
+        if current is None:
+            raise KeyError(rule_id)
+        superseded_by = tuple(
+            item.rule_id for item in rules if item.supersedes_rule_id == rule_id
+        )
+        return {
+            "rule": current.to_data(),
+            "superseded_by": superseded_by,
+            "applicable": current.active,
+        }
+
     def save(
         self, rule: BehaviorRule, *, expected_version: int | None = None
     ) -> BehaviorRule:
-        rules = list(self.list(include_inactive=True))
-        current = next((item for item in rules if item.rule_id == rule.rule_id), None)
-        if current is not None and expected_version != current.version:
-            raise ValueError(f"stale behavior rule version for {rule.rule_id!r}")
-        if current is None and expected_version not in (None, 0):
-            raise ValueError(f"unexpected behavior rule version for {rule.rule_id!r}")
-        saved = BehaviorRule(
-            rule.rule_id,
-            rule.text,
-            rule.normalized_text,
-            rule.source_ref,
-            rule.scope,
-            rule.precedence,
-            (current.version + 1 if current else 1),
-            rule.active,
-            rule.expires_at,
-            rule.supersedes_rule_id,
-        )
-        rules = [saved if item.rule_id == rule.rule_id else item for item in rules]
-        if current is None:
-            rules.append(saved)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
-            json.dumps([item.to_data() for item in rules], indent=2) + "\n",
-            encoding="utf-8",
-        )
-        return saved
+        with self._locked():
+            rules = list(self._list_unlocked(include_inactive=True))
+            current = next(
+                (item for item in rules if item.rule_id == rule.rule_id), None
+            )
+            if current is not None and expected_version != current.version:
+                raise ValueError(f"stale behavior rule version for {rule.rule_id!r}")
+            if current is None and expected_version not in (None, 0):
+                raise ValueError(
+                    f"unexpected behavior rule version for {rule.rule_id!r}"
+                )
+            saved = BehaviorRule(
+                rule.rule_id,
+                rule.text,
+                rule.normalized_text,
+                rule.source_ref,
+                rule.scope,
+                rule.precedence,
+                (current.version + 1 if current else 1),
+                rule.active,
+                rule.expires_at,
+                rule.supersedes_rule_id,
+            )
+            rules = [saved if item.rule_id == rule.rule_id else item for item in rules]
+            if current is None:
+                rules.append(saved)
+            payload = json.dumps([item.to_data() for item in rules], indent=2) + "\n"
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=self.path.parent, delete=False
+            ) as temporary:
+                temporary.write(payload)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+                temporary_path = Path(temporary.name)
+            os.replace(temporary_path, self.path)
+            return saved
 
     def revoke(self, rule_id: str, *, expected_version: int) -> BehaviorRule:
-        current = next(
-            (
-                item
-                for item in self.list(include_inactive=True)
+        with self._locked():
+            current = next(
+                (
+                    item
+                    for item in self._list_unlocked(include_inactive=True)
+                    if item.rule_id == rule_id
+                ),
+                None,
+            )
+            if current is None:
+                raise KeyError(rule_id)
+            if current.version != expected_version:
+                raise ValueError(f"stale behavior rule version for {rule_id!r}")
+            rules = [
+                BehaviorRule(
+                    rule_id,
+                    current.text,
+                    current.normalized_text,
+                    current.source_ref,
+                    current.scope,
+                    current.precedence,
+                    current.version + 1,
+                    active=False,
+                    expires_at=current.expires_at,
+                    supersedes_rule_id=current.supersedes_rule_id,
+                )
                 if item.rule_id == rule_id
-            ),
-            None,
-        )
-        if current is None:
-            raise KeyError(rule_id)
-        if current.version != expected_version:
-            raise ValueError(f"stale behavior rule version for {rule_id!r}")
-        return self.save(
-            BehaviorRule(
-                rule_id,
-                current.text,
-                current.normalized_text,
-                current.source_ref,
-                current.scope,
-                current.precedence,
-                active=False,
-                expires_at=current.expires_at,
-                supersedes_rule_id=current.supersedes_rule_id,
-            ),
-            expected_version=expected_version,
-        )
+                else item
+                for item in self._list_unlocked(include_inactive=True)
+            ]
+            payload = json.dumps([item.to_data() for item in rules], indent=2) + "\n"
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=self.path.parent, delete=False
+            ) as temporary:
+                temporary.write(payload)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+                temporary_path = Path(temporary.name)
+            os.replace(temporary_path, self.path)
+            return next(item for item in rules if item.rule_id == rule_id)

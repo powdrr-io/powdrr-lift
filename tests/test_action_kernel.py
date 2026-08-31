@@ -37,3 +37,18 @@ def test_enrich_input_errors_are_agent_correctable() -> None:
         execute_enrich_tool({"format": "json"})
     assert raised.value.error_code == "invalid_enrich_format"
     assert raised.value.action_kind == "enrich"
+
+
+def test_action_kernel_expands_and_closes_instance_bound_obligations() -> None:
+    kernel = ActionKernel()
+    event = kernel.propose(
+        {"kind": "change"},
+        semantic_action="change_mutable_row",
+    )
+    assert len(event.obligations) == 2
+    assert len(kernel.open_obligations) == 2
+    obligation = event.obligations[0]
+    assert obligation.required_action is not None
+    assert kernel.satisfy("action-0", obligation.required_action)
+    assert len(kernel.open_obligations) == 1
+    assert not kernel.satisfy("other-action", obligation.required_action)

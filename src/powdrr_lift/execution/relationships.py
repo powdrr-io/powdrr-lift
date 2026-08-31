@@ -44,7 +44,7 @@ def expand_obligations(
 
 
 def expand_execution_obligations(
-    state: ExecutionState,
+    state: ExecutionState | None,
     *,
     action_instance_id: str,
     action: str,

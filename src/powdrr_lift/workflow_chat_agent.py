@@ -36,7 +36,6 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
-    execute_basedpyright_tool,
     is_basedpyright_tool,
 )
 from powdrr_lift.builtin_tool_help import (
@@ -71,6 +70,7 @@ from powdrr_lift.core.validation_messages import (
     validation_error_to_data,
 )
 from powdrr_lift.execution.builtin_tools import (
+    invoke_basedpyright_capability,
     invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
@@ -4084,7 +4084,7 @@ def _run_deterministic_pre_step(
                 tool, parameters, worktree_root=worktree_root
             )
         elif is_basedpyright_tool(tool):
-            result = execute_basedpyright_tool(
+            result = invoke_basedpyright_capability(
                 tool,
                 parameters,
                 worktree_root=worktree_root,
@@ -5753,7 +5753,7 @@ def _handle_workflow_action_invoke_tool(
             print(str(tool_result["stderr"]), end="", file=stderr)
     elif is_basedpyright_tool(action.tool or ""):
         assert action.tool is not None
-        tool_result = execute_basedpyright_tool(
+        tool_result = invoke_basedpyright_capability(
             action.tool,
             action.parameters,
             worktree_root=state.worktree_root,

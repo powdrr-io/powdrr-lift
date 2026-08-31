@@ -12,7 +12,6 @@ from typing import Any, TextIO
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
-    execute_basedpyright_tool,
     is_basedpyright_tool,
 )
 from powdrr_lift.builtin_tool_help import builtin_tool_help
@@ -31,6 +30,7 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.execution.builtin_tools import (
+    invoke_basedpyright_capability,
     invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
@@ -901,7 +901,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 worktree_root=self.repo_root,
             )
         elif action.tool is not None and is_basedpyright_tool(action.tool):
-            result = execute_basedpyright_tool(
+            result = invoke_basedpyright_capability(
                 action.tool,
                 action.parameters,
                 worktree_root=self.repo_root,
@@ -3037,7 +3037,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     action.parameters, worktree_root=self.repo_root
                 )
             elif is_basedpyright_tool(action.tool or ""):
-                result = execute_basedpyright_tool(
+                result = invoke_basedpyright_capability(
                     action.tool or "", action.parameters, worktree_root=self.repo_root
                 )
             else:

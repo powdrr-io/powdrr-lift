@@ -1,11 +1,13 @@
 """Typed execution-kernel building blocks."""
 
 from powdrr_lift.execution.builtin_tools import (
+    BasedPyrightAdapter,
     EnrichmentAdapter,
     FileMutationAdapter,
     IntrinsicRepositoryAdapter,
     ShellAdapter,
     builtin_tool_registry,
+    invoke_basedpyright_capability,
     invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
@@ -145,5 +147,7 @@ __all__ = [
     "invoke_shell_capability",
     "ShellAdapter",
     "FileMutationAdapter",
+    "BasedPyrightAdapter",
     "invoke_file_mutation",
+    "invoke_basedpyright_capability",
 ]

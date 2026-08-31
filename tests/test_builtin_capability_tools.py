@@ -6,6 +6,7 @@ import pytest
 
 from powdrr_lift.core.tool_manifest import ToolEffect
 from powdrr_lift.execution.builtin_tools import (
+    BasedPyrightAdapter,
     builtin_tool_registry,
     invoke_file_mutation,
     invoke_shell_capability,
@@ -113,3 +114,32 @@ def test_file_mutation_capability_rejects_absolute_and_escape_targets(
     for path in ("../outside.py", str(tmp_path / "outside.py")):
         with pytest.raises(ValueError, match="not executable"):
             invoke_file_mutation((path,), worktree_root=tmp_path, executor=execute)
+
+
+def test_basedpyright_capability_validates_symbol_and_structure_requests(
+    tmp_path: Path,
+) -> None:
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"inspect_code"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    structure_path = tmp_path / "example.py"
+    structure_path.write_text("value = 1\n", encoding="utf-8")
+
+    assert (
+        BasedPyrightAdapter("basedpyright-symbol")
+        .validate(context, {"query": "value", "limit": 10})
+        .valid
+    )
+    assert (
+        BasedPyrightAdapter("basedpyright-structure")
+        .validate(context, {"path": "example.py"})
+        .valid
+    )
+    assert (
+        not BasedPyrightAdapter("basedpyright-structure")
+        .validate(context, {"path": "../outside.py"})
+        .valid
+    )

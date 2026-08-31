@@ -236,6 +236,94 @@ class FileMutationAdapter:
         return ToolResult(self._executor(), frozenset({ToolEffect.WORKSPACE_WRITE}))
 
 
+class BasedPyrightAdapter:
+    """Read-only adapter for the bounded BasedPyright discovery tools."""
+
+    def __init__(self, tool_name: str) -> None:
+        self.manifest = ToolManifest(
+            tool_name,
+            ("inspect_code",),
+            (ToolEffect.WORKSPACE_READ,),
+            scope="worktree",
+            sandbox_profile="workspace-read",
+            reversible=True,
+        )
+        self._tool_name = tool_name
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        if arguments.get("help") is True:
+            return ToolValidationReport()
+        if self._tool_name == "basedpyright-symbol":
+            query = arguments.get("query")
+            if not isinstance(query, str) or not query.strip():
+                return ToolValidationReport(("basedpyright symbol query is required",))
+            limit = arguments.get("limit", 50)
+            if (
+                isinstance(limit, bool)
+                or not isinstance(limit, int)
+                or not 1 <= limit <= 200
+            ):
+                return ToolValidationReport(
+                    ("basedpyright symbol limit must be from 1 through 200",)
+                )
+            return ToolValidationReport()
+        path = arguments.get("path")
+        if not isinstance(path, str) or not path.strip():
+            return ToolValidationReport(("basedpyright structure path is required",))
+        if Path(path).is_absolute():
+            return ToolValidationReport(
+                ("basedpyright structure path must be relative",)
+            )
+        root = context.worktree_root.resolve()
+        target = (root / path).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError:
+            return ToolValidationReport(
+                ("basedpyright structure path escapes worktree",)
+            )
+        if target.suffix.casefold() != ".py":
+            return ToolValidationReport(
+                ("basedpyright structure currently supports Python files only",)
+            )
+        if not target.is_file():
+            return ToolValidationReport(("basedpyright structure path must be a file",))
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        from powdrr_lift.basedpyright_tools import execute_basedpyright_tool
+
+        return ToolResult(
+            execute_basedpyright_tool(
+                self._tool_name, dict(arguments), worktree_root=context.worktree_root
+            ),
+            frozenset({ToolEffect.WORKSPACE_READ}),
+        )
+
+
+def invoke_basedpyright_capability(
+    tool: str,
+    arguments: Mapping[str, Any],
+    *,
+    worktree_root: Path,
+) -> Any:
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset({"inspect_code"}),
+        allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    result = CapabilityBroker(ToolRegistry((BasedPyrightAdapter(tool),))).invoke(
+        context,
+        CapabilityRequest(tool, "inspect_code", dict(arguments)),
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(f"BasedPyright capability was not executable: {result.reason}")
+
+
 def invoke_file_mutation(
     paths: tuple[str, ...],
     *,

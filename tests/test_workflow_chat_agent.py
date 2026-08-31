@@ -6104,18 +6104,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     ):
                         self._pr_template_invoked = True
                         self._call_index += 1
-                        return {
-                            "action": "invoke_tool",
-                            "tool": "internal",
-                            "parameters": {
-                                "command": [
-                                    "powdrr-lift",
-                                    "pull-request-description",
-                                    "--kind",
-                                    "feature",
-                                ]
-                            },
-                        }
+                        return {"action": "next_step"}
                     if prompt["current_step_index"] == 2 and not self._pr_stage_invoked:
                         self._pr_stage_invoked = True
                         self._call_index += 1
@@ -6262,6 +6251,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             command[:3] == ["rtk", "powdrr-lift", "instantiate-workflow"]
             or command[:4] == ["uv", "run", "powdrr-lift", "instantiate-workflow"]
         ):
+            generated_pr_path = (
+                worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+            )
+            if not generated_pr_path.exists():
+                generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
             captured_stdout = io.StringIO()
             captured_stderr = io.StringIO()
             with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
@@ -6330,11 +6325,44 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     ) -> dict[str, object]:
         command = parameters.get("command")
         command_items = list(command) if isinstance(command, list) else []
+        if command_items[:1] == ["rtk"]:
+            command_items = command_items[1:]
+        if command_items[:3] == ["uv", "run", "powdrr-lift"]:
+            command_items = command_items[2:]
         if command_items and command_items[0] == "powdrr-lift":
+            if len(command_items) > 1 and command_items[1] == "pr-specification":
+                generated_pr_path = (
+                    worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+                )
+                generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
+                return {
+                    "command": " ".join(str(item) for item in command_items),
+                    "cwd": str(worktree_root),
+                    "returncode": 0,
+                    "stdout": "",
+                    "stderr": "",
+                }
+            if len(command_items) <= 1 or command_items[1] != "instantiate-workflow":
+                return {
+                    "command": " ".join(str(item) for item in command_items),
+                    "cwd": str(worktree_root),
+                    "returncode": 0,
+                    "stdout": "{}",
+                    "stderr": "",
+                }
+            generated_pr_path = (
+                worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+            )
+            if not generated_pr_path.exists():
+                generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
             captured_stdout = io.StringIO()
             captured_stderr = io.StringIO()
             with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
-                returncode = main(command_items[1:])
+                returncode = main(
+                    command_items[1:] + ["--repo-root", str(worktree_root)]
+                )
             return {
                 "command": " ".join(str(item) for item in command_items),
                 "cwd": str(worktree_root),
@@ -6367,6 +6395,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent._execute_shell_tool",
         _fake_pr_shell_tool,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.execution.runtime.ExecutionRuntime.publish_readiness",
+        lambda _runtime: types.SimpleNamespace(ready=True, reasons=()),
     )
 
     start_stdout = io.StringIO()

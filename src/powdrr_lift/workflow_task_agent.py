@@ -347,6 +347,9 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 skill_catalog=self.skill_catalog,
                 response_correction=self.response_correction,
                 compacted_context=self.compacted_context,
+                runtime_context=(
+                    self.runtime.prompt_context() if self.runtime is not None else None
+                ),
                 observer_intervention=self.observer_intervention,
             )
             limits = _model_limits_for(self.mapping_provider, self.model)
@@ -2012,6 +2015,7 @@ def _build_task_messages(
     repo_root: Path | None = None,
     response_correction: str | None = None,
     compacted_context: dict[str, Any] | None = None,
+    runtime_context: dict[str, Any] | None = None,
     skill_catalog: tuple[SkillCatalogEntry, ...] = (),
     observer_intervention: str | None = None,
 ) -> list[dict[str, str]]:
@@ -2027,6 +2031,8 @@ def _build_task_messages(
             context_data["deterministic_pre_step"] = deterministic_pre_step
     else:
         context_data = {"compacted_context": compacted_context}
+    if runtime_context is not None:
+        context_data["runtime_state"] = runtime_context
     workflow_dir = str(workflow.directory)
     if repo_root is not None:
         try:

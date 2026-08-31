@@ -1162,6 +1162,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 stalled_step_context=self.state.stalled_step_context,
                 inherited_interaction_style=self.inherited_interaction_style,
                 observer_intervention=self.observer_intervention,
+                runtime_prompt_context=(
+                    self.driver.runtime.prompt_context()
+                    if self.driver.runtime is not None
+                    else None
+                ),
             )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
@@ -4307,6 +4312,7 @@ def _build_step_execution_messages(
     stalled_step_context: Sequence[Mapping[str, Any]] = (),
     inherited_interaction_style: str | None = None,
     observer_intervention: str | None = None,
+    runtime_prompt_context: Mapping[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(
         worktree_root,
@@ -4439,6 +4445,8 @@ def _build_step_execution_messages(
     }
     if observer_intervention is not None:
         prompt_data["observer_intervention"] = observer_intervention
+    if runtime_prompt_context is not None:
+        prompt_data["runtime_state"] = dict(runtime_prompt_context)
     if _step_needs_prompt_catalog(current_step, "context_types"):
         prompt_data["available_context_types"] = [
             {

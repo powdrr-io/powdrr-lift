@@ -4198,17 +4198,23 @@ def _run_deterministic_pre_step(
         )
     keywords = template.get("keywords")
     filters = template.get("filters")
-    gathered_context = gather_specification_context(
-        worktree_root,
-        types=[str(value) for value in raw_types],
-        keywords=(
-            [str(value) for value in keywords]
-            if isinstance(keywords, Sequence)
-            and not isinstance(keywords, (str, bytes, bytearray))
-            else None
+    gathered_context = invoke_repository_read(
+        "gather_context",
+        dict(template),
+        worktree_root=worktree_root,
+        executor=lambda _arguments: gather_specification_context(
+            worktree_root,
+            types=[str(value) for value in raw_types],
+            keywords=(
+                [str(value) for value in keywords]
+                if isinstance(keywords, Sequence)
+                and not isinstance(keywords, (str, bytes, bytearray))
+                else None
+            ),
+            filters=dict(filters) if isinstance(filters, Mapping) else None,
+            feature_id=feature_id,
         ),
-        filters=dict(filters) if isinstance(filters, Mapping) else None,
-        feature_id=feature_id,
+        runtime=runtime,
     )
     result = json.loads(render_gather_context_report(gathered_context))
     event = {
@@ -5834,7 +5840,7 @@ def _handle_workflow_action_invoke_tool(
             and action.parameters.get("operation") == "pr_create"
             and state.runtime is not None
         ):
-            readiness = state.runtime.readiness()
+            readiness = state.runtime.publish_readiness()
             if not readiness.ready:
                 raise PowdrrExecutionError(
                     "Pull-request creation is blocked by execution readiness: "
@@ -7106,12 +7112,23 @@ def _handle_workflow_action_gather_context(
     config: WorkflowChatConfig,
 ) -> bool:
     _ = input_func
-    gathered_context = gather_specification_context(
-        state.worktree_root,
-        types=list(action.types),
-        keywords=list(action.keywords) if action.keywords else None,
-        filters=action.filters,
-        feature_id=action.feature_id,
+    gathered_context = invoke_repository_read(
+        "gather_context",
+        {
+            "types": list(action.types),
+            "keywords": list(action.keywords) if action.keywords else None,
+            "filters": action.filters,
+            "feature_id": action.feature_id,
+        },
+        worktree_root=state.worktree_root,
+        executor=lambda _arguments: gather_specification_context(
+            state.worktree_root,
+            types=list(action.types),
+            keywords=list(action.keywords) if action.keywords else None,
+            filters=action.filters,
+            feature_id=action.feature_id,
+        ),
+        runtime=state.runtime,
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(

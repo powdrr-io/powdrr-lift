@@ -421,6 +421,17 @@ class ExecutionRuntime:
 
     def publish_readiness(self, **kwargs: Any) -> ReadinessReport:
         """Evaluate the publish boundary using the current durable state."""
+        if not kwargs and self.profile is not None:
+            publish_phase = next(
+                (
+                    item
+                    for item in self.profile.phases
+                    if item.phase_type is PhaseType.PUBLISH_PR
+                ),
+                None,
+            )
+            if publish_phase is not None:
+                kwargs["required_artifact_types"] = publish_phase.input_artifacts
         return self.readiness_evaluator.evaluate(self.state, **kwargs)
 
     def verify(self) -> ExecutionState:

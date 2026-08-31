@@ -574,12 +574,23 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "make progress. Choose a materially different action."
             )
         if action.kind == "gather_context":
-            report = gather_specification_context(
-                self.repo_root,
-                types=list(action.types),
-                keywords=list(action.keywords),
-                filters=action.filters,
-                feature_id=action.feature_id,
+            report = invoke_repository_read(
+                "gather_context",
+                {
+                    "types": list(action.types),
+                    "keywords": list(action.keywords),
+                    "filters": action.filters,
+                    "feature_id": action.feature_id,
+                },
+                worktree_root=self.repo_root,
+                executor=lambda _arguments: gather_specification_context(
+                    self.repo_root,
+                    types=list(action.types),
+                    keywords=list(action.keywords),
+                    filters=action.filters,
+                    feature_id=action.feature_id,
+                ),
+                runtime=self.runtime,
             )
             self.events.append(
                 {
@@ -934,7 +945,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 and action.parameters.get("operation") == "pr_create"
                 and self.runtime is not None
             ):
-                readiness = self.runtime.readiness()
+                readiness = self.runtime.publish_readiness()
                 if not readiness.ready:
                     raise PowdrrExecutionError(
                         "Pull-request creation is blocked by execution readiness: "
@@ -2569,17 +2580,23 @@ def _run_task_deterministic_pre_step(
         )
     keywords = template.get("keywords")
     filters = template.get("filters")
-    report = gather_specification_context(
-        repo_root,
-        types=[str(value) for value in raw_types],
-        keywords=(
-            [str(value) for value in keywords]
-            if isinstance(keywords, Sequence)
-            and not isinstance(keywords, (str, bytes, bytearray))
-            else None
+    report = invoke_repository_read(
+        "gather_context",
+        dict(template),
+        worktree_root=repo_root,
+        executor=lambda _arguments: gather_specification_context(
+            repo_root,
+            types=[str(value) for value in raw_types],
+            keywords=(
+                [str(value) for value in keywords]
+                if isinstance(keywords, Sequence)
+                and not isinstance(keywords, (str, bytes, bytearray))
+                else None
+            ),
+            filters=dict(filters) if isinstance(filters, Mapping) else None,
+            feature_id=feature_id,
         ),
-        filters=dict(filters) if isinstance(filters, Mapping) else None,
-        feature_id=feature_id,
+        runtime=runtime,
     )
     result = json.loads(render_gather_context_report(report))
     events.append(

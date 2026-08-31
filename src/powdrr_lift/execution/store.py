@@ -14,6 +14,7 @@ from typing import Protocol
 from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.execution_state import (
     ExecutionEvent,
+    ExecutionMode,
     ExecutionState,
     initial_execution_state,
     reduce_execution_event,
@@ -40,6 +41,7 @@ class ExecutionStateStore(Protocol):
         *,
         profile_id: str,
         phase: PhaseType = PhaseType.INTAKE,
+        mode: ExecutionMode = ExecutionMode.OBSERVE,
     ) -> ExecutionState: ...
 
     def load(self, execution_id: str) -> ExecutionState: ...
@@ -71,9 +73,10 @@ class FileExecutionStateStore:
         *,
         profile_id: str,
         phase: PhaseType = PhaseType.INTAKE,
+        mode: ExecutionMode = ExecutionMode.OBSERVE,
     ) -> ExecutionState:
         state = initial_execution_state(
-            execution_id, profile_id=profile_id, phase=phase
+            execution_id, profile_id=profile_id, phase=phase, mode=mode
         )
         directory = self._execution_directory(execution_id)
         directory.mkdir(parents=True, exist_ok=True)

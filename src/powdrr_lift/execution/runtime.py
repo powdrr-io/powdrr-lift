@@ -1,0 +1,208 @@
+"""Durable owner for the typed execution kernel and capability boundary."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
+from powdrr_lift.core.delivery_profile import PhaseType
+from powdrr_lift.core.execution_state import (
+    ExecutionEvent,
+    ExecutionEventType,
+    ExecutionMode,
+    ExecutionState,
+)
+from powdrr_lift.execution.capabilities import (
+    CapabilityBroker,
+    CapabilityDecision,
+    CapabilityExceptionStore,
+    CapabilityRequest,
+    CapabilityResolution,
+    FileCapabilityExceptionStore,
+)
+from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.evidence import ReadinessEvaluator, ReadinessReport
+from powdrr_lift.execution.kernel import ActionKernel
+from powdrr_lift.execution.phases import PhaseController, PhaseTransitionDecision
+from powdrr_lift.execution.store import (
+    ExecutionStateConflict,
+    ExecutionStateStore,
+    FileExecutionStateStore,
+)
+from powdrr_lift.execution.tools import (
+    ToolAdapter,
+    ToolContext,
+    ToolRegistry,
+    ToolResult,
+)
+
+
+class ExecutionRuntime:
+    """Own one execution's durable state, tools, checkpoints, and readiness."""
+
+    def __init__(
+        self,
+        execution_id: str,
+        *,
+        profile_id: str,
+        workflow_directory: str | Path,
+        repo_root: str | Path,
+        adapters: tuple[ToolAdapter, ...] = (),
+        registry: ToolRegistry | None = None,
+        exception_authority: CapabilityExceptionAuthority | None = None,
+        exception_store: CapabilityExceptionStore | None = None,
+        phase: PhaseType = PhaseType.INTAKE,
+        mode: ExecutionMode = ExecutionMode.ENFORCE,
+        state_store: ExecutionStateStore | None = None,
+    ) -> None:
+        self.execution_id = execution_id
+        self.repo_root = Path(repo_root).resolve()
+        self.state_store = state_store or FileExecutionStateStore(workflow_directory)
+        try:
+            self.state = self.state_store.load(execution_id)
+        except (FileNotFoundError, IsADirectoryError):
+            self.state = self.state_store.create(
+                execution_id, profile_id=profile_id, phase=phase, mode=mode
+            )
+        self.kernel = ActionKernel()
+        self.phase_controller = PhaseController()
+        self.readiness_evaluator = ReadinessEvaluator()
+        self.checkpoint_store = ContentAddressedCheckpointStore(
+            Path(workflow_directory) / "execution" / "checkpoints"
+        )
+        self.broker = CapabilityBroker(
+            registry or ToolRegistry(adapters),
+            exception_authority=exception_authority,
+            exception_store=exception_store
+            or FileCapabilityExceptionStore(workflow_directory),
+            checkpoint_store=self.checkpoint_store,
+            state_json_provider=lambda _context: self.state.to_json(),
+        )
+        self._projected_kernel_events = 0
+
+    def context(
+        self,
+        *,
+        semantic_actions: frozenset[str],
+        allowed_effects: frozenset[Any],
+        active_unit_id: str | None = None,
+    ) -> ToolContext:
+        return ToolContext(
+            self.repo_root,
+            self.repo_root,
+            semantic_actions,
+            allowed_effects,
+            execution_id=self.execution_id,
+            active_unit_id=active_unit_id,
+        )
+
+    def readiness(self) -> ReadinessReport:
+        return self.readiness_evaluator.evaluate(self.state)
+
+    def transition(
+        self,
+        target_phase: PhaseType,
+        *,
+        persona_id: str | None = None,
+    ) -> PhaseTransitionDecision:
+        """Validate and durably apply one closed-topology phase transition."""
+        decision = self.phase_controller.evaluate(
+            self.state,
+            target_phase,
+            open_obligations=tuple(
+                obligation.description for obligation in self.kernel.open_obligations
+            ),
+        )
+        if not decision.allowed:
+            return decision
+        sequence = self.state.event_sequence + 1
+        event = ExecutionEvent(
+            self.execution_id,
+            sequence,
+            self.state.state_version,
+            ExecutionEventType.PHASE_ENTERED,
+            {
+                "phase_type": target_phase.value,
+                "persona_id": persona_id,
+            },
+            f"{self.execution_id}:{sequence}",
+        )
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, (event,)
+        )
+        return decision
+
+    def verify(self) -> ExecutionState:
+        """Rebuild state from the durable event log and verify its cache."""
+        verify = getattr(self.state_store, "verify", None)
+        if not callable(verify):
+            return self.state
+        self.state = verify(self.execution_id)
+        return self.state
+
+    def invoke(
+        self, context: ToolContext, request: CapabilityRequest
+    ) -> ToolResult | CapabilityResolution:
+        """Invoke a capability and persist the broker decision."""
+        before = len(self.broker.decision_log)
+        result = self.broker.invoke(context, request)
+        decisions = self.broker.decision_log[before:]
+        if decisions:
+            self._append_capability_decisions(decisions)
+        return result
+
+    def sync_kernel(self, *, phase_type: str, actor_id: str) -> ExecutionState:
+        pending = self.kernel.events[self._projected_kernel_events :]
+        if not pending:
+            return self.state
+        durable_events = self.kernel.to_execution_events(
+            self.execution_id,
+            phase_type=phase_type,
+            actor_id=actor_id,
+            starting_state=self.state,
+            events=pending,
+        )
+        try:
+            self.state = self.state_store.append(
+                self.execution_id, self.state.state_version, durable_events
+            )
+        except ExecutionStateConflict:
+            # A chat/session adapter may recreate its materialized state while
+            # retaining the in-memory kernel. Reload and replay the typed
+            # lifecycle stream so recovery remains deterministic.
+            self.state = self.state_store.load(self.execution_id)
+            replay = self.kernel.to_execution_events(
+                self.execution_id,
+                phase_type=phase_type,
+                actor_id=actor_id,
+                starting_state=self.state,
+            )
+            self.state = self.state_store.append(
+                self.execution_id, self.state.state_version, replay
+            )
+        self._projected_kernel_events = len(self.kernel.events)
+        return self.state
+
+    def _append_capability_decisions(
+        self, decisions: tuple[CapabilityDecision, ...]
+    ) -> None:
+        events: list[ExecutionEvent] = []
+        state_version = self.state.state_version
+        sequence = self.state.event_sequence
+        for decision in decisions:
+            sequence += 1
+            events.append(
+                ExecutionEvent(
+                    self.execution_id,
+                    sequence,
+                    state_version,
+                    ExecutionEventType.CAPABILITY_DECISION,
+                    decision.to_data(),
+                    f"{self.execution_id}:{sequence}",
+                )
+            )
+            state_version += 1
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, events
+        )

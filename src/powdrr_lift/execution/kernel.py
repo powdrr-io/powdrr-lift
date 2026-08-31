@@ -83,13 +83,15 @@ class ActionKernel:
         phase_type: str,
         actor_id: str,
         starting_state: ExecutionState | None = None,
+        events: tuple[ActionLifecycleEvent, ...] | None = None,
     ) -> tuple[ExecutionEvent, ...]:
         """Project kernel lifecycle into the durable execution event schema."""
         state_version = starting_state.state_version if starting_state else 0
         sequence = starting_state.event_sequence if starting_state else 0
-        events: list[ExecutionEvent] = []
+        projected: list[ExecutionEvent] = []
         proposal_sequences: dict[int, str] = {}
-        for event in self._events:
+        lifecycle_events = events if events is not None else self._events
+        for event in lifecycle_events:
             event_type = {
                 ActionLifecyclePhase.PROPOSED: ExecutionEventType.ACTION_PROPOSED,
                 ActionLifecyclePhase.STARTED: ExecutionEventType.ACTION_STARTED,
@@ -124,7 +126,7 @@ class ActionKernel:
                         event.error, "error_code", type(event.error).__name__
                     )
             sequence += 1
-            events.append(
+            projected.append(
                 ExecutionEvent(
                     execution_id,
                     sequence,
@@ -135,7 +137,7 @@ class ActionKernel:
                 )
             )
             state_version += 1
-        return tuple(events)
+        return tuple(projected)
 
     def propose(
         self,

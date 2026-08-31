@@ -6,6 +6,9 @@ import pytest
 
 from powdrr_lift.core.tool_manifest import ToolEffect
 from powdrr_lift.execution.builtin_tools import (
+    BasedPyrightAdapter,
+    FuzzyMatchAdapter,
+    RepositoryReadAdapter,
     builtin_tool_registry,
     invoke_file_mutation,
     invoke_shell_capability,
@@ -113,3 +116,69 @@ def test_file_mutation_capability_rejects_absolute_and_escape_targets(
     for path in ("../outside.py", str(tmp_path / "outside.py")):
         with pytest.raises(ValueError, match="not executable"):
             invoke_file_mutation((path,), worktree_root=tmp_path, executor=execute)
+
+
+def test_basedpyright_capability_validates_symbol_and_structure_requests(
+    tmp_path: Path,
+) -> None:
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"inspect_code"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    structure_path = tmp_path / "example.py"
+    structure_path.write_text("value = 1\n", encoding="utf-8")
+
+    assert (
+        BasedPyrightAdapter("basedpyright-symbol")
+        .validate(context, {"query": "value", "limit": 10})
+        .valid
+    )
+    assert (
+        BasedPyrightAdapter("basedpyright-structure")
+        .validate(context, {"path": "example.py"})
+        .valid
+    )
+    assert (
+        not BasedPyrightAdapter("basedpyright-structure")
+        .validate(context, {"path": "../outside.py"})
+        .valid
+    )
+
+
+def test_fuzzy_match_capability_requires_a_structured_command(tmp_path: Path) -> None:
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"discover_files"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    adapter = FuzzyMatchAdapter()
+
+    assert adapter.validate(context, {"command": ["fuzzy-match", "."]}).valid
+    assert not adapter.validate(context, {"command": []}).valid
+    assert not adapter.validate(context, {"command": ""}).valid
+
+
+def test_repository_read_capability_bounds_paths_and_ranges(tmp_path: Path) -> None:
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"read_document"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    adapter = RepositoryReadAdapter("read_document", lambda _arguments: None)
+
+    assert adapter.validate(
+        context,
+        {"file_path": "README.md", "start_line": 1, "end_line": 20},
+    ).valid
+    assert not adapter.validate(
+        context,
+        {"file_path": "../README.md", "start_line": 1, "end_line": 20},
+    ).valid
+    assert not adapter.validate(
+        context,
+        {"file_path": "README.md", "start_line": 1, "end_line": 2001},
+    ).valid

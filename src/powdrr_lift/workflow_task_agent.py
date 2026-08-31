@@ -12,7 +12,6 @@ from typing import Any, TextIO
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
-    execute_basedpyright_tool,
     is_basedpyright_tool,
 )
 from powdrr_lift.builtin_tool_help import builtin_tool_help
@@ -31,8 +30,11 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.execution.builtin_tools import (
+    invoke_basedpyright_capability,
     invoke_file_mutation,
+    invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
+    invoke_repository_read,
     invoke_shell_capability,
 )
 from powdrr_lift.file_management import manage_worktree_file
@@ -56,7 +58,6 @@ from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
     _default_llm_mappings,
     _estimate_message_tokens,
-    _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _find_skill_by_name,
     _interaction_style_prompt,
@@ -618,7 +619,18 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.events.append(
                 {
                     "kind": action.kind,
-                    "result": _read_task_document(action, self.repo_root),
+                    "result": invoke_repository_read(
+                        "read_document",
+                        {
+                            "file_path": action.file_path,
+                            "start_line": action.start_line,
+                            "end_line": action.end_line,
+                        },
+                        worktree_root=self.repo_root,
+                        executor=lambda _arguments: _read_task_document(
+                            action, self.repo_root
+                        ),
+                    ),
                 }
             )
             return WorkflowActionOutcome()
@@ -626,11 +638,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.events.append(
                 {
                     "kind": action.kind,
-                    "result": _list_worktree_files(
-                        action.directory or ".",
-                        action.pattern,
-                        action.recursive,
-                        self.repo_root,
+                    "result": invoke_repository_read(
+                        "list_files",
+                        {
+                            "directory": action.directory or ".",
+                            "pattern": action.pattern,
+                            "recursive": action.recursive,
+                        },
+                        worktree_root=self.repo_root,
+                        executor=lambda _arguments: _list_worktree_files(
+                            action.directory or ".",
+                            action.pattern,
+                            action.recursive,
+                            self.repo_root,
+                        ),
                     ),
                 }
             )
@@ -896,12 +917,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if result.get("stderr"):
                 print(str(result["stderr"]), end="", file=self.stderr)
         elif action.tool == "fuzzy-match":
-            result = _execute_fuzzy_match_tool(
+            result = invoke_fuzzy_match_capability(
                 action.parameters,
                 worktree_root=self.repo_root,
             )
         elif action.tool is not None and is_basedpyright_tool(action.tool):
-            result = execute_basedpyright_tool(
+            result = invoke_basedpyright_capability(
                 action.tool,
                 action.parameters,
                 worktree_root=self.repo_root,
@@ -2988,7 +3009,18 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": _read_task_document(action, self.repo_root),
+                    "result": invoke_repository_read(
+                        "read_document",
+                        {
+                            "file_path": action.file_path,
+                            "start_line": action.start_line,
+                            "end_line": action.end_line,
+                        },
+                        worktree_root=self.repo_root,
+                        executor=lambda _arguments: _read_task_document(
+                            action, self.repo_root
+                        ),
+                    ),
                 }
             )
             _record_task_action_outputs(
@@ -3033,11 +3065,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
                 )
             elif action.tool == "fuzzy-match":
-                result = _execute_fuzzy_match_tool(
+                result = invoke_fuzzy_match_capability(
                     action.parameters, worktree_root=self.repo_root
                 )
             elif is_basedpyright_tool(action.tool or ""):
-                result = execute_basedpyright_tool(
+                result = invoke_basedpyright_capability(
                     action.tool or "", action.parameters, worktree_root=self.repo_root
                 )
             else:

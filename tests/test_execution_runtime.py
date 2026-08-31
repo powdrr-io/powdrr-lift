@@ -268,3 +268,28 @@ def test_mutating_capability_invalidates_prior_evidence(tmp_path: Path) -> None:
     )
 
     assert not runtime.state.evidence[0].fresh
+
+
+def test_runtime_diagnostics_are_recorded_as_evidence(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-diagnostics",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    def broken(_root: Path) -> str:
+        raise RuntimeError("diagnostic failed")
+
+    results = runtime.diagnose(
+        (
+            ("tests", lambda _root: "all tests passed"),
+            ("broken", broken),
+        )
+    )
+
+    assert [result.successful for result in results] == [True, False]
+    assert {item.evidence_type for item in runtime.state.evidence} == {
+        "diagnostic:tests",
+        "diagnostic:broken",
+    }

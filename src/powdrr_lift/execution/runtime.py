@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,11 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolution,
     FileCapabilityExceptionStore,
 )
-from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.checkpoints import (
+    ContentAddressedCheckpointStore,
+    DiagnosticResult,
+    run_diagnostics,
+)
 from powdrr_lift.execution.compaction import (
     FileContextRetrievalStore,
     compact_execution_context,
@@ -433,6 +438,29 @@ class ExecutionRuntime:
             if publish_phase is not None:
                 kwargs["required_artifact_types"] = publish_phase.input_artifacts
         return self.readiness_evaluator.evaluate(self.state, **kwargs)
+
+    def diagnose(
+        self,
+        hooks: Iterable[tuple[str, Callable[[Path], str]]],
+        *,
+        max_output_chars: int = 8_000,
+    ) -> tuple[DiagnosticResult, ...]:
+        """Run bounded diagnostics and record each result as fresh evidence."""
+        results = run_diagnostics(
+            self.repo_root, hooks, max_output_chars=max_output_chars
+        )
+        for result in results:
+            fingerprint = hashlib.sha256(
+                f"{result.name}:{self.state.event_sequence}".encode()
+            ).hexdigest()
+            self.record_evidence(
+                evidence_id=f"diagnostic-{result.name}-{self.state.event_sequence + 1}",
+                producer_action_instance_id=result.name,
+                evidence_type=f"diagnostic:{result.name}",
+                input_fingerprint=fingerprint,
+                successful=result.successful,
+            )
+        return results
 
     def verify(self) -> ExecutionState:
         """Rebuild state from the durable event log and verify its cache."""

@@ -2,9 +2,11 @@
 
 from powdrr_lift.execution.builtin_tools import (
     EnrichmentAdapter,
+    FileMutationAdapter,
     IntrinsicRepositoryAdapter,
     ShellAdapter,
     builtin_tool_registry,
+    invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
@@ -142,4 +144,6 @@ __all__ = [
     "invoke_intrinsic_capability",
     "invoke_shell_capability",
     "ShellAdapter",
+    "FileMutationAdapter",
+    "invoke_file_mutation",
 ]

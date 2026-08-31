@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
@@ -196,6 +197,64 @@ class ShellAdapter:
             self._executor(arguments),
             frozenset({ToolEffect.PROCESS_EXECUTION}),
         )
+
+
+class FileMutationAdapter:
+    manifest = ToolManifest(
+        "file-mutation",
+        ("edit_files",),
+        (ToolEffect.WORKSPACE_WRITE,),
+        scope="worktree",
+        sandbox_profile="workspace-files",
+        reversible=False,
+    )
+
+    def __init__(self, executor: Callable[[], Any]) -> None:
+        self._executor = executor
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        paths = arguments.get("paths")
+        if not isinstance(paths, (list, tuple)) or not paths:
+            return ToolValidationReport(("file mutation requires target paths",))
+        root = context.worktree_root.resolve()
+        for value in paths:
+            if not isinstance(value, str) or not value:
+                return ToolValidationReport(("file mutation paths must be strings",))
+            if Path(value).is_absolute():
+                return ToolValidationReport(("file mutation paths must be relative",))
+            try:
+                (root / value).resolve().relative_to(root)
+            except ValueError:
+                return ToolValidationReport(
+                    (f"file mutation escapes worktree: {value}",)
+                )
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        return ToolResult(self._executor(), frozenset({ToolEffect.WORKSPACE_WRITE}))
+
+
+def invoke_file_mutation(
+    paths: tuple[str, ...],
+    *,
+    worktree_root: Any,
+    executor: Callable[[], Any],
+) -> Any:
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset({"edit_files"}),
+        allowed_effects=frozenset(ToolEffect),
+    )
+    result = CapabilityBroker(ToolRegistry((FileMutationAdapter(executor),))).invoke(
+        context,
+        CapabilityRequest("file-mutation", "edit_files", {"paths": list(paths)}),
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(f"File mutation was not executable: {result.reason}")
 
 
 def invoke_shell_capability(

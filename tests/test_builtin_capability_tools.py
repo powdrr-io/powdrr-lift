@@ -2,9 +2,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from powdrr_lift.core.tool_manifest import ToolEffect
 from powdrr_lift.execution.builtin_tools import (
     builtin_tool_registry,
+    invoke_file_mutation,
     invoke_shell_capability,
 )
 from powdrr_lift.execution.capabilities import (
@@ -80,3 +83,33 @@ def test_shell_capability_rejects_string_commands_and_escape(tmp_path: Path) -> 
             assert "not executable" in str(error)
         else:
             raise AssertionError("invalid process should fail")
+
+
+def test_file_mutation_capability_validates_targets_before_execution(
+    tmp_path: Path,
+) -> None:
+    seen: list[bool] = []
+
+    def execute() -> dict[str, list[str]]:
+        seen.append(True)
+        return {"changed": ["src/example.py"]}
+
+    result = invoke_file_mutation(
+        ("src/example.py",),
+        worktree_root=tmp_path,
+        executor=execute,
+    )
+
+    assert result == {"changed": ["src/example.py"]}
+    assert seen == [True]
+
+
+def test_file_mutation_capability_rejects_absolute_and_escape_targets(
+    tmp_path: Path,
+) -> None:
+    def execute() -> object:
+        raise AssertionError("invalid file mutation must not execute")
+
+    for path in ("../outside.py", str(tmp_path / "outside.py")):
+        with pytest.raises(ValueError, match="not executable"):
+            invoke_file_mutation((path,), worktree_root=tmp_path, executor=execute)

@@ -329,8 +329,13 @@ class ExecutionRuntime:
         workflow_directory: str | Path,
     ) -> WorkflowInstance:
         """Compile and persist the canonical task graph owned by this runtime."""
-        tasks = self.compile_plan(profile, plan, actions_by_phase=actions_by_phase)
-        return WorkflowInstance.create(workflow_directory, tasks)
+        self.save_plan(plan)
+        return WorkflowInstance.from_execution_plan(
+            workflow_directory,
+            profile=profile,
+            plan=plan,
+            actions_by_phase=actions_by_phase,
+        )
 
     def compact_prompt_context(self, context: dict[str, Any]) -> dict[str, Any]:
         """Compact arbitrary prompt data while retaining runtime references."""

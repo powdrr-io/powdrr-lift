@@ -203,6 +203,23 @@ class WorkflowInstance:
         return workflow
 
     @classmethod
+    def from_execution_plan(
+        cls,
+        directory: str | Path,
+        *,
+        profile: Any,
+        plan: Any,
+        actions_by_phase: Mapping[Any, tuple[str, ...]],
+    ) -> WorkflowInstance:
+        """Create the durable task graph from the canonical typed plan."""
+        from powdrr_lift.execution.compile import compile_execution_plan
+
+        return cls.create(
+            directory,
+            compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase),
+        )
+
+    @classmethod
     def from_directory(cls, directory: str | Path) -> WorkflowInstance:
         directory_path = Path(directory)
         return cls(

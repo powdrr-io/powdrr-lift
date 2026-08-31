@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Protocol, TypeVar, cast
 
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workflow_execution import (
@@ -48,27 +49,6 @@ class WorkflowLLMExecutionAborted(RuntimeError):
     def __init__(self, exit_code: int) -> None:
         super().__init__("Workflow execution was aborted by its adapter.")
         self.exit_code = exit_code
-
-
-class PowdrrExecutionError(RuntimeError):
-    """An action failed in Powdrr and should be corrected by the agent."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_code: str = "action_error",
-        action_kind: str | None = None,
-        remediation: str | None = None,
-        details: Mapping[str, str] | None = None,
-        cause_error: Exception | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.error_code = error_code
-        self.action_kind = action_kind
-        self.remediation = remediation
-        self.details = dict(details or {})
-        self.cause_error = cause_error
 
 
 ActionT = TypeVar("ActionT")

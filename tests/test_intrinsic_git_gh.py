@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.intrinsic_git_gh import (
     execute_intrinsic_git_gh_tool,
     intrinsic_command,
@@ -27,7 +28,7 @@ def test_git_intrinsic_operations_have_expected_commands() -> None:
 
 
 def test_git_intrinsic_rejects_worktree_escape() -> None:
-    with pytest.raises(RuntimeError, match="stay inside the worktree"):
+    with pytest.raises(PowdrrExecutionError, match="stay inside the worktree"):
         intrinsic_command(
             {"operation": "add", "paths": ["../outside.txt"]},
             tool="git",
@@ -35,9 +36,9 @@ def test_git_intrinsic_rejects_worktree_escape() -> None:
 
 
 def test_intrinsics_require_structured_operations() -> None:
-    with pytest.raises(RuntimeError, match="structured operation"):
+    with pytest.raises(PowdrrExecutionError, match="structured operation"):
         intrinsic_command({"command": ["status", "--short"]}, tool="git")
-    with pytest.raises(RuntimeError, match="structured operation"):
+    with pytest.raises(PowdrrExecutionError, match="structured operation"):
         intrinsic_command({"command": ["pr", "view", "394"]}, tool="gh")
 
 

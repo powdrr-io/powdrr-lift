@@ -10,6 +10,7 @@ from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_SYMBOL_TOOL,
     execute_basedpyright_tool,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 
 
 class _FakeServer:
@@ -117,7 +118,7 @@ def test_basedpyright_structure_tool_rejects_non_python_paths(tmp_path: Path) ->
     path = tmp_path / "example.txt"
     path.write_text("not Python")
 
-    with pytest.raises(RuntimeError, match="Python files only"):
+    with pytest.raises(PowdrrExecutionError, match="Python files only"):
         execute_basedpyright_tool(
             BASEDPYRIGHT_STRUCTURE_TOOL,
             {"path": "example.txt"},

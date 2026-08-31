@@ -25,6 +25,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionEventType,
     ExecutionFinding,
     ExecutionMode,
+    ExecutionObligation,
     ExecutionState,
 )
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
@@ -337,7 +338,34 @@ class ExecutionRuntime:
                 "execution plan is not compilable: " + "; ".join(evaluation.issues)
             )
         self.save_plan(plan)
+        for decision in evaluation.required_decisions:
+            obligation_id = f"plan-decision:{plan.plan_id}:{decision}"
+            if any(
+                item.obligation_id == obligation_id for item in self.state.obligations
+            ):
+                continue
+            self._append_event(
+                ExecutionEventType.OBLIGATION_OPENED,
+                ExecutionObligation(
+                    obligation_id,
+                    f"Resolve plan decision: {decision}",
+                    relationship_id=plan.plan_id,
+                ).to_data(),
+            )
         return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
+
+    def resolve_plan_decision(self, plan_id: str, decision: str) -> ExecutionState:
+        """Close one explicit plan decision after its external resolution."""
+        obligation_id = f"plan-decision:{plan_id}:{decision}"
+        if not any(
+            item.obligation_id == obligation_id and item.status.value == "open"
+            for item in self.state.obligations
+        ):
+            raise ValueError(f"open plan decision not found: {decision}")
+        return self._append_event(
+            ExecutionEventType.OBLIGATION_SATISFIED,
+            {"obligation_id": obligation_id},
+        )
 
     def compile_plan_to_workflow(
         self,

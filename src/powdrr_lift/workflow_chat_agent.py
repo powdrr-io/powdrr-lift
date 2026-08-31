@@ -71,6 +71,7 @@ from powdrr_lift.core.validation_messages import (
     validation_error_to_data,
 )
 from powdrr_lift.execution.builtin_tools import (
+    invoke_file_mutation,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
@@ -5199,9 +5200,14 @@ def _handle_workflow_action_edit(
             }
         )
 
-    for target_path, updated_text in pending_writes:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(updated_text, encoding="utf-8")
+    invoke_file_mutation(
+        tuple(
+            _worktree_relative_path(target_path, state.worktree_root)
+            for target_path, _updated_text in pending_writes
+        ),
+        worktree_root=state.worktree_root,
+        executor=lambda: _write_pending_file_mutations(pending_writes),
+    )
     if state.file_added_callback is not None:
         state.file_added_callback(
             tuple(
@@ -5253,6 +5259,12 @@ def _handle_workflow_action_edit(
     return True
 
 
+def _write_pending_file_mutations(pending_writes: Sequence[tuple[Path, str]]) -> None:
+    for target_path, updated_text in pending_writes:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(updated_text, encoding="utf-8")
+
+
 def _handle_workflow_action_yaml_edit(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
@@ -5281,7 +5293,11 @@ def _handle_workflow_action_yaml_edit(
         action.yaml_operations,
     )
     _validate_structured_document_text(target_path, updated_text)
-    target_path.write_text(updated_text, encoding="utf-8")
+    invoke_file_mutation(
+        (action.file_path,),
+        worktree_root=state.worktree_root,
+        executor=lambda: target_path.write_text(updated_text, encoding="utf-8"),
+    )
     if state.file_added_callback is not None:
         state.file_added_callback(
             (_worktree_relative_path(target_path, state.worktree_root),)
@@ -5344,11 +5360,20 @@ def _handle_workflow_action_file_management(
         raise PowdrrExecutionError(
             "file_management action requires operation and file_path."
         )
-    result = manage_worktree_file(
-        state.worktree_root,
-        operation=action.file_operation,
-        file_path=action.file_path,
-        destination_path=action.destination_path,
+    file_operation = action.file_operation
+    file_path = action.file_path
+    mutation_paths: tuple[str, ...] = (file_path,)
+    if action.destination_path is not None:
+        mutation_paths += (action.destination_path,)
+    result = invoke_file_mutation(
+        mutation_paths,
+        worktree_root=state.worktree_root,
+        executor=lambda: manage_worktree_file(
+            state.worktree_root,
+            operation=file_operation,
+            file_path=file_path,
+            destination_path=action.destination_path,
+        ),
     )
     if state.file_added_callback is not None:
         changed_paths = [action.file_path]

@@ -408,6 +408,27 @@ class ExecutionRuntime:
             ),
         )
         if decision.allowed and self.profile is not None:
+            assignment = next(
+                (
+                    item
+                    for item in self.profile.phases
+                    if item.phase_type is target_phase
+                ),
+                None,
+            )
+            if assignment is not None and persona_id not in {
+                None,
+                assignment.persona_id,
+            }:
+                return PhaseTransitionDecision(
+                    False,
+                    decision.current_phase,
+                    decision.target_phase,
+                    (
+                        f"phase {target_phase.value} is assigned to persona "
+                        f"{assignment.persona_id!r}",
+                    ),
+                )
             handoff = validate_handoff(
                 self.profile,
                 self.state,

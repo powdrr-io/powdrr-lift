@@ -288,6 +288,14 @@ class ExecutionRuntime:
             rule_id, expected_version=expected_version
         )
 
+    def supersede_guidance(
+        self, rule_id: str, replacement: Any, *, expected_version: int
+    ) -> Any:
+        """Replace guidance atomically while retaining why it was replaced."""
+        return self.behavior_rule_store.supersede(
+            rule_id, replacement, expected_version=expected_version
+        )
+
     def record_observer_decision(
         self,
         *,

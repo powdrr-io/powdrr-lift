@@ -127,6 +127,17 @@ class FileBehaviorRuleStore:
             rules if include_inactive else tuple(rule for rule in rules if rule.active)
         )
 
+    def _write_rules(self, rules: list[BehaviorRule]) -> None:
+        payload = json.dumps([item.to_data() for item in rules], indent=2) + "\n"
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=self.path.parent, delete=False
+        ) as temporary:
+            temporary.write(payload)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_path = Path(temporary.name)
+        os.replace(temporary_path, self.path)
+
     def list(self, *, include_inactive: bool = False) -> tuple[BehaviorRule, ...]:
         with self._locked():
             return self._list_unlocked(include_inactive=include_inactive)
@@ -176,16 +187,59 @@ class FileBehaviorRuleStore:
             rules = [saved if item.rule_id == rule.rule_id else item for item in rules]
             if current is None:
                 rules.append(saved)
-            payload = json.dumps([item.to_data() for item in rules], indent=2) + "\n"
-            with tempfile.NamedTemporaryFile(
-                "w", encoding="utf-8", dir=self.path.parent, delete=False
-            ) as temporary:
-                temporary.write(payload)
-                temporary.flush()
-                os.fsync(temporary.fileno())
-                temporary_path = Path(temporary.name)
-            os.replace(temporary_path, self.path)
+            self._write_rules(rules)
             return saved
+
+    def supersede(
+        self,
+        rule_id: str,
+        replacement: BehaviorRule,
+        *,
+        expected_version: int,
+    ) -> BehaviorRule:
+        """Atomically deactivate a rule and install its replacement."""
+        with self._locked():
+            rules = list(self._list_unlocked(include_inactive=True))
+            current = next((item for item in rules if item.rule_id == rule_id), None)
+            if current is None:
+                raise KeyError(rule_id)
+            if current.version != expected_version:
+                raise ValueError(f"stale behavior rule version for {rule_id!r}")
+            if replacement.rule_id == rule_id:
+                raise ValueError("a behavior rule cannot supersede itself")
+            if any(item.rule_id == replacement.rule_id for item in rules):
+                raise ValueError(
+                    f"behavior rule already exists: {replacement.rule_id!r}"
+                )
+            retired = BehaviorRule(
+                current.rule_id,
+                current.text,
+                current.normalized_text,
+                current.source_ref,
+                current.scope,
+                current.precedence,
+                current.version + 1,
+                active=False,
+                expires_at=current.expires_at,
+                supersedes_rule_id=current.supersedes_rule_id,
+            )
+            installed = BehaviorRule(
+                replacement.rule_id,
+                replacement.text,
+                replacement.normalized_text,
+                replacement.source_ref,
+                replacement.scope,
+                replacement.precedence,
+                1,
+                active=True,
+                expires_at=replacement.expires_at,
+                supersedes_rule_id=rule_id,
+            )
+            self._write_rules(
+                [retired if item.rule_id == rule_id else item for item in rules]
+                + [installed]
+            )
+            return installed
 
     def revoke(self, rule_id: str, *, expected_version: int) -> BehaviorRule:
         with self._locked():

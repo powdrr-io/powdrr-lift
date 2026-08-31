@@ -69,6 +69,25 @@ def test_stale_update_and_revoke_are_rejected(tmp_path: Path) -> None:
     assert store.explain(saved.rule_id)["applicable"] is False
 
 
+def test_supersede_atomically_retains_guidance_lineage(tmp_path: Path) -> None:
+    store = FileBehaviorRuleStore(tmp_path)
+    original = store.save(rule())
+    replacement = nominate_behavior_rule(
+        "When changes address review comments, resolve and link the comments.",
+        rule_id="review-comments-v2",
+        source_ref="conversation:43",
+        scope=original.scope,
+    )
+
+    installed = store.supersede(
+        original.rule_id, replacement, expected_version=original.version
+    )
+
+    assert installed.supersedes_rule_id == original.rule_id
+    assert store.list() == (installed,)
+    assert store.explain(original.rule_id)["superseded_by"] == (installed.rule_id,)
+
+
 def test_empty_rule_is_not_nominated() -> None:
     with pytest.raises(ValueError):
         nominate_behavior_rule(

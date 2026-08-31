@@ -117,6 +117,18 @@ class ContentAddressedCheckpointStore:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.objects / digest, target)
 
+    def restore_with_state(
+        self, checkpoint: Checkpoint, workspace_root: str | Path | None = None
+    ) -> str | None:
+        """Restore files and return the exact logical state captured with them.
+
+        The caller owns deserializing and installing the typed execution state;
+        returning it from the same restore operation prevents workspace and
+        logical-state recovery from silently diverging.
+        """
+        self.restore(checkpoint, workspace_root)
+        return self.load_state_json(checkpoint)
+
 
 @dataclass(frozen=True, slots=True)
 class DiagnosticResult:

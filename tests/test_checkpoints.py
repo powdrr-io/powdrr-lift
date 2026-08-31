@@ -29,6 +29,22 @@ def test_checkpoint_can_capture_logical_execution_state(tmp_path: Path) -> None:
     assert store.load_state_json(loaded) == '{"version": 3}'
 
 
+def test_checkpoint_restore_with_state_restores_workspace_and_state(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "state.txt").write_text("before", encoding="utf-8")
+    store = ContentAddressedCheckpointStore(tmp_path / "checkpoints")
+    checkpoint = store.create(workspace, "restore-with-state", state_json='{"step": 1}')
+
+    (workspace / "state.txt").write_text("after", encoding="utf-8")
+    restored_state = store.restore_with_state(checkpoint)
+
+    assert (workspace / "state.txt").read_text(encoding="utf-8") == "before"
+    assert restored_state == '{"step": 1}'
+
+
 def test_diagnostics_are_bounded_and_failures_are_evidence(tmp_path: Path) -> None:
     def long(root: Path) -> str:
         return "x" * 20

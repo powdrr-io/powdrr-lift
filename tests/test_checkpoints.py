@@ -1,6 +1,8 @@
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.execution.checkpoints import (
     ContentAddressedCheckpointStore,
     run_diagnostics,
@@ -43,6 +45,27 @@ def test_checkpoint_restore_with_state_restores_workspace_and_state(
 
     assert (workspace / "state.txt").read_text(encoding="utf-8") == "before"
     assert restored_state == '{"step": 1}'
+
+
+def test_checkpoint_restore_rejects_symlink_escape_before_mutating(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "nested").mkdir()
+    (workspace / "nested" / "file.txt").write_text("before", encoding="utf-8")
+    store = ContentAddressedCheckpointStore(tmp_path / "checkpoints")
+    checkpoint = store.create(workspace, "safe-restore")
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (workspace / "nested" / "file.txt").unlink()
+    (workspace / "nested").rmdir()
+    (workspace / "nested").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        store.restore(checkpoint)
+    assert not (outside / "file.txt").exists()
 
 
 def test_diagnostics_are_bounded_and_failures_are_evidence(tmp_path: Path) -> None:

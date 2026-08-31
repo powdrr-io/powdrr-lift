@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 TYPED_REFERENCE_KEYS = frozenset(
@@ -20,6 +23,41 @@ TYPED_REFERENCE_KEYS = frozenset(
         "checkpoint_ids",
     }
 )
+
+
+class FileContextRetrievalStore:
+    """Bounded retrieval store for prompt content omitted during compaction."""
+
+    def __init__(self, directory: str | Path) -> None:
+        self.root = Path(directory) / "execution" / "context"
+
+    def save(self, context: Mapping[str, Any]) -> str:
+        encoded = json.dumps(dict(context), sort_keys=True, default=str)
+        reference = hashlib.sha256(encoded.encode()).hexdigest()[:24]
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / f"{reference}.json").write_text(encoded + "\n", encoding="utf-8")
+        return reference
+
+    def load(self, reference: str) -> dict[str, Any]:
+        value = json.loads(
+            (self.root / f"{reference}.json").read_text(encoding="utf-8")
+        )
+        if not isinstance(value, dict):
+            raise ValueError("stored execution context must be an object")
+        return value
+
+
+def compact_with_retrieval(
+    context: Mapping[str, Any],
+    store: FileContextRetrievalStore,
+    *,
+    max_preview_chars: int = 1_000,
+) -> dict[str, Any]:
+    """Compact prompt data and expose a reference to the complete payload."""
+    reference = store.save(context)
+    compacted = compact_execution_context(context, max_preview_chars=max_preview_chars)
+    compacted["full_context_ref"] = reference
+    return compacted
 
 
 def compact_execution_context(

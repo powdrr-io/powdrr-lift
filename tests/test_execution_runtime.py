@@ -134,3 +134,40 @@ def test_builtin_helper_can_only_execute_through_runtime_broker_when_supplied(
         event.event_type is ExecutionEventType.CAPABILITY_DECISION for event in events
     )
     assert events[-1].event_type is ExecutionEventType.EVIDENCE_RECORDED
+
+
+def test_runtime_compaction_has_retrievable_full_context(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-context",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    compacted = runtime.compact_prompt_context({"transcript": "x" * 2_000})
+    restored = runtime.retrieve_prompt_context(compacted["full_context_ref"])
+
+    assert restored["transcript"] == "x" * 2_000
+    assert compacted["runtime_state"]["execution_id"] == "run-context"
+
+
+def test_runtime_profile_blocks_handoff_without_required_artifact(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-handoff",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+
+    decision = runtime.transition(PhaseType.SPECIFY)
+
+    assert not decision.allowed
+    assert "request" in " ".join(decision.guards)

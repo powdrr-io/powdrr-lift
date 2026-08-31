@@ -34,7 +34,9 @@ from powdrr_lift.execution.checkpoints import (
     run_diagnostics,
 )
 from powdrr_lift.execution.compaction import (
+    FileContextRetrievalStore,
     compact_execution_context,
+    compact_with_retrieval,
     compatibility_diagnostic,
 )
 from powdrr_lift.execution.compile import compile_execution_plan
@@ -147,6 +149,8 @@ __all__ = [
     "compile_execution_plan",
     "compatibility_diagnostic",
     "compact_execution_context",
+    "FileContextRetrievalStore",
+    "compact_with_retrieval",
     "evaluate_review_agreement",
     "invalidate_evidence",
     "builtin_tool_registry",

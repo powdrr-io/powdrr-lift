@@ -25,7 +25,7 @@ from powdrr_lift.core import (
     WorkflowTask,
     resolve_repo_root,
 )
-from powdrr_lift.core.delivery_profile import PhaseType
+from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -407,6 +407,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     timeout_backoff_seconds=self.config.timeout_backoff_seconds,
                 )
             )
+            if self.runtime is not None and self.compacted_context is not None:
+                self.compacted_context = self.runtime.compact_prompt_context(
+                    self.compacted_context
+                )
             self.events.append(
                 {
                     "kind": "context_compaction",
@@ -1316,6 +1320,15 @@ def run_workflow_task(
             workflow_directory=workflow_dir,
             repo_root=repo_root,
             phase=execution_phase,
+            profile=(
+                load_delivery_profile(
+                    repo_root / "delivery-profiles/default-software-delivery.yaml"
+                )
+                if (
+                    repo_root / "delivery-profiles/default-software-delivery.yaml"
+                ).is_file()
+                else None
+            ),
         )
         if client_was_provided:
             assert client is not None

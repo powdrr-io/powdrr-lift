@@ -57,6 +57,7 @@ from powdrr_lift.core import (
     system_map_specification_default_output_path,
     system_specification_default_output_path,
 )
+from powdrr_lift.core.delivery_profile import load_delivery_profile
 from powdrr_lift.core.python_tool_commands import (
     dependency_backed_command_variants,
     missing_executable_output,
@@ -2727,6 +2728,15 @@ def run_workflow_chat(
         profile_id=selected_skill.skill.name,
         workflow_directory=project_root / ".powdrr",
         repo_root=repo_root,
+        profile=(
+            load_delivery_profile(
+                repo_root / "delivery-profiles/default-software-delivery.yaml"
+            )
+            if (
+                repo_root / "delivery-profiles/default-software-delivery.yaml"
+            ).is_file()
+            else None
+        ),
     )
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,

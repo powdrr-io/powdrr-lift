@@ -462,6 +462,11 @@ class WorkflowStepRunner:
                         source_ref=f"{self.runtime.execution_id}:roundtrip-{roundtrips}",
                     )
             proposal_errors = self.kernel.validate_proposal(action)
+            if self.runtime is not None:
+                proposal_errors = (
+                    *proposal_errors,
+                    *self.runtime.validate_action(str(getattr(action, "kind", ""))),
+                )
             if proposal_errors:
                 error = PowdrrExecutionError(
                     " ".join(proposal_errors),

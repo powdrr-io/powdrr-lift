@@ -226,3 +226,17 @@ def test_runtime_captures_explicit_guidance_with_stable_identity(
     assert first.rule_id == second.rule_id
     assert second.version == 2
     assert runtime.guidance({"profile_id": "default"})[0].text.startswith("Always")
+
+
+def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-actions",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.set_action_contract(frozenset({"read_document"}))
+
+    assert runtime.validate_action("read_document") == ()
+    assert runtime.validate_action("next_step") == ()
+    assert runtime.validate_action("edit")

@@ -775,6 +775,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         context=action.context,
                         clean=action.clean,
                         error_log_root=self.error_log_root,
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -1330,6 +1331,7 @@ def run_workflow_task(
                 else None
             ),
         )
+        runtime.set_action_contract(frozenset(task.actions))
         if client_was_provided:
             assert client is not None
             task_client = client
@@ -2766,6 +2768,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     current_step: Any = None
     current_step_index: int = 0
     driver: WorkflowStepRunner | None = None
+    runtime: ExecutionRuntime | None = None
 
     def _restore_completed_skill(self, frame: _NestedSkillExecutionFrame) -> None:
         if frame.clean_context:
@@ -2785,6 +2788,10 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step_index = frame.step_index
             self.current_step = frame.skill.skill.steps[frame.step_index]
             step = self.current_step
+            if self.runtime is not None:
+                self.runtime.set_action_contract(
+                    frozenset(getattr(step, "actions", ()))
+                )
             if step.step_type == "gate":
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")
@@ -2800,6 +2807,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.verbose,
+                    runtime=self.runtime,
                 )
                 target_index = frame.step_index + 1
                 if not passed:
@@ -2833,6 +2841,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.verbose,
+                    runtime=self.runtime,
                 )
             return WorkflowActionRequest(
                 client=self.client,
@@ -3087,6 +3096,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         executor=lambda _arguments: _read_task_document(
                             action, self.repo_root
                         ),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -3102,6 +3112,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         _task_edit_paths(action),
                         worktree_root=self.repo_root,
                         executor=lambda: _apply_task_edits(action, self.repo_root),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -3126,18 +3137,27 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         stderr=self.stderr,
                         verbose=self.verbose,
                     ),
+                    runtime=self.runtime,
                 )
             elif action.tool == ENRICH_TOOL:
                 result = invoke_intrinsic_capability(
-                    ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
+                    ENRICH_TOOL,
+                    action.parameters,
+                    worktree_root=self.repo_root,
+                    runtime=self.runtime,
                 )
             elif action.tool == "fuzzy-match":
                 result = invoke_fuzzy_match_capability(
-                    action.parameters, worktree_root=self.repo_root
+                    action.parameters,
+                    worktree_root=self.repo_root,
+                    runtime=self.runtime,
                 )
             elif is_basedpyright_tool(action.tool or ""):
                 result = invoke_basedpyright_capability(
-                    action.tool or "", action.parameters, worktree_root=self.repo_root
+                    action.tool or "",
+                    action.parameters,
+                    worktree_root=self.repo_root,
+                    runtime=self.runtime,
                 )
             else:
                 raise PowdrrExecutionError(
@@ -3216,6 +3236,7 @@ def _run_skill_for_agent_with_shared_runner(
     context: tuple[str, ...] = (),
     clean: bool = False,
     error_log_root: Path | None = None,
+    runtime: ExecutionRuntime | None = None,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     transcript = [] if clean else [{"role": "user", "content": task.description}]
@@ -3271,8 +3292,9 @@ def _run_skill_for_agent_with_shared_runner(
                 parent_handoff_records={},
             )
         ],
+        runtime=runtime,
     )
-    driver = WorkflowStepRunner(max_stalled_roundtrips=3)
+    driver = WorkflowStepRunner(max_stalled_roundtrips=3, runtime=runtime)
     strategy.driver = driver
     exit_code = driver.run(
         strategy,
@@ -3301,6 +3323,7 @@ def _run_skill_for_agent(
     context: tuple[str, ...] = (),
     clean: bool = False,
     error_log_root: Path | None = None,
+    runtime: ExecutionRuntime | None = None,
 ) -> dict[str, Any]:
     return _run_skill_for_agent_with_shared_runner(
         skill_name,
@@ -3316,6 +3339,7 @@ def _run_skill_for_agent(
         context=context,
         clean=clean,
         error_log_root=error_log_root,
+        runtime=runtime,
     )
 
 

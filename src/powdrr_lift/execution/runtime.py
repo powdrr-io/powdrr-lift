@@ -22,6 +22,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionMode,
     ExecutionState,
 )
+from powdrr_lift.core.workflow_task_specification import WorkflowInstance
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityDecision,
@@ -109,6 +110,18 @@ class ExecutionRuntime:
             state_json_provider=lambda _context: self.state.to_json(),
         )
         self._projected_kernel_events = 0
+        self._allowed_actions: frozenset[str] | None = None
+
+    def set_action_contract(self, actions: frozenset[str] | None) -> None:
+        """Set the single runtime-owned action contract for the active step."""
+        self._allowed_actions = actions if actions else None
+
+    def validate_action(self, action_kind: str) -> tuple[str, ...]:
+        if self._allowed_actions is None or action_kind in self._allowed_actions:
+            return ()
+        if action_kind == "next_step":
+            return ()
+        return (f"action {action_kind!r} is not allowed by the active step contract",)
 
     def context(
         self,
@@ -128,6 +141,45 @@ class ExecutionRuntime:
 
     def readiness(self) -> ReadinessReport:
         return self.readiness_evaluator.evaluate(self.state)
+
+    def request_capability_exception(
+        self,
+        context: ToolContext,
+        request: CapabilityRequest,
+        reason: str,
+        *,
+        expires_at: str,
+        max_uses: int = 1,
+    ) -> Any:
+        """Create the exact human decision packet for an exceptional request."""
+        exception = self.broker.create_exception_request(
+            context,
+            request,
+            reason,
+            expires_at=expires_at,
+            max_uses=max_uses,
+        )
+        if exception is None:
+            raise ValueError("capability exception request is not eligible")
+        return exception
+
+    def decide_capability_exception(
+        self, exception: Any, *, approved: bool, decided_by: str
+    ) -> Any:
+        """Apply and durably record one human exception decision."""
+        decision = self.broker.decide_exception(
+            exception, approved=approved, decided_by=decided_by
+        )
+        self._append_event(
+            ExecutionEventType.CAPABILITY_DECISION,
+            {
+                "exception_id": exception.exception_id,
+                "kind": "executable" if approved else "denied",
+                "reason": "exception approved" if approved else "exception denied",
+                "decided_by": decided_by,
+            },
+        )
+        return decision
 
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
@@ -243,6 +295,18 @@ class ExecutionRuntime:
         """Compile a typed plan through the runtime-owned plan boundary."""
         self.save_plan(plan)
         return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
+
+    def compile_plan_to_workflow(
+        self,
+        profile: DeliveryProfile,
+        plan: ExecutionPlan,
+        *,
+        actions_by_phase: dict[PhaseType, tuple[str, ...]],
+        workflow_directory: str | Path,
+    ) -> WorkflowInstance:
+        """Compile and persist the canonical task graph owned by this runtime."""
+        tasks = self.compile_plan(profile, plan, actions_by_phase=actions_by_phase)
+        return WorkflowInstance.create(workflow_directory, tasks)
 
     def compact_prompt_context(self, context: dict[str, Any]) -> dict[str, Any]:
         """Compact arbitrary prompt data while retaining runtime references."""

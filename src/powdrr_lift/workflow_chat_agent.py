@@ -1000,6 +1000,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             self.current_step_index = self.state.step_index
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
+            if self.state.runtime is not None:
+                self.state.runtime.set_action_contract(
+                    frozenset(getattr(self.current_step, "actions", ()))
+                )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
                 self.current_step_index,

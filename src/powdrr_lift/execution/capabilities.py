@@ -236,6 +236,19 @@ class CapabilityBroker:
             )
         if is_expired(exception, utc_now()):
             raise ValueError("Cannot decide an expired capability exception.")
+        existing = self._decisions.get(exception.exception_id)
+        if existing is None and self.exception_store is not None:
+            stored = self.exception_store.load(exception.exception_id)
+            if stored is not None:
+                _, existing = stored
+                self._decisions[exception.exception_id] = existing
+        if existing is not None:
+            if existing.approved != approved or existing.decided_by != decided_by:
+                raise ValueError(
+                    f"capability exception {exception.exception_id!r} "
+                    "already has a decision"
+                )
+            return existing
         token = self.exception_authority.sign(exception) if approved else None
         decision = CapabilityExceptionDecision(
             exception.exception_id,

@@ -2,6 +2,8 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.execution_state import ExecutionEventType
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
@@ -205,3 +207,27 @@ def test_runtime_exception_flow_resumes_exact_request(tmp_path: Path) -> None:
         event.event_type is ExecutionEventType.CAPABILITY_DECISION
         for event in runtime.state_store.load_events("run-runtime-exception")
     )
+
+
+def test_exception_decision_is_idempotent_and_conflicts_are_rejected(
+    tmp_path: Path,
+) -> None:
+    store = FileCapabilityExceptionStore(tmp_path)
+    authority = CapabilityExceptionAuthority(b"secret")
+    context = ToolContext(
+        tmp_path, tmp_path, frozenset({"edit"}), frozenset(), execution_id="run-5"
+    )
+    request = CapabilityRequest("write-file", "edit", {"path": "one.txt"})
+    broker = CapabilityBroker(ToolRegistry([WriteTool()]), authority, store)
+    exception = broker.create_exception_request(
+        context,
+        request,
+        "needs review",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    assert exception is not None
+    first = broker.decide_exception(exception, approved=True, decided_by="human")
+    repeated = broker.decide_exception(exception, approved=True, decided_by="human")
+    assert repeated == first
+    with pytest.raises(ValueError, match="already has a decision"):
+        broker.decide_exception(exception, approved=False, decided_by="human")

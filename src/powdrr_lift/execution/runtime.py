@@ -68,6 +68,7 @@ class ExecutionRuntime:
                 execution_id, profile_id=profile_id, phase=phase, mode=mode
             )
         self.kernel = ActionKernel()
+        self.kernel.restore_obligations(self.state.obligations)
         self.phase_controller = PhaseController()
         self.readiness_evaluator = ReadinessEvaluator()
         self.checkpoint_store = ContentAddressedCheckpointStore(

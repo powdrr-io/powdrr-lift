@@ -49,6 +49,30 @@ def test_runtime_does_not_duplicate_kernel_events(tmp_path: Path) -> None:
     assert len(runtime.state_store.load_events("run-2")) == first_count
 
 
+def test_runtime_restores_open_obligations_for_resume(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-resume",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.kernel.propose(
+        {"kind": "change"},
+        semantic_action="change_mutable_row",
+    )
+    runtime.sync_kernel(phase_type="build", actor_id="engineer")
+
+    resumed = ExecutionRuntime(
+        "run-resume",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    assert resumed.kernel.open_obligations
+    assert resumed.kernel.validate_proposal({"kind": "unrelated"})
+
+
 def test_runtime_persists_capability_decisions(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-3",

@@ -13,6 +13,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionEventType,
     ExecutionObligation,
     ExecutionState,
+    ObligationStatus,
 )
 from powdrr_lift.execution.relationships import expand_execution_obligations
 
@@ -74,6 +75,14 @@ class ActionKernel:
             "open_obligations": [
                 obligation.to_data() for obligation in self._obligations.values()
             ],
+        }
+
+    def restore_obligations(self, obligations: tuple[ExecutionObligation, ...]) -> None:
+        """Hydrate open obligations when a durable execution is resumed."""
+        self._obligations = {
+            obligation.obligation_id: obligation
+            for obligation in obligations
+            if obligation.status is ObligationStatus.OPEN
         }
 
     def to_execution_events(

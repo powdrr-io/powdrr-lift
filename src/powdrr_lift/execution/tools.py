@@ -38,6 +38,7 @@ class ToolResult:
     output: Any = None
     observed_effects: frozenset[ToolEffect] = frozenset()
     evidence: tuple[str, ...] = ()
+    checkpoint_id: str | None = None
 
 
 class ToolAdapter(Protocol):

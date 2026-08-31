@@ -10,6 +10,7 @@ from powdrr_lift.execution.builtin_tools import (
 )
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
+    CapabilityCheckpointStore,
     CapabilityDecision,
     CapabilityExceptionStore,
     CapabilityRequest,
@@ -108,6 +109,7 @@ __all__ = [
     "satisfy_execution_obligation",
     "unresolved_obligations",
     "CapabilityBroker",
+    "CapabilityCheckpointStore",
     "CapabilityDecision",
     "EnrichmentAdapter",
     "Checkpoint",

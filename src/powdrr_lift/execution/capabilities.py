@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
@@ -74,6 +75,16 @@ class CapabilityExceptionStore(Protocol):
     def save_request(self, exception: CapabilityExceptionRequest) -> None: ...
 
 
+class CapabilityCheckpointStore(Protocol):
+    def create(
+        self,
+        workspace_root: str | Path,
+        checkpoint_id: str,
+        *,
+        state_json: str | None = None,
+    ) -> Any: ...
+
+
 class FileCapabilityExceptionStore:
     def __init__(self, workflow_directory: str | Path) -> None:
         self.root = Path(workflow_directory) / "execution" / "exceptions"
@@ -139,10 +150,14 @@ class CapabilityBroker:
         registry: ToolRegistry,
         exception_authority: CapabilityExceptionAuthority | None = None,
         exception_store: CapabilityExceptionStore | None = None,
+        checkpoint_store: CapabilityCheckpointStore | None = None,
+        state_json_provider: Callable[[ToolContext], str | None] | None = None,
     ) -> None:
         self.registry = registry
         self.exception_authority = exception_authority
         self.exception_store = exception_store
+        self.checkpoint_store = checkpoint_store
+        self.state_json_provider = state_json_provider
         self._decisions: dict[str, CapabilityExceptionDecision] = {}
         self._exceptions: dict[str, CapabilityExceptionRequest] = {}
         self._decision_log: list[CapabilityDecision] = []
@@ -389,7 +404,45 @@ class CapabilityBroker:
         if resolution.kind is not CapabilityResolutionKind.EXECUTABLE:
             return resolution
         assert resolution.adapter is not None and resolution.arguments is not None
-        return resolution.adapter.execute(context, resolution.arguments)
+        effects_for = getattr(resolution.adapter, "effects_for", None)
+        effects = (
+            effects_for(context, resolution.arguments)
+            if callable(effects_for)
+            else resolution.adapter.manifest.effects
+        )
+        checkpoint_id: str | None = None
+        if self.checkpoint_store is not None and any(
+            effect is not ToolEffect.WORKSPACE_READ for effect in effects
+        ):
+            encoded = json.dumps(
+                {
+                    "execution_id": context.execution_id,
+                    "tool": request.tool_name,
+                    "action": request.semantic_action,
+                    "arguments": dict(request.arguments),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+            checkpoint_id = (
+                "before-" + hashlib.sha256(encoded.encode()).hexdigest()[:24]
+            )
+            self.checkpoint_store.create(
+                context.worktree_root,
+                checkpoint_id,
+                state_json=(
+                    self.state_json_provider(context)
+                    if self.state_json_provider is not None
+                    else None
+                ),
+            )
+        result = resolution.adapter.execute(context, resolution.arguments)
+        return (
+            replace(result, checkpoint_id=checkpoint_id)
+            if checkpoint_id is not None
+            else result
+        )
 
 
 def _scope_error(worktree_root: Path, arguments: Mapping[str, Any]) -> str | None:

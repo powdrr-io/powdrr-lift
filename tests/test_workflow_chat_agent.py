@@ -7,8 +7,8 @@ import shutil
 import subprocess
 import sys
 import types
-from contextlib import redirect_stderr, redirect_stdout
 from collections.abc import Iterator
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path

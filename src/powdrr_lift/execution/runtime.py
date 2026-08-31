@@ -453,6 +453,15 @@ class ExecutionRuntime:
                         offset=len(events) + 1,
                     )
                 )
+            if checkpoint_ids:
+                for evidence in self.state.evidence:
+                    events.append(
+                        self._event(
+                            ExecutionEventType.EVIDENCE_INVALIDATED,
+                            {"evidence_id": evidence.evidence_id},
+                            offset=len(events) + 1,
+                        )
+                    )
             if isinstance(result, ToolResult) and any(
                 decision.kind.value == "executable" for decision in decisions
             ):

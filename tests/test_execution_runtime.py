@@ -6,7 +6,10 @@ from powdrr_lift.core.execution_state import (
     ExecutionEventType,
     ObligationStatus,
 )
-from powdrr_lift.execution.builtin_tools import invoke_shell_capability
+from powdrr_lift.execution.builtin_tools import (
+    invoke_file_mutation,
+    invoke_shell_capability,
+)
 from powdrr_lift.execution.capabilities import CapabilityRequest, CapabilityResolution
 from powdrr_lift.execution.runtime import ExecutionRuntime
 
@@ -240,3 +243,28 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     assert runtime.validate_action("read_document") == ()
     assert runtime.validate_action("next_step") == ()
     assert runtime.validate_action("edit")
+
+
+def test_mutating_capability_invalidates_prior_evidence(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-invalidation",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    invoke_shell_capability(
+        {"command": ["echo", "first"]},
+        worktree_root=tmp_path,
+        executor=lambda _arguments: {"returncode": 0},
+        runtime=runtime,
+    )
+    assert runtime.state.evidence[0].fresh
+
+    invoke_file_mutation(
+        ("changed.txt",),
+        worktree_root=tmp_path,
+        executor=lambda: (tmp_path / "changed.txt").write_text("changed\n"),
+        runtime=runtime,
+    )
+
+    assert not runtime.state.evidence[0].fresh

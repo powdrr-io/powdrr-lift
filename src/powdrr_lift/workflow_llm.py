@@ -454,6 +454,13 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            if self.runtime is not None:
+                guidance = getattr(action, "decisions_and_context", None)
+                if isinstance(guidance, str):
+                    self.runtime.capture_explicit_guidance(
+                        guidance,
+                        source_ref=f"{self.runtime.execution_id}:roundtrip-{roundtrips}",
+                    )
             proposal_errors = self.kernel.validate_proposal(action)
             if proposal_errors:
                 error = PowdrrExecutionError(

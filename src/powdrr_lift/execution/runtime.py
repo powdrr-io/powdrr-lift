@@ -7,7 +7,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.behavior_rule import FileBehaviorRuleStore
+from powdrr_lift.core.behavior_rule import (
+    FileBehaviorRuleStore,
+    nominate_behavior_rule,
+)
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan, FileExecutionPlanStore
@@ -128,6 +131,7 @@ class ExecutionRuntime:
 
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
+        rules = self.guidance({"profile_id": self.state.profile_id})
         return compact_execution_context(
             {
                 "execution_id": self.execution_id,
@@ -140,6 +144,14 @@ class ExecutionRuntime:
                 ],
                 "evidence_ids": [item.evidence_id for item in self.state.evidence],
                 "finding_ids": [item.finding_id for item in self.state.findings],
+                "guidance": [
+                    {
+                        "rule_id": rule.rule_id,
+                        "version": rule.version,
+                        "text": rule.text,
+                    }
+                    for rule in rules
+                ],
             }
         )
 
@@ -154,6 +166,41 @@ class ExecutionRuntime:
     ) -> Any:
         """Persist a user-requested behavior rule with optimistic versioning."""
         return self.behavior_rule_store.save(rule, expected_version=expected_version)
+
+    def capture_guidance(
+        self, text: str, *, source_ref: str, scope: dict[str, str] | None = None
+    ) -> Any:
+        """Turn an explicit user instruction into durable future behavior."""
+        normalized = " ".join(text.strip().casefold().split())
+        if not normalized:
+            raise ValueError("Guidance text must not be empty.")
+        rule_id = "guidance-" + hashlib.sha256(normalized.encode()).hexdigest()[:20]
+        current = next(
+            (
+                rule
+                for rule in self.behavior_rule_store.list(include_inactive=True)
+                if rule.rule_id == rule_id
+            ),
+            None,
+        )
+        return self.remember_guidance(
+            nominate_behavior_rule(
+                text,
+                rule_id=rule_id,
+                source_ref=source_ref,
+                scope=scope or {"profile_id": self.state.profile_id},
+            ),
+            expected_version=current.version if current is not None else None,
+        )
+
+    def capture_explicit_guidance(self, text: str, *, source_ref: str) -> Any | None:
+        """Capture only directive-shaped text, keeping ordinary rationale ephemeral."""
+        normalized = text.strip().casefold()
+        if not normalized.startswith(
+            ("always ", "never ", "when you ", "i want you to ")
+        ):
+            return None
+        return self.capture_guidance(text, source_ref=source_ref)
 
     def revoke_guidance(self, rule_id: str, *, expected_version: int) -> Any:
         return self.behavior_rule_store.revoke(
@@ -206,6 +253,27 @@ class ExecutionRuntime:
 
     def retrieve_prompt_context(self, reference: str) -> dict[str, Any]:
         return self.context_store.load(reference)
+
+    def restore_checkpoint(
+        self, checkpoint_id: str, *, workspace_root: str | Path | None = None
+    ) -> ExecutionState:
+        """Restore files and typed state as one replayable logical operation."""
+        checkpoint = self.checkpoint_store.load(checkpoint_id)
+        state_json = self.checkpoint_store.restore_with_state(
+            checkpoint, workspace_root
+        )
+        if state_json is None:
+            raise ValueError("checkpoint has no execution state snapshot")
+        restored = ExecutionState.from_json(state_json)
+        if restored.execution_id != self.execution_id:
+            raise ValueError("checkpoint belongs to a different execution")
+        self.state = self._append_event(
+            ExecutionEventType.CHECKPOINT_REVERTED,
+            {"checkpoint_id": checkpoint_id, "state": restored.to_data()},
+        )
+        self.kernel.restore_obligations(self.state.obligations)
+        self._projected_kernel_events = len(self.kernel.events)
+        return self.state
 
     def persona_packet(
         self,
@@ -307,7 +375,20 @@ class ExecutionRuntime:
         result = self.broker.invoke(context, request)
         decisions = self.broker.decision_log[before:]
         if decisions:
-            self._append_capability_decisions(decisions)
+            events = self._capability_decision_events(decisions)
+            checkpoint_ids = {
+                decision.checkpoint_id
+                for decision in decisions
+                if decision.checkpoint_id is not None
+            }
+            for checkpoint_id in sorted(checkpoint_ids):
+                events.append(
+                    self._event(
+                        ExecutionEventType.CHECKPOINT_CREATED,
+                        {"checkpoint_id": checkpoint_id},
+                        offset=len(events) + 1,
+                    )
+                )
             if isinstance(result, ToolResult) and any(
                 decision.kind.value == "executable" for decision in decisions
             ):
@@ -322,15 +403,26 @@ class ExecutionRuntime:
                         default=str,
                     ).encode()
                 ).hexdigest()
-                self.record_evidence(
-                    evidence_id=f"evidence-{self.state.event_sequence + 1}",
-                    producer_action_instance_id=(
-                        context.active_unit_id or request.semantic_action
-                    ),
-                    evidence_type=f"capability:{request.tool_name}",
-                    input_fingerprint=fingerprint,
-                    successful=True,
+                evidence_id = f"evidence-{self.state.event_sequence + len(events) + 1}"
+                events.append(
+                    self._event(
+                        ExecutionEventType.EVIDENCE_RECORDED,
+                        {
+                            "evidence_id": evidence_id,
+                            "producer_action_instance_id": (
+                                context.active_unit_id or request.semantic_action
+                            ),
+                            "evidence_type": f"capability:{request.tool_name}",
+                            "input_fingerprint": fingerprint,
+                            "successful": True,
+                            "fresh": True,
+                        },
+                        offset=len(events) + 1,
+                    )
                 )
+            self.state = self.state_store.append(
+                self.execution_id, self.state.state_version, tuple(events)
+            )
         return result
 
     def invoke_adapter(
@@ -377,19 +469,28 @@ class ExecutionRuntime:
     def _append_event(
         self, event_type: ExecutionEventType, payload: dict[str, Any]
     ) -> ExecutionState:
-        sequence = self.state.event_sequence + 1
-        event = ExecutionEvent(
-            self.execution_id,
-            sequence,
-            self.state.state_version,
-            event_type,
-            payload,
-            f"{self.execution_id}:{sequence}",
-        )
+        event = self._event(event_type, payload)
         self.state = self.state_store.append(
             self.execution_id, self.state.state_version, (event,)
         )
         return self.state
+
+    def _event(
+        self,
+        event_type: ExecutionEventType,
+        payload: dict[str, Any],
+        *,
+        offset: int = 1,
+    ) -> ExecutionEvent:
+        sequence = self.state.event_sequence + offset
+        return ExecutionEvent(
+            self.execution_id,
+            sequence,
+            self.state.state_version + offset - 1,
+            event_type,
+            payload,
+            f"{self.execution_id}:{sequence}",
+        )
 
     def sync_kernel(self, *, phase_type: str, actor_id: str) -> ExecutionState:
         pending = self.kernel.events[self._projected_kernel_events :]
@@ -423,9 +524,9 @@ class ExecutionRuntime:
         self._projected_kernel_events = len(self.kernel.events)
         return self.state
 
-    def _append_capability_decisions(
+    def _capability_decision_events(
         self, decisions: tuple[CapabilityDecision, ...]
-    ) -> None:
+    ) -> list[ExecutionEvent]:
         events: list[ExecutionEvent] = []
         state_version = self.state.state_version
         sequence = self.state.event_sequence
@@ -442,6 +543,4 @@ class ExecutionRuntime:
                 )
             )
             state_version += 1
-        self.state = self.state_store.append(
-            self.execution_id, self.state.state_version, events
-        )
+        return events

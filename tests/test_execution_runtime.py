@@ -1,7 +1,11 @@
 from pathlib import Path
 
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.core.execution_state import ExecutionEventType, ObligationStatus
+from powdrr_lift.core.execution_state import (
+    ExecutionArtifact,
+    ExecutionEventType,
+    ObligationStatus,
+)
 from powdrr_lift.execution.builtin_tools import invoke_shell_capability
 from powdrr_lift.execution.capabilities import CapabilityRequest, CapabilityResolution
 from powdrr_lift.execution.runtime import ExecutionRuntime
@@ -171,3 +175,54 @@ def test_runtime_profile_blocks_handoff_without_required_artifact(
 
     assert not decision.allowed
     assert "request" in " ".join(decision.guards)
+
+
+def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    runtime = ExecutionRuntime(
+        "run-checkpoint",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=repo_root,
+    )
+    target = repo_root / "source.txt"
+    target.write_text("before\n", encoding="utf-8")
+    checkpoint = runtime.checkpoint_store.create(
+        repo_root, "checkpoint-1", state_json=runtime.state.to_json()
+    )
+    target.write_text("after\n", encoding="utf-8")
+    runtime.record_artifact(
+        ExecutionArtifact("artifact-1", "request", "v1", "architect", "ref-1")
+    )
+
+    restored = runtime.restore_checkpoint(checkpoint.checkpoint_id)
+
+    assert target.read_text(encoding="utf-8") == "before\n"
+    assert not restored.artifacts
+    assert runtime.verify() == restored
+    assert runtime.state_store.load_events("run-checkpoint")[-1].event_type is (
+        ExecutionEventType.CHECKPOINT_REVERTED
+    )
+
+
+def test_runtime_captures_explicit_guidance_with_stable_identity(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-guidance",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    first = runtime.capture_guidance(
+        "Always use optimistic locking for mutable rows.", source_ref="user:1"
+    )
+    second = runtime.capture_guidance(
+        "Always use optimistic locking for mutable rows.", source_ref="user:2"
+    )
+
+    assert first.rule_id == second.rule_id
+    assert second.version == 2
+    assert runtime.guidance({"profile_id": "default"})[0].text.startswith("Always")

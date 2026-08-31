@@ -1058,6 +1058,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.config.verbose,
+                    runtime=self.state.runtime,
                 )
                 if passed:
                     self.state.step_index += 1
@@ -1097,6 +1098,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.config.verbose,
+                    runtime=self.state.runtime,
                 )
                 pre_step_event = _latest_deterministic_pre_step(
                     self.state.execution_events,
@@ -4054,6 +4056,7 @@ def _run_deterministic_pre_step(
     stderr: TextIO = sys.stderr,
     verbose: bool = False,
     force: bool = False,
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     if not force and _latest_deterministic_pre_step(
         execution_events,
@@ -4088,7 +4091,7 @@ def _run_deterministic_pre_step(
             parameters.pop("tool", None)
             _wire_previous_tool_output(parameters, execution_events, handoff_records)
             result = invoke_intrinsic_capability(
-                ENRICH_TOOL, parameters, worktree_root=worktree_root
+                ENRICH_TOOL, parameters, worktree_root=worktree_root, runtime=runtime
             )
         elif tool == VALIDATE_EDIT_TOOL:
             parameters.pop("tool", None)
@@ -4096,6 +4099,7 @@ def _run_deterministic_pre_step(
                 VALIDATE_EDIT_TOOL,
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         elif tool == APPLY_EDIT_TOOL:
             parameters.pop("tool", None)
@@ -4103,11 +4107,13 @@ def _run_deterministic_pre_step(
                 APPLY_EDIT_TOOL,
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         elif tool == "fuzzy-match":
             result = invoke_fuzzy_match_capability(
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         elif tool in {"shell", _INTERNAL_TOOL}:
             if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
@@ -4123,16 +4129,18 @@ def _run_deterministic_pre_step(
                     verbose=verbose,
                     announce=False,
                 ),
+                runtime=runtime,
             )
         elif tool in {GIT_TOOL, GH_TOOL}:
             result = invoke_intrinsic_capability(
-                tool, parameters, worktree_root=worktree_root
+                tool, parameters, worktree_root=worktree_root, runtime=runtime
             )
         elif is_basedpyright_tool(tool):
             result = invoke_basedpyright_capability(
                 tool,
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         else:
             raise PowdrrExecutionError(
@@ -4252,6 +4260,7 @@ def _run_gate(
     stdout: TextIO,
     stderr: TextIO,
     verbose: bool,
+    runtime: ExecutionRuntime | None = None,
 ) -> bool:
     if step.gate is None or step.pre_step is None:
         raise PowdrrExecutionError(
@@ -4271,6 +4280,7 @@ def _run_gate(
         stderr=stderr,
         verbose=verbose,
         force=True,
+        runtime=runtime,
     )
     event = execution_events[-1] if len(execution_events) > before else None
     if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):

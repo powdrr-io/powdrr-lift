@@ -1360,6 +1360,7 @@ def run_workflow_task(
                 repo_root=repo_root,
                 events=driver_events,
                 include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
+                runtime=runtime,
             )
         )
         driver = WorkflowStepRunner(
@@ -2505,6 +2506,7 @@ def _run_task_deterministic_pre_step(
     repo_root: Path,
     events: list[dict[str, Any]],
     include_invoke_tool: bool = False,
+    runtime: ExecutionRuntime | None = None,
 ) -> tuple[Any, bool]:
     """Run a task's deterministic context pre-step before asking the LLM.
 
@@ -2533,6 +2535,7 @@ def _run_task_deterministic_pre_step(
             handoff_records=handoff_records,
             step_index=0,
             workflow_context=None,
+            runtime=runtime,
         )
         result = events[-1].get("result")
         return {task.output_state_type: result}, True

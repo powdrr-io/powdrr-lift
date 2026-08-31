@@ -407,6 +407,17 @@ def reduce_execution_event(
                 for item in state.findings
             ),
         )
+    elif event.event_type is ExecutionEventType.CHECKPOINT_REVERTED:
+        restored = payload.get("state")
+        if not isinstance(restored, Mapping):
+            raise ValueError("checkpoint_reverted requires a typed state snapshot")
+        restored_state = ExecutionState.from_data(restored)
+        if restored_state.execution_id != state.execution_id:
+            raise ValueError("checkpoint state belongs to a different execution")
+        # The revert itself remains part of the new event stream.  Preserve
+        # the stream's monotonic version/sequence while replacing all logical
+        # state, including obligations and evidence, from the snapshot.
+        next_state = restored_state
     elif event.event_type in {
         ExecutionEventType.CREATED,
         ExecutionEventType.CHECKPOINT_CREATED,

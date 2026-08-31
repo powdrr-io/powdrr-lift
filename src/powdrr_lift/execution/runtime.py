@@ -409,7 +409,11 @@ class ExecutionRuntime:
         workflow_directory: str | Path,
     ) -> WorkflowInstance:
         """Compile and persist the canonical task graph owned by this runtime."""
-        self.save_plan(plan)
+        self.compile_plan(
+            profile,
+            plan,
+            actions_by_phase=actions_by_phase,
+        )
         return WorkflowInstance.from_execution_plan(
             workflow_directory,
             profile=profile,

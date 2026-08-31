@@ -295,6 +295,51 @@ def test_plan_decisions_become_durable_readiness_obligations(tmp_path: Path) -> 
     assert runtime.readiness().ready
 
 
+def test_compile_plan_to_workflow_uses_runtime_validation_boundary(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+    from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+    from powdrr_lift.core.workflow_task_specification import WorkflowInstance
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-compiled-workflow",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "runtime",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    plan = ExecutionPlan(
+        plan_id="plan-compiled-workflow",
+        proposed_pr_fingerprint="workflow-fingerprint",
+        units=(
+            ExecutionUnit(
+                unit_id="unit-1",
+                objective="Implement the change",
+                paths=("src/app.py",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("The implementation is validated.",),
+            ),
+        ),
+        allowed_paths=("src",),
+    )
+
+    workflow = runtime.compile_plan_to_workflow(
+        profile,
+        plan,
+        actions_by_phase={
+            phase.phase_type: ("read_document",) for phase in profile.phases
+        },
+        workflow_directory=tmp_path / "workflow",
+    )
+
+    assert isinstance(workflow, WorkflowInstance)
+    assert runtime.load_plan(plan.plan_id) == plan
+
+
 def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

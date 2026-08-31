@@ -1,5 +1,10 @@
 import pytest
 
+from powdrr_lift.core.execution_state import (
+    ExecutionEventType,
+    initial_execution_state,
+    reduce_execution_events,
+)
 from powdrr_lift.execution.kernel import ActionKernel, ActionLifecyclePhase
 from powdrr_lift.intrinsic_enrich import execute_enrich_tool
 from powdrr_lift.workflow_llm import PowdrrExecutionError
@@ -148,3 +153,25 @@ def test_action_kernel_snapshot_is_json_compatible_and_replayable() -> None:
     assert snapshot["events"][0]["phase"] == "proposed"
     assert snapshot["events"][1]["phase"] == "obligation_opened"
     assert all("relationship_id" in item for item in snapshot["open_obligations"])
+
+
+def test_action_kernel_projects_lifecycle_to_durable_state_events() -> None:
+    kernel = ActionKernel()
+    kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
+    kernel.complete({"kind": "test", "semantic_action": "run_concurrency_test"})
+    initial = initial_execution_state("run-1", profile_id="default")
+
+    events = kernel.to_execution_events(
+        "run-1", phase_type="build", actor_id="engineer", starting_state=initial
+    )
+    rebuilt = reduce_execution_events(initial, events)
+
+    assert events[0].event_type is ExecutionEventType.ACTION_PROPOSED
+    assert any(
+        event.event_type is ExecutionEventType.OBLIGATION_OPENED for event in events
+    )
+    assert any(
+        event.event_type is ExecutionEventType.OBLIGATION_SATISFIED for event in events
+    )
+    assert len(rebuilt.obligations) == 2
+    assert sum(item.status.value == "open" for item in rebuilt.obligations) == 1

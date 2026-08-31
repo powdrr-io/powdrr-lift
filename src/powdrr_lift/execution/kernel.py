@@ -8,7 +8,12 @@ from enum import StrEnum
 from typing import Any
 
 from powdrr_lift.core.action_relationship import BUILTIN_ACTION_RELATIONSHIPS
-from powdrr_lift.core.execution_state import ExecutionObligation
+from powdrr_lift.core.execution_state import (
+    ExecutionEvent,
+    ExecutionEventType,
+    ExecutionObligation,
+    ExecutionState,
+)
 from powdrr_lift.execution.relationships import expand_execution_obligations
 
 
@@ -70,6 +75,67 @@ class ActionKernel:
                 obligation.to_data() for obligation in self._obligations.values()
             ],
         }
+
+    def to_execution_events(
+        self,
+        execution_id: str,
+        *,
+        phase_type: str,
+        actor_id: str,
+        starting_state: ExecutionState | None = None,
+    ) -> tuple[ExecutionEvent, ...]:
+        """Project kernel lifecycle into the durable execution event schema."""
+        state_version = starting_state.state_version if starting_state else 0
+        sequence = starting_state.event_sequence if starting_state else 0
+        events: list[ExecutionEvent] = []
+        proposal_sequences: dict[int, str] = {}
+        for event in self._events:
+            event_type = {
+                ActionLifecyclePhase.PROPOSED: ExecutionEventType.ACTION_PROPOSED,
+                ActionLifecyclePhase.STARTED: ExecutionEventType.ACTION_STARTED,
+                ActionLifecyclePhase.COMPLETED: ExecutionEventType.ACTION_COMPLETED,
+                ActionLifecyclePhase.FAILED: ExecutionEventType.ACTION_FAILED,
+                ActionLifecyclePhase.OBLIGATION_OPENED: (
+                    ExecutionEventType.OBLIGATION_OPENED
+                ),
+                ActionLifecyclePhase.OBLIGATION_SATISFIED: (
+                    ExecutionEventType.OBLIGATION_SATISFIED
+                ),
+            }[event.phase]
+            action_id = self._action_instance_id(event.action, event.sequence)
+            if event.phase is ActionLifecyclePhase.PROPOSED:
+                proposal_sequences[event.sequence] = action_id
+            payload: dict[str, Any]
+            if event.phase in {
+                ActionLifecyclePhase.OBLIGATION_OPENED,
+                ActionLifecyclePhase.OBLIGATION_SATISFIED,
+            }:
+                payload = dict(event.obligations[0].to_data())
+            else:
+                payload = {
+                    "action_instance_id": action_id,
+                    "kind": self._semantic_action(event.action, None),
+                    "actor_id": actor_id,
+                    "phase_type": phase_type,
+                }
+                if event.error is not None:
+                    payload["status"] = "correctable_error"
+                    payload["error_code"] = getattr(
+                        event.error, "error_code", type(event.error).__name__
+                    )
+            sequence += 1
+            events.append(
+                ExecutionEvent(
+                    execution_id,
+                    sequence,
+                    state_version,
+                    event_type,
+                    payload,
+                    f"{execution_id}:{sequence}",
+                )
+            )
+            state_version += 1
+        return tuple(events)
 
     def propose(
         self,
@@ -178,6 +244,15 @@ class ActionKernel:
         return explicit or str(
             getattr(action, "semantic_action", None) or getattr(action, "kind", "")
         )
+
+    @staticmethod
+    def _action_instance_id(action: Any, sequence: int) -> str:
+        value = (
+            action.get("action_instance_id")
+            if isinstance(action, Mapping)
+            else getattr(action, "action_instance_id", None)
+        )
+        return value if isinstance(value, str) and value else f"action-{sequence}"
 
     @staticmethod
     def _action_attributes(action: Any) -> frozenset[str]:

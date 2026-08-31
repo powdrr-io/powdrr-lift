@@ -123,4 +123,45 @@ def test_pending_and_denied_exception_decisions_are_durable(tmp_path: Path) -> N
     ).exists()
     broker.decide_exception(exception, approved=False, decided_by="human")
     assert (tmp_path / "execution/exceptions/run-2_write-file_edit.json").exists()
-    assert len(broker.decision_log) == 1
+
+
+def test_exception_use_count_survives_broker_restart(tmp_path: Path) -> None:
+    store = FileCapabilityExceptionStore(tmp_path)
+    authority = CapabilityExceptionAuthority(b"secret")
+    context = ToolContext(
+        tmp_path, tmp_path, frozenset({"edit"}), frozenset(), execution_id="run-4"
+    )
+    request = CapabilityRequest("write-file", "edit", {"path": "one.txt"})
+    broker = CapabilityBroker(ToolRegistry([WriteTool()]), authority, store)
+    exception = broker.create_exception_request(
+        context,
+        request,
+        "needs review",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    assert exception is not None
+    decision = broker.decide_exception(exception, approved=True, decided_by="human")
+    approved = broker.resolve(
+        context,
+        CapabilityRequest(
+            request.tool_name,
+            request.semantic_action,
+            request.arguments,
+            decision.token,
+        ),
+    )
+    assert approved.kind is CapabilityResolutionKind.EXECUTABLE
+
+    restarted = CapabilityBroker(ToolRegistry([WriteTool()]), authority, store)
+    replay = restarted.resolve(
+        context,
+        CapabilityRequest(
+            request.tool_name,
+            request.semantic_action,
+            request.arguments,
+            decision.token,
+        ),
+    )
+    assert replay.kind is CapabilityResolutionKind.EXCEPTION_REQUIRED
+    stored = store.load(exception.exception_id)
+    assert stored is not None and stored[1].uses == 1

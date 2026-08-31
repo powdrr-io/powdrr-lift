@@ -336,17 +336,18 @@ class CapabilityBroker:
                     and decision.binding == exception.binding()
                     and decision.uses < exception.max_uses
                 ):
-                    self._decisions[decision.exception_id] = (
-                        CapabilityExceptionDecision(
-                            decision.exception_id,
-                            decision.binding,
-                            decision.approved,
-                            decision.decided_by,
-                            decision.decided_at,
-                            decision.token,
-                            decision.uses + 1,
-                        )
+                    consumed = CapabilityExceptionDecision(
+                        decision.exception_id,
+                        decision.binding,
+                        decision.approved,
+                        decision.decided_by,
+                        decision.decided_at,
+                        decision.token,
+                        decision.uses + 1,
                     )
+                    self._decisions[decision.exception_id] = consumed
+                    if self.exception_store is not None:
+                        self.exception_store.save(exception, consumed)
                     return self._record(
                         request,
                         CapabilityResolution(

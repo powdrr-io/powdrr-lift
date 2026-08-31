@@ -200,6 +200,37 @@ def test_runtime_profile_rejects_wrong_phase_persona(tmp_path: Path) -> None:
     assert "architect" in " ".join(decision.guards)
 
 
+def test_runtime_persona_packet_must_match_current_profile_phase(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-persona-packet",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+
+    try:
+        runtime.persona_packet(
+            profile,
+            run_id="run",
+            phase_type=PhaseType.SPECIFY,
+            phase_actions=frozenset({"read"}),
+            persona_actions={"architect": frozenset({"read"})},
+            allowed_effects=frozenset(),
+        )
+    except ValueError as error:
+        assert "does not match runtime phase" in str(error)
+    else:
+        raise AssertionError("mismatched persona packet should be rejected")
+
+
 def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

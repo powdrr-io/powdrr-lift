@@ -379,6 +379,19 @@ class ExecutionRuntime:
         allowed_effects: frozenset[Any],
     ) -> PersonaPacket:
         """Build a least-privilege persona packet from durable runtime state."""
+        if phase_type is not self.state.current_phase:
+            raise ValueError(
+                f"persona packet phase {phase_type.value!r} does not match "
+                f"runtime phase {self.state.current_phase.value!r}"
+            )
+        assignment = next(
+            (item for item in profile.phases if item.phase_type is phase_type), None
+        )
+        if assignment is not None and assignment.persona_id not in persona_actions:
+            raise ValueError(
+                "persona actions omit profile-assigned persona "
+                f"{assignment.persona_id!r}"
+            )
         return build_persona_packet(
             profile,
             execution_id=self.execution_id,

@@ -309,6 +309,7 @@ def invoke_basedpyright_capability(
     arguments: Mapping[str, Any],
     *,
     worktree_root: Path,
+    runtime: Any = None,
 ) -> Any:
     context = ToolContext(
         repo_root=worktree_root,
@@ -316,9 +317,12 @@ def invoke_basedpyright_capability(
         semantic_actions=frozenset({"inspect_code"}),
         allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
     )
-    result = CapabilityBroker(ToolRegistry((BasedPyrightAdapter(tool),))).invoke(
-        context,
-        CapabilityRequest(tool, "inspect_code", dict(arguments)),
+    adapter = BasedPyrightAdapter(tool)
+    request = CapabilityRequest(tool, "inspect_code", dict(arguments))
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -388,6 +392,7 @@ def invoke_fuzzy_match_capability(
     worktree_root: Path,
     path_cache: MutableMapping[tuple[str, int, int | None], tuple[Path, ...]]
     | None = None,
+    runtime: Any = None,
 ) -> Any:
     context = ToolContext(
         repo_root=worktree_root,
@@ -395,9 +400,12 @@ def invoke_fuzzy_match_capability(
         semantic_actions=frozenset({"discover_files"}),
         allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
     )
-    result = CapabilityBroker(ToolRegistry((FuzzyMatchAdapter(path_cache),))).invoke(
-        context,
-        CapabilityRequest("fuzzy-match", "discover_files", dict(arguments)),
+    adapter = FuzzyMatchAdapter(path_cache)
+    request = CapabilityRequest("fuzzy-match", "discover_files", dict(arguments))
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -461,12 +469,59 @@ class RepositoryReadAdapter:
         )
 
 
+class DeferredEditAdapter:
+    """Broker adapter for validation/application of deferred edit payloads."""
+
+    def __init__(self, tool_name: str, worktree_root: Path) -> None:
+        self._tool_name = tool_name
+        self._worktree_root = worktree_root
+        self.manifest = ToolManifest(
+            tool_name,
+            ("validate_edit",) if tool_name == "validate-edit" else ("apply_edit",),
+            (ToolEffect.WORKSPACE_READ,)
+            if tool_name == "validate-edit"
+            else (ToolEffect.WORKSPACE_WRITE,),
+            scope="worktree",
+            sandbox_profile="workspace-files",
+            reversible=tool_name == "validate-edit",
+        )
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        if (
+            not isinstance(arguments.get("edit"), Mapping)
+            and arguments.get("edit") is not None
+        ):
+            return ToolValidationReport(("deferred edit must be an object",))
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        from powdrr_lift.intrinsic_edit import (
+            execute_apply_edit_tool,
+            execute_validate_edit_tool,
+        )
+
+        result = (
+            execute_validate_edit_tool(arguments, worktree_root=self._worktree_root)
+            if self._tool_name == "validate-edit"
+            else execute_apply_edit_tool(arguments, worktree_root=self._worktree_root)
+        )
+        effects = (
+            frozenset({ToolEffect.WORKSPACE_READ})
+            if self._tool_name == "validate-edit"
+            else frozenset({ToolEffect.WORKSPACE_WRITE})
+        )
+        return ToolResult(result, effects)
+
+
 def invoke_repository_read(
     operation: str,
     arguments: Mapping[str, Any],
     *,
     worktree_root: Path,
     executor: Callable[[Mapping[str, Any]], Any],
+    runtime: Any = None,
 ) -> Any:
     context = ToolContext(
         repo_root=worktree_root,
@@ -474,15 +529,42 @@ def invoke_repository_read(
         semantic_actions=frozenset({operation}),
         allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
     )
-    result = CapabilityBroker(
-        ToolRegistry((RepositoryReadAdapter(operation, executor),))
-    ).invoke(
-        context,
-        CapabilityRequest(f"repository-{operation}", operation, dict(arguments)),
+    adapter = RepositoryReadAdapter(operation, executor)
+    request = CapabilityRequest(f"repository-{operation}", operation, dict(arguments))
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
     )
     if isinstance(result, ToolResult):
         return result.output
     raise ValueError(f"Repository read was not executable: {result.reason}")
+
+
+def invoke_deferred_edit_capability(
+    tool: str,
+    arguments: Mapping[str, Any],
+    *,
+    worktree_root: Path,
+    runtime: Any = None,
+) -> Any:
+    request_action = "validate_edit" if tool == "validate-edit" else "apply_edit"
+    adapter = DeferredEditAdapter(tool, worktree_root)
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset({request_action}),
+        allowed_effects=frozenset(ToolEffect),
+    )
+    request = CapabilityRequest(tool, request_action, dict(arguments))
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(f"Deferred edit capability was not executable: {result.reason}")
 
 
 def invoke_file_mutation(
@@ -490,6 +572,7 @@ def invoke_file_mutation(
     *,
     worktree_root: Any,
     executor: Callable[[], Any],
+    runtime: Any = None,
 ) -> Any:
     context = ToolContext(
         repo_root=worktree_root,
@@ -497,9 +580,12 @@ def invoke_file_mutation(
         semantic_actions=frozenset({"edit_files"}),
         allowed_effects=frozenset(ToolEffect),
     )
-    result = CapabilityBroker(ToolRegistry((FileMutationAdapter(executor),))).invoke(
-        context,
-        CapabilityRequest("file-mutation", "edit_files", {"paths": list(paths)}),
+    adapter = FileMutationAdapter(executor)
+    request = CapabilityRequest("file-mutation", "edit_files", {"paths": list(paths)})
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -511,6 +597,7 @@ def invoke_shell_capability(
     *,
     worktree_root: Any,
     executor: Callable[[Mapping[str, Any]], Any],
+    runtime: Any = None,
 ) -> Any:
     """Run one argv process after broker validation and scope checks."""
     context = ToolContext(
@@ -519,9 +606,12 @@ def invoke_shell_capability(
         semantic_actions=frozenset({"run_process"}),
         allowed_effects=frozenset(ToolEffect),
     )
-    result = CapabilityBroker(ToolRegistry((ShellAdapter(executor),))).invoke(
-        context,
-        CapabilityRequest("process", "run_process", dict(arguments)),
+    adapter = ShellAdapter(executor)
+    request = CapabilityRequest("process", "run_process", dict(arguments))
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -539,6 +629,7 @@ def invoke_intrinsic_capability(
     arguments: Mapping[str, Any],
     *,
     worktree_root: Any,
+    runtime: Any = None,
 ) -> Any:
     """Execute legacy git/gh/enrich calls through the typed broker.
 
@@ -580,9 +671,14 @@ def invoke_intrinsic_capability(
         ),
         allowed_effects=frozenset(ToolEffect),
     )
-    result = CapabilityBroker(builtin_tool_registry()).invoke(
-        context,
-        CapabilityRequest(request_tool, semantic_action, dict(arguments)),
+    request = CapabilityRequest(request_tool, semantic_action, dict(arguments))
+    adapter = builtin_tool_registry().get(request_tool)
+    if adapter is None:
+        raise ValueError(f"No adapter registered for intrinsic tool {request_tool!r}")
+    result = (
+        runtime.invoke_adapter(adapter, context, request)
+        if runtime is not None
+        else CapabilityBroker(builtin_tool_registry()).invoke(context, request)
     )
     if isinstance(result, ToolResult):
         return result.output

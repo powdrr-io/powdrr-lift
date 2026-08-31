@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.core.behavior_rule import FileBehaviorRuleStore
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
-from powdrr_lift.core.delivery_profile import PhaseType
+from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
+from powdrr_lift.core.execution_plan import ExecutionPlan, FileExecutionPlanStore
 from powdrr_lift.core.execution_state import (
     ExecutionEvent,
     ExecutionEventType,
@@ -22,8 +26,11 @@ from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.compaction import compact_execution_context
+from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import ReadinessEvaluator, ReadinessReport
 from powdrr_lift.execution.kernel import ActionKernel
+from powdrr_lift.execution.personas import PersonaPacket, build_persona_packet
 from powdrr_lift.execution.phases import PhaseController, PhaseTransitionDecision
 from powdrr_lift.execution.store import (
     ExecutionStateConflict,
@@ -55,6 +62,7 @@ class ExecutionRuntime:
         phase: PhaseType = PhaseType.INTAKE,
         mode: ExecutionMode = ExecutionMode.ENFORCE,
         state_store: ExecutionStateStore | None = None,
+        behavior_rule_store: FileBehaviorRuleStore | None = None,
     ) -> None:
         self.execution_id = execution_id
         self.repo_root = Path(repo_root).resolve()
@@ -66,8 +74,13 @@ class ExecutionRuntime:
                 execution_id, profile_id=profile_id, phase=phase, mode=mode
             )
         self.kernel = ActionKernel()
+        self.kernel.restore_obligations(self.state.obligations)
         self.phase_controller = PhaseController()
         self.readiness_evaluator = ReadinessEvaluator()
+        self.behavior_rule_store = behavior_rule_store or FileBehaviorRuleStore(
+            workflow_directory
+        )
+        self.plan_store = FileExecutionPlanStore(workflow_directory)
         self.checkpoint_store = ContentAddressedCheckpointStore(
             Path(workflow_directory) / "execution" / "checkpoints"
         )
@@ -99,6 +112,77 @@ class ExecutionRuntime:
 
     def readiness(self) -> ReadinessReport:
         return self.readiness_evaluator.evaluate(self.state)
+
+    def prompt_context(self) -> dict[str, Any]:
+        """Return the bounded typed state used at every prompt boundary."""
+        return compact_execution_context(
+            {
+                "execution_id": self.execution_id,
+                "phase": self.state.current_phase.value,
+                "persona_id": self.state.current_persona_id,
+                "artifact_ids": [item.artifact_id for item in self.state.artifacts],
+                "action_ids": [item.action_instance_id for item in self.state.actions],
+                "obligation_ids": [
+                    item.obligation_id for item in self.state.obligations
+                ],
+                "evidence_ids": [item.evidence_id for item in self.state.evidence],
+                "finding_ids": [item.finding_id for item in self.state.findings],
+            }
+        )
+
+    def guidance(self, context: dict[str, str]) -> tuple[Any, ...]:
+        """Retrieve active scoped behavior rules for the current execution."""
+        from powdrr_lift.execution.guidance import load_applicable_guidance
+
+        return load_applicable_guidance(self.behavior_rule_store, context)
+
+    def save_plan(self, plan: ExecutionPlan) -> Path:
+        """Persist the plan artifact owned by this execution."""
+        return self.plan_store.save(plan)
+
+    def load_plan(self, plan_id: str) -> ExecutionPlan:
+        return self.plan_store.load(plan_id)
+
+    def compile_plan(
+        self,
+        profile: DeliveryProfile,
+        plan: ExecutionPlan,
+        *,
+        actions_by_phase: dict[PhaseType, tuple[str, ...]],
+    ) -> tuple[Any, ...]:
+        """Compile a typed plan through the runtime-owned plan boundary."""
+        self.save_plan(plan)
+        return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
+
+    def persona_packet(
+        self,
+        profile: DeliveryProfile,
+        *,
+        run_id: str,
+        phase_type: PhaseType,
+        phase_actions: frozenset[str],
+        persona_actions: dict[str, frozenset[str]],
+        allowed_effects: frozenset[Any],
+    ) -> PersonaPacket:
+        """Build a least-privilege persona packet from durable runtime state."""
+        return build_persona_packet(
+            profile,
+            execution_id=self.execution_id,
+            run_id=run_id,
+            phase_type=phase_type,
+            phase_actions=phase_actions,
+            persona_actions=persona_actions,
+            allowed_effects=allowed_effects,
+            input_artifact_ids=tuple(
+                artifact.artifact_id for artifact in self.state.artifacts
+            ),
+            guidance_rules=self.guidance(
+                {
+                    "profile_id": profile.profile_id,
+                    "phase_type": phase_type.value,
+                }
+            ),
+        )
 
     def transition(
         self,
@@ -150,7 +234,71 @@ class ExecutionRuntime:
         decisions = self.broker.decision_log[before:]
         if decisions:
             self._append_capability_decisions(decisions)
+            if isinstance(result, ToolResult) and any(
+                decision.kind.value == "executable" for decision in decisions
+            ):
+                fingerprint = hashlib.sha256(
+                    json.dumps(
+                        {
+                            "tool": request.tool_name,
+                            "action": request.semantic_action,
+                            "arguments": dict(request.arguments),
+                        },
+                        sort_keys=True,
+                        default=str,
+                    ).encode()
+                ).hexdigest()
+                self.record_evidence(
+                    evidence_id=f"evidence-{self.state.event_sequence + 1}",
+                    producer_action_instance_id=(
+                        context.active_unit_id or request.semantic_action
+                    ),
+                    evidence_type=f"capability:{request.tool_name}",
+                    input_fingerprint=fingerprint,
+                    successful=True,
+                )
         return result
+
+    def invoke_adapter(
+        self,
+        adapter: ToolAdapter,
+        context: ToolContext,
+        request: CapabilityRequest,
+    ) -> ToolResult | CapabilityResolution:
+        """Run a context-bound adapter through this runtime's broker."""
+        self.broker.registry.replace(adapter)
+        return self.invoke(context, request)
+
+    def record_evidence(
+        self,
+        *,
+        evidence_id: str,
+        producer_action_instance_id: str,
+        evidence_type: str,
+        input_fingerprint: str,
+        successful: bool,
+    ) -> ExecutionState:
+        """Append a typed validation result to the durable evidence ledger."""
+        sequence = self.state.event_sequence + 1
+        event = ExecutionEvent(
+            self.execution_id,
+            sequence,
+            self.state.state_version,
+            ExecutionEventType.EVIDENCE_RECORDED,
+            {
+                "evidence_id": evidence_id,
+                "producer_action_instance_id": producer_action_instance_id,
+                "evidence_type": evidence_type,
+                "input_fingerprint": input_fingerprint,
+                "successful": successful,
+                "fresh": True,
+            },
+            f"{self.execution_id}:{sequence}",
+        )
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, (event,)
+        )
+        return self.state
 
     def sync_kernel(self, *, phase_type: str, actor_id: str) -> ExecutionState:
         pending = self.kernel.events[self._projected_kernel_events :]

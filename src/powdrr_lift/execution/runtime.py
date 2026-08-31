@@ -288,6 +288,31 @@ class ExecutionRuntime:
             rule_id, expected_version=expected_version
         )
 
+    def record_observer_decision(
+        self,
+        *,
+        verdict: str,
+        reason: str,
+        action_kind: str,
+        action_signature: str,
+        material_progress: bool | None = None,
+        target_step_id: str | None = None,
+    ) -> ExecutionState:
+        """Persist an observer outcome in the authoritative execution stream."""
+        if not verdict.strip() or not reason.strip() or not action_kind.strip():
+            raise ValueError("Observer decisions require verdict, reason, and action.")
+        return self._append_event(
+            ExecutionEventType.OBSERVER_DECISION,
+            {
+                "verdict": verdict,
+                "reason": reason,
+                "action_kind": action_kind,
+                "action_signature": action_signature,
+                "material_progress": material_progress,
+                "target_step_id": target_step_id,
+            },
+        )
+
     def record_artifact(self, artifact: ExecutionArtifact) -> ExecutionState:
         return self._append_event(
             ExecutionEventType.ARTIFACT_PRODUCED, artifact.to_data()

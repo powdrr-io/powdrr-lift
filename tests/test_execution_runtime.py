@@ -360,6 +360,28 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     assert runtime.validate_action("edit")
 
 
+def test_runtime_persists_observer_decisions_in_event_stream(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-observer",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    runtime.record_observer_decision(
+        verdict="coach",
+        reason="The action made no material progress.",
+        action_kind="edit",
+        action_signature='{"kind":"edit","path":"src/app.py"}',
+        material_progress=False,
+    )
+
+    event = runtime.state_store.load_events("run-observer")[-1]
+    assert event.event_type is ExecutionEventType.OBSERVER_DECISION
+    assert event.payload["verdict"] == "coach"
+    assert runtime.verify() == runtime.state
+
+
 def test_mutating_capability_invalidates_prior_evidence(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-invalidation",

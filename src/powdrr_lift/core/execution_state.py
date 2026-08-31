@@ -43,6 +43,7 @@ class ExecutionEventType(StrEnum):
     CHECKPOINT_CREATED = "checkpoint_created"
     CHECKPOINT_REVERTED = "checkpoint_reverted"
     CAPABILITY_DECISION = "capability_decision"
+    OBSERVER_DECISION = "observer_decision"
 
 
 class ActionStatus(StrEnum):
@@ -423,6 +424,7 @@ def reduce_execution_event(
         ExecutionEventType.CHECKPOINT_CREATED,
         ExecutionEventType.CHECKPOINT_REVERTED,
         ExecutionEventType.CAPABILITY_DECISION,
+        ExecutionEventType.OBSERVER_DECISION,
     }:
         next_state = state
 

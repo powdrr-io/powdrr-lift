@@ -1658,6 +1658,17 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ),
             }
         )
+        if self.driver.runtime is not None:
+            self.driver.runtime.record_observer_decision(
+                verdict=decision.verdict,
+                reason=decision.reason,
+                action_kind=str(getattr(action, "kind", "unknown")),
+                action_signature=_workflow_action_signature(action),
+                material_progress=(
+                    observation.made_progress if observation is not None else None
+                ),
+                target_step_id=decision.target_step_id,
+            )
         return observation is None
 
     def clear_observer_intervention(self) -> None:

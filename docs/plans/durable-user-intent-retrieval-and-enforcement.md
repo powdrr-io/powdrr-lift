@@ -155,9 +155,9 @@ The target flow is:
 
 ```text
 user instruction
-  -> nominate and validate structured intent
-  -> persist source + current typed contract
-  -> index selectors and specification relationships
+  -> capture one canonical intent source
+  -> nominate and validate typed clauses by reference
+  -> index clause IDs by selectors and specification relationships
   -> compile statically relevant IDs into plan units and tasks
   -> resolve the effective contract for the current execution context
   -> render the relevant contract into the model request
@@ -182,8 +182,8 @@ known to be relevant from:
 - repository, work-item, and proposed-PR scope.
 
 The resulting task stores typed references such as `decision_ids`,
-`invariant_ids`, `procedure_ids`, and `rule_ids`. It does not copy unversioned
-prose into every task.
+`invariant_ids`, `procedure_ids`, and `rule_ids`. It does not copy prose,
+selectors, or executable requirements into every task.
 
 ### Dynamic resolution
 
@@ -209,18 +209,68 @@ correctly.
 
 ### Preserve source separately from executable meaning
 
-Every remembered instruction retains:
+Every remembered instruction has one canonical source record that retains:
 
 - the exact user text;
 - source conversation, message, workflow, or specification reference;
 - who supplied or confirmed it;
 - creation time;
-- current version;
-- supersession and revocation history; and
-- the structured interpretation used by the runtime.
+- a content fingerprint; and
+- optional source spans used by its structured clauses.
 
 The original text is evidence of intent and is useful for explanation. Runtime
-behavior is based on validated typed fields.
+behavior is based on validated typed clauses that reference the source record.
+The source text is not copied into every clause, rule version, task, execution,
+obligation, event, or prompt.
+
+### Single-capture reference model
+
+Separate the canonical instruction from its executable interpretations:
+
+```yaml
+intent_source:
+  intent_id: intent-review-resolution
+  exact_text: After addressing a review comment, resolve the review thread.
+  content_fingerprint: sha256:...
+  source_ref: conversation:123/message:456
+  supplied_by: user:gregory
+  created_at: 2026-08-31T12:00:00Z
+
+intent_clause:
+  clause_id: clause-review-resolution-v1
+  intent_id: intent-review-resolution
+  source_span: {start: 0, end: 69}
+  kind: procedure
+  contract_ref: procedure:resolve-review-thread-after-fix:v1
+  status: active
+```
+
+One source may yield multiple clauses when a single instruction contains
+multiple independent requirements. Each clause points to a source span; it
+does not duplicate the text. Reinterpreting a clause creates a new version of
+the clause or referenced contract, while the original source remains unchanged.
+Supersession and revocation are edges between clause or contract versions, not
+copies of the original message.
+
+Capture is idempotent by stable source identity. Reprocessing the same
+conversation message or specification node returns its existing `intent_id`.
+Content fingerprints diagnose duplicate ingestion but do not silently collapse
+two separately stated instructions, since repetition may be meaningful
+confirmation. Semantic similarity may nominate an existing intent for
+user-confirmed reuse; it cannot merge sources automatically.
+
+Canonical ownership is strict:
+
+- `IntentSource` owns exact wording and provenance once;
+- `IntentClause` owns classification and a reference to executable meaning;
+- a contract owns executable selectors and requirements once;
+- indexes contain only IDs and lookup keys;
+- plans, tasks, handoffs, and checkpoints contain only versioned IDs;
+- `EffectiveContract` is an ephemeral projection resolved from those IDs;
+- execution state contains only its fingerprint, applicable IDs, and active
+  consequence IDs; and
+- events record IDs, versions, and transition facts, not repeated source text
+  or complete contract snapshots.
 
 ### Behavior rule contract
 
@@ -234,9 +284,8 @@ Conceptually, a rule contains:
 ```yaml
 schema_version: behavior-rule-v2
 rule_id: resolve-review-thread-after-fix
+clause_ref: clause-review-resolution-v1
 kind: procedure
-text: After addressing a review comment, resolve the review thread.
-source_ref: conversation:123/message:456
 scope:
   repository: powdrr-lift
 selectors:
@@ -281,6 +330,16 @@ execution boundary. It contains:
 
 The effective contract is derived state. Persist its references and fingerprint
 in execution events, but rebuild it from authoritative rules and specifications.
+Do not persist one complete effective-contract document per action. The prompt
+renderer may resolve a compact view from canonical contracts for the current
+request, but that view is disposable rather than a new record.
+
+The execution-state projection should contain only the effective-contract
+fingerprint, applicable clause or contract IDs and versions, active obligation
+and evidence IDs, blocked-transition IDs, and current values that cannot be
+deterministically resolved from those IDs. If several selectors reach the same
+clause, the resolver records multiple explanation paths but returns the clause
+once.
 
 ## Capture pipeline
 
@@ -445,7 +504,7 @@ proposed action.
 
 Extend obligations to include:
 
-- source rule and relationship IDs;
+- source clause, contract, and relationship IDs;
 - source action instance ID;
 - target semantic action or evidence requirement;
 - exact target identity, such as review thread ID;
@@ -457,6 +516,20 @@ Extend obligations to include:
 An obligation is satisfied only by an exact completed semantic action or by
 fresh typed evidence accepted by its requirement. Similar prose from the model
 does not close it.
+
+Obligation expansion is idempotent. Its stable instance key is:
+
+```text
+(source_clause_id, contract_version, relationship_id,
+ trigger_action_instance_id, requirement_id, exact_target_fingerprint)
+```
+
+Static resolution, dynamic resolution, retry, replay, and nested execution all
+reuse an existing instance for that key. They cannot append duplicate
+obligations. Current state retains only open or operationally relevant
+instances; satisfied, obsolete, and superseded instances remain in the event
+log and indexes for audit. Evidence follows the same rule, keyed by evidence
+type, producer contract, scope, and input fingerprint.
 
 ### Review comment example
 
@@ -548,13 +621,17 @@ The durable event stream records:
 Materialized execution state stores current typed references. Context
 compaction must preserve exact:
 
-- rule IDs and versions;
+- intent, clause, and contract IDs and versions;
 - decision and invariant IDs;
 - effective-contract fingerprint;
 - obligation IDs and dependency edges;
 - evidence IDs and input fingerprints;
 - review finding and thread IDs; and
-- source references needed for explanation.
+- canonical source IDs needed for explanation.
+
+Compaction must not preserve copies of source text, executable contracts,
+rendered guidance, or completed consequence records. Those remain reachable by
+canonical IDs and the event log.
 
 After restart or compaction, Powdrr rebuilds the same effective contract from
 typed state. It never treats a generated summary as the authoritative copy of a
@@ -562,7 +639,8 @@ user instruction.
 
 Nested skills and persona handoffs inherit the applicable contract by ID and
 version. A child may receive a narrower effective contract, but cannot drop a
-parent obligation relevant to its work.
+parent obligation relevant to its work. A nested skill references the parent's
+obligation instance; it does not clone it into child state.
 
 ## Explanation and user control
 
@@ -594,7 +672,9 @@ lookup without changing action behavior.
 
 Required changes:
 
-- evolve `core/behavior_rule.py` to the current typed schema;
+- add canonical `IntentSource` and versioned `IntentClause` contracts;
+- evolve `core/behavior_rule.py` so executable rules reference clauses rather
+  than embedding source text and provenance;
 - add closed enums and dataclasses for selectors, triggers, requirements,
   completion gates, and source provenance;
 - add `core/effective_contract.py` for derived contract records;
@@ -603,12 +683,17 @@ Required changes:
   `codebase_state.py`, `entity_context.py`, and `spec_context.py`;
 - add strict parsing, unknown-field rejection, graph validation, and stable
   fingerprints;
+- make capture idempotent by source identity and make index postings ID-only;
 - replace current development rule data through a one-time migration and keep
   only the current runtime schema; and
 - expose read-only inspection and explanation through shared core functions.
 
 Tests:
 
+- prove the original source text is stored exactly once;
+- prove repeated ingestion of one source returns the same intent ID;
+- prove one source can produce multiple span-referenced clauses without text
+  duplication;
 - round-trip every rule kind;
 - reject unknown selectors, actions, entities, and cycles;
 - prove narrow scope wins and unrelated rules do not match;
@@ -616,8 +701,10 @@ Tests:
 - prove revocation and explicit supersession; and
 - prove semantic search cannot activate a rule.
 
-Acceptance gate: given typed execution context, the resolver returns the exact
-applicable intent IDs, versions, and provenance with no LLM call.
+Acceptance gate: source wording and provenance have one canonical owner, every
+derived structure reaches them by ID, and no execution object embeds a copy.
+Given typed execution context, the resolver also returns the exact applicable
+intent IDs, versions, and provenance with no LLM call.
 
 ### PR 2: Capture and effective-contract delivery
 
@@ -633,6 +720,7 @@ Required changes:
 - add a typed `PolicyContext` supplied by the shared strategy boundary;
 - attach statically relevant IDs during plan/task compilation;
 - resolve dynamic selectors before request construction;
+- deduplicate multi-path matches by canonical clause and contract version;
 - render one `effective_contract` in both chat and durable-task prompts;
 - retain contract references through compaction and nested-skill handoff; and
 - record observe-mode matches and disagreements.
@@ -644,7 +732,10 @@ Tests:
 - both adapters receive identical contracts for identical context;
 - nested and resumed execution preserve applicable IDs;
 - prompt contains relevant rules and excludes unrelated rules; and
-- compaction preserves exact IDs and versions.
+- compaction preserves exact IDs and versions;
+- repeated resolution does not create persisted contract snapshots; and
+- plans, tasks, checkpoints, and handoffs contain references rather than copied
+  intent or contract bodies.
 
 Acceptance gate: a rule stated in one session appears automatically in a later
 relevant session and does not appear in an unrelated task.
@@ -661,6 +752,8 @@ Required changes:
 - expand applicable action relationships deterministically;
 - extend execution obligations with rule provenance, exact target identity,
   dependency IDs, and accepted evidence;
+- use a deterministic obligation-instance key so retries, replay, multiple
+  selector paths, and nested skills cannot duplicate consequences;
 - persist obligation-opened, satisfied, obsolete, and reopened events;
 - enforce prerequisite order;
 - return typed correction packets for policy violations;
@@ -674,6 +767,8 @@ Tests:
 - resolving the wrong thread does not close the obligation;
 - failure of the triggering action creates no durable follow-up obligation;
 - restart and replay reconstruct identical obligation state;
+- repeated expansion returns the same obligation instance;
+- satisfied historical obligations leave current execution state;
 - relationship conflicts create a structured decision; and
 - chat and task adapters produce identical events and corrections.
 
@@ -758,6 +853,12 @@ maintain a focused scenario matrix:
 
 Add invariants to tests themselves:
 
+- original user wording has exactly one canonical persisted owner;
+- indexes, plans, tasks, handoffs, checkpoints, and execution state store intent
+  references rather than source or contract copies;
+- repeated applicability resolution is persistence-free;
+- repeated relationship expansion is idempotent;
+- nested skills reference parent obligations rather than cloning them;
 - no model call is used for applicability matching;
 - no transition guard parses prompt prose;
 - no obligation closes from narrative text;
@@ -769,6 +870,12 @@ Add invariants to tests themselves:
 
 Observe and enforce modes should record:
 
+- canonical intent-source count and clause count;
+- duplicate source-ingestion attempts;
+- average references per source without copied bytes;
+- effective-contract projection bytes versus canonical contract bytes;
+- active versus historical obligation and evidence counts;
+- duplicate obligation-expansion suppressions;
 - applicable rule count by task and action;
 - irrelevant-rule exclusion count;
 - contract size and prompt token contribution;
@@ -783,7 +890,9 @@ Observe and enforce modes should record:
 
 The desired result is not a high number of injected rules. It is precise
 retrieval: every relevant instruction, no irrelevant instruction, and the same
-decision before and after restart.
+decision before and after restart. For constant active complexity, current
+execution-state size must remain bounded as action count, selector paths,
+retries, nested skills, and completed obligations increase.
 
 ## Final acceptance demonstration
 
@@ -796,16 +905,23 @@ The final end-to-end demonstration should begin with three user instructions:
    pass mypy.
 
 The execution should then move through planning, implementation, validation,
-review correction, compaction, process restart, and PR readiness. The final
-record must show:
+review correction, nested execution, repeated selector matches, compaction,
+process restart, and PR readiness. The final record must show:
 
-- where each instruction was captured;
+- one canonical source record for each instruction and no copied source text in
+  derived records;
 - the structured interpretation and scope;
 - each action where it became applicable;
+- versioned references from plans, tasks, contracts, state, and events back to
+  the canonical source;
 - the concise contract delivered to the model;
 - obligations and evidence it created;
+- idempotent reuse of consequence instances across retries, replay, and nested
+  execution;
 - any action or transition it blocked;
 - exact closure evidence;
+- removal of completed consequences from current execution state;
+- bounded current-state size for constant active complexity;
 - survival across compaction and restart; and
 - a deterministic final readiness decision with no dependence on remembered
   chat prose.

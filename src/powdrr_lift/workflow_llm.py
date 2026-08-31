@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from powdrr_lift.execution.kernel import ActionKernel
@@ -426,6 +426,24 @@ class WorkflowStepRunner:
             request = strategy.next_request()
             if request is None:
                 return 0
+            if self.runtime is not None and request.request_action is None:
+                compacted = self.runtime.compact_prompt_context(
+                    {"messages": request.messages}
+                )
+                request = replace(
+                    request,
+                    messages=[
+                        *request.messages,
+                        {
+                            "role": "system",
+                            "content": (
+                                "Use this bounded execution context. The complete "
+                                "request is retrievable by full_context_ref: "
+                                + json.dumps(compacted, ensure_ascii=False)
+                            ),
+                        },
+                    ],
+                )
             try:
                 action = (
                     request.request_action()
@@ -454,7 +472,19 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            if self.runtime is not None:
+                guidance = getattr(action, "decisions_and_context", None)
+                if isinstance(guidance, str):
+                    self.runtime.capture_explicit_guidance(
+                        guidance,
+                        source_ref=f"{self.runtime.execution_id}:roundtrip-{roundtrips}",
+                    )
             proposal_errors = self.kernel.validate_proposal(action)
+            if self.runtime is not None:
+                proposal_errors = (
+                    *proposal_errors,
+                    *self.runtime.validate_action(str(getattr(action, "kind", ""))),
+                )
             if proposal_errors:
                 error = PowdrrExecutionError(
                     " ".join(proposal_errors),
@@ -788,5 +818,26 @@ def prune_execution_events(
                     "truncated": True,
                     "preview": result_text[:_MAX_PROMPT_EVENT_CHARS],
                 }
-        prompt_events.append(prompt_event)
+        prompt_events.append(_bound_prompt_value(prompt_event))
     return prompt_events
+
+
+def _bound_prompt_value(value: Any, *, depth: int = 0) -> Any:
+    """Bound nested event fields, including templates and command metadata."""
+    if depth > 6:
+        return "<nested prompt value omitted>"
+    if isinstance(value, str):
+        return (
+            value
+            if len(value) <= _MAX_PROMPT_EVENT_CHARS
+            else value[:_MAX_PROMPT_EVENT_CHARS]
+        )
+    if isinstance(value, Mapping):
+        return {
+            str(key): _bound_prompt_value(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        items = value[-32:] if len(value) > 32 else value
+        return [_bound_prompt_value(item, depth=depth + 1) for item in items]
+    return value

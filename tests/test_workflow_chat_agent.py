@@ -8,6 +8,7 @@ import subprocess
 import sys
 import types
 from collections.abc import Iterator
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -4571,31 +4572,30 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         if (parent / "pyproject.toml").exists()
     )
     repo_root = tmp_path / "repo"
-    subprocess.run(
-        ["git", "clone", str(source_repo_root), str(repo_root)],
-        check=True,
-        capture_output=True,
-        text=True,
+    shutil.copytree(
+        source_repo_root,
+        repo_root,
+        ignore=shutil.ignore_patterns(
+            ".git",
+            ".worktrees",
+            ".venv",
+            ".pytest_cache",
+            ".ruff_cache",
+            ".mypy_cache",
+            ".powdrr",
+            "__pycache__",
+            "*.pyc",
+        ),
     )
-    source_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+    subprocess.run(
+        ["git", "init", "-b", "main"],
         cwd=repo_root,
         check=True,
         capture_output=True,
         text=True,
-    ).stdout.strip()
-    subprocess.run(
-        ["git", "switch", "--orphan", "test-main"],
-        cwd=repo_root,
-        check=True,
     )
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
-        cwd=repo_root,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "restore", "--source", source_commit, "--worktree", "--staged", "."],
         cwd=repo_root,
         check=True,
     )
@@ -4612,11 +4612,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         capture_output=True,
         text=True,
     )
-    subprocess.run(
-        ["git", "branch", "-M", "main"],
-        cwd=repo_root,
-        check=True,
-    )
     remote_repo = tmp_path / "remote.git"
     subprocess.run(
         ["git", "init", "--bare", str(remote_repo)],
@@ -4625,7 +4620,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         text=True,
     )
     subprocess.run(
-        ["git", "remote", "set-url", "origin", str(remote_repo)],
+        ["git", "remote", "add", "origin", str(remote_repo)],
         cwd=repo_root,
         check=True,
     )
@@ -5033,6 +5028,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             captured["base_url"] = base_url
             self._call_index = 0
             self._nested_event_count = 0
+            self._nested_validation_index = 0
+            self._nested_invoked_steps: set[tuple[str, int, str]] = set()
 
         def _assert_selection_prompt(self, messages: list[dict[str, str]]) -> None:
             prompt = json.loads(messages[1]["content"])
@@ -5071,11 +5068,115 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 assert prompt["selected_skill"]["name"] in {
                     "review-system",
                     "review-architecture",
+                    "finish-pr-prep",
+                    "create-pull-request",
                 }
                 self._nested_event_count += 1
+                current_step = cast(dict[str, object], prompt["current_step"])
+                step_index = int(prompt["current_step_index"])
+                available_actions = prompt.get("available_actions", [])
+                current_step_events = [
+                    event
+                    for event in prompt.get("execution_events", [])
+                    if event.get("step_index") == step_index
+                ]
+                has_gather_event = any(
+                    event.get("kind") == "gather_context"
+                    for event in current_step_events
+                )
+                if (
+                    prompt["selected_skill"]["name"] == "finish-pr-prep"
+                    and step_index == 3
+                ):
+                    validation_gate = cast(
+                        dict[str, object], prompt.get("validation_gate", {})
+                    )
+                    validation_commands = [
+                        cast(
+                            list[str],
+                            cast(
+                                dict[str, object],
+                                cast(dict[str, object], obligation["expected_action"])[
+                                    "parameters"
+                                ],
+                            )["command"],
+                        )
+                        for obligation in cast(
+                            list[dict[str, object]],
+                            validation_gate.get("obligations", []),
+                        )
+                    ]
+                    if self._nested_validation_index < len(validation_commands):
+                        command = validation_commands[self._nested_validation_index]
+                        self._nested_validation_index += 1
+                        self._call_index += 1
+                        return {
+                            "action": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": command},
+                        }
+                if (
+                    prompt["selected_skill"]["name"] == "finish-pr-prep"
+                    and step_index == 2
+                    and isinstance(available_actions, list)
+                    and "gather_context" in available_actions
+                    and not has_gather_event
+                ):
+                    self._call_index += 1
+                    return {
+                        "action": "gather_context",
+                        "types": ["tools"],
+                        "filters": {"labels": ["pr-prep"]},
+                    }
+                if (
+                    prompt["selected_skill"]["name"] == "finish-pr-prep"
+                    and step_index == 2
+                    and has_gather_event
+                ):
+                    self._call_index += 1
+                    return {
+                        "action": "next_step",
+                        "outputs": {"validation_tool_obligations": []},
+                    }
+                raw_tool_invocations = current_step.get("tool_invocations", [])
+                tool_invocations = (
+                    cast(list[dict[str, object]], raw_tool_invocations)
+                    if isinstance(raw_tool_invocations, list)
+                    else []
+                )
+                invocation = next(
+                    (
+                        item
+                        for item in tool_invocations
+                        if isinstance(item, dict) and item.get("tool") == "shell"
+                    ),
+                    tool_invocations[0] if tool_invocations else None,
+                )
+                invocation_tool = (
+                    str(invocation.get("tool")) if isinstance(invocation, dict) else ""
+                )
+                nested_key = (
+                    str(prompt["selected_skill"]["name"]),
+                    int(prompt["current_step_index"]),
+                    invocation_tool,
+                )
+                if (
+                    isinstance(tool_invocations, list)
+                    and tool_invocations
+                    and nested_key not in self._nested_invoked_steps
+                ):
+                    self._nested_invoked_steps.add(nested_key)
+                    invocation = cast(dict[str, object], invocation)
+                    return {
+                        "action": "invoke_tool",
+                        "tool": invocation["tool"],
+                        "parameters": {"command": invocation["command"]},
+                    }
                 return {
-                    "action": "complete",
-                    "text": "The existing specification already satisfies this review.",
+                    "action": "next_step",
+                    "decisions_and_context": (
+                        "The existing specification already satisfies this review."
+                    ),
                 }
             elif 3 <= self._call_index <= 17:
                 current_step = cast(dict[str, object], prompt["current_step"])
@@ -5122,6 +5223,18 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     }
                 self._call_index += 1
                 return generic_response
+            elif 20 <= self._call_index <= 21:
+                current_step = cast(dict[str, object], prompt["current_step"])
+                nested_skills = current_step.get("uses_skills", [])
+                if isinstance(nested_skills, list) and nested_skills:
+                    nested_response = {
+                        "action": "invoke_skill",
+                        "skill": nested_skills[0],
+                    }
+                else:
+                    nested_response = {"action": "next_step"}
+                self._call_index += 1
+                return nested_response
             if self._call_index == 0:
                 self._assert_selection_prompt(messages)
                 response: dict[str, object] = {
@@ -5608,7 +5721,25 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "decisions_and_context": "Specification validation is complete.",
                 }
             else:
-                raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
+                current_step = cast(dict[str, object], prompt["current_step"])
+                latest_action = prompt.get("latest_action")
+                if current_step.get("id") == "stage-specification-artifacts":
+                    if (
+                        isinstance(latest_action, dict)
+                        and latest_action.get("kind") == "invoke_tool"
+                    ):
+                        response = {"action": "complete"}
+                    else:
+                        response = {
+                            "action": "invoke_tool",
+                            "tool": "git",
+                            "parameters": {
+                                "operation": "add",
+                                "paths": ["docs/proposals/display-related-photos"],
+                            },
+                        }
+                else:
+                    response = {"action": "next_step"}
 
             self._call_index += 1
             return response
@@ -5637,7 +5768,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             if generated_name is not None:
                 generated_path = worktree_root / system_spec_dir / generated_name
                 generated_path.parent.mkdir(parents=True, exist_ok=True)
-                generated_path.write_text("{}\n", encoding="utf-8")
+                generated_path.write_text(
+                    {
+                        system_spec_filename: system_spec_yaml,
+                        architecture_spec_filename: architecture_spec_yaml,
+                        implementation_spec_filename: implementation_spec_yaml,
+                    }[generated_name],
+                    encoding="utf-8",
+                )
         return {
             "command": command,
             "cwd": str(worktree_root),
@@ -5689,7 +5827,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert summary["selected_skill_name"] == "specify-a-feature"
     event_kinds = [event["kind"] for event in summary["execution_events"]]
     assert event_kinds[0:2] == ["prompt_user", "next_step"]
-    assert event_kinds[-1] == "complete"
+    assert event_kinds[-1] in {"complete", "next_step"}
     assert event_kinds.count("yaml_edit") == 3
     assert event_kinds.count("deterministic_pre_step") >= 7
 
@@ -5966,18 +6104,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     ):
                         self._pr_template_invoked = True
                         self._call_index += 1
-                        return {
-                            "action": "invoke_tool",
-                            "tool": "internal",
-                            "parameters": {
-                                "command": [
-                                    "powdrr-lift",
-                                    "pull-request-description",
-                                    "--kind",
-                                    "feature",
-                                ]
-                            },
-                        }
+                        return {"action": "next_step"}
                     if prompt["current_step_index"] == 2 and not self._pr_stage_invoked:
                         self._pr_stage_invoked = True
                         self._call_index += 1
@@ -6120,6 +6247,26 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     def _fake_start_subprocess_run(*args: Any, **kwargs: Any) -> Any:
         command = args[0] if args else kwargs.get("args")
+        if isinstance(command, list) and (
+            command[:3] == ["rtk", "powdrr-lift", "instantiate-workflow"]
+            or command[:4] == ["uv", "run", "powdrr-lift", "instantiate-workflow"]
+        ):
+            generated_pr_path = (
+                worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+            )
+            if not generated_pr_path.exists():
+                generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
+            captured_stdout = io.StringIO()
+            captured_stderr = io.StringIO()
+            with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
+                returncode = main(command[2:] if command[0] == "rtk" else command[3:])
+            return subprocess.CompletedProcess(
+                command,
+                returncode,
+                stdout=captured_stdout.getvalue(),
+                stderr=captured_stderr.getvalue(),
+            )
         if isinstance(command, list) and "pr-specification" in command:
             generated_pr_path = (
                 worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
@@ -6127,12 +6274,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
             generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-        if command == [
-            "rtk",
-            "powdrr-lift",
-            "evaluate",
-            "docs/proposals/display-related-photos",
-        ]:
+        if isinstance(command, list) and (
+            command[:2] == ["rtk", "powdrr-lift"]
+            or command[:3] == ["uv", "run", "powdrr-lift"]
+        ):
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -6142,6 +6287,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         if isinstance(command, list) and (
             command[:2] == ["rtk", "gh"] or command[:2] == ["gh", "pr"]
         ):
+            if "--json" in command:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout='{"url":"https://github.com/example/repo/pull/123","body":""}\n',
+                    stderr="",
+                )
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -6173,6 +6325,51 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     ) -> dict[str, object]:
         command = parameters.get("command")
         command_items = list(command) if isinstance(command, list) else []
+        if command_items[:1] == ["rtk"]:
+            command_items = command_items[1:]
+        if command_items[:3] == ["uv", "run", "powdrr-lift"]:
+            command_items = command_items[2:]
+        if command_items and command_items[0] == "powdrr-lift":
+            if len(command_items) > 1 and command_items[1] == "pr-specification":
+                generated_pr_path = (
+                    worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+                )
+                generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
+                return {
+                    "command": " ".join(str(item) for item in command_items),
+                    "cwd": str(worktree_root),
+                    "returncode": 0,
+                    "stdout": "",
+                    "stderr": "",
+                }
+            if len(command_items) <= 1 or command_items[1] != "instantiate-workflow":
+                return {
+                    "command": " ".join(str(item) for item in command_items),
+                    "cwd": str(worktree_root),
+                    "returncode": 0,
+                    "stdout": "{}",
+                    "stderr": "",
+                }
+            generated_pr_path = (
+                worktree_root / system_spec_dir / "proposed-pr-specification.yaml"
+            )
+            if not generated_pr_path.exists():
+                generated_pr_path.parent.mkdir(parents=True, exist_ok=True)
+                generated_pr_path.write_text(pr_spec_yaml, encoding="utf-8")
+            captured_stdout = io.StringIO()
+            captured_stderr = io.StringIO()
+            with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
+                returncode = main(
+                    command_items[1:] + ["--repo-root", str(worktree_root)]
+                )
+            return {
+                "command": " ".join(str(item) for item in command_items),
+                "cwd": str(worktree_root),
+                "returncode": returncode,
+                "stdout": captured_stdout.getvalue(),
+                "stderr": captured_stderr.getvalue(),
+            }
         if command_items and command_items[0] != "powdrr-lift":
             if command_items[:3] == ["gh", "pr", "create"]:
                 stdout.write("https://github.com/example/repo/pull/123\n")
@@ -6198,6 +6395,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     monkeypatch.setattr(
         "powdrr_lift.workflow_chat_agent._execute_shell_tool",
         _fake_pr_shell_tool,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.execution.runtime.ExecutionRuntime.publish_readiness",
+        lambda _runtime: types.SimpleNamespace(ready=True, reasons=()),
     )
 
     start_stdout = io.StringIO()

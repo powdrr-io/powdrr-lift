@@ -574,12 +574,23 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "make progress. Choose a materially different action."
             )
         if action.kind == "gather_context":
-            report = gather_specification_context(
-                self.repo_root,
-                types=list(action.types),
-                keywords=list(action.keywords),
-                filters=action.filters,
-                feature_id=action.feature_id,
+            report = invoke_repository_read(
+                "gather_context",
+                {
+                    "types": list(action.types),
+                    "keywords": list(action.keywords),
+                    "filters": action.filters,
+                    "feature_id": action.feature_id,
+                },
+                worktree_root=self.repo_root,
+                executor=lambda _arguments: gather_specification_context(
+                    self.repo_root,
+                    types=list(action.types),
+                    keywords=list(action.keywords),
+                    filters=action.filters,
+                    feature_id=action.feature_id,
+                ),
+                runtime=self.runtime,
             )
             self.events.append(
                 {
@@ -775,6 +786,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         context=action.context,
                         clean=action.clean,
                         error_log_root=self.error_log_root,
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -845,6 +857,17 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ),
             }
         )
+        if self.runtime is not None:
+            self.runtime.record_observer_decision(
+                verdict=decision.verdict,
+                reason=decision.reason,
+                action_kind=str(getattr(action, "kind", "unknown")),
+                action_signature=workflow_action_signature(action),
+                material_progress=(
+                    observation.made_progress if observation is not None else None
+                ),
+                target_step_id=decision.target_step_id,
+            )
         return observation is None
 
     def clear_observer_intervention(self) -> None:
@@ -933,7 +956,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 and action.parameters.get("operation") == "pr_create"
                 and self.runtime is not None
             ):
-                readiness = self.runtime.readiness()
+                readiness = self.runtime.publish_readiness()
                 if not readiness.ready:
                     raise PowdrrExecutionError(
                         "Pull-request creation is blocked by execution readiness: "
@@ -1330,6 +1353,7 @@ def run_workflow_task(
                 else None
             ),
         )
+        runtime.set_action_contract(frozenset(task.actions))
         if client_was_provided:
             assert client is not None
             task_client = client
@@ -1360,6 +1384,7 @@ def run_workflow_task(
                 repo_root=repo_root,
                 events=driver_events,
                 include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
+                runtime=runtime,
             )
         )
         driver = WorkflowStepRunner(
@@ -2505,6 +2530,7 @@ def _run_task_deterministic_pre_step(
     repo_root: Path,
     events: list[dict[str, Any]],
     include_invoke_tool: bool = False,
+    runtime: ExecutionRuntime | None = None,
 ) -> tuple[Any, bool]:
     """Run a task's deterministic context pre-step before asking the LLM.
 
@@ -2533,6 +2559,7 @@ def _run_task_deterministic_pre_step(
             handoff_records=handoff_records,
             step_index=0,
             workflow_context=None,
+            runtime=runtime,
         )
         result = events[-1].get("result")
         return {task.output_state_type: result}, True
@@ -2564,17 +2591,23 @@ def _run_task_deterministic_pre_step(
         )
     keywords = template.get("keywords")
     filters = template.get("filters")
-    report = gather_specification_context(
-        repo_root,
-        types=[str(value) for value in raw_types],
-        keywords=(
-            [str(value) for value in keywords]
-            if isinstance(keywords, Sequence)
-            and not isinstance(keywords, (str, bytes, bytearray))
-            else None
+    report = invoke_repository_read(
+        "gather_context",
+        dict(template),
+        worktree_root=repo_root,
+        executor=lambda _arguments: gather_specification_context(
+            repo_root,
+            types=[str(value) for value in raw_types],
+            keywords=(
+                [str(value) for value in keywords]
+                if isinstance(keywords, Sequence)
+                and not isinstance(keywords, (str, bytes, bytearray))
+                else None
+            ),
+            filters=dict(filters) if isinstance(filters, Mapping) else None,
+            feature_id=feature_id,
         ),
-        filters=dict(filters) if isinstance(filters, Mapping) else None,
-        feature_id=feature_id,
+        runtime=runtime,
     )
     result = json.loads(render_gather_context_report(report))
     events.append(
@@ -2763,6 +2796,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     current_step: Any = None
     current_step_index: int = 0
     driver: WorkflowStepRunner | None = None
+    runtime: ExecutionRuntime | None = None
 
     def _restore_completed_skill(self, frame: _NestedSkillExecutionFrame) -> None:
         if frame.clean_context:
@@ -2782,6 +2816,10 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step_index = frame.step_index
             self.current_step = frame.skill.skill.steps[frame.step_index]
             step = self.current_step
+            if self.runtime is not None:
+                self.runtime.set_action_contract(
+                    frozenset(getattr(step, "actions", ()))
+                )
             if step.step_type == "gate":
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")
@@ -2797,6 +2835,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.verbose,
+                    runtime=self.runtime,
                 )
                 target_index = frame.step_index + 1
                 if not passed:
@@ -2830,6 +2869,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.verbose,
+                    runtime=self.runtime,
                 )
             return WorkflowActionRequest(
                 client=self.client,
@@ -3053,11 +3093,21 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.execution_context.extend(nested_context)
             return WorkflowActionOutcome()
         if action.kind == "gather_context":
-            report = gather_specification_context(
-                self.repo_root,
-                types=list(action.types),
-                feature_id=action.feature_id,
-                keywords=list(action.keywords),
+            report = invoke_repository_read(
+                "gather_context",
+                {
+                    "types": list(action.types),
+                    "feature_id": action.feature_id,
+                    "keywords": list(action.keywords),
+                },
+                worktree_root=self.repo_root,
+                executor=lambda _arguments: gather_specification_context(
+                    self.repo_root,
+                    types=list(action.types),
+                    feature_id=action.feature_id,
+                    keywords=list(action.keywords),
+                ),
+                runtime=self.runtime,
             )
             self.execution_events.append(
                 {
@@ -3084,6 +3134,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         executor=lambda _arguments: _read_task_document(
                             action, self.repo_root
                         ),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -3099,6 +3150,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         _task_edit_paths(action),
                         worktree_root=self.repo_root,
                         executor=lambda: _apply_task_edits(action, self.repo_root),
+                        runtime=self.runtime,
                     ),
                 }
             )
@@ -3123,18 +3175,27 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         stderr=self.stderr,
                         verbose=self.verbose,
                     ),
+                    runtime=self.runtime,
                 )
             elif action.tool == ENRICH_TOOL:
                 result = invoke_intrinsic_capability(
-                    ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
+                    ENRICH_TOOL,
+                    action.parameters,
+                    worktree_root=self.repo_root,
+                    runtime=self.runtime,
                 )
             elif action.tool == "fuzzy-match":
                 result = invoke_fuzzy_match_capability(
-                    action.parameters, worktree_root=self.repo_root
+                    action.parameters,
+                    worktree_root=self.repo_root,
+                    runtime=self.runtime,
                 )
             elif is_basedpyright_tool(action.tool or ""):
                 result = invoke_basedpyright_capability(
-                    action.tool or "", action.parameters, worktree_root=self.repo_root
+                    action.tool or "",
+                    action.parameters,
+                    worktree_root=self.repo_root,
+                    runtime=self.runtime,
                 )
             else:
                 raise PowdrrExecutionError(
@@ -3213,6 +3274,7 @@ def _run_skill_for_agent_with_shared_runner(
     context: tuple[str, ...] = (),
     clean: bool = False,
     error_log_root: Path | None = None,
+    runtime: ExecutionRuntime | None = None,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     transcript = [] if clean else [{"role": "user", "content": task.description}]
@@ -3268,8 +3330,9 @@ def _run_skill_for_agent_with_shared_runner(
                 parent_handoff_records={},
             )
         ],
+        runtime=runtime,
     )
-    driver = WorkflowStepRunner(max_stalled_roundtrips=3)
+    driver = WorkflowStepRunner(max_stalled_roundtrips=3, runtime=runtime)
     strategy.driver = driver
     exit_code = driver.run(
         strategy,
@@ -3298,6 +3361,7 @@ def _run_skill_for_agent(
     context: tuple[str, ...] = (),
     clean: bool = False,
     error_log_root: Path | None = None,
+    runtime: ExecutionRuntime | None = None,
 ) -> dict[str, Any]:
     return _run_skill_for_agent_with_shared_runner(
         skill_name,
@@ -3313,6 +3377,7 @@ def _run_skill_for_agent(
         context=context,
         clean=clean,
         error_log_root=error_log_root,
+        runtime=runtime,
     )
 
 

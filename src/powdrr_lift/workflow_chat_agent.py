@@ -1000,6 +1000,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             self.current_step_index = self.state.step_index
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
+            if self.state.runtime is not None:
+                self.state.runtime.set_action_contract(
+                    frozenset(getattr(self.current_step, "actions", ()))
+                )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
                 self.current_step_index,
@@ -1058,6 +1062,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.config.verbose,
+                    runtime=self.state.runtime,
                 )
                 if passed:
                     self.state.step_index += 1
@@ -1097,6 +1102,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stdout=self.stdout,
                     stderr=self.stderr,
                     verbose=self.config.verbose,
+                    runtime=self.state.runtime,
                 )
                 pre_step_event = _latest_deterministic_pre_step(
                     self.state.execution_events,
@@ -1169,6 +1175,23 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     else None
                 ),
             )
+            if self.state.runtime is not None:
+                compacted = self.state.runtime.compact_prompt_context(
+                    {
+                        "step_index": self.current_step_index,
+                        "selected_skill": self.selected_skill.skill.name,
+                    }
+                )
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "Bounded runtime context; retrieve the complete context "
+                            "using full_context_ref: "
+                            + json.dumps(compacted, ensure_ascii=False)
+                        ),
+                    }
+                )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
                 messages=messages,
@@ -1634,6 +1657,17 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ),
             }
         )
+        if self.driver.runtime is not None:
+            self.driver.runtime.record_observer_decision(
+                verdict=decision.verdict,
+                reason=decision.reason,
+                action_kind=str(getattr(action, "kind", "unknown")),
+                action_signature=_workflow_action_signature(action),
+                material_progress=(
+                    observation.made_progress if observation is not None else None
+                ),
+                target_step_id=decision.target_step_id,
+            )
         return observation is None
 
     def clear_observer_intervention(self) -> None:
@@ -2850,7 +2884,10 @@ def run_workflow_chat(
         )
     exit_code = driver.run(
         execution_strategy,
-        max_roundtrips=None,
+        # Skill selection and execution have different turn budgets. Keep a
+        # bounded execution ceiling so malformed provider responses cannot
+        # spin forever, while allowing multi-phase skills to finish.
+        max_roundtrips=max(config.max_turns, 128),
         signature=_workflow_action_signature,
     )
     if exit_code != 0:
@@ -4054,6 +4091,7 @@ def _run_deterministic_pre_step(
     stderr: TextIO = sys.stderr,
     verbose: bool = False,
     force: bool = False,
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     if not force and _latest_deterministic_pre_step(
         execution_events,
@@ -4088,7 +4126,7 @@ def _run_deterministic_pre_step(
             parameters.pop("tool", None)
             _wire_previous_tool_output(parameters, execution_events, handoff_records)
             result = invoke_intrinsic_capability(
-                ENRICH_TOOL, parameters, worktree_root=worktree_root
+                ENRICH_TOOL, parameters, worktree_root=worktree_root, runtime=runtime
             )
         elif tool == VALIDATE_EDIT_TOOL:
             parameters.pop("tool", None)
@@ -4096,6 +4134,7 @@ def _run_deterministic_pre_step(
                 VALIDATE_EDIT_TOOL,
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         elif tool == APPLY_EDIT_TOOL:
             parameters.pop("tool", None)
@@ -4103,11 +4142,13 @@ def _run_deterministic_pre_step(
                 APPLY_EDIT_TOOL,
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         elif tool == "fuzzy-match":
             result = invoke_fuzzy_match_capability(
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         elif tool in {"shell", _INTERNAL_TOOL}:
             if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
@@ -4123,16 +4164,18 @@ def _run_deterministic_pre_step(
                     verbose=verbose,
                     announce=False,
                 ),
+                runtime=runtime,
             )
         elif tool in {GIT_TOOL, GH_TOOL}:
             result = invoke_intrinsic_capability(
-                tool, parameters, worktree_root=worktree_root
+                tool, parameters, worktree_root=worktree_root, runtime=runtime
             )
         elif is_basedpyright_tool(tool):
             result = invoke_basedpyright_capability(
                 tool,
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
             )
         else:
             raise PowdrrExecutionError(
@@ -4186,17 +4229,23 @@ def _run_deterministic_pre_step(
         )
     keywords = template.get("keywords")
     filters = template.get("filters")
-    gathered_context = gather_specification_context(
-        worktree_root,
-        types=[str(value) for value in raw_types],
-        keywords=(
-            [str(value) for value in keywords]
-            if isinstance(keywords, Sequence)
-            and not isinstance(keywords, (str, bytes, bytearray))
-            else None
+    gathered_context = invoke_repository_read(
+        "gather_context",
+        dict(template),
+        worktree_root=worktree_root,
+        executor=lambda _arguments: gather_specification_context(
+            worktree_root,
+            types=[str(value) for value in raw_types],
+            keywords=(
+                [str(value) for value in keywords]
+                if isinstance(keywords, Sequence)
+                and not isinstance(keywords, (str, bytes, bytearray))
+                else None
+            ),
+            filters=dict(filters) if isinstance(filters, Mapping) else None,
+            feature_id=feature_id,
         ),
-        filters=dict(filters) if isinstance(filters, Mapping) else None,
-        feature_id=feature_id,
+        runtime=runtime,
     )
     result = json.loads(render_gather_context_report(gathered_context))
     event = {
@@ -4252,6 +4301,7 @@ def _run_gate(
     stdout: TextIO,
     stderr: TextIO,
     verbose: bool,
+    runtime: ExecutionRuntime | None = None,
 ) -> bool:
     if step.gate is None or step.pre_step is None:
         raise PowdrrExecutionError(
@@ -4271,6 +4321,7 @@ def _run_gate(
         stderr=stderr,
         verbose=verbose,
         force=True,
+        runtime=runtime,
     )
     event = execution_events[-1] if len(execution_events) > before else None
     if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
@@ -4485,10 +4536,13 @@ def _build_step_execution_messages(
         step_index=current_step_index,
     )
     if pre_step_event is not None:
+        bounded_pre_step_event = prune_execution_events(
+            [pre_step_event], include_results=True
+        )[0]
         prompt_data["deterministic_context"] = {
-            "source": pre_step_event["action"],
-            "scope": pre_step_event["template"],
-            "result": pre_step_event["result"],
+            "source": bounded_pre_step_event["action"],
+            "scope": bounded_pre_step_event["template"],
+            "result": bounded_pre_step_event["result"],
         }
     return [
         {
@@ -5820,7 +5874,7 @@ def _handle_workflow_action_invoke_tool(
             and action.parameters.get("operation") == "pr_create"
             and state.runtime is not None
         ):
-            readiness = state.runtime.readiness()
+            readiness = state.runtime.publish_readiness()
             if not readiness.ready:
                 raise PowdrrExecutionError(
                     "Pull-request creation is blocked by execution readiness: "
@@ -7092,12 +7146,23 @@ def _handle_workflow_action_gather_context(
     config: WorkflowChatConfig,
 ) -> bool:
     _ = input_func
-    gathered_context = gather_specification_context(
-        state.worktree_root,
-        types=list(action.types),
-        keywords=list(action.keywords) if action.keywords else None,
-        filters=action.filters,
-        feature_id=action.feature_id,
+    gathered_context = invoke_repository_read(
+        "gather_context",
+        {
+            "types": list(action.types),
+            "keywords": list(action.keywords) if action.keywords else None,
+            "filters": action.filters,
+            "feature_id": action.feature_id,
+        },
+        worktree_root=state.worktree_root,
+        executor=lambda _arguments: gather_specification_context(
+            state.worktree_root,
+            types=list(action.types),
+            keywords=list(action.keywords) if action.keywords else None,
+            filters=action.filters,
+            feature_id=action.feature_id,
+        ),
+        runtime=state.runtime,
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(

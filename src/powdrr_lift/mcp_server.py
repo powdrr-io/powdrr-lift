@@ -61,10 +61,10 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.execution.capabilities import (
-    CapabilityBroker,
     FileCapabilityExceptionStore,
 )
-from powdrr_lift.execution.tools import ToolRegistry
+from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.runtime import ExecutionRuntime
 
 
 def _load_fastmcp() -> Any:
@@ -123,14 +123,52 @@ def build_server() -> Any:
             raise ValueError(
                 "POWDRR_CAPABILITY_SECRET is required to decide exceptions"
             )
-        broker = CapabilityBroker(
-            ToolRegistry(), CapabilityExceptionAuthority(secret.encode()), store
+        runtime = ExecutionRuntime(
+            request.execution_id,
+            profile_id="exception-decision",
+            workflow_directory=workflow_dir,
+            repo_root=workflow_dir,
+            exception_authority=CapabilityExceptionAuthority(secret.encode()),
+            exception_store=store,
         )
         return json.dumps(
-            broker.decide_exception(
+            runtime.decide_capability_exception(
                 request, approved=decision == "approve", decided_by=decided_by
             ).to_data(),
             ensure_ascii=False,
+        )
+
+    @server.tool()
+    def execution_checkpoints(
+        workflow_dir: str,
+        execution_id: str,
+        checkpoint_id: str | None = None,
+        revert: bool = False,
+        repo_root: str | None = None,
+    ) -> str:
+        """Inspect or restore one durable typed execution checkpoint."""
+        store = ContentAddressedCheckpointStore(
+            Path(workflow_dir) / "execution" / "checkpoints"
+        )
+        if checkpoint_id is None:
+            return json.dumps(
+                [
+                    store.load(path.stem).to_data()
+                    for path in sorted(store.manifests.glob("*.json"))
+                ],
+                ensure_ascii=False,
+            )
+        checkpoint = store.load(checkpoint_id)
+        if not revert:
+            return json.dumps(checkpoint.to_data(), ensure_ascii=False)
+        runtime = ExecutionRuntime(
+            execution_id,
+            profile_id="checkpoint-restore",
+            workflow_directory=workflow_dir,
+            repo_root=repo_root or checkpoint.workspace_root,
+        )
+        return json.dumps(
+            runtime.restore_checkpoint(checkpoint_id).to_data(), ensure_ascii=False
         )
 
     @server.tool()

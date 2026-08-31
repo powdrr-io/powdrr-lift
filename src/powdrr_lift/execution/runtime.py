@@ -4,21 +4,31 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.behavior_rule import FileBehaviorRuleStore
+from powdrr_lift.core.behavior_rule import (
+    FileBehaviorRuleStore,
+    nominate_behavior_rule,
+)
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
-from powdrr_lift.core.execution_plan import ExecutionPlan, FileExecutionPlanStore
+from powdrr_lift.core.execution_plan import (
+    ExecutionPlan,
+    FileExecutionPlanStore,
+    evaluate_execution_plan,
+)
 from powdrr_lift.core.execution_state import (
     ExecutionArtifact,
     ExecutionEvent,
     ExecutionEventType,
     ExecutionFinding,
     ExecutionMode,
+    ExecutionObligation,
     ExecutionState,
 )
+from powdrr_lift.core.workflow_task_specification import WorkflowInstance
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityDecision,
@@ -27,7 +37,11 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolution,
     FileCapabilityExceptionStore,
 )
-from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.checkpoints import (
+    ContentAddressedCheckpointStore,
+    DiagnosticResult,
+    run_diagnostics,
+)
 from powdrr_lift.execution.compaction import (
     FileContextRetrievalStore,
     compact_execution_context,
@@ -106,6 +120,18 @@ class ExecutionRuntime:
             state_json_provider=lambda _context: self.state.to_json(),
         )
         self._projected_kernel_events = 0
+        self._allowed_actions: frozenset[str] | None = None
+
+    def set_action_contract(self, actions: frozenset[str] | None) -> None:
+        """Set the single runtime-owned action contract for the active step."""
+        self._allowed_actions = actions if actions else None
+
+    def validate_action(self, action_kind: str) -> tuple[str, ...]:
+        if self._allowed_actions is None or action_kind in self._allowed_actions:
+            return ()
+        if action_kind == "next_step":
+            return ()
+        return (f"action {action_kind!r} is not allowed by the active step contract",)
 
     def context(
         self,
@@ -126,8 +152,67 @@ class ExecutionRuntime:
     def readiness(self) -> ReadinessReport:
         return self.readiness_evaluator.evaluate(self.state)
 
+    def request_capability_exception(
+        self,
+        context: ToolContext,
+        request: CapabilityRequest,
+        reason: str,
+        *,
+        expires_at: str,
+        max_uses: int = 1,
+    ) -> Any:
+        """Create the exact human decision packet for an exceptional request."""
+        exception = self.broker.create_exception_request(
+            context,
+            request,
+            reason,
+            expires_at=expires_at,
+            max_uses=max_uses,
+        )
+        if exception is None:
+            raise ValueError("capability exception request is not eligible")
+        return exception
+
+    def decide_capability_exception(
+        self, exception: Any, *, approved: bool, decided_by: str
+    ) -> Any:
+        """Apply and durably record one human exception decision."""
+        decision = self.broker.decide_exception(
+            exception, approved=approved, decided_by=decided_by
+        )
+        self._append_event(
+            ExecutionEventType.CAPABILITY_DECISION,
+            {
+                "exception_id": exception.exception_id,
+                "kind": "executable" if approved else "denied",
+                "reason": "exception approved" if approved else "exception denied",
+                "decided_by": decided_by,
+            },
+        )
+        return decision
+
+    def invoke_approved_exception(
+        self,
+        context: ToolContext,
+        request: CapabilityRequest,
+        decision: Any,
+    ) -> ToolResult | CapabilityResolution:
+        """Resume exactly one approved request through the normal broker path."""
+        if not decision.approved or not decision.token:
+            raise ValueError("only an approved exception can be resumed")
+        return self.invoke(
+            context,
+            CapabilityRequest(
+                request.tool_name,
+                request.semantic_action,
+                request.arguments,
+                decision.token,
+            ),
+        )
+
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
+        rules = self.guidance({"profile_id": self.state.profile_id})
         return compact_execution_context(
             {
                 "execution_id": self.execution_id,
@@ -140,6 +225,14 @@ class ExecutionRuntime:
                 ],
                 "evidence_ids": [item.evidence_id for item in self.state.evidence],
                 "finding_ids": [item.finding_id for item in self.state.findings],
+                "guidance": [
+                    {
+                        "rule_id": rule.rule_id,
+                        "version": rule.version,
+                        "text": rule.text,
+                    }
+                    for rule in rules
+                ],
             }
         )
 
@@ -155,9 +248,77 @@ class ExecutionRuntime:
         """Persist a user-requested behavior rule with optimistic versioning."""
         return self.behavior_rule_store.save(rule, expected_version=expected_version)
 
+    def capture_guidance(
+        self, text: str, *, source_ref: str, scope: dict[str, str] | None = None
+    ) -> Any:
+        """Turn an explicit user instruction into durable future behavior."""
+        normalized = " ".join(text.strip().casefold().split())
+        if not normalized:
+            raise ValueError("Guidance text must not be empty.")
+        rule_id = "guidance-" + hashlib.sha256(normalized.encode()).hexdigest()[:20]
+        current = next(
+            (
+                rule
+                for rule in self.behavior_rule_store.list(include_inactive=True)
+                if rule.rule_id == rule_id
+            ),
+            None,
+        )
+        return self.remember_guidance(
+            nominate_behavior_rule(
+                text,
+                rule_id=rule_id,
+                source_ref=source_ref,
+                scope=scope or {"profile_id": self.state.profile_id},
+            ),
+            expected_version=current.version if current is not None else None,
+        )
+
+    def capture_explicit_guidance(self, text: str, *, source_ref: str) -> Any | None:
+        """Capture only directive-shaped text, keeping ordinary rationale ephemeral."""
+        normalized = text.strip().casefold()
+        if not normalized.startswith(
+            ("always ", "never ", "when you ", "i want you to ")
+        ):
+            return None
+        return self.capture_guidance(text, source_ref=source_ref)
+
     def revoke_guidance(self, rule_id: str, *, expected_version: int) -> Any:
         return self.behavior_rule_store.revoke(
             rule_id, expected_version=expected_version
+        )
+
+    def supersede_guidance(
+        self, rule_id: str, replacement: Any, *, expected_version: int
+    ) -> Any:
+        """Replace guidance atomically while retaining why it was replaced."""
+        return self.behavior_rule_store.supersede(
+            rule_id, replacement, expected_version=expected_version
+        )
+
+    def record_observer_decision(
+        self,
+        *,
+        verdict: str,
+        reason: str,
+        action_kind: str,
+        action_signature: str,
+        material_progress: bool | None = None,
+        target_step_id: str | None = None,
+    ) -> ExecutionState:
+        """Persist an observer outcome in the authoritative execution stream."""
+        if not verdict.strip() or not reason.strip() or not action_kind.strip():
+            raise ValueError("Observer decisions require verdict, reason, and action.")
+        return self._append_event(
+            ExecutionEventType.OBSERVER_DECISION,
+            {
+                "verdict": verdict,
+                "reason": reason,
+                "action_kind": action_kind,
+                "action_signature": action_signature,
+                "material_progress": material_progress,
+                "target_step_id": target_step_id,
+            },
         )
 
     def record_artifact(self, artifact: ExecutionArtifact) -> ExecutionState:
@@ -194,8 +355,71 @@ class ExecutionRuntime:
         actions_by_phase: dict[PhaseType, tuple[str, ...]],
     ) -> tuple[Any, ...]:
         """Compile a typed plan through the runtime-owned plan boundary."""
+        validation_profiles = frozenset(
+            profile_name
+            for phase in profile.phases
+            for profile_name in phase.validation_profiles
+        )
+        evaluation = evaluate_execution_plan(
+            plan,
+            proposed_pr_fingerprint=plan.proposed_pr_fingerprint,
+            proposed_pr_paths=tuple(path for unit in plan.units for path in unit.paths),
+            known_validation_profiles=validation_profiles,
+        )
+        if not evaluation.valid:
+            raise ValueError(
+                "execution plan is not compilable: " + "; ".join(evaluation.issues)
+            )
         self.save_plan(plan)
+        for decision in evaluation.required_decisions:
+            obligation_id = f"plan-decision:{plan.plan_id}:{decision}"
+            if any(
+                item.obligation_id == obligation_id for item in self.state.obligations
+            ):
+                continue
+            self._append_event(
+                ExecutionEventType.OBLIGATION_OPENED,
+                ExecutionObligation(
+                    obligation_id,
+                    f"Resolve plan decision: {decision}",
+                    relationship_id=plan.plan_id,
+                ).to_data(),
+            )
         return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
+
+    def resolve_plan_decision(self, plan_id: str, decision: str) -> ExecutionState:
+        """Close one explicit plan decision after its external resolution."""
+        obligation_id = f"plan-decision:{plan_id}:{decision}"
+        if not any(
+            item.obligation_id == obligation_id and item.status.value == "open"
+            for item in self.state.obligations
+        ):
+            raise ValueError(f"open plan decision not found: {decision}")
+        return self._append_event(
+            ExecutionEventType.OBLIGATION_SATISFIED,
+            {"obligation_id": obligation_id},
+        )
+
+    def compile_plan_to_workflow(
+        self,
+        profile: DeliveryProfile,
+        plan: ExecutionPlan,
+        *,
+        actions_by_phase: dict[PhaseType, tuple[str, ...]],
+        workflow_directory: str | Path,
+    ) -> WorkflowInstance:
+        """Compile and persist the canonical task graph owned by this runtime."""
+        self.compile_plan(
+            profile,
+            plan,
+            actions_by_phase=actions_by_phase,
+        )
+        return WorkflowInstance.from_execution_plan(
+            workflow_directory,
+            profile=profile,
+            plan=plan,
+            actions_by_phase=actions_by_phase,
+        )
 
     def compact_prompt_context(self, context: dict[str, Any]) -> dict[str, Any]:
         """Compact arbitrary prompt data while retaining runtime references."""
@@ -206,6 +430,26 @@ class ExecutionRuntime:
 
     def retrieve_prompt_context(self, reference: str) -> dict[str, Any]:
         return self.context_store.load(reference)
+
+    def restore_checkpoint(
+        self, checkpoint_id: str, *, workspace_root: str | Path | None = None
+    ) -> ExecutionState:
+        """Restore files and typed state as one replayable logical operation."""
+        checkpoint = self.checkpoint_store.load(checkpoint_id)
+        state_json = self.checkpoint_store.load_state_json(checkpoint)
+        if state_json is None:
+            raise ValueError("checkpoint has no execution state snapshot")
+        restored = ExecutionState.from_json(state_json)
+        if restored.execution_id != self.execution_id:
+            raise ValueError("checkpoint belongs to a different execution")
+        self.checkpoint_store.restore(checkpoint, workspace_root)
+        self.state = self._append_event(
+            ExecutionEventType.CHECKPOINT_REVERTED,
+            {"checkpoint_id": checkpoint_id, "state": restored.to_data()},
+        )
+        self.kernel.restore_obligations(self.state.obligations)
+        self._projected_kernel_events = len(self.kernel.events)
+        return self.state
 
     def persona_packet(
         self,
@@ -218,6 +462,19 @@ class ExecutionRuntime:
         allowed_effects: frozenset[Any],
     ) -> PersonaPacket:
         """Build a least-privilege persona packet from durable runtime state."""
+        if phase_type is not self.state.current_phase:
+            raise ValueError(
+                f"persona packet phase {phase_type.value!r} does not match "
+                f"runtime phase {self.state.current_phase.value!r}"
+            )
+        assignment = next(
+            (item for item in profile.phases if item.phase_type is phase_type), None
+        )
+        if assignment is not None and assignment.persona_id not in persona_actions:
+            raise ValueError(
+                "persona actions omit profile-assigned persona "
+                f"{assignment.persona_id!r}"
+            )
         return build_persona_packet(
             profile,
             execution_id=self.execution_id,
@@ -252,6 +509,27 @@ class ExecutionRuntime:
             ),
         )
         if decision.allowed and self.profile is not None:
+            assignment = next(
+                (
+                    item
+                    for item in self.profile.phases
+                    if item.phase_type is target_phase
+                ),
+                None,
+            )
+            if assignment is not None and persona_id not in {
+                None,
+                assignment.persona_id,
+            }:
+                return PhaseTransitionDecision(
+                    False,
+                    decision.current_phase,
+                    decision.target_phase,
+                    (
+                        f"phase {target_phase.value} is assigned to persona "
+                        f"{assignment.persona_id!r}",
+                    ),
+                )
             handoff = validate_handoff(
                 self.profile,
                 self.state,
@@ -289,7 +567,41 @@ class ExecutionRuntime:
 
     def publish_readiness(self, **kwargs: Any) -> ReadinessReport:
         """Evaluate the publish boundary using the current durable state."""
+        if not kwargs and self.profile is not None:
+            publish_phase = next(
+                (
+                    item
+                    for item in self.profile.phases
+                    if item.phase_type is PhaseType.PUBLISH_PR
+                ),
+                None,
+            )
+            if publish_phase is not None:
+                kwargs["required_artifact_types"] = publish_phase.input_artifacts
         return self.readiness_evaluator.evaluate(self.state, **kwargs)
+
+    def diagnose(
+        self,
+        hooks: Iterable[tuple[str, Callable[[Path], str]]],
+        *,
+        max_output_chars: int = 8_000,
+    ) -> tuple[DiagnosticResult, ...]:
+        """Run bounded diagnostics and record each result as fresh evidence."""
+        results = run_diagnostics(
+            self.repo_root, hooks, max_output_chars=max_output_chars
+        )
+        for result in results:
+            fingerprint = hashlib.sha256(
+                f"{result.name}:{self.state.event_sequence}".encode()
+            ).hexdigest()
+            self.record_evidence(
+                evidence_id=f"diagnostic-{result.name}-{self.state.event_sequence + 1}",
+                producer_action_instance_id=result.name,
+                evidence_type=f"diagnostic:{result.name}",
+                input_fingerprint=fingerprint,
+                successful=result.successful,
+            )
+        return results
 
     def verify(self) -> ExecutionState:
         """Rebuild state from the durable event log and verify its cache."""
@@ -307,7 +619,29 @@ class ExecutionRuntime:
         result = self.broker.invoke(context, request)
         decisions = self.broker.decision_log[before:]
         if decisions:
-            self._append_capability_decisions(decisions)
+            events = self._capability_decision_events(decisions)
+            checkpoint_ids = {
+                decision.checkpoint_id
+                for decision in decisions
+                if decision.checkpoint_id is not None
+            }
+            for checkpoint_id in sorted(checkpoint_ids):
+                events.append(
+                    self._event(
+                        ExecutionEventType.CHECKPOINT_CREATED,
+                        {"checkpoint_id": checkpoint_id},
+                        offset=len(events) + 1,
+                    )
+                )
+            if checkpoint_ids:
+                for evidence in self.state.evidence:
+                    events.append(
+                        self._event(
+                            ExecutionEventType.EVIDENCE_INVALIDATED,
+                            {"evidence_id": evidence.evidence_id},
+                            offset=len(events) + 1,
+                        )
+                    )
             if isinstance(result, ToolResult) and any(
                 decision.kind.value == "executable" for decision in decisions
             ):
@@ -322,15 +656,26 @@ class ExecutionRuntime:
                         default=str,
                     ).encode()
                 ).hexdigest()
-                self.record_evidence(
-                    evidence_id=f"evidence-{self.state.event_sequence + 1}",
-                    producer_action_instance_id=(
-                        context.active_unit_id or request.semantic_action
-                    ),
-                    evidence_type=f"capability:{request.tool_name}",
-                    input_fingerprint=fingerprint,
-                    successful=True,
+                evidence_id = f"evidence-{self.state.event_sequence + len(events) + 1}"
+                events.append(
+                    self._event(
+                        ExecutionEventType.EVIDENCE_RECORDED,
+                        {
+                            "evidence_id": evidence_id,
+                            "producer_action_instance_id": (
+                                context.active_unit_id or request.semantic_action
+                            ),
+                            "evidence_type": f"capability:{request.tool_name}",
+                            "input_fingerprint": fingerprint,
+                            "successful": _tool_result_successful(result),
+                            "fresh": True,
+                        },
+                        offset=len(events) + 1,
+                    )
                 )
+            self.state = self.state_store.append(
+                self.execution_id, self.state.state_version, tuple(events)
+            )
         return result
 
     def invoke_adapter(
@@ -377,19 +722,28 @@ class ExecutionRuntime:
     def _append_event(
         self, event_type: ExecutionEventType, payload: dict[str, Any]
     ) -> ExecutionState:
-        sequence = self.state.event_sequence + 1
-        event = ExecutionEvent(
-            self.execution_id,
-            sequence,
-            self.state.state_version,
-            event_type,
-            payload,
-            f"{self.execution_id}:{sequence}",
-        )
+        event = self._event(event_type, payload)
         self.state = self.state_store.append(
             self.execution_id, self.state.state_version, (event,)
         )
         return self.state
+
+    def _event(
+        self,
+        event_type: ExecutionEventType,
+        payload: dict[str, Any],
+        *,
+        offset: int = 1,
+    ) -> ExecutionEvent:
+        sequence = self.state.event_sequence + offset
+        return ExecutionEvent(
+            self.execution_id,
+            sequence,
+            self.state.state_version + offset - 1,
+            event_type,
+            payload,
+            f"{self.execution_id}:{sequence}",
+        )
 
     def sync_kernel(self, *, phase_type: str, actor_id: str) -> ExecutionState:
         pending = self.kernel.events[self._projected_kernel_events :]
@@ -423,9 +777,9 @@ class ExecutionRuntime:
         self._projected_kernel_events = len(self.kernel.events)
         return self.state
 
-    def _append_capability_decisions(
+    def _capability_decision_events(
         self, decisions: tuple[CapabilityDecision, ...]
-    ) -> None:
+    ) -> list[ExecutionEvent]:
         events: list[ExecutionEvent] = []
         state_version = self.state.state_version
         sequence = self.state.event_sequence
@@ -442,6 +796,12 @@ class ExecutionRuntime:
                 )
             )
             state_version += 1
-        self.state = self.state_store.append(
-            self.execution_id, self.state.state_version, events
-        )
+        return events
+
+
+def _tool_result_successful(result: ToolResult) -> bool:
+    """Interpret common structured command failures without hiding tool output."""
+    output = result.output
+    if isinstance(output, dict) and "returncode" in output:
+        return output.get("returncode") == 0
+    return True

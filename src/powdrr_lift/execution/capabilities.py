@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -102,30 +104,32 @@ class FileCapabilityExceptionStore:
     def __init__(self, workflow_directory: str | Path) -> None:
         self.root = Path(workflow_directory) / "execution" / "exceptions"
 
+    def _write(self, path: Path, payload: dict[str, Any]) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=self.root, delete=False
+        ) as temporary:
+            temporary.write(json.dumps(payload, indent=2) + "\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_path = Path(temporary.name)
+        os.replace(temporary_path, path)
+
     def save(
         self,
         exception: CapabilityExceptionRequest,
         decision: CapabilityExceptionDecision,
     ) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / f"{exception.exception_id.replace(':', '_')}.json"
-        path.write_text(
-            json.dumps(
-                {"exception": exception.to_data(), "decision": decision.to_data()},
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
+        self._write(
+            path,
+            {"exception": exception.to_data(), "decision": decision.to_data()},
         )
 
     def save_request(self, exception: CapabilityExceptionRequest) -> None:
         """Persist a pending request before a human decision exists."""
-        self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / f"{exception.exception_id.replace(':', '_')}.request.json"
-        path.write_text(
-            json.dumps({"exception": exception.to_data()}, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        self._write(path, {"exception": exception.to_data()})
 
     def load(
         self, exception_id: str
@@ -236,6 +240,19 @@ class CapabilityBroker:
             )
         if is_expired(exception, utc_now()):
             raise ValueError("Cannot decide an expired capability exception.")
+        existing = self._decisions.get(exception.exception_id)
+        if existing is None and self.exception_store is not None:
+            stored = self.exception_store.load(exception.exception_id)
+            if stored is not None:
+                _, existing = stored
+                self._decisions[exception.exception_id] = existing
+        if existing is not None:
+            if existing.approved != approved or existing.decided_by != decided_by:
+                raise ValueError(
+                    f"capability exception {exception.exception_id!r} "
+                    "already has a decision"
+                )
+            return existing
         token = self.exception_authority.sign(exception) if approved else None
         decision = CapabilityExceptionDecision(
             exception.exception_id,
@@ -336,17 +353,18 @@ class CapabilityBroker:
                     and decision.binding == exception.binding()
                     and decision.uses < exception.max_uses
                 ):
-                    self._decisions[decision.exception_id] = (
-                        CapabilityExceptionDecision(
-                            decision.exception_id,
-                            decision.binding,
-                            decision.approved,
-                            decision.decided_by,
-                            decision.decided_at,
-                            decision.token,
-                            decision.uses + 1,
-                        )
+                    consumed = CapabilityExceptionDecision(
+                        decision.exception_id,
+                        decision.binding,
+                        decision.approved,
+                        decision.decided_by,
+                        decision.decided_at,
+                        decision.token,
+                        decision.uses + 1,
                     )
+                    self._decisions[decision.exception_id] = consumed
+                    if self.exception_store is not None:
+                        self.exception_store.save(exception, consumed)
                     return self._record(
                         request,
                         CapabilityResolution(

@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.execution.compaction import (
+    FileContextRetrievalStore,
     compact_execution_context,
     compatibility_diagnostic,
 )
@@ -47,3 +50,37 @@ def test_compaction_retains_typed_references_and_bounds_previews() -> None:
     assert compacted["finding_ids"] == ["f-1"]
     assert compatibility_diagnostic({"schema_version": "old-v0"}) is not None
     assert compatibility_diagnostic({"schema_version": "execution-state-v1"}) is None
+
+
+def test_retrieval_store_bounds_ephemeral_context_history(tmp_path: Path) -> None:
+    store = FileContextRetrievalStore(tmp_path, max_entries=2)
+    references = [store.save({"sequence": index}) for index in range(3)]
+
+    assert len(tuple(store.root.glob("*.json"))) == 2
+    assert store.load(references[-1])["sequence"] == 2
+
+
+def test_compaction_bounds_retrieval_payload_before_serializing(tmp_path: Path) -> None:
+    from powdrr_lift.execution.compaction import compact_with_retrieval
+
+    store = FileContextRetrievalStore(tmp_path)
+    compacted = compact_with_retrieval(
+        {
+            "messages": [{"content": "x" * 20_000} for _ in range(200)],
+            "phase": "build",
+        },
+        store,
+    )
+
+    restored = store.load(compacted["full_context_ref"])
+    assert len(restored["messages"]) == 32
+    assert len(restored["messages"][0]["content"]) < 4_000
+
+
+def test_error_log_bounding_limits_transcript_growth() -> None:
+    from powdrr_lift.workflow_error_logging import _bounded_log_value
+
+    bounded = _bounded_log_value({"history": ["x" * 20_000 for _ in range(100)]})
+
+    assert len(bounded["history"]) == 32
+    assert len(bounded["history"][0]) < 4_000

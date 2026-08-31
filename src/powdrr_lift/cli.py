@@ -92,10 +92,10 @@ from powdrr_lift.core.workflow_template_specification import (
     load_workflow_template,
 )
 from powdrr_lift.execution.capabilities import (
-    CapabilityBroker,
     FileCapabilityExceptionStore,
 )
-from powdrr_lift.execution.tools import ToolRegistry
+from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.openai_proxy import (
     OpenAIProxyConfig,
     default_openai_proxy_log_dir,
@@ -1486,6 +1486,20 @@ def build_parser() -> argparse.ArgumentParser:
     exceptions_parser.add_argument("--json", action="store_true")
     exceptions_parser.set_defaults(func=_run_execution_exceptions)
 
+    checkpoints_parser = subparsers.add_parser(
+        "execution-checkpoints",
+        aliases=["execution_checkpoints"],
+        help="Inspect or restore typed execution checkpoints.",
+    )
+    checkpoints_parser.add_argument("--workflow-dir", type=Path, required=True)
+    checkpoints_parser.add_argument("--execution-id", required=True)
+    checkpoints_parser.add_argument("--checkpoint-id")
+    checkpoints_parser.add_argument("--repo-root", type=Path)
+    checkpoints_parser.add_argument(
+        "--revert", action="store_true", help="Restore the selected checkpoint."
+    )
+    checkpoints_parser.set_defaults(func=_run_execution_checkpoints)
+
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
         aliases=["workflow_recovery"],
@@ -1799,10 +1813,15 @@ def _run_execution_exceptions(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
-        broker = CapabilityBroker(
-            ToolRegistry(), CapabilityExceptionAuthority(secret.encode("utf-8")), store
+        runtime = ExecutionRuntime(
+            request.execution_id,
+            profile_id="exception-decision",
+            workflow_directory=args.workflow_dir,
+            repo_root=args.repo_root or Path.cwd(),
+            exception_authority=CapabilityExceptionAuthority(secret.encode("utf-8")),
+            exception_store=store,
         )
-        decision = broker.decide_exception(
+        decision = runtime.decide_capability_exception(
             request, approved=args.decision == "approve", decided_by=args.decided_by
         )
         payload: object = decision.to_data()
@@ -1815,6 +1834,38 @@ def _run_execution_exceptions(args: argparse.Namespace) -> int:
     else:
         payload = [request.decision_packet() for request in store.pending()]
     print(json.dumps(payload, indent=2, ensure_ascii=False))
+    return 0
+
+
+def _run_execution_checkpoints(args: argparse.Namespace) -> int:
+    """Inspect or restore checkpoints through the durable execution runtime."""
+    store = ContentAddressedCheckpointStore(
+        args.workflow_dir / "execution" / "checkpoints"
+    )
+    if args.revert and not args.checkpoint_id:
+        print("--checkpoint-id is required with --revert", file=sys.stderr)
+        return 2
+    if args.checkpoint_id:
+        checkpoint = store.load(args.checkpoint_id)
+        if args.revert:
+            repo_root = resolve_repo_root(args.repo_root or checkpoint.workspace_root)
+            runtime = ExecutionRuntime(
+                args.execution_id,
+                profile_id="checkpoint-restore",
+                workflow_directory=args.workflow_dir,
+                repo_root=repo_root,
+            )
+            print(
+                json.dumps(
+                    runtime.restore_checkpoint(args.checkpoint_id).to_data(),
+                    indent=2,
+                )
+            )
+        else:
+            print(json.dumps(checkpoint.to_data(), indent=2))
+        return 0
+    manifests = sorted(store.manifests.glob("*.json"))
+    print(json.dumps([store.load(path.stem).to_data() for path in manifests], indent=2))
     return 0
 
 

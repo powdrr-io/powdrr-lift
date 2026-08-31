@@ -62,6 +62,15 @@ class ActionKernel:
     def open_obligations(self) -> tuple[ExecutionObligation, ...]:
         return tuple(self._obligations.values())
 
+    def snapshot(self) -> dict[str, Any]:
+        """Return the durable, JSON-compatible relationship kernel state."""
+        return {
+            "events": [event.to_data() for event in self._events],
+            "open_obligations": [
+                obligation.to_data() for obligation in self._obligations.values()
+            ],
+        }
+
     def propose(
         self,
         action: Any,
@@ -70,6 +79,8 @@ class ActionKernel:
         attributes: frozenset[str] = frozenset(),
     ) -> ActionLifecycleEvent:
         semantic_action = self._semantic_action(action, semantic_action)
+        if not attributes:
+            attributes = self._action_attributes(action)
         obligations: tuple[ExecutionObligation, ...] = ()
         if semantic_action:
             expansion = expand_execution_obligations(
@@ -167,6 +178,18 @@ class ActionKernel:
         return explicit or str(
             getattr(action, "semantic_action", None) or getattr(action, "kind", "")
         )
+
+    @staticmethod
+    def _action_attributes(action: Any) -> frozenset[str]:
+        if isinstance(action, Mapping):
+            value = action.get("attributes", ())
+        else:
+            value = getattr(action, "attributes", ())
+        if isinstance(value, (set, frozenset, list, tuple)) and all(
+            isinstance(item, str) for item in value
+        ):
+            return frozenset(value)
+        return frozenset()
 
     @staticmethod
     def _source_action_instance_id(action: Any) -> str | None:

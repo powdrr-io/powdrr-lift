@@ -126,3 +126,25 @@ def test_action_kernel_serializes_obligation_provenance_and_closes_one_source() 
         if event.phase is ActionLifecyclePhase.OBLIGATION_SATISFIED
     )
     assert satisfied_event.to_data()["obligations"][0]["relationship_id"]
+
+
+def test_action_kernel_preserves_declared_safety_attributes() -> None:
+    kernel = ActionKernel()
+    event = kernel.propose(
+        {
+            "kind": "change_mutable_row",
+            "attributes": ["optimistic_locking", "concurrency_evidence"],
+        }
+    )
+    assert event.obligations == ()
+
+
+def test_action_kernel_snapshot_is_json_compatible_and_replayable() -> None:
+    kernel = ActionKernel()
+    kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
+
+    snapshot = kernel.snapshot()
+
+    assert snapshot["events"][0]["phase"] == "proposed"
+    assert snapshot["events"][1]["phase"] == "obligation_opened"
+    assert all("relationship_id" in item for item in snapshot["open_obligations"])

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.execution_state import (
     ExecutionArtifact,
@@ -367,6 +369,37 @@ def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -
     assert runtime.state_store.load_events("run-checkpoint")[-1].event_type is (
         ExecutionEventType.CHECKPOINT_REVERTED
     )
+
+
+def test_runtime_rejects_mismatched_checkpoint_before_mutating_workspace(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    target = repo_root / "source.txt"
+    target.write_text("current\n", encoding="utf-8")
+    runtime = ExecutionRuntime(
+        "run-current",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=repo_root,
+    )
+    other = ExecutionRuntime(
+        "run-other",
+        profile_id="default",
+        workflow_directory=tmp_path / "other-workflow",
+        repo_root=repo_root,
+    )
+    checkpoint = runtime.checkpoint_store.create(
+        repo_root,
+        "checkpoint-mismatch",
+        state_json=other.state.to_json(),
+    )
+
+    with pytest.raises(ValueError, match="different execution"):
+        runtime.restore_checkpoint(checkpoint.checkpoint_id)
+
+    assert target.read_text(encoding="utf-8") == "current\n"
 
 
 def test_runtime_captures_explicit_guidance_with_stable_identity(

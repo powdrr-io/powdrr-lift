@@ -436,14 +436,13 @@ class ExecutionRuntime:
     ) -> ExecutionState:
         """Restore files and typed state as one replayable logical operation."""
         checkpoint = self.checkpoint_store.load(checkpoint_id)
-        state_json = self.checkpoint_store.restore_with_state(
-            checkpoint, workspace_root
-        )
+        state_json = self.checkpoint_store.load_state_json(checkpoint)
         if state_json is None:
             raise ValueError("checkpoint has no execution state snapshot")
         restored = ExecutionState.from_json(state_json)
         if restored.execution_id != self.execution_id:
             raise ValueError("checkpoint belongs to a different execution")
+        self.checkpoint_store.restore(checkpoint, workspace_root)
         self.state = self._append_event(
             ExecutionEventType.CHECKPOINT_REVERTED,
             {"checkpoint_id": checkpoint_id, "state": restored.to_data()},

@@ -4,11 +4,13 @@ from powdrr_lift.execution.builtin_tools import (
     BasedPyrightAdapter,
     EnrichmentAdapter,
     FileMutationAdapter,
+    FuzzyMatchAdapter,
     IntrinsicRepositoryAdapter,
     ShellAdapter,
     builtin_tool_registry,
     invoke_basedpyright_capability,
     invoke_file_mutation,
+    invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
@@ -148,6 +150,8 @@ __all__ = [
     "ShellAdapter",
     "FileMutationAdapter",
     "BasedPyrightAdapter",
+    "FuzzyMatchAdapter",
     "invoke_file_mutation",
     "invoke_basedpyright_capability",
+    "invoke_fuzzy_match_capability",
 ]

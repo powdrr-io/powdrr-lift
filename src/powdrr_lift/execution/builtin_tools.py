@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import shlex
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
 from typing import Any
 
@@ -322,6 +323,85 @@ def invoke_basedpyright_capability(
     if isinstance(result, ToolResult):
         return result.output
     raise ValueError(f"BasedPyright capability was not executable: {result.reason}")
+
+
+class FuzzyMatchAdapter:
+    """Read-only adapter for bounded repository path discovery."""
+
+    manifest = ToolManifest(
+        "fuzzy-match",
+        ("discover_files",),
+        (ToolEffect.WORKSPACE_READ,),
+        scope="worktree",
+        sandbox_profile="workspace-read",
+        reversible=True,
+    )
+
+    def __init__(
+        self,
+        path_cache: MutableMapping[tuple[str, int, int | None], tuple[Path, ...]]
+        | None = None,
+    ) -> None:
+        self._path_cache = path_cache
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        command = arguments.get("command")
+        if not isinstance(command, (str, list, tuple)):
+            return ToolValidationReport(
+                ("fuzzy-match command must be a string or array",)
+            )
+        if isinstance(command, str) and not command.strip():
+            return ToolValidationReport(("fuzzy-match command must not be empty",))
+        if isinstance(command, (list, tuple)) and (
+            not command or not all(isinstance(item, str) and item for item in command)
+        ):
+            return ToolValidationReport(
+                ("fuzzy-match command items must be non-empty strings",)
+            )
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        from powdrr_lift.fuzzy_match import fuzzy_match_json
+
+        command = arguments["command"]
+        return ToolResult(
+            {
+                "tool": "fuzzy-match",
+                "command": command,
+                "result": json.loads(
+                    fuzzy_match_json(
+                        command,
+                        worktree_root=context.worktree_root,
+                        path_cache=self._path_cache,
+                    )
+                ),
+            },
+            frozenset({ToolEffect.WORKSPACE_READ}),
+        )
+
+
+def invoke_fuzzy_match_capability(
+    arguments: Mapping[str, Any],
+    *,
+    worktree_root: Path,
+    path_cache: MutableMapping[tuple[str, int, int | None], tuple[Path, ...]]
+    | None = None,
+) -> Any:
+    context = ToolContext(
+        repo_root=worktree_root,
+        worktree_root=worktree_root,
+        semantic_actions=frozenset({"discover_files"}),
+        allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    result = CapabilityBroker(ToolRegistry((FuzzyMatchAdapter(path_cache),))).invoke(
+        context,
+        CapabilityRequest("fuzzy-match", "discover_files", dict(arguments)),
+    )
+    if isinstance(result, ToolResult):
+        return result.output
+    raise ValueError(f"Fuzzy-match capability was not executable: {result.reason}")
 
 
 def invoke_file_mutation(

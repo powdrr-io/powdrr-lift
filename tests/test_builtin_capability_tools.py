@@ -7,6 +7,7 @@ import pytest
 from powdrr_lift.core.tool_manifest import ToolEffect
 from powdrr_lift.execution.builtin_tools import (
     BasedPyrightAdapter,
+    FuzzyMatchAdapter,
     builtin_tool_registry,
     invoke_file_mutation,
     invoke_shell_capability,
@@ -143,3 +144,17 @@ def test_basedpyright_capability_validates_symbol_and_structure_requests(
         .validate(context, {"path": "../outside.py"})
         .valid
     )
+
+
+def test_fuzzy_match_capability_requires_a_structured_command(tmp_path: Path) -> None:
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"discover_files"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    adapter = FuzzyMatchAdapter()
+
+    assert adapter.validate(context, {"command": ["fuzzy-match", "."]}).valid
+    assert not adapter.validate(context, {"command": []}).valid
+    assert not adapter.validate(context, {"command": ""}).valid

@@ -72,6 +72,7 @@ from powdrr_lift.core.validation_messages import (
 from powdrr_lift.execution.builtin_tools import (
     invoke_basedpyright_capability,
     invoke_file_mutation,
+    invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
@@ -4060,7 +4061,7 @@ def _run_deterministic_pre_step(
             parameters.pop("tool", None)
             result = execute_apply_edit_tool(parameters, worktree_root=worktree_root)
         elif tool == "fuzzy-match":
-            result = _execute_fuzzy_match_tool(
+            result = invoke_fuzzy_match_capability(
                 parameters,
                 worktree_root=worktree_root,
             )
@@ -5702,7 +5703,7 @@ def _handle_workflow_action_invoke_tool(
 ) -> bool:
     _ = input_func
     if action.tool == "fuzzy-match":
-        tool_result = _execute_fuzzy_match_tool(
+        tool_result = invoke_fuzzy_match_capability(
             action.parameters,
             worktree_root=state.worktree_root,
             path_cache=state.fuzzy_match_cache,

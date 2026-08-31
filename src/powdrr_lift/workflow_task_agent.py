@@ -32,6 +32,7 @@ from powdrr_lift.core.spec_context import (
 from powdrr_lift.execution.builtin_tools import (
     invoke_basedpyright_capability,
     invoke_file_mutation,
+    invoke_fuzzy_match_capability,
     invoke_intrinsic_capability,
     invoke_shell_capability,
 )
@@ -56,7 +57,6 @@ from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
     _default_llm_mappings,
     _estimate_message_tokens,
-    _execute_fuzzy_match_tool,
     _execute_shell_tool,
     _find_skill_by_name,
     _interaction_style_prompt,
@@ -896,7 +896,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if result.get("stderr"):
                 print(str(result["stderr"]), end="", file=self.stderr)
         elif action.tool == "fuzzy-match":
-            result = _execute_fuzzy_match_tool(
+            result = invoke_fuzzy_match_capability(
                 action.parameters,
                 worktree_root=self.repo_root,
             )
@@ -3033,7 +3033,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     ENRICH_TOOL, action.parameters, worktree_root=self.repo_root
                 )
             elif action.tool == "fuzzy-match":
-                result = _execute_fuzzy_match_tool(
+                result = invoke_fuzzy_match_capability(
                     action.parameters, worktree_root=self.repo_root
                 )
             elif is_basedpyright_tool(action.tool or ""):

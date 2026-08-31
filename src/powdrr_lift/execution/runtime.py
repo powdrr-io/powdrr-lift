@@ -186,6 +186,25 @@ class ExecutionRuntime:
         )
         return decision
 
+    def invoke_approved_exception(
+        self,
+        context: ToolContext,
+        request: CapabilityRequest,
+        decision: Any,
+    ) -> ToolResult | CapabilityResolution:
+        """Resume exactly one approved request through the normal broker path."""
+        if not decision.approved or not decision.token:
+            raise ValueError("only an approved exception can be resumed")
+        return self.invoke(
+            context,
+            CapabilityRequest(
+                request.tool_name,
+                request.semantic_action,
+                request.arguments,
+                decision.token,
+            ),
+        )
+
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
         rules = self.guidance({"profile_id": self.state.profile_id})

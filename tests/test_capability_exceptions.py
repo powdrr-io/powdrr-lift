@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
+from powdrr_lift.core.execution_state import ExecutionEventType
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
@@ -10,6 +11,7 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolutionKind,
     FileCapabilityExceptionStore,
 )
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import (
     ToolContext,
     ToolRegistry,
@@ -165,3 +167,41 @@ def test_exception_use_count_survives_broker_restart(tmp_path: Path) -> None:
     assert replay.kind is CapabilityResolutionKind.EXCEPTION_REQUIRED
     stored = store.load(exception.exception_id)
     assert stored is not None and stored[1].uses == 1
+
+
+def test_runtime_exception_flow_resumes_exact_request(tmp_path: Path) -> None:
+    store = FileCapabilityExceptionStore(tmp_path / "workflow")
+    runtime = ExecutionRuntime(
+        "run-runtime-exception",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        registry=ToolRegistry([WriteTool()]),
+        exception_authority=CapabilityExceptionAuthority(b"secret"),
+        exception_store=store,
+    )
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"edit"}),
+        frozenset(),
+        execution_id="run-runtime-exception",
+    )
+    request = CapabilityRequest("write-file", "edit", {"path": "one.txt"})
+    exception = runtime.request_capability_exception(
+        context,
+        request,
+        "needs human approval",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    decision = runtime.decide_capability_exception(
+        exception, approved=True, decided_by="human"
+    )
+
+    result = runtime.invoke_approved_exception(context, request, decision)
+
+    assert isinstance(result, ToolResult)
+    assert any(
+        event.event_type is ExecutionEventType.CAPABILITY_DECISION
+        for event in runtime.state_store.load_events("run-runtime-exception")
+    )

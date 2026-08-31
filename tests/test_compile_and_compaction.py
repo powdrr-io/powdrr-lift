@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.execution.compaction import (
+    FileContextRetrievalStore,
     compact_execution_context,
     compatibility_diagnostic,
 )
@@ -47,3 +50,11 @@ def test_compaction_retains_typed_references_and_bounds_previews() -> None:
     assert compacted["finding_ids"] == ["f-1"]
     assert compatibility_diagnostic({"schema_version": "old-v0"}) is not None
     assert compatibility_diagnostic({"schema_version": "execution-state-v1"}) is None
+
+
+def test_retrieval_store_bounds_ephemeral_context_history(tmp_path: Path) -> None:
+    store = FileContextRetrievalStore(tmp_path, max_entries=2)
+    references = [store.save({"sequence": index}) for index in range(3)]
+
+    assert len(tuple(store.root.glob("*.json"))) == 2
+    assert store.load(references[-1])["sequence"] == 2

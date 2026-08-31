@@ -28,14 +28,22 @@ TYPED_REFERENCE_KEYS = frozenset(
 class FileContextRetrievalStore:
     """Bounded retrieval store for prompt content omitted during compaction."""
 
-    def __init__(self, directory: str | Path) -> None:
+    def __init__(self, directory: str | Path, *, max_entries: int = 256) -> None:
+        if max_entries < 1:
+            raise ValueError("max_entries must be positive")
         self.root = Path(directory) / "execution" / "context"
+        self.max_entries = max_entries
 
     def save(self, context: Mapping[str, Any]) -> str:
         encoded = json.dumps(dict(context), sort_keys=True, default=str)
         reference = hashlib.sha256(encoded.encode()).hexdigest()[:24]
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / f"{reference}.json").write_text(encoded + "\n", encoding="utf-8")
+        entries = sorted(
+            self.root.glob("*.json"), key=lambda path: path.stat().st_mtime
+        )
+        for stale in entries[: -self.max_entries]:
+            stale.unlink(missing_ok=True)
         return reference
 
     def load(self, reference: str) -> dict[str, Any]:

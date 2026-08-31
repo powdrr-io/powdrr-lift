@@ -313,3 +313,22 @@ def test_runtime_diagnostics_are_recorded_as_evidence(tmp_path: Path) -> None:
         "diagnostic:tests",
         "diagnostic:broken",
     }
+
+
+def test_failed_command_does_not_produce_successful_evidence(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-failed-command",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    invoke_shell_capability(
+        {"command": ["false"]},
+        worktree_root=tmp_path,
+        executor=lambda _arguments: {"returncode": 1, "stderr": "failed"},
+        runtime=runtime,
+    )
+
+    assert runtime.state.evidence
+    assert not runtime.state.evidence[-1].successful

@@ -571,7 +571,7 @@ class ExecutionRuntime:
                             ),
                             "evidence_type": f"capability:{request.tool_name}",
                             "input_fingerprint": fingerprint,
-                            "successful": True,
+                            "successful": _tool_result_successful(result),
                             "fresh": True,
                         },
                         offset=len(events) + 1,
@@ -701,3 +701,11 @@ class ExecutionRuntime:
             )
             state_version += 1
         return events
+
+
+def _tool_result_successful(result: ToolResult) -> bool:
+    """Interpret common structured command failures without hiding tool output."""
+    output = result.output
+    if isinstance(output, dict) and "returncode" in output:
+        return output.get("returncode") == 0
+    return True

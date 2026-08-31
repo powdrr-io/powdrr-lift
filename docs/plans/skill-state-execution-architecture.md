@@ -583,6 +583,14 @@ The agent does not need to remember to retrieve them. They become part of `P_t`
 when state and action selectors make them applicable. Their consequences become
 runtime-owned obligations and evidence requirements in `Sigma_t`.
 
+Original intent is captured once in a canonical `IntentSource`. Typed clauses,
+decisions, invariants, procedures, indexes, plans, tasks, handoffs, contracts,
+and execution state reference that source and one another by stable versioned
+IDs. `EffectiveProcedure` is an ephemeral deduplicated projection, not another
+persisted copy. Multiple selector paths return one clause, and relationship
+expansion uses stable consequence keys so retries, replay, and nested skills
+reuse an existing obligation instead of cloning it.
+
 ## State patches and action execution
 
 The model response should contain exactly one state patch and one action:

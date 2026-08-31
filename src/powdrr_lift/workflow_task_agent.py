@@ -661,7 +661,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 path.read_text(encoding="utf-8"),
                 action.yaml_operations,
             )
-            path.write_text(updated, encoding="utf-8")
+            invoke_file_mutation(
+                (action.file_path,),
+                worktree_root=self.repo_root,
+                executor=lambda: path.write_text(updated, encoding="utf-8"),
+            )
             self.events.append(
                 {
                     "kind": action.kind,
@@ -685,11 +689,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 raise PowdrrExecutionError(
                     "file_management action requires operation and file_path."
                 )
-            result = manage_worktree_file(
-                self.repo_root,
-                operation=action.file_operation,
-                file_path=action.file_path,
-                destination_path=action.destination_path,
+            file_operation = action.file_operation
+            file_path = action.file_path
+            mutation_paths: tuple[str, ...] = (file_path,)
+            if action.destination_path is not None:
+                mutation_paths += (action.destination_path,)
+            result = invoke_file_mutation(
+                mutation_paths,
+                worktree_root=self.repo_root,
+                executor=lambda: manage_worktree_file(
+                    self.repo_root,
+                    operation=file_operation,
+                    file_path=file_path,
+                    destination_path=action.destination_path,
+                ),
             )
             self.events.append(
                 {

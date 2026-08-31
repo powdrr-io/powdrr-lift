@@ -96,3 +96,33 @@ def test_action_kernel_preserves_validation_before_thread_resolution() -> None:
     assert kernel.validate_proposal(
         {"kind": "resolve"}, semantic_action="resolve_review_thread"
     )
+
+
+def test_action_kernel_serializes_obligation_provenance_and_closes_one_source() -> None:
+    kernel = ActionKernel()
+    first = kernel.propose({"kind": "change-1"}, semantic_action="change_mutable_row")
+    second = kernel.propose({"kind": "change-2"}, semantic_action="change_mutable_row")
+    assert (
+        first.obligations[0].source_action_instance_id
+        != second.obligations[0].source_action_instance_id
+    )
+
+    kernel.complete(
+        {
+            "kind": "lock",
+            "semantic_action": "add_optimistic_lock",
+            "source_action_instance_id": first.obligations[0].source_action_instance_id,
+        }
+    )
+    remaining = [
+        item
+        for item in kernel.open_obligations
+        if item.required_action == "add_optimistic_lock"
+    ]
+    assert len(remaining) == 1
+    satisfied_event = next(
+        event
+        for event in kernel.events
+        if event.phase is ActionLifecyclePhase.OBLIGATION_SATISFIED
+    )
+    assert satisfied_event.to_data()["obligations"][0]["relationship_id"]

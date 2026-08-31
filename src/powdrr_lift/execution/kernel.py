@@ -29,6 +29,18 @@ class ActionLifecycleEvent:
     error: Any = None
     obligations: tuple[ExecutionObligation, ...] = ()
 
+    def to_data(self) -> dict[str, Any]:
+        error = self.error
+        if error is not None and not isinstance(error, (str, int, float, bool)):
+            error = str(error)
+        return {
+            "sequence": self.sequence,
+            "phase": self.phase.value,
+            "action": self.action,
+            "error": error,
+            "obligations": [item.to_data() for item in self.obligations],
+        }
+
 
 class ActionKernel:
     """Record one ordered lifecycle for an action.
@@ -101,7 +113,10 @@ class ActionKernel:
         return self._record(ActionLifecyclePhase.STARTED, action)
 
     def complete(self, action: Any) -> ActionLifecycleEvent:
-        self._close_matching_obligations(self._semantic_action(action, None))
+        self._close_matching_obligations(
+            self._semantic_action(action, None),
+            self._source_action_instance_id(action),
+        )
         return self._record(ActionLifecyclePhase.COMPLETED, action)
 
     def fail(self, action: Any, error: Any) -> ActionLifecycleEvent:
@@ -153,12 +168,34 @@ class ActionKernel:
             getattr(action, "semantic_action", None) or getattr(action, "kind", "")
         )
 
-    def _close_matching_obligations(self, semantic_action: str) -> None:
-        for obligation_id, obligation in tuple(self._obligations.items()):
-            if obligation.required_action == semantic_action:
-                del self._obligations[obligation_id]
-                self._record(
-                    ActionLifecyclePhase.OBLIGATION_SATISFIED,
-                    {"action": semantic_action},
-                    obligations=(obligation,),
-                )
+    @staticmethod
+    def _source_action_instance_id(action: Any) -> str | None:
+        if isinstance(action, Mapping):
+            value = action.get("source_action_instance_id")
+        else:
+            value = getattr(action, "source_action_instance_id", None)
+        return value if isinstance(value, str) and value else None
+
+    def _close_matching_obligations(
+        self, semantic_action: str, source_action_instance_id: str | None
+    ) -> None:
+        matches = tuple(
+            (obligation_id, obligation)
+            for obligation_id, obligation in self._obligations.items()
+            if obligation.required_action == semantic_action
+            and (
+                source_action_instance_id is None
+                or obligation.source_action_instance_id == source_action_instance_id
+            )
+        )
+        # A follow-up without explicit provenance closes only the oldest matching
+        # obligation; it must not accidentally satisfy another source action.
+        if source_action_instance_id is None:
+            matches = matches[:1]
+        for obligation_id, obligation in matches:
+            del self._obligations[obligation_id]
+            self._record(
+                ActionLifecyclePhase.OBLIGATION_SATISFIED,
+                {"action": semantic_action},
+                obligations=(obligation,),
+            )

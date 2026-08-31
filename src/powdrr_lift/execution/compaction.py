@@ -62,10 +62,33 @@ def compact_with_retrieval(
     max_preview_chars: int = 1_000,
 ) -> dict[str, Any]:
     """Compact prompt data and expose a reference to the complete payload."""
-    reference = store.save(context)
+    reference = store.save(_bounded_retrieval_context(context))
     compacted = compact_execution_context(context, max_preview_chars=max_preview_chars)
     compacted["full_context_ref"] = reference
     return compacted
+
+
+def _bounded_retrieval_context(
+    value: Any, *, depth: int = 0, max_text: int = 4_000
+) -> Any:
+    """Prevent retrieval persistence from serializing unbounded prompt history."""
+    if depth > 6:
+        return "<nested context omitted>"
+    if isinstance(value, str):
+        if len(value) <= max_text:
+            return value
+        return (
+            value[: max_text - 40] + f"… <{len(value) - max_text + 40} chars omitted>"
+        )
+    if isinstance(value, Mapping):
+        return {
+            str(key): _bounded_retrieval_context(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        items = value[-32:] if len(value) > 32 else value
+        return [_bounded_retrieval_context(item, depth=depth + 1) for item in items]
+    return value
 
 
 def compact_execution_context(

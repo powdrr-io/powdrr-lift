@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import types
+from contextlib import redirect_stderr, redirect_stdout
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -4572,22 +4573,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     )
     repo_root = tmp_path / "repo"
     subprocess.run(
-        ["git", "clone", str(source_repo_root), str(repo_root)],
+        ["git", "clone", "--depth", "1", str(source_repo_root), str(repo_root)],
         check=True,
         capture_output=True,
         text=True,
-    )
-    source_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    subprocess.run(
-        ["git", "switch", "--orphan", "test-main"],
-        cwd=repo_root,
-        check=True,
     )
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
@@ -4595,22 +4584,9 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         check=True,
     )
     subprocess.run(
-        ["git", "restore", "--source", source_commit, "--worktree", "--staged", "."],
-        cwd=repo_root,
-        check=True,
-    )
-    subprocess.run(
         ["git", "config", "user.name", "Test User"],
         cwd=repo_root,
         check=True,
-    )
-    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Create isolated test base"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
     )
     subprocess.run(
         ["git", "branch", "-M", "main"],
@@ -6120,6 +6096,25 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
 
     def _fake_start_subprocess_run(*args: Any, **kwargs: Any) -> Any:
         command = args[0] if args else kwargs.get("args")
+        if (
+            isinstance(command, list)
+            and len(command) > 2
+            and command[:2]
+            == [
+                "rtk",
+                "powdrr-lift",
+            ]
+        ):
+            captured_stdout = io.StringIO()
+            captured_stderr = io.StringIO()
+            with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
+                returncode = main(command[2:])
+            return subprocess.CompletedProcess(
+                command,
+                returncode,
+                stdout=captured_stdout.getvalue(),
+                stderr=captured_stderr.getvalue(),
+            )
         if isinstance(command, list) and "pr-specification" in command:
             generated_pr_path = (
                 worktree_root / system_spec_dir / "proposed-pr-specification.yaml"

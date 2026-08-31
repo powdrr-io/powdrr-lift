@@ -818,5 +818,26 @@ def prune_execution_events(
                     "truncated": True,
                     "preview": result_text[:_MAX_PROMPT_EVENT_CHARS],
                 }
-        prompt_events.append(prompt_event)
+        prompt_events.append(_bound_prompt_value(prompt_event))
     return prompt_events
+
+
+def _bound_prompt_value(value: Any, *, depth: int = 0) -> Any:
+    """Bound nested event fields, including templates and command metadata."""
+    if depth > 6:
+        return "<nested prompt value omitted>"
+    if isinstance(value, str):
+        return (
+            value
+            if len(value) <= _MAX_PROMPT_EVENT_CHARS
+            else value[:_MAX_PROMPT_EVENT_CHARS]
+        )
+    if isinstance(value, Mapping):
+        return {
+            str(key): _bound_prompt_value(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        items = value[-32:] if len(value) > 32 else value
+        return [_bound_prompt_value(item, depth=depth + 1) for item in items]
+    return value

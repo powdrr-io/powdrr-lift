@@ -1178,9 +1178,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.state.runtime is not None:
                 compacted = self.state.runtime.compact_prompt_context(
                     {
-                        "transcript": self.state.transcript,
-                        "execution_events": self.state.execution_events,
-                        "execution_context": self.state.execution_context,
+                        "step_index": self.current_step_index,
+                        "selected_skill": self.selected_skill.skill.name,
                     }
                 )
                 messages.append(
@@ -4534,10 +4533,13 @@ def _build_step_execution_messages(
         step_index=current_step_index,
     )
     if pre_step_event is not None:
+        bounded_pre_step_event = prune_execution_events(
+            [pre_step_event], include_results=True
+        )[0]
         prompt_data["deterministic_context"] = {
-            "source": pre_step_event["action"],
-            "scope": pre_step_event["template"],
-            "result": pre_step_event["result"],
+            "source": bounded_pre_step_event["action"],
+            "scope": bounded_pre_step_event["template"],
+            "result": bounded_pre_step_event["result"],
         }
     return [
         {

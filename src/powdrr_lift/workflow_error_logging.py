@@ -13,6 +13,25 @@ WORKFLOW_LLM_ERROR_LOG = "workflow-llm-errors.jsonl"
 WORKFLOW_OBSERVER_LOG = "workflow-observer-events.jsonl"
 
 
+def _bounded_log_value(value: Any, *, depth: int = 0) -> Any:
+    """Keep diagnostic logging from becoming a second unbounded transcript."""
+    if depth > 5:
+        return "<nested value omitted>"
+    if isinstance(value, str):
+        return value if len(value) <= 4_000 else value[:3_960] + "… <truncated>"
+    if isinstance(value, Mapping):
+        return {
+            str(key): _bounded_log_value(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [
+            _bounded_log_value(item, depth=depth + 1)
+            for item in (value[-32:] if len(value) > 32 else value)
+        ]
+    return value
+
+
 def record_workflow_llm_error(
     repo_root: Path,
     *,
@@ -39,12 +58,12 @@ def record_workflow_llm_error(
         "phase": phase,
         "error_type": type(error).__name__,
         "error": str(error),
-        "context": dict(context),
+        "context": _bounded_log_value(context),
     }
     if llm_output is not None:
-        record["llm_output"] = llm_output
+        record["llm_output"] = _bounded_log_value(llm_output)
     if attempted_action is not None:
-        record["attempted_action"] = attempted_action
+        record["attempted_action"] = _bounded_log_value(attempted_action)
     if guidance:
         record["guidance"] = guidance
 
@@ -77,12 +96,12 @@ def record_workflow_observer_event(
         "phase": "observer_shadow",
         "trigger": trigger,
         "fingerprint": fingerprint,
-        "context": dict(context),
+        "context": _bounded_log_value(context),
     }
     if packet is not None:
-        record["observer_packet"] = dict(packet)
+        record["observer_packet"] = _bounded_log_value(packet)
     if decision is not None:
-        record["observer_decision"] = dict(decision)
+        record["observer_decision"] = _bounded_log_value(decision)
     if error is not None:
         record["error_type"] = type(error).__name__
         record["error"] = str(error)

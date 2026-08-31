@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
@@ -59,6 +59,19 @@ class CapabilityDecision:
     kind: CapabilityResolutionKind
     reason: str
     manifest_fingerprint: str | None = None
+    arguments: Mapping[str, Any] = field(default_factory=dict)
+    checkpoint_id: str | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "tool_name": self.tool_name,
+            "semantic_action": self.semantic_action,
+            "kind": self.kind.value,
+            "reason": self.reason,
+            "manifest_fingerprint": self.manifest_fingerprint,
+            "arguments": dict(self.arguments),
+            "checkpoint_id": self.checkpoint_id,
+        }
 
 
 class CapabilityExceptionStore(Protocol):
@@ -393,6 +406,7 @@ class CapabilityBroker:
                 resolution.kind,
                 resolution.reason,
                 fingerprint or resolution.manifest_fingerprint,
+                dict(request.arguments),
             )
         )
         return resolution
@@ -438,6 +452,10 @@ class CapabilityBroker:
                 ),
             )
         result = resolution.adapter.execute(context, resolution.arguments)
+        if self._decision_log:
+            self._decision_log[-1] = replace(
+                self._decision_log[-1], checkpoint_id=checkpoint_id
+            )
         return (
             replace(result, checkpoint_id=checkpoint_id)
             if checkpoint_id is not None

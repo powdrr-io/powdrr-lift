@@ -134,3 +134,7 @@ def test_broker_checkpoints_mutations_before_execution(tmp_path: Path) -> None:
     assert isinstance(result, ToolResult)
     assert result.checkpoint_id == checkpoints[0][0]
     assert checkpoints[0][1] == '{"state": 1}'
+    decision = broker.decision_log[-1]
+    assert decision.arguments == {"path": "one.txt"}
+    assert decision.checkpoint_id == result.checkpoint_id
+    assert decision.to_data()["checkpoint_id"] == result.checkpoint_id

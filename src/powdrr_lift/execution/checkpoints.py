@@ -107,13 +107,17 @@ class ContentAddressedCheckpointStore:
         self, checkpoint: Checkpoint, workspace_root: str | Path | None = None
     ) -> None:
         workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
+        if workspace.is_symlink() or not workspace.is_dir():
+            raise ValueError("checkpoint restore workspace must be a real directory")
         expected = set(checkpoint.objects)
+        targets = {
+            relative: _safe_restore_path(workspace, relative) for relative in expected
+        }
         for path in _workspace_files(workspace):
             if str(path.relative_to(workspace)) not in expected:
                 path.unlink()
         for relative, digest in checkpoint.objects.items():
-            target = (workspace / relative).resolve()
-            target.relative_to(workspace)
+            target = targets[relative]
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.objects / digest, target)
 
@@ -163,3 +167,24 @@ def _workspace_files(workspace: Path) -> tuple[Path, ...]:
         for path in workspace.rglob("*")
         if path.is_file() and ".git" not in path.relative_to(workspace).parts
     )
+
+
+def _safe_restore_path(workspace: Path, relative: str) -> Path:
+    candidate = Path(relative)
+    if candidate.is_absolute() or ".." in candidate.parts or not candidate.parts:
+        raise ValueError(
+            f"checkpoint object path is not workspace-relative: {relative!r}"
+        )
+    current = workspace
+    for part in candidate.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"checkpoint restore refuses symlink path: {relative!r}")
+    resolved = current.resolve()
+    try:
+        resolved.relative_to(workspace)
+    except ValueError as error:
+        raise ValueError(
+            f"checkpoint object path escapes workspace: {relative!r}"
+        ) from error
+    return current

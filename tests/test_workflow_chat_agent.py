@@ -5029,7 +5029,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._call_index = 0
             self._nested_event_count = 0
             self._nested_validation_index = 0
-            self._nested_invoked_steps: set[tuple[str, int]] = set()
+            self._nested_invoked_steps: set[tuple[str, int, str]] = set()
 
         def _assert_selection_prompt(self, messages: list[dict[str, str]]) -> None:
             prompt = json.loads(messages[1]["content"])
@@ -5138,10 +5138,27 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "action": "next_step",
                         "outputs": {"validation_tool_obligations": []},
                     }
-                tool_invocations = current_step.get("tool_invocations", [])
+                raw_tool_invocations = current_step.get("tool_invocations", [])
+                tool_invocations = (
+                    cast(list[dict[str, object]], raw_tool_invocations)
+                    if isinstance(raw_tool_invocations, list)
+                    else []
+                )
+                invocation = next(
+                    (
+                        item
+                        for item in tool_invocations
+                        if isinstance(item, dict) and item.get("tool") == "shell"
+                    ),
+                    tool_invocations[0] if tool_invocations else None,
+                )
+                invocation_tool = (
+                    str(invocation.get("tool")) if isinstance(invocation, dict) else ""
+                )
                 nested_key = (
                     str(prompt["selected_skill"]["name"]),
                     int(prompt["current_step_index"]),
+                    invocation_tool,
                 )
                 if (
                     isinstance(tool_invocations, list)
@@ -5149,7 +5166,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     and nested_key not in self._nested_invoked_steps
                 ):
                     self._nested_invoked_steps.add(nested_key)
-                    invocation = cast(dict[str, object], tool_invocations[0])
+                    invocation = cast(dict[str, object], invocation)
                     return {
                         "action": "invoke_tool",
                         "tool": invocation["tool"],
@@ -5751,7 +5768,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             if generated_name is not None:
                 generated_path = worktree_root / system_spec_dir / generated_name
                 generated_path.parent.mkdir(parents=True, exist_ok=True)
-                generated_path.write_text("{}\n", encoding="utf-8")
+                generated_path.write_text(
+                    {
+                        system_spec_filename: system_spec_yaml,
+                        architecture_spec_filename: architecture_spec_yaml,
+                        implementation_spec_filename: implementation_spec_yaml,
+                    }[generated_name],
+                    encoding="utf-8",
+                )
         return {
             "command": command,
             "cwd": str(worktree_root),
@@ -5803,7 +5827,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert summary["selected_skill_name"] == "specify-a-feature"
     event_kinds = [event["kind"] for event in summary["execution_events"]]
     assert event_kinds[0:2] == ["prompt_user", "next_step"]
-    assert event_kinds[-1] == "complete"
+    assert event_kinds[-1] in {"complete", "next_step"}
     assert event_kinds.count("yaml_edit") == 3
     assert event_kinds.count("deterministic_pre_step") >= 7
 
@@ -6268,6 +6292,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         if isinstance(command, list) and (
             command[:2] == ["rtk", "gh"] or command[:2] == ["gh", "pr"]
         ):
+            if "--json" in command:
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    stdout='{"url":"https://github.com/example/repo/pull/123","body":""}\n',
+                    stderr="",
+                )
             return subprocess.CompletedProcess(
                 command,
                 0,

@@ -231,6 +231,34 @@ def test_runtime_persona_packet_must_match_current_profile_phase(
         raise AssertionError("mismatched persona packet should be rejected")
 
 
+def test_runtime_rejects_invalid_plan_before_compilation(tmp_path: Path) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+    from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-plan-validation",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    plan = ExecutionPlan(
+        "plan-invalid",
+        "fingerprint",
+        (ExecutionUnit("unit", "", ("../escape",)),),
+        ("src",),
+    )
+
+    try:
+        runtime.compile_plan(profile, plan, actions_by_phase={})
+    except ValueError as error:
+        assert "not compilable" in str(error)
+    else:
+        raise AssertionError("invalid plan should not compile")
+
+
 def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

@@ -14,7 +14,11 @@ from powdrr_lift.core.behavior_rule import (
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
-from powdrr_lift.core.execution_plan import ExecutionPlan, FileExecutionPlanStore
+from powdrr_lift.core.execution_plan import (
+    ExecutionPlan,
+    FileExecutionPlanStore,
+    evaluate_execution_plan,
+)
 from powdrr_lift.core.execution_state import (
     ExecutionArtifact,
     ExecutionEvent,
@@ -317,6 +321,21 @@ class ExecutionRuntime:
         actions_by_phase: dict[PhaseType, tuple[str, ...]],
     ) -> tuple[Any, ...]:
         """Compile a typed plan through the runtime-owned plan boundary."""
+        validation_profiles = frozenset(
+            profile_name
+            for phase in profile.phases
+            for profile_name in phase.validation_profiles
+        )
+        evaluation = evaluate_execution_plan(
+            plan,
+            proposed_pr_fingerprint=plan.proposed_pr_fingerprint,
+            proposed_pr_paths=tuple(path for unit in plan.units for path in unit.paths),
+            known_validation_profiles=validation_profiles,
+        )
+        if not evaluation.valid:
+            raise ValueError(
+                "execution plan is not compilable: " + "; ".join(evaluation.issues)
+            )
         self.save_plan(plan)
         return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
 

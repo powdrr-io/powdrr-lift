@@ -19,9 +19,10 @@ from powdrr_lift.core.execution_state import (
     initial_execution_state,
     reduce_execution_event,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 
 
-class ExecutionStateConflict(RuntimeError):
+class ExecutionStateConflict(PowdrrExecutionError):
     """Raised when a state append was based on a stale version."""
 
     def __init__(self, execution_id: str, expected: int, actual: int) -> None:

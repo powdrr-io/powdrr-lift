@@ -696,7 +696,12 @@ def invoke_intrinsic_capability(
     request = CapabilityRequest(request_tool, semantic_action, dict(arguments))
     adapter = builtin_tool_registry().get(request_tool)
     if adapter is None:
-        raise ValueError(f"No adapter registered for intrinsic tool {request_tool!r}")
+        raise PowdrrExecutionError(
+            f"No adapter registered for intrinsic tool {request_tool!r}",
+            error_code="intrinsic_tool_unregistered",
+            action_kind=semantic_action,
+            remediation="Use a registered builtin tool or request tool discovery.",
+        )
     result = (
         runtime.invoke_adapter(adapter, context, request)
         if runtime is not None
@@ -704,6 +709,9 @@ def invoke_intrinsic_capability(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(
-        f"Intrinsic capability request was not executable: {result.reason}"
+    raise PowdrrExecutionError(
+        f"Intrinsic capability request was not executable: {result.reason}",
+        error_code="intrinsic_capability_not_executable",
+        action_kind=semantic_action,
+        remediation="Correct the capability request using the reported reason.",
     )

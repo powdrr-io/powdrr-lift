@@ -12,6 +12,7 @@ from powdrr_lift.execution.builtin_tools import (
     RepositoryReadAdapter,
     builtin_tool_registry,
     invoke_file_mutation,
+    invoke_intrinsic_capability,
     invoke_shell_capability,
 )
 from powdrr_lift.execution.capabilities import (
@@ -20,6 +21,19 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolutionKind,
 )
 from powdrr_lift.execution.tools import ToolContext, ToolResult
+
+
+def test_intrinsic_capability_unknown_tool_has_typed_correction_metadata(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(PowdrrExecutionError) as raised:
+        invoke_intrinsic_capability(
+            "unknown",
+            {},
+            worktree_root=tmp_path,
+        )
+
+    assert raised.value.error_code == "unsupported_tool"
 
 
 def test_builtin_repository_inspection_resolves_through_broker(tmp_path: Path) -> None:

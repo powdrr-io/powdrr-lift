@@ -4212,7 +4212,7 @@ def test_action_repair_prompt_includes_the_rejected_edit() -> None:
 
     assert "previous edit action failed and was not applied" in prompt
     assert '"file_path": "implementation-specification.txt"' in prompt
-    assert "don't do this again" in prompt
+    assert "Do not repeat it unchanged" in prompt
 
 
 def test_action_repair_prompt_explains_validation_errors() -> None:
@@ -4243,8 +4243,12 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
     assert '"text":"One clear English question?"' in prompt
     assert '"action":"next_step"' in prompt
     assert 'rename "prompt" to "text"' in prompt
-    assert "This step declares no tool invocations; do not return invoke_tool" in prompt
+    assert (
+        "This step declares no tool invocations; do not return invoke_tool"
+        not in prompt
+    )
     assert "file_path and edits or file_edits for edit" not in prompt
+    assert '"action":"yaml_edit"' not in prompt
 
 
 def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:

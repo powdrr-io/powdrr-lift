@@ -10043,7 +10043,9 @@ def _action_repair_prompt(
         if _validation_gate_enabled(current_step):
             prompt += (
                 "This step has a runtime validation gate. Never return next_step, "
-                "goto_step, or complete until every discovered validation obligation "
+                + ("goto_step, " if "goto_step" in action_names else "")
+                + ("or complete " if "complete" in action_names else "")
+                + "until every discovered validation obligation "
                 "has "
                 "passed in the current epoch. After any correction, rerun every "
                 "discovered obligation; the runtime validation_gate object is "
@@ -10051,37 +10053,47 @@ def _action_repair_prompt(
                 "repair that produced the same validation issue. Inspect the exact "
                 "current file and reported issue path first, preserve valid fields, "
                 "choose a materially different target or strategy when the issue state "
-                "is unchanged or worse. Apply independent YAML fixes in one yaml_edit "
-                "and wait for the deterministic rerun before claiming progress. "
+                "is unchanged or worse. "
+                + (
+                    "Apply independent YAML fixes in one yaml_edit. "
+                    if "yaml_edit" in action_names
+                    else ""
+                )
+                + "Wait for the deterministic rerun before claiming progress. "
             )
         invocations = tuple(current_step.tool_invocations)
-        if invocations:
+        if invocations and "invoke_tool" in action_names:
             declared_tools = json.dumps(
                 [_tool_invocation_to_data(item) for item in invocations],
                 ensure_ascii=False,
             )
             prompt += f"Use only these declared tool invocations: {declared_tools}. "
-        else:
-            prompt += (
-                "This step declares no tool invocations; do not return invoke_tool. "
+        shapes: list[str] = []
+        if "prompt_user" in action_names:
+            shapes.append(
+                '{"action":"prompt_user","text":"One clear English question?",'
+                '"decisions_and_context":"More information is required."}'
             )
-        prompt += (
-            "For this repair, these are the exact prompt_user and next_step "
-            "action shapes allowed for the current step: "
-            '{"action":"prompt_user","text":"One clear English question?",'
-            '"decisions_and_context":"More information is required."} or '
-            '{"action":"next_step","decisions_and_context":"The current step '
-            'is complete."}. '
-        )
-        prompt += (
-            'If the correction is a YAML edit, use exactly {"action":"yaml_edit",'
-            '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
-            '"path":["id"],"value":"feature-id"}]}; include all required '
-            'fields in the operation. For list items, use {"op":"upsert_item",'
-            '"section":"requirements","id":"req-1","value":{"description":'
-            '"...","state":"added"}}. '
-        )
-        if invocations:
+        if "next_step" in action_names:
+            shapes.append(
+                '{"action":"next_step","decisions_and_context":"The current '
+                'step is complete."}'
+            )
+        if shapes:
+            prompt += (
+                "For this repair, use one of these exact action shapes allowed for "
+                "the current step: " + " or ".join(shapes) + ". "
+            )
+        if "yaml_edit" in action_names:
+            prompt += (
+                'For a YAML correction, use exactly {"action":"yaml_edit",'
+                '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
+                '"path":["id"],"value":"feature-id"}]}; include all required '
+                'fields in the operation. For list items, use {"op":"upsert_item",'
+                '"section":"requirements","id":"req-1","value":{"description":'
+                '"...","state":"added"}}. '
+            )
+        if invocations and "invoke_tool" in action_names:
             prompt += (
                 "invoke_tool is also allowed only with one of the declared tool "
                 "templates shown above; do not invent another tool or parameter "
@@ -10105,14 +10117,16 @@ def _action_repair_prompt(
             )
     if failed_action is not None:
         prompt += (
-            "\nThe previous edit action failed and was not applied. don't do this "
-            "again; do not repeat it "
-            "unchanged; reread the current file and return a corrected action. "
-            "For YAML, prefer yaml_edit with upsert_item, remove_item, "
-            "remove_key, or set_value; use a normal edit with exact line "
-            "ranges when those "
-            "operations cannot express the repair. The "
-            "rejected edit was:\n"
+            f"\nThe previous {failed_action.kind} action failed and was not applied. "
+            "Do not repeat it unchanged; return a corrected action. "
+            + (
+                "For YAML, prefer yaml_edit with upsert_item, remove_item, "
+                "remove_key, or set_value; use a normal edit with exact line "
+                "ranges when those operations cannot express the repair. "
+                if {"edit", "yaml_edit"} & action_names
+                else ""
+            )
+            + "The rejected action was:\n"
             f"{_workflow_action_signature(failed_action)}"
         )
     return prompt

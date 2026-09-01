@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 from powdrr_lift.core import WorkflowInstance
+from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.skill_specification import SkillToolInvocation
 from powdrr_lift.core.workflow_task_specification import TaskComplexity
 from powdrr_lift.core.workflow_template_specification import (
@@ -341,7 +343,9 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
     assert template.task_templates[0].input_state["feature_id"] == "<work-item-name>"
-    assert [task.phase_type.value for task in template.task_templates] == [
+    assert [
+        cast(PhaseType, task.phase_type).value for task in template.task_templates
+    ] == [
         "intake",
         "plan_pr",
         "build",

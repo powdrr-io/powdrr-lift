@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from powdrr_lift.errors import PowdrrExecutionError
 
-class FileManagementError(RuntimeError):
+
+class FileManagementError(PowdrrExecutionError):
     """A requested file mutation violated the workflow worktree boundary."""
 
 

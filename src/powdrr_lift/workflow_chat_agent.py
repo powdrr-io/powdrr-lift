@@ -2443,19 +2443,19 @@ class LocalModelRuntimeError(RuntimeError):
     """Raised when the required local GPU model cannot run."""
 
 
-class _WorkflowEditRangeError(RuntimeError):
+class _WorkflowEditRangeError(PowdrrExecutionError):
     """Raised when a line-based edit falls outside the current file."""
 
 
-class _WorkflowStructuredDocumentError(RuntimeError):
+class _WorkflowStructuredDocumentError(PowdrrExecutionError):
     """Raised when an edit produces invalid structured document text."""
 
 
-class _WorkflowYamlEditError(RuntimeError):
+class _WorkflowYamlEditError(PowdrrExecutionError):
     """Raised when a structural YAML edit cannot be applied safely."""
 
 
-class _WorkflowToolValidationError(RuntimeError):
+class _WorkflowToolValidationError(PowdrrExecutionError):
     def __init__(self, validation_error: ValidationError) -> None:
         self.validation_error = validation_error
         super().__init__(validation_error.message)

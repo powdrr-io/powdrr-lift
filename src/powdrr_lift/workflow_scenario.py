@@ -59,7 +59,7 @@ class WorkflowScenarioResult:
     execution_events: tuple[dict[str, Any], ...]
     audit_events: tuple[dict[str, Any], ...]
     roundtrips: int
-    llm_exchanges: tuple[dict[str, Any], ...] = ()
+    llm_exchanges: tuple[Any, ...] = ()
     analysis: dict[str, Any] | None = None
     stdout: str = ""
     stderr: str = ""
@@ -124,6 +124,7 @@ def run_workflow_scenario(
     max_roundtrips_override: int | None = None,
     max_stalled_roundtrips_override: int | None = None,
     stream_live: bool = False,
+    guidance: Sequence[str] = (),
 ) -> WorkflowScenarioResult:
     """Run one scripted skill scenario in a fresh temporary Git repository."""
     _validate_scenario(scenario)
@@ -215,6 +216,7 @@ def run_workflow_scenario(
                 ),
                 verbose=bool(provider.get("verbose", False)),
                 stream_live=stream_live,
+                guidance=guidance,
             )
         finally:
             if generated_workflow_root is not None:
@@ -286,6 +288,17 @@ def run_workflow_scenario(
     worktree_root = temporary_root / "repository"
     try:
         _build_fixture_repository(worktree_root, fixture_path)
+        if guidance:
+            guidance_runtime = ExecutionRuntime(
+                "scenario-guidance",
+                profile_id="default",
+                workflow_directory=temporary_root / ".powdrr-execution",
+                repo_root=worktree_root,
+            )
+            for rule in guidance:
+                guidance_runtime.capture_guidance(
+                    rule, source_ref=f"scenario:{scenario_id}", scope={}
+                )
         execution = _run_scripted_skill(
             definition_path=definition_path,
             worktree_root=worktree_root,
@@ -317,6 +330,7 @@ def run_workflow_scenario(
             execution_events=tuple(execution.execution_events),
             audit_events=tuple(execution.audit_events),
             roundtrips=execution.roundtrips,
+            llm_exchanges=tuple(execution.llm_exchanges),
             worktree_root=retained_root,
         )
     finally:
@@ -333,6 +347,7 @@ class _ScriptedSkillExecution:
     execution_events: list[dict[str, Any]]
     audit_events: list[dict[str, Any]]
     roundtrips: int
+    llm_exchanges: list[list[dict[str, str]]]
 
 
 def _run_scripted_skill(
@@ -421,6 +436,7 @@ def _run_scripted_skill(
         execution_events=state.execution_events,
         audit_events=state.audit_events,
         roundtrips=len(client.messages),
+        llm_exchanges=client.messages,
     )
 
 

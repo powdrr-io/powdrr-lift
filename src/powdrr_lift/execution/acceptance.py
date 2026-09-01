@@ -108,7 +108,7 @@ class _AcceptanceExceptionAdapter:
 
 
 class _StructuredDeliveryAdapter:
-    """Drive the real runtime with validated artifacts from one delivery run."""
+    """Drive the runtime with the repository's real artifact validators."""
 
     manifest = ToolManifest(
         "structured-delivery",
@@ -130,8 +130,38 @@ class _StructuredDeliveryAdapter:
     def validate(
         self, context: ToolContext, arguments: Mapping[str, Any]
     ) -> ToolValidationReport:
-        if not all(path.is_file() for path in self.artifact_root.rglob("*.yaml")):
-            return ToolValidationReport(("delivery artifacts are incomplete",))
+        stage = arguments.get("stage")
+        implementation_path = (
+            self.artifact_root
+            / "docs/specs/powdrr-lift/implementation-specification.yaml"
+        )
+        proposal_path = (
+            self.artifact_root
+            / "docs/proposals/acceptance-feature/proposed-pr-specification.yaml"
+        )
+        if stage in {"validate_specification", "create_proposed_pr"}:
+            if not implementation_path.is_file() or not proposal_path.is_file():
+                return ToolValidationReport(("delivery artifacts are incomplete",))
+            try:
+                implementation = implementation_path.read_text(encoding="utf-8")
+                proposal = proposal_path.read_text(encoding="utf-8")
+                if stage == "create_proposed_pr":
+                    report = build_pr_specification_validation_report(
+                        proposal,
+                        work_item_name="acceptance-feature",
+                        repo_root=self.artifact_root,
+                        file_path=proposal_path,
+                    )
+                    if not report.validation_successful:
+                        return ToolValidationReport(
+                            tuple(issue.message for issue in report.issues)
+                        )
+                elif "specification-v1" not in implementation:
+                    return ToolValidationReport(
+                        ("implementation specification has an invalid schema",)
+                    )
+            except OSError as exc:
+                return ToolValidationReport((str(exc),))
         return ToolValidationReport()
 
     def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
@@ -574,6 +604,12 @@ def run_final_acceptance(
             ),
         ),
         AcceptanceCheck(
+            "production-guidance-context",
+            _exchanges_contain_guidance(production_task)
+            and _exchanges_contain_guidance(production_chat),
+            "durable guidance is present in prompts sent by both production adapters",
+        ),
+        AcceptanceCheck(
             "durable-guidance-changes-behavior",
             len(guidance_after["guidance"]) == len(guidance_before["guidance"]) + 2
             and "resolve the comment" in str(guidance_after["guidance"]).casefold()
@@ -931,6 +967,7 @@ expect:
         scenario,
         scenario_path=scenario_path,
         repo_root=repo_root,
+        guidance=("Always use optimistic locking for mutable row changes.",),
     )
 
 
@@ -990,7 +1027,18 @@ expect:
         load_workflow_scenario(scenario_path),
         scenario_path=scenario_path,
         repo_root=repo_root,
+        guidance=("Always use optimistic locking for mutable row changes.",),
     )
+
+
+def _exchanges_contain_guidance(result: Any) -> bool:
+    """Check the actual production adapter prompt payload, not a helper prompt."""
+    exchanges = (
+        result.get("exchanges", ())
+        if isinstance(result, Mapping)
+        else getattr(result, "llm_exchanges", ())
+    )
+    return "optimistic locking" in json.dumps(exchanges).casefold()
 
 
 def _walk_profile(

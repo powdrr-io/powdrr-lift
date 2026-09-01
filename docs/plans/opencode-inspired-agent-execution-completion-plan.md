@@ -43,6 +43,10 @@ publication.
 See [`docs/audits/opencode-implementation-audit.md`](../audits/opencode-implementation-audit.md)
 for the evidence and required closure associated with each gap.
 
+Acceptance proof must validate real structured artifacts and exercise persisted
+guidance through the production chat and durable-task prompt paths. Fixture-file
+presence and direct runtime helper calls alone are not sufficient evidence.
+
 ## PR sequence
 
 ### PR 1 — Authoritative execution runtime and action transaction

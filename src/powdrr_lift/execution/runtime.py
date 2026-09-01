@@ -590,7 +590,9 @@ class ExecutionRuntime:
                 text,
                 rule_id=rule_id,
                 source_ref=source_ref,
-                scope=scope or {"profile_id": self.state.profile_id},
+                scope=scope
+                if scope is not None
+                else {"profile_id": self.state.profile_id},
             ),
             expected_version=current.version if current is not None else None,
         )

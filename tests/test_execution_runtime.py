@@ -848,6 +848,27 @@ def test_runtime_rejects_mismatched_checkpoint_before_mutating_workspace(
     assert target.read_text(encoding="utf-8") == "current\n"
 
 
+def test_runtime_rejects_checkpoint_restore_into_another_workspace(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    runtime = ExecutionRuntime(
+        "run-workspace-mismatch",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=repo_root,
+    )
+    checkpoint = runtime.checkpoint_store.create(
+        repo_root, "checkpoint-workspace", state_json=runtime.state.to_json()
+    )
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.restore_checkpoint(checkpoint.checkpoint_id, workspace_root=tmp_path)
+
+    assert raised.value.error_code == "checkpoint_workspace_mismatch"
+
+
 def test_runtime_captures_explicit_guidance_with_stable_identity(
     tmp_path: Path,
 ) -> None:

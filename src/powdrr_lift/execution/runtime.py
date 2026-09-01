@@ -597,6 +597,16 @@ class ExecutionRuntime:
                 error_code="checkpoint_execution_mismatch",
                 remediation="Restore a checkpoint created by this execution.",
             )
+        target_workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
+        if target_workspace != Path(checkpoint.workspace_root).resolve():
+            raise PowdrrExecutionError(
+                "checkpoint restore target differs from its recorded workspace",
+                error_code="checkpoint_workspace_mismatch",
+                remediation=(
+                    "Restore the checkpoint to the exact workspace captured when "
+                    "the checkpoint was created."
+                ),
+            )
         changed_paths = self.checkpoint_store.changed_paths(checkpoint, workspace_root)
         self.checkpoint_store.restore(checkpoint, workspace_root)
         self.state = self._append_event(

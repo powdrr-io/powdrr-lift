@@ -6094,7 +6094,9 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
-        and action.kind != "complete"
+        and not (
+            action.kind == "complete" and not getattr(step, "actions_declared", False)
+        )
         and not (action.kind == "invoke_tool" and action.tool == "internal")
     ):
         raise _WorkflowToolValidationError(
@@ -6967,7 +6969,9 @@ def _validate_workflow_action_for_step_unwrapped(
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
-        and action.kind != "complete"
+        and not (
+            action.kind == "complete" and not getattr(step, "actions_declared", False)
+        )
         and not (action.kind == "invoke_tool" and action.tool == "internal")
     ):
         raise _WorkflowToolValidationError(
@@ -9856,7 +9860,7 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
 def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     """Return only this step's declared actions, always including next_step."""
     declared = tuple(getattr(step, "actions", ()) or ())
-    if declared:
+    if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
     else:
         # Older skill definitions may omit an explicit action catalog. Infer the
@@ -9896,13 +9900,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
-    has_required_outputs = any(
-        getattr(output, "required_for_next_step", False)
-        for output in (getattr(step, "outputs", ()) or ())
-    )
-    if not has_required_outputs:
-        actions = [item for item in actions if item[0] != "next_step"]
-    if has_required_outputs and "next_step" not in action_names:
+    if "next_step" not in action_names:
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(
         output

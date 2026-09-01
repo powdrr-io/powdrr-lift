@@ -124,6 +124,7 @@ from powdrr_lift.workflow_chat_agent import (
     _run_deterministic_pre_step,
     _run_gate,
     _serialize_messages,
+    _step_actions,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
@@ -142,6 +143,7 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     _WorkflowStructuredDocumentError,
+    _WorkflowToolValidationError,
     _WorkflowYamlEditError,
     _worktree_reuse_decision,
     available_workflow_providers,
@@ -484,6 +486,36 @@ def test_modular_action_prompt_requires_invoke_skill_for_nested_steps() -> None:
 
     assert "use invoke_skill, not invoke_tool or an internal CLI command" in prompt
     assert '"skill":"finish-pr-prep"' in prompt
+
+
+def test_explicit_empty_step_does_not_infer_legacy_actions() -> None:
+    actions = _step_actions(
+        SkillStep(
+            description="Wait for the engine-owned result.",
+            details="Legacy inference must not reopen this contract.",
+            uses_skills=("unrelated-skill",),
+            actions_declared=True,
+        )
+    )
+
+    assert actions == (("next_step", "Advance only after this step is complete."),)
+
+
+def test_next_step_is_prompted_without_required_outputs() -> None:
+    actions = _step_actions(SkillStep(description="Finish the step."))
+
+    assert any(name == "next_step" for name, _ in actions)
+
+
+def test_explicit_step_contract_rejects_undeclared_complete() -> None:
+    with pytest.raises(_WorkflowToolValidationError, match="not allowed"):
+        _validate_workflow_action_for_step(
+            _parse_action_response({"action": "complete"}),
+            SkillStep(
+                description="Use the declared handoff.",
+                actions=("read_document",),
+            ),
+        )
 
 
 def test_deterministic_shell_pre_step_accepts_empty_successful_result(

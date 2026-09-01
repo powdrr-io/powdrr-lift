@@ -795,6 +795,47 @@ def test_compile_plan_requires_one_action_contract_per_phase(tmp_path: Path) -> 
         )
 
 
+def test_compile_plan_accepts_explicit_empty_phase_contracts(tmp_path: Path) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+    from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-empty-actions",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "runtime",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    plan = ExecutionPlan(
+        "plan-empty-actions",
+        "fingerprint",
+        (
+            ExecutionUnit(
+                "unit-1",
+                "Wait",
+                ("src/app.py",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("wait completes",),
+            ),
+        ),
+        ("src",),
+    )
+
+    workflow = runtime.compile_plan_to_workflow(
+        profile,
+        plan,
+        actions_by_phase={phase.phase_type: () for phase in profile.phases},
+        workflow_directory=tmp_path / "workflow",
+    )
+
+    assert workflow.tasks
+    assert all(task.actions == () for task in workflow.tasks)
+    assert all(task.actions_declared for task in workflow.tasks)
+
+
 def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
     tmp_path: Path,
 ) -> None:

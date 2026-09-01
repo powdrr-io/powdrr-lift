@@ -433,6 +433,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _llm_error_context(self) -> dict[str, Any]:
         recent_events = self.events[-8:]
+        runtime_actions = (
+            self.runtime.allowed_actions() if self.runtime is not None else None
+        )
+        allowed_actions = list(runtime_actions) if runtime_actions is not None else None
         last_successful_action = next(
             (
                 event
@@ -457,13 +461,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "provider": self.mapping_provider,
             "model": self.model,
             "action_contract": {
-                "allowed_actions": [
-                    "invoke_tool",
-                    "invoke_skill",
-                    "get-human-input",
-                    "next_step",
-                    "complete",
-                ],
+                "allowed_actions": allowed_actions,
                 "declared_nested_skills": list(self.task.uses_skills),
             },
             "recent_events": recent_events,
@@ -523,10 +521,19 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if payload is not None
             else f"<no parsed response; client error: {error}>"
         )
+        allowed_actions = (
+            self.runtime.allowed_actions() if self.runtime is not None else None
+        )
+        contract_guidance = (
+            " The action must be one of: " + ", ".join(allowed_actions) + "."
+            if allowed_actions is not None
+            else ""
+        )
         guidance = (
             "Return exactly one complete JSON object matching one of the "
-            "documented workflow-task action shapes. Do not return markdown, "
-            "prose, or an empty response."
+            "documented workflow-task action shapes."
+            + contract_guidance
+            + " Do not return markdown, prose, or an empty response."
         )
         record_workflow_llm_error(
             self.error_log_root,

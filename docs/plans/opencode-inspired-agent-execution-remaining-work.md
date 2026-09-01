@@ -1,4 +1,4 @@
-# Remaining work for the Opencode-inspired execution plan
+# Historical remaining work for the Opencode-inspired execution plan
 
 > This open-ended inventory is retained as an audit reference. The finite,
 > dependency-ordered implementation plan is
@@ -6,15 +6,20 @@
 
 ## Purpose
 
+This document is now a historical inventory. The finite completion plan has
+been executed through its final consolidated PR. Current closure is proved by
+`powdrr-lift final-acceptance` and `powdrr-lift audit-capabilities`, not by the
+older item-by-item notes below.
+
 The merged implementation establishes the typed execution-kernel vocabulary,
 but it has not yet made that kernel the authoritative runtime for the complete
 Powdrr workflow. This document records the remaining work identified by the
 post-merge audit.
 
-The merged tree is healthy: the full suite passes (684 tests), and formatting,
-linting, and mypy pass. Passing tests currently prove the new primitives and
-legacy behavior independently; they do not yet prove the final enforce-mode
-acceptance gate.
+The merged tree is healthy: the full suite passes (757 tests), formatting,
+linting, and mypy pass, and the final enforce-mode acceptance gate passes all
+14 checks, including phase walking, replay, partial-failure recovery, typed
+exception decisions, scope rejection, readiness, and compaction.
 
 ## Current status
 
@@ -38,10 +43,12 @@ reachable only through direct Python APIs or tests.
 
 The final acceptance implementation now provides executable closure checks for
 the integrated path. Run `powdrr-lift final-acceptance` for the deterministic
-compiled-plan, effective-contract, relationship, lifecycle, and adapter-parity
-scenario, and `powdrr-lift audit-capabilities` for the built-in capability
-manifest audit. These commands are covered by the full test suite and are the
-required evidence for the final phase.
+compiled-plan, full phase/handoff walk, effective-contract, relationship,
+lifecycle, adapter-parity, checkpoint recovery, exception decision, scope,
+readiness, replay, and compaction scenario, and `powdrr-lift
+audit-capabilities` for the built-in capability manifest audit. These commands
+are covered by the full test suite and are the required evidence for the final
+phase.
 
 ## Remaining work, in priority order
 

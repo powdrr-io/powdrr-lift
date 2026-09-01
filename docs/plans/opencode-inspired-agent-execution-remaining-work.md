@@ -53,7 +53,7 @@ phase.
 The normal builtin capability path is runtime-authoritative: helpers require
 one durable `ExecutionRuntime`, and scenario/compatibility paths create an
 explicit runtime rather than falling back to an ephemeral broker. The full
-suite currently reports 760 passing tests.
+suite currently reports 763 passing tests.
 
 ## Remaining work, in priority order
 

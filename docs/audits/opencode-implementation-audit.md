@@ -77,7 +77,7 @@ The scenario intentionally avoids an LLM and external GitHub mutation so its
 result is repeatable in CI. Provider-specific and external-write behavior
 remains covered by the existing broker, exception, checkpoint, and workflow
 scenario suites. The measured repository acceptance result is 14 passing
-checks, and the full repository suite is 760 passing tests. The capability
+checks, and the full repository suite is 763 passing tests. The capability
 audit additionally verifies that builtin helpers cannot construct an
 ephemeral broker when a runtime is absent.
 

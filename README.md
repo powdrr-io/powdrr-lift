@@ -1,56 +1,36 @@
-# powdrr-lift
+# Stop Babysitting Agents. Start Writing Software
 
-## The software factory for agents that need to ship
+Powdrr gives you an agent you can trust with real engineering work. It is high-integrity
+by design: it follows an explicit plan, acts only through declared capabilities, keeps
+changes isolated, and makes its work ready for review. It also has an elephant-like
+memory. Powdrr carries intent, decisions, constraints, and prior context forward so the
+agent can keep doing the right work after the conversation has moved on.
 
-### Stop Prompting. Start Engineering.
+## Your Agent Does Not Know What Is Safe
 
-Powdrr turns your prompts into a durable, verifiable plan. Every prompt and decision
-evolves that plan for confirmation before implementation. No more crafting prompts to
-give your agent all the relevant context again. Powdrr's structured plans provide the
-context for planning, implementation, validation, and review, keeping your project on
-track toward its long-term goals.
+Approval fatigue starts when your agent literally has no idea which commands are safe
+and which ones are not. You end up approving every shell command, second-guessing every
+file edit, and watching closely because a harmless-looking action can mutate the wrong
+checkout or push work past the request.
 
-It is safer by design: tool access is scoped to the workflow and its worktree, actions
-are declared and validated, and the agent stops when it cannot prove progress. You do
-not have to blindly approve a stream of surprising commands. Your architectural
-decisions become durable workflow context instead of disappearing when a conversation
-ends. And detailed steps stay detailed—the agent follows the workflow rather than
-quietly skipping to “done.”
+Powdrr makes safety part of the workflow's construction. Each step declares its purpose,
+tools, and expected outcome. The runtime checks every action against the active step,
+keeps work in a dedicated worktree, detects repeated failures and stalled roundtrips,
+and stops when the agent cannot make validated progress. You can review what the agent
+was authorized to do, why it did it, and what it produced.
 
-### Why teams try it
+## Your Agent Has The Memory of a Goldfish
 
-* **Safe-by-design autonomy.** Sandboxed tools, isolated worktrees, declared actions,
-  and validation gates make the safe path the default.
-* **Design memory that lasts.** Decisions, constraints, dependencies, and intent are
-  recorded as structured context that survives compaction, handoffs, and new sessions.
-* **Workflow fidelity.** Ordered steps, explicit outputs, and self-validating actions
-  keep the agent doing the complete job—not the shortest job it can narrate.
-* **Human control without micromanagement.** Direct the work in chat, inspect the
-  execution trail, and intervene at meaningful boundaries instead of approving every
-  low-level move.
+You constantly have to remind agents what they need to do: restate the goal, repeat the
+constraints, explain an earlier decision, and point them back to the file or change that
+made the current task possible. Long conversations compress, details disappear, and the
+agent starts filling gaps with guesses.
 
-### The agent problems Powdrr is designed to prevent
-
-**“It forgot the architecture we agreed on.”** A new session should not reset the
-design. Powdrr carries decisions, invariants, and rationale forward as workflow data,
-so the next step starts from the same engineering context. Design memory is part of the
-system, not a hope pinned to chat history.
-
-**“It skipped half the checklist and said it was done.”** Powdrr workflows define the
-steps, actions, outputs, and validation required for completion. The agent cannot
-silently replace a ten-step plan with a plausible summary; it must produce the declared
-outputs or stop with a useful failure state.
-
-**“It asked me to approve everything until ‘yes’ became muscle memory.”** Repeated
-low-value prompts train people to click through the moment that matters. Powdrr scopes
-tools and changes to the workflow's execution boundary, so it asks for human judgment
-at meaningful decision points—not for every routine operation. Attention stays focused
-on the moments worth thinking about.
-
-**“It edited the first plausible file and quietly widened the scope.”** Powdrr grounds
-each action in the active workflow step, the repository's declared context, and an
-isolated worktree. The agent follows an authorized change path instead of improvising
-its own definition of “close enough.”
+Powdrr preserves durable intent instead of relying on conversation memory. The workflow
+captures the request, decisions, affected entities, relationships, invariants, and
+guidance as structured artifacts alongside the code. Each next step receives the smallest
+useful slice of that context, while execution events and review findings remain available
+for later work. The agent can forget the conversation without forgetting the work.
 
 ## How Powdrr Lift delivers it
 
@@ -322,26 +302,3 @@ review, and repository-state management:
 9. **specify-system** - Create, fill, and validate system specification templates with the repository's system-specification CLI or MCP endpoints.
 
 10. **synchronize-code-and-state** - Generate the current codebase-state snapshot, compare it to the source tree and changelog index, and reconcile mismatches by changing code and/or the changelog while preserving the repo's intent.
-
-## Background
-
-All memory systems operate bypointing the agent at the most relevant aspects of an ever-growing
-context. The standand approach is to treat context as an ever-growing conversation between 
-human and agent. Conversations can be difficult to follow even for participants, necessitating
-clarifying questions. Trying to understand a conversation post hoc as an observer is an imperfect
-process, leading to semantic loss.
-
-`powdrr-lift` takes a different approach. The human-agent conversation builds a great shared understanding
-of intent, decisions, affected entities, and reasoning along with some artifacts like code, documents, images, and models.
-`powdrr-lift` provides a way to capture the intent/decisions/entities/reasoning as an additional
-structured artifact. This structure removes the ambuiguity of the conversation format. This further enables
-a high fidelity way to synthesize changes over hundreds or thousands of revisions into a highly detailed and
-accurate semantic graph.
-
-'powdrr-lift' leverages the semantic graph in future operations. The next operation after code changes and
-validation is review. The semantic graph information helps inform the review in two key ways:
-
-* Information in the current change helps inform the reviewer on the granular decisions and reasoning
-* Information from previous changes helps inform the reviewer on previous decisions, what is ok to change and what should not be changed
-
-'powdrr-lift' leverages the semantic graph for planning. 

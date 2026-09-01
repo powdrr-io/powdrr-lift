@@ -34,46 +34,39 @@ guidance as structured artifacts alongside the code. Each next step receives the
 useful slice of that context, while execution events and review findings remain available
 for later work. The agent can forget the conversation without forgetting the work.
 
-## How Powdrr Lift delivers it
+## How Powdrr Lift Delivers It
 
-### Direct the work in chat—or let it run
+Powdrr turns an open-ended request into a controlled engineering process. The agent gets
+the context it needs, works through an authorized sequence of steps, and leaves behind
+evidence that the work is complete.
 
-Start with a conversation when the problem is still ambiguous. The workflow chat client
-matches the request to a well-formulated plan, asks the questions that matter, and shows the
-agent's current step and context. Once the work is specified, autonomous workflows can
-continue driving it forward without requiring a human to translate every decision into
-the next prompt.
+### 1. Turn the request into a plan
 
-### Keep agents grounded in the repository
+Start in workflow chat when the problem is still ambiguous. Powdrr asks the questions that
+matter, captures the decisions, and shapes the request into an explicit plan. Once the plan
+is ready, the same workflow can continue autonomously through implementation, validation,
+review, and handoff.
 
-Powdrr Lift gathers the relevant specifications, decisions, entities, relationships,
-invariants, files, and prior workflow context before an agent acts. It does not ask a
-model to reconstruct the whole project from chat history. It gives the model the smallest
-useful slice of the repository, then records the resulting decisions and execution events
-for the next step and the next review.
+### 2. Give the agent the right context
 
-### Make the workflow executable and self-validating
+Before each step, Powdrr gathers the relevant specifications, files, entities,
+relationships, invariants, and prior decisions. The agent receives a focused view of the
+repository instead of reconstructing the project from a compressed conversation. Every
+step adds its decisions and execution events to the context available to the next one.
 
-Skills are checked-in YAML or JSON definitions with ordered steps, declared tools,
-expected outcomes, and composable subskills. The runtime validates skill directories,
-resolves dependencies, validates actions against the active step, detects repeated
-failures and stalled roundtrips, and persists an execution summary. If an agent cannot
-produce a coherent next action, the workflow has a defined stop—not permission to invent
-one.
+### 3. Constrain every action
 
-### Isolate changes before they become damage
+Checked-in skills define the ordered steps, allowed tools, expected outputs, and validation
+gates. The runtime checks actions against the active step, resolves dependencies, and
+stops on repeated failures or stalled progress. Work happens in a dedicated worktree and
+branch, so an agent cannot quietly turn a focused request into uncontrolled changes.
 
-Every invocation resolves a worktree context. Work happens on a dedicated branch instead
-of silently mutating the primary checkout, and the workflow carries its worktree and
-pull-request context forward. This makes autonomous execution inspectable, reversible,
-and ready for human review.
+### 4. Prove the result and preserve the why
 
-### Preserve the why, not just the diff
-
-Powdrr Lift's structured change layer captures intent, decisions, affected entities,
-relationships, invariants, and guidance alongside the code. Reviews can ask not only
-“what changed?” but “why was this the right change, what does it depend on, and what must
-remain true?” That context stays useful long after the original conversation is gone.
+Powdrr records the execution summary, validation results, review context, and the intent
+behind the change. That gives people a reviewable handoff: not just a diff, but what was
+changed, why it was changed, what it depends on, and what must remain true. The result is
+autonomy with a clear boundary and a durable record.
 
 ## How Powdrr Lift is different
 

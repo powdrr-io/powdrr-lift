@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
+import io
+import json
 from collections.abc import Mapping
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -108,6 +112,7 @@ def run_final_acceptance(
 ) -> AcceptanceReport:
     """Exercise the typed path without an LLM or external GitHub mutation."""
     root = Path(repo_root)
+    structured_artifacts = _run_structured_artifact_chain(Path(workflow_directory))
     profile = load_delivery_profile(
         root / "delivery-profiles/default-software-delivery.yaml"
     )
@@ -116,17 +121,41 @@ def run_final_acceptance(
         "final-acceptance-pr",
         (
             ExecutionUnit(
-                "feature",
-                "Exercise the complete typed delivery path",
-                ("src/feature.py",),
+                "architecture",
+                "Architect validates the structured delivery specification",
+                ("docs/specs/powdrr-lift/implementation-specification.yaml",),
                 validation_profiles=("repository-validation",),
-                acceptance_criteria=("the typed path is auditable",),
+                acceptance_criteria=("the structured specification is valid",),
+            ),
+            ExecutionUnit(
+                "proposed-pr",
+                "Engineering Manager creates one scoped proposed PR",
+                ("docs/proposals/acceptance-feature/proposed-pr-specification.yaml",),
+                dependencies=("architecture",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("the proposed PR is scoped and reviewable",),
+            ),
+            ExecutionUnit(
+                "implementation",
+                "Engineer implements the approved proposed PR",
+                ("src/feature.py",),
+                dependencies=("proposed-pr",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("the implementation satisfies the proposal",),
+            ),
+            ExecutionUnit(
+                "review",
+                "Independent reviewers validate the implementation",
+                ("tests/test_feature.py",),
+                dependencies=("implementation",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("blocking findings are resolved",),
             ),
         ),
-        ("src",),
+        ("src", "docs", "tests"),
     )
     actions: dict[PhaseType, tuple[str, ...]] = {
-        phase.phase_type: ("next_step",) for phase in profile.phases
+        phase.phase_type: ("next_step", "complete") for phase in profile.phases
     }
     tasks = compile_execution_plan(profile, plan, actions_by_phase=actions)
     runtime = ExecutionRuntime(
@@ -225,6 +254,21 @@ def run_final_acceptance(
         "duplicate denial prompt must be suppressed",
         expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
     )
+    from powdrr_lift.cli import _run_execution_exceptions
+    from powdrr_lift.mcp_server import execution_exceptions_tool
+
+    cli_output = io.StringIO()
+    with redirect_stdout(cli_output):
+        cli_pending_exit = _run_execution_exceptions(
+            argparse.Namespace(
+                workflow_dir=Path(workflow_directory),
+                exception_id=None,
+                decision=None,
+                decided_by="acceptance-reviewer",
+            )
+        )
+    cli_pending = json.loads(cli_output.getvalue())
+    mcp_pending = json.loads(execution_exceptions_tool(workflow_directory))
     denied_decision = runtime.decide_capability_exception(
         denied_exception, approved=False, decided_by="acceptance-reviewer"
     )
@@ -323,7 +367,6 @@ def run_final_acceptance(
     task_sequence = _run_shared_runner(workflow_directory, root, "task")
     production_task = _run_production_task_adapter(Path(workflow_directory), root)
     production_chat = _run_production_chat_adapter(Path(workflow_directory), root)
-    structured_artifacts = _run_structured_artifact_chain(Path(workflow_directory))
     guidance_before = runtime.prompt_context()
     runtime.capture_guidance(
         "When a review-driven change is made, resolve the comment after validation.",
@@ -334,20 +377,45 @@ def run_final_acceptance(
         source_ref="acceptance:user-request:optimistic-locking",
     )
     guidance_after = runtime.prompt_context()
+    guidance_requirements = runtime.guidance_required_actions()
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
             "contract_fingerprint": contract["contract_fingerprint"],
         }
     )
-    restarted_context = ExecutionRuntime(
+    restarted_runtime = ExecutionRuntime(
         runtime.execution_id,
         profile_id=profile.profile_id,
         workflow_directory=workflow_directory,
         repo_root=root,
         profile=profile,
-    ).retrieve_prompt_context(compacted["full_context_ref"])
+    )
+    restarted_context = restarted_runtime.retrieve_prompt_context(
+        compacted["full_context_ref"]
+    )
+    later_prompt = restarted_runtime.prompt_context()
     retrieved = runtime.retrieve_prompt_context(compacted["full_context_ref"])
+    boundary_contexts = tuple(
+        runtime.compact_prompt_context(
+            {
+                "phase": phase.phase_type.value,
+                "tool_output": f"omitted tool output for {phase.phase_type.value}",
+                "decision": f"decision-{phase.phase_type.value}",
+            }
+        )
+        for phase in profile.phases
+    )
+    boundary_retrieval = tuple(
+        ExecutionRuntime(
+            runtime.execution_id,
+            profile_id=profile.profile_id,
+            workflow_directory=workflow_directory,
+            repo_root=root,
+            profile=profile,
+        ).retrieve_prompt_context(item["full_context_ref"])
+        for item in boundary_contexts
+    )
     evidence_fingerprint = "source-fingerprint-v1"
     runtime.record_evidence(
         evidence_id="acceptance-validation",
@@ -378,6 +446,12 @@ def run_final_acceptance(
     exception_store = runtime.broker.exception_store
     assert exception_store is not None
     pending_exceptions = exception_store.pending()
+    try:
+        WorkflowStepRunner(max_stalled_roundtrips=1)
+    except ProgrammerInvariantError:
+        legacy_runner_is_explicit = True
+    else:
+        legacy_runner_is_explicit = False
     checks = (
         AcceptanceCheck(
             "vertical-structured-delivery",
@@ -393,7 +467,18 @@ def run_final_acceptance(
             "durable-guidance-changes-behavior",
             len(guidance_after["guidance"]) == len(guidance_before["guidance"]) + 2
             and "resolve the comment" in str(guidance_after["guidance"]).casefold()
-            and "optimistic locking" in str(guidance_after["guidance"]).casefold(),
+            and "optimistic locking" in str(guidance_after["guidance"]).casefold()
+            and guidance_requirements
+            == frozenset(
+                {
+                    "run_validation",
+                    "resolve_review_thread",
+                    "add_optimistic_lock",
+                    "run_concurrency_test",
+                }
+            )
+            and later_prompt["guidance_required_actions"]
+            == sorted(guidance_requirements),
             (
                 "explicit user instructions are persisted and present in a later "
                 "prompt context"
@@ -424,9 +509,23 @@ def run_final_acceptance(
             ),
         ),
         AcceptanceCheck(
+            "legacy-runner-isolation",
+            legacy_runner_is_explicit,
+            "runtime-less workflow execution requires an explicit compatibility opt-in",
+        ),
+        AcceptanceCheck(
             "normal-adapter-exception-flow",
             len(pending_exceptions) == 0
             and duplicate_denied_exception.exception_id == denied_exception.exception_id
+            and cli_pending_exit == 0
+            and any(
+                item["exception_id"] == denied_exception.exception_id
+                for item in cli_pending
+            )
+            and any(
+                item["exception_id"] == denied_exception.exception_id
+                for item in mcp_pending
+            )
             and isinstance(altered_result, CapabilityResolution)
             and altered_result.kind.value == "exception_required"
             and calls == ["acceptance-secret-approved"],
@@ -442,6 +541,19 @@ def run_final_acceptance(
             "omitted tool output remains retrievable after a fresh runtime is started",
         ),
         AcceptanceCheck(
+            "phase-boundary-retrieval",
+            len(boundary_retrieval) == len(profile.phases)
+            and all(
+                item["tool_output"]
+                == f"omitted tool output for {phase.phase_type.value}"
+                for item, phase in zip(boundary_retrieval, profile.phases, strict=True)
+            ),
+            (
+                "each phase boundary preserves actual omitted tool output for "
+                "restart retrieval"
+            ),
+        ),
+        AcceptanceCheck(
             "typed-error-boundary",
             issubclass(ProviderExecutionError, PowdrrExecutionError)
             and issubclass(PersistenceCorruptionError, PowdrrExecutionError)
@@ -454,8 +566,12 @@ def run_final_acceptance(
         ),
         AcceptanceCheck(
             "compiled-task-graph",
-            len(tasks) == len(profile.phases) == len(workflow.tasks),
-            f"compiled {len(workflow.tasks)} phase tasks with profile assignments",
+            len(tasks) == len(plan.units) * len(profile.phases)
+            and len(workflow.tasks) == len(tasks),
+            (
+                f"compiled {len(workflow.tasks)} typed tasks across "
+                f"{len(plan.units)} units"
+            ),
         ),
         AcceptanceCheck(
             "runtime-contract",

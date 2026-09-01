@@ -36,7 +36,7 @@ from powdrr_lift.core.execution_state import (
 )
 from powdrr_lift.core.intent import IntentStore
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
-from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.errors import PersistenceCorruptionError, PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityDecision,
@@ -141,6 +141,7 @@ class ExecutionRuntime:
         self._phase_actions: frozenset[str] | None = None
         self._persona_actions: frozenset[str] | None = None
         self._unit_actions: frozenset[str] | None = None
+        self._adapter_actions: frozenset[str] | None = None
         self._transaction_events: (
             list[tuple[ExecutionEventType, dict[str, Any]]] | None
         ) = None
@@ -153,9 +154,11 @@ class ExecutionRuntime:
         # An empty set is meaningful: the step supports the implicit
         # ``next_step`` transition but no model/tool action.
         self._allowed_actions = actions if actions or enforce_empty else None
-        self._phase_actions = None
-        self._persona_actions = None
-        self._unit_actions = None
+        if actions is None and not enforce_empty:
+            self._phase_actions = None
+            self._persona_actions = None
+            self._unit_actions = None
+            self._adapter_actions = None
 
     def set_execution_scope(
         self,
@@ -164,12 +167,14 @@ class ExecutionRuntime:
         phase_actions: frozenset[str] | None = None,
         persona_actions: frozenset[str] | None = None,
         unit_actions: frozenset[str] | None = None,
+        adapter_actions: frozenset[str] | None = None,
     ) -> None:
         """Install all inputs to the one effective action intersection."""
         self._allowed_actions = declared_actions
         self._phase_actions = phase_actions
         self._persona_actions = persona_actions
         self._unit_actions = unit_actions
+        self._adapter_actions = adapter_actions
 
     def effective_action_contract(self) -> frozenset[str] | None:
         """Return actions allowed by step, phase, persona, unit, and adapters."""
@@ -180,6 +185,7 @@ class ExecutionRuntime:
                 self._phase_actions,
                 self._persona_actions,
                 self._unit_actions,
+                self._adapter_actions,
             )
             if item is not None
         )
@@ -201,10 +207,19 @@ class ExecutionRuntime:
     def transaction(self) -> Iterator[ExecutionRuntime]:
         """Commit lifecycle events as one optimistic-locking transaction."""
         if self._transaction_events is not None:
-            raise RuntimeError("nested execution transactions are not supported")
+            # ``invoke`` owns the normal transaction, while callers may wrap
+            # several runtime operations in one larger atomic unit.
+            yield self
+            return
         self._transaction_events = []
         try:
             yield self
+        except BaseException:
+            queued = self._transaction_events
+            if queued:
+                self._commit_transaction(queued)
+            raise
+        else:
             queued = self._transaction_events
             if queued:
                 self._commit_transaction(queued)
@@ -459,6 +474,7 @@ class ExecutionRuntime:
                     }
                     for rule in rules
                 ],
+                "guidance_required_actions": sorted(self.guidance_required_actions()),
                 "intent_ids": [item.intent_id for item in contract.sources],
                 "clause_ids": list(contract.clause_ids),
                 "contract_fingerprint": contract.fingerprint,
@@ -486,6 +502,24 @@ class ExecutionRuntime:
         from powdrr_lift.execution.guidance import load_applicable_guidance
 
         return load_applicable_guidance(self.behavior_rule_store, context)
+
+    def guidance_required_actions(self) -> frozenset[str]:
+        """Derive typed follow-ups from the active durable instructions."""
+        text = " ".join(
+            rule.text.casefold()
+            for rule in self.guidance(
+                {
+                    "profile_id": self.state.profile_id,
+                    "phase_type": self.state.current_phase.value,
+                }
+            )
+        )
+        actions: set[str] = set()
+        if "review" in text and "resolv" in text:
+            actions.update({"run_validation", "resolve_review_thread"})
+        if "optimistic lock" in text or "optimistic-lock" in text:
+            actions.update({"add_optimistic_lock", "run_concurrency_test"})
+        return frozenset(actions)
 
     def remember_guidance(
         self, rule: Any, *, expected_version: int | None = None
@@ -814,6 +848,7 @@ class ExecutionRuntime:
             declared_actions=packet.allowed_actions,
             phase_actions=phase_actions,
             persona_actions=persona_actions.get(packet.persona.persona_id),
+            adapter_actions=self.available_adapter_actions(),
         )
         return packet
 
@@ -953,10 +988,25 @@ class ExecutionRuntime:
         verify = getattr(self.state_store, "verify", None)
         if not callable(verify):
             return self.state
-        self.state = verify(self.execution_id)
+        try:
+            self.state = verify(self.execution_id)
+        except (OSError, ValueError) as error:
+            raise PersistenceCorruptionError(
+                f"Execution state verification failed: {error}",
+                error_code="execution_state_corrupt",
+                remediation="Restore the execution from a verified event log.",
+                cause_error=error,
+            ) from error
         return self.state
 
     def invoke(
+        self, context: ToolContext, request: CapabilityRequest
+    ) -> ToolResult | CapabilityResolution:
+        """Invoke one capability as one durable lifecycle transaction."""
+        with self.transaction():
+            return self._invoke_in_transaction(context, request)
+
+    def _invoke_in_transaction(
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
@@ -1123,9 +1173,7 @@ class ExecutionRuntime:
                         offset=len(events) + 1,
                     )
                 )
-            self.state = self.state_store.append(
-                self.execution_id, self.state.state_version, tuple(events)
-            )
+            self._append_events(events)
         return result
 
     @staticmethod
@@ -1219,6 +1267,28 @@ class ExecutionRuntime:
             )
         )
 
+    def available_adapter_actions(self) -> frozenset[str]:
+        """Map registered manifest actions to model-facing action families."""
+        mapping = {
+            "file-mutation": {"edit", "yaml_edit", "file_management"},
+            "validate-edit": {"validate_edit"},
+            "apply-edit": {"apply_edit"},
+            "process": {"shell"},
+            "fuzzy-match": {"fuzzy_match"},
+            "repository-gather_context": {"gather_context"},
+            "repository-read_document": {"read_document"},
+            "repository-list_files": {"list_files"},
+            "basedpyright-symbol": {"basedpyright"},
+            "basedpyright-structure": {"basedpyright"},
+            "enrich": {"enrich"},
+            "repository": {"git", "gh"},
+        }
+        return frozenset(
+            action
+            for manifest in self.capability_manifests()
+            for action in mapping.get(manifest.tool_name, set())
+        )
+
     def record_evidence(
         self,
         *,
@@ -1272,6 +1342,19 @@ class ExecutionRuntime:
         )
         return self.state
 
+    def _append_events(self, events: Iterable[ExecutionEvent]) -> ExecutionState:
+        """Append events or queue them in the active action transaction."""
+        events = tuple(events)
+        if self._transaction_events is not None:
+            self._transaction_events.extend(
+                (event.event_type, dict(event.payload)) for event in events
+            )
+            return self.state
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, events
+        )
+        return self.state
+
     def _event(
         self,
         event_type: ExecutionEventType,
@@ -1301,9 +1384,7 @@ class ExecutionRuntime:
             events=pending,
         )
         if self._transaction_events is not None:
-            self._transaction_events.extend(
-                (event.event_type, dict(event.payload)) for event in durable_events
-            )
+            self._append_events(durable_events)
             self._projected_kernel_events = len(self.kernel.events)
             return self.state
         try:

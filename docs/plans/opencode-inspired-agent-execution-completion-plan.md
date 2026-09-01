@@ -32,15 +32,13 @@ compaction/resume, and readiness-controlled publication.
 - Every implementation PR runs the full test suite, Ruff format/check, mypy,
   adapter conformance tests, and the affected vertical scenarios before push.
 
-## Re-audit status: eight gaps remain open
+## Re-audit status: eight gaps closed
 
 The September 2026 independent re-audit identified eight proof and
-implementation gaps in the earlier closure claim. The current branch adds
-diagnostic checks for them, but those checks do not yet satisfy the stopping
-rule. The numbered findings and exact evidence are retained in the audit
-document for traceability. `run_final_acceptance` reports 25 checks, but a
-green report and full suite are necessary rather than sufficient: the checks
-must exercise the real normal prompt-to-publish path.
+implementation gaps in the earlier closure claim. This branch closes them in
+the runtime and records executable evidence in `run_final_acceptance`, which
+now reports 27 checks. The full suite and static checks remain required before
+publication.
 
 See [`docs/audits/opencode-implementation-audit.md`](../audits/opencode-implementation-audit.md)
 for the evidence and required closure associated with each gap.

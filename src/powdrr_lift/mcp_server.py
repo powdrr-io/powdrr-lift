@@ -81,6 +81,64 @@ def _load_fastmcp() -> Any:
 FastMCP = _load_fastmcp()
 
 
+def execution_exceptions_tool(
+    workflow_dir: str | Path,
+    exception_id: str | None = None,
+    decision: str | None = None,
+    decided_by: str = "human",
+) -> str:
+    """Implement the MCP exception-inspection and decision tool."""
+    store = FileCapabilityExceptionStore(workflow_dir)
+    if decision is None:
+        if exception_id is None:
+            return json.dumps(
+                [item.decision_packet() for item in store.pending()],
+                ensure_ascii=False,
+            )
+        request = store.load_request(exception_id)
+        if request is None:
+            raise PowdrrExecutionError(
+                f"Unknown exception: {exception_id}",
+                error_code="capability_exception_unknown",
+                remediation=("Inspect pending exception requests and use an exact ID."),
+            )
+        return json.dumps(request.decision_packet(), ensure_ascii=False)
+    if decision not in {"approve", "deny"} or exception_id is None:
+        raise PowdrrExecutionError(
+            "decision must be approve/deny and include exception_id",
+            error_code="capability_exception_decision_invalid",
+            remediation=("Provide an exact exception_id and approve or deny decision."),
+        )
+    request = store.load_request(exception_id)
+    if request is None:
+        raise PowdrrExecutionError(
+            f"Unknown pending exception: {exception_id}",
+            error_code="capability_exception_pending_unknown",
+            remediation=("Inspect pending exception requests and use an exact ID."),
+        )
+    secret = os.environ.get("POWDRR_CAPABILITY_SECRET")
+    if not secret:
+        raise PowdrrExecutionError(
+            "POWDRR_CAPABILITY_SECRET is required to decide exceptions",
+            error_code="capability_exception_secret_missing",
+            remediation=("Configure the capability decision secret before deciding."),
+        )
+    runtime = ExecutionRuntime(
+        request.execution_id,
+        profile_id="exception-decision",
+        workflow_directory=workflow_dir,
+        repo_root=workflow_dir,
+        exception_authority=CapabilityExceptionAuthority(secret.encode()),
+        exception_store=store,
+    )
+    return json.dumps(
+        runtime.decide_capability_exception(
+            request, approved=decision == "approve", decided_by=decided_by
+        ).to_data(),
+        ensure_ascii=False,
+    )
+
+
 def build_server() -> Any:
     if FastMCP is None:
         raise PowdrrExecutionError(
@@ -103,60 +161,8 @@ def build_server() -> Any:
         decided_by: str = "human",
     ) -> str:
         """Inspect or approve/deny one exact pending capability request."""
-        store = FileCapabilityExceptionStore(workflow_dir)
-        if decision is None:
-            if exception_id is None:
-                return json.dumps(
-                    [item.decision_packet() for item in store.pending()],
-                    ensure_ascii=False,
-                )
-            request = store.load_request(exception_id)
-            if request is None:
-                raise PowdrrExecutionError(
-                    f"Unknown exception: {exception_id}",
-                    error_code="capability_exception_unknown",
-                    remediation=(
-                        "Inspect pending exception requests and use an exact ID."
-                    ),
-                )
-            return json.dumps(request.decision_packet(), ensure_ascii=False)
-        if decision not in {"approve", "deny"} or exception_id is None:
-            raise PowdrrExecutionError(
-                "decision must be approve/deny and include exception_id",
-                error_code="capability_exception_decision_invalid",
-                remediation=(
-                    "Provide an exact exception_id and approve or deny decision."
-                ),
-            )
-        request = store.load_request(exception_id)
-        if request is None:
-            raise PowdrrExecutionError(
-                f"Unknown pending exception: {exception_id}",
-                error_code="capability_exception_pending_unknown",
-                remediation=("Inspect pending exception requests and use an exact ID."),
-            )
-        secret = os.environ.get("POWDRR_CAPABILITY_SECRET")
-        if not secret:
-            raise PowdrrExecutionError(
-                "POWDRR_CAPABILITY_SECRET is required to decide exceptions",
-                error_code="capability_exception_secret_missing",
-                remediation=(
-                    "Configure the capability decision secret before deciding."
-                ),
-            )
-        runtime = ExecutionRuntime(
-            request.execution_id,
-            profile_id="exception-decision",
-            workflow_directory=workflow_dir,
-            repo_root=workflow_dir,
-            exception_authority=CapabilityExceptionAuthority(secret.encode()),
-            exception_store=store,
-        )
-        return json.dumps(
-            runtime.decide_capability_exception(
-                request, approved=decision == "approve", decided_by=decided_by
-            ).to_data(),
-            ensure_ascii=False,
+        return execution_exceptions_tool(
+            workflow_dir, exception_id, decision, decided_by
         )
 
     @server.tool()

@@ -389,6 +389,7 @@ class WorkflowStepRunner:
         observer: WorkflowExecutionObserver | None = None,
         shadow_recorder: WorkflowShadowRecorder | None = None,
         runtime: ExecutionRuntime | None = None,
+        legacy_compatibility: bool = False,
         phase_type: str = "build",
         actor_id: str = "workflow-agent",
     ) -> None:
@@ -400,6 +401,15 @@ class WorkflowStepRunner:
         self.runtime = runtime
         self.phase_type = phase_type
         self.actor_id = actor_id
+        if runtime is None and not legacy_compatibility:
+            raise ProgrammerInvariantError(
+                "WorkflowStepRunner requires an ExecutionRuntime for normal execution.",
+                error_code="execution_runtime_required",
+                remediation=(
+                    "Create an ExecutionRuntime, or explicitly opt into the "
+                    "legacy compatibility runner."
+                ),
+            )
         self.kernel = runtime.kernel if runtime is not None else ActionKernel()
 
     def run(
@@ -455,6 +465,7 @@ class WorkflowStepRunner:
                 ProviderExecutionError,
                 PersistenceCorruptionError,
                 ProgrammerInvariantError,
+                ExecutionCancelled,
             ):
                 # These failures are not model-correctable action errors.
                 raise

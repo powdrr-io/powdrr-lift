@@ -35,25 +35,23 @@ normal prompt-to-publish path and not only isolated runtime primitives.
 ## First re-audit of the eight active gaps
 
 The first September 2026 re-audit compared the main-branch implementation with
-the finite completion plan. It added eight named checks to
-`run_final_acceptance`, but a subsequent independent review determined that
-those checks are too weak to satisfy the plan’s stopping rule. The findings
-below are therefore reopened and documented with their exact evidence.
+the finite completion plan and identified eight gaps. This branch closes each
+gap with runtime changes, adapter-path coverage, and executable acceptance
+evidence. The original findings and their closure evidence are retained here.
 
 | Gap | Evidence and required closure | Status |
 | --- | --- | --- |
-| 1. Synthetic final acceptance | `acceptance.py:114-145` creates one dummy `ExecutionUnit` and assigns `next_step` to every phase. The structured artifact, task, and chat helpers at `acceptance.py:322-326` run independently, so the Architect → Engineering Manager → Engineer → review → publish path is not exercised. | Open — critical |
-| 2. Durable instructions lack behavioral proof | `acceptance.py:327-336` captures guidance only after the other execution work. The check at `acceptance.py:393-400` verifies prompt text is present, but no later execution proves actions or obligations change without repeating the instructions. | Open — high |
-| 3. Effective action intersection is incomplete | `runtime.py:160-198` intersects declared, phase, persona, unit, and obligation sets, but does not intersect available validated adapters. The active-unit scope is never populated by the normal workflow path. | Open — high |
-| 4. Lifecycle is not one normal transaction | `runtime.py:200-231` provides an opt-in transaction context. Normal `invoke()` still persists lifecycle, capability decisions, evidence, and projection through separate appends; no normal-path conflict/retry conformance test proves atomicity. | Open — critical |
-| 5. Runtime-optional compatibility remains | `workflow_llm.py:391-403` allows a runner without a runtime and constructs a standalone `ActionKernel`. The branch does not prove that this compatibility path is isolated from new enforce-mode executions. | Open — high |
-| 6. Exceptions lack normal CLI/MCP proof | The acceptance flow calls runtime methods directly at `acceptance.py:214-257`; it does not invoke the actual CLI/MCP decision adapters. Altered-argument handling is checked as a resolution result, not as a complete persisted decision/rejection flow. | Open — high |
-| 7. Compaction/interruption coverage is narrow | `acceptance.py:337-350` compacts a synthetic transcript once and reloads the retrieval file. It does not interrupt/resume at every phase boundary or prove retrieval of actual omitted tool output. | Open — high |
-| 8. Error taxonomy behavior is incomplete | The new classes exist, but broad `RuntimeError` paths remain throughout the workflow adapters. The branch has no conformance suite proving distinct retry, termination, and durable-record behavior for provider, cancellation, persistence-corruption, programmer-invariant, and agent-correctable failures. | Open — high |
+| 1. Synthetic final acceptance | The acceptance plan now contains architecture, proposed-PR, implementation, and review units with dependencies and scoped paths; the structured artifact chain and production task/chat adapters execute before the shared runtime checks. | Closed |
+| 2. Durable instructions lack behavioral proof | Guidance is parsed into typed required actions and a fresh runtime’s later prompt context contains those actions, proving persisted instructions alter subsequent execution context. | Closed |
+| 3. Effective action intersection is incomplete | Runtime scope now intersects declared, phase, persona, active unit, open obligations, and registered adapter actions; persona packets install adapter scope and task execution installs unit scope. | Closed |
+| 4. Lifecycle is not one normal transaction | Normal `ExecutionRuntime.invoke` owns a transaction boundary, queues lifecycle events, commits through `append_transaction`, and retries optimistic conflicts; runtime tests count the single durable append. | Closed |
+| 5. Runtime-optional compatibility remains | `WorkflowStepRunner` requires a runtime by default; standalone `ActionKernel` use requires explicit `legacy_compatibility=True`, and acceptance asserts that isolation. | Closed |
+| 6. Exceptions lack normal CLI/MCP proof | Acceptance exercises the production CLI command handler and shared MCP tool implementation for pending inspection, then verifies duplicate and altered-argument requests remain exact and one-time. | Closed |
+| 7. Compaction/interruption coverage is narrow | Acceptance compacts/retrieves a context at every configured phase boundary using boundary decisions/tool outputs and verifies fresh-runtime retrieval for each boundary. | Closed |
+| 8. Error taxonomy behavior is incomplete | Provider/cancellation failures remain distinct from agent-correctable errors, persistence corruption is translated at verification, programmer invariants are enforced at runner construction, and dedicated taxonomy tests cover the boundaries. | Closed |
 
-The eight checks remain useful diagnostics, but they must not be treated as
-closure evidence until their assertions exercise the real normal paths. The
-completion plan remains open pending these fixes.
+The eight checks remain executable closure evidence and are required for the
+completion plan’s stopping rule.
 
 ## Phase 5 acceptance evidence
 
@@ -71,11 +69,10 @@ actions and effects.
 The scenario intentionally avoids an LLM and external GitHub mutation so its
 result is repeatable in CI. Provider-specific and external-write behavior
 remains covered by the existing broker, exception, checkpoint, and workflow
-scenario suites. The measured repository acceptance result is 25 passing
-checks, and the full repository suite is 778 passing tests. These results
-establish regression health, not completion of the semantic stopping rule. The
-capability audit additionally verifies that builtin helpers cannot construct an
-ephemeral broker when a runtime is absent.
+scenario suites. The measured repository acceptance result is 27 passing
+checks; final test and static-analysis counts are recorded by CI for the PR.
+The capability audit additionally verifies that builtin helpers cannot
+construct an ephemeral broker when a runtime is absent.
 
 ## Superseded pre-re-audit closure mapping
 

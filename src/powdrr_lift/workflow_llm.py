@@ -56,6 +56,9 @@ StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
 _MAX_PROMPT_EVENT_CHARS = 8_000
 _PROMPT_SIZE_CHARS_PER_TOKEN = 3
+# A caller may opt into an unlimited loop for deterministic harnesses, but
+# production entry points must always provide a finite budget.
+DEFAULT_MAX_ROUNDTRIPS = 128
 
 
 @dataclass(frozen=True, slots=True)

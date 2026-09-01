@@ -102,6 +102,7 @@ from powdrr_lift.workflow_git import (
     workflow_id_from_task_id,
 )
 from powdrr_lift.workflow_llm import (
+    DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
     ProgressDecision,
     WorkflowAction,
@@ -202,7 +203,7 @@ class WorkflowTaskAgentConfig:
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
-    max_roundtrips: int | None = None
+    max_roundtrips: int | None = DEFAULT_MAX_ROUNDTRIPS
     max_stalled_roundtrips: int = 3
     max_timeout_retries: int = 8
     timeout_backoff_seconds: float = 10.0
@@ -3336,7 +3337,7 @@ def _run_skill_for_agent_with_shared_runner(
     strategy.driver = driver
     exit_code = driver.run(
         strategy,
-        max_roundtrips=None,
+        max_roundtrips=DEFAULT_MAX_ROUNDTRIPS,
         signature=workflow_action_signature,
     )
     if exit_code != 0:

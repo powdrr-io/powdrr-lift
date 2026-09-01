@@ -331,6 +331,15 @@ def test_persona_packet_installs_the_same_action_contract_used_for_validation(
         "prompt_catalogs": ["architect-responsibilities"],
     }
     assert runtime.verify().current_persona_id == "architect"
+    resumed = ExecutionRuntime(
+        "run-persona-contract",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    assert resumed.prompt_context()["persona_id"] == "architect"
+    assert resumed.prompt_context()["persona"]["persona_type"] == "architect"
 
 
 def test_runtime_phase_controller_is_durable_and_closed_topology(

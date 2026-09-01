@@ -92,8 +92,9 @@ actions and effects.
 The scenario intentionally avoids an LLM and external GitHub mutation so its
 result is repeatable in CI. Provider-specific and external-write behavior
 remains covered by the existing broker, exception, checkpoint, and workflow
-scenario suites. The measured repository acceptance result is 27 passing
-checks; final test and static-analysis counts are recorded by CI for the PR.
+scenario suites. The measured repository acceptance result is 30 passing
+checks; the capability audit adds 16 passing checks. Full test and
+static-analysis counts are recorded by CI for the PR.
 The capability audit additionally verifies that builtin helpers cannot
 construct an ephemeral broker when a runtime is absent.
 
@@ -441,4 +442,5 @@ The findings above describe the pre-Phase-5 state. The consolidated closure
 scenario now exercises the durable runtime boundary end to end, including the
 failure and recovery cases that were previously only isolated primitives. The
 repository is complete against the finite OpenCode completion plan when the
-27-check acceptance command and the full verification suite remain green.
+30-check acceptance command, 16-check capability audit, and full verification
+suite remain green.

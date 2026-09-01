@@ -431,8 +431,30 @@ def run_final_acceptance(
 
 
 def _run_production_task_adapter(repo_root: Path) -> Any:
-    scenario_path = (
-        repo_root / "workflow-evals/scenarios/execute-proposed-pr/task-001-context.yaml"
+    scenario_root = repo_root / ".acceptance-task-scenario"
+    scenario_root.mkdir(parents=True, exist_ok=True)
+    fixture_path = (
+        repo_root / "workflow-evals/scenarios/execute-proposed-pr/fixtures/task-001"
+    )
+    scenario_path = scenario_root / "scenario.yaml"
+    scenario_path.write_text(
+        f"""\
+schema_version: 1
+id: acceptance-task
+execution_mode: workflow_task
+workflow_template: {repo_root / "templates/execute-proposed-pr.yaml"}
+work_item_name: acceptance-feature
+task_id: task-001
+fixture: {fixture_path}
+provider:
+  mode: scripted
+  responses:
+  - action: complete
+    output_state: $deterministic_pre_step
+expect:
+  output_state: $deterministic_pre_step
+""",
+        encoding="utf-8",
     )
     scenario = load_workflow_scenario(scenario_path)
     return run_workflow_scenario(

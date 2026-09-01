@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionEventType,
     ObligationStatus,
 )
+from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.builtin_tools import (
     invoke_file_mutation,
@@ -15,6 +17,29 @@ from powdrr_lift.execution.builtin_tools import (
 )
 from powdrr_lift.execution.capabilities import CapabilityRequest, CapabilityResolution
 from powdrr_lift.execution.runtime import ExecutionRuntime
+from powdrr_lift.execution.tools import (
+    ToolContext,
+    ToolResult,
+    ToolValidationReport,
+)
+
+
+class MutableRowTool:
+    manifest = ToolManifest(
+        "mutable-row",
+        ("change_mutable_row", "add_optimistic_lock", "run_concurrency_test"),
+        (ToolEffect.WORKSPACE_WRITE,),
+    )
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolValidationReport:
+        return ToolValidationReport()
+
+    def execute(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolResult:
+        return ToolResult(observed_effects=frozenset({ToolEffect.WORKSPACE_WRITE}))
 
 
 def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) -> None:
@@ -165,6 +190,49 @@ def test_runtime_persists_capability_decisions(tmp_path: Path) -> None:
     events = runtime.state_store.load_events("run-3")
     assert events[-1].event_type is ExecutionEventType.CAPABILITY_DECISION
     assert events[-1].payload["kind"] == "denied"
+
+
+def test_runtime_capability_invocation_projects_relationship_obligations(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-capability-relationships",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        adapters=[MutableRowTool()],
+    )
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset(
+            {"change_mutable_row", "add_optimistic_lock", "run_concurrency_test"}
+        ),
+        frozenset({ToolEffect.WORKSPACE_WRITE}),
+        execution_id=runtime.execution_id,
+    )
+
+    result = runtime.invoke(
+        context,
+        CapabilityRequest("mutable-row", "change_mutable_row", {}),
+    )
+
+    assert isinstance(result, ToolResult)
+    assert {item.required_action for item in runtime.kernel.open_obligations} == {
+        "add_optimistic_lock",
+        "run_concurrency_test",
+    }
+    assert any(
+        event.event_type is ExecutionEventType.OBLIGATION_OPENED
+        for event in runtime.state_store.load_events(runtime.execution_id)
+    )
+
+    for semantic_action in ("add_optimistic_lock", "run_concurrency_test"):
+        runtime.invoke(
+            context,
+            CapabilityRequest("mutable-row", semantic_action, {}),
+        )
+    assert not runtime.kernel.open_obligations
 
 
 def test_runtime_phase_controller_is_durable_and_closed_topology(

@@ -736,8 +736,54 @@ class ExecutionRuntime:
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
+        action_instance_id = (
+            f"{self.execution_id}:action:{self.state.event_sequence + 1}"
+        )
+        action = {
+            "action_instance_id": action_instance_id,
+            "semantic_action": request.semantic_action,
+            "arguments": dict(request.arguments),
+        }
+        relationship_errors = self.kernel.validate_proposal(
+            action, semantic_action=request.semantic_action
+        )
+        if relationship_errors:
+            raise PowdrrExecutionError(
+                "Capability action is blocked by execution obligations: "
+                + "; ".join(relationship_errors),
+                error_code="relationship_obligation_blocked",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Execute the exact required follow-up action, then retry "
+                    "the blocked capability."
+                ),
+            )
+        self.kernel.propose(action, semantic_action=request.semantic_action)
+        self.kernel.start(action)
+        self.sync_kernel(
+            phase_type=self.state.current_phase.value,
+            actor_id=self.state.current_persona_id or "execution-runtime",
+        )
         before = len(self.broker.decision_log)
-        result = self.broker.invoke(context, request)
+        try:
+            result = self.broker.invoke(context, request)
+        except Exception as error:
+            self.kernel.fail(action, error)
+            self.sync_kernel(
+                phase_type=self.state.current_phase.value,
+                actor_id=self.state.current_persona_id or "execution-runtime",
+            )
+            raise
+        if isinstance(result, ToolResult):
+            # A follow-up action satisfies the oldest exact semantic obligation;
+            # its own instance ID is not the source ID of that obligation.
+            self.kernel.complete(action)
+        else:
+            self.kernel.fail(action, result)
+        self.sync_kernel(
+            phase_type=self.state.current_phase.value,
+            actor_id=self.state.current_persona_id or "execution-runtime",
+        )
         decisions = self.broker.decision_log[before:]
         if decisions:
             events = self._capability_decision_events(decisions)

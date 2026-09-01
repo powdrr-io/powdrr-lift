@@ -203,6 +203,7 @@ def run_final_acceptance(
         frozenset({"read_secret_denied", "read_secret_approved"}),
         frozenset(),
         execution_id=runtime.execution_id,
+        active_persona_id=runtime.state.current_persona_id,
     )
     denied_request = CapabilityRequest(
         "acceptance-secret-denied", "read_secret_denied", {"target": "secret"}

@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -278,6 +279,33 @@ def test_runtime_phase_controller_is_durable_and_closed_topology(
     assert not rejected.allowed
     assert runtime.state.current_phase is PhaseType.SPECIFY
     assert runtime.verify().current_phase is PhaseType.SPECIFY
+
+
+def test_runtime_phase_transition_consults_durable_obligations(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-durable-obligation-phase-gate",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime._append_event(
+        ExecutionEventType.OBLIGATION_OPENED,
+        {
+            "obligation_id": "plan-decision:run:approve",
+            "description": "Resolve plan decision: approve",
+            "relationship_id": "run",
+        },
+    )
+    runtime.state = replace(runtime.state, current_phase=PhaseType.REVIEW_PR)
+
+    rejected = runtime.transition(
+        PhaseType.CONFIRM_READINESS, persona_id="code-reviewer"
+    )
+
+    assert not rejected.allowed
+    assert any("Resolve plan decision: approve" in guard for guard in rejected.guards)
 
 
 def test_builtin_helper_can_only_execute_through_runtime_broker_when_supplied(

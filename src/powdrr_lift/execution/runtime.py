@@ -610,7 +610,13 @@ class ExecutionRuntime:
             self.state,
             target_phase,
             open_obligations=tuple(
-                obligation.description for obligation in self.kernel.open_obligations
+                dict.fromkeys(
+                    obligation.description
+                    for obligation in (
+                        *self.state.obligations,
+                        *self.kernel.open_obligations,
+                    )
+                )
             ),
         )
         if decision.allowed and self.profile is not None:

@@ -3,21 +3,23 @@
 Powdrr gives you an agent you can trust with real engineering work. It is high-integrity
 by design: it follows an explicit plan, acts only through declared capabilities, keeps
 changes isolated, and makes its work ready for review. It also has an elephant-like
-memory. Powdrr carries intent, decisions, constraints, and prior context forward so the
-agent can keep doing the right work after the conversation has moved on.
+memory. Powdrr carries intent, decisions, constraints, and prior context forward so it
+always has the right context at the right time.
 
 ## Your Agent Does Not Know What Is Safe
 
-Approval fatigue starts when your agent literally has no idea which commands are safe
+Approval fatigue happens because your agent literally has no idea which commands are safe
 and which ones are not. You end up approving every shell command, second-guessing every
 file edit, and watching closely because a harmless-looking action can mutate the wrong
 checkout or push work past the request.
 
-Powdrr makes safety part of the workflow's construction. Each step declares its purpose,
-tools, and expected outcome. The runtime checks every action against the active step,
-keeps work in a dedicated worktree, detects repeated failures and stalled roundtrips,
-and stops when the agent cannot make validated progress. You can review what the agent
-was authorized to do, why it did it, and what it produced.
+Powdrr makes safety part of the agent's construction. Built-in tooling provides powerful
+and fundamentally safe code generation and validation capabilities. Each step declares
+its purpose, tools, and expected outcome. The runtime checks every action against the
+active step, keeps work in a dedicated worktree, detects repeated failures and stalled
+roundtrips, and stops when the agent cannot make validated progress. When Powdrr asks
+for permission on those rare occasions, it provides the context and reasoning you need
+to make an informed decision.
 
 ## Your Agent Has The Memory of a Goldfish
 

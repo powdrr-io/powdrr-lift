@@ -230,6 +230,7 @@ class ExecutionRuntime:
                 "kind": "executable" if approved else "denied",
                 "reason": "exception approved" if approved else "exception denied",
                 "decided_by": decided_by,
+                "decision_packet": exception.decision_packet(),
             },
         )
         return decision

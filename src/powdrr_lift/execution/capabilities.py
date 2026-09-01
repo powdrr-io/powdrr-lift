@@ -531,7 +531,10 @@ class CapabilityBroker:
                         "before retrying."
                     )
                 ),
-                details={"changed_paths": json.dumps(changed_paths)},
+                details={
+                    "checkpoint_id": checkpoint_id or "",
+                    "changed_paths": json.dumps(changed_paths),
+                },
                 cause_error=error,
             ) from error
         if self._decision_log:

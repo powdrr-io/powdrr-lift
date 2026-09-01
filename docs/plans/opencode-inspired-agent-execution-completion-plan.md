@@ -37,8 +37,8 @@ compaction/resume, and readiness-controlled publication.
 The September 2026 independent re-audit identified eight proof and
 implementation gaps in the earlier closure claim. This branch closes them in
 the runtime and records executable evidence in `run_final_acceptance`, which
-now reports 27 checks. The full suite and static checks remain required before
-publication.
+now reports 30 checks. The capability audit reports 16 checks. The full suite
+and static checks remain required before publication.
 
 See [`docs/audits/opencode-implementation-audit.md`](../audits/opencode-implementation-audit.md)
 for the evidence and required closure associated with each gap.

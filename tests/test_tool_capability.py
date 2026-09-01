@@ -132,6 +132,35 @@ def test_broker_reports_partial_mutation_when_tool_fails(tmp_path: Path) -> None
     assert "changed.txt" in raised.value.details["changed_paths"]
 
 
+def test_broker_requires_checkpoints_for_normal_mutations(tmp_path: Path) -> None:
+    class Mutation:
+        manifest = ToolManifest("write-file", ("edit",), (ToolEffect.WORKSPACE_WRITE,))
+
+        def validate(
+            self, context: ToolContext, arguments: Mapping[str, Any]
+        ) -> ToolValidationReport:
+            return ToolValidationReport()
+
+        def execute(
+            self, context: ToolContext, arguments: Mapping[str, Any]
+        ) -> ToolResult:
+            raise AssertionError("mutation must be blocked before execution")
+
+    broker = CapabilityBroker(ToolRegistry([Mutation()]))
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"edit"}),
+        frozenset({ToolEffect.WORKSPACE_WRITE}),
+        execution_id="run-1",
+    )
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        broker.invoke(context, CapabilityRequest("write-file", "edit", {}))
+
+    assert raised.value.error_code == "capability_checkpoint_required"
+
+
 def test_broker_checkpoints_mutations_before_execution(tmp_path: Path) -> None:
     checkpoints: list[tuple[str, str | None]] = []
 

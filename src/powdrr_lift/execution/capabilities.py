@@ -459,10 +459,23 @@ class CapabilityBroker:
             if callable(effects_for)
             else resolution.adapter.manifest.effects
         )
-        checkpoint_id: str | None = None
-        if self.checkpoint_store is not None and any(
-            effect is not ToolEffect.WORKSPACE_READ for effect in effects
+        mutating = any(effect is not ToolEffect.WORKSPACE_READ for effect in effects)
+        if (
+            mutating
+            and context.execution_id is not None
+            and self.checkpoint_store is None
         ):
+            raise PowdrrExecutionError(
+                "Mutating capability execution requires a checkpoint store.",
+                error_code="capability_checkpoint_required",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Run the action through an ExecutionRuntime with checkpoints "
+                    "enabled."
+                ),
+            )
+        checkpoint_id: str | None = None
+        if self.checkpoint_store is not None and mutating:
             encoded = json.dumps(
                 {
                     "execution_id": context.execution_id,

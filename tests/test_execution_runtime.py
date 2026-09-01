@@ -200,7 +200,7 @@ def test_runtime_capability_invocation_projects_relationship_obligations(
         profile_id="default",
         workflow_directory=tmp_path / "workflow",
         repo_root=tmp_path,
-        adapters=[MutableRowTool()],
+        adapters=(MutableRowTool(),),
     )
     context = ToolContext(
         tmp_path,

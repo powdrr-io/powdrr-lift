@@ -112,6 +112,13 @@ class ExecutionRuntime:
         self.checkpoint_store = ContentAddressedCheckpointStore(
             Path(workflow_directory) / "execution" / "checkpoints"
         )
+        if registry is None and not adapters:
+            # Import lazily to keep the builtin adapters independent from the
+            # runtime module while ensuring every normal execution starts from
+            # one canonical registry.
+            from powdrr_lift.execution.builtin_tools import builtin_tool_registry
+
+            registry = builtin_tool_registry()
         self.broker = CapabilityBroker(
             registry or ToolRegistry(adapters),
             exception_authority=exception_authority,
@@ -729,8 +736,16 @@ class ExecutionRuntime:
         request: CapabilityRequest,
     ) -> ToolResult | CapabilityResolution:
         """Run a context-bound adapter through this runtime's broker."""
-        self.broker.registry.replace(adapter)
+        self.register_adapter(adapter)
         return self.invoke(context, request)
+
+    def register_adapter(self, adapter: ToolAdapter) -> None:
+        """Register a context-bound adapter in this execution's one registry."""
+        self.broker.registry.replace(adapter)
+
+    def capability_manifests(self) -> tuple[Any, ...]:
+        """Return the executable capability surface owned by this runtime."""
+        return self.broker.registry.manifests()
 
     def record_evidence(
         self,

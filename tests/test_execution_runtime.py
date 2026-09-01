@@ -17,6 +17,20 @@ from powdrr_lift.execution.capabilities import CapabilityRequest, CapabilityReso
 from powdrr_lift.execution.runtime import ExecutionRuntime
 
 
+def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-default-registry",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    assert {manifest.tool_name for manifest in runtime.capability_manifests()} == {
+        "repository",
+        "enrich",
+    }
+
+
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-1",

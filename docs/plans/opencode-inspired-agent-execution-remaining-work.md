@@ -1,5 +1,9 @@
 # Remaining work for the Opencode-inspired execution plan
 
+> This open-ended inventory is retained as an audit reference. The finite,
+> dependency-ordered implementation plan is
+> [`opencode-inspired-agent-execution-completion-plan.md`](opencode-inspired-agent-execution-completion-plan.md).
+
 ## Purpose
 
 The merged implementation establishes the typed execution-kernel vocabulary,

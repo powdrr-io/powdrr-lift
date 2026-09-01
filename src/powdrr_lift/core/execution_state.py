@@ -197,6 +197,7 @@ class ExecutionState:
     obligations: tuple[ExecutionObligation, ...] = field(default_factory=tuple)
     evidence: tuple[ExecutionEvidence, ...] = field(default_factory=tuple)
     findings: tuple[ExecutionFinding, ...] = field(default_factory=tuple)
+    completed_idempotency_keys: tuple[str, ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -215,6 +216,7 @@ class ExecutionState:
             "obligations": [item.to_data() for item in self.obligations],
             "evidence": [item.to_data() for item in self.evidence],
             "findings": [item.to_data() for item in self.findings],
+            "completed_idempotency_keys": list(self.completed_idempotency_keys),
         }
 
     def to_json(self) -> str:
@@ -252,6 +254,11 @@ class ExecutionState:
             ),
             findings=tuple(
                 _parse_finding(item) for item in _mapping_sequence(data, "findings")
+            ),
+            completed_idempotency_keys=tuple(
+                item
+                for item in data.get("completed_idempotency_keys", ())
+                if isinstance(item, str)
             ),
         )
 
@@ -358,6 +365,15 @@ def reduce_execution_event(
         ExecutionEventType.ACTION_FAILED,
     }:
         next_state = _reduce_action_event(state, event.event_type, payload)
+    elif event.event_type is ExecutionEventType.CAPABILITY_DECISION:
+        key = payload.get("arguments", {}).get("idempotency_key")
+        if payload.get("kind") == "executable" and isinstance(key, str):
+            next_state = replace(
+                state,
+                completed_idempotency_keys=tuple(
+                    dict.fromkeys((*state.completed_idempotency_keys, key))
+                ),
+            )
     elif event.event_type is ExecutionEventType.ARTIFACT_PRODUCED:
         artifact = _parse_artifact(payload)
         next_state = replace(

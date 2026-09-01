@@ -60,7 +60,7 @@ def test_retrieval_store_bounds_ephemeral_context_history(tmp_path: Path) -> Non
     assert store.load(references[-1])["sequence"] == 2
 
 
-def test_compaction_bounds_retrieval_payload_before_serializing(tmp_path: Path) -> None:
+def test_compaction_keeps_complete_retrieval_payload(tmp_path: Path) -> None:
     from powdrr_lift.execution.compaction import compact_with_retrieval
 
     store = FileContextRetrievalStore(tmp_path)
@@ -73,8 +73,8 @@ def test_compaction_bounds_retrieval_payload_before_serializing(tmp_path: Path) 
     )
 
     restored = store.load(compacted["full_context_ref"])
-    assert len(restored["messages"]) == 32
-    assert len(restored["messages"][0]["content"]) < 4_000
+    assert len(restored["messages"]) == 200
+    assert restored["messages"][0]["content"] == "x" * 20_000
 
 
 def test_error_log_bounding_limits_transcript_growth() -> None:

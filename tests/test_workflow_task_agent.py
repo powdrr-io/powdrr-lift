@@ -780,8 +780,9 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         stdout: object,
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
+        runtime: object = None,
     ) -> None:
-        del workflow_id, reason, stdout, open_pull_request, events
+        del workflow_id, reason, stdout, open_pull_request, events, runtime
         published_roots.append(repo_root)
         assert published_workflow.directory == (
             integration_root / "docs" / "workflows" / "feature"
@@ -842,16 +843,18 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
     )
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._git_output",
-        lambda _repo_root, _arguments: "powdrr/feature-17",
+        lambda _repo_root, _arguments, **_kwargs: "powdrr/feature-17",
     )
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._git_result",
-        lambda _repo_root, _arguments: subprocess.CompletedProcess(
+        lambda _repo_root, _arguments, **_kwargs: subprocess.CompletedProcess(
             [], 0, stdout="", stderr=""
         ),
     )
 
-    def _record_git_call(_repo_root: Path, arguments: list[str]) -> str:
+    def _record_git_call(
+        _repo_root: Path, arguments: list[str], **_kwargs: object
+    ) -> str:
         git_calls.append(arguments)
         return ""
 
@@ -897,8 +900,9 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         stdout: object,
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
+        runtime: object = None,
     ) -> None:
-        del workflow_id, open_pull_request, events
+        del workflow_id, open_pull_request, events, runtime
         assert repo_root == tmp_path
         assert published_workflow.directory == workflow.directory
         published_reasons.append(reason)

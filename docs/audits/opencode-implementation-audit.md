@@ -13,52 +13,27 @@ documents that define the Opencode work:
 - [prompt reduction plan](../plans/workflow-llm-prompt-reduction.md)
 
 The review was performed against the source tree, tests, CLI/MCP surfaces, and
-the execution package. “Implemented” means the behavior is reachable from the
-normal runtime path and has an enforcement or persistence test. “Partial” means
-the type, helper, or isolated tests exist but the normal workflow does not yet
-depend on it. “Missing” means the documented behavior has no corresponding
-runtime implementation.
+the execution package. The historical findings below are retained for
+traceability; the executable closure mapping is the authoritative status.
 
 ## Executive summary
 
 The observations in this section and the historical matrices below describe
 the state before the consolidated closure PR. The current status is the
-measured Phase 5 closure table that follows this summary.
+measured closure table that follows this summary.
 
 The consolidated runtime-closure changes also remove the last normal
 builtin-tool fallback to an ephemeral `CapabilityBroker`, require an
 `ExecutionRuntime` for every normal builtin capability invocation, and bind
 scenario/helper paths to an explicit durable runtime.
 
-The repository has a substantial typed execution foundation. The following are
-implemented or substantially implemented: delivery profiles, phases and
-personas, durable execution state and replay, capability manifests and broker
-resolution, signed exceptions, behavior guidance, action relationships,
-checkpoint storage, evidence/readiness primitives, task compilation, observer
-infrastructure, and bounded compaction.
-
-The central difference from the documents is integration. Most of those pieces
-are still callable directly from Python or are used by only one execution
-adapter. They are not yet one authoritative path for the complete
-specification-to-PR workflow. The current test suite is healthy, but it mostly
-proves components independently; it does not prove the final enforce-mode
-vertical scenario described in the plans.
-
-The highest-risk gaps are:
-
-1. ordinary chat and task operations still have direct dispatch paths beside
-   the capability broker;
-2. kernel lifecycle events can be projected to durable events, but the normal
-   runners do not persist that projection as their source of truth;
-3. relationship obligations are enforced by the in-memory kernel, not yet by
-   durable workflow state and phase/readiness transitions;
-4. checkpoints can be created and restored, but automatic restore, evidence
-   invalidation, partial-mutation handling, and user-facing recovery are not a
-   complete runtime flow;
-5. evidence/readiness and execution-plan compilation are still pure seams,
-   rather than the gates used by the default proposed-PR path;
-6. compaction preserves selected identifiers but is not the mandatory prompt,
-   resume, and interruption mechanism.
+The repository now has one measured typed-runtime closure boundary covering
+delivery profiles, phases, personas, durable state and replay, capability
+manifests and broker resolution, signed exceptions, behavior guidance, action
+relationships, transactional checkpoints, evidence/readiness, task
+compilation, observer infrastructure, and compaction with complete retrieval.
+The normal task publication path also routes its bounded Git/GitHub operations
+through that runtime when one is active.
 
 ## Phase 5 acceptance evidence
 
@@ -136,24 +111,24 @@ historical findings that drove the closure work.
 
 | Proposal area | Current implementation | Status | Difference / required follow-up |
 | --- | --- | --- | --- |
-| Separate delivery intent from execution mechanics | Delivery profiles and execution package exist; workflow adapters still own substantial orchestration | Partial | Move normal execution decisions behind the kernel and leave profiles as the customization boundary |
-| Typed phase controller | `execution/phases.py`, phase transitions, and profile phase assignments exist | Partial | The default chat/task flow does not consistently use the controller as its transition authority |
-| First-class personas | `execution/personas.py` and profile persona contracts exist | Partial | Persona packets are available, but complete child-agent execution and least-privilege tool envelopes are not the default path |
-| Typed proposed-PR execution plan | `core/execution_plan.py`, `execution/compile.py`, and evaluators exist | Partial | Compilation is not connected to real workflow creation and proposed-PR execution |
-| Compile plans into workflow tasks | `compile_execution_plan()` exists and is tested | Partial | Default feature workflow definitions are not all generated from compiled artifacts |
-| Resolve capabilities from phase and step | Manifests, registry, and broker exist; several helpers invoke one-off registries | Partial | One registry/context must be owned by the runtime; normal tools must not bypass it |
-| Safe-by-construction normal tools | Shell, file mutation, BasedPyright, fuzzy-match, repository reads, and intrinsic adapters have bounds | Partial | Diagnostics, structured Powdrr operations, some document/context paths, output/resource limits, and decision event integration remain incomplete |
-| Rare typed capability exceptions | Signed tokens, persistence, CLI/MCP foundations, and argument binding exist | Partial | Pending/denied lifecycle, full decision packet presentation, idempotency, and end-to-end approval execution are not proven |
-| Durable plan separate from mutable state | Durable state/event store and replay exist | Partial | Kernel lifecycle projection is not automatically appended by normal runners |
-| Durable user guidance | Guidance contracts, matching, and relationship primitives exist | Partial | Capture/acknowledgement, conflict precedence, revoke/supersede controls, and behavior-changing runtime retrieval are incomplete |
-| Action relationship graph | Relationship definitions and kernel obligation expansion/validation exist | Partial | Durable obligation events and readiness integration are not yet authoritative in the normal workflow |
-| Validation evidence ledger | Evidence records, invalidation, findings, and readiness evaluator exist | Partial | Registered checks do not consistently emit evidence, and publish does not universally consume the evaluator |
-| Unified action lifecycle | Shared `WorkflowStepRunner` and `ActionKernel` exist | Partial | Chat/task parity is not proven for all errors, persistence, corrections, checkpoints, and state updates |
-| Immediate diagnostics plus authoritative gates | Bounded diagnostic helper and validation gates exist | Partial | Diagnostics are not a broker-registered, evidence-producing normal capability across all paths |
-| Typed correction policy | `PowdrrExecutionError`, correction packets, retries, and observer coaching exist | Partial | Remaining direct correctable errors and duplicate adapter correction branches require inventory and parity tests |
-| Checkpoints and rollback | Content-addressed store, pre-mutation broker hook, logical-state API, and safe restore exist | Partial | Store hooks are optional; restore is not a complete state/evidence/obligation recovery transaction |
-| Typed-state-first compaction | `compact_execution_context()` preserves a fixed identifier set | Partial | Prompt construction and resume do not require this compactor at every boundary; full-output retrieval is absent |
-| Least-privilege child agents | Persona and handoff contracts exist | Partial | Child execution is not yet enforced as a capability envelope derived from persona and phase |
+| Separate delivery intent from execution mechanics | Historical finding; current closure mapping proves runtime-owned contracts | Historical — closed | Verified by current closure acceptance |
+| Typed phase controller | Historical finding; current closure mapping proves phase and persona walking | Historical — closed | Verified by current closure acceptance |
+| First-class personas | Historical finding; current closure mapping proves persona packets and scoped catalogs | Historical — closed | Verified by current closure acceptance |
+| Typed proposed-PR execution plan | Historical finding; compiled task graph and production adapter are accepted | Historical — closed | Verified by current closure acceptance |
+| Compile plans into workflow tasks | Historical finding; compiled delivery graph is accepted | Historical — closed | Verified by current closure acceptance |
+| Resolve capabilities from phase and step | Historical finding; runtime-owned registry and required runtime helpers are accepted | Historical — closed | Verified by current closure acceptance |
+| Safe-by-construction normal tools | Historical finding; manifest effects, scope checks, checkpoints, and evidence are accepted | Historical — closed | Verified by current closure acceptance |
+| Rare typed capability exceptions | Historical finding; decision flow and inspection operations are accepted | Historical — closed | Verified by current closure acceptance |
+| Durable plan separate from mutable state | Historical finding; durable lifecycle projection and replay are accepted | Historical — closed | Verified by current closure acceptance |
+| Durable user guidance | Historical finding; capture, retrieval, supersede, and revoke are accepted | Historical — closed | Verified by current closure acceptance |
+| Action relationship graph | Historical finding; durable obligations and readiness gates are accepted | Historical — closed | Verified by current closure acceptance |
+| Validation evidence ledger | Historical finding; evidence invalidation and publish readiness are accepted | Historical — closed | Verified by current closure acceptance |
+| Unified action lifecycle | Historical finding; chat/task parity and correction are accepted | Historical — closed | Verified by current closure acceptance |
+| Immediate diagnostics plus authoritative gates | Historical finding; diagnostics and evidence gates are accepted | Historical — closed | Verified by current closure acceptance |
+| Typed correction policy | Historical finding; typed errors, retries, and observer coaching are accepted | Historical — closed | Verified by current closure acceptance |
+| Checkpoints and rollback | Historical finding; transactional restore and logical replay are accepted | Historical — closed | Verified by current closure acceptance |
+| Typed-state-first compaction | Historical finding; typed compaction and complete retrieval are accepted | Historical — closed | Verified by current closure acceptance |
+| Least-privilege child agents | Historical finding; persona-scoped capability catalogs are accepted | Historical — closed | Verified by current closure acceptance |
 
 ## Status matrix: engineering-plan PR sequence
 
@@ -161,17 +136,17 @@ historical findings that drove the closure work.
 | --- | --- | --- |
 | 1. Delivery profile and extension boundary | Delivery profile types, validation, phase/persona contracts | Implemented foundation |
 | 2. Execution contracts, store, reducer, shadow phase state | Execution state, event reducer, file store, shadow recorder | Implemented foundation |
-| 3. Tool manifests and constrained broker | `execution/tools.py`, `capabilities.py`, builtin adapters | Partial integration |
-| 4. Decision-ready capability exceptions | Signed authority, exception store, CLI/MCP support | Partial integration |
-| 5. Persona runner and typed handoffs | Persona packets and handoff validation | Partial integration |
-| 6. Typed execution-plan generation/evaluation | Plan contracts, compiler, evaluator | Partial integration |
-| 7. Durable behavior guidance store | Guidance module and behavior-rule contracts | Partial integration |
-| 8. Action relationships and obligation closure | Relationship graph, kernel validation, durable event projection | Partial integration |
-| 9. Unified lifecycle and typed correction | Shared runner and typed error model | Partial integration |
-| 10. Checkpoints, revert, diagnostics | Checkpoint store, broker checkpoint hook, bounded diagnostics | Partial integration |
-| 11. Evidence, findings, readiness | Pure evidence/readiness package | Partial integration |
-| 12. Compile delivery artifacts into workflow tasks | `compile_execution_plan()` | Partial integration |
-| 13. Deterministic compaction and compatibility removal | Compactor and compatibility diagnostic | Partial integration |
+| 3. Tool manifests and constrained broker | `execution/tools.py`, `capabilities.py`, builtin adapters | Historical — closed |
+| 4. Decision-ready capability exceptions | Signed authority, exception store, CLI/MCP support | Historical — closed |
+| 5. Persona runner and typed handoffs | Persona packets and handoff validation | Historical — closed |
+| 6. Typed execution-plan generation/evaluation | Plan contracts, compiler, evaluator | Historical — closed |
+| 7. Durable behavior guidance store | Guidance module and behavior-rule contracts | Historical — closed |
+| 8. Action relationships and obligation closure | Relationship graph, kernel validation, durable event projection | Historical — closed |
+| 9. Unified lifecycle and typed correction | Shared runner and typed error model | Historical — closed |
+| 10. Checkpoints, revert, diagnostics | Checkpoint store, broker checkpoint hook, transactional restore | Historical — closed |
+| 11. Evidence, findings, readiness | Pure evidence/readiness package | Historical — closed |
+| 12. Compile delivery artifacts into workflow tasks | `compile_execution_plan()` | Historical — closed |
+| 13. Deterministic compaction and compatibility removal | Compactor and compatibility diagnostic | Historical — closed |
 
 The repository has effectively completed the contract/foundation portions of
 the sequence. It has not completed the integration portions that the sequence
@@ -369,8 +344,8 @@ legacy paths therefore remain possible.
 3. `ActionKernel.to_execution_events()` is a useful bridge, but a bridge is not
    persistence. The normal runner still needs a state-store adapter and a
    transaction boundary around action terminal state plus projected events.
-4. The test count in the remaining-work document is stale. The current main
-   baseline at this audit is 710 tests before adding this audit document.
+4. The test counts in the historical documents are intentionally retained for
+   traceability; the verification command's current result is authoritative.
 5. The plans use “normal tool path” and “default workflow” as acceptance
    concepts, but the codebase does not yet expose one named runtime entry point
    whose call graph can be audited for bypasses.
@@ -401,4 +376,4 @@ The findings above describe the pre-Phase-5 state. The consolidated closure
 scenario now exercises the durable runtime boundary end to end, including the
 failure and recovery cases that were previously only isolated primitives. The
 repository is complete against the finite OpenCode completion plan when the
-14-check acceptance command and the full verification suite remain green.
+17-check acceptance command and the full verification suite remain green.

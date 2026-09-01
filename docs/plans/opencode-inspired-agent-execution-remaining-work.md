@@ -16,10 +16,12 @@ the consolidated closure PR makes that kernel authoritative for the measured
 normal runtime paths. This document retains the pre-closure inventory for
 traceability; it is not an active backlog. The current status is defined by the
 closure mapping and executable acceptance checks in the audit document.
+All sections after the current-status summary are historical findings from the
+pre-closure audit and must be read as already addressed by the current proof.
 
-The merged tree is healthy: the full suite passes (757 tests), formatting,
+The pre-closure baseline was healthy: the full suite passed (757 tests), formatting,
 linting, and mypy pass, and the final enforce-mode acceptance gate passes all
-14 checks, including phase walking, replay, partial-failure recovery, typed
+17 checks, including phase walking, replay, partial-failure recovery, typed
 exception decisions, scope rejection, readiness, and compaction.
 
 ## Current status
@@ -54,7 +56,8 @@ phase.
 The normal builtin capability path is runtime-authoritative: helpers require
 one durable `ExecutionRuntime`, and scenario/compatibility paths create an
 explicit runtime rather than falling back to an ephemeral broker. The full
-suite currently reports 763 passing tests.
+historical closure run reported 763 passing tests; run the current verification
+suite for the authoritative count.
 
 ## Historical closure inventory
 

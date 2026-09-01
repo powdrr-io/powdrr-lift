@@ -122,13 +122,11 @@ def test_runtime_binds_external_writes_to_a_stable_idempotency_key(
     )
 
     runtime.invoke(context, request)
-    runtime.invoke(context, request)
+    with pytest.raises(PowdrrExecutionError, match="already completed"):
+        runtime.invoke(context, request)
 
-    assert len(adapter.arguments) == 2
-    assert (
-        adapter.arguments[0]["idempotency_key"]
-        == adapter.arguments[1]["idempotency_key"]
-    )
+    assert len(adapter.arguments) == 1
+    assert isinstance(adapter.arguments[0]["idempotency_key"], str)
 
 
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:

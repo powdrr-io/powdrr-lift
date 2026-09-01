@@ -859,6 +859,21 @@ class ExecutionRuntime:
             and request.arguments.get("operation") == "pr_create"
         ):
             self.require_publish_readiness()
+        idempotency_key = request.arguments.get("idempotency_key")
+        if (
+            request.tool_name == "repository"
+            and isinstance(idempotency_key, str)
+            and idempotency_key in self.state.completed_idempotency_keys
+        ):
+            raise PowdrrExecutionError(
+                "This external write was already completed for its idempotency key.",
+                error_code="external_write_already_completed",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Inspect the existing repository or pull request result; do not "
+                    "repeat the external write with the same semantic request."
+                ),
+            )
         action_instance_id = (
             f"{self.execution_id}:action:{self.state.event_sequence + 1}"
         )

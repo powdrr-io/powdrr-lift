@@ -8,7 +8,11 @@ from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.core.tool_manifest import (
+    IdempotencyKind,
+    ToolEffect,
+    ToolManifest,
+)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import CapabilityRequest
 from powdrr_lift.execution.tools import (
@@ -49,6 +53,7 @@ class IntrinsicRepositoryAdapter:
             ToolEffect.GITHUB_MUTATION,
         ),
         scope="worktree",
+        idempotency=IdempotencyKind.KEYED,
     )
 
     def validate(
@@ -59,6 +64,14 @@ class IntrinsicRepositoryAdapter:
             return ToolValidationReport(("repository operation is required",))
         supported = {
             "status",
+            "remote",
+            "branch_current",
+            "default_branch",
+            "show_ref",
+            "switch",
+            "switch_create",
+            "commit",
+            "push",
             "add",
             "move",
             "rename",
@@ -116,7 +129,16 @@ class IntrinsicRepositoryAdapter:
         return frozenset(
             {
                 ToolEffect.GIT_MUTATION
-                if operation in {"add", "move", "rename"}
+                if operation
+                in {
+                    "add",
+                    "move",
+                    "rename",
+                    "switch",
+                    "switch_create",
+                    "commit",
+                    "push",
+                }
                 else ToolEffect.WORKSPACE_READ
             }
         )
@@ -758,7 +780,8 @@ def invoke_intrinsic_capability(
     elif tool == "git":
         semantic_action = (
             "mutate_repository"
-            if operation in {"add", "move", "rename"}
+            if operation
+            in {"add", "move", "rename", "switch", "switch_create", "commit", "push"}
             else "inspect_repository"
         )
         request_tool = "repository"

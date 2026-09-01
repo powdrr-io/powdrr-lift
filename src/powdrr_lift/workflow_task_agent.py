@@ -638,6 +638,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 stdout=self.stdout,
                 open_pull_request=False,
                 events=self.events,
+                runtime=self.runtime,
             )
             print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
             return WorkflowActionOutcome(continue_running=False)
@@ -823,6 +824,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 stdout=self.stdout,
                 open_pull_request=False,
                 events=self.events,
+                runtime=self.runtime,
             )
             if action.text:
                 print(action.text, file=self.stdout)
@@ -904,6 +906,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stdout=self.stdout,
             open_pull_request=False,
             events=self.events,
+            runtime=self.runtime,
         )
         return WorkflowActionOutcome(continue_running=False)
 
@@ -1072,6 +1075,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stdout=self.stdout,
             open_pull_request=False,
             events=self.events,
+            runtime=self.runtime,
         )
         return 2
 
@@ -1257,6 +1261,7 @@ def run_workflow_task(
         print(str(exc), file=stderr)
         return 2
 
+    last_runtime: ExecutionRuntime | None = None
     while True:
         task = _select_task(workflow, requested_task_id)
         requested_task_id = None
@@ -1279,6 +1284,7 @@ def run_workflow_task(
                         workflow,
                         workflow_git_state,
                         stdout=stdout,
+                        runtime=last_runtime,
                     )
                     return 0
                 if not _is_git_worktree(repo_root):
@@ -1356,6 +1362,7 @@ def run_workflow_task(
             phase=execution_phase,
             profile=delivery_profile,
         )
+        last_runtime = runtime
         runtime.set_action_contract(frozenset(task.actions))
         if (
             delivery_profile is not None
@@ -1657,6 +1664,7 @@ def _publish_workflow_progress(
     stdout: TextIO,
     open_pull_request: bool = True,
     events: Sequence[Mapping[str, Any]] = (),
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     """Commit and publish durable workflow progress for execution tasks.
 
@@ -1674,10 +1682,10 @@ def _publish_workflow_progress(
     )
     if (
         workflow_git_state is None
-        and not _git_result(repo_root, ["remote"]).stdout.strip()
+        and not _git_result(repo_root, ["remote"], runtime=runtime).stdout.strip()
     ):
         return
-    branch = _git_output(repo_root, ["branch", "--show-current"])
+    branch = _git_output(repo_root, ["branch", "--show-current"], runtime=runtime)
     if (
         workflow_git_state is not None
         and branch != workflow_git_state.integration_branch
@@ -1701,22 +1709,23 @@ def _publish_workflow_progress(
     if branch in {"", "main", "master"}:
         branch = _workflow_branch_name(workflow)
         if _git_result(
-            repo_root, ["show-ref", "--verify", f"refs/heads/{branch}"]
+            repo_root, ["show-ref", "--verify", f"refs/heads/{branch}"], runtime=runtime
         ).returncode:
-            _run_git(repo_root, ["switch", "-c", branch])
+            _run_git(repo_root, ["switch", "-c", branch], runtime=runtime)
         else:
-            _run_git(repo_root, ["switch", branch])
+            _run_git(repo_root, ["switch", branch], runtime=runtime)
 
-    _run_git(repo_root, ["add", "--all"])
-    status = _git_result(repo_root, ["status", "--porcelain"])
+    _run_git(repo_root, ["add", "--all"], runtime=runtime)
+    status = _git_result(repo_root, ["status", "--porcelain"], runtime=runtime)
     if status.stdout.strip():
         _run_git(
             repo_root,
             ["commit", "-m", f"Persist workflow progress: {reason}"],
+            runtime=runtime,
         )
     # Always push at a task boundary. A nested operation may have created a
     # local commit, leaving no working-tree changes for the add/status check.
-    _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
+    _run_git(repo_root, ["push", "--set-upstream", "origin", branch], runtime=runtime)
     if not open_pull_request:
         print(f"Published workflow progress on branch: {branch}", file=stdout)
         return
@@ -1726,14 +1735,10 @@ def _publish_workflow_progress(
         if workflow_git_state is not None
         else _default_branch(repo_root)
     )
-    existing_pr = subprocess.run(
-        ["gh", "pr", "view", branch, "--json", "url", "--jq", ".url"],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+    existing_pr = _gh_result(
+        repo_root,
+        {"operation": "pr_view", "pr_reference": branch, "json_fields": ["url"]},
+        runtime=runtime,
     )
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
         _write_workflow_record(
@@ -1753,26 +1758,16 @@ def _publish_workflow_progress(
         "Automated durable workflow progress. This draft PR contains task state "
         "and worktree changes so execution can resume from the next task."
     )
-    created_pr = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            default_branch,
-            "--head",
-            branch,
-            "--title",
-            title,
-            "--body",
-            body,
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+    created_pr = _gh_result(
+        repo_root,
+        {
+            "operation": "pr_create",
+            "title": title,
+            "body": body,
+            "base": default_branch,
+            "head": branch,
+        },
+        runtime=runtime,
     )
     if created_pr.returncode != 0:
         raise PowdrrExecutionError(
@@ -1798,6 +1793,7 @@ def publish_workflow_progress(
     stdout: TextIO,
     open_pull_request: bool = True,
     events: Sequence[Mapping[str, Any]] = (),
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     """Publish workflow progress for non-LLM workflow participants."""
     _publish_workflow_progress(
@@ -1807,6 +1803,7 @@ def publish_workflow_progress(
         stdout=stdout,
         open_pull_request=open_pull_request,
         events=events,
+        runtime=runtime,
     )
 
 
@@ -1881,25 +1878,18 @@ def _open_final_workflow_pull_request(
     workflow_git_state: WorkflowGitState,
     *,
     stdout: TextIO,
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     """Open the human-facing integration PR after every task is complete."""
-    existing_pr = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "view",
-            workflow_git_state.integration_branch,
-            "--json",
-            "url",
-            "--jq",
-            ".url",
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+    existing_pr = _gh_result(
+        repo_root,
+        {
+            "operation": "pr_view",
+            "pr_reference": workflow_git_state.integration_branch,
+            "json_fields": ["url"],
+            "jq": ".url",
+        },
+        runtime=runtime,
     )
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
         _write_workflow_record(
@@ -1912,30 +1902,20 @@ def _open_final_workflow_pull_request(
         )
         print(f"Updated final workflow PR: {existing_pr.stdout.strip()}", file=stdout)
         return
-    created_pr = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            workflow_git_state.base_branch,
-            "--head",
-            workflow_git_state.integration_branch,
-            "--title",
-            f"Workflow: {workflow.directory.name}",
-            "--body",
-            (
+    created_pr = _gh_result(
+        repo_root,
+        {
+            "operation": "pr_create",
+            "base": workflow_git_state.base_branch,
+            "head": workflow_git_state.integration_branch,
+            "title": f"Workflow: {workflow.directory.name}",
+            "body": (
                 "Final integration pull request for durable workflow "
                 f"{workflow.directory.name}. All workflow tasks are complete on "
                 "the integration branch."
             ),
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+        },
+        runtime=runtime,
     )
     if created_pr.returncode != 0:
         raise PowdrrExecutionError(
@@ -1964,8 +1944,25 @@ def _is_git_worktree(repo_root: Path) -> bool:
 
 
 def _git_result(
-    repo_root: Path, arguments: list[str]
+    repo_root: Path,
+    arguments: list[str],
+    *,
+    runtime: ExecutionRuntime | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    if runtime is not None:
+        parameters = _git_operation_parameters(arguments)
+        result = invoke_intrinsic_capability(
+            GIT_TOOL,
+            parameters,
+            worktree_root=repo_root,
+            runtime=runtime,
+        )
+        return subprocess.CompletedProcess(
+            ["git", *arguments],
+            int(result.get("returncode", 1)),
+            str(result.get("stdout", "")),
+            str(result.get("stderr", "")),
+        )
     return subprocess.run(
         ["git", *arguments],
         cwd=repo_root,
@@ -1984,8 +1981,17 @@ def _noninteractive_environment() -> dict[str, str]:
     return environment
 
 
-def _run_git(repo_root: Path, arguments: list[str]) -> str:
-    result = _git_result(repo_root, arguments)
+def _run_git(
+    repo_root: Path,
+    arguments: list[str],
+    *,
+    runtime: ExecutionRuntime | None = None,
+) -> str:
+    result = (
+        _git_result(repo_root, arguments, runtime=runtime)
+        if runtime is not None
+        else _git_result(repo_root, arguments)
+    )
     if result.returncode != 0:
         raise PowdrrExecutionError(
             f"git {' '.join(arguments)} failed: {result.stderr.strip()}"
@@ -1993,8 +1999,84 @@ def _run_git(repo_root: Path, arguments: list[str]) -> str:
     return result.stdout.strip()
 
 
-def _git_output(repo_root: Path, arguments: list[str]) -> str:
-    return _run_git(repo_root, arguments)
+def _git_output(
+    repo_root: Path,
+    arguments: list[str],
+    *,
+    runtime: ExecutionRuntime | None = None,
+) -> str:
+    return (
+        _run_git(repo_root, arguments, runtime=runtime)
+        if runtime is not None
+        else _run_git(repo_root, arguments)
+    )
+
+
+def _git_operation_parameters(arguments: list[str]) -> dict[str, Any]:
+    """Translate one internal git argv shape to the bounded repository API."""
+    if arguments == ["status", "--porcelain"] or arguments == ["status", "--short"]:
+        return {"operation": "status"}
+    if arguments == ["remote"]:
+        return {"operation": "remote"}
+    if arguments == ["branch", "--show-current"]:
+        return {"operation": "branch_current"}
+    if arguments[:2] == ["symbolic-ref", "--short"]:
+        return {"operation": "default_branch"}
+    if arguments[:2] == ["show-ref", "--verify"]:
+        return {
+            "operation": "show_ref",
+            "branch": arguments[-1].removeprefix("refs/heads/"),
+        }
+    if arguments[:2] == ["switch", "-c"]:
+        return {"operation": "switch_create", "branch": arguments[2]}
+    if arguments[:1] == ["switch"]:
+        return {"operation": "switch", "branch": arguments[1]}
+    if arguments[:2] == ["commit", "-m"]:
+        return {"operation": "commit", "message": arguments[2]}
+    if arguments[:2] == ["push", "--set-upstream"]:
+        return {"operation": "push", "branch": arguments[-1]}
+    if arguments[:1] == ["add"]:
+        paths = arguments[1:]
+        if paths == ["--all"] or not paths:
+            paths = ["."]
+        return {"operation": "add", "paths": paths}
+    raise PowdrrExecutionError(
+        f"Unsupported internal git operation: {' '.join(arguments)}",
+        error_code="unsupported_git_operation",
+    )
+
+
+def _gh_result(
+    repo_root: Path,
+    parameters: Mapping[str, Any],
+    *,
+    runtime: ExecutionRuntime | None = None,
+) -> subprocess.CompletedProcess[str]:
+    if runtime is not None:
+        result = invoke_intrinsic_capability(
+            GH_TOOL,
+            parameters,
+            worktree_root=repo_root,
+            runtime=runtime,
+        )
+        return subprocess.CompletedProcess(
+            ["gh"],
+            int(result.get("returncode", 1)),
+            str(result.get("stdout", "")),
+            str(result.get("stderr", "")),
+        )
+    from powdrr_lift.intrinsic_git_gh import intrinsic_command
+
+    command = ["gh", *intrinsic_command(parameters, tool=GH_TOOL)]
+    return subprocess.run(
+        command,
+        cwd=repo_root,
+        capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
 
 
 def _workflow_branch_name(workflow: WorkflowInstance) -> str:

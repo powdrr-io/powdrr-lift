@@ -25,6 +25,12 @@ def test_git_intrinsic_operations_have_expected_commands() -> None:
         {"operation": "move", "source": "old.yaml", "destination": "new.yaml"},
         tool="git",
     ) == ["mv", "old.yaml", "new.yaml"]
+    assert intrinsic_command(
+        {"operation": "switch_create", "branch": "workflow/demo"}, tool="git"
+    ) == ["switch", "-c", "workflow/demo"]
+    assert intrinsic_command(
+        {"operation": "push", "branch": "workflow/demo"}, tool="git"
+    ) == ["push", "--set-upstream", "origin", "workflow/demo"]
 
 
 def test_git_intrinsic_rejects_worktree_escape() -> None:
@@ -99,6 +105,16 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         "-f",
         "side=RIGHT",
     ]
+    assert intrinsic_command(
+        {
+            "operation": "pr_create",
+            "title": "Add feature",
+            "body": "Summary",
+            "base": "main",
+            "head": "workflow/demo",
+        },
+        tool="gh",
+    )[-4:] == ["--base", "main", "--head", "workflow/demo"]
 
 
 def test_git_intrinsic_executes_only_inside_the_worktree(tmp_path: Path) -> None:

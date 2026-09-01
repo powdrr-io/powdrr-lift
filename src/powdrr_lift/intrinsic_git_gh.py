@@ -59,6 +59,26 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
     operation = parameters.get("operation")
     if operation == "status":
         command = ["status", "--short"]
+    elif operation == "remote":
+        command = ["remote"]
+    elif operation == "branch_current":
+        command = ["branch", "--show-current"]
+    elif operation == "default_branch":
+        command = ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
+    elif operation == "show_ref":
+        branch = _required_text(parameters.get("branch"), "branch")
+        command = ["show-ref", "--verify", f"refs/heads/{branch}"]
+    elif operation == "switch":
+        branch = _branch_name(parameters.get("branch"))
+        command = ["switch", branch]
+    elif operation == "switch_create":
+        branch = _branch_name(parameters.get("branch"))
+        command = ["switch", "-c", branch]
+    elif operation == "commit":
+        command = ["commit", "-m", _required_text(parameters.get("message"), "message")]
+    elif operation == "push":
+        branch = _branch_name(parameters.get("branch"))
+        command = ["push", "--set-upstream", "origin", branch]
     elif operation == "add":
         paths = _relative_paths(parameters.get("paths"), field="paths")
         command = ["add", *paths]
@@ -68,11 +88,22 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
         command = ["mv", source, destination]
     else:
         raise PowdrrExecutionError(
-            "git intrinsic tool requires structured operation status, add, or move."
+            "git intrinsic tool requires a supported structured operation."
         )
-    if command[0] not in {"status", "add", "mv"}:
+    if command[0] not in {
+        "status",
+        "remote",
+        "branch",
+        "symbolic-ref",
+        "show-ref",
+        "switch",
+        "commit",
+        "push",
+        "add",
+        "mv",
+    }:
         raise PowdrrExecutionError(
-            "git intrinsic tool only supports status, add, and move."
+            "git intrinsic tool only supports bounded repository operations."
         )
     if command[0] in {"add", "mv"}:
         for item in command[1:]:
@@ -100,6 +131,8 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
                     "gh pr_view json_fields must be a non-empty array of strings."
                 )
             command.extend(["--json", ",".join(field.strip() for field in fields)])
+            if parameters.get("jq") == ".url":
+                command.extend(["--jq", ".url"])
     elif operation == "pr_create":
         command = [
             "pr",
@@ -110,6 +143,10 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             "--body",
             _required_text(parameters.get("body"), "body"),
         ]
+        if parameters.get("base") is not None:
+            command.extend(["--base", _branch_name(parameters.get("base"))])
+        if parameters.get("head") is not None:
+            command.extend(["--head", _branch_name(parameters.get("head"))])
     elif operation == "pr_edit":
         command = [
             "pr",
@@ -209,3 +246,12 @@ def _required_text(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise PowdrrExecutionError(f"gh intrinsic {field} must be a non-empty string.")
     return value
+
+
+def _branch_name(value: object) -> str:
+    branch = _required_text(value, "branch")
+    if any(character in branch for character in "..~^:?*[\\ "):
+        raise PowdrrExecutionError(
+            "git intrinsic branch must be a safe branch name without shell syntax."
+        )
+    return branch

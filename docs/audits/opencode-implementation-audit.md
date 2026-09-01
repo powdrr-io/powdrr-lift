@@ -52,7 +52,7 @@ The scenario intentionally avoids an LLM and external GitHub mutation so its
 result is repeatable in CI. Provider-specific and external-write behavior
 remains covered by the existing broker, exception, checkpoint, and workflow
 scenario suites. The measured repository acceptance result is 17 passing
-checks, and the full repository suite is 763 passing tests. The capability
+checks, and the full repository suite is 778 passing tests. The capability
 audit additionally verifies that builtin helpers cannot construct an
 ephemeral broker when a runtime is absent.
 
@@ -104,7 +104,7 @@ the prior PRs and the following final gate is the authoritative status:
 | Evidence invalidation and readiness | Passed: stale evidence blocks publication |
 | Typed compaction and retrieval | Passed: references survive bounded prompt context |
 | Normal capability catalog | Passed: exact 12-manifest surface audited |
-| Repository verification | Passed: 763 tests, Ruff, and mypy |
+| Repository verification | Passed: 778 tests, Ruff, and mypy |
 
 No item in the final acceptance gate is currently unproven. The rows below are
 historical findings that drove the closure work.

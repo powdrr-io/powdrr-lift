@@ -6047,6 +6047,7 @@ def _record_chat_pull_request(
         tool_result,
         root_skill=state.root_skill or state.selected_skill,
         step_index=state.step_index,
+        runtime=_ensure_execution_runtime(state),
     )
 
 
@@ -6056,6 +6057,7 @@ def _record_skill_pull_request(
     skill: SkillCatalogEntry,
     events: Sequence[Mapping[str, Any]],
     tool_result: Mapping[str, Any],
+    runtime: ExecutionRuntime,
     root_skill: SkillCatalogEntry | None = None,
     step_index: int | None = None,
 ) -> None:
@@ -6083,14 +6085,14 @@ def _record_skill_pull_request(
         "step_index": step_index,
     }
     record_skill = root_skill or skill
-    branch_result = subprocess.run(
-        ["git", "branch", "--show-current"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    branch = branch_result.stdout.strip()
+    with runtime.without_action_contract():
+        branch_result = invoke_intrinsic_capability(
+            GIT_TOOL,
+            {"operation": "branch_current"},
+            worktree_root=repo_root,
+            runtime=runtime,
+        )
+    branch = str(branch_result.get("stdout", "")).strip()
     if not branch:
         raise PowdrrExecutionError(
             "Could not determine the branch for the workflow record."

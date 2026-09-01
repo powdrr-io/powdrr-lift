@@ -1011,6 +1011,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "parameters": action.parameters,
             "result": result,
         }
+        if self.runtime is None:
+            raise PowdrrExecutionError(
+                "Workflow task pull-request recording requires an execution runtime.",
+                error_code="execution_runtime_required",
+            )
         _record_task_pull_request(
             action,
             self.workflow,
@@ -1018,6 +1023,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.repo_root,
             self.events,
             result,
+            runtime=self.runtime,
         )
         self.events.append(event)
 
@@ -1095,6 +1101,7 @@ def _record_task_pull_request(
     repo_root: Path,
     events: Sequence[Mapping[str, Any]],
     result: object,
+    runtime: ExecutionRuntime,
 ) -> None:
     command = action.parameters.get("command")
     if command is None and isinstance(result, Mapping):
@@ -1114,7 +1121,12 @@ def _record_task_pull_request(
             "GitHub did not return a pull-request URL, so the workflow record "
             "could not be named under docs/prs/<pr-number>.yaml."
         )
-    branch = _git_output(repo_root, ["branch", "--show-current"])
+    with runtime.without_action_contract():
+        branch = _git_output(
+            repo_root,
+            ["branch", "--show-current"],
+            runtime=runtime,
+        )
     state = load_workflow_git_state(
         workflow.directory,
         workflow_id=workflow_id_from_task_id(task_id),
@@ -1308,34 +1320,6 @@ def run_workflow_task(
             print("No ready agent task found.", file=stderr)
             return 1
 
-        try:
-            if workflow_git_state is not None:
-                validate_workflow_git_state(
-                    project_root,
-                    workflow_git_state,
-                    task.task_id,
-                )
-                claim_workflow_task(project_root, workflow_git_state, task.task_id)
-            task = workflow.claim_task(task.task_id)
-        except (RuntimeError, ValueError) as exc:
-            print(
-                "Workflow state changed or is inconsistent; no task work was "
-                "started for this task.",
-                file=stderr,
-            )
-            print(str(exc), file=stderr)
-            return 2
-        print(f"Claimed workflow task: {task.task_id}", file=stdout)
-        print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
-        _publish_workflow_progress(
-            repo_root,
-            workflow,
-            workflow_id=workflow_id_from_task_id(task.task_id),
-            reason=f"claim {task.task_id}",
-            stdout=stdout,
-            open_pull_request=False,
-        )
-
         provider = resolve_workflow_provider(config.provider)
         mappings = tuple(_default_llm_mappings(provider).items())
         mapping = _resolve_workflow_task_mapping(
@@ -1371,6 +1355,34 @@ def run_workflow_task(
             profile=delivery_profile,
         )
         last_runtime = runtime
+        try:
+            if workflow_git_state is not None:
+                validate_workflow_git_state(
+                    project_root,
+                    workflow_git_state,
+                    task.task_id,
+                )
+                claim_workflow_task(project_root, workflow_git_state, task.task_id)
+            task = workflow.claim_task(task.task_id)
+        except (RuntimeError, ValueError) as exc:
+            print(
+                "Workflow state changed or is inconsistent; no task work was "
+                "started for this task.",
+                file=stderr,
+            )
+            print(str(exc), file=stderr)
+            return 2
+        print(f"Claimed workflow task: {task.task_id}", file=stdout)
+        print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
+        _publish_workflow_progress(
+            repo_root,
+            workflow,
+            workflow_id=workflow_id_from_task_id(task.task_id),
+            reason=f"claim {task.task_id}",
+            stdout=stdout,
+            open_pull_request=False,
+            runtime=runtime,
+        )
         runtime.set_action_contract(
             frozenset(task.actions),
             enforce_empty=task.actions_declared,
@@ -1751,7 +1763,7 @@ def _publish_workflow_progress(
     default_branch = (
         workflow_git_state.integration_branch
         if workflow_git_state is not None
-        else _default_branch(repo_root)
+        else _default_branch(repo_root, runtime=runtime)
     )
     existing_pr = _gh_result(
         repo_root,
@@ -1765,6 +1777,7 @@ def _publish_workflow_progress(
             workflow_git_state,
             existing_pr.stdout.strip(),
             events=events,
+            runtime=runtime,
         )
         print(
             f"Updated workflow progress PR: {existing_pr.stdout.strip()}", file=stdout
@@ -1799,6 +1812,7 @@ def _publish_workflow_progress(
         created_pr.stdout.strip(),
         events=events,
         title=title,
+        runtime=runtime,
     )
     print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
 
@@ -1833,6 +1847,7 @@ def _write_workflow_record(
     *,
     events: Sequence[Mapping[str, Any]],
     title: str | None = None,
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     number = pull_request_number(pull_request_output)
     if number is None:
@@ -1843,12 +1858,12 @@ def _write_workflow_record(
     branch = (
         workflow_git_state.integration_branch
         if workflow_git_state is not None
-        else _git_output(repo_root, ["branch", "--show-current"])
+        else _git_output(repo_root, ["branch", "--show-current"], runtime=runtime)
     )
     base_branch = (
         workflow_git_state.base_branch
         if workflow_git_state is not None
-        else _default_branch(repo_root)
+        else _default_branch(repo_root, runtime=runtime)
     )
     record_pull_request_workflow(
         repo_root,
@@ -1917,6 +1932,7 @@ def _open_final_workflow_pull_request(
             existing_pr.stdout.strip(),
             events=(),
             title=f"Workflow: {workflow.directory.name}",
+            runtime=runtime,
         )
         print(f"Updated final workflow PR: {existing_pr.stdout.strip()}", file=stdout)
         return
@@ -1946,6 +1962,7 @@ def _open_final_workflow_pull_request(
         created_pr.stdout.strip(),
         events=(),
         title=f"Workflow: {workflow.directory.name}",
+        runtime=runtime,
     )
     print(f"Created final workflow PR: {created_pr.stdout.strip()}", file=stdout)
 
@@ -2104,10 +2121,11 @@ def _workflow_branch_name(workflow: WorkflowInstance) -> str:
     return f"workflow/{slug or 'execution'}"
 
 
-def _default_branch(repo_root: Path) -> str:
+def _default_branch(repo_root: Path, *, runtime: ExecutionRuntime | None = None) -> str:
     remote_head = _git_result(
         repo_root,
         ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        runtime=runtime,
     )
     if remote_head.returncode == 0 and remote_head.stdout.strip():
         return remote_head.stdout.strip().removeprefix("origin/")
@@ -3368,6 +3386,12 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 raise PowdrrExecutionError(
                     f"Unsupported nested skill tool: {action.tool!r}"
                 )
+            if self.runtime is None:
+                raise PowdrrExecutionError(
+                    "Nested skill pull-request recording requires an execution "
+                    "runtime.",
+                    error_code="execution_runtime_required",
+                )
             _record_skill_pull_request(
                 action,
                 self.repo_root,
@@ -3375,6 +3399,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.execution_events,
                 result,
                 step_index=frame.step_index,
+                runtime=self.runtime,
             )
             self.execution_events.append(
                 {

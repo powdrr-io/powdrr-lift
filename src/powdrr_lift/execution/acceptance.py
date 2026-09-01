@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import io
 import json
 from collections.abc import Mapping
@@ -31,11 +32,17 @@ from powdrr_lift.execution.evidence import EvidenceRequirement
 from powdrr_lift.execution.personas import build_persona_packet
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import ToolContext, ToolResult, ToolValidationReport
+from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
     WorkflowAction,
+    WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionRequest,
     WorkflowStepRunner,
+)
+from powdrr_lift.workflow_observer import (
+    ObserverExecutionContext,
+    ShadowWorkflowObserver,
 )
 from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
 
@@ -455,22 +462,33 @@ def run_final_acceptance(
     )
     with runtime.transaction():
         review_kernel.propose(
-            {"kind": "review-edit", "attributes": ["thread:R123"]},
+            {
+                "kind": "review-edit",
+                "attributes": ["thread:R123", "validated"],
+            },
             semantic_action="edit_for_review_comment",
         )
         blocked_resolution = review_kernel.validate_proposal(
-            {"kind": "resolve", "thread": "R123"},
+            {"kind": "resolve", "thread": "R123", "attributes": ["thread:R123"]},
             semantic_action="resolve_review_thread",
         )
         review_kernel.complete(
-            {"kind": "validation", "semantic_action": "run_validation"}
+            {
+                "kind": "validation",
+                "semantic_action": "run_validation",
+                "attributes": ["thread:R123"],
+            }
         )
         allowed_resolution = review_kernel.validate_proposal(
-            {"kind": "resolve", "thread": "R123"},
+            {"kind": "resolve", "thread": "R123", "attributes": ["thread:R123"]},
             semantic_action="resolve_review_thread",
         )
         review_kernel.complete(
-            {"kind": "resolve", "semantic_action": "resolve_review_thread"}
+            {
+                "kind": "resolve",
+                "semantic_action": "resolve_review_thread",
+                "attributes": ["thread:R123"],
+            }
         )
         runtime._projected_kernel_events = 0
         runtime.sync_kernel(phase_type=PhaseType.BUILD.value, actor_id="engineer")
@@ -593,6 +611,14 @@ def run_final_acceptance(
         legacy_runner_is_explicit = False
     checks = (
         AcceptanceCheck(
+            "observer-production-boundary",
+            _run_observer_acceptance(Path(workflow_directory)),
+            (
+                "observer coaching is exercised, logged, and deduplicated at the "
+                "shared boundary"
+            ),
+        ),
+        AcceptanceCheck(
             "vertical-structured-delivery",
             structured_artifacts
             and tuple(delivery_calls) == delivery_adapter.manifest.semantic_actions
@@ -681,6 +707,15 @@ def run_final_acceptance(
                 "the shared adapter path supports inspect, deny, approve, and "
                 "one-time execution"
             ),
+        ),
+        AcceptanceCheck(
+            "durable-exception-request",
+            any(
+                event.event_type.value == "capability_exception_requested"
+                and event.payload.get("exception_id") == denied_exception.exception_id
+                for event in runtime.state_store.load_events(runtime.execution_id)
+            ),
+            "exception request creation is retained in the durable execution stream",
         ),
         AcceptanceCheck(
             "interruption-retrieval",
@@ -1041,6 +1076,52 @@ def _exchanges_contain_guidance(result: Any) -> bool:
     return "optimistic locking" in json.dumps(exchanges).casefold()
 
 
+def _run_observer_acceptance(workflow_directory: Path) -> bool:
+    class Client:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            self.calls += 1
+            return {
+                "verdict": "coach",
+                "reason": "The same action is repeating.",
+                "guidance": ["Inspect the latest validation result."],
+                "expected_progress": "validation state changes",
+            }
+
+    client = Client()
+    observer = ShadowWorkflowObserver(
+        client=client,
+        model="acceptance-observer",
+        provider="scripted",
+        worktree_root=workflow_directory,
+        log_root=workflow_directory,
+        context_provider=lambda: ObserverExecutionContext(
+            "workflow_chat",
+            "acceptance",
+            "acceptance-workflow",
+            "build",
+            "Build the fixture",
+        ),
+    )
+    action = {"kind": "invoke_tool", "tool": "shell"}
+    observation = WorkflowActionObservation(
+        "same-action", False, ProgressDecision.THRESHOLD
+    )
+    first = observer.action_completed(action, observation)
+    second = observer.action_completed(action, observation)
+    third = observer.action_completed(action, observation)
+    log_path = workflow_directory / "workflow-observer-events.jsonl"
+    return (
+        first is None
+        and second is not None
+        and third is None
+        and client.calls == 1
+        and log_path.is_file()
+    )
+
+
 def _walk_profile(
     runtime: ExecutionRuntime,
     profile: Any,
@@ -1229,6 +1310,25 @@ def audit_capability_surface(registry: Any) -> tuple[AcceptanceCheck, ...]:
             "else CapabilityBroker" not in builtin_source
             and builtin_source.count("_require_runtime(runtime") >= 7,
             "normal builtin helpers cannot create an ephemeral broker",
+        )
+    )
+    from powdrr_lift.execution import builtin_tools
+
+    helpers = tuple(
+        (name, helper)
+        for name, helper in inspect.getmembers(builtin_tools, inspect.isfunction)
+        if name.startswith("invoke_")
+    )
+    checks.append(
+        AcceptanceCheck(
+            "normal-helper-runtime-contract",
+            bool(helpers)
+            and all(
+                "runtime" in inspect.signature(helper).parameters
+                and "_require_runtime(runtime" in inspect.getsource(helper)
+                for _, helper in helpers
+            ),
+            "every normal builtin helper requires the caller's durable runtime",
         )
     )
     return tuple(checks)

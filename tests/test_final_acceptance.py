@@ -15,12 +15,14 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
     assert {check.name for check in report.checks} == {
         "vertical-structured-delivery",
         "production-guidance-context",
+        "observer-production-boundary",
         "durable-guidance-changes-behavior",
         "effective-action-intersection",
         "transaction-boundary",
         "enforce-mode-runtime-authority",
         "legacy-runner-isolation",
         "normal-adapter-exception-flow",
+        "durable-exception-request",
         "interruption-retrieval",
         "phase-boundary-retrieval",
         "typed-error-boundary",
@@ -47,5 +49,5 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
 def test_capability_audit_covers_all_registered_manifests() -> None:
     checks = audit_capability_surface(builtin_tool_registry())
 
-    assert len(checks) == len(REQUIRED_BUILTIN_MANIFESTS) + 2
+    assert len(checks) == len(REQUIRED_BUILTIN_MANIFESTS) + 3
     assert all(check.passed for check in checks)

@@ -218,6 +218,7 @@ class ActionKernel:
         self._close_matching_obligations(
             self._semantic_action(action, None),
             self._source_action_instance_id(action),
+            self._target_ref(action),
         )
         return self._record(ActionLifecyclePhase.COMPLETED, action)
 
@@ -254,6 +255,17 @@ class ActionKernel:
                 "Review-thread resolution is blocked until run_validation is complete.",
             )
         if semantic_action in required:
+            target_ref = self._target_ref(action)
+            targeted = tuple(
+                item
+                for item in self._obligations.values()
+                if item.required_action == semantic_action and item.target_ref
+            )
+            if targeted and not any(item.target_ref == target_ref for item in targeted):
+                return (
+                    f"Action {semantic_action!r} targets {target_ref!r}, but open "
+                    f"obligations require {targeted[0].target_ref!r}.",
+                )
             return ()
         return (
             f"Action {semantic_action!r} is blocked by open relationship "
@@ -292,6 +304,18 @@ class ActionKernel:
         return frozenset()
 
     @staticmethod
+    def _target_ref(action: Any) -> str | None:
+        attributes = ActionKernel._action_attributes(action)
+        return next(
+            (
+                attribute
+                for attribute in sorted(attributes)
+                if attribute.startswith(("thread:", "row:"))
+            ),
+            None,
+        )
+
+    @staticmethod
     def _source_action_instance_id(action: Any) -> str | None:
         if isinstance(action, Mapping):
             value = action.get("source_action_instance_id")
@@ -300,7 +324,10 @@ class ActionKernel:
         return value if isinstance(value, str) and value else None
 
     def _close_matching_obligations(
-        self, semantic_action: str, source_action_instance_id: str | None
+        self,
+        semantic_action: str,
+        source_action_instance_id: str | None,
+        target_ref: str | None,
     ) -> None:
         matches = tuple(
             (obligation_id, obligation)
@@ -310,6 +337,7 @@ class ActionKernel:
                 source_action_instance_id is None
                 or obligation.source_action_instance_id == source_action_instance_id
             )
+            and (obligation.target_ref is None or obligation.target_ref == target_ref)
         )
         # A follow-up without explicit provenance closes only the oldest matching
         # obligation; it must not accidentally satisfy another source action.

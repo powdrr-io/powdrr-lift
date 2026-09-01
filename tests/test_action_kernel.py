@@ -82,7 +82,13 @@ def test_action_kernel_records_obligation_open_and_satisfied_events() -> None:
         event.phase is ActionLifecyclePhase.OBLIGATION_OPENED for event in kernel.events
     ) == len(proposed.obligations)
 
-    kernel.complete({"kind": "validation", "semantic_action": "run_validation"})
+    kernel.complete(
+        {
+            "kind": "validation",
+            "semantic_action": "run_validation",
+            "attributes": ["thread:R123"],
+        }
+    )
     assert (
         sum(
             event.phase is ActionLifecyclePhase.OBLIGATION_SATISFIED
@@ -100,6 +106,33 @@ def test_action_kernel_preserves_validation_before_thread_resolution() -> None:
     )
     assert kernel.validate_proposal(
         {"kind": "resolve"}, semantic_action="resolve_review_thread"
+    )
+
+
+def test_action_kernel_requires_the_originating_review_thread() -> None:
+    kernel = ActionKernel()
+    kernel.propose(
+        {
+            "kind": "review-edit",
+            "attributes": ["thread:R123", "validated"],
+        },
+        semantic_action="edit_for_review_comment",
+    )
+    kernel.complete(
+        {
+            "kind": "validation",
+            "semantic_action": "run_validation",
+            "attributes": ["thread:R123"],
+        }
+    )
+
+    assert kernel.validate_proposal(
+        {"kind": "resolve", "attributes": ["thread:R999"]},
+        semantic_action="resolve_review_thread",
+    )
+    assert not kernel.validate_proposal(
+        {"kind": "resolve", "attributes": ["thread:R123"]},
+        semantic_action="resolve_review_thread",
     )
 
 

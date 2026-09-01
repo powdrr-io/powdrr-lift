@@ -823,6 +823,11 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     assert runtime.validate_action("read_document") == ()
     assert runtime.validate_action("next_step") == ()
     assert runtime.validate_action("edit")
+    assert runtime.allowed_actions() == ("next_step", "read_document")
+    assert runtime.prompt_context()["allowed_actions"] == [
+        "next_step",
+        "read_document",
+    ]
 
 
 def test_runtime_persists_observer_decisions_in_event_stream(tmp_path: Path) -> None:

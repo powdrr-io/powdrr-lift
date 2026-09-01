@@ -12,6 +12,7 @@ from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.execution_state import ExecutionArtifact
+from powdrr_lift.core.pr_specification import build_pr_specification_validation_report
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import CapabilityRequest
@@ -280,6 +281,7 @@ def run_final_acceptance(
     task_sequence = _run_shared_runner(workflow_directory, root, "task")
     production_task = _run_production_task_adapter(Path(workflow_directory), root)
     production_chat = _run_production_chat_adapter(Path(workflow_directory), root)
+    structured_artifacts = _run_structured_artifact_chain(Path(workflow_directory))
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
@@ -378,6 +380,11 @@ def run_final_acceptance(
             "the production chat adapter completes a parsed action sequence",
         ),
         AcceptanceCheck(
+            "structured-artifact-chain",
+            structured_artifacts,
+            "a structured implementation catalog produces a validated proposed PR",
+        ),
+        AcceptanceCheck(
             "stale-evidence-gate",
             evidence_ready.ready and stale_evidence_blocked,
             (
@@ -428,6 +435,74 @@ def run_final_acceptance(
         ),
     )
     return AcceptanceReport(checks)
+
+
+def _run_structured_artifact_chain(workflow_directory: Path) -> bool:
+    """Validate high-level intent artifacts before compiling execution work."""
+    artifact_root = workflow_directory / "structured-artifacts"
+    implementation_path = (
+        artifact_root
+        / "docs"
+        / "specs"
+        / "powdrr-lift"
+        / "implementation-specification.yaml"
+    )
+    implementation_path.parent.mkdir(parents=True, exist_ok=True)
+    implementation_path.write_text(
+        """schema: https://powdrr.io/schemas/specification-v1
+architecture_id: acceptance-architecture
+features:
+  - id: acceptance-feature
+    description: Exercise structured delivery.
+    functional_requirements:
+      - Preserve the typed delivery boundary.
+""",
+        encoding="utf-8",
+    )
+    proposal_path = (
+        artifact_root
+        / "docs"
+        / "proposals"
+        / "acceptance-feature"
+        / "proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True, exist_ok=True)
+    proposal_path.write_text(
+        """schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: acceptance-feature-pr
+feature_ids: [acceptance-feature]
+intent:
+  problem: Exercise structured delivery.
+  goal: Preserve the typed delivery boundary.
+  reasoning: The runtime must retain high-level intent.
+acceptance_criteria:
+  - id: acceptance-criterion
+    description: The typed delivery boundary is preserved.
+expected_tests:
+  - id: acceptance-test
+    description: The vertical acceptance scenario passes.
+required_test_cases:
+  - id: acceptance-case
+    description: The proposed PR is validated before execution.
+expected_outcomes:
+  - id: acceptance-outcome
+    description: A typed execution plan can be compiled.
+non_goals:
+  - id: acceptance-non-goal
+    description: External GitHub mutation.
+risks:
+  - id: acceptance-risk
+    description: Fixture-only execution could bypass validation.
+""",
+        encoding="utf-8",
+    )
+    report = build_pr_specification_validation_report(
+        proposal_path.read_text(encoding="utf-8"),
+        work_item_name="acceptance-feature",
+        repo_root=artifact_root,
+        file_path=proposal_path,
+    )
+    return report.validation_successful
 
 
 def _run_production_task_adapter(workflow_directory: Path, repo_root: Path) -> Any:

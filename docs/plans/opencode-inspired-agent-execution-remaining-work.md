@@ -11,10 +11,11 @@ been executed through its final consolidated PR. Current closure is proved by
 `powdrr-lift final-acceptance` and `powdrr-lift audit-capabilities`, not by the
 older item-by-item notes below.
 
-The merged implementation establishes the typed execution-kernel vocabulary,
-but it has not yet made that kernel the authoritative runtime for the complete
-Powdrr workflow. This document records the remaining work identified by the
-post-merge audit.
+The merged implementation establishes the typed execution-kernel vocabulary and
+the consolidated closure PR makes that kernel authoritative for the measured
+normal runtime paths. This document retains the pre-closure inventory for
+traceability; it is not an active backlog. The current status is defined by the
+closure mapping and executable acceptance checks in the audit document.
 
 The merged tree is healthy: the full suite passes (757 tests), formatting,
 linting, and mypy pass, and the final enforce-mode acceptance gate passes all
@@ -55,7 +56,12 @@ one durable `ExecutionRuntime`, and scenario/compatibility paths create an
 explicit runtime rather than falling back to an ephemeral broker. The full
 suite currently reports 763 passing tests.
 
-## Remaining work, in priority order
+## Historical closure inventory
+
+The sections below describe the gaps that drove the closure work. Their
+completion criteria are now exercised by `powdrr-lift final-acceptance` and
+`powdrr-lift audit-capabilities`; future work should be added as a new,
+versioned audit finding rather than appended to this historical inventory.
 
 ### 1. Make the capability broker authoritative
 

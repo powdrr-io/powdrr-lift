@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -11,7 +12,11 @@ from powdrr_lift.errors import (
     ProviderExecutionError,
 )
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.workflow_llm import WorkflowActionRequest, WorkflowStepRunner
+from powdrr_lift.workflow_llm import (
+    WorkflowActionRequest,
+    WorkflowExecutionStrategy,
+    WorkflowStepRunner,
+)
 
 
 def test_execution_error_categories_are_distinct() -> None:
@@ -52,7 +57,7 @@ def test_provider_failure_bypasses_model_correction_path() -> None:
                 raise ProviderExecutionError("provider unavailable")
 
             return WorkflowActionRequest(
-                client=object(),
+                client=cast(Any, object()),
                 messages=[],
                 parser=lambda payload: payload,
                 model="test",
@@ -67,5 +72,7 @@ def test_provider_failure_bypasses_model_correction_path() -> None:
 
     with pytest.raises(ProviderExecutionError):
         WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
-            Strategy(), max_roundtrips=1, signature=lambda _: "failure"
+            cast(WorkflowExecutionStrategy, Strategy()),
+            max_roundtrips=1,
+            signature=lambda _: "failure",
         )

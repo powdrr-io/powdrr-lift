@@ -23,10 +23,14 @@ def compile_execution_plan(
     *,
     actions_by_phase: Mapping[PhaseType, tuple[str, ...]],
     skills_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
+    intent_ids_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
+    clause_ids_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
 ) -> tuple[WorkflowTask, ...]:
     """Produce deterministic tasks while preserving step actions verbatim."""
 
     skills = skills_by_phase or {}
+    intent_ids = intent_ids_by_phase or {}
+    clause_ids = clause_ids_by_phase or {}
     assignments = {item.phase_type: item for item in profile.phases}
     personas = {item.persona_id: item for item in profile.personas}
     phases = tuple(assignments)
@@ -99,6 +103,8 @@ def compile_execution_plan(
                         "execution_unit_id": unit.unit_id,
                         "phase_type": phase.value,
                         "persona_id": persona.persona_id,
+                        "intent_ids": list(intent_ids.get(phase, ())),
+                        "clause_ids": list(clause_ids.get(phase, ())),
                     },
                     output_state={
                         "artifacts": list(assignment.output_artifacts),

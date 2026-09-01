@@ -491,6 +491,8 @@ def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
         profile,
         plan,
         actions_by_phase=actions,
+        intent_ids_by_phase={PhaseType.BUILD: ("intent-locking",)},
+        clause_ids_by_phase={PhaseType.BUILD: ("clause-locking-v1",)},
         workflow_directory=tmp_path / "workflow",
     )
     feature_build = next(
@@ -505,6 +507,8 @@ def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
     assert feature_build.phase_type is PhaseType.BUILD
     assert feature_build.persona_id
     assert feature_build.actions == ("read_document", "next_step")
+    assert feature_build.input_state["intent_ids"] == ["intent-locking"]
+    assert feature_build.input_state["clause_ids"] == ["clause-locking-v1"]
     reloaded = workflow.__class__.from_directory(tmp_path / "workflow")
     assert {task.task_id: task for task in reloaded.tasks} == {
         task.task_id: task for task in workflow.tasks

@@ -1,5 +1,9 @@
 """Typed execution-kernel building blocks."""
 
+from powdrr_lift.core.effective_contract import (
+    EffectiveContract,
+    resolve_effective_contract,
+)
 from powdrr_lift.execution.builtin_tools import (
     BasedPyrightAdapter,
     EnrichmentAdapter,
@@ -38,6 +42,7 @@ from powdrr_lift.execution.compaction import (
     compact_execution_context,
     compact_with_retrieval,
     compatibility_diagnostic,
+    compatibility_report,
 )
 from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import (
@@ -148,9 +153,12 @@ __all__ = [
     "dispose_finding",
     "compile_execution_plan",
     "compatibility_diagnostic",
+    "compatibility_report",
     "compact_execution_context",
     "FileContextRetrievalStore",
     "compact_with_retrieval",
+    "EffectiveContract",
+    "resolve_effective_contract",
     "evaluate_review_agreement",
     "invalidate_evidence",
     "builtin_tool_registry",

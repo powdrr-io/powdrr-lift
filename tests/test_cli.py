@@ -50,6 +50,57 @@ def test_cli_init_writes_template(
     ]
 
 
+def test_cli_remember_and_explain_intent(tmp_path: Path) -> None:
+    workflow_dir = tmp_path / "workflow"
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "remember-intent",
+                    "--workflow-dir",
+                    str(workflow_dir),
+                    "--intent-id",
+                    "intent-review",
+                    "--clause-id",
+                    "clause-review",
+                    "--text",
+                    "Resolve the review thread after validation.",
+                    "--source-ref",
+                    "conversation:1/message:2",
+                    "--kind",
+                    "procedure",
+                    "--selector",
+                    "phase_type=resolve_findings",
+                    "--require",
+                    "run_validation",
+                    "--require",
+                    "resolve_review_thread",
+                ]
+            )
+            == 0
+        )
+    acknowledged = json.loads(stdout.getvalue())
+    assert acknowledged["created"] is True
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "explain-effective-contract",
+                    "--workflow-dir",
+                    str(workflow_dir),
+                    "--context",
+                    "phase_type=resolve_findings",
+                ]
+            )
+            == 0
+        )
+    explanation = json.loads(stdout.getvalue())
+    assert explanation["contract"]["clause_ids"] == ["clause-review"]
+    assert explanation["contract"]["clauses"][0]["text"].startswith("Resolve")
+
+
 def test_cli_compiles_plan_into_profiled_workflow(tmp_path: Path) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
     plan_path = repo_root / "execution-plan.json"

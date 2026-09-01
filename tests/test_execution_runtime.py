@@ -838,6 +838,14 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
         "read_document",
     ]
 
+    runtime.set_action_contract(frozenset({"next_step"}))
+    assert runtime.capability_catalog() == ()
+
+    runtime.set_action_contract(frozenset({"edit", "next_step"}))
+    assert {
+        item["tool_name"] for item in runtime.capability_catalog()
+    } == {"apply-edit", "file-mutation", "validate-edit"}
+
 
 def test_runtime_persists_observer_decisions_in_event_stream(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(

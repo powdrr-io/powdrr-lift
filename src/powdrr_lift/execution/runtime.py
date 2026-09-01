@@ -943,10 +943,36 @@ class ExecutionRuntime:
 
     def capability_catalog(self) -> tuple[dict[str, Any], ...]:
         """Return the bounded model-facing catalog for this runtime's tools."""
+        actions = self._allowed_actions
+        if actions is not None and "invoke_tool" not in actions:
+            tools_by_prompt_action = {
+                "edit": frozenset({"file-mutation", "validate-edit", "apply-edit"}),
+                "yaml_edit": frozenset(
+                    {"file-mutation", "validate-edit", "apply-edit"}
+                ),
+                "file_management": frozenset({"file-mutation"}),
+                "read_document": frozenset({"repository-read_document"}),
+                "gather_context": frozenset({"repository-gather_context"}),
+                "fuzzy_match": frozenset({"fuzzy-match"}),
+                "basedpyright": frozenset(
+                    {"basedpyright-symbol", "basedpyright-structure"}
+                ),
+                "shell": frozenset({"process"}),
+            }
+            allowed_tools = frozenset().union(
+                *(tools_by_prompt_action.get(action, frozenset()) for action in actions)
+            )
+        else:
+            allowed_tools = None
         return tuple(
             manifest.to_data()
             for manifest in sorted(
-                self.capability_manifests(), key=lambda item: item.tool_name
+                (
+                    manifest
+                    for manifest in self.capability_manifests()
+                    if allowed_tools is None or manifest.tool_name in allowed_tools
+                ),
+                key=lambda item: item.tool_name,
             )
         )
 

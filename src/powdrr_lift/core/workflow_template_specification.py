@@ -345,6 +345,8 @@ def instantiate_workflow_template(
                 _substitute_tool_invocation(invocation, explicit_substitutions)
                 for invocation in task_template.tool_invocations
             ),
+            actions=task_template.actions,
+            actions_declared=task_template.actions_declared,
             output_state_type=task_template.output_state_type,
             step_type=task_template.step_type,
             pre_step=task_template.pre_step,

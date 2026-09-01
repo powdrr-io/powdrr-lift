@@ -1071,6 +1071,25 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     }
 
 
+def test_engine_bookkeeping_temporarily_suspends_action_contract(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-bookkeeping",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.set_action_contract(frozenset({"read_document"}))
+
+    with runtime.without_action_contract():
+        assert runtime.validate_action("git") == ()
+        assert runtime.allowed_actions() is None
+
+    assert runtime.allowed_actions() == ("next_step", "read_document")
+    assert runtime.validate_action("git")
+
+
 def test_runtime_persists_observer_decisions_in_event_stream(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-observer",

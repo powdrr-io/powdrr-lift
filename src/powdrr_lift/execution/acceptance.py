@@ -512,20 +512,54 @@ def _run_production_task_adapter(workflow_directory: Path, repo_root: Path) -> A
     fixture_path = (
         repo_root / "workflow-evals/scenarios/execute-proposed-pr/fixtures/task-001"
     )
+    workflow_path = scenario_root / "workflow"
+    workflow_path.mkdir(parents=True, exist_ok=True)
+    (workflow_path / "task-001.yaml").write_text(
+        """\
+task_id: task-001
+status: open
+upstream_task_ids: []
+dependent_state: [proposed-pr-context-gathered]
+complexity: high
+input_state:
+  proposed_pr: <proposed-pr-id>
+  feature_id: acceptance-feature
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+description: Gather context about the proposed PR
+step_type: invoke_tool
+actions: [next_step]
+pre_step:
+  action: gather_context
+  template:
+    feature_id: <feature_id>
+    types:
+    - proposed_prs
+    - requirements
+    - features
+    - acceptance_criteria
+    - expected_tests
+    - intent
+    - risks
+    - decisions
+""",
+        encoding="utf-8",
+    )
     scenario_path = scenario_root / "scenario.yaml"
     scenario_path.write_text(
         f"""\
 schema_version: 1
 id: acceptance-task
 execution_mode: workflow_task
-workflow_template: {repo_root / "templates/execute-proposed-pr.yaml"}
+workflow_dir: {workflow_path}
 work_item_name: acceptance-feature
 task_id: task-001
 fixture: {fixture_path}
 provider:
   mode: scripted
   responses:
-  - action: complete
+  - action: next_step
     output_state: $deterministic_pre_step
 expect:
   output_state: $deterministic_pre_step

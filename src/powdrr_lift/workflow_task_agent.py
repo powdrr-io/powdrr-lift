@@ -1968,13 +1968,14 @@ def _git_result(
     runtime: ExecutionRuntime | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if runtime is not None:
-        parameters = _git_operation_parameters(arguments)
-        result = invoke_intrinsic_capability(
-            GIT_TOOL,
-            parameters,
-            worktree_root=repo_root,
-            runtime=runtime,
-        )
+        with runtime.without_action_contract():
+            parameters = _git_operation_parameters(arguments)
+            result = invoke_intrinsic_capability(
+                GIT_TOOL,
+                parameters,
+                worktree_root=repo_root,
+                runtime=runtime,
+            )
         return subprocess.CompletedProcess(
             ["git", *arguments],
             int(result.get("returncode", 1)),
@@ -2071,12 +2072,13 @@ def _gh_result(
     runtime: ExecutionRuntime | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if runtime is not None:
-        result = invoke_intrinsic_capability(
-            GH_TOOL,
-            parameters,
-            worktree_root=repo_root,
-            runtime=runtime,
-        )
+        with runtime.without_action_contract():
+            result = invoke_intrinsic_capability(
+                GH_TOOL,
+                parameters,
+                worktree_root=repo_root,
+                runtime=runtime,
+            )
         return subprocess.CompletedProcess(
             ["gh"],
             int(result.get("returncode", 1)),

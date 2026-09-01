@@ -53,6 +53,18 @@ evidence. The original findings and their closure evidence are retained here.
 The eight checks remain executable closure evidence and are required for the
 completion plan’s stopping rule.
 
+The follow-up audit items are also executable now: review obligations retain
+their originating `thread:` or `row:` target and reject mismatched follow-up
+actions; the capability audit inspects every builtin invocation helper's
+runtime contract; exception request creation emits a durable execution event;
+and final acceptance exercises observer coaching, cooldown/deduplication, and
+event logging.
+
+The review relationship preserves its existing sequencing rule: the
+thread-resolution obligation is created only for a validated review edit, and
+both validation and resolution must carry the same target reference. The
+acceptance harness now verifies mismatched and matching thread targets.
+
 ## Phase 5 acceptance evidence
 
 The final acceptance surface is executable rather than a document-only claim.

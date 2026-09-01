@@ -36,6 +36,7 @@ class RelationshipObligation:
     required_action: str
     description: str
     source_action: str
+    target_ref: str | None = None
 
 
 BUILTIN_ACTION_RELATIONSHIPS: tuple[ActionRelationship, ...] = (
@@ -87,6 +88,14 @@ def expand_action_relationships(
                     relationship.follow_up_action,
                     relationship.obligation_description,
                     fact.action,
+                    next(
+                        (
+                            attribute
+                            for attribute in sorted(fact.attributes)
+                            if attribute.startswith(("thread:", "row:"))
+                        ),
+                        None,
+                    ),
                 )
     return tuple(sorted(obligations.values(), key=lambda item: item.obligation_id))
 

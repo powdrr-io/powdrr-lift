@@ -369,6 +369,14 @@ class ExecutionRuntime:
                     "request."
                 ),
             )
+        self._append_event(
+            ExecutionEventType.CAPABILITY_EXCEPTION_REQUESTED,
+            {
+                "exception_id": exception.exception_id,
+                "decision_packet": exception.decision_packet(),
+                "reason": reason,
+            },
+        )
         return exception
 
     def decide_capability_exception(

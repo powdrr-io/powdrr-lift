@@ -64,6 +64,7 @@ def expand_execution_obligations(
                 source_action_instance_id=action_instance_id,
                 required_action=item.required_action,
                 relationship_id=item.relationship_id,
+                target_ref=item.target_ref,
             )
             for item in expansion.obligations
         ),

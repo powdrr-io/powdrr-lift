@@ -262,6 +262,29 @@ def test_runtime_capability_invocation_projects_relationship_obligations(
     assert not runtime.kernel.open_obligations
 
 
+def test_runtime_rejects_capability_context_from_another_execution(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-context-owner",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    foreign_context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset(),
+        frozenset(),
+        execution_id="other-execution",
+    )
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.invoke(foreign_context, CapabilityRequest("missing", "inspect", {}))
+
+    assert raised.value.error_code == "capability_execution_mismatch"
+
+
 def test_runtime_phase_controller_is_durable_and_closed_topology(
     tmp_path: Path,
 ) -> None:

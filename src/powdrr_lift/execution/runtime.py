@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -742,6 +743,26 @@ class ExecutionRuntime:
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
+        if context.execution_id != self.execution_id:
+            raise PowdrrExecutionError(
+                "capability context belongs to a different execution",
+                error_code="capability_execution_mismatch",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Create the capability context from the same ExecutionRuntime "
+                    "that will invoke the request."
+                ),
+            )
+        if context.repo_root.resolve() != self.repo_root:
+            raise PowdrrExecutionError(
+                "capability context belongs to a different repository",
+                error_code="capability_repository_mismatch",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Use the active runtime repository as both the repository and "
+                    "worktree context."
+                ),
+            )
         if (
             request.tool_name == "repository"
             and request.arguments.get("operation") == "pr_create"
@@ -864,6 +885,8 @@ class ExecutionRuntime:
     ) -> ToolResult | CapabilityResolution:
         """Run a context-bound adapter through this runtime's broker."""
         self.register_adapter(adapter)
+        if context.execution_id is None:
+            context = replace(context, execution_id=self.execution_id)
         return self.invoke(context, request)
 
     def register_adapter(self, adapter: ToolAdapter) -> None:

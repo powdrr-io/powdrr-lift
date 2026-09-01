@@ -20,7 +20,17 @@ from powdrr_lift.execution.capabilities import (
     CapabilityRequest,
     CapabilityResolutionKind,
 )
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import ToolContext, ToolResult
+
+
+def _runtime(tmp_path: Path) -> ExecutionRuntime:
+    return ExecutionRuntime(
+        "builtin-test",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
 
 
 def test_intrinsic_capability_unknown_tool_has_typed_correction_metadata(
@@ -34,6 +44,17 @@ def test_intrinsic_capability_unknown_tool_has_typed_correction_metadata(
         )
 
     assert raised.value.error_code == "unsupported_tool"
+
+
+def test_normal_capability_requires_a_durable_runtime(tmp_path: Path) -> None:
+    with pytest.raises(PowdrrExecutionError) as raised:
+        invoke_shell_capability(
+            {"command": ["echo", "no-ephemeral-broker"]},
+            worktree_root=tmp_path,
+            executor=lambda _arguments: None,
+        )
+
+    assert raised.value.error_code == "execution_runtime_required"
 
 
 def test_builtin_repository_inspection_resolves_through_broker(tmp_path: Path) -> None:
@@ -82,6 +103,7 @@ def test_shell_capability_requires_argv_and_scopes_cwd(tmp_path: Path) -> None:
         {"command": ["pytest"], "cwd": "tests"},
         worktree_root=tmp_path,
         executor=execute,
+        runtime=_runtime(tmp_path),
     )
     assert result == {"returncode": 0}
     assert seen[0]["command"] == ["pytest"]
@@ -91,12 +113,15 @@ def test_shell_capability_rejects_string_commands_and_escape(tmp_path: Path) -> 
     def execute(arguments: Mapping[str, Any]) -> object:
         raise AssertionError("invalid process must not execute")
 
+    runtime = _runtime(tmp_path)
     for arguments in (
         {"command": "pytest ; touch escaped"},
         {"command": ["pytest"], "cwd": "../outside"},
     ):
         try:
-            invoke_shell_capability(arguments, worktree_root=tmp_path, executor=execute)
+            invoke_shell_capability(
+                arguments, worktree_root=tmp_path, executor=execute, runtime=runtime
+            )
         except PowdrrExecutionError as error:
             assert "not executable" in str(error)
         else:
@@ -116,6 +141,7 @@ def test_file_mutation_capability_validates_targets_before_execution(
         ("src/example.py",),
         worktree_root=tmp_path,
         executor=execute,
+        runtime=_runtime(tmp_path),
     )
 
     assert result == {"changed": ["src/example.py"]}
@@ -128,9 +154,12 @@ def test_file_mutation_capability_rejects_absolute_and_escape_targets(
     def execute() -> object:
         raise AssertionError("invalid file mutation must not execute")
 
+    runtime = _runtime(tmp_path)
     for path in ("../outside.py", str(tmp_path / "outside.py")):
         with pytest.raises(PowdrrExecutionError, match="not executable"):
-            invoke_file_mutation((path,), worktree_root=tmp_path, executor=execute)
+            invoke_file_mutation(
+                (path,), worktree_root=tmp_path, executor=execute, runtime=runtime
+            )
 
 
 def test_basedpyright_capability_validates_symbol_and_structure_requests(

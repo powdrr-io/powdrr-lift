@@ -26,6 +26,7 @@ from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
@@ -363,6 +364,12 @@ def _run_scripted_skill(
         step_index=0,
         worktree_root=worktree_root,
         error_log_root=worktree_root,
+        runtime=ExecutionRuntime(
+            f"scenario-{skill.name}",
+            profile_id="default",
+            workflow_directory=worktree_root.parent / ".powdrr-execution",
+            repo_root=worktree_root,
+        ),
     )
     stderr = io.StringIO()
     strategy = _ChatWorkflowExecutionStrategy(
@@ -384,7 +391,12 @@ def _run_scripted_skill(
         provider_role="normal",
         current_model="scripted",
         provider="local",
-        driver=WorkflowStepRunner(max_stalled_roundtrips=2),
+        driver=WorkflowStepRunner(
+            max_stalled_roundtrips=2,
+            runtime=state.runtime,
+            phase_type="build",
+            actor_id="scenario",
+        ),
     )
     with _stub_github_intrinsic():
         try:

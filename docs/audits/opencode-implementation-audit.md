@@ -25,6 +25,11 @@ The observations in this section and the historical matrices below describe
 the state before the consolidated closure PR. The current status is the
 measured Phase 5 closure table that follows this summary.
 
+The consolidated runtime-closure changes also remove the last normal
+builtin-tool fallback to an ephemeral `CapabilityBroker`, require an
+`ExecutionRuntime` for every normal builtin capability invocation, and bind
+scenario/helper paths to an explicit durable runtime.
+
 The repository has a substantial typed execution foundation. The following are
 implemented or substantially implemented: delivery profiles, phases and
 personas, durable execution state and replay, capability manifests and broker
@@ -72,7 +77,9 @@ The scenario intentionally avoids an LLM and external GitHub mutation so its
 result is repeatable in CI. Provider-specific and external-write behavior
 remains covered by the existing broker, exception, checkpoint, and workflow
 scenario suites. The measured repository acceptance result is 14 passing
-checks, and the full repository suite is 757 passing tests.
+checks, and the full repository suite is 758 passing tests. The capability
+audit additionally verifies that builtin helpers cannot construct an
+ephemeral broker when a runtime is absent.
 
 ## Historical status matrix: proposal recommendations
 

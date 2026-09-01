@@ -13,6 +13,7 @@ from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.execution_state import ExecutionArtifact
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import CapabilityRequest
 from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import EvidenceRequirement
@@ -20,6 +21,12 @@ from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.personas import build_persona_packet
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import ToolContext, ToolResult, ToolValidationReport
+from powdrr_lift.workflow_llm import (
+    WorkflowAction,
+    WorkflowActionOutcome,
+    WorkflowActionRequest,
+    WorkflowStepRunner,
+)
 
 REQUIRED_BUILTIN_MANIFESTS = frozenset(
     {
@@ -265,8 +272,8 @@ def run_final_acceptance(
     mutable_kernel = ActionKernel()
     mutable_kernel.propose({"kind": "row-change"}, semantic_action="change_mutable_row")
     mutable_actions = {item.required_action for item in mutable_kernel.open_obligations}
-    chat_sequence = _review_sequence()
-    task_sequence = _review_sequence()
+    chat_sequence = _run_shared_runner(workflow_directory, root, "chat")
+    task_sequence = _run_shared_runner(workflow_directory, root, "task")
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
@@ -344,7 +351,7 @@ def run_final_acceptance(
         AcceptanceCheck(
             "adapter-parity",
             chat_sequence == task_sequence,
-            "chat and durable-task adapters produce the same typed lifecycle",
+            "chat and durable-task adapters use the same durable typed lifecycle",
         ),
         AcceptanceCheck(
             "stale-evidence-gate",
@@ -449,17 +456,98 @@ def _walk_profile(
     return tuple(transitions), published
 
 
-def _review_sequence() -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
-    kernel = ActionKernel()
-    kernel.propose(
-        {"kind": "review-edit", "attributes": ["thread:R123"]},
-        semantic_action="edit_for_review_comment",
+class _AcceptanceClient:
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        raise AssertionError("the acceptance runner must use request_action")
+
+
+class _ScriptedRunnerStrategy:
+    """Minimal adapter that drives the production shared runner in CI."""
+
+    def __init__(self, runtime: ExecutionRuntime, mode: str) -> None:
+        self.runtime = runtime
+        self.mode = mode
+        self._requested = False
+        self._material_state = 0
+
+    def next_request(self) -> WorkflowActionRequest | None:
+        if self._requested:
+            return None
+        self._requested = True
+        return WorkflowActionRequest(
+            client=_AcceptanceClient(),
+            messages=[],
+            parser=lambda payload: payload,
+            model="acceptance",
+            stderr=None,
+            max_timeout_retries=0,
+            timeout_backoff_seconds=0,
+            request_action=lambda: WorkflowAction(kind="next_step"),
+        )
+
+    def report_roundtrip(self, roundtrip: int, action: Any) -> None:
+        pass
+
+    def execute_action(self, action: Any) -> WorkflowActionOutcome:
+        self._material_state += 1
+        return WorkflowActionOutcome(continue_running=False)
+
+    def material_state(self, action: Any) -> object:
+        return self._material_state
+
+    def record_no_progress(self, action: Any, observation: Any) -> None:
+        pass
+
+    def record_response_error(self, error: RuntimeError, payload: Any) -> None:
+        raise error
+
+    def record_action_error(self, action: Any, error: Exception) -> None:
+        raise error
+
+    def action_failure_exit_code(self, action: Any) -> int:
+        return 1
+
+    def observe_outcome(
+        self, action: Any, observation: Any, outcome: WorkflowActionOutcome
+    ) -> WorkflowActionOutcome:
+        return outcome
+
+    def exhausted_roundtrips_exit_code(self) -> int:
+        return 1
+
+
+def _run_shared_runner(
+    workflow_directory: str | Path, repo_root: Path, mode: str
+) -> tuple[dict[str, Any], ...]:
+    runtime = ExecutionRuntime(
+        f"final-acceptance-{mode}",
+        profile_id="default-software-delivery",
+        workflow_directory=Path(workflow_directory) / mode,
+        repo_root=repo_root,
     )
-    kernel.complete({"kind": "validation", "semantic_action": "run_validation"})
-    kernel.complete({"kind": "resolve", "semantic_action": "resolve_review_thread"})
-    return (
-        tuple(event.to_data() for event in kernel.events),
-        tuple(item.to_data() for item in kernel.open_obligations),
+    strategy = _ScriptedRunnerStrategy(runtime, mode)
+    runner = WorkflowStepRunner(
+        max_stalled_roundtrips=1,
+        runtime=runtime,
+        phase_type=PhaseType.INTAKE.value,
+        actor_id="architect",
+    )
+    exit_code = runner.run(strategy, max_roundtrips=1, signature=lambda _: "next-step")
+    if exit_code != 0:
+        raise PowdrrExecutionError(
+            f"acceptance {mode} runner did not complete",
+            error_code="acceptance_runner_incomplete",
+            remediation=(
+                "Inspect the durable runner events and correct the failed action."
+            ),
+        )
+    return tuple(
+        {
+            "event_type": event.event_type.value,
+            "payload": event.payload,
+            "sequence": event.sequence,
+        }
+        for event in runtime.state_store.load_events(runtime.execution_id)
     )
 
 
@@ -482,4 +570,15 @@ def audit_capability_surface(registry: Any) -> tuple[AcceptanceCheck, ...]:
                 "manifest declares semantic actions and effects",
             )
         )
+    builtin_source = (
+        Path(__file__).with_name("builtin_tools.py").read_text(encoding="utf-8")
+    )
+    checks.append(
+        AcceptanceCheck(
+            "normal-runtime-authority",
+            "else CapabilityBroker" not in builtin_source
+            and builtin_source.count("_require_runtime(runtime") >= 7,
+            "normal builtin helpers cannot create an ephemeral broker",
+        )
+    )
     return tuple(checks)

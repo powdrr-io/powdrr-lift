@@ -50,6 +50,11 @@ audit-capabilities` for the built-in capability manifest audit. These commands
 are covered by the full test suite and are the required evidence for the final
 phase.
 
+The normal builtin capability path is runtime-authoritative: helpers require
+one durable `ExecutionRuntime`, and scenario/compatibility paths create an
+explicit runtime rather than falling back to an ephemeral broker. The full
+suite currently reports 758 passing tests.
+
 ## Remaining work, in priority order
 
 ### 1. Make the capability broker authoritative

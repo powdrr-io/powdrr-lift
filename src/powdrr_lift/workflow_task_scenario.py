@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core import WorkflowInstance
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
@@ -161,9 +162,18 @@ def run_workflow_task_scenario(
             ),
             None,
         )
+        pre_step_runtime = ExecutionRuntime(
+            "scenario-pre-step",
+            profile_id="default",
+            workflow_directory=repo_root.parent / "scenario-execution",
+            repo_root=repo_root,
+        )
         deterministic_state, _ = (
             _run_task_deterministic_pre_step(
-                source_task, repo_root=repo_root, events=[]
+                source_task,
+                repo_root=repo_root,
+                events=[],
+                runtime=pre_step_runtime,
             )
             if source_task is not None
             else (None, False)

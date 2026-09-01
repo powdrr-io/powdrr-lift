@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -2542,6 +2543,13 @@ def _run_task_deterministic_pre_step(
     first workflow task must persist the exact report so downstream tasks do
     not rediscover it or replace it with a lossy summary.
     """
+    if runtime is None:
+        runtime = ExecutionRuntime(
+            "task-pre-step-" + hashlib.sha256(str(repo_root).encode()).hexdigest()[:24],
+            profile_id="default",
+            workflow_directory=repo_root.parent / ".powdrr-execution",
+            repo_root=repo_root,
+        )
     pre_step = task.pre_step
     if pre_step is None:
         return None, False

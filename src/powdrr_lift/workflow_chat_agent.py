@@ -601,6 +601,19 @@ class _WorkflowExecutionState:
     runtime: ExecutionRuntime | None = None
 
 
+def _ensure_execution_runtime(state: _WorkflowExecutionState) -> ExecutionRuntime:
+    """Give direct strategy helpers the same durable boundary as normal runs."""
+    if state.runtime is None:
+        state.runtime = ExecutionRuntime(
+            "chat-helper-"
+            + hashlib.sha256(str(state.worktree_root).encode()).hexdigest()[:24],
+            profile_id="default",
+            workflow_directory=state.worktree_root.parent / ".powdrr-execution",
+            repo_root=state.worktree_root,
+        )
+    return state.runtime
+
+
 @dataclass(slots=True)
 class _WorkflowStepCheckpoint:
     identity: tuple[str, int]
@@ -4093,6 +4106,14 @@ def _run_deterministic_pre_step(
     force: bool = False,
     runtime: ExecutionRuntime | None = None,
 ) -> None:
+    if runtime is None:
+        runtime = ExecutionRuntime(
+            "chat-pre-step-"
+            + hashlib.sha256(str(worktree_root).encode()).hexdigest()[:24],
+            profile_id="default",
+            workflow_directory=worktree_root.parent / ".powdrr-execution",
+            repo_root=worktree_root,
+        )
     if not force and _latest_deterministic_pre_step(
         execution_events,
         skill_name=skill_name,
@@ -5309,7 +5330,7 @@ def _handle_workflow_action_edit(
         ),
         worktree_root=state.worktree_root,
         executor=lambda: _write_pending_file_mutations(pending_writes),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
@@ -5400,7 +5421,7 @@ def _handle_workflow_action_yaml_edit(
         (action.file_path,),
         worktree_root=state.worktree_root,
         executor=lambda: target_path.write_text(updated_text, encoding="utf-8"),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
@@ -5478,7 +5499,7 @@ def _handle_workflow_action_file_management(
             file_path=file_path,
             destination_path=action.destination_path,
         ),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     if state.file_added_callback is not None:
         changed_paths = [action.file_path]
@@ -5820,28 +5841,28 @@ def _handle_workflow_action_invoke_tool(
             action.parameters,
             worktree_root=state.worktree_root,
             path_cache=state.fuzzy_match_cache,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool == ENRICH_TOOL:
         tool_result = invoke_intrinsic_capability(
             ENRICH_TOOL,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool == VALIDATE_EDIT_TOOL:
         tool_result = invoke_deferred_edit_capability(
             VALIDATE_EDIT_TOOL,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool == APPLY_EDIT_TOOL:
         tool_result = invoke_deferred_edit_capability(
             APPLY_EDIT_TOOL,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
@@ -5866,20 +5887,16 @@ def _handle_workflow_action_invoke_tool(
                     and command_items[1:2] == ["pull-request-description"]
                 ),
             ),
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool in {GIT_TOOL, GH_TOOL}:
-        if (
-            action.tool == GH_TOOL
-            and action.parameters.get("operation") == "pr_create"
-            and state.runtime is not None
-        ):
-            state.runtime.require_publish_readiness()
+        if action.tool == GH_TOOL and action.parameters.get("operation") == "pr_create":
+            _ensure_execution_runtime(state).require_publish_readiness()
         tool_result = invoke_intrinsic_capability(
             action.tool,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
         if tool_result.get("stdout"):
             print(str(tool_result["stdout"]), end="", file=stdout)
@@ -5891,7 +5908,7 @@ def _handle_workflow_action_invoke_tool(
             action.tool,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     else:
         raise PowdrrExecutionError(
@@ -7154,7 +7171,7 @@ def _handle_workflow_action_gather_context(
             filters=action.filters,
             feature_id=action.feature_id,
         ),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(

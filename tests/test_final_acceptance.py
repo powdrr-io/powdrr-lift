@@ -33,5 +33,5 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
 def test_capability_audit_covers_all_registered_manifests() -> None:
     checks = audit_capability_surface(builtin_tool_registry())
 
-    assert len(checks) == len(REQUIRED_BUILTIN_MANIFESTS) + 1
+    assert len(checks) == len(REQUIRED_BUILTIN_MANIFESTS) + 2
     assert all(check.passed for check in checks)

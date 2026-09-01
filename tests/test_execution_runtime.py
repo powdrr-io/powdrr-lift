@@ -43,6 +43,28 @@ class MutableRowTool:
         return ToolResult(observed_effects=frozenset({ToolEffect.WORKSPACE_WRITE}))
 
 
+class ExternalWriteTool:
+    manifest = ToolManifest(
+        "repository",
+        ("mutate_pull_request",),
+        (ToolEffect.GITHUB_MUTATION,),
+    )
+
+    def __init__(self) -> None:
+        self.arguments: list[Mapping[str, object]] = []
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolValidationReport:
+        return ToolValidationReport()
+
+    def execute(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolResult:
+        self.arguments.append(arguments)
+        return ToolResult(observed_effects=frozenset({ToolEffect.GITHUB_MUTATION}))
+
+
 def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-default-registry",
@@ -71,6 +93,42 @@ def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) ->
             runtime.capability_manifests(), key=lambda item: item.tool_name
         )
     ]
+
+
+def test_runtime_binds_external_writes_to_a_stable_idempotency_key(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-idempotency",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    adapter = ExternalWriteTool()
+    runtime.register_adapter(adapter)
+    context = runtime.context(
+        semantic_actions=frozenset({"mutate_pull_request"}),
+        allowed_effects=frozenset({ToolEffect.GITHUB_MUTATION}),
+    )
+    request = CapabilityRequest(
+        "repository",
+        "mutate_pull_request",
+        {
+            "operation": "pr_edit",
+            "pr_reference": "123",
+            "title": "Updated",
+            "body": "Body",
+        },
+    )
+
+    runtime.invoke(context, request)
+    runtime.invoke(context, request)
+
+    assert len(adapter.arguments) == 2
+    assert (
+        adapter.arguments[0]["idempotency_key"]
+        == adapter.arguments[1]["idempotency_key"]
+    )
 
 
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:

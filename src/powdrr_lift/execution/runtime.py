@@ -195,6 +195,7 @@ class ExecutionRuntime:
         max_uses: int = 1,
     ) -> Any:
         """Create the exact human decision packet for an exceptional request."""
+        request = self._with_idempotency_key(request)
         exception = self.broker.create_exception_request(
             context,
             request,
@@ -811,6 +812,7 @@ class ExecutionRuntime:
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
+        request = self._with_idempotency_key(request)
         if context.execution_id != self.execution_id:
             raise PowdrrExecutionError(
                 "capability context belongs to a different execution",
@@ -944,6 +946,35 @@ class ExecutionRuntime:
                 self.execution_id, self.state.state_version, tuple(events)
             )
         return result
+
+    @staticmethod
+    def _with_idempotency_key(request: CapabilityRequest) -> CapabilityRequest:
+        """Bind external repository writes to one stable semantic retry key."""
+        if request.tool_name != "repository":
+            return request
+        operation = request.arguments.get("operation")
+        if operation not in {"pr_create", "pr_edit", "pr_review_comment"}:
+            return request
+        if request.arguments.get("idempotency_key"):
+            return request
+        encoded = json.dumps(
+            {
+                "tool": request.tool_name,
+                "action": request.semantic_action,
+                "arguments": dict(request.arguments),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return replace(
+            request,
+            arguments={
+                **request.arguments,
+                "idempotency_key": "powdrr-"
+                + hashlib.sha256(encoded.encode()).hexdigest()[:24],
+            },
+        )
 
     def invoke_adapter(
         self,

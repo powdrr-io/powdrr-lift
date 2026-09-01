@@ -133,6 +133,25 @@ class ContentAddressedCheckpointStore:
         self.restore(checkpoint, workspace_root)
         return self.load_state_json(checkpoint)
 
+    def changed_paths(
+        self, checkpoint: Checkpoint, workspace_root: str | Path | None = None
+    ) -> tuple[str, ...]:
+        """Return workspace-relative files changed since a checkpoint."""
+        workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
+        current = {
+            str(path.relative_to(workspace)): hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            for path in _workspace_files(workspace)
+        }
+        return tuple(
+            sorted(
+                relative
+                for relative in set(checkpoint.objects) | set(current)
+                if checkpoint.objects.get(relative) != current.get(relative)
+            )
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class DiagnosticResult:

@@ -68,6 +68,26 @@ def test_checkpoint_restore_rejects_symlink_escape_before_mutating(
     assert not (outside / "file.txt").exists()
 
 
+def test_checkpoint_reports_changed_created_and_deleted_files(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    source = workspace / "source.txt"
+    deleted = workspace / "deleted.txt"
+    source.write_text("before\n", encoding="utf-8")
+    deleted.write_text("remove\n", encoding="utf-8")
+    store = ContentAddressedCheckpointStore(tmp_path / "checkpoints")
+    checkpoint = store.create(workspace, "before")
+    source.write_text("after\n", encoding="utf-8")
+    deleted.unlink()
+    (workspace / "created.txt").write_text("new\n", encoding="utf-8")
+
+    assert store.changed_paths(checkpoint) == (
+        "created.txt",
+        "deleted.txt",
+        "source.txt",
+    )
+
+
 def test_diagnostics_are_bounded_and_failures_are_evidence(tmp_path: Path) -> None:
     def long(root: Path) -> str:
         return "x" * 20

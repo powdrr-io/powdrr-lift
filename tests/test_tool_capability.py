@@ -2,12 +2,16 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityRequest,
     CapabilityResolutionKind,
 )
+from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
 from powdrr_lift.execution.tools import (
     ToolContext,
     ToolRegistry,
@@ -88,6 +92,44 @@ def test_broker_requires_exception_for_unavailable_effect(tmp_path: Path) -> Non
     request = CapabilityRequest("write-file", "edit", {"path": "file.txt"})
     resolution = broker.resolve(context(tmp_path, frozenset({"edit"})), request)
     assert resolution.kind is CapabilityResolutionKind.EXCEPTION_REQUIRED
+
+
+def test_broker_reports_partial_mutation_when_tool_fails(tmp_path: Path) -> None:
+    class FailingMutation:
+        manifest = ToolManifest(
+            "failing-write", ("edit",), (ToolEffect.WORKSPACE_WRITE,)
+        )
+
+        def validate(
+            self, context: ToolContext, arguments: Mapping[str, Any]
+        ) -> ToolValidationReport:
+            return ToolValidationReport()
+
+        def execute(
+            self, context: ToolContext, arguments: Mapping[str, Any]
+        ) -> ToolResult:
+            (context.worktree_root / "changed.txt").write_text(
+                "partial\n", encoding="utf-8"
+            )
+            raise OSError("write failed")
+
+    broker = CapabilityBroker(
+        ToolRegistry([FailingMutation()]),
+        checkpoint_store=ContentAddressedCheckpointStore(tmp_path / "checkpoints"),
+    )
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"edit"}),
+        frozenset({ToolEffect.WORKSPACE_WRITE}),
+        execution_id="run-1",
+    )
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        broker.invoke(context, CapabilityRequest("failing-write", "edit", {}))
+
+    assert raised.value.error_code == "capability_partial_mutation"
+    assert "changed.txt" in raised.value.details["changed_paths"]
 
 
 def test_broker_checkpoints_mutations_before_execution(tmp_path: Path) -> None:

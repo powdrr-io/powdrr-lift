@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 import powdrr_lift.workflow_git as workflow_git
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_git import (
     WorkflowGitState,
     claim_workflow_task,
@@ -177,7 +178,7 @@ def test_claim_workflow_task_is_an_atomic_git_ref(tmp_path: Path) -> None:
 
     claim_workflow_task(tmp_path, state, "task-001")
 
-    with pytest.raises(RuntimeError, match="task claim already exists"):
+    with pytest.raises(PowdrrExecutionError, match="task claim already exists"):
         claim_workflow_task(tmp_path, state, "task-001")
 
 
@@ -217,7 +218,7 @@ def test_claim_workflow_task_reports_ref_creation_errors(
     monkeypatch.setattr(workflow_git, "_git", failing_claim_git)
 
     with pytest.raises(
-        RuntimeError, match="could not create task claim.*permission denied"
+        PowdrrExecutionError, match="could not create task claim.*permission denied"
     ):
         claim_workflow_task(tmp_path, state, "task-001")
 

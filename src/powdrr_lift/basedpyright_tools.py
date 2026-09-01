@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from powdrr_lift.builtin_tool_help import builtin_tool_help
+from powdrr_lift.errors import PowdrrExecutionError
 
 BASEDPYRIGHT_SYMBOL_TOOL = "basedpyright-symbol"
 BASEDPYRIGHT_STRUCTURE_TOOL = "basedpyright-structure"
@@ -32,7 +33,9 @@ def execute_basedpyright_tool(
         return _find_symbols(parameters, worktree_root=worktree_root)
     if tool == BASEDPYRIGHT_STRUCTURE_TOOL:
         return _discover_structure(parameters, worktree_root=worktree_root)
-    raise RuntimeError(f"Unsupported basedpyright tool: {tool!r}")
+    raise PowdrrExecutionError(
+        f"Unsupported basedpyright tool: {tool!r}", error_code="unsupported_tool"
+    )
 
 
 def _find_symbols(
@@ -46,7 +49,9 @@ def _find_symbols(
         _open_workspace_python_documents(server, worktree_root)
         symbols = server.request("workspace/symbol", {"query": query})
     if not isinstance(symbols, list):
-        raise RuntimeError("basedpyright returned an invalid workspace symbol result.")
+        raise PowdrrExecutionError(
+            "basedpyright returned an invalid workspace symbol result."
+        )
     return {
         "tool": BASEDPYRIGHT_SYMBOL_TOOL,
         "query": query,
@@ -64,11 +69,11 @@ def _discover_structure(
     relative_path = _required_string(parameters, "path")
     path = _resolve_worktree_path(relative_path, worktree_root)
     if not path.is_file():
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"basedpyright structure path is not a file: {relative_path}"
         )
     if path.suffix.casefold() != ".py":
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "basedpyright structure currently supports Python files only."
         )
 
@@ -89,7 +94,9 @@ def _discover_structure(
             {"textDocument": {"uri": path.as_uri()}},
         )
     if not isinstance(symbols, list):
-        raise RuntimeError("basedpyright returned an invalid document symbol result.")
+        raise PowdrrExecutionError(
+            "basedpyright returned an invalid document symbol result."
+        )
     return {
         "tool": BASEDPYRIGHT_STRUCTURE_TOOL,
         "path": str(path.relative_to(worktree_root)),
@@ -102,7 +109,7 @@ def _discover_structure(
 def _required_string(parameters: dict[str, Any], name: str) -> str:
     value = parameters.get(name)
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(f"{name} must be a non-empty string.")
+        raise PowdrrExecutionError(f"{name} must be a non-empty string.")
     return value.strip()
 
 
@@ -142,7 +149,9 @@ def _result_limit(parameters: dict[str, Any]) -> int:
         or not isinstance(value, int)
         or not 1 <= value <= _MAX_RESULTS
     ):
-        raise RuntimeError(f"limit must be an integer from 1 through {_MAX_RESULTS}.")
+        raise PowdrrExecutionError(
+            f"limit must be an integer from 1 through {_MAX_RESULTS}."
+        )
     return value
 
 
@@ -150,7 +159,7 @@ def _resolve_worktree_path(relative_path: str, worktree_root: Path) -> Path:
     root = worktree_root.resolve()
     path = (root / relative_path).resolve()
     if path != root and root not in path.parents:
-        raise RuntimeError(f"Path escapes the worktree: {relative_path}")
+        raise PowdrrExecutionError(f"Path escapes the worktree: {relative_path}")
     return path
 
 
@@ -158,7 +167,7 @@ class _BasedPyrightLanguageServer:
     def __init__(self, worktree_root: Path) -> None:
         command = shutil.which("basedpyright-langserver")
         if command is None:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "basedpyright-langserver is not installed or not on PATH. "
                 "Install basedpyright to use basedpyright tools."
             )
@@ -221,7 +230,9 @@ class _BasedPyrightLanguageServer:
             if message.get("id") != request_id:
                 continue
             if "error" in message:
-                raise RuntimeError(f"basedpyright {method} failed: {message['error']}")
+                raise PowdrrExecutionError(
+                    f"basedpyright {method} failed: {message['error']}"
+                )
             return message.get("result")
 
     def notify(self, method: str, params: Any) -> None:
@@ -229,7 +240,9 @@ class _BasedPyrightLanguageServer:
 
     def _write(self, message: dict[str, Any]) -> None:
         if self.process.stdin is None:
-            raise RuntimeError("basedpyright language server stdin is unavailable.")
+            raise PowdrrExecutionError(
+                "basedpyright language server stdin is unavailable."
+            )
         payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
         self.process.stdin.write(
             f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii") + payload
@@ -238,7 +251,9 @@ class _BasedPyrightLanguageServer:
 
     def _read(self) -> dict[str, Any]:
         if self.process.stdout is None:
-            raise RuntimeError("basedpyright language server stdout is unavailable.")
+            raise PowdrrExecutionError(
+                "basedpyright language server stdout is unavailable."
+            )
         content_length: int | None = None
         while True:
             line = self.process.stdout.readline()
@@ -248,7 +263,7 @@ class _BasedPyrightLanguageServer:
                     if self.process.stderr
                     else ""
                 )
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "basedpyright language server exited before responding"
                     + (f": {error.strip()}" if error.strip() else ".")
                 )
@@ -258,13 +273,15 @@ class _BasedPyrightLanguageServer:
             if name.casefold() == "content-length":
                 content_length = int(value.strip())
         if content_length is None:
-            raise RuntimeError("basedpyright returned an LSP message without a length.")
+            raise PowdrrExecutionError(
+                "basedpyright returned an LSP message without a length."
+            )
         payload = self.process.stdout.read(content_length)
         if len(payload) != content_length:
-            raise RuntimeError("basedpyright returned a truncated LSP message.")
+            raise PowdrrExecutionError("basedpyright returned a truncated LSP message.")
         message = json.loads(payload)
         if not isinstance(message, dict):
-            raise RuntimeError("basedpyright returned an invalid LSP message.")
+            raise PowdrrExecutionError("basedpyright returned an invalid LSP message.")
         return message
 
 

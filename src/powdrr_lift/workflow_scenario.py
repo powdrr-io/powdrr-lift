@@ -25,6 +25,7 @@ from powdrr_lift.core import load_skill, resolve_repo_root
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
@@ -91,7 +92,7 @@ class _ScriptedWorkflowClient:
         try:
             return next(self._responses)
         except StopIteration as exc:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 "Scenario exhausted scripted responses before the workflow completed."
             ) from exc
 
@@ -763,6 +764,6 @@ def _optional_non_negative_int(value: Any, *, default: int) -> int:
 
 
 def _raise_human_input_requested() -> str:
-    raise RuntimeError(
+    raise PowdrrExecutionError(
         "Scenario requires human input; scripted scenarios must avoid prompt_user."
     )

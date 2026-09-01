@@ -48,6 +48,7 @@ from powdrr_lift.core.workflow_task_specification import (
     save_workflow_task,
     select_ready_workflow_tasks,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.test_failure_packet import build_test_failure_packet
@@ -3336,6 +3337,7 @@ def test_file_management_rejects_parent_traversal(tmp_path: Path, path: str) -> 
             operation="delete",
             file_path=path,
         )
+    assert issubclass(FileManagementError, PowdrrExecutionError)
     assert source.exists()
 
 

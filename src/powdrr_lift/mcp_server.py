@@ -60,6 +60,7 @@ from powdrr_lift.core import (
     start_planning_feature as _start_planning_feature,
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
@@ -82,7 +83,7 @@ FastMCP = _load_fastmcp()
 
 def build_server() -> Any:
     if FastMCP is None:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "The 'mcp' package is required to run the powdrr-lift MCP server."
         )
 

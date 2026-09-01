@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.builtin_tool_help import builtin_tool_help
+from powdrr_lift.errors import PowdrrExecutionError
 
 GIT_TOOL = "git"
 GH_TOOL = "gh"
@@ -29,7 +30,10 @@ def execute_intrinsic_git_gh_tool(
         command = _gh_command(parameters)
         executable = "gh"
     else:
-        raise RuntimeError(f"Unsupported intrinsic repository tool: {tool!r}.")
+        raise PowdrrExecutionError(
+            f"Unsupported intrinsic repository tool: {tool!r}.",
+            error_code="unsupported_tool",
+        )
     result = subprocess.run(
         [executable, *command],
         cwd=worktree_root,
@@ -63,11 +67,13 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
         destination = _relative_path(parameters.get("destination"), field="destination")
         command = ["mv", source, destination]
     else:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "git intrinsic tool requires structured operation status, add, or move."
         )
     if command[0] not in {"status", "add", "mv"}:
-        raise RuntimeError("git intrinsic tool only supports status, add, and move.")
+        raise PowdrrExecutionError(
+            "git intrinsic tool only supports status, add, and move."
+        )
     if command[0] in {"add", "mv"}:
         for item in command[1:]:
             _relative_path(item, field="path")
@@ -90,7 +96,7 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
                     not isinstance(field, str) or not field.strip() for field in fields
                 )
             ):
-                raise RuntimeError(
+                raise PowdrrExecutionError(
                     "gh pr_view json_fields must be a non-empty array of strings."
                 )
             command.extend(["--json", ",".join(field.strip() for field in fields)])
@@ -128,10 +134,14 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
         path = _required_text(parameters.get("path"), "path")
         line = parameters.get("line")
         if isinstance(line, bool) or not isinstance(line, int) or line < 1:
-            raise RuntimeError("gh pr_review_comment line must be a positive integer.")
+            raise PowdrrExecutionError(
+                "gh pr_review_comment line must be a positive integer."
+            )
         side = parameters.get("side", "RIGHT")
         if side not in {"LEFT", "RIGHT"}:
-            raise RuntimeError("gh pr_review_comment side must be LEFT or RIGHT.")
+            raise PowdrrExecutionError(
+                "gh pr_review_comment side must be LEFT or RIGHT."
+            )
         command = [
             "api",
             "repos/"
@@ -150,7 +160,7 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             f"side={side}",
         ]
     else:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "gh intrinsic tool requires structured operation pr_view, pr_diff, "
             "pr_checks, pr_create, pr_edit, pr_comments, or pr_review_comment."
         )
@@ -169,7 +179,7 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             }
         )
     ):
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "gh intrinsic tool only supports GitHub pull-request create and "
             "inspect operations."
         )
@@ -178,20 +188,24 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
 
 def _relative_paths(value: object, *, field: str) -> list[str]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
-        raise RuntimeError(f"git intrinsic {field} must be an array of paths.")
+        raise PowdrrExecutionError(f"git intrinsic {field} must be an array of paths.")
     return [_relative_path(item, field=field) for item in value]
 
 
 def _relative_path(value: object, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(f"git intrinsic {field} must be a non-empty relative path.")
+        raise PowdrrExecutionError(
+            f"git intrinsic {field} must be a non-empty relative path."
+        )
     path = value.strip()
     if Path(path).is_absolute() or ".." in Path(path).parts:
-        raise RuntimeError(f"git intrinsic {field} must stay inside the worktree.")
+        raise PowdrrExecutionError(
+            f"git intrinsic {field} must stay inside the worktree."
+        )
     return path
 
 
 def _required_text(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise RuntimeError(f"gh intrinsic {field} must be a non-empty string.")
+        raise PowdrrExecutionError(f"gh intrinsic {field} must be a non-empty string.")
     return value

@@ -12,10 +12,12 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.errors import PowdrrExecutionError
+
 WORKFLOW_GIT_STATE_SUFFIX = "-workflow.yaml"
 
 
-class WorkflowGitInconsistency(RuntimeError):
+class WorkflowGitInconsistency(PowdrrExecutionError):
     """A workflow's Git-backed state cannot be safely advanced."""
 
 
@@ -229,13 +231,13 @@ def resolve_git_repository_root(repo_root: str | Path) -> Path:
         ["rev-parse", "--path-format=absolute", "--git-common-dir"],
     )
     if result.returncode != 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Could not determine the common Git directory for {repo_root_path}: "
             f"{result.stderr.strip()}"
         )
     common_git_directory = Path(result.stdout.strip()).resolve()
     if common_git_directory.name != ".git":
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Git common directory is not a repository .git directory: "
             f"{common_git_directory}"
         )
@@ -254,12 +256,12 @@ def create_workflow_worktree(
     worktree.parent.mkdir(parents=True, exist_ok=True)
     if worktree.exists():
         if not (worktree / ".git").exists():
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"Workflow worktree path is not a Git worktree: {worktree}"
             )
         existing_branch = _run_git(worktree, ["branch", "--show-current"])
         if existing_branch != branch:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 f"Workflow worktree {worktree} is on {existing_branch!r}, "
                 f"expected integration branch {branch!r}."
             )
@@ -290,7 +292,9 @@ def create_task_worktree(
     worktree.parent.mkdir(parents=True, exist_ok=True)
     if worktree.exists():
         if not (worktree / ".git").exists():
-            raise RuntimeError(f"Task worktree path is not a Git worktree: {worktree}")
+            raise PowdrrExecutionError(
+                f"Task worktree path is not a Git worktree: {worktree}"
+            )
         return worktree, branch
     if (
         _git(
@@ -392,7 +396,7 @@ def synchronize_workflow_initialization(
     source_path = Path(source_worktree).resolve()
     source_branch = _run_git(source_path, ["branch", "--show-current"])
     if source_branch in {"main", "master"}:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Cannot initialize a workflow from a protected branch; use a "
             "dedicated feature worktree."
         )
@@ -879,7 +883,7 @@ def validate_workflow_git_state(
 def _for_each_ref(repo_root: Path, prefix: str) -> list[str]:
     result = _git(repo_root, ["for-each-ref", "--format=%(refname)", prefix])
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip())
+        raise PowdrrExecutionError(result.stderr.strip() or "git for-each-ref failed")
     refs = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     if prefix.startswith("refs/heads/"):
         return [ref.removeprefix("refs/heads/") for ref in refs]
@@ -913,7 +917,7 @@ def _workflow_worktrees(
 ) -> list[dict[str, str]]:
     result = _git(repo_root, ["worktree", "list", "--porcelain"])
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip())
+        raise PowdrrExecutionError(result.stderr.strip() or "git worktree list failed")
     worktrees: list[dict[str, str]] = []
     current: dict[str, str] = {}
     for line in [*result.stdout.splitlines(), ""]:
@@ -1021,5 +1025,7 @@ def _git(repo_root: Path, arguments: list[str]) -> subprocess.CompletedProcess[s
 def _run_git(repo_root: Path, arguments: list[str]) -> str:
     result = _git(repo_root, arguments)
     if result.returncode != 0:
-        raise RuntimeError(f"git {' '.join(arguments)} failed: {result.stderr.strip()}")
+        raise PowdrrExecutionError(
+            f"git {' '.join(arguments)} failed: {result.stderr.strip()}"
+        )
     return result.stdout.strip()

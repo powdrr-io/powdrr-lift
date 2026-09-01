@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 from typing import Final
 
+from powdrr_lift.errors import PowdrrExecutionError
+
 _COMMON_TEMPLATE: Final[str] = """# Pull Request Description
 
 Fill every section below with evidence from the current worktree, diff, skill
@@ -141,7 +143,7 @@ def find_existing_pull_request(
             text=True,
         )
     except FileNotFoundError:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "Cannot inspect pull requests because gh is not installed"
         ) from None
 
@@ -153,20 +155,20 @@ def find_existing_pull_request(
             or "no pull requests" in normalized_error
         ):
             return None
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Cannot determine whether this branch has a pull request: {error}"
         )
 
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             "gh returned invalid JSON while inspecting the pull request"
         ) from None
     url = payload.get("url")
     body = payload.get("body")
     if not isinstance(url, str) or not isinstance(body, str):
-        raise RuntimeError("gh returned incomplete pull-request metadata")
+        raise PowdrrExecutionError("gh returned incomplete pull-request metadata")
     return url, body
 
 

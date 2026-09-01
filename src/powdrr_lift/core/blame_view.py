@@ -9,6 +9,7 @@ from powdrr_lift.core.code_index import CodeIndexStore, _current_branch
 from powdrr_lift.core.index import ProvenanceRecord, SourceIndex
 from powdrr_lift.core.pr_analysis import resolve_default_branch
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
+from powdrr_lift.errors import PowdrrExecutionError
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +96,10 @@ def build_blame_view_state(
     source_index = store.refresh(resolved_branch, resolved_parent)
     branch_state = store.branch_state_for(resolved_branch)
     if branch_state is None:
-        raise RuntimeError(f"Missing branch state for {resolved_branch!r}.")
+        raise PowdrrExecutionError(
+            f"Missing branch state for {resolved_branch!r}.",
+            error_code="missing_branch_state",
+        )
 
     tracked_files = _collect_tracked_files(repo_root_path)
     tree = build_repo_tree(tracked_files)

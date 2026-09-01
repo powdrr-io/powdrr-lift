@@ -91,6 +91,7 @@ from powdrr_lift.core.workflow_template_specification import (
     instantiated_workflow_relationships,
     load_workflow_template,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
@@ -1606,7 +1607,7 @@ def _stage_generated_file(repo_root: Path, output_path: Path) -> None:
         check=False,
     )
     if staged.returncode != 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Could not stage generated file {relative_path}: {staged.stderr.strip()}"
         )
     if os.environ.get("POWDRR_FILE_ADDED_EVENTS") == "1":
@@ -2201,7 +2202,7 @@ def _changed_branch_paths(repo_root: Path, base_branch: str) -> list[Path]:
             command, cwd=repo_root, capture_output=True, text=True, check=False
         )
         if result.returncode != 0:
-            raise RuntimeError(
+            raise PowdrrExecutionError(
                 result.stderr.strip()
                 or f"Could not determine changed files relative to {base_branch}."
             )

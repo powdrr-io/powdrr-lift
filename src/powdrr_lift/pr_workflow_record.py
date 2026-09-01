@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.errors import PowdrrExecutionError
+
 _PULL_REQUEST_URL = re.compile(r"/pull/(\d+)(?:\b|/|$)")
 
 
@@ -183,7 +185,7 @@ def _run_git(repo_root: Path, arguments: list[str]) -> subprocess.CompletedProce
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(
+        raise PowdrrExecutionError(
             f"Git command failed ({' '.join(arguments)}): {result.stderr.strip()}"
         )
     return result

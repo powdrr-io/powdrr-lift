@@ -833,6 +833,8 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
         workflow_directory=tmp_path / "workflow",
         repo_root=tmp_path,
     )
+    assert runtime.allowed_actions() is None
+    assert runtime.prompt_context()["allowed_actions"] is None
     runtime.set_action_contract(frozenset({"read_document"}))
 
     assert runtime.validate_action("read_document") == ()

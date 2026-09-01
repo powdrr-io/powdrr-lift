@@ -142,14 +142,15 @@ class ExecutionRuntime:
         """Set the single runtime-owned action contract for the active step."""
         self._allowed_actions = actions if actions else None
 
-    def allowed_actions(self) -> tuple[str, ...]:
+    def allowed_actions(self) -> tuple[str, ...] | None:
         """Return the action names the active prompt may propose.
 
-        ``next_step`` is a kernel transition and is therefore always available,
-        even when a step declares no tool actions.  Keeping this projection next
-        to ``validate_action`` makes the model-facing contract and enforcement
-        share one source of truth.
+        ``next_step`` is a kernel transition and is therefore always available
+        once a step declares a contract, even when that contract has no tool
+        actions. ``None`` means no step contract has been installed yet.
         """
+        if self._allowed_actions is None:
+            return None
         return tuple(
             sorted(
                 {*self._allowed_actions, "next_step"}
@@ -303,7 +304,11 @@ class ExecutionRuntime:
                     if active_persona is not None
                     else None
                 ),
-                "allowed_actions": list(self.allowed_actions()),
+                "allowed_actions": (
+                    list(self.allowed_actions())
+                    if self.allowed_actions() is not None
+                    else None
+                ),
                 "capability_catalog": list(self.capability_catalog()),
                 "artifact_ids": [item.artifact_id for item in self.state.artifacts],
                 "action_ids": [item.action_instance_id for item in self.state.actions],

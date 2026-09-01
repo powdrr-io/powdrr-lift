@@ -133,6 +133,32 @@ def test_runtime_publish_gate_returns_typed_remediation(tmp_path: Path) -> None:
     assert raised.value.remediation
 
 
+def test_runtime_publish_gate_cannot_be_bypassed_by_direct_capability_invocation(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-direct-publish",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
+    runtime.sync_kernel(phase_type="build", actor_id="engineer")
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.invoke(
+            runtime.context(
+                semantic_actions=frozenset({"mutate_pull_request"}),
+                allowed_effects=frozenset(),
+            ),
+            CapabilityRequest(
+                "repository", "mutate_pull_request", {"operation": "pr_create"}
+            ),
+        )
+
+    assert raised.value.error_code == "readiness_blocked"
+
+
 def test_runtime_does_not_duplicate_kernel_events(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-2",

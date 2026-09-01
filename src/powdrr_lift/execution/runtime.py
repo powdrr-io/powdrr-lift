@@ -736,6 +736,11 @@ class ExecutionRuntime:
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
+        if (
+            request.tool_name == "repository"
+            and request.arguments.get("operation") == "pr_create"
+        ):
+            self.require_publish_readiness()
         action_instance_id = (
             f"{self.execution_id}:action:{self.state.event_sequence + 1}"
         )

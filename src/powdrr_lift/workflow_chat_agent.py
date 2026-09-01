@@ -2424,11 +2424,11 @@ def _estimate_message_tokens(
     )
 
 
-class _ModelUnavailableError(RuntimeError):
+class _ModelUnavailableError(PowdrrExecutionError):
     pass
 
 
-class _EmptyProviderResponseError(RuntimeError):
+class _EmptyProviderResponseError(PowdrrExecutionError):
     def __init__(
         self,
         message: str,
@@ -2439,7 +2439,7 @@ class _EmptyProviderResponseError(RuntimeError):
         self.messages = messages
 
 
-class LocalModelRuntimeError(RuntimeError):
+class LocalModelRuntimeError(PowdrrExecutionError):
     """Raised when the required local GPU model cannot run."""
 
 

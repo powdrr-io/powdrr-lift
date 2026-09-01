@@ -8,6 +8,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionEventType,
     ObligationStatus,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.builtin_tools import (
     invoke_file_mutation,
     invoke_shell_capability,
@@ -227,7 +228,7 @@ def test_runtime_persona_packet_must_match_current_profile_phase(
             persona_actions={"architect": frozenset({"read"})},
             allowed_effects=frozenset(),
         )
-    except ValueError as error:
+    except PowdrrExecutionError as error:
         assert "does not match runtime phase" in str(error)
     else:
         raise AssertionError("mismatched persona packet should be rejected")
@@ -255,7 +256,7 @@ def test_runtime_rejects_invalid_plan_before_compilation(tmp_path: Path) -> None
 
     try:
         runtime.compile_plan(profile, plan, actions_by_phase={})
-    except ValueError as error:
+    except PowdrrExecutionError as error:
         assert "not compilable" in str(error)
     else:
         raise AssertionError("invalid plan should not compile")
@@ -396,7 +397,7 @@ def test_runtime_rejects_mismatched_checkpoint_before_mutating_workspace(
         state_json=other.state.to_json(),
     )
 
-    with pytest.raises(ValueError, match="different execution"):
+    with pytest.raises(PowdrrExecutionError, match="different execution"):
         runtime.restore_checkpoint(checkpoint.checkpoint_id)
 
     assert target.read_text(encoding="utf-8") == "current\n"

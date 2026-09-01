@@ -31,11 +31,11 @@ class WorkflowLLMClient(Protocol):
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
 
 
-class WorkflowLLMTimeoutExhausted(RuntimeError):
+class WorkflowLLMTimeoutExhausted(PowdrrExecutionError):
     """Raised when a provider request keeps timing out after its retry budget."""
 
 
-class WorkflowLLMHTTPError(RuntimeError):
+class WorkflowLLMHTTPError(PowdrrExecutionError):
     """A provider response that includes an HTTP status code."""
 
     def __init__(self, provider: str, status_code: int, detail: str) -> None:
@@ -43,7 +43,7 @@ class WorkflowLLMHTTPError(RuntimeError):
         super().__init__(f"{provider} request failed with HTTP {status_code}: {detail}")
 
 
-class WorkflowLLMExecutionAborted(RuntimeError):
+class WorkflowLLMExecutionAborted(PowdrrExecutionError):
     """Stop a shared execution loop after its adapter aborts a request."""
 
     def __init__(self, exit_code: int) -> None:

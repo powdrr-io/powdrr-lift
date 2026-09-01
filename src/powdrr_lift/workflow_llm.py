@@ -505,7 +505,13 @@ class WorkflowStepRunner:
                 self.kernel.fail(action, exc)
                 self._sync_runtime()
                 self._record_shadow(
-                    "action_failed", action, error_code=type(exc).__name__
+                    "action_failed",
+                    action,
+                    error_code=(
+                        exc.error_code
+                        if isinstance(exc, PowdrrExecutionError)
+                        else type(exc).__name__
+                    ),
                 )
                 strategy.record_action_error(action, exc)
                 failure_decision = None

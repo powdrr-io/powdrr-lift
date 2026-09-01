@@ -2252,7 +2252,7 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
 
 def _nested_action_response_correction(error: RuntimeError) -> str:
     """Return actionable repair guidance for a nested skill response."""
-    return (
+    correction = (
         f"The nested skill response was invalid: {error} "
         "Return exactly one corrected JSON object for the current nested step. "
         "The top-level discriminator is the string field "
@@ -2265,6 +2265,9 @@ def _nested_action_response_correction(error: RuntimeError) -> str:
         '"file_edits":[{"file_path":"relative/path.py","edits":[...]}]. '
         "Do not return markdown, prose, or a nested action object."
     )
+    if isinstance(error, PowdrrExecutionError):
+        correction += _typed_error_guidance(error)
+    return correction
 
 
 def _action_response_correction(
@@ -2276,6 +2279,8 @@ def _action_response_correction(
         "Return a corrected JSON action and "
         "do not repeat the failed command unchanged."
     )
+    if isinstance(error, PowdrrExecutionError):
+        correction += _typed_error_guidance(error)
     if action.tool == "fuzzy-match":
         correction += (
             " A fuzzy-match command must be an array beginning with "
@@ -2298,6 +2303,14 @@ def _action_response_correction(
                 "from a task id, template id, package name, or description."
             )
     return correction
+
+
+def _typed_error_guidance(error: PowdrrExecutionError) -> str:
+    """Expose machine-readable correction metadata at the next prompt boundary."""
+    guidance = f" Error code: {error.error_code}."
+    if error.remediation:
+        guidance += f" Remediation: {error.remediation}"
+    return guidance
 
 
 def _task_action_material_state(

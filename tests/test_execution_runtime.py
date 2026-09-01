@@ -139,6 +139,50 @@ def test_effective_action_contract_intersects_registered_adapter_scope(
     assert runtime.effective_action_contract() == frozenset({"edit"})
 
 
+def test_durable_guidance_creates_obligations_when_triggering_action_runs(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "guidance-runtime",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        adapters=(MutableRowTool(),),
+    )
+    runtime.capture_guidance(
+        "Always use optimistic locking for mutable row changes.",
+        source_ref="test:user-request",
+    )
+    actions = frozenset(
+        {"change_mutable_row", "add_optimistic_lock", "run_concurrency_test"}
+    )
+    runtime.set_execution_scope(
+        declared_actions=actions,
+        phase_actions=actions,
+        persona_actions=actions,
+        unit_actions=actions,
+        adapter_actions=runtime.available_adapter_actions(),
+    )
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        actions,
+        frozenset({ToolEffect.WORKSPACE_WRITE}),
+        execution_id=runtime.execution_id,
+        active_persona_id=runtime.state.current_persona_id,
+    )
+
+    runtime.invoke(
+        context,
+        CapabilityRequest("mutable-row", "change_mutable_row", {"row": "users:1"}),
+    )
+
+    assert {item.required_action for item in runtime.kernel.open_obligations} == {
+        "add_optimistic_lock",
+        "run_concurrency_test",
+    }
+
+
 def test_runtime_invocation_commits_one_transaction(tmp_path: Path) -> None:
     store = CountingExecutionStore(tmp_path / "workflow")
     runtime = ExecutionRuntime(

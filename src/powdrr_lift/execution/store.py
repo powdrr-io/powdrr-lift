@@ -95,6 +95,7 @@ class FileExecutionStateStore:
         return state
 
     def load(self, execution_id: str) -> ExecutionState:
+        self._recover_transaction(execution_id)
         path = self._execution_directory(execution_id) / "state.json"
         return ExecutionState.from_json(path.read_text(encoding="utf-8"))
 
@@ -117,27 +118,72 @@ class FileExecutionStateStore:
         directory = self._execution_directory(execution_id)
         directory.mkdir(parents=True, exist_ok=True)
         with self._lock(directory / "state.lock"):
-            state = self.load(execution_id)
-            if state.state_version != expected_version:
-                raise ExecutionStateConflict(
-                    execution_id, expected_version, state.state_version
-                )
-            next_state = state
-            for event in events:
-                next_state = reduce_execution_event(next_state, event)
-            existing_events = self.load_events(execution_id)
-            all_events = (*existing_events, *events)
-            self._write_lines(
-                directory / "events.jsonl",
-                tuple(
-                    json.dumps(event.to_data(), ensure_ascii=False)
-                    for event in all_events
-                ),
-            )
-            self._write_json(directory / "state.json", next_state.to_data())
-            return next_state
+            return self._append_locked(execution_id, expected_version, events)
 
-    append_transaction = append
+    def append_transaction(
+        self, execution_id: str, expected_version: int, events: Sequence[ExecutionEvent]
+    ) -> ExecutionState:
+        """Journal a state/event append so restart can finish an interrupted commit."""
+        directory = self._execution_directory(execution_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        journal = directory / "transaction.json"
+        payload = {
+            "expected_version": expected_version,
+            "events": [event.to_data() for event in events],
+        }
+        with self._lock(directory / "state.lock"):
+            self._write_json(journal, payload)
+            try:
+                return self._append_locked(execution_id, expected_version, events)
+            finally:
+                journal.unlink(missing_ok=True)
+
+    def _append_locked(
+        self, execution_id: str, expected_version: int, events: Sequence[ExecutionEvent]
+    ) -> ExecutionState:
+        directory = self._execution_directory(execution_id)
+        state = ExecutionState.from_json(
+            (directory / "state.json").read_text(encoding="utf-8")
+        )
+        if state.state_version != expected_version:
+            raise ExecutionStateConflict(
+                execution_id, expected_version, state.state_version
+            )
+        next_state = state
+        for event in events:
+            next_state = reduce_execution_event(next_state, event)
+        event_path = directory / "events.jsonl"
+        existing_events = (
+            tuple(
+                ExecutionEvent.from_data(json.loads(line))
+                for line in event_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            )
+            if event_path.exists()
+            else ()
+        )
+        self._write_lines(
+            event_path,
+            tuple(
+                json.dumps(event.to_data(), ensure_ascii=False)
+                for event in (*existing_events, *events)
+            ),
+        )
+        self._write_json(directory / "state.json", next_state.to_data())
+        return next_state
+
+    def _recover_transaction(self, execution_id: str) -> None:
+        directory = self._execution_directory(execution_id)
+        journal = directory / "transaction.json"
+        if not journal.exists():
+            return
+        with self._lock(directory / "state.lock"):
+            if not journal.exists():
+                return
+            payload = json.loads(journal.read_text(encoding="utf-8"))
+            events = tuple(ExecutionEvent.from_data(item) for item in payload["events"])
+            self._append_locked(execution_id, payload["expected_version"], events)
+            journal.unlink(missing_ok=True)
 
     def verify(self, execution_id: str) -> ExecutionState:
         state = self.load(execution_id)

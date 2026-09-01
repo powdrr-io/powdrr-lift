@@ -3005,7 +3005,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")
                 if self.runtime is not None:
-                    self.runtime.set_action_contract(None)
+                    self.runtime.install_step_scope(frozenset())
                 try:
                     passed = _run_gate(
                         step,
@@ -3023,7 +3023,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     )
                 finally:
                     if self.runtime is not None:
-                        self.runtime.set_action_contract(
+                        self.runtime.install_step_scope(
                             frozenset(step.actions),
                             enforce_empty=step.actions_declared,
                         )

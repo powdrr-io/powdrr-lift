@@ -107,6 +107,40 @@ class _AcceptanceExceptionAdapter:
         )
 
 
+class _StructuredDeliveryAdapter:
+    """Drive the real runtime with validated artifacts from one delivery run."""
+
+    manifest = ToolManifest(
+        "structured-delivery",
+        (
+            "validate_specification",
+            "create_proposed_pr",
+            "implement_proposed_pr",
+            "review_implementation",
+            "publish_proposed_pr",
+        ),
+        (ToolEffect.WORKSPACE_READ,),
+        scope="worktree",
+    )
+
+    def __init__(self, artifact_root: Path, calls: list[str]) -> None:
+        self.artifact_root = artifact_root
+        self.calls = calls
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        if not all(path.is_file() for path in self.artifact_root.rglob("*.yaml")):
+            return ToolValidationReport(("delivery artifacts are incomplete",))
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        self.calls.append(str(arguments["stage"]))
+        return ToolResult(
+            f"completed {arguments['stage']}", frozenset({ToolEffect.WORKSPACE_READ})
+        )
+
+
 def run_final_acceptance(
     repo_root: str | Path, workflow_directory: str | Path
 ) -> AcceptanceReport:
@@ -172,6 +206,48 @@ def run_final_acceptance(
         actions_by_phase=actions,
         workflow_directory=workflow_directory,
     )
+    delivery_calls: list[str] = []
+    delivery_adapter = _StructuredDeliveryAdapter(
+        Path(workflow_directory) / "structured-artifacts", delivery_calls
+    )
+    runtime.register_adapter(delivery_adapter)
+    intake = next(
+        phase for phase in profile.phases if phase.phase_type is PhaseType.INTAKE
+    )
+    delivery_actions = frozenset(delivery_adapter.manifest.semantic_actions)
+    runtime.persona_packet(
+        profile,
+        run_id=runtime.execution_id,
+        phase_type=PhaseType.INTAKE,
+        phase_actions=delivery_actions,
+        persona_actions={intake.persona_id: delivery_actions},
+        allowed_effects=frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    runtime.set_execution_scope(
+        declared_actions=delivery_actions,
+        phase_actions=delivery_actions,
+        persona_actions=delivery_actions,
+        unit_actions=delivery_actions,
+        adapter_actions=runtime.available_adapter_actions(),
+    )
+    delivery_context = ToolContext(
+        root,
+        root,
+        delivery_actions,
+        frozenset({ToolEffect.WORKSPACE_READ}),
+        execution_id=runtime.execution_id,
+        active_persona_id=runtime.state.current_persona_id,
+    )
+    for stage in delivery_adapter.manifest.semantic_actions:
+        delivery_result = runtime.invoke(
+            delivery_context,
+            CapabilityRequest("structured-delivery", stage, {"stage": stage}),
+        )
+        if not isinstance(delivery_result, ToolResult):
+            raise PowdrrExecutionError(
+                f"structured delivery stage did not execute: {stage}",
+                error_code="acceptance_delivery_incomplete",
+            )
     contract = runtime.prompt_context()
     persona_packets = tuple(
         build_persona_packet(
@@ -188,7 +264,10 @@ def run_final_acceptance(
         )
         for phase in profile.phases
     )
-    phase_transitions, published = _walk_profile(runtime, profile)
+    boundary_contexts: list[dict[str, Any]] = []
+    phase_transitions, published = _walk_profile(
+        runtime, profile, boundary_contexts=boundary_contexts
+    )
     phase_state = runtime.state
     replayed_runtime = ExecutionRuntime(
         runtime.execution_id,
@@ -231,6 +310,13 @@ def run_final_acceptance(
     )
     runtime.register_adapter(denied_adapter)
     runtime.register_adapter(approved_adapter)
+    runtime.set_execution_scope(
+        declared_actions=frozenset({"read_secret_denied", "read_secret_approved"}),
+        phase_actions=frozenset({"read_secret_denied", "read_secret_approved"}),
+        persona_actions=frozenset({"read_secret_denied", "read_secret_approved"}),
+        unit_actions=frozenset({"read_secret_denied", "read_secret_approved"}),
+        adapter_actions=runtime.available_adapter_actions(),
+    )
     exception_context = ToolContext(
         root,
         root,
@@ -378,6 +464,39 @@ def run_final_acceptance(
     )
     guidance_after = runtime.prompt_context()
     guidance_requirements = runtime.guidance_required_actions()
+    guidance_execution = ExecutionRuntime(
+        "guidance-follow-up-execution",
+        profile_id=profile.profile_id,
+        workflow_directory=workflow_directory,
+        repo_root=root,
+    )
+    guidance_calls: list[str] = []
+    guidance_execution.register_adapter(
+        _AcceptanceExceptionAdapter(
+            "guidance-row", "change_mutable_row", guidance_calls
+        )
+    )
+    guidance_execution.capture_guidance(
+        "Always use optimistic locking for mutable row changes.",
+        source_ref="acceptance:user-request:optimistic-locking",
+    )
+    guidance_execution.set_execution_scope(
+        declared_actions=frozenset({"change_mutable_row"}),
+        phase_actions=frozenset({"change_mutable_row"}),
+        persona_actions=frozenset({"change_mutable_row"}),
+        unit_actions=frozenset({"change_mutable_row"}),
+        adapter_actions=guidance_execution.available_adapter_actions(),
+    )
+    guidance_execution.invoke(
+        guidance_execution.context(
+            semantic_actions=frozenset({"change_mutable_row"}),
+            allowed_effects=frozenset({ToolEffect.PROCESS_EXECUTION}),
+        ),
+        CapabilityRequest("guidance-row", "change_mutable_row", {"row": "users:1"}),
+    )
+    guidance_obligations = {
+        item.required_action for item in guidance_execution.kernel.open_obligations
+    }
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
@@ -396,16 +515,6 @@ def run_final_acceptance(
     )
     later_prompt = restarted_runtime.prompt_context()
     retrieved = runtime.retrieve_prompt_context(compacted["full_context_ref"])
-    boundary_contexts = tuple(
-        runtime.compact_prompt_context(
-            {
-                "phase": phase.phase_type.value,
-                "tool_output": f"omitted tool output for {phase.phase_type.value}",
-                "decision": f"decision-{phase.phase_type.value}",
-            }
-        )
-        for phase in profile.phases
-    )
     boundary_retrieval = tuple(
         ExecutionRuntime(
             runtime.execution_id,
@@ -456,6 +565,7 @@ def run_final_acceptance(
         AcceptanceCheck(
             "vertical-structured-delivery",
             structured_artifacts
+            and tuple(delivery_calls) == delivery_adapter.manifest.semantic_actions
             and production_task.status == "passed"
             and production_chat.status == "passed",
             (
@@ -478,7 +588,9 @@ def run_final_acceptance(
                 }
             )
             and later_prompt["guidance_required_actions"]
-            == sorted(guidance_requirements),
+            == sorted(guidance_requirements)
+            and guidance_obligations == {"add_optimistic_lock", "run_concurrency_test"}
+            and guidance_calls == ["guidance-row"],
             (
                 "explicit user instructions are persisted and present in a later "
                 "prompt context"
@@ -542,14 +654,14 @@ def run_final_acceptance(
         ),
         AcceptanceCheck(
             "phase-boundary-retrieval",
-            len(boundary_retrieval) == len(profile.phases)
+            len(boundary_retrieval) == len(boundary_contexts)
             and all(
-                item["tool_output"]
-                == f"omitted tool output for {phase.phase_type.value}"
-                for item, phase in zip(boundary_retrieval, profile.phases, strict=True)
+                isinstance(item.get("phase"), str)
+                and item["tool_output"].startswith("{")
+                for item in boundary_retrieval
             ),
             (
-                "each phase boundary preserves actual omitted tool output for "
+                "each phase boundary preserves actual runtime output for "
                 "restart retrieval"
             ),
         ),
@@ -882,7 +994,10 @@ expect:
 
 
 def _walk_profile(
-    runtime: ExecutionRuntime, profile: Any
+    runtime: ExecutionRuntime,
+    profile: Any,
+    *,
+    boundary_contexts: list[dict[str, Any]] | None = None,
 ) -> tuple[tuple[bool, ...], bool]:
     """Drive the real phase controller through every profile assignment."""
     assignments = {phase.phase_type: phase for phase in profile.phases}
@@ -919,6 +1034,18 @@ def _walk_profile(
             )
             runtime.record_artifact(artifact)
             runtime.accept_artifact(artifact.artifact_id)
+        if boundary_contexts is not None:
+            boundary_contexts.append(
+                runtime.compact_prompt_context(
+                    {
+                        "phase": phase.phase_type.value,
+                        "tool_output": json.dumps(
+                            runtime.prompt_context(), sort_keys=True
+                        ),
+                        "decision": f"phase-boundary-{phase.phase_type.value}",
+                    }
+                )
+            )
         if phase_type is PhaseType.CONFIRM_READINESS:
             published = runtime.require_publish_readiness().ready
         if index + 1 == len(route):

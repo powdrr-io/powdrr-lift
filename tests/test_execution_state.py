@@ -185,6 +185,28 @@ def test_file_store_rejects_stale_append_without_writing(tmp_path: Path) -> None
     assert len(store.load_events("execution-1")) == 1
 
 
+def test_file_store_recovers_an_interrupted_transaction_journal(tmp_path: Path) -> None:
+    store = FileExecutionStateStore(tmp_path / "workflow")
+    store.create("execution-1", profile_id="default")
+    event = _event(
+        0,
+        1,
+        ExecutionEventType.PHASE_ENTERED,
+        {"phase_type": "specify"},
+    )
+    journal = tmp_path / "workflow" / "execution" / "execution-1" / "transaction.json"
+    journal.write_text(
+        json.dumps({"expected_version": 0, "events": [event.to_data()]}),
+        encoding="utf-8",
+    )
+
+    recovered = store.load("execution-1")
+
+    assert recovered.current_phase is PhaseType.SPECIFY
+    assert store.load_events("execution-1") == (event,)
+    assert not journal.exists()
+
+
 def test_state_json_has_typed_schema_version(tmp_path: Path) -> None:
     store = FileExecutionStateStore(tmp_path / "workflow")
     store.create("execution-1", profile_id="default")

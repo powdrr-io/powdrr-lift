@@ -21,6 +21,7 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
         "durable-lifecycle",
         "adapter-parity",
         "production-task-adapter",
+        "production-chat-adapter",
         "stale-evidence-gate",
         "compaction-retrieval",
         "full-phase-walk",

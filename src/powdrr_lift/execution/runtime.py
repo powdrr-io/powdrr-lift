@@ -268,6 +268,7 @@ class ExecutionRuntime:
             ),
         }
         rules = self.guidance(guidance_context)
+        allowed_actions = self.allowed_actions()
         active_persona = None
         if self.profile is not None and self.state.current_persona_id is not None:
             active_persona = next(
@@ -305,9 +306,7 @@ class ExecutionRuntime:
                     else None
                 ),
                 "allowed_actions": (
-                    list(self.allowed_actions())
-                    if self.allowed_actions() is not None
-                    else None
+                    list(allowed_actions) if allowed_actions is not None else None
                 ),
                 "capability_catalog": list(self.capability_catalog()),
                 "artifact_ids": [item.artifact_id for item in self.state.artifacts],

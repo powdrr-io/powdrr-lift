@@ -1364,7 +1364,8 @@ def run_workflow_task(
         )
         last_runtime = runtime
         runtime.set_action_contract(
-            frozenset(task.actions) if task.actions else None,
+            frozenset(task.actions),
+            enforce_empty=task.actions_declared,
         )
         if (
             delivery_profile is not None
@@ -1416,7 +1417,8 @@ def run_workflow_task(
             )
         finally:
             runtime.set_action_contract(
-                frozenset(task.actions) if task.actions else None
+                frozenset(task.actions),
+                enforce_empty=task.actions_declared,
             )
         driver = WorkflowStepRunner(
             max_stalled_roundtrips=config.max_stalled_roundtrips,
@@ -2950,9 +2952,8 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             step = self.current_step
             if self.runtime is not None:
                 self.runtime.set_action_contract(
-                    frozenset(getattr(step, "actions", ()))
-                    if getattr(step, "actions", ())
-                    else None,
+                    frozenset(getattr(step, "actions", ())),
+                    enforce_empty=getattr(step, "actions_declared", False),
                 )
             if step.step_type == "gate":
                 if step.gate is None:
@@ -2977,7 +2978,8 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.runtime is not None:
                         self.runtime.set_action_contract(
-                            frozenset(step.actions) if step.actions else None
+                            frozenset(step.actions),
+                            enforce_empty=step.actions_declared,
                         )
                 target_index = frame.step_index + 1
                 if not passed:

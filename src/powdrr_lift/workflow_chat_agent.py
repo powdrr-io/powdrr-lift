@@ -1015,9 +1015,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
             if self.state.runtime is not None:
                 self.state.runtime.set_action_contract(
-                    frozenset(getattr(self.current_step, "actions", ()))
-                    if getattr(self.current_step, "actions", ())
-                    else None,
+                    frozenset(getattr(self.current_step, "actions", ())),
+                    enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
@@ -1085,9 +1084,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.set_action_contract(
-                            frozenset(self.current_step.actions)
-                            if self.current_step.actions
-                            else None
+                            frozenset(self.current_step.actions),
+                            enforce_empty=self.current_step.actions_declared,
                         )
                 if passed:
                     self.state.step_index += 1
@@ -1139,9 +1137,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.set_action_contract(
-                            frozenset(self.current_step.actions)
-                            if self.current_step.actions
-                            else None
+                            frozenset(self.current_step.actions),
+                            enforce_empty=self.current_step.actions_declared,
                         )
                 pre_step_event = _latest_deterministic_pre_step(
                     self.state.execution_events,

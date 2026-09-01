@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from collections import Counter, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
@@ -298,6 +300,7 @@ class ShadowWorkflowObserver:
         self.provider = provider
         self.worktree_root = worktree_root
         self.log_root = log_root
+        self.state_path = log_root / "workflow-observer-state.json"
         self.context_provider = context_provider
         self.state = ObserverState()
         self._actions: deque[ObserverActionSummary] = deque(maxlen=6)
@@ -312,6 +315,114 @@ class ShadowWorkflowObserver:
         self._last_validation_issue_count: int | None = None
         self._last_observed_failure_signature: str | None = None
         self._pending_action: ObserverActionSummary | None = None
+        try:
+            self._restore_state()
+        except (AttributeError, KeyError, TypeError, ValueError):
+            # A corrupt observer state must not stop the workflow it observes.
+            return
+
+    def _restore_state(self) -> None:
+        try:
+            data = json.loads(self.state_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        if not isinstance(data, Mapping):
+            return
+        state = data.get("state")
+        if isinstance(state, Mapping):
+            decision = state.get("last_decision")
+            self.state = ObserverState(
+                last_fingerprint=(
+                    state.get("last_fingerprint")
+                    if isinstance(state.get("last_fingerprint"), str)
+                    else None
+                ),
+                last_observed_action_index=(
+                    state.get("last_observed_action_index")
+                    if isinstance(state.get("last_observed_action_index"), int)
+                    else None
+                ),
+                last_decision=(
+                    parse_observer_decision(decision)
+                    if isinstance(decision, Mapping)
+                    else None
+                ),
+                intervention_pending=bool(state.get("intervention_pending")),
+                observation_epoch=int(state.get("observation_epoch", 0)),
+            )
+        self._action_index = int(data.get("action_index", 0))
+        self._last_action_signature = data.get("last_action_signature")
+        self._last_failure_signature = data.get("last_failure_signature")
+        self._last_step_id = data.get("last_step_id")
+        self._last_material_progress_action = data.get("last_material_progress_action")
+        self._last_validation_issue_count = data.get("last_validation_issue_count")
+        self._last_observed_failure_signature = data.get(
+            "last_observed_failure_signature"
+        )
+        for signature, count in (data.get("action_counts", {}) or {}).items():
+            self._action_counts[str(signature)] = int(count)
+        for signature, count in (data.get("failure_counts", {}) or {}).items():
+            self._failure_counts[str(signature)] = int(count)
+        self._actions.extend(
+            ObserverActionSummary(
+                int(item["index"]),
+                str(item["action"]),
+                item.get("made_progress"),
+                str(item["outcome"]),
+            )
+            for item in data.get("recent_actions", ())
+            if isinstance(item, Mapping)
+        )
+        self._failures.extend(
+            ObserverFailureSummary(
+                int(item["index"]),
+                item.get("action"),
+                str(item["error_type"]),
+                str(item["error"]),
+            )
+            for item in data.get("recent_failures", ())
+            if isinstance(item, Mapping)
+        )
+
+    def _persist_state(self) -> None:
+        payload = {
+            "schema_version": 1,
+            "state": {
+                "last_fingerprint": self.state.last_fingerprint,
+                "last_observed_action_index": self.state.last_observed_action_index,
+                "last_decision": (
+                    asdict(self.state.last_decision)
+                    if self.state.last_decision is not None
+                    else None
+                ),
+                "intervention_pending": self.state.intervention_pending,
+                "observation_epoch": self.state.observation_epoch,
+            },
+            "action_index": self._action_index,
+            "last_action_signature": self._last_action_signature,
+            "last_failure_signature": self._last_failure_signature,
+            "last_step_id": self._last_step_id,
+            "last_material_progress_action": self._last_material_progress_action,
+            "last_validation_issue_count": self._last_validation_issue_count,
+            "last_observed_failure_signature": self._last_observed_failure_signature,
+            "action_counts": dict(self._action_counts),
+            "failure_counts": dict(self._failure_counts),
+            "recent_actions": [asdict(item) for item in self._actions],
+            "recent_failures": [asdict(item) for item in self._failures],
+        }
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=self.state_path.parent, delete=False
+            ) as stream:
+                json.dump(payload, stream, ensure_ascii=False)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+                temporary_path = stream.name
+            os.replace(temporary_path, self.state_path)
+        except OSError:
+            return
 
     def response_failed(self, error: Exception) -> ObserverDecision | None:
         count = self._record_failure(None, error)
@@ -476,6 +587,7 @@ class ShadowWorkflowObserver:
                 ),
                 context=context,
             )
+        self._persist_state()
         return decision
 
     def _record_failure(self, action_signature: str | None, error: Exception) -> int:
@@ -506,6 +618,7 @@ class ShadowWorkflowObserver:
                 error=_compact_text(str(error)),
             )
         )
+        self._persist_state()
         return self._failure_counts[failure_signature]
 
     def _safe_context(self) -> ObserverExecutionContext | None:
@@ -526,7 +639,11 @@ class ShadowWorkflowObserver:
                     if isinstance(item, Mapping)
                     and item.get("path")
                     and item.get("path")
-                    not in {WORKFLOW_LLM_ERROR_LOG, WORKFLOW_OBSERVER_LOG}
+                    not in {
+                        WORKFLOW_LLM_ERROR_LOG,
+                        WORKFLOW_OBSERVER_LOG,
+                        self.state_path.name,
+                    }
                 )
             )
         except Exception as error:  # observer diagnostics must never stop execution
@@ -634,6 +751,7 @@ class ShadowWorkflowObserver:
             except Exception as observer_error:  # shadow failures are non-fatal
                 error = observer_error
         self.state.last_fingerprint = fingerprint
+        self._persist_state()
         return self._record_trigger(
             context,
             trigger,

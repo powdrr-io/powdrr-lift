@@ -20,6 +20,7 @@ from powdrr_lift.core.capability_exception import (
     utc_now,
 )
 from powdrr_lift.core.tool_manifest import ToolEffect
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.tools import (
     ToolAdapter,
     ToolContext,
@@ -207,7 +208,12 @@ class CapabilityBroker:
             else adapter.manifest.effects
         )
         if max_uses < 1:
-            raise ValueError("max_uses must be positive")
+            raise PowdrrExecutionError(
+                "max_uses must be positive",
+                error_code="capability_exception_invalid_use_count",
+                action_kind=request.semantic_action,
+                remediation="Set max_uses to a positive integer.",
+            )
         exception = CapabilityExceptionRequest(
             exception_id=f"{context.execution_id}:{request.tool_name}:{request.semantic_action}",
             execution_id=context.execution_id,
@@ -235,11 +241,19 @@ class CapabilityBroker:
         decided_by: str,
     ) -> CapabilityExceptionDecision:
         if self.exception_authority is None:
-            raise ValueError(
-                "An exception authority is required to decide capabilities."
+            raise PowdrrExecutionError(
+                "An exception authority is required to decide capabilities.",
+                error_code="capability_exception_authority_missing",
+                action_kind=exception.semantic_action,
+                remediation="Configure an exception authority before deciding.",
             )
         if is_expired(exception, utc_now()):
-            raise ValueError("Cannot decide an expired capability exception.")
+            raise PowdrrExecutionError(
+                "Cannot decide an expired capability exception.",
+                error_code="capability_exception_expired",
+                action_kind=exception.semantic_action,
+                remediation="Create a new exception request with a future expiry.",
+            )
         existing = self._decisions.get(exception.exception_id)
         if existing is None and self.exception_store is not None:
             stored = self.exception_store.load(exception.exception_id)
@@ -248,9 +262,12 @@ class CapabilityBroker:
                 self._decisions[exception.exception_id] = existing
         if existing is not None:
             if existing.approved != approved or existing.decided_by != decided_by:
-                raise ValueError(
+                raise PowdrrExecutionError(
                     f"capability exception {exception.exception_id!r} "
-                    "already has a decision"
+                    "already has a decision",
+                    error_code="capability_exception_decision_conflict",
+                    action_kind=exception.semantic_action,
+                    remediation="Reuse the existing decision or create a new request.",
                 )
             return existing
         token = self.exception_authority.sign(exception) if approved else None

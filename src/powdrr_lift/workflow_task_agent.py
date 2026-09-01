@@ -612,10 +612,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.requires_deterministic_output_state and output_state != (
                 self.deterministic_output_state
             ):
-                raise ValueError(
+                raise PowdrrExecutionError(
                     "This task must persist the exact deterministic pre-step result "
                     "in the top-level output_state field; do not use outputs, "
-                    "text, or a summary instead."
+                    "text, or a summary instead.",
+                    error_code="deterministic_output_state_mismatch",
+                    action_kind=action.kind,
+                    remediation="Copy the exact pre-step result into output_state.",
                 )
             completed = self.workflow.complete_task(
                 self.task.task_id,
@@ -800,10 +803,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.requires_deterministic_output_state and action.output_state != (
                 self.deterministic_output_state
             ):
-                raise ValueError(
+                raise PowdrrExecutionError(
                     "This task must persist the exact deterministic pre-step result "
                     "in the top-level output_state field; do not use outputs, "
-                    "text, or a summary instead."
+                    "text, or a summary instead.",
+                    error_code="deterministic_output_state_mismatch",
+                    action_kind=action.kind,
+                    remediation="Copy the exact pre-step result into output_state.",
                 )
             completed = self.workflow.terminate_workflow(
                 self.task.task_id,
@@ -2380,9 +2386,12 @@ def _durable_task_action_output_state(action: WorkflowAction) -> Any:
     if output_state is None and action.outputs:
         output_state = action.outputs
     if output_state is None:
-        raise ValueError(
+        raise PowdrrExecutionError(
             "The next_step action must include a non-null top-level "
-            "output_state object."
+            "output_state object.",
+            error_code="output_state_missing",
+            action_kind="next_step",
+            remediation="Return the task result in the top-level output_state field.",
         )
     return output_state
 
@@ -2419,12 +2428,15 @@ def _require_staged_pull_request_files(repo_root: Path) -> None:
     if not status.stdout.strip():
         return
 
-    raise ValueError(
+    raise PowdrrExecutionError(
         "The staged pull-request file set is empty. Use the intrinsic Git add "
         '{"operation":"add","paths":[...]} for every approved '
         "implementation, test, and promoted-document path, then re-read "
         "Git status before returning next_step. Unstaged or untracked files "
-        "must be added or explicitly deleted before advancing."
+        "must be added or explicitly deleted before advancing.",
+        error_code="staged_pull_request_files_missing",
+        action_kind="next_step",
+        remediation="Stage every approved change before advancing the task.",
     )
 
 

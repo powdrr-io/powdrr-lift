@@ -2788,6 +2788,10 @@ def run_workflow_chat(
         repo_root=repo_root,
         profile=delivery_profile,
     )
+    runtime.capture_explicit_guidance(
+        user_request,
+        source_ref=f"{execution_id}:user-request",
+    )
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
         root_skill=root_skill,

@@ -34,6 +34,13 @@ guidance as structured artifacts alongside the code. Each next step receives the
 useful slice of that context, while execution events and review findings remain available
 for later work. The agent can forget the conversation without forgetting the work.
 
+## Your Agent is a Sycophant
+
+Tired of an agent that tells you everything is great, but admits it isn't when you ask
+again? Tired of needing a manager agent just to monitor your coding agent and make sure
+it performs its basic duties? Powdrr does what you ask, doesn't report false success, and
+doesn't need a chaperone to keep it from running amok.
+
 ## How Powdrr Lift Delivers It
 
 Powdrr turns an open-ended request into a controlled engineering process. The agent gets

@@ -4914,11 +4914,16 @@ def _modular_action_system_prompt(
     interaction_style: str | None = None,
 ) -> str:
     """Build a compact action prompt with explicitly selected guidance sections."""
-    include_context = _step_needs_prompt_catalog(current_step, "context_types")
-    include_skills = _step_needs_prompt_catalog(current_step, "skills")
+    step_actions = _step_actions(current_step)
+    action_names = {name for name, _ in step_actions}
+    include_context = "gather_context" in action_names and _step_needs_prompt_catalog(
+        current_step, "context_types"
+    )
+    include_skills = "invoke_skill" in action_names and _step_needs_prompt_catalog(
+        current_step, "skills"
+    )
     action_lines = "\n".join(
-        f"- {name}: {instructions}"
-        for name, instructions in _step_actions(current_step)
+        f"- {name}: {instructions}" for name, instructions in step_actions
     )
     prompt = (
         "Task: execute the supplied details using the handoff inputs, latest action "
@@ -4927,9 +4932,8 @@ def _modular_action_system_prompt(
         + action_lines
         + "\nThe current-step contract below is authoritative. Do not use action "
         "instructions or action names from any previous step.\n"
-        "next_step is always allowed with the default completion behavior; it is "
-        "listed below only when this step needs output-specific handoff guidance.\n"
-        + "\n"
+        "next_step is always allowed and is listed with its default completion "
+        "behavior below. Required outputs add exact handoff requirements.\n" + "\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "
         "its exact declared name. A statement in decisions_and_context is not an "
@@ -4949,7 +4953,6 @@ def _modular_action_system_prompt(
         "actions.\n"
     )
     prompt += _interaction_style_prompt(interaction_style)
-    action_names = {name for name, _ in _step_actions(current_step)}
     if "invoke_tool" in action_names:
         prompt += (
             "A declared internal command is represented as: "
@@ -5002,9 +5005,7 @@ def _modular_action_system_prompt(
             '"provider_role":"adversarial","clean":true}.\n'
         )
     nested_skills = tuple(getattr(current_step, "uses_skills", ()) or ())
-    if nested_skills and "invoke_skill" in {
-        name for name, _ in _step_actions(current_step)
-    }:
+    if nested_skills and "invoke_skill" in action_names:
         prompt += (
             "This step delegates to a nested skill; use invoke_skill, "
             "not invoke_tool or an internal CLI command. The only listed nested "
@@ -5023,21 +5024,35 @@ def _modular_action_system_prompt(
             "Deterministic context: the resolved pre_step template has already run. "
             "The deterministic_context field is the context for this step; do not "
             "invoke the pre-step again. invoke_tool is not allowed in this step. "
-            "Use the result and choose next_step; choose complete only when the "
-            "skill itself is finished.\n"
         )
+        if "complete" in action_names:
+            prompt += (
+                "Use the result and choose next_step; choose complete only when the "
+                "skill itself is finished.\n"
+            )
+        else:
+            prompt += (
+                "Use the result and choose next_step when this step is finished.\n"
+            )
     if _validation_gate_enabled(current_step):
         prompt += (
             "This step has a runtime validation gate. Run every discovered obligation "
             "using the exact action in validation_gate. You cannot choose next_step, "
-            "goto_step, or complete until every obligation passes in the current "
+            + ("goto_step, " if "goto_step" in action_names else "")
+            + ("or complete " if "complete" in action_names else "")
+            + "until every obligation passes in the current "
             "epoch. If any obligation fails, apply its corrective action; the runtime "
             "will reset the epoch and require every obligation to run again.\n"
-            "gather_context remains allowed while repairing a failed obligation. "
-            "Use it when the latest validator result reports a missing or unknown id; "
-            "use the validator's suggested context types and keywords, then apply "
-            "the correction.\n"
-            "Validation repair protocol: a failed result is a diagnosis, not "
+            + (
+                "gather_context remains allowed while repairing a failed obligation. "
+                "Use it when the latest validator result reports a missing or unknown "
+                "id; "
+                "use the validator's suggested context types and keywords, then apply "
+                "the correction.\n"
+                if "gather_context" in action_names
+                else ""
+            )
+            + "Validation repair protocol: a failed result is a diagnosis, not "
             "permission to repeat the same edit. First inspect the exact current "
             "file and full validator result, map each issue to its reported path, "
             "and apply a structural correction at that path. Never repeat an "
@@ -5048,36 +5063,45 @@ def _modular_action_system_prompt(
             "is unchanged or worse, change the target or repair strategy; do not keep "
             "retrying the same action.\n"
         )
-    prompt += (
-        "Transition rules are enforced by the runtime: goto_step may target only a "
-        "prior step in this skill, never the current or a later step, and complete "
-        "is invalid while any gate remains later in this skill.\n"
-    )
-    if action_names & {"yaml_edit", "read_document", "edit"} or include_context:
+    if "goto_step" in action_names or "complete" in action_names:
         prompt += (
-            "Structured-file guidance: use yaml_edit for YAML specifications, combine "
-            "independent corrections in one operations array, and preserve document "
-            "structure. Use read_document for the smallest useful range of a large "
+            "Transition rules are enforced by the runtime: "
+            + (
+                "goto_step may target only a prior step in this skill, never the "
+                "current or a later step. "
+                if "goto_step" in action_names
+                else ""
+            )
+            + (
+                "complete is invalid while any gate remains later in this skill."
+                if "complete" in action_names
+                else ""
+            )
+            + "\n"
+        )
+    if "read_document" in action_names:
+        prompt += (
+            "read_document guidance: use the smallest useful range of a large "
             "document; it requires file_path, non-negative start_line and end_line "
             "for at most 2000 lines, with line 0 meaning the beginning and an "
-            "end_line past "
-            "EOF clamped.\n"
-            "edit requires valid line edits; prefer yaml_edit for YAML, but edit is "
-            "allowed as a fallback when structural operations cannot express the "
-            "repair. A yaml_edit set_value path is a JSON array of mapping keys, "
-            'such as ["title"] or ["metadata","owner"], never a JSON '
-            "pointer such as /title. For list sections, use one upsert_item per "
-            "item with section, id, and a complete value mapping; do not replace "
-            "the whole list with set_value.\n"
-            "yaml_edit is a first-class action, not a command. Return it directly "
-            'with action="yaml_edit", file_path, and operations; never wrap it in '
-            'action="invoke_tool" through the internal or shell tool. Example: '
-            '{"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml",'
-            '"operations":[{"op":"set_value","path":["title"],"value":"..."}]}\n'
+            "end_line past EOF clamped.\n"
         )
-    if current_step.tool_invocations and "invoke_tool" in {
-        name for name, _ in _step_actions(current_step)
-    }:
+    if "edit" in action_names:
+        prompt += (
+            "edit guidance: use valid line edits; prefer yaml_edit for YAML only "
+            "when yaml_edit is also listed, but edit is allowed as a fallback when "
+            "structural operations cannot express the repair.\n"
+        )
+    if "yaml_edit" in action_names:
+        prompt += (
+            "yaml_edit guidance: combine independent corrections in one operations "
+            "array and preserve document structure. A set_value path is a JSON array "
+            'of mapping keys, such as ["title"] or ["metadata","owner"], never a '
+            "JSON pointer such as /title. For list sections, use one upsert_item per "
+            "item with section, id, and a complete value mapping. Return yaml_edit "
+            'directly with action="yaml_edit"; never wrap it in invoke_tool.\n'
+        )
+    if current_step.tool_invocations and "invoke_tool" in action_names:
         prompt += (
             "Tool guidance: invoke one of the declared tool_invocations successfully "
             "before next_step or complete. A prose summary is not a tool invocation.\n"

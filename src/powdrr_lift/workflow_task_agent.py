@@ -1363,7 +1363,9 @@ def run_workflow_task(
             profile=delivery_profile,
         )
         last_runtime = runtime
-        runtime.set_action_contract(frozenset(task.actions))
+        runtime.set_action_contract(
+            frozenset(task.actions) if task.actions else None,
+        )
         if (
             delivery_profile is not None
             and task.phase_type is not None
@@ -1401,15 +1403,21 @@ def run_workflow_task(
             compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
 
         driver_events: list[dict[str, Any]] = []
-        deterministic_output_state, requires_deterministic_output_state = (
-            _run_task_deterministic_pre_step(
-                task,
-                repo_root=repo_root,
-                events=driver_events,
-                include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
-                runtime=runtime,
+        runtime.set_action_contract(None)
+        try:
+            deterministic_output_state, requires_deterministic_output_state = (
+                _run_task_deterministic_pre_step(
+                    task,
+                    repo_root=repo_root,
+                    events=driver_events,
+                    include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
+                    runtime=runtime,
+                )
             )
-        )
+        finally:
+            runtime.set_action_contract(
+                frozenset(task.actions) if task.actions else None
+            )
         driver = WorkflowStepRunner(
             max_stalled_roundtrips=config.max_stalled_roundtrips,
             runtime=runtime,
@@ -2943,24 +2951,34 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             if self.runtime is not None:
                 self.runtime.set_action_contract(
                     frozenset(getattr(step, "actions", ()))
+                    if getattr(step, "actions", ())
+                    else None,
                 )
             if step.step_type == "gate":
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")
-                passed = _run_gate(
-                    step,
-                    skill_name=frame.skill.skill.name,
-                    worktree_root=self.repo_root,
-                    execution_events=self.execution_events,
-                    execution_context=self.execution_context,
-                    handoff_records=self.handoff_records,
-                    step_index=frame.step_index,
-                    workflow_context=None,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.verbose,
-                    runtime=self.runtime,
-                )
+                if self.runtime is not None:
+                    self.runtime.set_action_contract(None)
+                try:
+                    passed = _run_gate(
+                        step,
+                        skill_name=frame.skill.skill.name,
+                        worktree_root=self.repo_root,
+                        execution_events=self.execution_events,
+                        execution_context=self.execution_context,
+                        handoff_records=self.handoff_records,
+                        step_index=frame.step_index,
+                        workflow_context=None,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.verbose,
+                        runtime=self.runtime,
+                    )
+                finally:
+                    if self.runtime is not None:
+                        self.runtime.set_action_contract(
+                            frozenset(step.actions) if step.actions else None
+                        )
                 target_index = frame.step_index + 1
                 if not passed:
                     target_index = _step_index_by_id(frame.skill, step.gate.goto_step)

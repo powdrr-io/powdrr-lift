@@ -1016,6 +1016,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.state.runtime is not None:
                 self.state.runtime.set_action_contract(
                     frozenset(getattr(self.current_step, "actions", ()))
+                    if getattr(self.current_step, "actions", ())
+                    else None,
                 )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
@@ -1063,20 +1065,30 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     step_index=self.current_step_index,
                 )
             if self.current_step.step_type == "gate":
-                passed = _run_gate(
-                    self.current_step,
-                    skill_name=self.selected_skill.skill.name,
-                    worktree_root=self.state.worktree_root,
-                    execution_events=self.state.execution_events,
-                    execution_context=self.state.execution_context,
-                    handoff_records=self.state.handoff_records,
-                    step_index=self.state.step_index,
-                    workflow_context=self.workflow_context,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.config.verbose,
-                    runtime=self.state.runtime,
-                )
+                if self.state.runtime is not None:
+                    self.state.runtime.set_action_contract(None)
+                try:
+                    passed = _run_gate(
+                        self.current_step,
+                        skill_name=self.selected_skill.skill.name,
+                        worktree_root=self.state.worktree_root,
+                        execution_events=self.state.execution_events,
+                        execution_context=self.state.execution_context,
+                        handoff_records=self.state.handoff_records,
+                        step_index=self.state.step_index,
+                        workflow_context=self.workflow_context,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.config.verbose,
+                        runtime=self.state.runtime,
+                    )
+                finally:
+                    if self.state.runtime is not None:
+                        self.state.runtime.set_action_contract(
+                            frozenset(self.current_step.actions)
+                            if self.current_step.actions
+                            else None
+                        )
                 if passed:
                     self.state.step_index += 1
                 else:
@@ -1103,20 +1115,34 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.current_step.step_type == "invoke_tool"
                 and self.current_step.pre_step is not None
             ):
-                _run_deterministic_pre_step(
-                    self.current_step,
-                    skill_name=self.selected_skill.skill.name,
-                    worktree_root=self.state.worktree_root,
-                    execution_events=self.state.execution_events,
-                    execution_context=self.state.execution_context,
-                    handoff_records=self.state.handoff_records,
-                    step_index=self.state.step_index,
-                    workflow_context=self.workflow_context,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.config.verbose,
-                    runtime=self.state.runtime,
-                )
+                # A deterministic pre-step is engine-owned work declared by
+                # the step, not a model-proposed action. Temporarily remove
+                # the model action contract while executing it, then restore
+                # the contract before constructing the LLM prompt.
+                if self.state.runtime is not None:
+                    self.state.runtime.set_action_contract(None)
+                try:
+                    _run_deterministic_pre_step(
+                        self.current_step,
+                        skill_name=self.selected_skill.skill.name,
+                        worktree_root=self.state.worktree_root,
+                        execution_events=self.state.execution_events,
+                        execution_context=self.state.execution_context,
+                        handoff_records=self.state.handoff_records,
+                        step_index=self.state.step_index,
+                        workflow_context=self.workflow_context,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.config.verbose,
+                        runtime=self.state.runtime,
+                    )
+                finally:
+                    if self.state.runtime is not None:
+                        self.state.runtime.set_action_contract(
+                            frozenset(self.current_step.actions)
+                            if self.current_step.actions
+                            else None
+                        )
                 pre_step_event = _latest_deterministic_pre_step(
                     self.state.execution_events,
                     skill_name=self.selected_skill.skill.name,

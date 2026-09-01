@@ -144,6 +144,36 @@ def test_runtime_binds_external_writes_to_a_stable_idempotency_key(
         )
 
 
+def test_runtime_rejects_nested_capability_outside_step_contract(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-contract",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        adapters=(ExternalWriteTool(),),
+    )
+    runtime.set_action_contract(frozenset({"read_document"}))
+    with pytest.raises(PowdrrExecutionError, match="not allowed by the active step"):
+        runtime.invoke(
+            runtime.context(
+                semantic_actions=frozenset({"mutate_pull_request"}),
+                allowed_effects=frozenset({ToolEffect.GITHUB_MUTATION}),
+            ),
+            CapabilityRequest(
+                "repository",
+                "mutate_pull_request",
+                {
+                    "operation": "pr_edit",
+                    "pr_reference": "123",
+                    "title": "Updated",
+                    "body": "Body",
+                },
+            ),
+        )
+
+
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-1",
@@ -985,6 +1015,11 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     ]
 
     runtime.set_action_contract(frozenset({"next_step"}))
+    assert runtime.capability_catalog() == ()
+
+    runtime.set_action_contract(frozenset(), enforce_empty=True)
+    assert runtime.allowed_actions() == ("next_step",)
+    assert runtime.validate_action("edit")
     assert runtime.capability_catalog() == ()
 
     runtime.set_action_contract(frozenset({"edit", "next_step"}))

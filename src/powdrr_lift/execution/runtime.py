@@ -138,9 +138,14 @@ class ExecutionRuntime:
         self._projected_kernel_events = 0
         self._allowed_actions: frozenset[str] | None = None
 
-    def set_action_contract(self, actions: frozenset[str] | None) -> None:
+    def set_action_contract(
+        self, actions: frozenset[str] | None, *, enforce_empty: bool = False
+    ) -> None:
         """Set the single runtime-owned action contract for the active step."""
-        self._allowed_actions = actions if actions else None
+        # ``None`` means the caller has not installed a step contract yet.
+        # An empty set is meaningful: the step supports the implicit
+        # ``next_step`` transition but no model/tool action.
+        self._allowed_actions = actions if actions or enforce_empty else None
 
     def allowed_actions(self) -> tuple[str, ...] | None:
         """Return the action names the active prompt may propose.
@@ -165,6 +170,35 @@ class ExecutionRuntime:
         if action_kind == "next_step":
             return ()
         return (f"action {action_kind!r} is not allowed by the active step contract",)
+
+    def validate_capability_action(self, semantic_action: str) -> tuple[str, ...]:
+        """Ensure a nested capability belongs to the active step contract."""
+        if self._allowed_actions is None or "invoke_tool" in self._allowed_actions:
+            return ()
+        action_families = {
+            "edit_files": frozenset({"edit", "yaml_edit", "file_management"}),
+            "validate_edit": frozenset({"validate_edit"}),
+            "apply_edit": frozenset({"apply_edit"}),
+            "run_process": frozenset({"shell"}),
+            "inspect_code": frozenset({"basedpyright"}),
+            "discover_files": frozenset({"fuzzy_match"}),
+            "gather_context": frozenset({"gather_context"}),
+            "read_document": frozenset({"read_document"}),
+            "list_files": frozenset({"list_files"}),
+            "inspect_repository": frozenset({"git"}),
+            "mutate_repository": frozenset({"git"}),
+            "inspect_pull_request": frozenset({"gh"}),
+            "mutate_pull_request": frozenset({"gh"}),
+            "enrich_test_output": frozenset({"enrich"}),
+        }
+        if self._allowed_actions.intersection(
+            action_families.get(semantic_action, frozenset())
+        ):
+            return ()
+        return (
+            f"capability semantic action {semantic_action!r} is not allowed by "
+            "the active step contract",
+        )
 
     def context(
         self,
@@ -197,6 +231,14 @@ class ExecutionRuntime:
     ) -> Any:
         """Create the exact human decision packet for an exceptional request."""
         request = self._with_idempotency_key(request)
+        capability_errors = self.validate_capability_action(request.semantic_action)
+        if capability_errors:
+            raise PowdrrExecutionError(
+                capability_errors[0],
+                error_code="capability_action_not_allowed",
+                action_kind=request.semantic_action,
+                remediation="Use one of the capabilities declared for this step.",
+            )
         exception = self.broker.create_exception_request(
             context,
             request,
@@ -854,6 +896,14 @@ class ExecutionRuntime:
                     "Create the capability context through the active runtime "
                     "persona envelope."
                 ),
+            )
+        capability_errors = self.validate_capability_action(request.semantic_action)
+        if capability_errors:
+            raise PowdrrExecutionError(
+                capability_errors[0],
+                error_code="capability_action_not_allowed",
+                action_kind=request.semantic_action,
+                remediation="Use one of the capabilities declared for this step.",
             )
         if (
             request.tool_name == "repository"

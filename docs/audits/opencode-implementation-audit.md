@@ -35,6 +35,28 @@ compilation, observer infrastructure, and compaction with complete retrieval.
 The normal task publication path also routes its bounded Git/GitHub operations
 through that runtime when one is active.
 
+## Re-audit of the eight active gaps
+
+The September 2026 re-audit compared the main-branch implementation with the
+finite completion plan and closed all eight findings below. The proof is now
+part of `run_final_acceptance`; it reports 25 checks, while the full repository
+suite remains the authoritative regression gate.
+
+| Gap | Fix and executable proof | Status |
+| --- | --- | --- |
+| Synthetic final acceptance | The acceptance fixture compiles structured artifacts, runs the production chat/task adapters, and checks the vertical delivery chain. | Closed: `vertical-structured-delivery` |
+| Durable instructions had no behavioral proof | Acceptance captures both review-resolution and optimistic-locking instructions, restarts the runtime, and verifies both rules are present in later prompt context. | Closed: `durable-guidance-changes-behavior` |
+| Incomplete effective action intersection | `ExecutionRuntime.effective_action_contract()` intersects declared step, phase, persona, unit, and open-obligation scopes; prompt exposure and validation use it. | Closed: `effective-action-intersection` |
+| Lifecycle was not one transaction | Runtime transactions queue projected lifecycle events and commit them with one optimistic-locking store append and bounded conflict retry. | Closed: `transaction-boundary` |
+| Runtime-optional enforce paths | Enforce acceptance asserts the runtime owns the registry broker and checkpoint store; normal capability helpers continue to reject missing runtimes. | Closed: `enforce-mode-runtime-authority` |
+| Exception flow lacked normal-adapter proof | Pending requests are deduplicated, altered arguments receive a distinct binding, and acceptance covers inspect, deny, approve, and one-time adapter execution. | Closed: `normal-adapter-exception-flow` |
+| Narrow compaction/interruption coverage | Acceptance reloads a fresh runtime and retrieves the exact persisted full context after compaction. | Closed: `interruption-retrieval` |
+| Error taxonomy was not separated | Provider, cancellation, persistence-corruption, programmer-invariant, and agent-correctable error classes are distinct; non-correctable provider/persistence/invariant failures bypass model correction. | Closed: `typed-error-boundary` |
+
+No active gap remains in this re-audit. The completion plan’s stopping rule is
+therefore satisfied by the executable checks and the repository verification
+commands listed below.
+
 ## Phase 5 acceptance evidence
 
 The final acceptance surface is executable rather than a document-only claim.

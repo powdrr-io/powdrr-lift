@@ -28,3 +28,23 @@ class PowdrrExecutionError(RuntimeError):
         self.remediation = remediation
         self.details = dict(details or {})
         self.cause_error = cause_error
+
+
+class AgentCorrectableError(PowdrrExecutionError):
+    """An action can be repaired by returning a corrected request."""
+
+
+class ProviderExecutionError(PowdrrExecutionError):
+    """The model/provider boundary failed; it is not an action correction."""
+
+
+class ExecutionCancelled(PowdrrExecutionError):
+    """Execution was deliberately cancelled by its owner or user."""
+
+
+class PersistenceCorruptionError(PowdrrExecutionError):
+    """Durable execution state is unreadable or internally inconsistent."""
+
+
+class ProgrammerInvariantError(PowdrrExecutionError):
+    """A programming invariant failed and must not be sent back to the model."""

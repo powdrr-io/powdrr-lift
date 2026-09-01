@@ -14,11 +14,16 @@ from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.execution_state import ExecutionArtifact
 from powdrr_lift.core.pr_specification import build_pr_specification_validation_report
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.execution.capabilities import CapabilityRequest
+from powdrr_lift.errors import (
+    ExecutionCancelled,
+    PersistenceCorruptionError,
+    PowdrrExecutionError,
+    ProgrammerInvariantError,
+    ProviderExecutionError,
+)
+from powdrr_lift.execution.capabilities import CapabilityRequest, CapabilityResolution
 from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import EvidenceRequirement
-from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.personas import build_persona_packet
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import ToolContext, ToolResult, ToolValidationReport
@@ -214,6 +219,12 @@ def run_final_acceptance(
         "acceptance denial path",
         expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
     )
+    duplicate_denied_exception = runtime.request_capability_exception(
+        exception_context,
+        denied_request,
+        "duplicate denial prompt must be suppressed",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
     denied_decision = runtime.decide_capability_exception(
         denied_exception, approved=False, decided_by="acceptance-reviewer"
     )
@@ -232,6 +243,15 @@ def run_final_acceptance(
     )
     approved_result = runtime.invoke_approved_exception(
         exception_context, approved_request, approved_decision
+    )
+    altered_result = runtime.invoke(
+        exception_context,
+        CapabilityRequest(
+            "acceptance-secret-approved",
+            "read_secret_approved",
+            {"target": "different-secret"},
+            approved_decision.token,
+        ),
     )
     exception_flow = (
         denied_blocked
@@ -252,30 +272,51 @@ def run_final_acceptance(
     )
     scope_rejected = not scope_report.valid
 
-    review_kernel = ActionKernel()
-    review_kernel.propose(
-        {"kind": "review-edit", "attributes": ["thread:R123"]},
-        semantic_action="edit_for_review_comment",
+    review_kernel = runtime.kernel
+    runtime.set_execution_scope(
+        declared_actions=frozenset(
+            {
+                "edit_for_review",
+                "resolve_review_thread",
+                "run_validation",
+                "add_optimistic_lock",
+                "run_concurrency_test",
+            }
+        ),
+        phase_actions=frozenset(
+            {
+                "edit_for_review",
+                "resolve_review_thread",
+                "run_validation",
+                "add_optimistic_lock",
+                "run_concurrency_test",
+            }
+        ),
     )
-    blocked_resolution = review_kernel.validate_proposal(
-        {"kind": "resolve", "thread": "R123"},
-        semantic_action="resolve_review_thread",
-    )
-    review_kernel.complete({"kind": "validation", "semantic_action": "run_validation"})
-    allowed_resolution = review_kernel.validate_proposal(
-        {"kind": "resolve", "thread": "R123"},
-        semantic_action="resolve_review_thread",
-    )
-    review_kernel.complete(
-        {"kind": "resolve", "semantic_action": "resolve_review_thread"}
-    )
-    runtime.kernel = review_kernel
-    # This acceptance fixture swaps in a deliberately prepared kernel; normal
-    # runtimes retain one kernel for their entire execution.
-    runtime._projected_kernel_events = 0
-    runtime.sync_kernel(phase_type=PhaseType.BUILD.value, actor_id="engineer")
+    with runtime.transaction():
+        review_kernel.propose(
+            {"kind": "review-edit", "attributes": ["thread:R123"]},
+            semantic_action="edit_for_review_comment",
+        )
+        blocked_resolution = review_kernel.validate_proposal(
+            {"kind": "resolve", "thread": "R123"},
+            semantic_action="resolve_review_thread",
+        )
+        review_kernel.complete(
+            {"kind": "validation", "semantic_action": "run_validation"}
+        )
+        allowed_resolution = review_kernel.validate_proposal(
+            {"kind": "resolve", "thread": "R123"},
+            semantic_action="resolve_review_thread",
+        )
+        review_kernel.complete(
+            {"kind": "resolve", "semantic_action": "resolve_review_thread"}
+        )
+        runtime._projected_kernel_events = 0
+        runtime.sync_kernel(phase_type=PhaseType.BUILD.value, actor_id="engineer")
+    review_closed = not review_kernel.open_obligations
 
-    mutable_kernel = ActionKernel()
+    mutable_kernel = runtime.kernel
     mutable_kernel.propose({"kind": "row-change"}, semantic_action="change_mutable_row")
     mutable_actions = {item.required_action for item in mutable_kernel.open_obligations}
     chat_sequence = _run_shared_runner(workflow_directory, root, "chat")
@@ -283,12 +324,29 @@ def run_final_acceptance(
     production_task = _run_production_task_adapter(Path(workflow_directory), root)
     production_chat = _run_production_chat_adapter(Path(workflow_directory), root)
     structured_artifacts = _run_structured_artifact_chain(Path(workflow_directory))
+    guidance_before = runtime.prompt_context()
+    runtime.capture_guidance(
+        "When a review-driven change is made, resolve the comment after validation.",
+        source_ref="acceptance:user-request:review-resolution",
+    )
+    runtime.capture_guidance(
+        "Always use optimistic locking for mutable row changes.",
+        source_ref="acceptance:user-request:optimistic-locking",
+    )
+    guidance_after = runtime.prompt_context()
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
             "contract_fingerprint": contract["contract_fingerprint"],
         }
     )
+    restarted_context = ExecutionRuntime(
+        runtime.execution_id,
+        profile_id=profile.profile_id,
+        workflow_directory=workflow_directory,
+        repo_root=root,
+        profile=profile,
+    ).retrieve_prompt_context(compacted["full_context_ref"])
     retrieved = runtime.retrieve_prompt_context(compacted["full_context_ref"])
     evidence_fingerprint = "source-fingerprint-v1"
     runtime.record_evidence(
@@ -317,7 +375,83 @@ def run_final_acceptance(
             ),
         )
     ).ready
+    exception_store = runtime.broker.exception_store
+    assert exception_store is not None
+    pending_exceptions = exception_store.pending()
     checks = (
+        AcceptanceCheck(
+            "vertical-structured-delivery",
+            structured_artifacts
+            and production_task.status == "passed"
+            and production_chat.status == "passed",
+            (
+                "the production adapters execute the structured request through "
+                "implementation and review surfaces"
+            ),
+        ),
+        AcceptanceCheck(
+            "durable-guidance-changes-behavior",
+            len(guidance_after["guidance"]) == len(guidance_before["guidance"]) + 2
+            and "resolve the comment" in str(guidance_after["guidance"]).casefold()
+            and "optimistic locking" in str(guidance_after["guidance"]).casefold(),
+            (
+                "explicit user instructions are persisted and present in a later "
+                "prompt context"
+            ),
+        ),
+        AcceptanceCheck(
+            "effective-action-intersection",
+            runtime.effective_action_contract()
+            == frozenset({"add_optimistic_lock", "run_concurrency_test"}),
+            "declared, phase, persona, and obligation scopes intersect before exposure",
+        ),
+        AcceptanceCheck(
+            "transaction-boundary",
+            any(
+                event.event_type.value == "action_proposed"
+                for event in runtime.state_store.load_events(runtime.execution_id)
+            ),
+            "lifecycle projection is committed through the runtime transaction "
+            "boundary",
+        ),
+        AcceptanceCheck(
+            "enforce-mode-runtime-authority",
+            runtime.state.mode.value == "enforce"
+            and runtime.broker.checkpoint_store is runtime.checkpoint_store,
+            (
+                "enforce-mode execution owns the broker, checkpoint, and durable "
+                "state authority"
+            ),
+        ),
+        AcceptanceCheck(
+            "normal-adapter-exception-flow",
+            len(pending_exceptions) == 0
+            and duplicate_denied_exception.exception_id == denied_exception.exception_id
+            and isinstance(altered_result, CapabilityResolution)
+            and altered_result.kind.value == "exception_required"
+            and calls == ["acceptance-secret-approved"],
+            (
+                "the shared adapter path supports inspect, deny, approve, and "
+                "one-time execution"
+            ),
+        ),
+        AcceptanceCheck(
+            "interruption-retrieval",
+            restarted_context == retrieved
+            and restarted_context["transcript"].startswith("x"),
+            "omitted tool output remains retrievable after a fresh runtime is started",
+        ),
+        AcceptanceCheck(
+            "typed-error-boundary",
+            issubclass(ProviderExecutionError, PowdrrExecutionError)
+            and issubclass(PersistenceCorruptionError, PowdrrExecutionError)
+            and issubclass(ProgrammerInvariantError, PowdrrExecutionError)
+            and issubclass(ExecutionCancelled, PowdrrExecutionError),
+            (
+                "provider, cancellation, persistence, invariant, and action errors "
+                "are distinct"
+            ),
+        ),
         AcceptanceCheck(
             "compiled-task-graph",
             len(tasks) == len(profile.phases) == len(workflow.tasks),
@@ -337,9 +471,7 @@ def run_final_acceptance(
         ),
         AcceptanceCheck(
             "review-resolution-order",
-            bool(blocked_resolution)
-            and not allowed_resolution
-            and not review_kernel.open_obligations,
+            bool(blocked_resolution) and not allowed_resolution and review_closed,
             "review resolution is blocked before validation and closes after it",
         ),
         AcceptanceCheck(

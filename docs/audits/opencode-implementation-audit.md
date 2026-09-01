@@ -81,6 +81,34 @@ checks, and the full repository suite is 763 passing tests. The capability
 audit additionally verifies that builtin helpers cannot construct an
 ephemeral broker when a runtime is absent.
 
+## Current closure mapping
+
+The older matrices below are retained as historical findings. They are not an
+open work queue. The following mapping is the current status contract: each
+area is closed only when the runtime path or its acceptance harness proves the
+behavior.
+
+| Plan area | Current proof | Status |
+| --- | --- | --- |
+| Delivery intent and execution separation | Compiled task graph, profile/persona assignments, and runtime-owned contracts | Closed |
+| Typed phases and personas | Full phase walk and persona packet checks | Closed |
+| Typed execution-plan compilation | Compiled-task-graph and production task adapter checks | Closed |
+| Runtime capability authority | Capability manifest audit and runtime-required builtin helpers | Closed |
+| Safe normal capabilities | Manifest effects, scope rejection, checkpoints, and lifecycle evidence | Closed |
+| Typed capability exceptions | Exception decision-flow check plus CLI/MCP inspection operations | Closed |
+| Durable relationships | Review-resolution ordering, mutable-row consequences, replay, and readiness gates | Closed |
+| Unified lifecycle and correction | Chat/task adapter parity and durable lifecycle checks | Closed |
+| Checkpoints and rollback | Partial-failure recovery and checkpoint CLI/MCP operations | Closed |
+| Evidence and readiness | Stale-evidence gate and publish readiness enforcement | Closed |
+| Durable user guidance | Scoped prompt retrieval, capture, supersede/revoke, and runtime prompt context | Closed |
+| Compaction and retrieval | Compaction-retrieval and interruption-replay checks | Closed |
+| Compatibility and enforce mode | Final acceptance and capability audit commands | Closed |
+
+The historical “Difference / required follow-up” cells remain useful as an
+audit trail of what prompted the closure changes, but must not be read as
+current implementation claims. Any future regression must first fail one of
+the executable checks above before it is considered a new gap.
+
 ## Historical status matrix: proposal recommendations
 
 The matrix below records the pre-closure audit and is retained for traceability.
@@ -101,7 +129,7 @@ the prior PRs and the following final gate is the authoritative status:
 | Evidence invalidation and readiness | Passed: stale evidence blocks publication |
 | Typed compaction and retrieval | Passed: references survive bounded prompt context |
 | Normal capability catalog | Passed: exact 12-manifest surface audited |
-| Repository verification | Passed: 757 tests, Ruff, and mypy |
+| Repository verification | Passed: 763 tests, Ruff, and mypy |
 
 No item in the final acceptance gate is currently unproven. The rows below are
 historical findings that drove the closure work.

@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+from powdrr_lift.core.execution_state import ExecutionArtifact
+from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.execution.capabilities import CapabilityRequest
 from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import EvidenceRequirement
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.personas import build_persona_packet
 from powdrr_lift.execution.runtime import ExecutionRuntime
+from powdrr_lift.execution.tools import ToolContext, ToolResult, ToolValidationReport
 
 REQUIRED_BUILTIN_MANIFESTS = frozenset(
     {
@@ -57,6 +64,31 @@ class AcceptanceReport:
         }
 
 
+class _AcceptanceExceptionAdapter:
+    """Small deterministic adapter used to exercise the exception boundary."""
+
+    def __init__(self, tool_name: str, action: str, calls: list[str]) -> None:
+        self.manifest = ToolManifest(
+            tool_name,
+            (action,),
+            (ToolEffect.PROCESS_EXECUTION,),
+            scope="worktree",
+            sandbox_profile="acceptance-exception",
+        )
+        self._calls = calls
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        self._calls.append(self.manifest.tool_name)
+        return ToolResult(
+            "approved execution", frozenset({ToolEffect.PROCESS_EXECUTION})
+        )
+
+
 def run_final_acceptance(
     repo_root: str | Path, workflow_directory: str | Path
 ) -> AcceptanceReport:
@@ -89,6 +121,7 @@ def run_final_acceptance(
         workflow_directory=workflow_directory,
         repo_root=root,
         profile=profile,
+        exception_authority=CapabilityExceptionAuthority(b"final-acceptance-key"),
     )
     workflow = runtime.compile_plan_to_workflow(
         profile,
@@ -112,6 +145,102 @@ def run_final_acceptance(
         )
         for phase in profile.phases
     )
+    phase_transitions, published = _walk_profile(runtime, profile)
+    phase_state = runtime.state
+    replayed_runtime = ExecutionRuntime(
+        runtime.execution_id,
+        profile_id=profile.profile_id,
+        workflow_directory=workflow_directory,
+        repo_root=root,
+        profile=profile,
+    )
+    replayed_runtime.verify()
+
+    checkpoint_workspace = Path(workflow_directory) / "acceptance-workspace"
+    checkpoint_workspace.mkdir(parents=True, exist_ok=True)
+    protected_file = checkpoint_workspace / "protected.txt"
+    protected_file.write_text("before", encoding="utf-8")
+    checkpoint = runtime.checkpoint_store.create(
+        checkpoint_workspace,
+        "acceptance-partial-failure",
+        state_json=runtime.state.to_json(),
+    )
+    protected_file.write_text("partially changed", encoding="utf-8")
+    (checkpoint_workspace / "partial.txt").write_text("partial", encoding="utf-8")
+    changed_paths = runtime.checkpoint_store.changed_paths(
+        checkpoint, checkpoint_workspace
+    )
+    restored_state = runtime.restore_checkpoint(
+        checkpoint.checkpoint_id, workspace_root=checkpoint_workspace
+    )
+    partial_failure_recovered = (
+        changed_paths == ("partial.txt", "protected.txt")
+        and protected_file.read_text(encoding="utf-8") == "before"
+        and restored_state.execution_id == runtime.execution_id
+    )
+
+    calls: list[str] = []
+    denied_adapter = _AcceptanceExceptionAdapter(
+        "acceptance-secret-denied", "read_secret_denied", calls
+    )
+    approved_adapter = _AcceptanceExceptionAdapter(
+        "acceptance-secret-approved", "read_secret_approved", calls
+    )
+    runtime.register_adapter(denied_adapter)
+    runtime.register_adapter(approved_adapter)
+    exception_context = ToolContext(
+        root,
+        root,
+        frozenset({"read_secret_denied", "read_secret_approved"}),
+        frozenset(),
+        execution_id=runtime.execution_id,
+    )
+    denied_request = CapabilityRequest(
+        "acceptance-secret-denied", "read_secret_denied", {"target": "secret"}
+    )
+    denied_exception = runtime.request_capability_exception(
+        exception_context,
+        denied_request,
+        "acceptance denial path",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    denied_decision = runtime.decide_capability_exception(
+        denied_exception, approved=False, decided_by="acceptance-reviewer"
+    )
+    denied_blocked = not denied_decision.approved
+    approved_request = CapabilityRequest(
+        "acceptance-secret-approved", "read_secret_approved", {"target": "secret"}
+    )
+    approved_exception = runtime.request_capability_exception(
+        exception_context,
+        approved_request,
+        "acceptance approval path",
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    approved_decision = runtime.decide_capability_exception(
+        approved_exception, approved=True, decided_by="acceptance-reviewer"
+    )
+    approved_result = runtime.invoke_approved_exception(
+        exception_context, approved_request, approved_decision
+    )
+    exception_flow = (
+        denied_blocked
+        and isinstance(approved_result, ToolResult)
+        and calls == ["acceptance-secret-approved"]
+    )
+    scope_context = ToolContext(
+        root,
+        root,
+        frozenset({"edit_files"}),
+        frozenset({ToolEffect.WORKSPACE_WRITE}),
+        execution_id=runtime.execution_id,
+    )
+    from powdrr_lift.execution.builtin_tools import FileMutationAdapter
+
+    scope_report = FileMutationAdapter(lambda: None).validate(
+        scope_context, {"paths": ["../outside-worktree"]}
+    )
+    scope_rejected = not scope_report.valid
 
     review_kernel = ActionKernel()
     review_kernel.propose(
@@ -235,8 +364,89 @@ def run_final_acceptance(
                 "full-context retrieval"
             ),
         ),
+        AcceptanceCheck(
+            "full-phase-walk",
+            len(phase_transitions) == 15 and published,
+            "all configured phases and required artifact handoffs reach publication",
+        ),
+        AcceptanceCheck(
+            "interruption-replay",
+            replayed_runtime.state == phase_state,
+            "a restarted runtime rebuilds the same durable typed state",
+        ),
+        AcceptanceCheck(
+            "partial-failure-recovery",
+            partial_failure_recovered,
+            (
+                "checkpoint restore recovers workspace and logical state after "
+                "partial mutation"
+            ),
+        ),
+        AcceptanceCheck(
+            "exception-decision-flow",
+            exception_flow,
+            (
+                "denial blocks execution and approval resumes exactly the bound "
+                "request once"
+            ),
+        ),
+        AcceptanceCheck(
+            "scope-expansion-blocked",
+            scope_rejected,
+            "a path outside the active worktree is rejected at the adapter boundary",
+        ),
     )
     return AcceptanceReport(checks)
+
+
+def _walk_profile(
+    runtime: ExecutionRuntime, profile: Any
+) -> tuple[tuple[bool, ...], bool]:
+    """Drive the real phase controller through every profile assignment."""
+    assignments = {phase.phase_type: phase for phase in profile.phases}
+    route = (
+        PhaseType.INTAKE,
+        PhaseType.SPECIFY,
+        PhaseType.REVIEW_SPECIFICATIONS,
+        PhaseType.DECOMPOSE,
+        PhaseType.REVIEW_PROPOSED_PRS,
+        PhaseType.PLAN_PR,
+        PhaseType.AWAIT_PLAN_DECISION,
+        PhaseType.BUILD,
+        PhaseType.VALIDATE,
+        PhaseType.REVIEW_PR,
+        PhaseType.RESOLVE_FINDINGS,
+        PhaseType.VALIDATE,
+        PhaseType.REVIEW_PR,
+        PhaseType.CONFIRM_READINESS,
+        PhaseType.PUBLISH_PR,
+        PhaseType.COMPLETE_FEATURE,
+    )
+    transitions: list[bool] = []
+    published = False
+    for index, phase_type in enumerate(route):
+        phase = assignments[phase_type]
+        for artifact_index, artifact_type in enumerate(phase.output_artifacts):
+            artifact = ExecutionArtifact(
+                f"acceptance-{index}-{phase.phase_type.value}-{artifact_index}",
+                artifact_type,
+                "acceptance-v1",
+                phase.persona_id,
+                f"acceptance:{phase.phase_type.value}:{artifact_index}",
+                accepted=True,
+            )
+            runtime.record_artifact(artifact)
+            runtime.accept_artifact(artifact.artifact_id)
+        if phase_type is PhaseType.CONFIRM_READINESS:
+            published = runtime.require_publish_readiness().ready
+        if index + 1 == len(route):
+            continue
+        target = assignments[route[index + 1]]
+        decision = runtime.transition(target.phase_type, persona_id=target.persona_id)
+        transitions.append(decision.allowed)
+        if not decision.allowed:
+            break
+    return tuple(transitions), published
 
 
 def _review_sequence() -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:

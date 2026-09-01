@@ -22,6 +22,11 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
         "adapter-parity",
         "stale-evidence-gate",
         "compaction-retrieval",
+        "full-phase-walk",
+        "interruption-replay",
+        "partial-failure-recovery",
+        "exception-decision-flow",
+        "scope-expansion-blocked",
     }
 
 

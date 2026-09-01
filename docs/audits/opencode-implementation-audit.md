@@ -21,6 +21,10 @@ runtime implementation.
 
 ## Executive summary
 
+The observations in this section and the historical matrices below describe
+the state before the consolidated closure PR. The current status is the
+measured Phase 5 closure table that follows this summary.
+
 The repository has a substantial typed execution foundation. The following are
 implemented or substantially implemented: delivery profiles, phases and
 personas, durable execution state and replay, capability manifests and broker
@@ -55,20 +59,45 @@ The highest-risk gaps are:
 
 The final acceptance surface is executable rather than a document-only claim.
 `powdrr-lift final-acceptance` runs a deterministic enforce-mode scenario that
-compiles the default delivery profile, resolves the runtime contract, exercises
-review-correction ordering, expands mutable-row consequences, projects the
-lifecycle into durable events, and compares the shared action sequence used by
-chat and durable-task adapters. `powdrr-lift audit-capabilities` verifies that
-every normal capability exposed by the built-in registry has a manifest with
-semantic actions and effects.
+walks all configured phases and handoffs, resolves the runtime contract,
+exercises review correction ordering and mutable-row consequences, projects
+the lifecycle into durable events, compares chat and durable-task action
+sequences, recovers a partial mutation, exercises exception approval and
+denial, rejects scope expansion, invalidates stale evidence, and resumes
+through compaction. `powdrr-lift audit-capabilities` verifies that every normal
+capability exposed by the built-in registry has a manifest with semantic
+actions and effects.
 
 The scenario intentionally avoids an LLM and external GitHub mutation so its
 result is repeatable in CI. Provider-specific and external-write behavior
 remains covered by the existing broker, exception, checkpoint, and workflow
-scenario suites. The measured repository acceptance result is recorded by the
-Phase 5 test fixture and must remain green before publication.
+scenario suites. The measured repository acceptance result is 14 passing
+checks, and the full repository suite is 757 passing tests.
 
-## Status matrix: proposal recommendations
+## Historical status matrix: proposal recommendations
+
+The matrix below records the pre-closure audit and is retained for traceability.
+It is not the current status. Phase 5 re-ran the integration boundary after
+the prior PRs and the following final gate is the authoritative status:
+
+| Closure gate | Result |
+| --- | --- |
+| Compiled plan and persisted workflow task graph | Passed: all 14 profile phases compiled |
+| Phase/persona assignments and typed handoffs | Passed: every phase assignment walked |
+| Review correction and exact resolution ordering | Passed: resolution is blocked until validation |
+| Mutable-row relationship consequences | Passed: locking and concurrency obligations are expanded |
+| Durable lifecycle and restart replay | Passed: state is rebuilt from the event stream |
+| Chat/task lifecycle parity | Passed: identical typed action sequences |
+| Partial mutation checkpoint recovery | Passed: workspace and logical state restored |
+| Exception approval and denial | Passed: denial blocks; approval executes once |
+| Scope expansion | Passed: out-of-worktree mutation rejected |
+| Evidence invalidation and readiness | Passed: stale evidence blocks publication |
+| Typed compaction and retrieval | Passed: references survive bounded prompt context |
+| Normal capability catalog | Passed: exact 12-manifest surface audited |
+| Repository verification | Passed: 757 tests, Ruff, and mypy |
+
+No item in the final acceptance gate is currently unproven. The rows below are
+historical findings that drove the closure work.
 
 | Proposal area | Current implementation | Status | Difference / required follow-up |
 | --- | --- | --- | --- |
@@ -333,8 +362,8 @@ done as one integration effort with these vertical slices:
 
 ## Audit conclusion
 
-The implementation is materially ahead of the original foundation plan but
-materially behind its final acceptance gate. The principal work remaining is
-not another collection of small types or adapters; it is consolidation of the
-existing seams into one durable, enforceable runtime path and proving that path
-end to end.
+The findings above describe the pre-Phase-5 state. The consolidated closure
+scenario now exercises the durable runtime boundary end to end, including the
+failure and recovery cases that were previously only isolated primitives. The
+repository is complete against the finite OpenCode completion plan when the
+14-check acceptance command and the full verification suite remain green.

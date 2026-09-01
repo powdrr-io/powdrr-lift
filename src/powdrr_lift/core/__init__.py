@@ -39,6 +39,22 @@ from powdrr_lift.core.behavior_rule import (
     nominate_behavior_rule,
     normalize_behavior_text,
 )
+from powdrr_lift.core.intent import (
+    INTENT_SCHEMA_VERSION,
+    IntentClause,
+    IntentContract,
+    IntentIndex,
+    IntentKind,
+    IntentSource,
+    IntentStore,
+    IntentTrigger,
+    intent_fingerprint,
+    make_intent_source,
+)
+from powdrr_lift.core.effective_contract import (
+    EffectiveContract,
+    resolve_effective_contract,
+)
 from powdrr_lift.core.action_relationship import (
     BUILTIN_ACTION_RELATIONSHIPS,
     ActionFact,

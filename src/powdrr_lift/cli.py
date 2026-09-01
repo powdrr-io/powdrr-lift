@@ -71,8 +71,17 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType
+from powdrr_lift.core.effective_contract import resolve_effective_contract
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.execution_plan import ExecutionPlan
+from powdrr_lift.core.intent import (
+    IntentClause,
+    IntentContract,
+    IntentKind,
+    IntentStore,
+    IntentTrigger,
+    make_intent_source,
+)
 from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
     create_project_structure_template,
@@ -99,6 +108,7 @@ from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
 from powdrr_lift.execution.checkpoints import ContentAddressedCheckpointStore
+from powdrr_lift.execution.compaction import compatibility_report
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.openai_proxy import (
     OpenAIProxyConfig,
@@ -1516,6 +1526,98 @@ def build_parser() -> argparse.ArgumentParser:
     )
     checkpoints_parser.set_defaults(func=_run_execution_checkpoints)
 
+    compatibility_parser = subparsers.add_parser(
+        "execution-compatibility",
+        aliases=["execution_compatibility"],
+        help="Inspect persisted execution JSON for migration compatibility.",
+    )
+    compatibility_parser.add_argument("--workflow-dir", type=Path, required=True)
+    compatibility_parser.set_defaults(func=_run_execution_compatibility)
+
+    remember_intent_parser = subparsers.add_parser(
+        "remember-intent",
+        aliases=["remember_intent"],
+        help="Persist one explicit, scoped user instruction for future executions.",
+    )
+    remember_intent_parser.add_argument("--workflow-dir", type=Path, required=True)
+    remember_intent_parser.add_argument("--intent-id", required=True)
+    remember_intent_parser.add_argument("--clause-id", required=True)
+    remember_intent_parser.add_argument("--text", required=True)
+    remember_intent_parser.add_argument("--source-ref", required=True)
+    remember_intent_parser.add_argument("--supplied-by", default="user")
+    remember_intent_parser.add_argument(
+        "--kind", choices=[kind.value for kind in IntentKind], required=True
+    )
+    remember_intent_parser.add_argument(
+        "--selector", action="append", default=[], metavar="KEY=VALUE"
+    )
+    remember_intent_parser.add_argument(
+        "--trigger",
+        choices=[item.value for item in IntentTrigger],
+        default="before_action",
+    )
+    remember_intent_parser.add_argument("--trigger-action")
+    remember_intent_parser.add_argument(
+        "--require", dest="requirements", action="append", default=[]
+    )
+    remember_intent_parser.add_argument("--completion-gate")
+    remember_intent_parser.add_argument("--precedence", type=int, default=0)
+    remember_intent_parser.set_defaults(func=_run_remember_intent)
+
+    list_intent_parser = subparsers.add_parser(
+        "list-intent", aliases=["list_intent"], help="List remembered intent clauses."
+    )
+    list_intent_parser.add_argument("--workflow-dir", type=Path, required=True)
+    list_intent_parser.add_argument("--include-inactive", action="store_true")
+    list_intent_parser.set_defaults(func=_run_list_intent)
+
+    explain_intent_parser = subparsers.add_parser(
+        "explain-effective-contract",
+        aliases=["explain_effective_contract"],
+        help="Explain exactly which remembered intent applies to a context.",
+    )
+    explain_intent_parser.add_argument("--workflow-dir", type=Path, required=True)
+    explain_intent_parser.add_argument(
+        "--context", action="append", default=[], metavar="KEY=VALUE"
+    )
+    explain_intent_parser.set_defaults(func=_run_explain_effective_contract)
+
+    revoke_intent_parser = subparsers.add_parser(
+        "revoke-intent",
+        aliases=["revoke_intent"],
+        help="Revoke a remembered intent clause.",
+    )
+    revoke_intent_parser.add_argument("--workflow-dir", type=Path, required=True)
+    revoke_intent_parser.add_argument("--clause-id", required=True)
+    revoke_intent_parser.add_argument("--expected-version", type=int, required=True)
+    revoke_intent_parser.set_defaults(func=_run_revoke_intent)
+
+    supersede_intent_parser = subparsers.add_parser(
+        "supersede-intent",
+        aliases=["supersede_intent"],
+        help="Install an explicit replacement for a remembered intent clause.",
+    )
+    supersede_intent_parser.add_argument("--workflow-dir", type=Path, required=True)
+    supersede_intent_parser.add_argument("--clause-id", required=True)
+    supersede_intent_parser.add_argument("--replacement-clause-id", required=True)
+    supersede_intent_parser.add_argument("--expected-version", type=int, required=True)
+    supersede_intent_parser.add_argument(
+        "--kind", choices=[kind.value for kind in IntentKind]
+    )
+    supersede_intent_parser.add_argument(
+        "--selector", action="append", default=[], metavar="KEY=VALUE"
+    )
+    supersede_intent_parser.add_argument(
+        "--trigger", choices=[item.value for item in IntentTrigger]
+    )
+    supersede_intent_parser.add_argument("--trigger-action")
+    supersede_intent_parser.add_argument(
+        "--require", dest="requirements", action="append"
+    )
+    supersede_intent_parser.add_argument("--completion-gate")
+    supersede_intent_parser.add_argument("--precedence", type=int)
+    supersede_intent_parser.set_defaults(func=_run_supersede_intent)
+
     compile_workflow_parser = subparsers.add_parser(
         "compile-execution-plan",
         aliases=["compile_execution_plan"],
@@ -2020,6 +2122,127 @@ def _run_execution_checkpoints(args: argparse.Namespace) -> int:
     manifests = sorted(store.manifests.glob("*.json"))
     print(json.dumps([store.load(path.stem).to_data() for path in manifests], indent=2))
     return 0
+
+
+def _run_execution_compatibility(args: argparse.Namespace) -> int:
+    print(json.dumps(compatibility_report(args.workflow_dir), indent=2))
+    return 0
+
+
+def _run_remember_intent(args: argparse.Namespace) -> int:
+    selectors = _parse_intent_pairs(args.selector)
+    source = make_intent_source(
+        intent_id=args.intent_id,
+        exact_text=args.text,
+        source_ref=args.source_ref,
+        supplied_by=args.supplied_by,
+    )
+    clause = IntentClause(
+        args.clause_id,
+        source.intent_id,
+        (0, len(source.exact_text)),
+        IntentKind(args.kind),
+        IntentContract(
+            selectors=selectors,
+            trigger=IntentTrigger(args.trigger),
+            trigger_action=args.trigger_action,
+            requirements=tuple(args.requirements),
+            completion_gate=args.completion_gate,
+            precedence=args.precedence,
+        ),
+    )
+    saved_source, clauses, created = IntentStore(args.workflow_dir).capture(
+        source, (clause,)
+    )
+    print(
+        json.dumps(
+            {
+                "created": created,
+                "acknowledgment": (
+                    f"Recorded {clauses[0].kind.value} intent {clauses[0].clause_id!r} "
+                    f"for source {saved_source.intent_id!r}."
+                ),
+                "source": saved_source.to_data(),
+                "clauses": [item.to_data() for item in clauses],
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def _run_list_intent(args: argparse.Namespace) -> int:
+    store = IntentStore(args.workflow_dir)
+    clauses = store.list(include_inactive=args.include_inactive)
+    print(json.dumps([item.to_data() for item in clauses], indent=2))
+    return 0
+
+
+def _run_explain_effective_contract(args: argparse.Namespace) -> int:
+    context = {
+        key: values[-1] for key, values in _parse_intent_pairs(args.context).items()
+    }
+    contract = resolve_effective_contract(IntentStore(args.workflow_dir), context)
+    print(json.dumps(contract.explain(), indent=2))
+    return 0
+
+
+def _run_revoke_intent(args: argparse.Namespace) -> int:
+    revoked = IntentStore(args.workflow_dir).revoke(
+        args.clause_id, expected_version=args.expected_version
+    )
+    print(json.dumps(revoked.to_data(), indent=2))
+    return 0
+
+
+def _run_supersede_intent(args: argparse.Namespace) -> int:
+    store = IntentStore(args.workflow_dir)
+    current = next(
+        item
+        for item in store.list(include_inactive=True)
+        if item.clause_id == args.clause_id
+    )
+    replacement = IntentClause(
+        args.replacement_clause_id,
+        current.intent_id,
+        current.source_span,
+        IntentKind(args.kind) if args.kind else current.kind,
+        IntentContract(
+            selectors=_parse_intent_pairs(args.selector)
+            if args.selector
+            else current.contract.selectors,
+            trigger=IntentTrigger(args.trigger)
+            if args.trigger
+            else current.contract.trigger,
+            trigger_action=args.trigger_action or current.contract.trigger_action,
+            requirements=tuple(args.requirements)
+            if args.requirements is not None
+            else current.contract.requirements,
+            completion_gate=args.completion_gate or current.contract.completion_gate,
+            precedence=(
+                args.precedence
+                if args.precedence is not None
+                else current.contract.precedence
+            ),
+        ),
+    )
+    installed = store.update_clause(
+        args.clause_id, replacement, expected_version=args.expected_version
+    )
+    print(json.dumps(installed.to_data(), indent=2))
+    return 0
+
+
+def _parse_intent_pairs(values: Sequence[str]) -> dict[str, tuple[str, ...]]:
+    result: dict[str, list[str]] = {}
+    for value in values:
+        key, separator, raw_values = value.partition("=")
+        if not separator or not key.strip() or not raw_values.strip():
+            raise ValueError("intent selectors must use KEY=VALUE")
+        result.setdefault(key.strip(), []).extend(
+            item.strip() for item in raw_values.split(",") if item.strip()
+        )
+    return {key: tuple(items) for key, items in result.items()}
 
 
 def _run_compile_execution_plan(args: argparse.Namespace) -> int:

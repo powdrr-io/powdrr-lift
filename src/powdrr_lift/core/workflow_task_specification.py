@@ -210,13 +210,21 @@ class WorkflowInstance:
         profile: Any,
         plan: Any,
         actions_by_phase: Mapping[Any, tuple[str, ...]],
+        intent_ids_by_phase: Mapping[Any, tuple[str, ...]] | None = None,
+        clause_ids_by_phase: Mapping[Any, tuple[str, ...]] | None = None,
     ) -> WorkflowInstance:
         """Create the durable task graph from the canonical typed plan."""
         from powdrr_lift.execution.compile import compile_execution_plan
 
         return cls.create(
             directory,
-            compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase),
+            compile_execution_plan(
+                profile,
+                plan,
+                actions_by_phase=actions_by_phase,
+                intent_ids_by_phase=intent_ids_by_phase,
+                clause_ids_by_phase=clause_ids_by_phase,
+            ),
         )
 
     @classmethod

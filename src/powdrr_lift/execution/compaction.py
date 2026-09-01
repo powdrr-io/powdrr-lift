@@ -20,6 +20,10 @@ TYPED_REFERENCE_KEYS = frozenset(
         "finding_ids",
         "exception_ids",
         "rule_ids",
+        "intent_ids",
+        "clause_ids",
+        "contract_fingerprint",
+        "effective_contract",
         "checkpoint_ids",
     }
 )
@@ -113,6 +117,44 @@ def compatibility_diagnostic(document: Mapping[str, Any]) -> str | None:
     version = document.get("schema_version")
     if version is None:
         return "persisted workflow has no schema_version; migration is required"
-    if version not in {"execution-state-v1", "execution-plan-v1", "behavior-rule-v1"}:
+    if version not in {
+        "execution-state-v1",
+        "execution-plan-v1",
+        "behavior-rule-v1",
+        "intent-v1",
+    }:
         return f"unsupported persisted workflow schema: {version!r}"
     return None
+
+
+def compatibility_report(directory: str | Path) -> dict[str, Any]:
+    """Report persisted files requiring migration without mutating them."""
+    root = Path(directory)
+    inspected = 0
+    diagnostics: list[dict[str, str]] = []
+    paths = sorted(root.rglob("*.json")) if root.exists() else ()
+    for path in paths:
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            diagnostics.append({"path": str(path), "diagnostic": "invalid JSON"})
+            continue
+        if isinstance(document, list):
+            diagnostics.append(
+                {
+                    "path": str(path),
+                    "diagnostic": "legacy behavior rules require intent migration",
+                }
+            )
+            inspected += 1
+            continue
+        if not isinstance(document, Mapping):
+            diagnostics.append(
+                {"path": str(path), "diagnostic": "persisted document is not an object"}
+            )
+            continue
+        inspected += 1
+        diagnostic = compatibility_diagnostic(document)
+        if diagnostic is not None:
+            diagnostics.append({"path": str(path), "diagnostic": diagnostic})
+    return {"directory": str(root), "inspected": inspected, "diagnostics": diagnostics}

@@ -14,6 +14,10 @@ from powdrr_lift.core.behavior_rule import (
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PhaseType
+from powdrr_lift.core.effective_contract import (
+    EffectiveContract,
+    resolve_effective_contract,
+)
 from powdrr_lift.core.execution_plan import (
     ExecutionPlan,
     FileExecutionPlanStore,
@@ -28,6 +32,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionObligation,
     ExecutionState,
 )
+from powdrr_lift.core.intent import IntentStore
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
@@ -107,6 +112,8 @@ class ExecutionRuntime:
         self.behavior_rule_store = behavior_rule_store or FileBehaviorRuleStore(
             workflow_directory
         )
+        self.intent_store = IntentStore(workflow_directory)
+        self.intent_store.migrate_legacy_behavior_rules()
         self.plan_store = FileExecutionPlanStore(workflow_directory)
         self.context_store = FileContextRetrievalStore(workflow_directory)
         self.checkpoint_store = ContentAddressedCheckpointStore(
@@ -234,6 +241,17 @@ class ExecutionRuntime:
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
         rules = self.guidance({"profile_id": self.state.profile_id})
+        contract = self.effective_contract(
+            {
+                "profile_id": self.state.profile_id,
+                "phase_type": self.state.current_phase.value,
+                **(
+                    {"persona_id": self.state.current_persona_id}
+                    if self.state.current_persona_id is not None
+                    else {}
+                ),
+            }
+        )
         return compact_execution_context(
             {
                 "execution_id": self.execution_id,
@@ -254,8 +272,21 @@ class ExecutionRuntime:
                     }
                     for rule in rules
                 ],
+                "intent_ids": [item.intent_id for item in contract.sources],
+                "clause_ids": list(contract.clause_ids),
+                "contract_fingerprint": contract.fingerprint,
+                "effective_contract": contract.to_data(),
+                "open_obligations": [
+                    item.to_data()
+                    for item in self.state.obligations
+                    if item.status.value == "open"
+                ],
             }
         )
+
+    def effective_contract(self, context: dict[str, str]) -> EffectiveContract:
+        """Resolve the exact active intent contract for a prompt boundary."""
+        return resolve_effective_contract(self.intent_store, context)
 
     def guidance(self, context: dict[str, str]) -> tuple[Any, ...]:
         """Retrieve active scoped behavior rules for the current execution."""
@@ -382,6 +413,8 @@ class ExecutionRuntime:
         plan: ExecutionPlan,
         *,
         actions_by_phase: dict[PhaseType, tuple[str, ...]],
+        intent_ids_by_phase: dict[PhaseType, tuple[str, ...]] | None = None,
+        clause_ids_by_phase: dict[PhaseType, tuple[str, ...]] | None = None,
     ) -> tuple[Any, ...]:
         """Compile a typed plan through the runtime-owned plan boundary."""
         validation_profiles = frozenset(
@@ -422,7 +455,13 @@ class ExecutionRuntime:
             # Plan validation and decision-obligation creation are also useful
             # before an execution workflow has been materialized.
             return ()
-        return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
+        return compile_execution_plan(
+            profile,
+            plan,
+            actions_by_phase=actions_by_phase,
+            intent_ids_by_phase=intent_ids_by_phase,
+            clause_ids_by_phase=clause_ids_by_phase,
+        )
 
     def resolve_plan_decision(self, plan_id: str, decision: str) -> ExecutionState:
         """Close one explicit plan decision after its external resolution."""
@@ -448,18 +487,24 @@ class ExecutionRuntime:
         *,
         actions_by_phase: dict[PhaseType, tuple[str, ...]],
         workflow_directory: str | Path,
+        intent_ids_by_phase: dict[PhaseType, tuple[str, ...]] | None = None,
+        clause_ids_by_phase: dict[PhaseType, tuple[str, ...]] | None = None,
     ) -> WorkflowInstance:
         """Compile and persist the canonical task graph owned by this runtime."""
         self.compile_plan(
             profile,
             plan,
             actions_by_phase=actions_by_phase,
+            intent_ids_by_phase=intent_ids_by_phase,
+            clause_ids_by_phase=clause_ids_by_phase,
         )
         return WorkflowInstance.from_execution_plan(
             workflow_directory,
             profile=profile,
             plan=plan,
             actions_by_phase=actions_by_phase,
+            intent_ids_by_phase=intent_ids_by_phase,
+            clause_ids_by_phase=clause_ids_by_phase,
         )
 
     def compact_prompt_context(self, context: dict[str, Any]) -> dict[str, Any]:

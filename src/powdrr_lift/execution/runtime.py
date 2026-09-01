@@ -241,7 +241,16 @@ class ExecutionRuntime:
 
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
-        rules = self.guidance({"profile_id": self.state.profile_id})
+        guidance_context = {
+            "profile_id": self.state.profile_id,
+            "phase_type": self.state.current_phase.value,
+            **(
+                {"persona_id": self.state.current_persona_id}
+                if self.state.current_persona_id is not None
+                else {}
+            ),
+        }
+        rules = self.guidance(guidance_context)
         contract = self.effective_contract(
             {
                 "profile_id": self.state.profile_id,
@@ -279,8 +288,14 @@ class ExecutionRuntime:
                 "effective_contract": contract.to_data(),
                 "open_obligations": [
                     item.to_data()
-                    for item in self.state.obligations
-                    if item.status.value == "open"
+                    for item in {
+                        item.obligation_id: item
+                        for item in (
+                            *self.state.obligations,
+                            *self.kernel.open_obligations,
+                        )
+                        if item.status.value == "open"
+                    }.values()
                 ],
             }
         )

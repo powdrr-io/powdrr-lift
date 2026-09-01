@@ -253,6 +253,9 @@ def test_runtime_capability_invocation_projects_relationship_obligations(
         event.event_type is ExecutionEventType.OBLIGATION_OPENED
         for event in runtime.state_store.load_events(runtime.execution_id)
     )
+    assert {
+        item["required_action"] for item in runtime.prompt_context()["open_obligations"]
+    } == {"add_optimistic_lock", "run_concurrency_test"}
 
     for semantic_action in ("add_optimistic_lock", "run_concurrency_test"):
         runtime.invoke(
@@ -783,6 +786,29 @@ def test_runtime_captures_explicit_guidance_with_stable_identity(
     assert first.rule_id == second.rule_id
     assert second.version == 2
     assert runtime.guidance({"profile_id": "default"})[0].text.startswith("Always")
+
+
+def test_runtime_prompt_context_applies_phase_scoped_guidance(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-phase-guidance",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    runtime.capture_guidance(
+        "Always include the architecture tradeoff table.",
+        source_ref="user:phase-guidance",
+        scope={"profile_id": "default", "phase_type": "intake"},
+    )
+
+    prompt_context = runtime.prompt_context()
+
+    assert [item["text"] for item in prompt_context["guidance"]] == [
+        "Always include the architecture tradeoff table."
+    ]
 
 
 def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) -> None:

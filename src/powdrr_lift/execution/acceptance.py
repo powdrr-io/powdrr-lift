@@ -13,11 +13,20 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.core.architecture_specification import (
+    build_architecture_specification_validation_report,
+)
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.execution_state import ExecutionArtifact
+from powdrr_lift.core.implementation_specification import (
+    build_implementation_specification_validation_report,
+)
 from powdrr_lift.core.pr_specification import build_pr_specification_validation_report
+from powdrr_lift.core.system_specification import (
+    build_system_specification_validation_report,
+)
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.errors import (
     ExecutionCancelled,
@@ -870,8 +879,34 @@ def run_final_acceptance(
 
 
 def _run_structured_artifact_chain(workflow_directory: Path) -> bool:
-    """Validate high-level intent artifacts before compiling execution work."""
+    """Run the real specification handoff validators before execution."""
     artifact_root = workflow_directory / "structured-artifacts"
+    proposal_root = artifact_root / "docs" / "proposals" / "acceptance-feature"
+    proposal_root.mkdir(parents=True, exist_ok=True)
+    system_path = proposal_root / "system-specification.yaml"
+    system_path.write_text(
+        "schema: https://powdrr.io/schemas/specification-v1\n"
+        "id: acceptance-system\n"
+        "title: Acceptance system\n"
+        "requirements:\n"
+        "- id: acceptance-requirement\n"
+        "  description: Preserve the typed delivery boundary.\n"
+        "  state: added\n"
+        "approach:\n"
+        "- id: acceptance-approach\n"
+        "  description: Use the validated execution runtime.\n"
+        "  state: added\n",
+        encoding="utf-8",
+    )
+    architecture_path = proposal_root / "architecture-specification.yaml"
+    architecture_path.write_text(
+        "schema: https://powdrr.io/schemas/specification-v1\n"
+        "id: acceptance-architecture\n"
+        "title: Acceptance architecture\n"
+        "entities: []\nmodules: []\ntools: []\n"
+        "entity_relationships: []\ninvariants: []\nguidance: []\n",
+        encoding="utf-8",
+    )
     implementation_path = (
         artifact_root
         / "docs"
@@ -885,6 +920,7 @@ def _run_structured_artifact_chain(workflow_directory: Path) -> bool:
 architecture_id: acceptance-architecture
 features:
   - id: acceptance-feature
+    action: added
     description: Exercise structured delivery.
     functional_requirements:
       - Preserve the typed delivery boundary.
@@ -928,13 +964,33 @@ risks:
 """,
         encoding="utf-8",
     )
+    system_report = build_system_specification_validation_report(
+        system_path.read_text(encoding="utf-8"),
+        work_item_name="acceptance-feature",
+        repo_root=artifact_root,
+    )
+    architecture_report = build_architecture_specification_validation_report(
+        architecture_path.read_text(encoding="utf-8"),
+        entity_types=("Service", "Skill"),
+        work_item_name="acceptance-feature",
+        repo_root=artifact_root,
+    )
+    implementation_report = build_implementation_specification_validation_report(
+        implementation_path.read_text(encoding="utf-8"),
+        work_item_name="acceptance-feature",
+        architecture_specification_path=architecture_path,
+        repo_root=artifact_root,
+    )
     report = build_pr_specification_validation_report(
         proposal_path.read_text(encoding="utf-8"),
         work_item_name="acceptance-feature",
         repo_root=artifact_root,
         file_path=proposal_path,
     )
-    return report.validation_successful
+    return all(
+        item.validation_successful
+        for item in (system_report, architecture_report, implementation_report, report)
+    )
 
 
 def _run_production_task_adapter(workflow_directory: Path, repo_root: Path) -> Any:
@@ -1111,13 +1167,30 @@ def _run_observer_acceptance(workflow_directory: Path) -> bool:
     )
     first = observer.action_completed(action, observation)
     second = observer.action_completed(action, observation)
-    third = observer.action_completed(action, observation)
+    restarted_client = Client()
+    restarted = ShadowWorkflowObserver(
+        client=restarted_client,
+        model="acceptance-observer",
+        provider="scripted",
+        worktree_root=workflow_directory,
+        log_root=workflow_directory,
+        context_provider=lambda: ObserverExecutionContext(
+            "workflow_chat",
+            "acceptance",
+            "acceptance-workflow",
+            "build",
+            "Build the fixture",
+        ),
+    )
+    third = restarted.action_completed(action, observation)
     log_path = workflow_directory / "workflow-observer-events.jsonl"
     return (
         first is None
         and second is not None
         and third is None
         and client.calls == 1
+        and restarted.state.last_decision is not None
+        and restarted_client.calls == 0
         and log_path.is_file()
     )
 

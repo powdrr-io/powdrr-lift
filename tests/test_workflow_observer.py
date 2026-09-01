@@ -147,6 +147,48 @@ def test_repeated_action_triggers_once_for_identical_material_state(
     assert records[-1]["observer_decision"]["verdict"] == "coach"
 
 
+def test_observer_state_survives_restart_and_preserves_cooldown(tmp_path: Path) -> None:
+    _git_init(tmp_path)
+    first_client = _Client(_decision_payload())
+    observer = ShadowWorkflowObserver(
+        client=first_client,
+        model="high-model",
+        provider="configured-provider",
+        worktree_root=tmp_path,
+        log_root=tmp_path,
+        context_provider=_context,
+    )
+    progress = WorkflowActionObservation(
+        signature='{"kind":"edit"}',
+        made_progress=True,
+        decision=ProgressDecision.CONTINUE,
+    )
+    stalled = replace(progress, made_progress=False)
+    observer.action_completed({"kind": "edit"}, progress)
+    observer.action_completed({"kind": "edit"}, stalled)
+    observer.action_completed({"kind": "edit"}, stalled)
+
+    restarted_client = _Client(_decision_payload())
+    restarted = ShadowWorkflowObserver(
+        client=restarted_client,
+        model="high-model",
+        provider="configured-provider",
+        worktree_root=tmp_path,
+        log_root=tmp_path,
+        context_provider=_context,
+    )
+    restarted.action_completed({"kind": "edit"}, stalled)
+
+    assert (tmp_path / "workflow-observer-state.json").is_file()
+    assert restarted.state.last_decision == ObserverDecision(
+        verdict="coach",
+        reason="The action is repeating.",
+        guidance=("Choose a materially different action.",),
+        expected_progress="The next action changes material state.",
+    )
+    assert restarted_client.messages == []
+
+
 def test_repeated_failure_is_deterministic_and_observer_failure_is_nonfatal(
     tmp_path: Path,
 ) -> None:

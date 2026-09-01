@@ -414,6 +414,27 @@ done as one integration effort with these vertical slices:
 6. Update the remaining-work document only after those scenarios pass; do not
    mark a primitive “complete” merely because a unit-testable module exists.
 
+## Final closure audit
+
+The final audit found two remaining gaps in the closure evidence, and both are
+now covered by executable behavior:
+
+- The structured acceptance path now creates a complete system, architecture,
+  implementation, and proposed-PR handoff, then runs the repository's real
+  validators for each artifact before compilation and production-adapter
+  execution. This proves the specification intake chain rather than validating
+  a fixture-only implementation artifact.
+- The shadow observer persists its fingerprint, action and failure counters,
+  cooldown position, recent summaries, observation epoch, and prior decision in
+  `workflow-observer-state.json`. A restart scenario restores that state and
+  proves a duplicate intervention is suppressed without invoking the model.
+  Observer-owned state is excluded from repository-change fingerprints so the
+  persistence mechanism cannot create false progress.
+
+The focused tests cover both closure cases, including validator handoff and
+observer restart behavior. The full verification suite and acceptance command
+are the release gates for this audit.
+
 ## Audit conclusion
 
 The findings above describe the pre-Phase-5 state. The consolidated closure

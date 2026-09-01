@@ -81,7 +81,7 @@ def normalize_behavior_text(text: str) -> str:
 def nominate_behavior_rule(
     text: str, *, rule_id: str, source_ref: str, scope: dict[str, str]
 ) -> BehaviorRule:
-    if not text.strip() or not source_ref or not scope:
+    if not text.strip() or not source_ref or scope is None:
         raise ValueError("A behavior rule requires text, source_ref, and scope.")
     return BehaviorRule(
         rule_id, text.strip(), normalize_behavior_text(text), source_ref, dict(scope)

@@ -114,6 +114,7 @@ def run_workflow_task_scenario(
     max_stalled_roundtrips: int = 3,
     verbose: bool = False,
     stream_live: bool = False,
+    guidance: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Run one real task, or every ready task, with scripted LLM output.
 
@@ -151,6 +152,17 @@ def run_workflow_task_scenario(
         shutil.copytree(workflow_source, workflow_dir)
         _ensure_fixture_source_package(repo_root)
         _initialize_git_repository(repo_root)
+        if guidance:
+            guidance_runtime = ExecutionRuntime(
+                "scenario-guidance",
+                profile_id="default",
+                workflow_directory=workflow_dir,
+                repo_root=repo_root,
+            )
+            for rule in guidance:
+                guidance_runtime.capture_guidance(
+                    rule, source_ref="scenario:guidance", scope={}
+                )
         source_tasks = WorkflowInstance.from_directory(workflow_dir).tasks
         target_task_id = task_id or source_tasks[-1].task_id
         source_task = next(
@@ -257,7 +269,9 @@ def run_workflow_task_scenario(
             "output_state": actual,
             "output_matches": actual == expected,
             "roundtrips": len(client.messages),
-            "exchanges": recorder.exchanges if recorder is not None else [],
+            "exchanges": (
+                recorder.exchanges if recorder is not None else client.messages
+            ),
             "all_tasks_completed": all(
                 item.status.value == "completed" for item in final_tasks
             ),

@@ -14,6 +14,7 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
     assert report.passed
     assert {check.name for check in report.checks} == {
         "vertical-structured-delivery",
+        "production-guidance-context",
         "durable-guidance-changes-behavior",
         "effective-action-intersection",
         "transaction-boundary",

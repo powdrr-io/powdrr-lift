@@ -56,6 +56,17 @@ completion plan’s stopping rule.
 ## Phase 5 acceptance evidence
 
 The final acceptance surface is executable rather than a document-only claim.
+The structured-delivery adapter validates the actual implementation and
+proposed-PR documents with the repository specification validator before any
+stage is accepted; it no longer treats fixture-file presence as proof of
+delivery. The production chat and durable-task scenarios are seeded from the
+same persisted guidance store, and the acceptance report verifies that the
+guidance appears in prompts sent by both adapters.
+
+The workflow, runtime, validators, persistence, and prompt construction are
+production code; only the model response transport is scripted for repeatable
+CI execution without provider credentials.
+
 `powdrr-lift final-acceptance` runs a deterministic enforce-mode scenario that
 walks all configured phases and handoffs, resolves the runtime contract,
 exercises review correction ordering and mutable-row consequences, projects

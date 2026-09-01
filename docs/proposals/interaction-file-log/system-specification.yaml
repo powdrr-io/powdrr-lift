@@ -1,0 +1,17 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: interaction-file-log
+title: Interaction File Log
+requirements:
+- id: interaction-log-json
+  description: Record all human and LLM interaction inputs and outputs as JSON entries
+    in a log file.
+  state: added
+- id: interaction-log-location
+  description: Store the interaction log in a hidden .powdrr directory with the file
+    name interaction-log.json.
+  state: added
+approach:
+- id: interaction-log-writer
+  description: Implement a log writer that appends each interaction's input and output
+    as a JSON object to .powdrr/interaction-log.json.
+  state: added

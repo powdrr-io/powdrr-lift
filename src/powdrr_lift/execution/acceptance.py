@@ -279,6 +279,7 @@ def run_final_acceptance(
     chat_sequence = _run_shared_runner(workflow_directory, root, "chat")
     task_sequence = _run_shared_runner(workflow_directory, root, "task")
     production_task = _run_production_task_adapter(root)
+    production_chat = _run_production_chat_adapter(Path(workflow_directory), root)
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
@@ -368,6 +369,15 @@ def run_final_acceptance(
             "the production workflow-task adapter completes a persisted task handoff",
         ),
         AcceptanceCheck(
+            "production-chat-adapter",
+            production_chat.status == "passed"
+            and any(
+                item["name"] == "outcome" and item["passed"]
+                for item in production_chat.assertions
+            ),
+            "the production chat adapter completes a parsed action sequence",
+        ),
+        AcceptanceCheck(
             "stale-evidence-gate",
             evidence_ready.ready and stale_evidence_blocked,
             (
@@ -427,6 +437,65 @@ def _run_production_task_adapter(repo_root: Path) -> Any:
     scenario = load_workflow_scenario(scenario_path)
     return run_workflow_scenario(
         scenario,
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+    )
+
+
+def _run_production_chat_adapter(workflow_directory: Path, repo_root: Path) -> Any:
+    scenario_root = workflow_directory / "production-chat"
+    fixture_root = scenario_root / "fixture"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    (fixture_root / "example.txt").write_text("acceptance\n", encoding="utf-8")
+    skill_path = scenario_root / "skill.yaml"
+    skill_path.write_text(
+        """\
+name: acceptance-chat
+when_to_use:
+- Exercise the production chat adapter.
+steps:
+- id: inspect
+  description: Inspect the fixture.
+  actions: [invoke_tool, complete, next_step]
+  step_type: freeform
+  tool_invocations:
+  - tool: shell
+    command: [git, status, --short]
+""",
+        encoding="utf-8",
+    )
+    scenario_path = scenario_root / "scenario.yaml"
+    scenario_path.write_text(
+        f"""\
+schema_version: 1
+id: acceptance-chat
+definition: {skill_path}
+execution_mode: workflow_chat
+fixture: fixture
+request: Inspect the acceptance fixture.
+provider:
+  mode: scripted
+  responses:
+  - action: invoke_tool
+    tool: shell
+    parameters:
+      command: [git, status, --short]
+  - action: complete
+    text: Inspection complete.
+expect:
+  outcome: complete
+  visited_steps:
+    ordered: [inspect]
+  required_actions:
+  - kind: invoke_tool
+    tool: shell
+  - kind: complete
+  max_roundtrips: 2
+""",
+        encoding="utf-8",
+    )
+    return run_workflow_scenario(
+        load_workflow_scenario(scenario_path),
         scenario_path=scenario_path,
         repo_root=repo_root,
     )

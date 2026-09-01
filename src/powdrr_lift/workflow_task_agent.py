@@ -1351,6 +1351,19 @@ def run_workflow_task(
             profile=delivery_profile,
         )
         runtime.set_action_contract(frozenset(task.actions))
+        if (
+            delivery_profile is not None
+            and task.phase_type is not None
+            and task.persona_id is not None
+        ):
+            runtime.persona_packet(
+                delivery_profile,
+                run_id=task.task_id,
+                phase_type=task.phase_type,
+                phase_actions=frozenset(task.actions),
+                persona_actions={task.persona_id: frozenset(task.actions)},
+                allowed_effects=frozenset(),
+            )
         if client_was_provided:
             assert client is not None
             task_client = client

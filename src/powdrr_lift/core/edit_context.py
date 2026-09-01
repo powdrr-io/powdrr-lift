@@ -10,6 +10,7 @@ import yaml
 from powdrr_lift.core.code_index import CodeIndexStore, _current_branch
 from powdrr_lift.core.index import ProvenanceRecord
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
+from powdrr_lift.errors import PowdrrExecutionError
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +73,10 @@ def lookup_edit_context(
     source_index = store.refresh(resolved_branch, parent_branch)
     branch_state = store.branch_state_for(resolved_branch)
     if branch_state is None:
-        raise RuntimeError(f"Missing branch state for {resolved_branch!r}.")
+        raise PowdrrExecutionError(
+            f"Missing branch state for {resolved_branch!r}.",
+            error_code="missing_branch_state",
+        )
 
     matching_changes: list[ProvenanceRecord] = []
     change_ref_by_record: dict[ProvenanceRecord, int] = {}

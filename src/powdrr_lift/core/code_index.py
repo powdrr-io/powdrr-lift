@@ -44,6 +44,7 @@ from powdrr_lift.core.index import (
     _parse_commit_log_output,
     load_specification_documents,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 
 INDEX_CACHE_VERSION = 14
 
@@ -1017,7 +1018,10 @@ class CodeIndexStore:
                 (branch_name,),
             ).fetchone()
             if branch_row is None:
-                raise RuntimeError(f"Missing branch state for {branch_name!r}.")
+                raise PowdrrExecutionError(
+                    f"Missing branch state for {branch_name!r}.",
+                    error_code="missing_branch_state",
+                )
             specification_documents = load_specification_documents(self.repo_root)
 
             document_rows = connection.execute(
@@ -1756,7 +1760,10 @@ class CodeIndexStore:
                 )
                 provenance_id = cursor.lastrowid
                 if provenance_id is None:
-                    raise RuntimeError("Missing provenance row id after insert.")
+                    raise PowdrrExecutionError(
+                        "Missing provenance row id after insert.",
+                        error_code="missing_provenance_id",
+                    )
 
                 provenance_id_by_record[id(record)] = provenance_id
                 for entity_id in record.affects:

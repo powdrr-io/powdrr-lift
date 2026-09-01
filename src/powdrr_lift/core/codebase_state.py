@@ -17,6 +17,7 @@ from powdrr_lift.core.spec_paths import (
     SPECIFICATION_SCHEMA_URL,
     is_current_specification_path,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 
 _DEFAULT_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "codebase-state.yaml"
 _CURRENT_STATE_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "current-state.yaml"
@@ -1152,7 +1153,10 @@ def _load_codebase_state_state(
     source_index = store.refresh(branch_name, parent_branch)
     branch_state = store.branch_state_for(branch_name)
     if branch_state is None:
-        raise RuntimeError(f"Missing branch state for {branch_name!r}.")
+        raise PowdrrExecutionError(
+            f"Missing branch state for {branch_name!r}.",
+            error_code="missing_branch_state",
+        )
 
     return _CodebaseStateSnapshot(
         store=store,

@@ -34,7 +34,7 @@ guidance as structured artifacts alongside the code. Each next step receives the
 useful slice of that context, while execution events and review findings remain available
 for later work. The agent can forget the conversation without forgetting the work.
 
-## Your Agent is a Sycophant
+## Your Agent is an Irresponsible Sycophant
 
 Tired of an agent that tells you everything is great, but admits it isn't when you ask
 again? Tired of needing a manager agent just to monitor your coding agent and make sure

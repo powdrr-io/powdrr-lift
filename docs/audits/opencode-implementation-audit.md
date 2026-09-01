@@ -51,6 +51,23 @@ The highest-risk gaps are:
 6. compaction preserves selected identifiers but is not the mandatory prompt,
    resume, and interruption mechanism.
 
+## Phase 5 acceptance evidence
+
+The final acceptance surface is executable rather than a document-only claim.
+`powdrr-lift final-acceptance` runs a deterministic enforce-mode scenario that
+compiles the default delivery profile, resolves the runtime contract, exercises
+review-correction ordering, expands mutable-row consequences, projects the
+lifecycle into durable events, and compares the shared action sequence used by
+chat and durable-task adapters. `powdrr-lift audit-capabilities` verifies that
+every normal capability exposed by the built-in registry has a manifest with
+semantic actions and effects.
+
+The scenario intentionally avoids an LLM and external GitHub mutation so its
+result is repeatable in CI. Provider-specific and external-write behavior
+remains covered by the existing broker, exception, checkpoint, and workflow
+scenario suites. The measured repository acceptance result is recorded by the
+Phase 5 test fixture and must remain green before publication.
+
 ## Status matrix: proposal recommendations
 
 | Proposal area | Current implementation | Status | Difference / required follow-up |

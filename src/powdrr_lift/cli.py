@@ -104,6 +104,11 @@ from powdrr_lift.core.workflow_template_specification import (
     load_workflow_template,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.execution.acceptance import (
+    audit_capability_surface,
+    run_final_acceptance,
+)
+from powdrr_lift.execution.builtin_tools import builtin_tool_registry
 from powdrr_lift.execution.capabilities import (
     FileCapabilityExceptionStore,
 )
@@ -1534,6 +1539,22 @@ def build_parser() -> argparse.ArgumentParser:
     compatibility_parser.add_argument("--workflow-dir", type=Path, required=True)
     compatibility_parser.set_defaults(func=_run_execution_compatibility)
 
+    acceptance_parser = subparsers.add_parser(
+        "final-acceptance",
+        aliases=["final_acceptance"],
+        help="Run the deterministic typed execution acceptance scenario.",
+    )
+    acceptance_parser.add_argument("--repo-root", type=Path)
+    acceptance_parser.add_argument("--workflow-dir", type=Path, required=True)
+    acceptance_parser.set_defaults(func=_run_final_acceptance)
+
+    audit_parser = subparsers.add_parser(
+        "audit-capabilities",
+        aliases=["audit_capabilities"],
+        help="Audit the runtime capability registry for complete manifests.",
+    )
+    audit_parser.set_defaults(func=_run_audit_capabilities)
+
     remember_intent_parser = subparsers.add_parser(
         "remember-intent",
         aliases=["remember_intent"],
@@ -2127,6 +2148,22 @@ def _run_execution_checkpoints(args: argparse.Namespace) -> int:
 def _run_execution_compatibility(args: argparse.Namespace) -> int:
     print(json.dumps(compatibility_report(args.workflow_dir), indent=2))
     return 0
+
+
+def _run_final_acceptance(args: argparse.Namespace) -> int:
+    report = run_final_acceptance(resolve_repo_root(args.repo_root), args.workflow_dir)
+    print(json.dumps(report.to_data(), indent=2))
+    return 0 if report.passed else 1
+
+
+def _run_audit_capabilities(args: argparse.Namespace) -> int:
+    checks = audit_capability_surface(builtin_tool_registry())
+    report = {
+        "passed": all(item.passed for item in checks),
+        "checks": [item.to_data() for item in checks],
+    }
+    print(json.dumps(report, indent=2))
+    return 0 if report["passed"] else 1
 
 
 def _run_remember_intent(args: argparse.Namespace) -> int:

@@ -1,0 +1,90 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: '2026-09-01'
+title: Interaction File Log Architecture
+entities:
+- id: interaction-log
+  type: Feature
+  action: added
+  summary: Feature to log all human and LLM interaction inputs and outputs as JSON
+    entries.
+  rationale: Represents the feature to log all human and LLM interaction inputs and
+    outputs as JSON ("interaction-log-json").
+- id: interaction-log-writer
+  type: Module
+  action: added
+  summary: Module that appends each interaction's input and output as a JSON object
+    to the log file.
+  rationale: Implements the log writer that appends each interaction's input and output
+    as a JSON object ("interaction-log-writer").
+- id: interaction-log-file
+  type: Configuration file
+  action: added
+  summary: Configuration file storing the interaction log in a hidden .powdrr directory.
+  rationale: Stores the interaction log as JSON in a hidden .powdrr directory with
+    file name interaction-log.json ("interaction-log-location").
+modules:
+- id: interaction-log-writer
+  action: added
+  relative_location: src/interaction_log_writer.py
+  purpose: Append each interaction's input and output as a JSON object to .powdrr/interaction-log.json.
+tools:
+- id: interaction-log-writer
+  action: added
+  when_to_use: Use when an interaction with a human or LLM occurs and needs to be
+    logged.
+  template: interaction-log-writer
+  how_to_use: Call the log writer with the interaction input and output to append
+    a JSON entry to the log file.
+entity_relationships:
+- id: interaction-log-has-writer
+  source: interaction-log
+  target: interaction-log-writer
+  relationship: implements
+  description: The interaction-log feature is implemented by the interaction-log-writer
+    module.
+  rationale: The feature is implemented by the log writer module ("interaction-log-json",
+    "interaction-log-writer").
+  type: Feature
+  action: added
+- id: interaction-log-writer-writes-file
+  source: interaction-log-writer
+  target: interaction-log-file
+  relationship: writes
+  description: The interaction-log-writer module writes JSON entries to the interaction-log-file.
+  rationale: The log writer appends JSON entries to the interaction log file ("interaction-log-writer",
+    "interaction-log-location").
+  type: Module
+  action: added
+invariants:
+- id: interaction-log-json-format
+  description: Every interaction entry must be a JSON object with input and output
+    fields.
+  rationale: Every interaction entry must be a JSON object with input and output fields
+    ("interaction-log-json").
+  related:
+    entities:
+    - interaction-log
+    entity_relationships:
+    - interaction-log-writer-writes-file
+- id: interaction-log-location-hidden
+  description: The log file must be stored in a hidden .powdrr directory with file
+    name interaction-log.json.
+  rationale: The log file must be stored in a hidden .powdrr directory with file name
+    interaction-log.json ("interaction-log-location").
+  related:
+    entities:
+    - interaction-log-file
+    entity_relationships:
+    - interaction-log-writer-writes-file
+guidance:
+- id: interaction-log-writer-append
+  description: The log writer should append each interaction entry to the log file
+    without overwriting previous entries.
+  rationale: The log writer should append each interaction entry to the log file without
+    overwriting previous entries ("interaction-log-writer").
+  related:
+    entities:
+    - interaction-log-writer
+    - interaction-log-file
+    entity_relationships:
+    - interaction-log-writer-writes-file

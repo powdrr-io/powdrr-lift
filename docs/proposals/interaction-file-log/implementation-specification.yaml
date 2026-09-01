@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schemas/specification-v1
+title: Interaction File Log Implementation
+architecture_id: '2026-09-01'
+entities:
+- id: interaction-log
+  action: added
+  rationale: The interaction-log feature captures all human and LLM interaction inputs
+    and outputs as JSON entries.
+modules:
+- id: interaction-log-writer
+  action: added
+  relative_location: src/interaction-log/writer.ts
+  purpose: Appends each interaction's input and output as a JSON object to .powdrr/interaction-log.json.
+tools:
+- id: interaction-log-writer
+  action: added
+  when_to_use: Use whenever a human or LLM interaction input or output is produced.
+  template: interaction-log-writer
+  how_to_use: Call the writer to append a JSON object containing the interaction input
+    and output to the log file.
+entity_relationships:
+- id: interaction-log-has-writer
+  action: added
+  rationale: The interaction-log feature is implemented by the interaction-log-writer
+    module.
+features:
+- id: interaction-log-json
+  action: added
+  description: Record all human and LLM interaction inputs and outputs as JSON entries.
+  functional_requirements:
+  - Capture the input and output of every interaction with the user or with the LLM.
+decisions:
+- id: interaction-log-location
+  action: added
+  description: Store the interaction log in a hidden .powdrr directory with file name
+    interaction-log.json.

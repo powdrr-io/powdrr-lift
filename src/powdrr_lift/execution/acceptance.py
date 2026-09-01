@@ -267,6 +267,9 @@ def run_final_acceptance(
         {"kind": "resolve", "semantic_action": "resolve_review_thread"}
     )
     runtime.kernel = review_kernel
+    # This acceptance fixture swaps in a deliberately prepared kernel; normal
+    # runtimes retain one kernel for their entire execution.
+    runtime._projected_kernel_events = 0
     runtime.sync_kernel(phase_type=PhaseType.BUILD.value, actor_id="engineer")
 
     mutable_kernel = ActionKernel()

@@ -38,6 +38,8 @@ invariants:
   cardinality: exactly_one
 task_templates:
 - description: Gather context about the proposed PR
+  phase_type: intake
+  persona_id: architect
   actions: [next_step]
   step_type: invoke_tool
   prompt_catalogs: [context_types]
@@ -73,6 +75,8 @@ task_templates:
   dependent_state:
   - proposed-pr-context-gathered
 - description: Create the execution plan
+  phase_type: plan_pr
+  persona_id: engineer
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
@@ -95,6 +99,8 @@ task_templates:
   dependent_state:
   - execution-plan-created
 - description: Generate the planned tests
+  phase_type: build
+  persona_id: engineer
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
@@ -119,6 +125,8 @@ task_templates:
   dependent_state:
   - tests-generated
 - description: Implement the planned product code
+  phase_type: build
+  persona_id: engineer
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
@@ -145,6 +153,8 @@ task_templates:
   dependent_state:
   - product-code-generated
 - description: Run all tests and fix failures
+  phase_type: validate
+  persona_id: engineer
   actions: [invoke_skill, next_step]
   step_type: freeform
   complexity: high
@@ -171,6 +181,8 @@ task_templates:
   dependent_state:
   - all-tests-passed
 - description: Review specification completeness
+  phase_type: review_specifications
+  persona_id: specification-reviewer
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
@@ -195,6 +207,8 @@ task_templates:
   dependent_state:
   - specification-complete
 - description: Repair specification completeness gaps
+  phase_type: specify
+  persona_id: architect
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: high
@@ -217,6 +231,8 @@ task_templates:
   dependent_state:
   - completeness-repair-complete
 - description: Run formatting checks
+  phase_type: validate
+  persona_id: engineer
   actions: [next_step]
   step_type: invoke_tool
   complexity: medium
@@ -242,6 +258,8 @@ task_templates:
   dependent_state:
   - formatting-checked
 - description: Run lint checks
+  phase_type: validate
+  persona_id: engineer
   actions: [next_step]
   step_type: invoke_tool
   complexity: medium
@@ -266,6 +284,8 @@ task_templates:
   dependent_state:
   - lint-checked
 - description: Run type checks
+  phase_type: validate
+  persona_id: engineer
   actions: [next_step]
   step_type: invoke_tool
   complexity: medium
@@ -289,6 +309,8 @@ task_templates:
   dependent_state:
   - type-checked
 - description: Review the final diff for scope
+  phase_type: review_pr
+  persona_id: code-reviewer
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: medium
@@ -318,6 +340,8 @@ task_templates:
   dependent_state:
   - final-scope-reviewed
 - description: Repair final diff scope issues
+  phase_type: resolve_findings
+  persona_id: engineer
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   complexity: medium
@@ -340,6 +364,8 @@ task_templates:
   dependent_state:
   - final-scope-repair-complete
 - description: Promote the feature documents
+  phase_type: confirm_readiness
+  persona_id: code-reviewer
   actions: [next_step]
   step_type: invoke_tool
   complexity: medium
@@ -368,6 +394,8 @@ task_templates:
   dependent_state:
   - current-state-documents-promoted
 - description: Verify the pull request file set
+  phase_type: confirm_readiness
+  persona_id: code-reviewer
   actions: [next_step]
   step_type: invoke_tool
   complexity: medium
@@ -400,6 +428,8 @@ task_templates:
   dependent_state:
   - pull-request-files-verified
 - description: Finish pull request preparation
+  phase_type: publish_pr
+  persona_id: engineering-manager
   actions: [invoke_skill, next_step]
   step_type: freeform
   complexity: medium

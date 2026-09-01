@@ -341,6 +341,40 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
     assert template.task_templates[0].input_state["feature_id"] == "<work-item-name>"
+    assert [task.phase_type.value for task in template.task_templates] == [
+        "intake",
+        "plan_pr",
+        "build",
+        "build",
+        "validate",
+        "review_specifications",
+        "specify",
+        "validate",
+        "validate",
+        "validate",
+        "review_pr",
+        "resolve_findings",
+        "confirm_readiness",
+        "confirm_readiness",
+        "publish_pr",
+    ]
+    assert [task.persona_id for task in template.task_templates] == [
+        "architect",
+        "engineer",
+        "engineer",
+        "engineer",
+        "engineer",
+        "specification-reviewer",
+        "architect",
+        "engineer",
+        "engineer",
+        "engineer",
+        "code-reviewer",
+        "engineer",
+        "code-reviewer",
+        "code-reviewer",
+        "engineering-manager",
+    ]
     assert template.task_templates[0].llm_type == "long_context"
     assert "one responsibility" in " ".join(template.how_to_fill_this_out)
     assert template.task_templates[0].step_type == "invoke_tool"

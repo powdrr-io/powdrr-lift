@@ -124,6 +124,7 @@ from powdrr_lift.workflow_chat_agent import (
     _run_deterministic_pre_step,
     _run_gate,
     _serialize_messages,
+    _step_actions,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
@@ -142,6 +143,7 @@ from powdrr_lift.workflow_chat_agent import (
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     _WorkflowStructuredDocumentError,
+    _WorkflowToolValidationError,
     _WorkflowYamlEditError,
     _worktree_reuse_decision,
     available_workflow_providers,
@@ -484,6 +486,50 @@ def test_modular_action_prompt_requires_invoke_skill_for_nested_steps() -> None:
 
     assert "use invoke_skill, not invoke_tool or an internal CLI command" in prompt
     assert '"skill":"finish-pr-prep"' in prompt
+
+
+def test_explicit_empty_step_does_not_infer_legacy_actions() -> None:
+    actions = _step_actions(
+        SkillStep(
+            description="Wait for the engine-owned result.",
+            details="Legacy inference must not reopen this contract.",
+            uses_skills=("unrelated-skill",),
+            actions_declared=True,
+        )
+    )
+
+    assert actions == (("next_step", "Advance only after this step is complete."),)
+
+
+def test_next_step_is_prompted_without_required_outputs() -> None:
+    actions = _step_actions(SkillStep(description="Finish the step."))
+
+    assert any(name == "next_step" for name, _ in actions)
+
+
+def test_explicit_step_contract_rejects_undeclared_complete() -> None:
+    with pytest.raises(_WorkflowToolValidationError, match="not allowed"):
+        _validate_workflow_action_for_step(
+            _parse_action_response({"action": "complete"}),
+            SkillStep(
+                description="Use the declared handoff.",
+                actions=("read_document",),
+            ),
+        )
+
+
+def test_explicit_step_contract_rejects_undeclared_internal_tool() -> None:
+    with pytest.raises(_WorkflowToolValidationError, match="not allowed"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "action": "invoke_tool",
+                    "tool": "internal",
+                    "parameters": {"command": ["powdrr-lift", "help"]},
+                }
+            ),
+            SkillStep(description="Only read documents.", actions=("read_document",)),
+        )
 
 
 def test_deterministic_shell_pre_step_accepts_empty_successful_result(
@@ -4166,7 +4212,7 @@ def test_action_repair_prompt_includes_the_rejected_edit() -> None:
 
     assert "previous edit action failed and was not applied" in prompt
     assert '"file_path": "implementation-specification.txt"' in prompt
-    assert "don't do this again" in prompt
+    assert "Do not repeat it unchanged" in prompt
 
 
 def test_action_repair_prompt_explains_validation_errors() -> None:
@@ -4183,6 +4229,7 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
     step = SkillStep(
         description="Ask for the missing success criteria.",
         details="Collect the answer before continuing.",
+        actions=("prompt_user",),
     )
     prompt = _action_repair_prompt(
         SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
@@ -4196,7 +4243,12 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
     assert '"text":"One clear English question?"' in prompt
     assert '"action":"next_step"' in prompt
     assert 'rename "prompt" to "text"' in prompt
-    assert "This step declares no tool invocations; do not return invoke_tool" in prompt
+    assert (
+        "This step declares no tool invocations; do not return invoke_tool"
+        not in prompt
+    )
+    assert "file_path and edits or file_edits for edit" not in prompt
+    assert '"action":"yaml_edit"' not in prompt
 
 
 def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:

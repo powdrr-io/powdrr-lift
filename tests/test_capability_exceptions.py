@@ -208,6 +208,14 @@ def test_runtime_exception_flow_resumes_exact_request(tmp_path: Path) -> None:
         event.event_type is ExecutionEventType.CAPABILITY_DECISION
         for event in runtime.state_store.load_events("run-runtime-exception")
     )
+    decision_events = [
+        event
+        for event in runtime.state_store.load_events("run-runtime-exception")
+        if event.event_type is ExecutionEventType.CAPABILITY_DECISION
+    ]
+    assert decision_events[0].payload["decision_packet"]["execution_id"] == (
+        "run-runtime-exception"
+    )
 
 
 def test_exception_decision_is_idempotent_and_conflicts_are_rejected(

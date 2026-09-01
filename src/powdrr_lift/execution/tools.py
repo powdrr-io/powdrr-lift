@@ -22,6 +22,7 @@ class ToolContext:
     allowed_effects: frozenset[ToolEffect]
     execution_id: str | None = None
     active_unit_id: str | None = None
+    active_persona_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

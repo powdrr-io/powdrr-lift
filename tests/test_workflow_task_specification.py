@@ -59,6 +59,30 @@ def test_workflow_task_round_trips_through_json() -> None:
     }
 
 
+def test_workflow_task_preserves_explicit_empty_action_contract() -> None:
+    task = workflow_task_from_json(
+        json.dumps(
+            {
+                "task_id": "closed-task",
+                "status": "open",
+                "upstream_task_ids": [],
+                "dependent_state": [],
+                "complexity": "low",
+                "input_state": {},
+                "assignee_type": "agent",
+                "assignee_role": "coder",
+                "output_state_type": "state",
+                "description": "Wait for an engine-owned result.",
+                "actions": [],
+            }
+        )
+    )
+
+    assert task.actions == ()
+    assert task.actions_declared is True
+    assert json.loads(workflow_task_to_json(task))["actions"] == []
+
+
 def test_workflow_task_round_trips_through_yaml() -> None:
     task = WorkflowTask(
         task_id="task-1",

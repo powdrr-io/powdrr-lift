@@ -53,6 +53,7 @@ from powdrr_lift.workflow_task_agent import (
     _read_task_document,
     _select_ready_workflow_git_state,
     _task_events_for_prompt,
+    _task_system_prompt,
     _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
@@ -87,6 +88,27 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
             ),
         ),
     )
+
+
+def test_explicit_task_prompt_contains_only_declared_action_guidance() -> None:
+    task = WorkflowTask(
+        task_id="scoped-task",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.LOW,
+        input_state={},
+        description="Read one document.",
+        actions=("read_document",),
+    )
+
+    prompt = _task_system_prompt(task=task)
+
+    assert "- read_document:" in prompt
+    assert "- next_step:" in prompt
+    assert "- invoke_skill:" not in prompt
+    assert "- edit:" not in prompt
+    assert "Use `complete` only" not in prompt
 
 
 def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(
@@ -780,8 +802,9 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         stdout: object,
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
+        runtime: object = None,
     ) -> None:
-        del workflow_id, reason, stdout, open_pull_request, events
+        del workflow_id, reason, stdout, open_pull_request, events, runtime
         published_roots.append(repo_root)
         assert published_workflow.directory == (
             integration_root / "docs" / "workflows" / "feature"
@@ -842,16 +865,18 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
     )
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._git_output",
-        lambda _repo_root, _arguments: "powdrr/feature-17",
+        lambda _repo_root, _arguments, **_kwargs: "powdrr/feature-17",
     )
     monkeypatch.setattr(
         "powdrr_lift.workflow_task_agent._git_result",
-        lambda _repo_root, _arguments: subprocess.CompletedProcess(
+        lambda _repo_root, _arguments, **_kwargs: subprocess.CompletedProcess(
             [], 0, stdout="", stderr=""
         ),
     )
 
-    def _record_git_call(_repo_root: Path, arguments: list[str]) -> str:
+    def _record_git_call(
+        _repo_root: Path, arguments: list[str], **_kwargs: object
+    ) -> str:
         git_calls.append(arguments)
         return ""
 
@@ -897,8 +922,9 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         stdout: object,
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
+        runtime: object = None,
     ) -> None:
-        del workflow_id, open_pull_request, events
+        del workflow_id, open_pull_request, events, runtime
         assert repo_root == tmp_path
         assert published_workflow.directory == workflow.directory
         published_reasons.append(reason)

@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionEventType,
     ObligationStatus,
 )
+from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.builtin_tools import (
     invoke_file_mutation,
@@ -15,6 +18,51 @@ from powdrr_lift.execution.builtin_tools import (
 )
 from powdrr_lift.execution.capabilities import CapabilityRequest, CapabilityResolution
 from powdrr_lift.execution.runtime import ExecutionRuntime
+from powdrr_lift.execution.tools import (
+    ToolContext,
+    ToolResult,
+    ToolValidationReport,
+)
+
+
+class MutableRowTool:
+    manifest = ToolManifest(
+        "mutable-row",
+        ("change_mutable_row", "add_optimistic_lock", "run_concurrency_test"),
+        (ToolEffect.WORKSPACE_WRITE,),
+    )
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolValidationReport:
+        return ToolValidationReport()
+
+    def execute(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolResult:
+        return ToolResult(observed_effects=frozenset({ToolEffect.WORKSPACE_WRITE}))
+
+
+class ExternalWriteTool:
+    manifest = ToolManifest(
+        "repository",
+        ("mutate_pull_request",),
+        (ToolEffect.GITHUB_MUTATION,),
+    )
+
+    def __init__(self) -> None:
+        self.arguments: list[Mapping[str, object]] = []
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolValidationReport:
+        return ToolValidationReport()
+
+    def execute(
+        self, context: ToolContext, arguments: Mapping[str, object]
+    ) -> ToolResult:
+        self.arguments.append(arguments)
+        return ToolResult(observed_effects=frozenset({ToolEffect.GITHUB_MUTATION}))
 
 
 def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) -> None:
@@ -39,6 +87,91 @@ def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) ->
         "repository-read_document",
         "repository-list_files",
     }
+    assert runtime.prompt_context()["capability_catalog"] == [
+        manifest.to_data()
+        for manifest in sorted(
+            runtime.capability_manifests(), key=lambda item: item.tool_name
+        )
+    ]
+
+
+def test_runtime_binds_external_writes_to_a_stable_idempotency_key(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-idempotency",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    adapter = ExternalWriteTool()
+    runtime.register_adapter(adapter)
+    context = runtime.context(
+        semantic_actions=frozenset({"mutate_pull_request"}),
+        allowed_effects=frozenset({ToolEffect.GITHUB_MUTATION}),
+    )
+    request = CapabilityRequest(
+        "repository",
+        "mutate_pull_request",
+        {
+            "operation": "pr_edit",
+            "pr_reference": "123",
+            "title": "Updated",
+            "body": "Body",
+        },
+    )
+
+    runtime.invoke(context, request)
+    with pytest.raises(PowdrrExecutionError, match="already completed"):
+        runtime.invoke(context, request)
+
+    assert len(adapter.arguments) == 1
+    assert isinstance(adapter.arguments[0]["idempotency_key"], str)
+    resumed = ExecutionRuntime(
+        "run-idempotency",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    resumed.register_adapter(adapter)
+    with pytest.raises(PowdrrExecutionError, match="already completed"):
+        resumed.invoke(
+            resumed.context(
+                semantic_actions=frozenset({"mutate_pull_request"}),
+                allowed_effects=frozenset({ToolEffect.GITHUB_MUTATION}),
+            ),
+            request,
+        )
+
+
+def test_runtime_rejects_nested_capability_outside_step_contract(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-contract",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        adapters=(ExternalWriteTool(),),
+    )
+    runtime.set_action_contract(frozenset({"read_document"}))
+    with pytest.raises(PowdrrExecutionError, match="not allowed by the active step"):
+        runtime.invoke(
+            runtime.context(
+                semantic_actions=frozenset({"mutate_pull_request"}),
+                allowed_effects=frozenset({ToolEffect.GITHUB_MUTATION}),
+            ),
+            CapabilityRequest(
+                "repository",
+                "mutate_pull_request",
+                {
+                    "operation": "pr_edit",
+                    "pr_reference": "123",
+                    "title": "Updated",
+                    "body": "Body",
+                },
+            ),
+        )
 
 
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:
@@ -108,6 +241,32 @@ def test_runtime_publish_gate_returns_typed_remediation(tmp_path: Path) -> None:
     assert raised.value.remediation
 
 
+def test_runtime_publish_gate_cannot_be_bypassed_by_direct_capability_invocation(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-direct-publish",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
+    runtime.sync_kernel(phase_type="build", actor_id="engineer")
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.invoke(
+            runtime.context(
+                semantic_actions=frozenset({"mutate_pull_request"}),
+                allowed_effects=frozenset(),
+            ),
+            CapabilityRequest(
+                "repository", "mutate_pull_request", {"operation": "pr_create"}
+            ),
+        )
+
+    assert raised.value.error_code == "readiness_blocked"
+
+
 def test_runtime_does_not_duplicate_kernel_events(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-2",
@@ -167,6 +326,160 @@ def test_runtime_persists_capability_decisions(tmp_path: Path) -> None:
     assert events[-1].payload["kind"] == "denied"
 
 
+def test_runtime_capability_invocation_projects_relationship_obligations(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-capability-relationships",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        adapters=(MutableRowTool(),),
+    )
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset(
+            {"change_mutable_row", "add_optimistic_lock", "run_concurrency_test"}
+        ),
+        frozenset({ToolEffect.WORKSPACE_WRITE}),
+        execution_id=runtime.execution_id,
+    )
+
+    result = runtime.invoke(
+        context,
+        CapabilityRequest("mutable-row", "change_mutable_row", {}),
+    )
+
+    assert isinstance(result, ToolResult)
+    assert {item.required_action for item in runtime.kernel.open_obligations} == {
+        "add_optimistic_lock",
+        "run_concurrency_test",
+    }
+    assert any(
+        event.event_type is ExecutionEventType.OBLIGATION_OPENED
+        for event in runtime.state_store.load_events(runtime.execution_id)
+    )
+    assert {
+        item["required_action"] for item in runtime.prompt_context()["open_obligations"]
+    } == {"add_optimistic_lock", "run_concurrency_test"}
+
+    for semantic_action in ("add_optimistic_lock", "run_concurrency_test"):
+        runtime.invoke(
+            context,
+            CapabilityRequest("mutable-row", semantic_action, {}),
+        )
+    assert not runtime.kernel.open_obligations
+
+
+def test_runtime_rejects_capability_context_from_another_execution(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-context-owner",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    foreign_context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset(),
+        frozenset(),
+        execution_id="other-execution",
+    )
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.invoke(foreign_context, CapabilityRequest("missing", "inspect", {}))
+
+    assert raised.value.error_code == "capability_execution_mismatch"
+
+
+def test_persona_packet_installs_the_same_action_contract_used_for_validation(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-persona-contract",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+
+    packet = runtime.persona_packet(
+        profile,
+        run_id="persona-run",
+        phase_type=PhaseType.INTAKE,
+        phase_actions=frozenset({"next_step", "edit"}),
+        persona_actions={"architect": frozenset({"next_step"})},
+        allowed_effects=frozenset(),
+    )
+
+    assert packet.allowed_actions == frozenset({"next_step"})
+    assert runtime.validate_action("edit")
+    assert not runtime.validate_action("next_step")
+    assert runtime.state.current_persona_id == "architect"
+    assert runtime.prompt_context()["persona_id"] == "architect"
+    assert runtime.prompt_context()["persona"] == {
+        "persona_id": "architect",
+        "persona_type": "architect",
+        "model_profile": "architecture",
+        "prompt_catalogs": ["architect-responsibilities"],
+    }
+    assert runtime.verify().current_persona_id == "architect"
+    resumed = ExecutionRuntime(
+        "run-persona-contract",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    assert resumed.prompt_context()["persona_id"] == "architect"
+    assert resumed.prompt_context()["persona"]["persona_type"] == "architect"
+
+
+def test_runtime_rejects_capability_context_from_another_persona(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-persona-owner",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    runtime.persona_packet(
+        profile,
+        run_id="persona-owner",
+        phase_type=PhaseType.INTAKE,
+        phase_actions=frozenset({"next_step"}),
+        persona_actions={"architect": frozenset({"next_step"})},
+        allowed_effects=frozenset(),
+    )
+    context = runtime.context(
+        semantic_actions=frozenset({"inspect_repository"}),
+        allowed_effects=frozenset(),
+    )
+    mismatched = replace(context, active_persona_id="engineer")
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.invoke(
+            mismatched, CapabilityRequest("missing", "inspect_repository", {})
+        )
+
+    assert raised.value.error_code == "capability_persona_mismatch"
+
+
 def test_runtime_phase_controller_is_durable_and_closed_topology(
     tmp_path: Path,
 ) -> None:
@@ -184,6 +497,33 @@ def test_runtime_phase_controller_is_durable_and_closed_topology(
     assert not rejected.allowed
     assert runtime.state.current_phase is PhaseType.SPECIFY
     assert runtime.verify().current_phase is PhaseType.SPECIFY
+
+
+def test_runtime_phase_transition_consults_durable_obligations(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-durable-obligation-phase-gate",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime._append_event(
+        ExecutionEventType.OBLIGATION_OPENED,
+        {
+            "obligation_id": "plan-decision:run:approve",
+            "description": "Resolve plan decision: approve",
+            "relationship_id": "run",
+        },
+    )
+    runtime.state = replace(runtime.state, current_phase=PhaseType.REVIEW_PR)
+
+    rejected = runtime.transition(
+        PhaseType.CONFIRM_READINESS, persona_id="code-reviewer"
+    )
+
+    assert not rejected.allowed
+    assert any("Resolve plan decision: approve" in guard for guard in rejected.guards)
 
 
 def test_builtin_helper_can_only_execute_through_runtime_broker_when_supplied(
@@ -455,6 +795,47 @@ def test_compile_plan_requires_one_action_contract_per_phase(tmp_path: Path) -> 
         )
 
 
+def test_compile_plan_accepts_explicit_empty_phase_contracts(tmp_path: Path) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+    from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-empty-actions",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "runtime",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    plan = ExecutionPlan(
+        "plan-empty-actions",
+        "fingerprint",
+        (
+            ExecutionUnit(
+                "unit-1",
+                "Wait",
+                ("src/app.py",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("wait completes",),
+            ),
+        ),
+        ("src",),
+    )
+
+    workflow = runtime.compile_plan_to_workflow(
+        profile,
+        plan,
+        actions_by_phase={phase.phase_type: () for phase in profile.phases},
+        workflow_directory=tmp_path / "workflow",
+    )
+
+    assert workflow.tasks
+    assert all(task.actions == () for task in workflow.tasks)
+    assert all(task.actions_declared for task in workflow.tasks)
+
+
 def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
     tmp_path: Path,
 ) -> None:
@@ -588,6 +969,27 @@ def test_runtime_rejects_mismatched_checkpoint_before_mutating_workspace(
     assert target.read_text(encoding="utf-8") == "current\n"
 
 
+def test_runtime_rejects_checkpoint_restore_into_another_workspace(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    runtime = ExecutionRuntime(
+        "run-workspace-mismatch",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=repo_root,
+    )
+    checkpoint = runtime.checkpoint_store.create(
+        repo_root, "checkpoint-workspace", state_json=runtime.state.to_json()
+    )
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.restore_checkpoint(checkpoint.checkpoint_id, workspace_root=tmp_path)
+
+    assert raised.value.error_code == "checkpoint_workspace_mismatch"
+
+
 def test_runtime_captures_explicit_guidance_with_stable_identity(
     tmp_path: Path,
 ) -> None:
@@ -610,6 +1012,29 @@ def test_runtime_captures_explicit_guidance_with_stable_identity(
     assert runtime.guidance({"profile_id": "default"})[0].text.startswith("Always")
 
 
+def test_runtime_prompt_context_applies_phase_scoped_guidance(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-phase-guidance",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+
+    runtime.capture_guidance(
+        "Always include the architecture tradeoff table.",
+        source_ref="user:phase-guidance",
+        scope={"profile_id": "default", "phase_type": "intake"},
+    )
+
+    prompt_context = runtime.prompt_context()
+
+    assert [item["text"] for item in prompt_context["guidance"]] == [
+        "Always include the architecture tradeoff table."
+    ]
+
+
 def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-actions",
@@ -617,11 +1042,52 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
         workflow_directory=tmp_path / "workflow",
         repo_root=tmp_path,
     )
+    assert runtime.allowed_actions() is None
+    assert runtime.prompt_context()["allowed_actions"] is None
     runtime.set_action_contract(frozenset({"read_document"}))
 
     assert runtime.validate_action("read_document") == ()
     assert runtime.validate_action("next_step") == ()
     assert runtime.validate_action("edit")
+    assert runtime.allowed_actions() == ("next_step", "read_document")
+    assert runtime.prompt_context()["allowed_actions"] == [
+        "next_step",
+        "read_document",
+    ]
+
+    runtime.set_action_contract(frozenset({"next_step"}))
+    assert runtime.capability_catalog() == ()
+
+    runtime.set_action_contract(frozenset(), enforce_empty=True)
+    assert runtime.allowed_actions() == ("next_step",)
+    assert runtime.validate_action("edit")
+    assert runtime.capability_catalog() == ()
+
+    runtime.set_action_contract(frozenset({"edit", "next_step"}))
+    assert {item["tool_name"] for item in runtime.capability_catalog()} == {
+        "apply-edit",
+        "file-mutation",
+        "validate-edit",
+    }
+
+
+def test_engine_bookkeeping_temporarily_suspends_action_contract(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-bookkeeping",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.set_action_contract(frozenset({"read_document"}))
+
+    with runtime.without_action_contract():
+        assert runtime.validate_action("git") == ()
+        assert runtime.allowed_actions() is None
+
+    assert runtime.allowed_actions() == ("next_step", "read_document")
+    assert runtime.validate_action("git")
 
 
 def test_runtime_persists_observer_decisions_in_event_stream(tmp_path: Path) -> None:

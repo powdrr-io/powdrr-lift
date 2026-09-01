@@ -12,7 +12,9 @@ from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.execution_state import ExecutionArtifact
+from powdrr_lift.core.pr_specification import build_pr_specification_validation_report
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import CapabilityRequest
 from powdrr_lift.execution.compile import compile_execution_plan
 from powdrr_lift.execution.evidence import EvidenceRequirement
@@ -20,6 +22,13 @@ from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.personas import build_persona_packet
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import ToolContext, ToolResult, ToolValidationReport
+from powdrr_lift.workflow_llm import (
+    WorkflowAction,
+    WorkflowActionOutcome,
+    WorkflowActionRequest,
+    WorkflowStepRunner,
+)
+from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
 
 REQUIRED_BUILTIN_MANIFESTS = frozenset(
     {
@@ -194,6 +203,7 @@ def run_final_acceptance(
         frozenset({"read_secret_denied", "read_secret_approved"}),
         frozenset(),
         execution_id=runtime.execution_id,
+        active_persona_id=runtime.state.current_persona_id,
     )
     denied_request = CapabilityRequest(
         "acceptance-secret-denied", "read_secret_denied", {"target": "secret"}
@@ -260,13 +270,19 @@ def run_final_acceptance(
         {"kind": "resolve", "semantic_action": "resolve_review_thread"}
     )
     runtime.kernel = review_kernel
+    # This acceptance fixture swaps in a deliberately prepared kernel; normal
+    # runtimes retain one kernel for their entire execution.
+    runtime._projected_kernel_events = 0
     runtime.sync_kernel(phase_type=PhaseType.BUILD.value, actor_id="engineer")
 
     mutable_kernel = ActionKernel()
     mutable_kernel.propose({"kind": "row-change"}, semantic_action="change_mutable_row")
     mutable_actions = {item.required_action for item in mutable_kernel.open_obligations}
-    chat_sequence = _review_sequence()
-    task_sequence = _review_sequence()
+    chat_sequence = _run_shared_runner(workflow_directory, root, "chat")
+    task_sequence = _run_shared_runner(workflow_directory, root, "task")
+    production_task = _run_production_task_adapter(Path(workflow_directory), root)
+    production_chat = _run_production_chat_adapter(Path(workflow_directory), root)
+    structured_artifacts = _run_structured_artifact_chain(Path(workflow_directory))
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
@@ -344,7 +360,30 @@ def run_final_acceptance(
         AcceptanceCheck(
             "adapter-parity",
             chat_sequence == task_sequence,
-            "chat and durable-task adapters produce the same typed lifecycle",
+            "chat and durable-task adapters use the same durable typed lifecycle",
+        ),
+        AcceptanceCheck(
+            "production-task-adapter",
+            production_task.status == "passed"
+            and any(
+                item["name"] == "task_status" and item["passed"]
+                for item in production_task.assertions
+            ),
+            "the production workflow-task adapter completes a persisted task handoff",
+        ),
+        AcceptanceCheck(
+            "production-chat-adapter",
+            production_chat.status == "passed"
+            and any(
+                item["name"] == "outcome" and item["passed"]
+                for item in production_chat.assertions
+            ),
+            "the production chat adapter completes a parsed action sequence",
+        ),
+        AcceptanceCheck(
+            "structured-artifact-chain",
+            structured_artifacts,
+            "a structured implementation catalog produces a validated proposed PR",
         ),
         AcceptanceCheck(
             "stale-evidence-gate",
@@ -399,6 +438,201 @@ def run_final_acceptance(
     return AcceptanceReport(checks)
 
 
+def _run_structured_artifact_chain(workflow_directory: Path) -> bool:
+    """Validate high-level intent artifacts before compiling execution work."""
+    artifact_root = workflow_directory / "structured-artifacts"
+    implementation_path = (
+        artifact_root
+        / "docs"
+        / "specs"
+        / "powdrr-lift"
+        / "implementation-specification.yaml"
+    )
+    implementation_path.parent.mkdir(parents=True, exist_ok=True)
+    implementation_path.write_text(
+        """schema: https://powdrr.io/schemas/specification-v1
+architecture_id: acceptance-architecture
+features:
+  - id: acceptance-feature
+    description: Exercise structured delivery.
+    functional_requirements:
+      - Preserve the typed delivery boundary.
+""",
+        encoding="utf-8",
+    )
+    proposal_path = (
+        artifact_root
+        / "docs"
+        / "proposals"
+        / "acceptance-feature"
+        / "proposed-pr-specification.yaml"
+    )
+    proposal_path.parent.mkdir(parents=True, exist_ok=True)
+    proposal_path.write_text(
+        """schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: acceptance-feature-pr
+feature_ids: [acceptance-feature]
+intent:
+  problem: Exercise structured delivery.
+  goal: Preserve the typed delivery boundary.
+  reasoning: The runtime must retain high-level intent.
+acceptance_criteria:
+  - id: acceptance-criterion
+    description: The typed delivery boundary is preserved.
+expected_tests:
+  - id: acceptance-test
+    description: The vertical acceptance scenario passes.
+required_test_cases:
+  - id: acceptance-case
+    description: The proposed PR is validated before execution.
+expected_outcomes:
+  - id: acceptance-outcome
+    description: A typed execution plan can be compiled.
+non_goals:
+  - id: acceptance-non-goal
+    description: External GitHub mutation.
+risks:
+  - id: acceptance-risk
+    description: Fixture-only execution could bypass validation.
+""",
+        encoding="utf-8",
+    )
+    report = build_pr_specification_validation_report(
+        proposal_path.read_text(encoding="utf-8"),
+        work_item_name="acceptance-feature",
+        repo_root=artifact_root,
+        file_path=proposal_path,
+    )
+    return report.validation_successful
+
+
+def _run_production_task_adapter(workflow_directory: Path, repo_root: Path) -> Any:
+    scenario_root = workflow_directory / "production-task"
+    scenario_root.mkdir(parents=True, exist_ok=True)
+    fixture_path = (
+        repo_root / "workflow-evals/scenarios/execute-proposed-pr/fixtures/task-001"
+    )
+    workflow_path = scenario_root / "workflow"
+    workflow_path.mkdir(parents=True, exist_ok=True)
+    (workflow_path / "task-001.yaml").write_text(
+        """\
+task_id: task-001
+status: open
+upstream_task_ids: []
+dependent_state: [proposed-pr-context-gathered]
+complexity: high
+input_state:
+  proposed_pr: <proposed-pr-id>
+  feature_id: acceptance-feature
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+description: Gather context about the proposed PR
+step_type: invoke_tool
+actions: [next_step]
+pre_step:
+  action: gather_context
+  template:
+    feature_id: <feature_id>
+    types:
+    - proposed_prs
+    - requirements
+    - features
+    - acceptance_criteria
+    - expected_tests
+    - intent
+    - risks
+    - decisions
+""",
+        encoding="utf-8",
+    )
+    scenario_path = scenario_root / "scenario.yaml"
+    scenario_path.write_text(
+        f"""\
+schema_version: 1
+id: acceptance-task
+execution_mode: workflow_task
+workflow_dir: {workflow_path}
+work_item_name: acceptance-feature
+task_id: task-001
+fixture: {fixture_path}
+provider:
+  mode: scripted
+  responses:
+  - action: next_step
+    output_state: $deterministic_pre_step
+expect:
+  output_state: $deterministic_pre_step
+""",
+        encoding="utf-8",
+    )
+    scenario = load_workflow_scenario(scenario_path)
+    return run_workflow_scenario(
+        scenario,
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+    )
+
+
+def _run_production_chat_adapter(workflow_directory: Path, repo_root: Path) -> Any:
+    scenario_root = workflow_directory / "production-chat"
+    fixture_root = scenario_root / "fixture"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    (fixture_root / "example.txt").write_text("acceptance\n", encoding="utf-8")
+    skill_path = scenario_root / "skill.yaml"
+    skill_path.write_text(
+        """\
+name: acceptance-chat
+when_to_use:
+- Exercise the production chat adapter.
+steps:
+- id: inspect
+  description: Inspect the fixture.
+  actions: [invoke_tool, complete, next_step]
+  step_type: freeform
+  tool_invocations:
+  - tool: shell
+    command: [git, status, --short]
+""",
+        encoding="utf-8",
+    )
+    scenario_path = scenario_root / "scenario.yaml"
+    scenario_path.write_text(
+        f"""\
+schema_version: 1
+id: acceptance-chat
+definition: {skill_path}
+execution_mode: workflow_chat
+fixture: fixture
+request: Inspect the acceptance fixture.
+provider:
+  mode: scripted
+  responses:
+  - action: invoke_tool
+    tool: shell
+    parameters:
+      command: [git, status, --short]
+  - action: complete
+    text: Inspection complete.
+expect:
+  outcome: complete
+  visited_steps:
+    ordered: [inspect]
+  required_actions:
+  - kind: invoke_tool
+    tool: shell
+  - kind: complete
+  max_roundtrips: 2
+""",
+        encoding="utf-8",
+    )
+    return run_workflow_scenario(
+        load_workflow_scenario(scenario_path),
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+    )
+
+
 def _walk_profile(
     runtime: ExecutionRuntime, profile: Any
 ) -> tuple[tuple[bool, ...], bool]:
@@ -449,17 +683,98 @@ def _walk_profile(
     return tuple(transitions), published
 
 
-def _review_sequence() -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
-    kernel = ActionKernel()
-    kernel.propose(
-        {"kind": "review-edit", "attributes": ["thread:R123"]},
-        semantic_action="edit_for_review_comment",
+class _AcceptanceClient:
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        raise AssertionError("the acceptance runner must use request_action")
+
+
+class _ScriptedRunnerStrategy:
+    """Minimal adapter that drives the production shared runner in CI."""
+
+    def __init__(self, runtime: ExecutionRuntime, mode: str) -> None:
+        self.runtime = runtime
+        self.mode = mode
+        self._requested = False
+        self._material_state = 0
+
+    def next_request(self) -> WorkflowActionRequest | None:
+        if self._requested:
+            return None
+        self._requested = True
+        return WorkflowActionRequest(
+            client=_AcceptanceClient(),
+            messages=[],
+            parser=lambda payload: payload,
+            model="acceptance",
+            stderr=None,
+            max_timeout_retries=0,
+            timeout_backoff_seconds=0,
+            request_action=lambda: WorkflowAction(kind="next_step"),
+        )
+
+    def report_roundtrip(self, roundtrip: int, action: Any) -> None:
+        pass
+
+    def execute_action(self, action: Any) -> WorkflowActionOutcome:
+        self._material_state += 1
+        return WorkflowActionOutcome(continue_running=False)
+
+    def material_state(self, action: Any) -> object:
+        return self._material_state
+
+    def record_no_progress(self, action: Any, observation: Any) -> None:
+        pass
+
+    def record_response_error(self, error: RuntimeError, payload: Any) -> None:
+        raise error
+
+    def record_action_error(self, action: Any, error: Exception) -> None:
+        raise error
+
+    def action_failure_exit_code(self, action: Any) -> int:
+        return 1
+
+    def observe_outcome(
+        self, action: Any, observation: Any, outcome: WorkflowActionOutcome
+    ) -> WorkflowActionOutcome:
+        return outcome
+
+    def exhausted_roundtrips_exit_code(self) -> int:
+        return 1
+
+
+def _run_shared_runner(
+    workflow_directory: str | Path, repo_root: Path, mode: str
+) -> tuple[dict[str, Any], ...]:
+    runtime = ExecutionRuntime(
+        f"final-acceptance-{mode}",
+        profile_id="default-software-delivery",
+        workflow_directory=Path(workflow_directory) / mode,
+        repo_root=repo_root,
     )
-    kernel.complete({"kind": "validation", "semantic_action": "run_validation"})
-    kernel.complete({"kind": "resolve", "semantic_action": "resolve_review_thread"})
-    return (
-        tuple(event.to_data() for event in kernel.events),
-        tuple(item.to_data() for item in kernel.open_obligations),
+    strategy = _ScriptedRunnerStrategy(runtime, mode)
+    runner = WorkflowStepRunner(
+        max_stalled_roundtrips=1,
+        runtime=runtime,
+        phase_type=PhaseType.INTAKE.value,
+        actor_id="architect",
+    )
+    exit_code = runner.run(strategy, max_roundtrips=1, signature=lambda _: "next-step")
+    if exit_code != 0:
+        raise PowdrrExecutionError(
+            f"acceptance {mode} runner did not complete",
+            error_code="acceptance_runner_incomplete",
+            remediation=(
+                "Inspect the durable runner events and correct the failed action."
+            ),
+        )
+    return tuple(
+        {
+            "event_type": event.event_type.value,
+            "payload": event.payload,
+            "sequence": event.sequence,
+        }
+        for event in runtime.state_store.load_events(runtime.execution_id)
     )
 
 
@@ -482,4 +797,15 @@ def audit_capability_surface(registry: Any) -> tuple[AcceptanceCheck, ...]:
                 "manifest declares semantic actions and effects",
             )
         )
+    builtin_source = (
+        Path(__file__).with_name("builtin_tools.py").read_text(encoding="utf-8")
+    )
+    checks.append(
+        AcceptanceCheck(
+            "normal-runtime-authority",
+            "else CapabilityBroker" not in builtin_source
+            and builtin_source.count("_require_runtime(runtime") >= 7,
+            "normal builtin helpers cannot create an ephemeral broker",
+        )
+    )
     return tuple(checks)

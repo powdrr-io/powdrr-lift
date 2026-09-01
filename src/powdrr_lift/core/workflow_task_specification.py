@@ -88,6 +88,7 @@ class WorkflowTask:
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
+    actions_declared: bool = False
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
@@ -99,6 +100,8 @@ class WorkflowTask:
     persona_id: str | None = None
 
     def __post_init__(self) -> None:
+        if self.actions:
+            object.__setattr__(self, "actions_declared", True)
         assignee_type, assignee_role = validate_assignee(
             self.assignee_type, self.assignee_role
         )
@@ -135,6 +138,8 @@ class WorkflowTask:
             step_data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.actions:
             step_data["actions"] = list(self.actions)
+        elif self.actions_declared:
+            step_data["actions"] = []
         if self.pre_step is not None:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -146,6 +151,8 @@ class WorkflowTask:
         if self.persona_id is not None:
             data["persona_id"] = self.persona_id
         data.update({key: value for key, value in step_data.items() if value})
+        if self.actions_declared and not self.actions:
+            data["actions"] = []
         return data
 
     def to_json(self) -> str:
@@ -422,6 +429,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,
+        actions_declared=step.actions_declared,
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,

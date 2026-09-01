@@ -113,13 +113,29 @@ class ContentAddressedCheckpointStore:
         targets = {
             relative: _safe_restore_path(workspace, relative) for relative in expected
         }
-        for path in _workspace_files(workspace):
-            if str(path.relative_to(workspace)) not in expected:
+        # Restore is a transaction from the caller's perspective. A damaged
+        # object, permission error, or interrupted copy must not leave a
+        # half-restored worktree behind without a corresponding durable event.
+        before = {
+            str(path.relative_to(workspace)): path.read_bytes()
+            for path in _workspace_files(workspace)
+        }
+        try:
+            for path in _workspace_files(workspace):
+                if str(path.relative_to(workspace)) not in expected:
+                    path.unlink()
+            for relative, digest in checkpoint.objects.items():
+                target = targets[relative]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(self.objects / digest, target)
+        except Exception:
+            for path in _workspace_files(workspace):
                 path.unlink()
-        for relative, digest in checkpoint.objects.items():
-            target = targets[relative]
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(self.objects / digest, target)
+            for relative, content in before.items():
+                target = _safe_restore_path(workspace, relative)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+            raise
 
     def restore_with_state(
         self, checkpoint: Checkpoint, workspace_root: str | Path | None = None

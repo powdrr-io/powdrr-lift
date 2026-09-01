@@ -601,6 +601,19 @@ class _WorkflowExecutionState:
     runtime: ExecutionRuntime | None = None
 
 
+def _ensure_execution_runtime(state: _WorkflowExecutionState) -> ExecutionRuntime:
+    """Give direct strategy helpers the same durable boundary as normal runs."""
+    if state.runtime is None:
+        state.runtime = ExecutionRuntime(
+            "chat-helper-"
+            + hashlib.sha256(str(state.worktree_root).encode()).hexdigest()[:24],
+            profile_id="default",
+            workflow_directory=state.worktree_root.parent / ".powdrr-execution",
+            repo_root=state.worktree_root,
+        )
+    return state.runtime
+
+
 @dataclass(slots=True)
 class _WorkflowStepCheckpoint:
     identity: tuple[str, int]
@@ -1002,7 +1015,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
             if self.state.runtime is not None:
                 self.state.runtime.set_action_contract(
-                    frozenset(getattr(self.current_step, "actions", ()))
+                    frozenset(getattr(self.current_step, "actions", ())),
+                    enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
@@ -1050,20 +1064,29 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     step_index=self.current_step_index,
                 )
             if self.current_step.step_type == "gate":
-                passed = _run_gate(
-                    self.current_step,
-                    skill_name=self.selected_skill.skill.name,
-                    worktree_root=self.state.worktree_root,
-                    execution_events=self.state.execution_events,
-                    execution_context=self.state.execution_context,
-                    handoff_records=self.state.handoff_records,
-                    step_index=self.state.step_index,
-                    workflow_context=self.workflow_context,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.config.verbose,
-                    runtime=self.state.runtime,
-                )
+                if self.state.runtime is not None:
+                    self.state.runtime.set_action_contract(None)
+                try:
+                    passed = _run_gate(
+                        self.current_step,
+                        skill_name=self.selected_skill.skill.name,
+                        worktree_root=self.state.worktree_root,
+                        execution_events=self.state.execution_events,
+                        execution_context=self.state.execution_context,
+                        handoff_records=self.state.handoff_records,
+                        step_index=self.state.step_index,
+                        workflow_context=self.workflow_context,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.config.verbose,
+                        runtime=self.state.runtime,
+                    )
+                finally:
+                    if self.state.runtime is not None:
+                        self.state.runtime.set_action_contract(
+                            frozenset(self.current_step.actions),
+                            enforce_empty=self.current_step.actions_declared,
+                        )
                 if passed:
                     self.state.step_index += 1
                 else:
@@ -1090,20 +1113,33 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.current_step.step_type == "invoke_tool"
                 and self.current_step.pre_step is not None
             ):
-                _run_deterministic_pre_step(
-                    self.current_step,
-                    skill_name=self.selected_skill.skill.name,
-                    worktree_root=self.state.worktree_root,
-                    execution_events=self.state.execution_events,
-                    execution_context=self.state.execution_context,
-                    handoff_records=self.state.handoff_records,
-                    step_index=self.state.step_index,
-                    workflow_context=self.workflow_context,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.config.verbose,
-                    runtime=self.state.runtime,
-                )
+                # A deterministic pre-step is engine-owned work declared by
+                # the step, not a model-proposed action. Temporarily remove
+                # the model action contract while executing it, then restore
+                # the contract before constructing the LLM prompt.
+                if self.state.runtime is not None:
+                    self.state.runtime.set_action_contract(None)
+                try:
+                    _run_deterministic_pre_step(
+                        self.current_step,
+                        skill_name=self.selected_skill.skill.name,
+                        worktree_root=self.state.worktree_root,
+                        execution_events=self.state.execution_events,
+                        execution_context=self.state.execution_context,
+                        handoff_records=self.state.handoff_records,
+                        step_index=self.state.step_index,
+                        workflow_context=self.workflow_context,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.config.verbose,
+                        runtime=self.state.runtime,
+                    )
+                finally:
+                    if self.state.runtime is not None:
+                        self.state.runtime.set_action_contract(
+                            frozenset(self.current_step.actions),
+                            enforce_empty=self.current_step.actions_declared,
+                        )
                 pre_step_event = _latest_deterministic_pre_step(
                     self.state.execution_events,
                     skill_name=self.selected_skill.skill.name,
@@ -2757,20 +2793,27 @@ def run_workflow_chat(
             f"{selection.selected_skill_path}:{user_request}".encode()
         ).hexdigest()[:24]
     )
+    delivery_profile = (
+        load_delivery_profile(
+            repo_root / "delivery-profiles/default-software-delivery.yaml"
+        )
+        if (repo_root / "delivery-profiles/default-software-delivery.yaml").is_file()
+        else None
+    )
     runtime = ExecutionRuntime(
         execution_id,
-        profile_id=selected_skill.skill.name,
+        profile_id=(
+            delivery_profile.profile_id
+            if delivery_profile is not None
+            else selected_skill.skill.name
+        ),
         workflow_directory=project_root / ".powdrr",
         repo_root=repo_root,
-        profile=(
-            load_delivery_profile(
-                repo_root / "delivery-profiles/default-software-delivery.yaml"
-            )
-            if (
-                repo_root / "delivery-profiles/default-software-delivery.yaml"
-            ).is_file()
-            else None
-        ),
+        profile=delivery_profile,
+    )
+    runtime.capture_explicit_guidance(
+        user_request,
+        source_ref=f"{execution_id}:user-request",
     )
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
@@ -3241,6 +3284,19 @@ def _workflow_context_path(project_root: Path) -> Path:
     return project_root / _WORKFLOW_CONTEXT_PATH
 
 
+def _workflow_context_runtime(
+    project_root: Path,
+    worktree_root: Path,
+) -> ExecutionRuntime:
+    """Create the durable runtime used by worktree-context bookkeeping."""
+    return ExecutionRuntime(
+        "workflow-context",
+        profile_id="workflow-context",
+        workflow_directory=project_root / ".powdrr" / "context-execution",
+        repo_root=worktree_root,
+    )
+
+
 def _load_workflow_context(project_root: Path) -> WorkflowContext | None:
     path = _workflow_context_path(project_root)
     try:
@@ -3286,29 +3342,29 @@ def _persist_workflow_context(
     pr_number: int | None = None
     pr_url: str | None = None
     try:
-        branch_result = subprocess.run(
-            ["git", "branch", "--show-current"],
-            cwd=worktree_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        branch_name = branch_result.stdout.strip() or None
-        pr_result = subprocess.run(
-            ["gh", "pr", "view", "--json", "number,url"],
-            cwd=worktree_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if pr_result.returncode == 0:
-            pr_payload = json.loads(pr_result.stdout)
-            if isinstance(pr_payload, dict):
-                value = pr_payload.get("number")
-                pr_number = value if isinstance(value, int) else None
-                url = pr_payload.get("url")
-                pr_url = url if isinstance(url, str) else None
-    except (OSError, json.JSONDecodeError):
+        runtime = _workflow_context_runtime(project_root, worktree_root)
+        with runtime.without_action_contract():
+            branch_result = invoke_intrinsic_capability(
+                GIT_TOOL,
+                {"operation": "branch_current"},
+                worktree_root=worktree_root,
+                runtime=runtime,
+            )
+            branch_name = str(branch_result.get("stdout", "")).strip() or None
+            pr_result = invoke_intrinsic_capability(
+                GH_TOOL,
+                {"operation": "pr_view", "json_fields": ["number", "url"]},
+                worktree_root=worktree_root,
+                runtime=runtime,
+            )
+            if int(pr_result.get("returncode", 1)) == 0:
+                pr_payload = json.loads(str(pr_result.get("stdout", "")))
+                if isinstance(pr_payload, dict):
+                    value = pr_payload.get("number")
+                    pr_number = value if isinstance(value, int) else None
+                    url = pr_payload.get("url")
+                    pr_url = url if isinstance(url, str) else None
+    except (OSError, json.JSONDecodeError, PowdrrExecutionError):
         pass
     context = WorkflowContext(
         worktree_root=worktree_root,
@@ -3344,17 +3400,23 @@ def _workflow_context_pr_is_closed(context: WorkflowContext | None) -> bool:
     ):
         return False
     try:
-        result = subprocess.run(
-            ["gh", "pr", "view", str(context.pr_number), "--json", "state"],
-            cwd=context.worktree_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
+        project_root = context.worktree_root
+        runtime = _workflow_context_runtime(project_root, context.worktree_root)
+        with runtime.without_action_contract():
+            result = invoke_intrinsic_capability(
+                GH_TOOL,
+                {
+                    "operation": "pr_view",
+                    "pr_reference": str(context.pr_number),
+                    "json_fields": ["state"],
+                },
+                worktree_root=context.worktree_root,
+                runtime=runtime,
+            )
+        if int(result.get("returncode", 1)) != 0:
             return False
-        payload = json.loads(result.stdout)
-    except (OSError, json.JSONDecodeError):
+        payload = json.loads(str(result.get("stdout", "")))
+    except (OSError, json.JSONDecodeError, PowdrrExecutionError):
         return False
     if not isinstance(payload, dict):
         return False
@@ -4093,6 +4155,14 @@ def _run_deterministic_pre_step(
     force: bool = False,
     runtime: ExecutionRuntime | None = None,
 ) -> None:
+    if runtime is None:
+        runtime = ExecutionRuntime(
+            "chat-pre-step-"
+            + hashlib.sha256(str(worktree_root).encode()).hexdigest()[:24],
+            profile_id="default",
+            workflow_directory=worktree_root.parent / ".powdrr-execution",
+            repo_root=worktree_root,
+        )
     if not force and _latest_deterministic_pre_step(
         execution_events,
         skill_name=skill_name,
@@ -4863,11 +4933,16 @@ def _modular_action_system_prompt(
     interaction_style: str | None = None,
 ) -> str:
     """Build a compact action prompt with explicitly selected guidance sections."""
-    include_context = _step_needs_prompt_catalog(current_step, "context_types")
-    include_skills = _step_needs_prompt_catalog(current_step, "skills")
+    step_actions = _step_actions(current_step)
+    action_names = {name for name, _ in step_actions}
+    include_context = "gather_context" in action_names and _step_needs_prompt_catalog(
+        current_step, "context_types"
+    )
+    include_skills = "invoke_skill" in action_names and _step_needs_prompt_catalog(
+        current_step, "skills"
+    )
     action_lines = "\n".join(
-        f"- {name}: {instructions}"
-        for name, instructions in _step_actions(current_step)
+        f"- {name}: {instructions}" for name, instructions in step_actions
     )
     prompt = (
         "Task: execute the supplied details using the handoff inputs, latest action "
@@ -4876,9 +4951,8 @@ def _modular_action_system_prompt(
         + action_lines
         + "\nThe current-step contract below is authoritative. Do not use action "
         "instructions or action names from any previous step.\n"
-        "next_step is always allowed with the default completion behavior; it is "
-        "listed below only when this step needs output-specific handoff guidance.\n"
-        + "\n"
+        "next_step is always allowed and is listed with its default completion "
+        "behavior below. Required outputs add exact handoff requirements.\n" + "\n"
         "If the current-step contract lists required outputs, the advancing action "
         "must also include an outputs object containing every required output under "
         "its exact declared name. A statement in decisions_and_context is not an "
@@ -4898,7 +4972,6 @@ def _modular_action_system_prompt(
         "actions.\n"
     )
     prompt += _interaction_style_prompt(interaction_style)
-    action_names = {name for name, _ in _step_actions(current_step)}
     if "invoke_tool" in action_names:
         prompt += (
             "A declared internal command is represented as: "
@@ -4951,9 +5024,7 @@ def _modular_action_system_prompt(
             '"provider_role":"adversarial","clean":true}.\n'
         )
     nested_skills = tuple(getattr(current_step, "uses_skills", ()) or ())
-    if nested_skills and "invoke_skill" in {
-        name for name, _ in _step_actions(current_step)
-    }:
+    if nested_skills and "invoke_skill" in action_names:
         prompt += (
             "This step delegates to a nested skill; use invoke_skill, "
             "not invoke_tool or an internal CLI command. The only listed nested "
@@ -4972,21 +5043,35 @@ def _modular_action_system_prompt(
             "Deterministic context: the resolved pre_step template has already run. "
             "The deterministic_context field is the context for this step; do not "
             "invoke the pre-step again. invoke_tool is not allowed in this step. "
-            "Use the result and choose next_step; choose complete only when the "
-            "skill itself is finished.\n"
         )
+        if "complete" in action_names:
+            prompt += (
+                "Use the result and choose next_step; choose complete only when the "
+                "skill itself is finished.\n"
+            )
+        else:
+            prompt += (
+                "Use the result and choose next_step when this step is finished.\n"
+            )
     if _validation_gate_enabled(current_step):
         prompt += (
             "This step has a runtime validation gate. Run every discovered obligation "
             "using the exact action in validation_gate. You cannot choose next_step, "
-            "goto_step, or complete until every obligation passes in the current "
+            + ("goto_step, " if "goto_step" in action_names else "")
+            + ("or complete " if "complete" in action_names else "")
+            + "until every obligation passes in the current "
             "epoch. If any obligation fails, apply its corrective action; the runtime "
             "will reset the epoch and require every obligation to run again.\n"
-            "gather_context remains allowed while repairing a failed obligation. "
-            "Use it when the latest validator result reports a missing or unknown id; "
-            "use the validator's suggested context types and keywords, then apply "
-            "the correction.\n"
-            "Validation repair protocol: a failed result is a diagnosis, not "
+            + (
+                "gather_context remains allowed while repairing a failed obligation. "
+                "Use it when the latest validator result reports a missing or unknown "
+                "id; "
+                "use the validator's suggested context types and keywords, then apply "
+                "the correction.\n"
+                if "gather_context" in action_names
+                else ""
+            )
+            + "Validation repair protocol: a failed result is a diagnosis, not "
             "permission to repeat the same edit. First inspect the exact current "
             "file and full validator result, map each issue to its reported path, "
             "and apply a structural correction at that path. Never repeat an "
@@ -4997,36 +5082,45 @@ def _modular_action_system_prompt(
             "is unchanged or worse, change the target or repair strategy; do not keep "
             "retrying the same action.\n"
         )
-    prompt += (
-        "Transition rules are enforced by the runtime: goto_step may target only a "
-        "prior step in this skill, never the current or a later step, and complete "
-        "is invalid while any gate remains later in this skill.\n"
-    )
-    if action_names & {"yaml_edit", "read_document", "edit"} or include_context:
+    if "goto_step" in action_names or "complete" in action_names:
         prompt += (
-            "Structured-file guidance: use yaml_edit for YAML specifications, combine "
-            "independent corrections in one operations array, and preserve document "
-            "structure. Use read_document for the smallest useful range of a large "
+            "Transition rules are enforced by the runtime: "
+            + (
+                "goto_step may target only a prior step in this skill, never the "
+                "current or a later step. "
+                if "goto_step" in action_names
+                else ""
+            )
+            + (
+                "complete is invalid while any gate remains later in this skill."
+                if "complete" in action_names
+                else ""
+            )
+            + "\n"
+        )
+    if "read_document" in action_names:
+        prompt += (
+            "read_document guidance: use the smallest useful range of a large "
             "document; it requires file_path, non-negative start_line and end_line "
             "for at most 2000 lines, with line 0 meaning the beginning and an "
-            "end_line past "
-            "EOF clamped.\n"
-            "edit requires valid line edits; prefer yaml_edit for YAML, but edit is "
-            "allowed as a fallback when structural operations cannot express the "
-            "repair. A yaml_edit set_value path is a JSON array of mapping keys, "
-            'such as ["title"] or ["metadata","owner"], never a JSON '
-            "pointer such as /title. For list sections, use one upsert_item per "
-            "item with section, id, and a complete value mapping; do not replace "
-            "the whole list with set_value.\n"
-            "yaml_edit is a first-class action, not a command. Return it directly "
-            'with action="yaml_edit", file_path, and operations; never wrap it in '
-            'action="invoke_tool" through the internal or shell tool. Example: '
-            '{"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml",'
-            '"operations":[{"op":"set_value","path":["title"],"value":"..."}]}\n'
+            "end_line past EOF clamped.\n"
         )
-    if current_step.tool_invocations and "invoke_tool" in {
-        name for name, _ in _step_actions(current_step)
-    }:
+    if "edit" in action_names:
+        prompt += (
+            "edit guidance: use valid line edits; prefer yaml_edit for YAML only "
+            "when yaml_edit is also listed, but edit is allowed as a fallback when "
+            "structural operations cannot express the repair.\n"
+        )
+    if "yaml_edit" in action_names:
+        prompt += (
+            "yaml_edit guidance: combine independent corrections in one operations "
+            "array and preserve document structure. A set_value path is a JSON array "
+            'of mapping keys, such as ["title"] or ["metadata","owner"], never a '
+            "JSON pointer such as /title. For list sections, use one upsert_item per "
+            "item with section, id, and a complete value mapping. Return yaml_edit "
+            'directly with action="yaml_edit"; never wrap it in invoke_tool.\n'
+        )
+    if current_step.tool_invocations and "invoke_tool" in action_names:
         prompt += (
             "Tool guidance: invoke one of the declared tool_invocations successfully "
             "before next_step or complete. A prose summary is not a tool invocation.\n"
@@ -5309,7 +5403,7 @@ def _handle_workflow_action_edit(
         ),
         worktree_root=state.worktree_root,
         executor=lambda: _write_pending_file_mutations(pending_writes),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
@@ -5400,7 +5494,7 @@ def _handle_workflow_action_yaml_edit(
         (action.file_path,),
         worktree_root=state.worktree_root,
         executor=lambda: target_path.write_text(updated_text, encoding="utf-8"),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
@@ -5478,7 +5572,7 @@ def _handle_workflow_action_file_management(
             file_path=file_path,
             destination_path=action.destination_path,
         ),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     if state.file_added_callback is not None:
         changed_paths = [action.file_path]
@@ -5820,28 +5914,28 @@ def _handle_workflow_action_invoke_tool(
             action.parameters,
             worktree_root=state.worktree_root,
             path_cache=state.fuzzy_match_cache,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool == ENRICH_TOOL:
         tool_result = invoke_intrinsic_capability(
             ENRICH_TOOL,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool == VALIDATE_EDIT_TOOL:
         tool_result = invoke_deferred_edit_capability(
             VALIDATE_EDIT_TOOL,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool == APPLY_EDIT_TOOL:
         tool_result = invoke_deferred_edit_capability(
             APPLY_EDIT_TOOL,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
@@ -5866,20 +5960,16 @@ def _handle_workflow_action_invoke_tool(
                     and command_items[1:2] == ["pull-request-description"]
                 ),
             ),
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     elif action.tool in {GIT_TOOL, GH_TOOL}:
-        if (
-            action.tool == GH_TOOL
-            and action.parameters.get("operation") == "pr_create"
-            and state.runtime is not None
-        ):
-            state.runtime.require_publish_readiness()
+        if action.tool == GH_TOOL and action.parameters.get("operation") == "pr_create":
+            _ensure_execution_runtime(state).require_publish_readiness()
         tool_result = invoke_intrinsic_capability(
             action.tool,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
         if tool_result.get("stdout"):
             print(str(tool_result["stdout"]), end="", file=stdout)
@@ -5891,7 +5981,7 @@ def _handle_workflow_action_invoke_tool(
             action.tool,
             action.parameters,
             worktree_root=state.worktree_root,
-            runtime=state.runtime,
+            runtime=_ensure_execution_runtime(state),
         )
     else:
         raise PowdrrExecutionError(
@@ -5976,6 +6066,7 @@ def _record_chat_pull_request(
         tool_result,
         root_skill=state.root_skill or state.selected_skill,
         step_index=state.step_index,
+        runtime=_ensure_execution_runtime(state),
     )
 
 
@@ -5985,6 +6076,7 @@ def _record_skill_pull_request(
     skill: SkillCatalogEntry,
     events: Sequence[Mapping[str, Any]],
     tool_result: Mapping[str, Any],
+    runtime: ExecutionRuntime,
     root_skill: SkillCatalogEntry | None = None,
     step_index: int | None = None,
 ) -> None:
@@ -6012,14 +6104,14 @@ def _record_skill_pull_request(
         "step_index": step_index,
     }
     record_skill = root_skill or skill
-    branch_result = subprocess.run(
-        ["git", "branch", "--show-current"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    branch = branch_result.stdout.strip()
+    with runtime.without_action_contract():
+        branch_result = invoke_intrinsic_capability(
+            GIT_TOOL,
+            {"operation": "branch_current"},
+            worktree_root=repo_root,
+            runtime=runtime,
+        )
+    branch = str(branch_result.get("stdout", "")).strip()
     if not branch:
         raise PowdrrExecutionError(
             "Could not determine the branch for the workflow record."
@@ -6047,8 +6139,14 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
-        and action.kind != "complete"
-        and not (action.kind == "invoke_tool" and action.tool == "internal")
+        and not (
+            action.kind == "complete" and not getattr(step, "actions_declared", False)
+        )
+        and not (
+            action.kind == "invoke_tool"
+            and action.tool == "internal"
+            and not getattr(step, "actions_declared", False)
+        )
     ):
         raise _WorkflowToolValidationError(
             ValidationError(
@@ -6920,8 +7018,14 @@ def _validate_workflow_action_for_step_unwrapped(
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
-        and action.kind != "complete"
-        and not (action.kind == "invoke_tool" and action.tool == "internal")
+        and not (
+            action.kind == "complete" and not getattr(step, "actions_declared", False)
+        )
+        and not (
+            action.kind == "invoke_tool"
+            and action.tool == "internal"
+            and not getattr(step, "actions_declared", False)
+        )
     ):
         raise _WorkflowToolValidationError(
             ValidationError(
@@ -7154,7 +7258,7 @@ def _handle_workflow_action_gather_context(
             filters=action.filters,
             feature_id=action.feature_id,
         ),
-        runtime=state.runtime,
+        runtime=_ensure_execution_runtime(state),
     )
     gathered_context_text = render_gather_context_report(gathered_context)
     _verbose_print(
@@ -9809,7 +9913,7 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
 def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     """Return only this step's declared actions, always including next_step."""
     declared = tuple(getattr(step, "actions", ()) or ())
-    if declared:
+    if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
     else:
         # Older skill definitions may omit an explicit action catalog. Infer the
@@ -9849,13 +9953,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
-    has_required_outputs = any(
-        getattr(output, "required_for_next_step", False)
-        for output in (getattr(step, "outputs", ()) or ())
-    )
-    if not has_required_outputs:
-        actions = [item for item in actions if item[0] != "next_step"]
-    if has_required_outputs and "next_step" not in action_names:
+    if "next_step" not in action_names:
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(
         output
@@ -9899,18 +9997,42 @@ def _action_repair_prompt(
         "this corrective response is also empty, the system will interpret it "
         "as next_step.\n"
         'Return exactly one JSON object with a top-level "action" field and the '
-        "fields required by that action. Use "
-        "file_path and edits or file_edits for edit, operation and file_path "
-        "for file_management (plus destination_path for move or rename), file_path "
-        "and operations for yaml_edit, tool and "
-        "parameters.command for invoke_tool, skill for invoke_skill, file_path "
-        "with positive start_line "
-        "and end_line for read_document, non-empty types for gather_context, "
-        'and text containing a clear English question ending in "?" for '
-        "prompt_user. Do not "
-        "combine actions or output markdown. For yaml_edit, combine all "
-        "independent corrections for the same file in one operations array."
+        "fields required by that action. Do not combine actions or output "
+        "markdown."
     )
+    action_names = (
+        {name for name, _ in _step_actions(current_step)}
+        if current_step is not None
+        else set(_DEFAULT_ACTION_INSTRUCTIONS)
+    )
+    action_requirements = {
+        "edit": "Use file_path and edits or file_edits for edit.",
+        "file_management": (
+            "Use operation and file_path for file_management; move and rename "
+            "also require destination_path."
+        ),
+        "yaml_edit": (
+            "Use file_path and operations for yaml_edit; combine independent "
+            "corrections for the same file in one operations array."
+        ),
+        "invoke_tool": "Use tool and parameters.command for invoke_tool.",
+        "invoke_skill": "Use skill for invoke_skill.",
+        "read_document": (
+            "Use file_path with positive start_line and end_line for read_document."
+        ),
+        "gather_context": "Use non-empty types for gather_context.",
+        "prompt_user": (
+            'Use text containing a clear English question ending in "?" for '
+            "prompt_user."
+        ),
+    }
+    requirements = [
+        action_requirements[name]
+        for name in action_names
+        if name in action_requirements
+    ]
+    if requirements:
+        prompt += " " + " ".join(requirements)
     if current_step is not None:
         interaction_style = (
             getattr(current_step, "interaction_style", None)
@@ -9942,7 +10064,9 @@ def _action_repair_prompt(
         if _validation_gate_enabled(current_step):
             prompt += (
                 "This step has a runtime validation gate. Never return next_step, "
-                "goto_step, or complete until every discovered validation obligation "
+                + ("goto_step, " if "goto_step" in action_names else "")
+                + ("or complete " if "complete" in action_names else "")
+                + "until every discovered validation obligation "
                 "has "
                 "passed in the current epoch. After any correction, rerun every "
                 "discovered obligation; the runtime validation_gate object is "
@@ -9950,37 +10074,47 @@ def _action_repair_prompt(
                 "repair that produced the same validation issue. Inspect the exact "
                 "current file and reported issue path first, preserve valid fields, "
                 "choose a materially different target or strategy when the issue state "
-                "is unchanged or worse. Apply independent YAML fixes in one yaml_edit "
-                "and wait for the deterministic rerun before claiming progress. "
+                "is unchanged or worse. "
+                + (
+                    "Apply independent YAML fixes in one yaml_edit. "
+                    if "yaml_edit" in action_names
+                    else ""
+                )
+                + "Wait for the deterministic rerun before claiming progress. "
             )
         invocations = tuple(current_step.tool_invocations)
-        if invocations:
+        if invocations and "invoke_tool" in action_names:
             declared_tools = json.dumps(
                 [_tool_invocation_to_data(item) for item in invocations],
                 ensure_ascii=False,
             )
             prompt += f"Use only these declared tool invocations: {declared_tools}. "
-        else:
-            prompt += (
-                "This step declares no tool invocations; do not return invoke_tool. "
+        shapes: list[str] = []
+        if "prompt_user" in action_names:
+            shapes.append(
+                '{"action":"prompt_user","text":"One clear English question?",'
+                '"decisions_and_context":"More information is required."}'
             )
-        prompt += (
-            "For this repair, these are the exact prompt_user and next_step "
-            "action shapes allowed for the current step: "
-            '{"action":"prompt_user","text":"One clear English question?",'
-            '"decisions_and_context":"More information is required."} or '
-            '{"action":"next_step","decisions_and_context":"The current step '
-            'is complete."}. '
-        )
-        prompt += (
-            'If the correction is a YAML edit, use exactly {"action":"yaml_edit",'
-            '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
-            '"path":["id"],"value":"feature-id"}]}; include all required '
-            'fields in the operation. For list items, use {"op":"upsert_item",'
-            '"section":"requirements","id":"req-1","value":{"description":'
-            '"...","state":"added"}}. '
-        )
-        if invocations:
+        if "next_step" in action_names:
+            shapes.append(
+                '{"action":"next_step","decisions_and_context":"The current '
+                'step is complete."}'
+            )
+        if shapes:
+            prompt += (
+                "For this repair, use one of these exact action shapes allowed for "
+                "the current step: " + " or ".join(shapes) + ". "
+            )
+        if "yaml_edit" in action_names:
+            prompt += (
+                'For a YAML correction, use exactly {"action":"yaml_edit",'
+                '"file_path":"relative/file.yaml","operations":[{"op":"set_value",'
+                '"path":["id"],"value":"feature-id"}]}; include all required '
+                'fields in the operation. For list items, use {"op":"upsert_item",'
+                '"section":"requirements","id":"req-1","value":{"description":'
+                '"...","state":"added"}}. '
+            )
+        if invocations and "invoke_tool" in action_names:
             prompt += (
                 "invoke_tool is also allowed only with one of the declared tool "
                 "templates shown above; do not invent another tool or parameter "
@@ -10004,14 +10138,16 @@ def _action_repair_prompt(
             )
     if failed_action is not None:
         prompt += (
-            "\nThe previous edit action failed and was not applied. don't do this "
-            "again; do not repeat it "
-            "unchanged; reread the current file and return a corrected action. "
-            "For YAML, prefer yaml_edit with upsert_item, remove_item, "
-            "remove_key, or set_value; use a normal edit with exact line "
-            "ranges when those "
-            "operations cannot express the repair. The "
-            "rejected edit was:\n"
+            f"\nThe previous {failed_action.kind} action failed and was not applied. "
+            "Do not repeat it unchanged; return a corrected action. "
+            + (
+                "For YAML, prefer yaml_edit with upsert_item, remove_item, "
+                "remove_key, or set_value; use a normal edit with exact line "
+                "ranges when those operations cannot express the repair. "
+                if {"edit", "yaml_edit"} & action_names
+                else ""
+            )
+            + "The rejected action was:\n"
             f"{_workflow_action_signature(failed_action)}"
         )
     return prompt

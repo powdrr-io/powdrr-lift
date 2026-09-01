@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -69,6 +70,7 @@ from powdrr_lift.workflow_chat_agent import (
     _long_context_backup_for,
     _maybe_record_llm_exchanges,
     _model_limits_for,
+    _modular_action_system_prompt,
     _parse_action_response,
     _print_waiting_for_model,
     _record_skill_pull_request,
@@ -432,6 +434,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _llm_error_context(self) -> dict[str, Any]:
         recent_events = self.events[-8:]
+        runtime_actions = (
+            self.runtime.allowed_actions() if self.runtime is not None else None
+        )
+        allowed_actions = list(runtime_actions) if runtime_actions is not None else None
         last_successful_action = next(
             (
                 event
@@ -456,13 +462,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "provider": self.mapping_provider,
             "model": self.model,
             "action_contract": {
-                "allowed_actions": [
-                    "invoke_tool",
-                    "invoke_skill",
-                    "get-human-input",
-                    "next_step",
-                    "complete",
-                ],
+                "allowed_actions": allowed_actions,
                 "declared_nested_skills": list(self.task.uses_skills),
             },
             "recent_events": recent_events,
@@ -522,10 +522,19 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if payload is not None
             else f"<no parsed response; client error: {error}>"
         )
+        allowed_actions = (
+            self.runtime.allowed_actions() if self.runtime is not None else None
+        )
+        contract_guidance = (
+            " The action must be one of: " + ", ".join(allowed_actions) + "."
+            if allowed_actions is not None
+            else ""
+        )
         guidance = (
             "Return exactly one complete JSON object matching one of the "
-            "documented workflow-task action shapes. Do not return markdown, "
-            "prose, or an empty response."
+            "documented workflow-task action shapes."
+            + contract_guidance
+            + " Do not return markdown, prose, or an empty response."
         )
         record_workflow_llm_error(
             self.error_log_root,
@@ -611,10 +620,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.requires_deterministic_output_state and output_state != (
                 self.deterministic_output_state
             ):
-                raise ValueError(
+                raise PowdrrExecutionError(
                     "This task must persist the exact deterministic pre-step result "
                     "in the top-level output_state field; do not use outputs, "
-                    "text, or a summary instead."
+                    "text, or a summary instead.",
+                    error_code="deterministic_output_state_mismatch",
+                    action_kind=action.kind,
+                    remediation="Copy the exact pre-step result into output_state.",
                 )
             completed = self.workflow.complete_task(
                 self.task.task_id,
@@ -634,6 +646,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 stdout=self.stdout,
                 open_pull_request=False,
                 events=self.events,
+                runtime=self.runtime,
             )
             print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
             return WorkflowActionOutcome(continue_running=False)
@@ -799,10 +812,13 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.requires_deterministic_output_state and action.output_state != (
                 self.deterministic_output_state
             ):
-                raise ValueError(
+                raise PowdrrExecutionError(
                     "This task must persist the exact deterministic pre-step result "
                     "in the top-level output_state field; do not use outputs, "
-                    "text, or a summary instead."
+                    "text, or a summary instead.",
+                    error_code="deterministic_output_state_mismatch",
+                    action_kind=action.kind,
+                    remediation="Copy the exact pre-step result into output_state.",
                 )
             completed = self.workflow.terminate_workflow(
                 self.task.task_id,
@@ -816,6 +832,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 stdout=self.stdout,
                 open_pull_request=False,
                 events=self.events,
+                runtime=self.runtime,
             )
             if action.text:
                 print(action.text, file=self.stdout)
@@ -897,6 +914,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stdout=self.stdout,
             open_pull_request=False,
             events=self.events,
+            runtime=self.runtime,
         )
         return WorkflowActionOutcome(continue_running=False)
 
@@ -993,6 +1011,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "parameters": action.parameters,
             "result": result,
         }
+        if self.runtime is None:
+            raise PowdrrExecutionError(
+                "Workflow task pull-request recording requires an execution runtime.",
+                error_code="execution_runtime_required",
+            )
         _record_task_pull_request(
             action,
             self.workflow,
@@ -1000,6 +1023,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.repo_root,
             self.events,
             result,
+            runtime=self.runtime,
         )
         self.events.append(event)
 
@@ -1065,6 +1089,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stdout=self.stdout,
             open_pull_request=False,
             events=self.events,
+            runtime=self.runtime,
         )
         return 2
 
@@ -1076,6 +1101,7 @@ def _record_task_pull_request(
     repo_root: Path,
     events: Sequence[Mapping[str, Any]],
     result: object,
+    runtime: ExecutionRuntime,
 ) -> None:
     command = action.parameters.get("command")
     if command is None and isinstance(result, Mapping):
@@ -1095,7 +1121,12 @@ def _record_task_pull_request(
             "GitHub did not return a pull-request URL, so the workflow record "
             "could not be named under docs/prs/<pr-number>.yaml."
         )
-    branch = _git_output(repo_root, ["branch", "--show-current"])
+    with runtime.without_action_contract():
+        branch = _git_output(
+            repo_root,
+            ["branch", "--show-current"],
+            runtime=runtime,
+        )
     state = load_workflow_git_state(
         workflow.directory,
         workflow_id=workflow_id_from_task_id(task_id),
@@ -1250,6 +1281,7 @@ def run_workflow_task(
         print(str(exc), file=stderr)
         return 2
 
+    last_runtime: ExecutionRuntime | None = None
     while True:
         task = _select_task(workflow, requested_task_id)
         requested_task_id = None
@@ -1272,6 +1304,7 @@ def run_workflow_task(
                         workflow,
                         workflow_git_state,
                         stdout=stdout,
+                        runtime=last_runtime,
                     )
                     return 0
                 if not _is_git_worktree(repo_root):
@@ -1287,6 +1320,41 @@ def run_workflow_task(
             print("No ready agent task found.", file=stderr)
             return 1
 
+        provider = resolve_workflow_provider(config.provider)
+        mappings = tuple(_default_llm_mappings(provider).items())
+        mapping = _resolve_workflow_task_mapping(
+            task.llm_type,
+            mappings=mappings,
+            provider=provider,
+        )
+        if mapping is None:
+            raise PowdrrExecutionError(
+                f"Workflow task has no LLM mapping: {task.task_id}"
+            )
+        model = mapping.model
+        execution_phase = task.phase_type or PhaseType.BUILD
+        delivery_profile = (
+            load_delivery_profile(
+                repo_root / "delivery-profiles/default-software-delivery.yaml"
+            )
+            if (
+                repo_root / "delivery-profiles/default-software-delivery.yaml"
+            ).is_file()
+            else None
+        )
+        runtime = ExecutionRuntime(
+            task.task_id,
+            profile_id=(
+                delivery_profile.profile_id
+                if delivery_profile is not None
+                else task.persona_id or task.assignee_role.value
+            ),
+            workflow_directory=workflow_dir,
+            repo_root=repo_root,
+            phase=execution_phase,
+            profile=delivery_profile,
+        )
+        last_runtime = runtime
         try:
             if workflow_git_state is not None:
                 validate_workflow_git_state(
@@ -1313,38 +1381,25 @@ def run_workflow_task(
             reason=f"claim {task.task_id}",
             stdout=stdout,
             open_pull_request=False,
+            runtime=runtime,
         )
-
-        provider = resolve_workflow_provider(config.provider)
-        mappings = tuple(_default_llm_mappings(provider).items())
-        mapping = _resolve_workflow_task_mapping(
-            task.llm_type,
-            mappings=mappings,
-            provider=provider,
+        runtime.set_action_contract(
+            frozenset(task.actions),
+            enforce_empty=task.actions_declared,
         )
-        if mapping is None:
-            raise PowdrrExecutionError(
-                f"Workflow task has no LLM mapping: {task.task_id}"
+        if (
+            delivery_profile is not None
+            and task.phase_type is not None
+            and task.persona_id is not None
+        ):
+            runtime.persona_packet(
+                delivery_profile,
+                run_id=task.task_id,
+                phase_type=task.phase_type,
+                phase_actions=frozenset(task.actions),
+                persona_actions={task.persona_id: frozenset(task.actions)},
+                allowed_effects=frozenset(),
             )
-        model = mapping.model
-        execution_phase = task.phase_type or PhaseType.BUILD
-        runtime = ExecutionRuntime(
-            task.task_id,
-            profile_id=task.persona_id or task.assignee_role.value,
-            workflow_directory=workflow_dir,
-            repo_root=repo_root,
-            phase=execution_phase,
-            profile=(
-                load_delivery_profile(
-                    repo_root / "delivery-profiles/default-software-delivery.yaml"
-                )
-                if (
-                    repo_root / "delivery-profiles/default-software-delivery.yaml"
-                ).is_file()
-                else None
-            ),
-        )
-        runtime.set_action_contract(frozenset(task.actions))
         if client_was_provided:
             assert client is not None
             task_client = client
@@ -1369,15 +1424,22 @@ def run_workflow_task(
             compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
 
         driver_events: list[dict[str, Any]] = []
-        deterministic_output_state, requires_deterministic_output_state = (
-            _run_task_deterministic_pre_step(
-                task,
-                repo_root=repo_root,
-                events=driver_events,
-                include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
-                runtime=runtime,
+        runtime.set_action_contract(None)
+        try:
+            deterministic_output_state, requires_deterministic_output_state = (
+                _run_task_deterministic_pre_step(
+                    task,
+                    repo_root=repo_root,
+                    events=driver_events,
+                    include_invoke_tool=config.run_deterministic_invoke_tool_pre_steps,
+                    runtime=runtime,
+                )
             )
-        )
+        finally:
+            runtime.set_action_contract(
+                frozenset(task.actions),
+                enforce_empty=task.actions_declared,
+            )
         driver = WorkflowStepRunner(
             max_stalled_roundtrips=config.max_stalled_roundtrips,
             runtime=runtime,
@@ -1632,6 +1694,7 @@ def _publish_workflow_progress(
     stdout: TextIO,
     open_pull_request: bool = True,
     events: Sequence[Mapping[str, Any]] = (),
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     """Commit and publish durable workflow progress for execution tasks.
 
@@ -1649,10 +1712,10 @@ def _publish_workflow_progress(
     )
     if (
         workflow_git_state is None
-        and not _git_result(repo_root, ["remote"]).stdout.strip()
+        and not _git_result(repo_root, ["remote"], runtime=runtime).stdout.strip()
     ):
         return
-    branch = _git_output(repo_root, ["branch", "--show-current"])
+    branch = _git_output(repo_root, ["branch", "--show-current"], runtime=runtime)
     if (
         workflow_git_state is not None
         and branch != workflow_git_state.integration_branch
@@ -1676,22 +1739,23 @@ def _publish_workflow_progress(
     if branch in {"", "main", "master"}:
         branch = _workflow_branch_name(workflow)
         if _git_result(
-            repo_root, ["show-ref", "--verify", f"refs/heads/{branch}"]
+            repo_root, ["show-ref", "--verify", f"refs/heads/{branch}"], runtime=runtime
         ).returncode:
-            _run_git(repo_root, ["switch", "-c", branch])
+            _run_git(repo_root, ["switch", "-c", branch], runtime=runtime)
         else:
-            _run_git(repo_root, ["switch", branch])
+            _run_git(repo_root, ["switch", branch], runtime=runtime)
 
-    _run_git(repo_root, ["add", "--all"])
-    status = _git_result(repo_root, ["status", "--porcelain"])
+    _run_git(repo_root, ["add", "--all"], runtime=runtime)
+    status = _git_result(repo_root, ["status", "--porcelain"], runtime=runtime)
     if status.stdout.strip():
         _run_git(
             repo_root,
             ["commit", "-m", f"Persist workflow progress: {reason}"],
+            runtime=runtime,
         )
     # Always push at a task boundary. A nested operation may have created a
     # local commit, leaving no working-tree changes for the add/status check.
-    _run_git(repo_root, ["push", "--set-upstream", "origin", branch])
+    _run_git(repo_root, ["push", "--set-upstream", "origin", branch], runtime=runtime)
     if not open_pull_request:
         print(f"Published workflow progress on branch: {branch}", file=stdout)
         return
@@ -1699,16 +1763,12 @@ def _publish_workflow_progress(
     default_branch = (
         workflow_git_state.integration_branch
         if workflow_git_state is not None
-        else _default_branch(repo_root)
+        else _default_branch(repo_root, runtime=runtime)
     )
-    existing_pr = subprocess.run(
-        ["gh", "pr", "view", branch, "--json", "url", "--jq", ".url"],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+    existing_pr = _gh_result(
+        repo_root,
+        {"operation": "pr_view", "pr_reference": branch, "json_fields": ["url"]},
+        runtime=runtime,
     )
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
         _write_workflow_record(
@@ -1717,6 +1777,7 @@ def _publish_workflow_progress(
             workflow_git_state,
             existing_pr.stdout.strip(),
             events=events,
+            runtime=runtime,
         )
         print(
             f"Updated workflow progress PR: {existing_pr.stdout.strip()}", file=stdout
@@ -1728,26 +1789,16 @@ def _publish_workflow_progress(
         "Automated durable workflow progress. This draft PR contains task state "
         "and worktree changes so execution can resume from the next task."
     )
-    created_pr = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            default_branch,
-            "--head",
-            branch,
-            "--title",
-            title,
-            "--body",
-            body,
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+    created_pr = _gh_result(
+        repo_root,
+        {
+            "operation": "pr_create",
+            "title": title,
+            "body": body,
+            "base": default_branch,
+            "head": branch,
+        },
+        runtime=runtime,
     )
     if created_pr.returncode != 0:
         raise PowdrrExecutionError(
@@ -1761,6 +1812,7 @@ def _publish_workflow_progress(
         created_pr.stdout.strip(),
         events=events,
         title=title,
+        runtime=runtime,
     )
     print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
 
@@ -1773,6 +1825,7 @@ def publish_workflow_progress(
     stdout: TextIO,
     open_pull_request: bool = True,
     events: Sequence[Mapping[str, Any]] = (),
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     """Publish workflow progress for non-LLM workflow participants."""
     _publish_workflow_progress(
@@ -1782,6 +1835,7 @@ def publish_workflow_progress(
         stdout=stdout,
         open_pull_request=open_pull_request,
         events=events,
+        runtime=runtime,
     )
 
 
@@ -1793,6 +1847,7 @@ def _write_workflow_record(
     *,
     events: Sequence[Mapping[str, Any]],
     title: str | None = None,
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     number = pull_request_number(pull_request_output)
     if number is None:
@@ -1803,12 +1858,12 @@ def _write_workflow_record(
     branch = (
         workflow_git_state.integration_branch
         if workflow_git_state is not None
-        else _git_output(repo_root, ["branch", "--show-current"])
+        else _git_output(repo_root, ["branch", "--show-current"], runtime=runtime)
     )
     base_branch = (
         workflow_git_state.base_branch
         if workflow_git_state is not None
-        else _default_branch(repo_root)
+        else _default_branch(repo_root, runtime=runtime)
     )
     record_pull_request_workflow(
         repo_root,
@@ -1856,25 +1911,18 @@ def _open_final_workflow_pull_request(
     workflow_git_state: WorkflowGitState,
     *,
     stdout: TextIO,
+    runtime: ExecutionRuntime | None = None,
 ) -> None:
     """Open the human-facing integration PR after every task is complete."""
-    existing_pr = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "view",
-            workflow_git_state.integration_branch,
-            "--json",
-            "url",
-            "--jq",
-            ".url",
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+    existing_pr = _gh_result(
+        repo_root,
+        {
+            "operation": "pr_view",
+            "pr_reference": workflow_git_state.integration_branch,
+            "json_fields": ["url"],
+            "jq": ".url",
+        },
+        runtime=runtime,
     )
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
         _write_workflow_record(
@@ -1884,33 +1932,24 @@ def _open_final_workflow_pull_request(
             existing_pr.stdout.strip(),
             events=(),
             title=f"Workflow: {workflow.directory.name}",
+            runtime=runtime,
         )
         print(f"Updated final workflow PR: {existing_pr.stdout.strip()}", file=stdout)
         return
-    created_pr = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            workflow_git_state.base_branch,
-            "--head",
-            workflow_git_state.integration_branch,
-            "--title",
-            f"Workflow: {workflow.directory.name}",
-            "--body",
-            (
+    created_pr = _gh_result(
+        repo_root,
+        {
+            "operation": "pr_create",
+            "base": workflow_git_state.base_branch,
+            "head": workflow_git_state.integration_branch,
+            "title": f"Workflow: {workflow.directory.name}",
+            "body": (
                 "Final integration pull request for durable workflow "
                 f"{workflow.directory.name}. All workflow tasks are complete on "
                 "the integration branch."
             ),
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
+        },
+        runtime=runtime,
     )
     if created_pr.returncode != 0:
         raise PowdrrExecutionError(
@@ -1923,6 +1962,7 @@ def _open_final_workflow_pull_request(
         created_pr.stdout.strip(),
         events=(),
         title=f"Workflow: {workflow.directory.name}",
+        runtime=runtime,
     )
     print(f"Created final workflow PR: {created_pr.stdout.strip()}", file=stdout)
 
@@ -1939,8 +1979,26 @@ def _is_git_worktree(repo_root: Path) -> bool:
 
 
 def _git_result(
-    repo_root: Path, arguments: list[str]
+    repo_root: Path,
+    arguments: list[str],
+    *,
+    runtime: ExecutionRuntime | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    if runtime is not None:
+        with runtime.without_action_contract():
+            parameters = _git_operation_parameters(arguments)
+            result = invoke_intrinsic_capability(
+                GIT_TOOL,
+                parameters,
+                worktree_root=repo_root,
+                runtime=runtime,
+            )
+        return subprocess.CompletedProcess(
+            ["git", *arguments],
+            int(result.get("returncode", 1)),
+            str(result.get("stdout", "")),
+            str(result.get("stderr", "")),
+        )
     return subprocess.run(
         ["git", *arguments],
         cwd=repo_root,
@@ -1959,8 +2017,17 @@ def _noninteractive_environment() -> dict[str, str]:
     return environment
 
 
-def _run_git(repo_root: Path, arguments: list[str]) -> str:
-    result = _git_result(repo_root, arguments)
+def _run_git(
+    repo_root: Path,
+    arguments: list[str],
+    *,
+    runtime: ExecutionRuntime | None = None,
+) -> str:
+    result = (
+        _git_result(repo_root, arguments, runtime=runtime)
+        if runtime is not None
+        else _git_result(repo_root, arguments)
+    )
     if result.returncode != 0:
         raise PowdrrExecutionError(
             f"git {' '.join(arguments)} failed: {result.stderr.strip()}"
@@ -1968,8 +2035,85 @@ def _run_git(repo_root: Path, arguments: list[str]) -> str:
     return result.stdout.strip()
 
 
-def _git_output(repo_root: Path, arguments: list[str]) -> str:
-    return _run_git(repo_root, arguments)
+def _git_output(
+    repo_root: Path,
+    arguments: list[str],
+    *,
+    runtime: ExecutionRuntime | None = None,
+) -> str:
+    return (
+        _run_git(repo_root, arguments, runtime=runtime)
+        if runtime is not None
+        else _run_git(repo_root, arguments)
+    )
+
+
+def _git_operation_parameters(arguments: list[str]) -> dict[str, Any]:
+    """Translate one internal git argv shape to the bounded repository API."""
+    if arguments == ["status", "--porcelain"] or arguments == ["status", "--short"]:
+        return {"operation": "status"}
+    if arguments == ["remote"]:
+        return {"operation": "remote"}
+    if arguments == ["branch", "--show-current"]:
+        return {"operation": "branch_current"}
+    if arguments[:2] == ["symbolic-ref", "--short"]:
+        return {"operation": "default_branch"}
+    if arguments[:2] == ["show-ref", "--verify"]:
+        return {
+            "operation": "show_ref",
+            "branch": arguments[-1].removeprefix("refs/heads/"),
+        }
+    if arguments[:2] == ["switch", "-c"]:
+        return {"operation": "switch_create", "branch": arguments[2]}
+    if arguments[:1] == ["switch"]:
+        return {"operation": "switch", "branch": arguments[1]}
+    if arguments[:2] == ["commit", "-m"]:
+        return {"operation": "commit", "message": arguments[2]}
+    if arguments[:2] == ["push", "--set-upstream"]:
+        return {"operation": "push", "branch": arguments[-1]}
+    if arguments[:1] == ["add"]:
+        paths = arguments[1:]
+        if paths == ["--all"] or not paths:
+            paths = ["."]
+        return {"operation": "add", "paths": paths}
+    raise PowdrrExecutionError(
+        f"Unsupported internal git operation: {' '.join(arguments)}",
+        error_code="unsupported_git_operation",
+    )
+
+
+def _gh_result(
+    repo_root: Path,
+    parameters: Mapping[str, Any],
+    *,
+    runtime: ExecutionRuntime | None = None,
+) -> subprocess.CompletedProcess[str]:
+    if runtime is not None:
+        with runtime.without_action_contract():
+            result = invoke_intrinsic_capability(
+                GH_TOOL,
+                parameters,
+                worktree_root=repo_root,
+                runtime=runtime,
+            )
+        return subprocess.CompletedProcess(
+            ["gh"],
+            int(result.get("returncode", 1)),
+            str(result.get("stdout", "")),
+            str(result.get("stderr", "")),
+        )
+    from powdrr_lift.intrinsic_git_gh import intrinsic_command
+
+    command = ["gh", *intrinsic_command(parameters, tool=GH_TOOL)]
+    return subprocess.run(
+        command,
+        cwd=repo_root,
+        capture_output=True,
+        env=_noninteractive_environment(),
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
 
 
 def _workflow_branch_name(workflow: WorkflowInstance) -> str:
@@ -1977,10 +2121,11 @@ def _workflow_branch_name(workflow: WorkflowInstance) -> str:
     return f"workflow/{slug or 'execution'}"
 
 
-def _default_branch(repo_root: Path) -> str:
+def _default_branch(repo_root: Path, *, runtime: ExecutionRuntime | None = None) -> str:
     remote_head = _git_result(
         repo_root,
         ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        runtime=runtime,
     )
     if remote_head.returncode == 0 and remote_head.stdout.strip():
         return remote_head.stdout.strip().removeprefix("origin/")
@@ -2078,6 +2223,7 @@ def _build_task_messages(
         {
             "role": "system",
             "content": _task_system_prompt(
+                task=task,
                 interaction_style=task.interaction_style,
             ),
         },
@@ -2361,9 +2507,12 @@ def _durable_task_action_output_state(action: WorkflowAction) -> Any:
     if output_state is None and action.outputs:
         output_state = action.outputs
     if output_state is None:
-        raise ValueError(
+        raise PowdrrExecutionError(
             "The next_step action must include a non-null top-level "
-            "output_state object."
+            "output_state object.",
+            error_code="output_state_missing",
+            action_kind="next_step",
+            remediation="Return the task result in the top-level output_state field.",
         )
     return output_state
 
@@ -2400,12 +2549,15 @@ def _require_staged_pull_request_files(repo_root: Path) -> None:
     if not status.stdout.strip():
         return
 
-    raise ValueError(
+    raise PowdrrExecutionError(
         "The staged pull-request file set is empty. Use the intrinsic Git add "
         '{"operation":"add","paths":[...]} for every approved '
         "implementation, test, and promoted-document path, then re-read "
         "Git status before returning next_step. Unstaged or untracked files "
-        "must be added or explicitly deleted before advancing."
+        "must be added or explicitly deleted before advancing.",
+        error_code="staged_pull_request_files_missing",
+        action_kind="next_step",
+        remediation="Stage every approved change before advancing the task.",
     )
 
 
@@ -2430,22 +2582,34 @@ def _task_action_failure_reached(
     return True
 
 
-def _task_system_prompt(*, interaction_style: str | None = None) -> str:
+def _task_system_prompt(
+    *, task: WorkflowTask, interaction_style: str | None = None
+) -> str:
+    action_prompt = (
+        _modular_action_system_prompt(task, interaction_style=interaction_style)
+        if task.actions_declared
+        else _action_system_prompt()
+    )
+    early_termination_guidance = (
+        " Use `complete` only for an early workflow termination when no later task "
+        "should run, such as when the proposed PR is superseded."
+        if not task.actions_declared or "complete" in task.actions
+        else ""
+    )
     return (
-        _action_system_prompt()
+        action_prompt
         + "\nDurable workflow-task contract: this is one task that may contain "
         "multiple actions. Use `next_step` when this task is finished: it persists "
         "this task's declared output_state and advances the workflow to the next "
-        "task. Use `complete` only for an early workflow termination when no later "
-        "task should run, such as when the proposed PR is superseded. If this is "
+        "task." + early_termination_guidance + " If this is "
         "the final task, `next_step` completes the workflow after persisting its "
         "output. For durable task completion, the result MUST be under "
         "the top-level `output_state` field; never put it under `outputs`. "
-        "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
-        "it advances this task. Every builtin tool accepts "
+        "Use only the actions listed for this task, and only when an action "
+        "advances this task. Every builtin tool accepts "
         "parameters.help = true without normal command arguments; this is the "
         "tool's conventional --help option. Invoke that form when you need "
-        "that form when you need detailed parameters, examples, or usage "
+        "detailed parameters, examples, or usage "
         "guidance. A help response does not count as a successful task tool "
         "invocation.\n" + _interaction_style_prompt(interaction_style)
     )
@@ -2542,6 +2706,13 @@ def _run_task_deterministic_pre_step(
     first workflow task must persist the exact report so downstream tasks do
     not rediscover it or replace it with a lossy summary.
     """
+    if runtime is None:
+        runtime = ExecutionRuntime(
+            "task-pre-step-" + hashlib.sha256(str(repo_root).encode()).hexdigest()[:24],
+            profile_id="default",
+            workflow_directory=repo_root.parent / ".powdrr-execution",
+            repo_root=repo_root,
+        )
     pre_step = task.pre_step
     if pre_step is None:
         return None, False
@@ -2822,25 +2993,35 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             step = self.current_step
             if self.runtime is not None:
                 self.runtime.set_action_contract(
-                    frozenset(getattr(step, "actions", ()))
+                    frozenset(getattr(step, "actions", ())),
+                    enforce_empty=getattr(step, "actions_declared", False),
                 )
             if step.step_type == "gate":
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")
-                passed = _run_gate(
-                    step,
-                    skill_name=frame.skill.skill.name,
-                    worktree_root=self.repo_root,
-                    execution_events=self.execution_events,
-                    execution_context=self.execution_context,
-                    handoff_records=self.handoff_records,
-                    step_index=frame.step_index,
-                    workflow_context=None,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.verbose,
-                    runtime=self.runtime,
-                )
+                if self.runtime is not None:
+                    self.runtime.set_action_contract(None)
+                try:
+                    passed = _run_gate(
+                        step,
+                        skill_name=frame.skill.skill.name,
+                        worktree_root=self.repo_root,
+                        execution_events=self.execution_events,
+                        execution_context=self.execution_context,
+                        handoff_records=self.handoff_records,
+                        step_index=frame.step_index,
+                        workflow_context=None,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.verbose,
+                        runtime=self.runtime,
+                    )
+                finally:
+                    if self.runtime is not None:
+                        self.runtime.set_action_contract(
+                            frozenset(step.actions),
+                            enforce_empty=step.actions_declared,
+                        )
                 target_index = frame.step_index + 1
                 if not passed:
                     target_index = _step_index_by_id(frame.skill, step.gate.goto_step)
@@ -3205,6 +3386,12 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 raise PowdrrExecutionError(
                     f"Unsupported nested skill tool: {action.tool!r}"
                 )
+            if self.runtime is None:
+                raise PowdrrExecutionError(
+                    "Nested skill pull-request recording requires an execution "
+                    "runtime.",
+                    error_code="execution_runtime_required",
+                )
             _record_skill_pull_request(
                 action,
                 self.repo_root,
@@ -3212,6 +3399,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.execution_events,
                 result,
                 step_index=frame.step_index,
+                runtime=self.runtime,
             )
             self.execution_events.append(
                 {

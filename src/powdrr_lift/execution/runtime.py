@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -137,9 +139,41 @@ class ExecutionRuntime:
         self._projected_kernel_events = 0
         self._allowed_actions: frozenset[str] | None = None
 
-    def set_action_contract(self, actions: frozenset[str] | None) -> None:
+    def set_action_contract(
+        self, actions: frozenset[str] | None, *, enforce_empty: bool = False
+    ) -> None:
         """Set the single runtime-owned action contract for the active step."""
-        self._allowed_actions = actions if actions else None
+        # ``None`` means the caller has not installed a step contract yet.
+        # An empty set is meaningful: the step supports the implicit
+        # ``next_step`` transition but no model/tool action.
+        self._allowed_actions = actions if actions or enforce_empty else None
+
+    @contextmanager
+    def without_action_contract(self) -> Iterator[None]:
+        """Run engine-owned bookkeeping without widening model permissions."""
+        previous = self._allowed_actions
+        self._allowed_actions = None
+        try:
+            yield
+        finally:
+            self._allowed_actions = previous
+
+    def allowed_actions(self) -> tuple[str, ...] | None:
+        """Return the action names the active prompt may propose.
+
+        ``next_step`` is a kernel transition and is therefore always available
+        once a step declares a contract, even when that contract has no tool
+        actions. ``None`` means no step contract has been installed yet.
+        """
+        if self._allowed_actions is None:
+            return None
+        return tuple(
+            sorted(
+                {*self._allowed_actions, "next_step"}
+                if self._allowed_actions is not None
+                else {"next_step"}
+            )
+        )
 
     def validate_action(self, action_kind: str) -> tuple[str, ...]:
         if self._allowed_actions is None or action_kind in self._allowed_actions:
@@ -147,6 +181,35 @@ class ExecutionRuntime:
         if action_kind == "next_step":
             return ()
         return (f"action {action_kind!r} is not allowed by the active step contract",)
+
+    def validate_capability_action(self, semantic_action: str) -> tuple[str, ...]:
+        """Ensure a nested capability belongs to the active step contract."""
+        if self._allowed_actions is None or "invoke_tool" in self._allowed_actions:
+            return ()
+        action_families = {
+            "edit_files": frozenset({"edit", "yaml_edit", "file_management"}),
+            "validate_edit": frozenset({"validate_edit"}),
+            "apply_edit": frozenset({"apply_edit"}),
+            "run_process": frozenset({"shell"}),
+            "inspect_code": frozenset({"basedpyright"}),
+            "discover_files": frozenset({"fuzzy_match"}),
+            "gather_context": frozenset({"gather_context"}),
+            "read_document": frozenset({"read_document"}),
+            "list_files": frozenset({"list_files"}),
+            "inspect_repository": frozenset({"git"}),
+            "mutate_repository": frozenset({"git"}),
+            "inspect_pull_request": frozenset({"gh"}),
+            "mutate_pull_request": frozenset({"gh"}),
+            "enrich_test_output": frozenset({"enrich"}),
+        }
+        if self._allowed_actions.intersection(
+            action_families.get(semantic_action, frozenset())
+        ):
+            return ()
+        return (
+            f"capability semantic action {semantic_action!r} is not allowed by "
+            "the active step contract",
+        )
 
     def context(
         self,
@@ -162,6 +225,7 @@ class ExecutionRuntime:
             allowed_effects,
             execution_id=self.execution_id,
             active_unit_id=active_unit_id,
+            active_persona_id=self.state.current_persona_id,
         )
 
     def readiness(self) -> ReadinessReport:
@@ -177,6 +241,15 @@ class ExecutionRuntime:
         max_uses: int = 1,
     ) -> Any:
         """Create the exact human decision packet for an exceptional request."""
+        request = self._with_idempotency_key(request)
+        capability_errors = self.validate_capability_action(request.semantic_action)
+        if capability_errors:
+            raise PowdrrExecutionError(
+                capability_errors[0],
+                error_code="capability_action_not_allowed",
+                action_kind=request.semantic_action,
+                remediation="Use one of the capabilities declared for this step.",
+            )
         exception = self.broker.create_exception_request(
             context,
             request,
@@ -210,6 +283,7 @@ class ExecutionRuntime:
                 "kind": "executable" if approved else "denied",
                 "reason": "exception approved" if approved else "exception denied",
                 "decided_by": decided_by,
+                "decision_packet": exception.decision_packet(),
             },
         )
         return decision
@@ -240,7 +314,27 @@ class ExecutionRuntime:
 
     def prompt_context(self) -> dict[str, Any]:
         """Return the bounded typed state used at every prompt boundary."""
-        rules = self.guidance({"profile_id": self.state.profile_id})
+        guidance_context = {
+            "profile_id": self.state.profile_id,
+            "phase_type": self.state.current_phase.value,
+            **(
+                {"persona_id": self.state.current_persona_id}
+                if self.state.current_persona_id is not None
+                else {}
+            ),
+        }
+        rules = self.guidance(guidance_context)
+        allowed_actions = self.allowed_actions()
+        active_persona = None
+        if self.profile is not None and self.state.current_persona_id is not None:
+            active_persona = next(
+                (
+                    persona
+                    for persona in self.profile.personas
+                    if persona.persona_id == self.state.current_persona_id
+                ),
+                None,
+            )
         contract = self.effective_contract(
             {
                 "profile_id": self.state.profile_id,
@@ -257,6 +351,20 @@ class ExecutionRuntime:
                 "execution_id": self.execution_id,
                 "phase": self.state.current_phase.value,
                 "persona_id": self.state.current_persona_id,
+                "persona": (
+                    {
+                        "persona_id": active_persona.persona_id,
+                        "persona_type": active_persona.persona_type.value,
+                        "model_profile": active_persona.model_profile,
+                        "prompt_catalogs": list(active_persona.prompt_catalogs),
+                    }
+                    if active_persona is not None
+                    else None
+                ),
+                "allowed_actions": (
+                    list(allowed_actions) if allowed_actions is not None else None
+                ),
+                "capability_catalog": list(self.capability_catalog()),
                 "artifact_ids": [item.artifact_id for item in self.state.artifacts],
                 "action_ids": [item.action_instance_id for item in self.state.actions],
                 "obligation_ids": [
@@ -278,8 +386,14 @@ class ExecutionRuntime:
                 "effective_contract": contract.to_data(),
                 "open_obligations": [
                     item.to_data()
-                    for item in self.state.obligations
-                    if item.status.value == "open"
+                    for item in {
+                        item.obligation_id: item
+                        for item in (
+                            *self.state.obligations,
+                            *self.kernel.open_obligations,
+                        )
+                        if item.status.value == "open"
+                    }.values()
                 ],
             }
         )
@@ -538,6 +652,16 @@ class ExecutionRuntime:
                 error_code="checkpoint_execution_mismatch",
                 remediation="Restore a checkpoint created by this execution.",
             )
+        target_workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
+        if target_workspace != Path(checkpoint.workspace_root).resolve():
+            raise PowdrrExecutionError(
+                "checkpoint restore target differs from its recorded workspace",
+                error_code="checkpoint_workspace_mismatch",
+                remediation=(
+                    "Restore the checkpoint to the exact workspace captured when "
+                    "the checkpoint was created."
+                ),
+            )
         changed_paths = self.checkpoint_store.changed_paths(checkpoint, workspace_root)
         self.checkpoint_store.restore(checkpoint, workspace_root)
         self.state = self._append_event(
@@ -580,7 +704,7 @@ class ExecutionRuntime:
                 error_code="persona_actions_missing",
                 remediation="Include actions for the persona assigned to this phase.",
             )
-        return build_persona_packet(
+        packet = build_persona_packet(
             profile,
             execution_id=self.execution_id,
             run_id=run_id,
@@ -598,6 +722,17 @@ class ExecutionRuntime:
                 }
             ),
         )
+        if self.state.current_persona_id != packet.persona.persona_id:
+            self.state = self._append_event(
+                ExecutionEventType.PERSONA_ASSIGNED,
+                {
+                    "phase_type": phase_type.value,
+                    "persona_id": packet.persona.persona_id,
+                    "run_id": run_id,
+                },
+            )
+        self.set_action_contract(packet.allowed_actions)
+        return packet
 
     def transition(
         self,
@@ -610,7 +745,13 @@ class ExecutionRuntime:
             self.state,
             target_phase,
             open_obligations=tuple(
-                obligation.description for obligation in self.kernel.open_obligations
+                dict.fromkeys(
+                    obligation.description
+                    for obligation in (
+                        *self.state.obligations,
+                        *self.kernel.open_obligations,
+                    )
+                )
             ),
         )
         if decision.allowed and self.profile is not None:
@@ -736,8 +877,113 @@ class ExecutionRuntime:
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
+        request = self._with_idempotency_key(request)
+        if context.execution_id != self.execution_id:
+            raise PowdrrExecutionError(
+                "capability context belongs to a different execution",
+                error_code="capability_execution_mismatch",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Create the capability context from the same ExecutionRuntime "
+                    "that will invoke the request."
+                ),
+            )
+        if context.repo_root.resolve() != self.repo_root:
+            raise PowdrrExecutionError(
+                "capability context belongs to a different repository",
+                error_code="capability_repository_mismatch",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Use the active runtime repository as both the repository and "
+                    "worktree context."
+                ),
+            )
+        if context.active_persona_id != self.state.current_persona_id:
+            raise PowdrrExecutionError(
+                "capability context is not bound to the active persona",
+                error_code="capability_persona_mismatch",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Create the capability context through the active runtime "
+                    "persona envelope."
+                ),
+            )
+        capability_errors = self.validate_capability_action(request.semantic_action)
+        if capability_errors:
+            raise PowdrrExecutionError(
+                capability_errors[0],
+                error_code="capability_action_not_allowed",
+                action_kind=request.semantic_action,
+                remediation="Use one of the capabilities declared for this step.",
+            )
+        if (
+            request.tool_name == "repository"
+            and request.arguments.get("operation") == "pr_create"
+        ):
+            self.require_publish_readiness()
+        idempotency_key = request.arguments.get("idempotency_key")
+        if (
+            request.tool_name == "repository"
+            and isinstance(idempotency_key, str)
+            and idempotency_key in self.state.completed_idempotency_keys
+        ):
+            raise PowdrrExecutionError(
+                "This external write was already completed for its idempotency key.",
+                error_code="external_write_already_completed",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Inspect the existing repository or pull request result; do not "
+                    "repeat the external write with the same semantic request."
+                ),
+            )
+        action_instance_id = (
+            f"{self.execution_id}:action:{self.state.event_sequence + 1}"
+        )
+        action = {
+            "action_instance_id": action_instance_id,
+            "semantic_action": request.semantic_action,
+            "arguments": dict(request.arguments),
+        }
+        relationship_errors = self.kernel.validate_proposal(
+            action, semantic_action=request.semantic_action
+        )
+        if relationship_errors:
+            raise PowdrrExecutionError(
+                "Capability action is blocked by execution obligations: "
+                + "; ".join(relationship_errors),
+                error_code="relationship_obligation_blocked",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Execute the exact required follow-up action, then retry "
+                    "the blocked capability."
+                ),
+            )
+        self.kernel.propose(action, semantic_action=request.semantic_action)
+        self.kernel.start(action)
+        self.sync_kernel(
+            phase_type=self.state.current_phase.value,
+            actor_id=self.state.current_persona_id or "execution-runtime",
+        )
         before = len(self.broker.decision_log)
-        result = self.broker.invoke(context, request)
+        try:
+            result = self.broker.invoke(context, request)
+        except Exception as error:
+            self.kernel.fail(action, error)
+            self.sync_kernel(
+                phase_type=self.state.current_phase.value,
+                actor_id=self.state.current_persona_id or "execution-runtime",
+            )
+            raise
+        if isinstance(result, ToolResult):
+            # A follow-up action satisfies the oldest exact semantic obligation;
+            # its own instance ID is not the source ID of that obligation.
+            self.kernel.complete(action)
+        else:
+            self.kernel.fail(action, result)
+        self.sync_kernel(
+            phase_type=self.state.current_phase.value,
+            actor_id=self.state.current_persona_id or "execution-runtime",
+        )
         decisions = self.broker.decision_log[before:]
         if decisions:
             events = self._capability_decision_events(decisions)
@@ -799,6 +1045,35 @@ class ExecutionRuntime:
             )
         return result
 
+    @staticmethod
+    def _with_idempotency_key(request: CapabilityRequest) -> CapabilityRequest:
+        """Bind external repository writes to one stable semantic retry key."""
+        if request.tool_name != "repository":
+            return request
+        operation = request.arguments.get("operation")
+        if operation not in {"pr_create", "pr_edit", "pr_review_comment"}:
+            return request
+        if request.arguments.get("idempotency_key"):
+            return request
+        encoded = json.dumps(
+            {
+                "tool": request.tool_name,
+                "action": request.semantic_action,
+                "arguments": dict(request.arguments),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return replace(
+            request,
+            arguments={
+                **request.arguments,
+                "idempotency_key": "powdrr-"
+                + hashlib.sha256(encoded.encode()).hexdigest()[:24],
+            },
+        )
+
     def invoke_adapter(
         self,
         adapter: ToolAdapter,
@@ -807,6 +1082,15 @@ class ExecutionRuntime:
     ) -> ToolResult | CapabilityResolution:
         """Run a context-bound adapter through this runtime's broker."""
         self.register_adapter(adapter)
+        context = replace(
+            context,
+            execution_id=context.execution_id or self.execution_id,
+            active_persona_id=(
+                context.active_persona_id
+                if context.active_persona_id is not None
+                else self.state.current_persona_id
+            ),
+        )
         return self.invoke(context, request)
 
     def register_adapter(self, adapter: ToolAdapter) -> None:
@@ -816,6 +1100,41 @@ class ExecutionRuntime:
     def capability_manifests(self) -> tuple[Any, ...]:
         """Return the executable capability surface owned by this runtime."""
         return self.broker.registry.manifests()
+
+    def capability_catalog(self) -> tuple[dict[str, Any], ...]:
+        """Return the bounded model-facing catalog for this runtime's tools."""
+        actions = self._allowed_actions
+        if actions is not None and "invoke_tool" not in actions:
+            tools_by_prompt_action = {
+                "edit": frozenset({"file-mutation", "validate-edit", "apply-edit"}),
+                "yaml_edit": frozenset(
+                    {"file-mutation", "validate-edit", "apply-edit"}
+                ),
+                "file_management": frozenset({"file-mutation"}),
+                "read_document": frozenset({"repository-read_document"}),
+                "gather_context": frozenset({"repository-gather_context"}),
+                "fuzzy_match": frozenset({"fuzzy-match"}),
+                "basedpyright": frozenset(
+                    {"basedpyright-symbol", "basedpyright-structure"}
+                ),
+                "shell": frozenset({"process"}),
+            }
+            allowed_tools = frozenset().union(
+                *(tools_by_prompt_action.get(action, frozenset()) for action in actions)
+            )
+        else:
+            allowed_tools = None
+        return tuple(
+            manifest.to_data()
+            for manifest in sorted(
+                (
+                    manifest
+                    for manifest in self.capability_manifests()
+                    if allowed_tools is None or manifest.tool_name in allowed_tools
+                ),
+                key=lambda item: item.tool_name,
+            )
+        )
 
     def record_evidence(
         self,

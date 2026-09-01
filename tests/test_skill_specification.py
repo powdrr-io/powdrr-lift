@@ -24,6 +24,41 @@ from powdrr_lift.core import (
 )
 
 
+def test_explicit_empty_actions_round_trip_as_closed_contract() -> None:
+    skill = skill_from_json(
+        json.dumps(
+            {
+                "name": "closed-step",
+                "when_to_use": ["When no model action is permitted."],
+                "steps": [
+                    {
+                        "id": "wait",
+                        "description": "Wait for the engine-owned result.",
+                        "actions": [],
+                    }
+                ],
+            }
+        )
+    )
+
+    step = skill.steps[0]
+    assert step.actions == ()
+    assert step.actions_declared is True
+    serialized = skill_to_json(skill)
+    assert '"actions": []' in serialized
+
+    legacy = skill_from_json(
+        json.dumps(
+            {
+                "name": "legacy-step",
+                "when_to_use": ["Compatibility."],
+                "steps": [{"description": "No contract."}],
+            }
+        )
+    )
+    assert legacy.steps[0].actions_declared is False
+
+
 def test_skill_round_trips_through_json() -> None:
     skill = Skill(
         name="specify-a-feature",

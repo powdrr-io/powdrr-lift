@@ -8,9 +8,13 @@ from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.core.tool_manifest import (
+    IdempotencyKind,
+    ToolEffect,
+    ToolManifest,
+)
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.execution.capabilities import CapabilityBroker, CapabilityRequest
+from powdrr_lift.execution.capabilities import CapabilityRequest
 from powdrr_lift.execution.tools import (
     ToolAdapter,
     ToolContext,
@@ -18,6 +22,20 @@ from powdrr_lift.execution.tools import (
     ToolResult,
     ToolValidationReport,
 )
+
+
+def _require_runtime(runtime: Any, capability: str) -> Any:
+    """Require normal capabilities to execute inside one durable runtime."""
+    if runtime is None:
+        raise PowdrrExecutionError(
+            f"{capability} requires an ExecutionRuntime",
+            error_code="execution_runtime_required",
+            remediation=(
+                "Create one ExecutionRuntime and pass it to the capability "
+                "adapter; direct ephemeral brokers are not supported."
+            ),
+        )
+    return runtime
 
 
 class IntrinsicRepositoryAdapter:
@@ -35,6 +53,7 @@ class IntrinsicRepositoryAdapter:
             ToolEffect.GITHUB_MUTATION,
         ),
         scope="worktree",
+        idempotency=IdempotencyKind.KEYED,
     )
 
     def validate(
@@ -45,6 +64,14 @@ class IntrinsicRepositoryAdapter:
             return ToolValidationReport(("repository operation is required",))
         supported = {
             "status",
+            "remote",
+            "branch_current",
+            "default_branch",
+            "show_ref",
+            "switch",
+            "switch_create",
+            "commit",
+            "push",
             "add",
             "move",
             "rename",
@@ -102,7 +129,16 @@ class IntrinsicRepositoryAdapter:
         return frozenset(
             {
                 ToolEffect.GIT_MUTATION
-                if operation in {"add", "move", "rename"}
+                if operation
+                in {
+                    "add",
+                    "move",
+                    "rename",
+                    "switch",
+                    "switch_create",
+                    "commit",
+                    "push",
+                }
                 else ToolEffect.WORKSPACE_READ
             }
         )
@@ -321,11 +357,7 @@ def invoke_basedpyright_capability(
     )
     adapter = BasedPyrightAdapter(tool)
     request = CapabilityRequest(tool, "inspect_code", dict(arguments))
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
-    )
+    result = _require_runtime(runtime, tool).invoke_adapter(adapter, context, request)
     if isinstance(result, ToolResult):
         return result.output
     raise PowdrrExecutionError(
@@ -407,10 +439,8 @@ def invoke_fuzzy_match_capability(
     )
     adapter = FuzzyMatchAdapter(path_cache)
     request = CapabilityRequest("fuzzy-match", "discover_files", dict(arguments))
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
+    result = _require_runtime(runtime, "fuzzy-match").invoke_adapter(
+        adapter, context, request
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -539,10 +569,8 @@ def invoke_repository_read(
     )
     adapter = RepositoryReadAdapter(operation, executor)
     request = CapabilityRequest(f"repository-{operation}", operation, dict(arguments))
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
+    result = _require_runtime(runtime, f"repository-{operation}").invoke_adapter(
+        adapter, context, request
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -565,14 +593,10 @@ def invoke_deferred_edit_capability(
         repo_root=worktree_root,
         worktree_root=worktree_root,
         semantic_actions=frozenset({request_action}),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
     request = CapabilityRequest(tool, request_action, dict(arguments))
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
-    )
+    result = _require_runtime(runtime, tool).invoke_adapter(adapter, context, request)
     if isinstance(result, ToolResult):
         return result.output
     raise PowdrrExecutionError(
@@ -588,18 +612,16 @@ def invoke_file_mutation(
     executor: Callable[[], Any],
     runtime: Any = None,
 ) -> Any:
+    adapter = FileMutationAdapter(executor)
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
         semantic_actions=frozenset({"edit_files"}),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
-    adapter = FileMutationAdapter(executor)
     request = CapabilityRequest("file-mutation", "edit_files", {"paths": list(paths)})
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
+    result = _require_runtime(runtime, "file-mutation").invoke_adapter(
+        adapter, context, request
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -617,18 +639,16 @@ def invoke_shell_capability(
     runtime: Any = None,
 ) -> Any:
     """Run one argv process after broker validation and scope checks."""
+    adapter = ShellAdapter(executor)
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
         semantic_actions=frozenset({"run_process"}),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
-    adapter = ShellAdapter(executor)
     request = CapabilityRequest("process", "run_process", dict(arguments))
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(ToolRegistry((adapter,))).invoke(context, request)
+    result = _require_runtime(runtime, "process").invoke_adapter(
+        adapter, context, request
     )
     if isinstance(result, ToolResult):
         return result.output
@@ -760,7 +780,8 @@ def invoke_intrinsic_capability(
     elif tool == "git":
         semantic_action = (
             "mutate_repository"
-            if operation in {"add", "move", "rename"}
+            if operation
+            in {"add", "move", "rename", "switch", "switch_create", "commit", "push"}
             else "inspect_repository"
         )
         request_tool = "repository"
@@ -776,6 +797,14 @@ def invoke_intrinsic_capability(
             f"Unsupported intrinsic capability: {tool}",
             error_code="unsupported_tool",
         )
+    adapter = builtin_tool_registry().get(request_tool)
+    if adapter is None:
+        raise PowdrrExecutionError(
+            f"No adapter registered for intrinsic tool {request_tool!r}",
+            error_code="intrinsic_tool_unregistered",
+            action_kind=semantic_action,
+            remediation="Use a registered builtin tool or request tool discovery.",
+        )
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
@@ -788,21 +817,11 @@ def invoke_intrinsic_capability(
                 "enrich_test_output",
             }
         ),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
     request = CapabilityRequest(request_tool, semantic_action, dict(arguments))
-    adapter = builtin_tool_registry().get(request_tool)
-    if adapter is None:
-        raise PowdrrExecutionError(
-            f"No adapter registered for intrinsic tool {request_tool!r}",
-            error_code="intrinsic_tool_unregistered",
-            action_kind=semantic_action,
-            remediation="Use a registered builtin tool or request tool discovery.",
-        )
-    result = (
-        runtime.invoke_adapter(adapter, context, request)
-        if runtime is not None
-        else CapabilityBroker(builtin_tool_registry()).invoke(context, request)
+    result = _require_runtime(runtime, request_tool).invoke_adapter(
+        adapter, context, request
     )
     if isinstance(result, ToolResult):
         return result.output

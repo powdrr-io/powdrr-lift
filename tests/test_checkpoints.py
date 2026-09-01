@@ -47,6 +47,25 @@ def test_checkpoint_restore_with_state_restores_workspace_and_state(
     assert restored_state == '{"step": 1}'
 
 
+def test_checkpoint_restore_rolls_back_when_an_object_is_missing(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "one.txt").write_text("before", encoding="utf-8")
+    store = ContentAddressedCheckpointStore(tmp_path / "checkpoints")
+    checkpoint = store.create(workspace, "atomic-restore")
+    (workspace / "one.txt").write_text("after", encoding="utf-8")
+    (workspace / "new.txt").write_text("new", encoding="utf-8")
+    (store.objects / checkpoint.objects["one.txt"]).unlink()
+
+    with pytest.raises(FileNotFoundError):
+        store.restore(checkpoint)
+
+    assert (workspace / "one.txt").read_text(encoding="utf-8") == "after"
+    assert (workspace / "new.txt").read_text(encoding="utf-8") == "new"
+
+
 def test_checkpoint_restore_rejects_symlink_escape_before_mutating(
     tmp_path: Path,
 ) -> None:

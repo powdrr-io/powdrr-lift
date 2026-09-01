@@ -181,6 +181,8 @@ class SkillStep:
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
+    # An explicit empty list is a closed contract; omission remains legacy.
+    actions_declared: bool = False
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -188,6 +190,10 @@ class SkillStep:
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
     validation_gate: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if self.actions:
+            object.__setattr__(self, "actions_declared", True)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -212,6 +218,8 @@ class SkillStep:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.actions:
             data["actions"] = list(self.actions)
+        elif self.actions_declared:
+            data["actions"] = []
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -1451,6 +1459,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
+    actions_declared = "actions" in data
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
     raw_validation_gate = data.get("validation_gate")
@@ -1521,6 +1530,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
         actions=actions,
+        actions_declared=actions_declared,
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,

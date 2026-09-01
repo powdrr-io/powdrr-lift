@@ -49,7 +49,7 @@ def compile_execution_plan(
             assignment = assignments[phase]
             persona = personas[assignment.persona_id]
             actions = actions_by_phase.get(phase)
-            if not actions:
+            if actions is None:
                 raise PowdrrExecutionError(
                     f"No action contract was supplied for phase {phase.value!r}.",
                     error_code="compiled_workflow_actions_missing",
@@ -117,6 +117,7 @@ def compile_execution_plan(
                     uses_skills=skills.get(phase, persona.skill_references),
                     prompt_catalogs=persona.prompt_catalogs,
                     actions=actions,
+                    actions_declared=True,
                     upstream_task_ids=tuple(upstream),
                     phase_type=phase,
                     persona_id=persona.persona_id,

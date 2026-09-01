@@ -32,6 +32,59 @@ compaction/resume, and readiness-controlled publication.
 - Every implementation PR runs the full test suite, Ruff format/check, mypy,
   adapter conformance tests, and the affected vertical scenarios before push.
 
+## Open gaps identified by the main-branch audit
+
+The repository's audit document currently describes the historical closure
+items as closed, but comparison of `main` with this plan found the following
+proof and implementation gaps. These are active requirements and must be
+closed before the stopping rule can be satisfied.
+
+1. **The final acceptance path is synthetic rather than vertical.** The
+   acceptance harness constructs one dummy execution unit, assigns only
+   `next_step` to every phase, and calls runtime primitives directly. It must
+   execute the real path from a structured user request through Architect
+   specifications, Engineering Manager proposed-PR decomposition, typed plan,
+   Engineer implementation, validation, independent review, correction, and
+   readiness-controlled publication.
+2. **Durable user instructions are not proven to change later behavior.** The
+   acceptance path must capture and persist the review-comment-resolution and
+   optimistic-locking instructions, start a later execution, and verify that
+   the resulting actions and obligations change without repeating the
+   instructions.
+3. **The effective action intersection is incomplete.** Runtime action
+   exposure and validation must intersect declared step actions, phase and
+   persona envelopes, active execution-unit scope, available validated
+   adapters, and unresolved obligations. The current step-contract checks do
+   not fully enforce or expose all of those dimensions.
+4. **Action lifecycle persistence is not one transaction.** Proposal, start,
+   capability decision, relationship events, evidence, completion/failure, and
+   workflow projection must be committed under one optimistic-locking
+   transaction with bounded conflict retry. Individual atomic file appends are
+   insufficient proof of this invariant.
+5. **Runtime-optional compatibility paths remain.** New enforce-mode execution
+   must not fall back to a standalone `ActionKernel`, optional runtime
+   publication path, or other alternate orchestration path. Compatibility
+   behavior must be explicitly isolated, audited, and excluded from the
+   enforce-mode call graph.
+6. **Capability exceptions lack a normal-adapter proof.** The acceptance
+   scenario must exercise pending, inspect, approve, deny, altered-argument
+   rejection, duplicate-prompt suppression, and one-time execution through the
+   shared CLI/MCP/chat/task decision surface rather than only direct runtime
+   calls.
+7. **Compaction and interruption coverage is too narrow.** The acceptance
+   harness must interrupt and resume at every phase boundary and prove that
+   actual omitted tool output remains retrievable after process restart, while
+   preserving all typed references and decisions.
+8. **Error taxonomy behavior is not fully separated.** Provider,
+   cancellation, persistence-corruption, programmer-invariant, and
+   agent-correctable failures need distinct types, retry/termination behavior,
+   durable records, and conformance tests. Broad `RuntimeError` handling must
+   not silently turn non-correctable failures into another model roundtrip.
+
+The final audit must mark each item above as closed with an executable proof;
+documentary assertions or isolated unit tests alone do not satisfy the
+stopping rule.
+
 ## PR sequence
 
 ### PR 1 — Authoritative execution runtime and action transaction

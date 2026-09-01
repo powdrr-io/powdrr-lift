@@ -57,7 +57,7 @@ from powdrr_lift.core import (
     system_map_specification_default_output_path,
     system_specification_default_output_path,
 )
-from powdrr_lift.core.delivery_profile import load_delivery_profile
+from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.python_tool_commands import (
     dependency_backed_command_variants,
     missing_executable_output,
@@ -103,6 +103,7 @@ from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
+    ProviderExecutionError,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
@@ -1014,7 +1015,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step_index = self.state.step_index
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
             if self.state.runtime is not None:
-                self.state.runtime.set_action_contract(
+                self.state.runtime.install_step_scope(
                     frozenset(getattr(self.current_step, "actions", ())),
                     enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
@@ -1065,7 +1066,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
             if self.current_step.step_type == "gate":
                 if self.state.runtime is not None:
-                    self.state.runtime.set_action_contract(None)
+                    self.state.runtime.install_step_scope(frozenset())
                 try:
                     passed = _run_gate(
                         self.current_step,
@@ -1083,7 +1084,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     )
                 finally:
                     if self.state.runtime is not None:
-                        self.state.runtime.set_action_contract(
+                        self.state.runtime.install_step_scope(
                             frozenset(self.current_step.actions),
                             enforce_empty=self.current_step.actions_declared,
                         )
@@ -1118,7 +1119,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 # the model action contract while executing it, then restore
                 # the contract before constructing the LLM prompt.
                 if self.state.runtime is not None:
-                    self.state.runtime.set_action_contract(None)
+                    self.state.runtime.install_step_scope(frozenset())
                 try:
                     _run_deterministic_pre_step(
                         self.current_step,
@@ -1136,7 +1137,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     )
                 finally:
                     if self.state.runtime is not None:
-                        self.state.runtime.set_action_contract(
+                        self.state.runtime.install_step_scope(
                             frozenset(self.current_step.actions),
                             enforce_empty=self.current_step.actions_declared,
                         )
@@ -2041,13 +2042,15 @@ class OpenAIChatClient:
                 exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
-            raise PowdrrExecutionError(f"OpenAI request failed: {exc.reason}") from exc
+            raise ProviderExecutionError(
+                f"OpenAI request failed: {exc.reason}"
+            ) from exc
         except ConnectionError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderExecutionError(
                 f"OpenAI request connection dropped: {exc}"
             ) from exc
         except TimeoutError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderExecutionError(
                 _provider_timeout_message(
                     provider="OpenAI-compatible",
                     model=self._model,
@@ -2460,11 +2463,11 @@ def _estimate_message_tokens(
     )
 
 
-class _ModelUnavailableError(PowdrrExecutionError):
+class _ModelUnavailableError(ProviderExecutionError):
     pass
 
 
-class _EmptyProviderResponseError(PowdrrExecutionError):
+class _EmptyProviderResponseError(ProviderExecutionError):
     def __init__(
         self,
         message: str,
@@ -2475,7 +2478,7 @@ class _EmptyProviderResponseError(PowdrrExecutionError):
         self.messages = messages
 
 
-class LocalModelRuntimeError(PowdrrExecutionError):
+class LocalModelRuntimeError(ProviderExecutionError):
     """Raised when the required local GPU model cannot run."""
 
 
@@ -2815,6 +2818,21 @@ def run_workflow_chat(
         user_request,
         source_ref=f"{execution_id}:user-request",
     )
+    if delivery_profile is not None:
+        assignment = next(
+            item
+            for item in delivery_profile.phases
+            if item.phase_type is PhaseType.INTAKE
+        )
+        available_actions = runtime.available_adapter_actions()
+        runtime.persona_packet(
+            delivery_profile,
+            run_id=execution_id,
+            phase_type=PhaseType.INTAKE,
+            phase_actions=available_actions,
+            persona_actions={assignment.persona_id: available_actions},
+            allowed_effects=frozenset(),
+        )
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,
         root_skill=root_skill,

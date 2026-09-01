@@ -160,6 +160,12 @@ class ExecutionRuntime:
             self._unit_actions = None
             self._adapter_actions = None
 
+    def install_step_scope(
+        self, actions: frozenset[str], *, enforce_empty: bool = False
+    ) -> None:
+        """Install a step contract without discarding phase/persona policy."""
+        self._allowed_actions = actions if actions or enforce_empty else None
+
     def set_execution_scope(
         self,
         *,
@@ -296,6 +302,8 @@ class ExecutionRuntime:
             "mutate_pull_request": frozenset({"gh"}),
             "enrich_test_output": frozenset({"enrich"}),
         }
+        if effective is not None and semantic_action in effective:
+            return ()
         if effective is not None and effective.intersection(
             action_families.get(semantic_action, frozenset())
         ):
@@ -520,6 +528,36 @@ class ExecutionRuntime:
         if "optimistic lock" in text or "optimistic-lock" in text:
             actions.update({"add_optimistic_lock", "run_concurrency_test"})
         return frozenset(actions)
+
+    def apply_guidance_obligations(
+        self, *, action_instance_id: str, action: str
+    ) -> None:
+        """Materialize matching user guidance when its triggering action occurs."""
+        required: tuple[str, ...] = ()
+        rules_text = " ".join(
+            rule.text.casefold()
+            for rule in self.guidance(
+                {
+                    "profile_id": self.state.profile_id,
+                    "phase_type": self.state.current_phase.value,
+                }
+            )
+        )
+        if action == "edit_for_review_comment" and "resolv" in rules_text:
+            required = ("resolve_review_thread",)
+        elif action == "change_mutable_row" and "optimistic lock" in rules_text:
+            required = ("add_optimistic_lock", "run_concurrency_test")
+        for required_action in required:
+            self.kernel.add_obligation(
+                ExecutionObligation(
+                    f"{action_instance_id}:guidance:{required_action}",
+                    f"Durable guidance requires {required_action} after {action}.",
+                    required_action=required_action,
+                    source_action_instance_id=action_instance_id,
+                    relationship_id="durable-guidance",
+                ),
+                action={"action_instance_id": action_instance_id, "kind": action},
+            )
 
     def remember_guidance(
         self, rule: Any, *, expected_version: int | None = None
@@ -1092,6 +1130,9 @@ class ExecutionRuntime:
                 ),
             )
         self.kernel.propose(action, semantic_action=request.semantic_action)
+        self.apply_guidance_obligations(
+            action_instance_id=action_instance_id, action=request.semantic_action
+        )
         self.kernel.start(action)
         self.sync_kernel(
             phase_type=self.state.current_phase.value,
@@ -1269,6 +1310,25 @@ class ExecutionRuntime:
 
     def available_adapter_actions(self) -> frozenset[str]:
         """Map registered manifest actions to model-facing action families."""
+        workflow_actions = {
+            "next_step",
+            "complete",
+            "invoke_tool",
+            "answer_question",
+            "handoff",
+            "request_input",
+            "prompt_user",
+            "edit",
+            "yaml_edit",
+            "file_management",
+            "gather_context",
+            "validate_edit",
+            "apply_edit",
+            "fuzzy_match",
+            "basedpyright",
+            "git",
+            "gh",
+        }
         mapping = {
             "file-mutation": {"edit", "yaml_edit", "file_management"},
             "validate-edit": {"validate_edit"},
@@ -1284,9 +1344,17 @@ class ExecutionRuntime:
             "repository": {"git", "gh"},
         }
         return frozenset(
-            action
-            for manifest in self.capability_manifests()
-            for action in mapping.get(manifest.tool_name, set())
+            workflow_actions
+            | {
+                action
+                for manifest in self.capability_manifests()
+                for action in mapping.get(manifest.tool_name, set())
+            }
+            | {
+                action
+                for manifest in self.capability_manifests()
+                for action in manifest.semantic_actions
+            }
         )
 
     def record_evidence(

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -11,6 +12,11 @@ from powdrr_lift.errors import (
     ProviderExecutionError,
 )
 from powdrr_lift.execution.runtime import ExecutionRuntime
+from powdrr_lift.workflow_llm import (
+    WorkflowActionRequest,
+    WorkflowExecutionStrategy,
+    WorkflowStepRunner,
+)
 
 
 def test_execution_error_categories_are_distinct() -> None:
@@ -42,3 +48,31 @@ def test_runtime_surfaces_corrupt_state_as_non_correctable_error(
 
     with pytest.raises(PersistenceCorruptionError):
         runtime.verify()
+
+
+def test_provider_failure_bypasses_model_correction_path() -> None:
+    class Strategy:
+        def next_request(self) -> WorkflowActionRequest:
+            def fail() -> None:
+                raise ProviderExecutionError("provider unavailable")
+
+            return WorkflowActionRequest(
+                client=cast(Any, object()),
+                messages=[],
+                parser=lambda payload: payload,
+                model="test",
+                stderr=None,
+                max_timeout_retries=0,
+                timeout_backoff_seconds=0,
+                request_action=fail,
+            )
+
+        def record_response_error(self, error: RuntimeError, payload: object) -> None:
+            raise AssertionError("provider failures must not enter correction")
+
+    with pytest.raises(ProviderExecutionError):
+        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+            cast(WorkflowExecutionStrategy, Strategy()),
+            max_roundtrips=1,
+            signature=lambda _: "failure",
+        )

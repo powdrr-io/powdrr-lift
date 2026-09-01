@@ -85,6 +85,20 @@ class ActionKernel:
             if obligation.status is ObligationStatus.OPEN
         }
 
+    def add_obligation(
+        self, obligation: ExecutionObligation, *, action: Any = None
+    ) -> None:
+        """Add one runtime-derived obligation and optionally record its opening."""
+        if obligation.obligation_id in self._obligations:
+            return
+        self._obligations[obligation.obligation_id] = obligation
+        if action is not None:
+            self._record(
+                ActionLifecyclePhase.OBLIGATION_OPENED,
+                action,
+                obligations=(obligation,),
+            )
+
     def to_execution_events(
         self,
         execution_id: str,

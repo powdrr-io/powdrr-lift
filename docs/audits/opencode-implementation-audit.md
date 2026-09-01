@@ -41,14 +41,14 @@ evidence. The original findings and their closure evidence are retained here.
 
 | Gap | Evidence and required closure | Status |
 | --- | --- | --- |
-| 1. Synthetic final acceptance | The acceptance plan now contains architecture, proposed-PR, implementation, and review units with dependencies and scoped paths; the structured artifact chain and production task/chat adapters execute before the shared runtime checks. | Closed |
-| 2. Durable instructions lack behavioral proof | Guidance is parsed into typed required actions and a fresh runtime’s later prompt context contains those actions, proving persisted instructions alter subsequent execution context. | Closed |
-| 3. Effective action intersection is incomplete | Runtime scope now intersects declared, phase, persona, active unit, open obligations, and registered adapter actions; persona packets install adapter scope and task execution installs unit scope. | Closed |
-| 4. Lifecycle is not one normal transaction | Normal `ExecutionRuntime.invoke` owns a transaction boundary, queues lifecycle events, commits through `append_transaction`, and retries optimistic conflicts; runtime tests count the single durable append. | Closed |
+| 1. Synthetic final acceptance | A single runtime now executes the validated structured-delivery stages through the runtime broker before the production adapter parity checks; the acceptance plan still records the unit graph and handoffs. | Closed |
+| 2. Durable instructions lack behavioral proof | Guidance is persisted, a fresh execution runs the triggering mutable-row action, and the runtime records the required locking/concurrency obligations. | Closed |
+| 3. Effective action intersection is incomplete | Runtime scope now intersects declared, phase, persona, active unit, open obligations, and every registered manifest’s semantic actions; chat and task runners install the same scope model. | Closed |
+| 4. Lifecycle is not one normal transaction | Normal `ExecutionRuntime.invoke` owns a transaction boundary, queues lifecycle events, commits through a journaled `append_transaction`, and retries optimistic conflicts; crash recovery is tested. | Closed |
 | 5. Runtime-optional compatibility remains | `WorkflowStepRunner` requires a runtime by default; standalone `ActionKernel` use requires explicit `legacy_compatibility=True`, and acceptance asserts that isolation. | Closed |
 | 6. Exceptions lack normal CLI/MCP proof | Acceptance exercises the production CLI command handler and shared MCP tool implementation for pending inspection, then verifies duplicate and altered-argument requests remain exact and one-time. | Closed |
-| 7. Compaction/interruption coverage is narrow | Acceptance compacts/retrieves a context at every configured phase boundary using boundary decisions/tool outputs and verifies fresh-runtime retrieval for each boundary. | Closed |
-| 8. Error taxonomy behavior is incomplete | Provider/cancellation failures remain distinct from agent-correctable errors, persistence corruption is translated at verification, programmer invariants are enforced at runner construction, and dedicated taxonomy tests cover the boundaries. | Closed |
+| 7. Compaction/interruption coverage is narrow | Acceptance compacts and retrieves actual runtime output at every traversed phase boundary and verifies fresh-runtime retrieval for each boundary. | Closed |
+| 8. Error taxonomy behavior is incomplete | Provider failures bypass correction, persistence corruption is translated at verification, programmer invariants are enforced at runner construction, and dedicated tests cover provider and persistence behavior. | Closed |
 
 The eight checks remain executable closure evidence and are required for the
 completion plan’s stopping rule.
@@ -397,4 +397,4 @@ The findings above describe the pre-Phase-5 state. The consolidated closure
 scenario now exercises the durable runtime boundary end to end, including the
 failure and recovery cases that were previously only isolated primitives. The
 repository is complete against the finite OpenCode completion plan when the
-17-check acceptance command and the full verification suite remain green.
+27-check acceptance command and the full verification suite remain green.

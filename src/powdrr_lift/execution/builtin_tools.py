@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import CapabilityBroker, CapabilityRequest
 from powdrr_lift.execution.tools import (
     ToolContext,
@@ -326,7 +327,10 @@ def invoke_basedpyright_capability(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(f"BasedPyright capability was not executable: {result.reason}")
+    raise PowdrrExecutionError(
+        f"BasedPyright capability was not executable: {result.reason}",
+        error_code="capability_not_executable",
+    )
 
 
 class FuzzyMatchAdapter:
@@ -409,7 +413,10 @@ def invoke_fuzzy_match_capability(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(f"Fuzzy-match capability was not executable: {result.reason}")
+    raise PowdrrExecutionError(
+        f"Fuzzy-match capability was not executable: {result.reason}",
+        error_code="capability_not_executable",
+    )
 
 
 class RepositoryReadAdapter:
@@ -538,7 +545,10 @@ def invoke_repository_read(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(f"Repository read was not executable: {result.reason}")
+    raise PowdrrExecutionError(
+        f"Repository read was not executable: {result.reason}",
+        error_code="capability_not_executable",
+    )
 
 
 def invoke_deferred_edit_capability(
@@ -564,7 +574,10 @@ def invoke_deferred_edit_capability(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(f"Deferred edit capability was not executable: {result.reason}")
+    raise PowdrrExecutionError(
+        f"Deferred edit capability was not executable: {result.reason}",
+        error_code="capability_not_executable",
+    )
 
 
 def invoke_file_mutation(
@@ -589,7 +602,10 @@ def invoke_file_mutation(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(f"File mutation was not executable: {result.reason}")
+    raise PowdrrExecutionError(
+        f"File mutation was not executable: {result.reason}",
+        error_code="capability_not_executable",
+    )
 
 
 def invoke_shell_capability(
@@ -615,7 +631,10 @@ def invoke_shell_capability(
     )
     if isinstance(result, ToolResult):
         return result.output
-    raise ValueError(f"Process capability request was not executable: {result.reason}")
+    raise PowdrrExecutionError(
+        f"Process capability request was not executable: {result.reason}",
+        error_code="capability_not_executable",
+    )
 
 
 def builtin_tool_registry() -> ToolRegistry:
@@ -656,7 +675,10 @@ def invoke_intrinsic_capability(
         )
         request_tool = "repository"
     else:
-        raise ValueError(f"Unsupported intrinsic capability: {tool}")
+        raise PowdrrExecutionError(
+            f"Unsupported intrinsic capability: {tool}",
+            error_code="unsupported_tool",
+        )
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,

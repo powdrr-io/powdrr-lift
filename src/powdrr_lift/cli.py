@@ -38,6 +38,7 @@ from powdrr_lift.core import (
     current_state_specification_default_output_path,
     feature_pr_specification_default_output_path,
     implementation_specification_default_output_path,
+    load_delivery_profile,
     lookup_edit_context,
     lookup_entity_decisions,
     lookup_entity_references,
@@ -69,7 +70,9 @@ from powdrr_lift.core import (
     validate_workflow_template_json,
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
+from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
+from powdrr_lift.core.execution_plan import ExecutionPlan
 from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
     create_project_structure_template,
@@ -1339,8 +1342,22 @@ def build_parser() -> argparse.ArgumentParser:
     instantiate_workflow_parser.add_argument(
         "--template",
         type=Path,
-        required=True,
-        help="Workflow template YAML or JSON to instantiate.",
+        help="Legacy workflow template YAML or JSON to instantiate.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--execution-plan",
+        type=Path,
+        help="Typed execution plan to compile instead of using a template.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--delivery-profile",
+        type=Path,
+        help="Delivery profile used with --execution-plan.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--action-contract",
+        type=Path,
+        help="Phase-to-actions JSON/YAML used with --execution-plan.",
     )
     instantiate_workflow_parser.add_argument(
         "--output-root",
@@ -1498,6 +1515,43 @@ def build_parser() -> argparse.ArgumentParser:
         "--revert", action="store_true", help="Restore the selected checkpoint."
     )
     checkpoints_parser.set_defaults(func=_run_execution_checkpoints)
+
+    compile_workflow_parser = subparsers.add_parser(
+        "compile-execution-plan",
+        aliases=["compile_execution_plan"],
+        help=(
+            "Compile a typed execution plan and delivery profile into a durable "
+            "workflow task graph."
+        ),
+    )
+    compile_workflow_parser.add_argument(
+        "--plan", type=Path, required=True, help="Execution plan JSON file."
+    )
+    compile_workflow_parser.add_argument(
+        "--profile", type=Path, required=True, help="Delivery profile YAML file."
+    )
+    compile_workflow_parser.add_argument(
+        "--actions",
+        type=Path,
+        required=True,
+        help="JSON or YAML mapping of phase names to allowed action names.",
+    )
+    compile_workflow_parser.add_argument(
+        "--workflow-dir",
+        type=Path,
+        required=True,
+        help="Directory in which to persist the compiled workflow and runtime state.",
+    )
+    compile_workflow_parser.add_argument(
+        "--execution-id",
+        help="Runtime execution id; defaults to the execution plan id.",
+    )
+    compile_workflow_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root used by the execution runtime.",
+    )
+    compile_workflow_parser.set_defaults(func=_run_compile_execution_plan)
 
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
@@ -1680,9 +1734,29 @@ def _parse_template_values(values: list[str]) -> dict[str, str]:
 
 def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
-    template_path = args.template
-    if not template_path.is_absolute():
-        template_path = repo_root / template_path
+    compiled_inputs = (
+        args.execution_plan,
+        args.delivery_profile,
+        args.action_contract,
+    )
+    if any(value is not None for value in compiled_inputs) and not all(
+        value is not None for value in compiled_inputs
+    ):
+        print(
+            "--execution-plan, --delivery-profile, and --action-contract "
+            "must be supplied together",
+            file=sys.stderr,
+        )
+        return 2
+    if args.template is None and not all(
+        value is not None for value in compiled_inputs
+    ):
+        print(
+            "--template or the complete compiled execution-plan options are required",
+            file=sys.stderr,
+        )
+        return 2
+    template_path = _resolve_cli_path(repo_root, args.template)
     output_root = args.output_root
     if not output_root.is_absolute():
         output_root = repo_root / output_root
@@ -1700,19 +1774,58 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             project_root,
             proposed_pr_id,
         )
-        output_directory, tasks = instantiate_workflow_template(
-            template_path=template_path,
-            work_item_name=args.work_item_name,
-            output_root=output_root,
-            workflow_instance_name=args.workflow_instance_name,
-            template_values=template_values,
-        )
-        invariants, relationships = instantiated_workflow_relationships(
-            template_path,
-            work_item_name=args.work_item_name,
-            workflow_instance_name=args.workflow_instance_name,
-            template_values=template_values,
-        )
+        if all(value is not None for value in compiled_inputs):
+            assert args.execution_plan is not None
+            assert args.delivery_profile is not None
+            assert args.action_contract is not None
+            plan_path = _resolve_cli_path(repo_root, args.execution_plan)
+            profile_path = _resolve_cli_path(repo_root, args.delivery_profile)
+            action_path = _resolve_cli_path(repo_root, args.action_contract)
+            assert plan_path is not None
+            assert profile_path is not None
+            assert action_path is not None
+            output_directory = _workflow_output_directory(
+                output_root, args.work_item_name
+            )
+            if output_directory.exists() and any(output_directory.iterdir()):
+                raise FileExistsError(
+                    f"Workflow output directory is not empty: {output_directory}."
+                )
+            plan = ExecutionPlan.from_data(_load_structured_mapping(plan_path))
+            profile = load_delivery_profile(profile_path)
+            actions_by_phase = _parse_action_contract(
+                _load_structured_mapping(action_path)
+            )
+            runtime = ExecutionRuntime(
+                plan.plan_id,
+                profile_id=profile.profile_id,
+                workflow_directory=output_directory,
+                repo_root=repo_root,
+                profile=profile,
+            )
+            tasks = runtime.compile_plan_to_workflow(
+                profile,
+                plan,
+                actions_by_phase=actions_by_phase,
+                workflow_directory=output_directory,
+            ).tasks
+            invariants: tuple[Any, ...] = ()
+            relationships: tuple[Any, ...] = ()
+        else:
+            assert template_path is not None
+            output_directory, tasks = instantiate_workflow_template(
+                template_path=template_path,
+                work_item_name=args.work_item_name,
+                output_root=output_root,
+                workflow_instance_name=args.workflow_instance_name,
+                template_values=template_values,
+            )
+            invariants, relationships = instantiated_workflow_relationships(
+                template_path,
+                work_item_name=args.work_item_name,
+                workflow_instance_name=args.workflow_instance_name,
+                template_values=template_values,
+            )
         relative_workflow = output_directory.relative_to(repo_root)
         state = WorkflowGitState(
             proposed_pr_id=template_values.get("proposed-pr-id", args.work_item_name),
@@ -1750,6 +1863,47 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _resolve_cli_path(repo_root: Path, path: Path | None) -> Path | None:
+    if path is None or path.is_absolute():
+        return path
+    return repo_root / path
+
+
+def _workflow_output_directory(output_root: Path, work_item_name: str) -> Path:
+    import re
+
+    slug = re.sub(r"[^a-z0-9]+", "-", work_item_name.strip().lower()).strip("-")
+    if not slug:
+        raise ValueError("work-item-name must contain at least one letter or digit")
+    return output_root / slug
+
+
+def _parse_action_contract(
+    actions_data: Mapping[str, Any],
+) -> dict[PhaseType, tuple[str, ...]]:
+    actions_by_phase: dict[PhaseType, tuple[str, ...]] = {}
+    for raw_phase, raw_actions in actions_data.items():
+        try:
+            phase = PhaseType(str(raw_phase))
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"Unknown delivery phase in action contract: {raw_phase!r}",
+                error_code="compiled_workflow_phase_unknown",
+                remediation="Use only phase names declared by the delivery profile.",
+            ) from error
+        if not isinstance(raw_actions, list | tuple) or not all(
+            isinstance(action, str) for action in raw_actions
+        ):
+            raise PowdrrExecutionError(
+                f"Action contract for phase {phase.value!r} must be a list of strings.",
+                error_code="compiled_workflow_action_contract_invalid",
+                action_kind=phase.value,
+                remediation="Provide a list containing each allowed action name.",
+            )
+        actions_by_phase[phase] = tuple(raw_actions)
+    return actions_by_phase
 
 
 def _run_process_workflow_task(args: argparse.Namespace) -> int:
@@ -1866,6 +2020,66 @@ def _run_execution_checkpoints(args: argparse.Namespace) -> int:
     manifests = sorted(store.manifests.glob("*.json"))
     print(json.dumps([store.load(path.stem).to_data() for path in manifests], indent=2))
     return 0
+
+
+def _run_compile_execution_plan(args: argparse.Namespace) -> int:
+    """Materialize the user-authored plan through the typed phase controller."""
+    assert args.plan is not None
+    assert args.profile is not None
+    assert args.actions is not None
+    plan_data = _load_structured_mapping(args.plan)
+    plan = ExecutionPlan.from_data(plan_data)
+    profile = load_delivery_profile(args.profile)
+    actions_data = _load_structured_mapping(args.actions)
+    actions_by_phase = _parse_action_contract(actions_data)
+    repo_root = resolve_repo_root(args.repo_root)
+    runtime = ExecutionRuntime(
+        args.execution_id or plan.plan_id,
+        profile_id=profile.profile_id,
+        workflow_directory=args.workflow_dir,
+        repo_root=repo_root,
+        profile=profile,
+    )
+    workflow = runtime.compile_plan_to_workflow(
+        profile,
+        plan,
+        actions_by_phase=actions_by_phase,
+        workflow_directory=args.workflow_dir,
+    )
+    print(
+        json.dumps(
+            {
+                "execution_id": runtime.execution_id,
+                "plan_id": plan.plan_id,
+                "profile_id": profile.profile_id,
+                "workflow_directory": str(Path(args.workflow_dir).resolve()),
+                "task_ids": [task.task_id for task in workflow.tasks],
+                "task_count": len(workflow.tasks),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def _load_structured_mapping(path: Path) -> dict[str, Any]:
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"Could not read structured input {path}: {error}",
+            error_code="compiled_workflow_input_invalid",
+            remediation="Provide a readable JSON or YAML input file.",
+        ) from error
+    if not isinstance(loaded, dict):
+        raise PowdrrExecutionError(
+            f"Structured input {path} must contain an object.",
+            error_code="compiled_workflow_input_invalid",
+            remediation=(
+                "Provide a top-level object in the plan or action contract file."
+            ),
+        )
+    return loaded
 
 
 def _run_workflow_recovery(args: argparse.Namespace) -> int:

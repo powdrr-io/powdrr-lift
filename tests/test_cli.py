@@ -50,6 +50,92 @@ def test_cli_init_writes_template(
     ]
 
 
+def test_cli_compiles_plan_into_profiled_workflow(tmp_path: Path) -> None:
+    repo_root = _create_repo_with_feature_branch(tmp_path)
+    plan_path = repo_root / "execution-plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "execution-plan-v1",
+                "plan_id": "plan-cli",
+                "proposed_pr_fingerprint": "fingerprint-1",
+                "units": [
+                    {
+                        "unit_id": "core",
+                        "objective": "Implement the core change",
+                        "paths": ["src/app.py"],
+                        "acceptance_criteria": ["tests pass"],
+                        "validation_profiles": ["repository-validation"],
+                    }
+                ],
+                "allowed_paths": ["src"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    profile_path = Path("delivery-profiles/default-software-delivery.yaml").resolve()
+    actions_path = repo_root / "actions.yaml"
+    actions_path.write_text(
+        "\n".join(
+            [
+                f"{phase}: [read_document, next_step]"
+                for phase in (
+                    "intake",
+                    "specify",
+                    "review_specifications",
+                    "decompose",
+                    "review_proposed_prs",
+                    "plan_pr",
+                    "await_plan_decision",
+                    "build",
+                    "validate",
+                    "review_pr",
+                    "resolve_findings",
+                    "confirm_readiness",
+                    "publish_pr",
+                    "complete_feature",
+                )
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    workflow_dir = repo_root / "workflow"
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "compile-execution-plan",
+                    "--plan",
+                    str(plan_path),
+                    "--profile",
+                    str(profile_path),
+                    "--actions",
+                    str(actions_path),
+                    "--workflow-dir",
+                    str(workflow_dir),
+                    "--repo-root",
+                    str(repo_root),
+                ]
+            )
+            == 0
+        )
+
+    result = json.loads(stdout.getvalue())
+    assert result["task_count"] == 14
+    assert (workflow_dir / "core-build.yaml").exists()
+    import yaml
+
+    build_task = yaml.safe_load(
+        (workflow_dir / "core-build.yaml").read_text(encoding="utf-8")
+    )
+    assert build_task["phase_type"] == "build"
+    assert build_task["persona_id"] == "engineer"
+    assert build_task["actions"] == ["read_document", "next_step"]
+
+
 def test_staging_generated_directory_emits_each_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -108,6 +108,7 @@ def test_explicit_task_prompt_contains_only_declared_action_guidance() -> None:
     assert "- next_step:" in prompt
     assert "- invoke_skill:" not in prompt
     assert "- edit:" not in prompt
+    assert "Use `complete` only" not in prompt
 
 
 def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(

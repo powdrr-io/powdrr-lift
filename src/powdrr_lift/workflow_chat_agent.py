@@ -6121,7 +6121,11 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
-        and not (action.kind == "invoke_tool" and action.tool == "internal")
+        and not (
+            action.kind == "invoke_tool"
+            and action.tool == "internal"
+            and not getattr(step, "actions_declared", False)
+        )
     ):
         raise _WorkflowToolValidationError(
             ValidationError(
@@ -6996,7 +7000,11 @@ def _validate_workflow_action_for_step_unwrapped(
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
-        and not (action.kind == "invoke_tool" and action.tool == "internal")
+        and not (
+            action.kind == "invoke_tool"
+            and action.tool == "internal"
+            and not getattr(step, "actions_declared", False)
+        )
     ):
         raise _WorkflowToolValidationError(
             ValidationError(

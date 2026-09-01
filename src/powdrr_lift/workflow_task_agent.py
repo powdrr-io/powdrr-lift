@@ -2570,13 +2570,18 @@ def _task_system_prompt(
         if task.actions_declared
         else _action_system_prompt()
     )
+    early_termination_guidance = (
+        " Use `complete` only for an early workflow termination when no later task "
+        "should run, such as when the proposed PR is superseded."
+        if not task.actions_declared or "complete" in task.actions
+        else ""
+    )
     return (
         action_prompt
         + "\nDurable workflow-task contract: this is one task that may contain "
         "multiple actions. Use `next_step` when this task is finished: it persists "
         "this task's declared output_state and advances the workflow to the next "
-        "task. Use `complete` only for an early workflow termination when no later "
-        "task should run, such as when the proposed PR is superseded. If this is "
+        "task." + early_termination_guidance + " If this is "
         "the final task, `next_step` completes the workflow after persisting its "
         "output. For durable task completion, the result MUST be under "
         "the top-level `output_state` field; never put it under `outputs`. "

@@ -518,6 +518,20 @@ def test_explicit_step_contract_rejects_undeclared_complete() -> None:
         )
 
 
+def test_explicit_step_contract_rejects_undeclared_internal_tool() -> None:
+    with pytest.raises(_WorkflowToolValidationError, match="not allowed"):
+        _validate_workflow_action_for_step(
+            _parse_action_response(
+                {
+                    "action": "invoke_tool",
+                    "tool": "internal",
+                    "parameters": {"command": ["powdrr-lift", "help"]},
+                }
+            ),
+            SkillStep(description="Only read documents.", actions=("read_document",)),
+        )
+
+
 def test_deterministic_shell_pre_step_accepts_empty_successful_result(
     tmp_path: Path,
 ) -> None:

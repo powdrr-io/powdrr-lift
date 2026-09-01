@@ -571,7 +571,7 @@ def invoke_deferred_edit_capability(
         repo_root=worktree_root,
         worktree_root=worktree_root,
         semantic_actions=frozenset({request_action}),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
     request = CapabilityRequest(tool, request_action, dict(arguments))
     result = _require_runtime(runtime, tool).invoke_adapter(adapter, context, request)
@@ -590,13 +590,13 @@ def invoke_file_mutation(
     executor: Callable[[], Any],
     runtime: Any = None,
 ) -> Any:
+    adapter = FileMutationAdapter(executor)
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
         semantic_actions=frozenset({"edit_files"}),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
-    adapter = FileMutationAdapter(executor)
     request = CapabilityRequest("file-mutation", "edit_files", {"paths": list(paths)})
     result = _require_runtime(runtime, "file-mutation").invoke_adapter(
         adapter, context, request
@@ -617,13 +617,13 @@ def invoke_shell_capability(
     runtime: Any = None,
 ) -> Any:
     """Run one argv process after broker validation and scope checks."""
+    adapter = ShellAdapter(executor)
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
         semantic_actions=frozenset({"run_process"}),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
-    adapter = ShellAdapter(executor)
     request = CapabilityRequest("process", "run_process", dict(arguments))
     result = _require_runtime(runtime, "process").invoke_adapter(
         adapter, context, request
@@ -774,6 +774,14 @@ def invoke_intrinsic_capability(
             f"Unsupported intrinsic capability: {tool}",
             error_code="unsupported_tool",
         )
+    adapter = builtin_tool_registry().get(request_tool)
+    if adapter is None:
+        raise PowdrrExecutionError(
+            f"No adapter registered for intrinsic tool {request_tool!r}",
+            error_code="intrinsic_tool_unregistered",
+            action_kind=semantic_action,
+            remediation="Use a registered builtin tool or request tool discovery.",
+        )
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
@@ -786,17 +794,9 @@ def invoke_intrinsic_capability(
                 "enrich_test_output",
             }
         ),
-        allowed_effects=frozenset(ToolEffect),
+        allowed_effects=frozenset(adapter.manifest.effects),
     )
     request = CapabilityRequest(request_tool, semantic_action, dict(arguments))
-    adapter = builtin_tool_registry().get(request_tool)
-    if adapter is None:
-        raise PowdrrExecutionError(
-            f"No adapter registered for intrinsic tool {request_tool!r}",
-            error_code="intrinsic_tool_unregistered",
-            action_kind=semantic_action,
-            remediation="Use a registered builtin tool or request tool discovery.",
-        )
     result = _require_runtime(runtime, request_tool).invoke_adapter(
         adapter, context, request
     )

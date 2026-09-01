@@ -284,6 +284,7 @@ class ExecutionRuntime:
                 "phase": self.state.current_phase.value,
                 "persona_id": self.state.current_persona_id,
                 "allowed_actions": list(self.allowed_actions()),
+                "capability_catalog": list(self.capability_catalog()),
                 "artifact_ids": [item.artifact_id for item in self.state.artifacts],
                 "action_ids": [item.action_instance_id for item in self.state.actions],
                 "obligation_ids": [
@@ -930,6 +931,15 @@ class ExecutionRuntime:
     def capability_manifests(self) -> tuple[Any, ...]:
         """Return the executable capability surface owned by this runtime."""
         return self.broker.registry.manifests()
+
+    def capability_catalog(self) -> tuple[dict[str, Any], ...]:
+        """Return the bounded model-facing catalog for this runtime's tools."""
+        return tuple(
+            manifest.to_data()
+            for manifest in sorted(
+                self.capability_manifests(), key=lambda item: item.tool_name
+            )
+        )
 
     def record_evidence(
         self,

@@ -65,6 +65,12 @@ def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) ->
         "repository-read_document",
         "repository-list_files",
     }
+    assert runtime.prompt_context()["capability_catalog"] == [
+        manifest.to_data()
+        for manifest in sorted(
+            runtime.capability_manifests(), key=lambda item: item.tool_name
+        )
+    ]
 
 
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:

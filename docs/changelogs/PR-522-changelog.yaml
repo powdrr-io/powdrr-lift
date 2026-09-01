@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 522
+title: Delete regenerated interaction file log artifacts
+intent:
+  problem: The previously removed interaction-file-log design and proposed workflow artifacts were regenerated in the repository.
+  goal: Remove the regenerated interaction-file-log proposal specifications and workflow definitions so they cannot be mistaken for active project direction.
+human-decisions:
+  - id: remove-regenerated-interaction-file-log
+    action: added
+    summary: Delete the regenerated interaction-file-log design specifications, proposed PR specification, and workflow artifacts.
+structured_files:
+  - docs/proposals/interaction-file-log/architecture-specification.yaml
+  - docs/proposals/interaction-file-log/implementation-specification.yaml
+  - docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+  - docs/proposals/interaction-file-log/system-specification.yaml
+files: []
+entities: []
+entity_relationships: []
+invariants:
+  - id: inv-no-interaction-file-log-artifacts
+    action: added
+    description: The repository must not contain interaction-file-log proposal or workflow artifacts.
+    rationale: Prevent regenerated obsolete design material from being treated as current project direction.
+guidance: []
+features: []
+proposed_prs: []

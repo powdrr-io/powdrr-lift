@@ -29,6 +29,7 @@ from powdrr_lift.core.execution_state import (
     ExecutionState,
 )
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityDecision,
@@ -170,7 +171,15 @@ class ExecutionRuntime:
             max_uses=max_uses,
         )
         if exception is None:
-            raise ValueError("capability exception request is not eligible")
+            raise PowdrrExecutionError(
+                "capability exception request is not eligible",
+                error_code="capability_exception_not_eligible",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Use a declared capability or provide an eligible exception "
+                    "request."
+                ),
+            )
         return exception
 
     def decide_capability_exception(
@@ -199,7 +208,12 @@ class ExecutionRuntime:
     ) -> ToolResult | CapabilityResolution:
         """Resume exactly one approved request through the normal broker path."""
         if not decision.approved or not decision.token:
-            raise ValueError("only an approved exception can be resumed")
+            raise PowdrrExecutionError(
+                "only an approved exception can be resumed",
+                error_code="capability_exception_not_approved",
+                action_kind=request.semantic_action,
+                remediation="Wait for an approved exception decision before resuming.",
+            )
         return self.invoke(
             context,
             CapabilityRequest(
@@ -254,7 +268,11 @@ class ExecutionRuntime:
         """Turn an explicit user instruction into durable future behavior."""
         normalized = " ".join(text.strip().casefold().split())
         if not normalized:
-            raise ValueError("Guidance text must not be empty.")
+            raise PowdrrExecutionError(
+                "Guidance text must not be empty.",
+                error_code="guidance_empty",
+                remediation="Provide a concrete behavior rule.",
+            )
         rule_id = "guidance-" + hashlib.sha256(normalized.encode()).hexdigest()[:20]
         current = next(
             (
@@ -308,7 +326,11 @@ class ExecutionRuntime:
     ) -> ExecutionState:
         """Persist an observer outcome in the authoritative execution stream."""
         if not verdict.strip() or not reason.strip() or not action_kind.strip():
-            raise ValueError("Observer decisions require verdict, reason, and action.")
+            raise PowdrrExecutionError(
+                "Observer decisions require verdict, reason, and action.",
+                error_code="observer_decision_incomplete",
+                remediation="Provide verdict, reason, and action_kind.",
+            )
         return self._append_event(
             ExecutionEventType.OBSERVER_DECISION,
             {
@@ -367,8 +389,12 @@ class ExecutionRuntime:
             known_validation_profiles=validation_profiles,
         )
         if not evaluation.valid:
-            raise ValueError(
-                "execution plan is not compilable: " + "; ".join(evaluation.issues)
+            raise PowdrrExecutionError(
+                "execution plan is not compilable: " + "; ".join(evaluation.issues),
+                error_code="execution_plan_invalid",
+                remediation=(
+                    "Resolve every plan issue before compiling the execution plan."
+                ),
             )
         self.save_plan(plan)
         for decision in evaluation.required_decisions:
@@ -394,7 +420,11 @@ class ExecutionRuntime:
             item.obligation_id == obligation_id and item.status.value == "open"
             for item in self.state.obligations
         ):
-            raise ValueError(f"open plan decision not found: {decision}")
+            raise PowdrrExecutionError(
+                f"open plan decision not found: {decision}",
+                error_code="plan_decision_not_open",
+                remediation="Resolve only a currently open plan decision.",
+            )
         return self._append_event(
             ExecutionEventType.OBLIGATION_SATISFIED,
             {"obligation_id": obligation_id},
@@ -438,10 +468,20 @@ class ExecutionRuntime:
         checkpoint = self.checkpoint_store.load(checkpoint_id)
         state_json = self.checkpoint_store.load_state_json(checkpoint)
         if state_json is None:
-            raise ValueError("checkpoint has no execution state snapshot")
+            raise PowdrrExecutionError(
+                "checkpoint has no execution state snapshot",
+                error_code="checkpoint_state_missing",
+                remediation=(
+                    "Choose a checkpoint that contains an execution state snapshot."
+                ),
+            )
         restored = ExecutionState.from_json(state_json)
         if restored.execution_id != self.execution_id:
-            raise ValueError("checkpoint belongs to a different execution")
+            raise PowdrrExecutionError(
+                "checkpoint belongs to a different execution",
+                error_code="checkpoint_execution_mismatch",
+                remediation="Restore a checkpoint created by this execution.",
+            )
         self.checkpoint_store.restore(checkpoint, workspace_root)
         self.state = self._append_event(
             ExecutionEventType.CHECKPOINT_REVERTED,
@@ -463,17 +503,21 @@ class ExecutionRuntime:
     ) -> PersonaPacket:
         """Build a least-privilege persona packet from durable runtime state."""
         if phase_type is not self.state.current_phase:
-            raise ValueError(
+            raise PowdrrExecutionError(
                 f"persona packet phase {phase_type.value!r} does not match "
-                f"runtime phase {self.state.current_phase.value!r}"
+                f"runtime phase {self.state.current_phase.value!r}",
+                error_code="persona_phase_mismatch",
+                remediation="Run the persona assigned to the runtime's current phase.",
             )
         assignment = next(
             (item for item in profile.phases if item.phase_type is phase_type), None
         )
         if assignment is not None and assignment.persona_id not in persona_actions:
-            raise ValueError(
+            raise PowdrrExecutionError(
                 "persona actions omit profile-assigned persona "
-                f"{assignment.persona_id!r}"
+                f"{assignment.persona_id!r}",
+                error_code="persona_actions_missing",
+                remediation="Include actions for the persona assigned to this phase.",
             )
         return build_persona_packet(
             profile,

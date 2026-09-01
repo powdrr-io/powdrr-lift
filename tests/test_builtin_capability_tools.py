@@ -5,12 +5,14 @@ from typing import Any
 import pytest
 
 from powdrr_lift.core.tool_manifest import ToolEffect
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.builtin_tools import (
     BasedPyrightAdapter,
     FuzzyMatchAdapter,
     RepositoryReadAdapter,
     builtin_tool_registry,
     invoke_file_mutation,
+    invoke_intrinsic_capability,
     invoke_shell_capability,
 )
 from powdrr_lift.execution.capabilities import (
@@ -19,6 +21,19 @@ from powdrr_lift.execution.capabilities import (
     CapabilityResolutionKind,
 )
 from powdrr_lift.execution.tools import ToolContext, ToolResult
+
+
+def test_intrinsic_capability_unknown_tool_has_typed_correction_metadata(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(PowdrrExecutionError) as raised:
+        invoke_intrinsic_capability(
+            "unknown",
+            {},
+            worktree_root=tmp_path,
+        )
+
+    assert raised.value.error_code == "unsupported_tool"
 
 
 def test_builtin_repository_inspection_resolves_through_broker(tmp_path: Path) -> None:
@@ -82,7 +97,7 @@ def test_shell_capability_rejects_string_commands_and_escape(tmp_path: Path) -> 
     ):
         try:
             invoke_shell_capability(arguments, worktree_root=tmp_path, executor=execute)
-        except ValueError as error:
+        except PowdrrExecutionError as error:
             assert "not executable" in str(error)
         else:
             raise AssertionError("invalid process should fail")
@@ -114,7 +129,7 @@ def test_file_mutation_capability_rejects_absolute_and_escape_targets(
         raise AssertionError("invalid file mutation must not execute")
 
     for path in ("../outside.py", str(tmp_path / "outside.py")):
-        with pytest.raises(ValueError, match="not executable"):
+        with pytest.raises(PowdrrExecutionError, match="not executable"):
             invoke_file_mutation((path,), worktree_root=tmp_path, executor=execute)
 
 

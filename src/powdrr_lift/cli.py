@@ -1419,10 +1419,8 @@ def build_parser() -> argparse.ArgumentParser:
     process_workflow_task_parser.add_argument(
         "--max-roundtrips",
         type=int,
-        default=None,
-        help=(
-            "Optional maximum LLM action roundtrips; by default progress is unlimited."
-        ),
+        default=128,
+        help=("Maximum LLM action roundtrips (default: 128)."),
     )
     process_workflow_task_parser.add_argument(
         "--context-compaction-threshold",

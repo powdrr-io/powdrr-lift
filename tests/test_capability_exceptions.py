@@ -7,6 +7,7 @@ import pytest
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.execution_state import ExecutionEventType
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityRequest,
@@ -229,5 +230,5 @@ def test_exception_decision_is_idempotent_and_conflicts_are_rejected(
     first = broker.decide_exception(exception, approved=True, decided_by="human")
     repeated = broker.decide_exception(exception, approved=True, decided_by="human")
     assert repeated == first
-    with pytest.raises(ValueError, match="already has a decision"):
+    with pytest.raises(PowdrrExecutionError, match="already has a decision"):
         broker.decide_exception(exception, approved=False, decided_by="human")

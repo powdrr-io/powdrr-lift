@@ -102,6 +102,7 @@ from powdrr_lift.workflow_git import (
     workflow_id_from_task_id,
 )
 from powdrr_lift.workflow_llm import (
+    DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
     ProgressDecision,
     WorkflowAction,
@@ -202,7 +203,7 @@ class WorkflowTaskAgentConfig:
     task_id: str | None = None
     api_key: str | None = None
     base_url: str | None = None
-    max_roundtrips: int | None = None
+    max_roundtrips: int | None = DEFAULT_MAX_ROUNDTRIPS
     max_stalled_roundtrips: int = 3
     max_timeout_retries: int = 8
     timeout_backoff_seconds: float = 10.0
@@ -2251,7 +2252,7 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
 
 def _nested_action_response_correction(error: RuntimeError) -> str:
     """Return actionable repair guidance for a nested skill response."""
-    return (
+    correction = (
         f"The nested skill response was invalid: {error} "
         "Return exactly one corrected JSON object for the current nested step. "
         "The top-level discriminator is the string field "
@@ -2264,6 +2265,9 @@ def _nested_action_response_correction(error: RuntimeError) -> str:
         '"file_edits":[{"file_path":"relative/path.py","edits":[...]}]. '
         "Do not return markdown, prose, or a nested action object."
     )
+    if isinstance(error, PowdrrExecutionError):
+        correction += _typed_error_guidance(error)
+    return correction
 
 
 def _action_response_correction(
@@ -2275,6 +2279,8 @@ def _action_response_correction(
         "Return a corrected JSON action and "
         "do not repeat the failed command unchanged."
     )
+    if isinstance(error, PowdrrExecutionError):
+        correction += _typed_error_guidance(error)
     if action.tool == "fuzzy-match":
         correction += (
             " A fuzzy-match command must be an array beginning with "
@@ -2297,6 +2303,14 @@ def _action_response_correction(
                 "from a task id, template id, package name, or description."
             )
     return correction
+
+
+def _typed_error_guidance(error: PowdrrExecutionError) -> str:
+    """Expose machine-readable correction metadata at the next prompt boundary."""
+    guidance = f" Error code: {error.error_code}."
+    if error.remediation:
+        guidance += f" Remediation: {error.remediation}"
+    return guidance
 
 
 def _task_action_material_state(
@@ -3336,7 +3350,7 @@ def _run_skill_for_agent_with_shared_runner(
     strategy.driver = driver
     exit_code = driver.run(
         strategy,
-        max_roundtrips=None,
+        max_roundtrips=DEFAULT_MAX_ROUNDTRIPS,
         signature=workflow_action_signature,
     )
     if exit_code != 0:

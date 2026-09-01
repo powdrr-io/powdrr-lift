@@ -2424,11 +2424,11 @@ def _estimate_message_tokens(
     )
 
 
-class _ModelUnavailableError(RuntimeError):
+class _ModelUnavailableError(PowdrrExecutionError):
     pass
 
 
-class _EmptyProviderResponseError(RuntimeError):
+class _EmptyProviderResponseError(PowdrrExecutionError):
     def __init__(
         self,
         message: str,
@@ -2439,7 +2439,7 @@ class _EmptyProviderResponseError(RuntimeError):
         self.messages = messages
 
 
-class LocalModelRuntimeError(RuntimeError):
+class LocalModelRuntimeError(PowdrrExecutionError):
     """Raised when the required local GPU model cannot run."""
 
 
@@ -9460,6 +9460,10 @@ def _workflow_edit_failure_feedback(
         f"Workflow {action.kind} action failed: {error}. "
         "Re-read the current file context and return a corrected action."
     )
+    if isinstance(error, PowdrrExecutionError):
+        feedback += f" Error code: {error.error_code}."
+        if error.remediation:
+            feedback += f" Remediation: {error.remediation}"
     if isinstance(error, _WorkflowEditRangeError):
         if current_file_context and current_file_context.get("exists"):
             feedback += (

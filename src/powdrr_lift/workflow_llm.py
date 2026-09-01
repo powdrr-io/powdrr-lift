@@ -31,11 +31,11 @@ class WorkflowLLMClient(Protocol):
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
 
 
-class WorkflowLLMTimeoutExhausted(RuntimeError):
+class WorkflowLLMTimeoutExhausted(PowdrrExecutionError):
     """Raised when a provider request keeps timing out after its retry budget."""
 
 
-class WorkflowLLMHTTPError(RuntimeError):
+class WorkflowLLMHTTPError(PowdrrExecutionError):
     """A provider response that includes an HTTP status code."""
 
     def __init__(self, provider: str, status_code: int, detail: str) -> None:
@@ -43,7 +43,7 @@ class WorkflowLLMHTTPError(RuntimeError):
         super().__init__(f"{provider} request failed with HTTP {status_code}: {detail}")
 
 
-class WorkflowLLMExecutionAborted(RuntimeError):
+class WorkflowLLMExecutionAborted(PowdrrExecutionError):
     """Stop a shared execution loop after its adapter aborts a request."""
 
     def __init__(self, exit_code: int) -> None:
@@ -56,6 +56,9 @@ StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
 _MAX_PROMPT_EVENT_CHARS = 8_000
 _PROMPT_SIZE_CHARS_PER_TOKEN = 3
+# A caller may opt into an unlimited loop for deterministic harnesses, but
+# production entry points must always provide a finite budget.
+DEFAULT_MAX_ROUNDTRIPS = 128
 
 
 @dataclass(frozen=True, slots=True)
@@ -502,7 +505,13 @@ class WorkflowStepRunner:
                 self.kernel.fail(action, exc)
                 self._sync_runtime()
                 self._record_shadow(
-                    "action_failed", action, error_code=type(exc).__name__
+                    "action_failed",
+                    action,
+                    error_code=(
+                        exc.error_code
+                        if isinstance(exc, PowdrrExecutionError)
+                        else type(exc).__name__
+                    ),
                 )
                 strategy.record_action_error(action, exc)
                 failure_decision = None

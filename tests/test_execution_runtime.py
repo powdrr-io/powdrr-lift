@@ -28,6 +28,16 @@ def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) ->
     assert {manifest.tool_name for manifest in runtime.capability_manifests()} == {
         "repository",
         "enrich",
+        "process",
+        "file-mutation",
+        "validate-edit",
+        "apply-edit",
+        "fuzzy-match",
+        "basedpyright-symbol",
+        "basedpyright-structure",
+        "repository-gather_context",
+        "repository-read_document",
+        "repository-list_files",
     }
 
 

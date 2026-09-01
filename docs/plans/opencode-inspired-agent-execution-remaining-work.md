@@ -36,6 +36,13 @@ The following foundations exist and are merged:
 These are kernel seams and unit-tested building blocks. Several are currently
 reachable only through direct Python APIs or tests.
 
+The final acceptance implementation now provides executable closure checks for
+the integrated path. Run `powdrr-lift final-acceptance` for the deterministic
+compiled-plan, effective-contract, relationship, lifecycle, and adapter-parity
+scenario, and `powdrr-lift audit-capabilities` for the built-in capability
+manifest audit. These commands are covered by the full test suite and are the
+required evidence for the final phase.
+
 ## Remaining work, in priority order
 
 ### 1. Make the capability broker authoritative

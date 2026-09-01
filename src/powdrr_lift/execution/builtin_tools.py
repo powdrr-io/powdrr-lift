@@ -12,6 +12,7 @@ from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.capabilities import CapabilityBroker, CapabilityRequest
 from powdrr_lift.execution.tools import (
+    ToolAdapter,
     ToolContext,
     ToolRegistry,
     ToolResult,
@@ -638,9 +639,105 @@ def invoke_shell_capability(
 
 
 def builtin_tool_registry() -> ToolRegistry:
-    """Return built-ins that have been migrated to capability execution."""
+    """Return every normal capability with a runtime-replaceable adapter.
 
-    return ToolRegistry((IntrinsicRepositoryAdapter(), EnrichmentAdapter()))
+    The workflow-specific wrappers replace the manifest-only adapters with
+    context-bound executors before invocation. Keeping every normal surface in
+    the registry makes the capability catalog complete and prevents an
+    unregistered fallback from becoming an accidental execution path.
+    """
+
+    adapters: list[ToolAdapter] = [
+        IntrinsicRepositoryAdapter(),
+        EnrichmentAdapter(),
+        _ManifestOnlyAdapter(
+            ToolManifest(
+                "process",
+                ("run_process",),
+                (ToolEffect.PROCESS_EXECUTION,),
+                scope="worktree",
+                sandbox_profile="workspace-process",
+            )
+        ),
+        _ManifestOnlyAdapter(
+            ToolManifest(
+                "file-mutation",
+                ("edit_files",),
+                (ToolEffect.WORKSPACE_WRITE,),
+                scope="worktree",
+                sandbox_profile="workspace-files",
+            )
+        ),
+        _ManifestOnlyAdapter(
+            ToolManifest(
+                "validate-edit",
+                ("validate_edit",),
+                (ToolEffect.WORKSPACE_READ,),
+                scope="worktree",
+                sandbox_profile="workspace-files",
+                reversible=True,
+            )
+        ),
+        _ManifestOnlyAdapter(
+            ToolManifest(
+                "apply-edit",
+                ("apply_edit",),
+                (ToolEffect.WORKSPACE_WRITE,),
+                scope="worktree",
+                sandbox_profile="workspace-files",
+            )
+        ),
+        _ManifestOnlyAdapter(
+            ToolManifest(
+                "fuzzy-match",
+                ("discover_files",),
+                (ToolEffect.WORKSPACE_READ,),
+                scope="worktree",
+                sandbox_profile="workspace-read",
+                reversible=True,
+            )
+        ),
+        *(
+            _ManifestOnlyAdapter(
+                ToolManifest(
+                    name,
+                    (action,),
+                    (ToolEffect.WORKSPACE_READ,),
+                    scope="worktree",
+                    sandbox_profile="workspace-read",
+                    reversible=True,
+                )
+            )
+            for name, action in (
+                ("basedpyright-symbol", "inspect_code"),
+                ("basedpyright-structure", "inspect_code"),
+                ("repository-gather_context", "gather_context"),
+                ("repository-read_document", "read_document"),
+                ("repository-list_files", "list_files"),
+            )
+        ),
+    ]
+    return ToolRegistry(adapters)
+
+
+class _ManifestOnlyAdapter:
+    """Registry placeholder replaced by a context-bound workflow adapter."""
+
+    def __init__(self, manifest: ToolManifest) -> None:
+        self.manifest = manifest
+
+    def validate(
+        self, context: ToolContext, arguments: Mapping[str, Any]
+    ) -> ToolValidationReport:
+        return ToolValidationReport()
+
+    def execute(self, context: ToolContext, arguments: Mapping[str, Any]) -> ToolResult:
+        raise PowdrrExecutionError(
+            "Capability "
+            f"{self.manifest.tool_name!r} requires a bound workflow executor.",
+            error_code="capability_not_bound",
+            remediation="Invoke the capability through its workflow adapter.",
+        )
 
 
 def invoke_intrinsic_capability(

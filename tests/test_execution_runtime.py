@@ -324,6 +324,12 @@ def test_persona_packet_installs_the_same_action_contract_used_for_validation(
     assert not runtime.validate_action("next_step")
     assert runtime.state.current_persona_id == "architect"
     assert runtime.prompt_context()["persona_id"] == "architect"
+    assert runtime.prompt_context()["persona"] == {
+        "persona_id": "architect",
+        "persona_type": "architect",
+        "model_profile": "architecture",
+        "prompt_catalogs": ["architect-responsibilities"],
+    }
     assert runtime.verify().current_persona_id == "architect"
 
 
@@ -842,9 +848,11 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     assert runtime.capability_catalog() == ()
 
     runtime.set_action_contract(frozenset({"edit", "next_step"}))
-    assert {
-        item["tool_name"] for item in runtime.capability_catalog()
-    } == {"apply-edit", "file-mutation", "validate-edit"}
+    assert {item["tool_name"] for item in runtime.capability_catalog()} == {
+        "apply-edit",
+        "file-mutation",
+        "validate-edit",
+    }
 
 
 def test_runtime_persists_observer_decisions_in_event_stream(tmp_path: Path) -> None:

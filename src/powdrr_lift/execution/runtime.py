@@ -267,6 +267,16 @@ class ExecutionRuntime:
             ),
         }
         rules = self.guidance(guidance_context)
+        active_persona = None
+        if self.profile is not None and self.state.current_persona_id is not None:
+            active_persona = next(
+                (
+                    persona
+                    for persona in self.profile.personas
+                    if persona.persona_id == self.state.current_persona_id
+                ),
+                None,
+            )
         contract = self.effective_contract(
             {
                 "profile_id": self.state.profile_id,
@@ -283,6 +293,16 @@ class ExecutionRuntime:
                 "execution_id": self.execution_id,
                 "phase": self.state.current_phase.value,
                 "persona_id": self.state.current_persona_id,
+                "persona": (
+                    {
+                        "persona_id": active_persona.persona_id,
+                        "persona_type": active_persona.persona_type.value,
+                        "model_profile": active_persona.model_profile,
+                        "prompt_catalogs": list(active_persona.prompt_catalogs),
+                    }
+                    if active_persona is not None
+                    else None
+                ),
                 "allowed_actions": list(self.allowed_actions()),
                 "capability_catalog": list(self.capability_catalog()),
                 "artifact_ids": [item.artifact_id for item in self.state.artifacts],

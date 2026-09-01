@@ -3284,6 +3284,19 @@ def _workflow_context_path(project_root: Path) -> Path:
     return project_root / _WORKFLOW_CONTEXT_PATH
 
 
+def _workflow_context_runtime(
+    project_root: Path,
+    worktree_root: Path,
+) -> ExecutionRuntime:
+    """Create the durable runtime used by worktree-context bookkeeping."""
+    return ExecutionRuntime(
+        "workflow-context",
+        profile_id="workflow-context",
+        workflow_directory=project_root / ".powdrr" / "context-execution",
+        repo_root=worktree_root,
+    )
+
+
 def _load_workflow_context(project_root: Path) -> WorkflowContext | None:
     path = _workflow_context_path(project_root)
     try:
@@ -3329,29 +3342,29 @@ def _persist_workflow_context(
     pr_number: int | None = None
     pr_url: str | None = None
     try:
-        branch_result = subprocess.run(
-            ["git", "branch", "--show-current"],
-            cwd=worktree_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        branch_name = branch_result.stdout.strip() or None
-        pr_result = subprocess.run(
-            ["gh", "pr", "view", "--json", "number,url"],
-            cwd=worktree_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if pr_result.returncode == 0:
-            pr_payload = json.loads(pr_result.stdout)
-            if isinstance(pr_payload, dict):
-                value = pr_payload.get("number")
-                pr_number = value if isinstance(value, int) else None
-                url = pr_payload.get("url")
-                pr_url = url if isinstance(url, str) else None
-    except (OSError, json.JSONDecodeError):
+        runtime = _workflow_context_runtime(project_root, worktree_root)
+        with runtime.without_action_contract():
+            branch_result = invoke_intrinsic_capability(
+                GIT_TOOL,
+                {"operation": "branch_current"},
+                worktree_root=worktree_root,
+                runtime=runtime,
+            )
+            branch_name = str(branch_result.get("stdout", "")).strip() or None
+            pr_result = invoke_intrinsic_capability(
+                GH_TOOL,
+                {"operation": "pr_view", "json_fields": ["number", "url"]},
+                worktree_root=worktree_root,
+                runtime=runtime,
+            )
+            if int(pr_result.get("returncode", 1)) == 0:
+                pr_payload = json.loads(str(pr_result.get("stdout", "")))
+                if isinstance(pr_payload, dict):
+                    value = pr_payload.get("number")
+                    pr_number = value if isinstance(value, int) else None
+                    url = pr_payload.get("url")
+                    pr_url = url if isinstance(url, str) else None
+    except (OSError, json.JSONDecodeError, PowdrrExecutionError):
         pass
     context = WorkflowContext(
         worktree_root=worktree_root,
@@ -3387,17 +3400,23 @@ def _workflow_context_pr_is_closed(context: WorkflowContext | None) -> bool:
     ):
         return False
     try:
-        result = subprocess.run(
-            ["gh", "pr", "view", str(context.pr_number), "--json", "state"],
-            cwd=context.worktree_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
+        project_root = context.worktree_root
+        runtime = _workflow_context_runtime(project_root, context.worktree_root)
+        with runtime.without_action_contract():
+            result = invoke_intrinsic_capability(
+                GH_TOOL,
+                {
+                    "operation": "pr_view",
+                    "pr_reference": str(context.pr_number),
+                    "json_fields": ["state"],
+                },
+                worktree_root=context.worktree_root,
+                runtime=runtime,
+            )
+        if int(result.get("returncode", 1)) != 0:
             return False
-        payload = json.loads(result.stdout)
-    except (OSError, json.JSONDecodeError):
+        payload = json.loads(str(result.get("stdout", "")))
+    except (OSError, json.JSONDecodeError, PowdrrExecutionError):
         return False
     if not isinstance(payload, dict):
         return False
